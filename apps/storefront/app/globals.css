@@ -14,10 +14,11 @@ body { margin: 0; background: var(--background); color: var(--navy); font-family
 .brand-icon { position: relative; display: block; flex: 0 0 1.15em; width: 1.15em; height: 1.15em; overflow: hidden; }
 .brand-icon img { position: absolute; width: 142%; max-width: none; height: 142%; left: -21%; top: -22%; }
 .site-header nav { display: flex; gap: 12px; flex-wrap: wrap; }
-/* --wordmark sizes the logo; the tagline scales with it and lines up under "BitoCard", past the icon. */
-.brand-lockup { --wordmark: 34px; display: flex; flex-direction: column; gap: calc(var(--wordmark) * .16); }
-.brand-lockup > .wordmark { font-size: var(--wordmark); }
-.tagline { margin: 0; padding-left: calc(var(--wordmark) * 1.39); color: #414f77; font-size: max(13px, calc(var(--wordmark) * .36)); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
+/* Header lockup: icon flush left spanning both lines; "BitoCard" with the tagline directly beneath. --wordmark sets the scale. */
+.brand-lockup { --wordmark: 34px; font-size: var(--wordmark); display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: .24em; row-gap: .06em; }
+.brand-lockup .brand-icon { grid-row: 1 / span 2; width: 1.5em; height: 1.5em; flex: none; }
+.brand-lockup .brand-name { grid-column: 2; align-self: end; }
+.tagline { grid-column: 2; align-self: start; color: #414f77; font-size: max(13px, .36em); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
 main { flex: 1; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; align-items: center; padding: 44px 0 25px; }
 .hero-copy { min-width: 0; }
 .status { display: inline-block; margin: 0 0 24px; padding: 9px 20px; border-radius: 30px; background: #fcecf8; text-transform: uppercase; letter-spacing: 4px; font-size: 12px; font-weight: 700; }
@@ -80,7 +81,7 @@ dialog h2 { font-size: 28px; font-weight: 700; }
   .brand-lockup { --wordmark: clamp(34px, 3.5vw, 52px); }
   .site-header nav { gap: 24px; }
   .button-nav { font-size: 17px; }
-  main { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: clamp(24px, 3vw, 48px); padding: 20px 0; }
+  main { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: clamp(24px, 3vw, 48px); padding: clamp(4px, 1svh, 20px) 0; }
   h1 { font-size: clamp(38px, min(5.3vw, 8svh), 80px); letter-spacing: -.045em; }
   .lead { font-size: clamp(18px, min(2.05vw, 3.2svh), 29px); margin-top: clamp(18px, 3svh, 26px); }
   .status { margin-bottom: clamp(18px, 3svh, 30px); font-size: 14px; }

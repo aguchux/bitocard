@@ -14,10 +14,10 @@ export default function Home() {
   return (
     <div className="site-shell">
       <header className="site-header">
-        <div className="brand-lockup">
-          <Link className="wordmark" href="/" aria-label="BitoCard home"><Brand /></Link>
-          <p className="tagline">Startup in minutes</p>
-        </div>
+        <Link className="wordmark brand-lockup" href="/">
+          <Brand />
+          <span className="tagline">Startup in 5 minutes</span>
+        </Link>
         <nav aria-label="Information">
           <InfoDialog id="nav-how" title="How it works" variant="nav"><HowItWorks /></InfoDialog>
           <InfoDialog id="nav-resellers" title="For resellers" variant="nav"><ForResellers /></InfoDialog>
