@@ -70,7 +70,7 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 - Name: **BitoCard**; ownership credit: **A Golojan Ltd venture**.
 - Preferred icon: the user-supplied interlocking B/exchange-arrow mark, with its original dark navy areas and the original yellow areas changed to vivid pink. Keep the recognisable shape and transparent background. Before the next visual release, align the site icon with this latest approved navy-and-pink treatment.
-- Approved tagline: **Startup in five minutes** (spell out "five"), shown directly beneath "BitoCard" in the storefront header, with the logo icon flush left spanning both lines. It refers to the store setup goal; keep the on-page note that verification and funding may take longer. Use a clean, confident navy-and-pink palette with ample white space. Avoid adding other slogans or claims of guaranteed income.
+- Approved tagline: **Digital store in 5 minutes** (numeral "5"), shown directly beneath "BitoCard" in the storefront header, with the logo icon flush left spanning both lines. It refers to the store setup goal; keep the on-page note that verification and funding may take longer. Use a clean, confident navy-and-pink palette with ample white space. Avoid adding other slogans or claims of guaranteed income.
 - Lead with the reseller offer: a branded store, a BitoCard subdomain first, an optional custom domain later, product selection, reseller-set customer prices, and a pre-funded wallet.
 - Describe the five-minute goal as **store setup**, not guaranteed funding, verification, or first sale. Those steps may take longer.
 - Use plain UK English. Do not promise specific countries, products, payment methods, or launch dates until confirmed.
@@ -82,6 +82,14 @@ The page must communicate that the product is coming soon. Do not add a working 
 - The main page should contain the logo with its tagline, coming-soon status, one clear reseller message, two dialog triggers, an illustrative storefront, and ownership credit.
 - Keep detailed onboarding and reseller capabilities in the dialogs. The API, custom-domain setup, and product availability are planned capabilities; label them accordingly.
 - Do not show provider names in public-facing page copy.
+
+## Legal pages
+
+- The storefront publishes `/legal` (overview), `/legal/privacy`, `/legal/terms`, `/legal/cookies` and `/legal/notice`, linked from the home page footer. They target global visitors, with region sections for Europe (UK/EEA/Switzerland), the United States, Canada, Africa and Asia.
+- Entities, regions, governing law, contact (`legal@bitocard.com`) and the "last updated" date live in `packages/ui/src/legal.ts`. Change them there, and bump `legalUpdated` whenever any legal page changes.
+- Entity by region: Golojan Technologies LLC (Delaware) for the Americas, Asia and anywhere unlisted; Golojan LLC (England and Wales) for the UK and Europe; De-Golojan Technologies Ltd (Nigeria) for Africa.
+- The pages describe what the site actually does: no cookies, local storage, analytics, forms or accounts. Update the privacy and cookie notices **before** adding analytics, a signup form, sign-in or any other data collection, and add a consent banner before any optional cookie.
+- Company numbers, registered addresses and an EU GDPR representative are not yet recorded; never invent them. These drafts need review by qualified lawyers in each target region before launch.
 
 ## Repository and delivery
 

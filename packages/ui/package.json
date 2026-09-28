@@ -6,6 +6,7 @@
   "exports": {
     "./brand": "./src/brand.tsx",
     "./coming-soon": "./src/coming-soon.tsx",
+    "./legal": "./src/legal.ts",
     "./site": "./src/site.ts",
     "./styles/workspace.css": "./src/styles/workspace.css"
   },

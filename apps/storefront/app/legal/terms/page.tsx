@@ -1,0 +1,90 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { legalEntities } from "@bitocard/ui/legal";
+import { ContactEmail, EntityTable, LegalPage, Section } from "@/components/legal";
+
+export const metadata: Metadata = {
+  title: "Terms of use | BitoCard",
+  description: "The terms for using BitoCard's coming-soon websites.",
+  alternates: { canonical: "/legal/terms" },
+};
+
+export default function TermsOfUse() {
+  return (
+    <LegalPage
+      title="Terms of use"
+      intro={<p>These terms apply when you use the BitoCard websites. By using them, you agree to these terms. If you do not agree, please do not use the websites.</p>}
+    >
+      <Section id="who" title="1. Who we are">
+        <p>The BitoCard websites are operated by companies in the Golojan group. Your agreement is with the company for your region.</p>
+        <EntityTable caption="Contracting entity by region" />
+        <p>If your region is not listed, your agreement is with Golojan Technologies LLC. In these terms, “we”, “us” and “our” mean that company.</p>
+      </Section>
+
+      <Section id="coming-soon" title="2. BitoCard is coming soon">
+        <p>These websites are for information only. BitoCard does not yet offer accounts, reseller onboarding, wallets, payments, or the purchase, sale or trade of gift cards, airtime, data or any other product.</p>
+        <ul>
+          <li>Nothing on these websites is an offer to sell, buy or trade anything.</li>
+          <li>Storefront images and previews are illustrative. They do not show live products, prices or availability.</li>
+          <li>Planned features, products, markets, timings and prices may change or may not launch. Availability will vary by country and depends on local law, regulatory approval, payment and verification arrangements, and supplier coverage.</li>
+          <li>Setup times, including our five-minute store setup goal, are goals, not promises. Verification, funding and readiness to take orders may take longer.</li>
+        </ul>
+        <p>When a service launches, it will be governed by separate terms, such as reseller and customer agreements, which you will need to accept before using it.</p>
+      </Section>
+
+      <Section id="no-advice" title="3. No financial advice">
+        <p>Nothing on these websites is financial, investment, legal or tax advice, and we do not promise any level of income or profit from reselling.</p>
+      </Section>
+
+      <Section id="use" title="4. Using the websites">
+        <p>You may use the websites for lawful, personal or business information purposes. You must not:</p>
+        <ul>
+          <li>break any law or anyone’s rights while using them;</li>
+          <li>attempt to gain unauthorised access to, disrupt, overload or damage the websites or the systems behind them;</li>
+          <li>introduce malware, or probe, scan or test for vulnerabilities without our written permission;</li>
+          <li>scrape or copy content in bulk, or use automated means to access the websites other than standard search engine indexing;</li>
+          <li>pretend to be BitoCard or the Golojan group, or claim a relationship with us that does not exist.</li>
+        </ul>
+        <p>If you believe you have found a security vulnerability, please report it to <ContactEmail />.</p>
+      </Section>
+
+      <Section id="ip" title="5. Intellectual property">
+        <p>The BitoCard name and logo, and the text, design and code of these websites, belong to the Golojan group or its licensors and are protected by intellectual property laws. You may view and share links to our pages, but you may not copy, adapt or use our brand or content for commercial purposes without our written permission.</p>
+        <p>Other product and brand names, including gift card brands, belong to their owners. Their mention does not imply endorsement or a relationship with us.</p>
+      </Section>
+
+      <Section id="links" title="6. Links to other websites">
+        <p>Where we link to other websites, we do so for convenience. We do not control them and are not responsible for their content or practices.</p>
+      </Section>
+
+      <Section id="availability" title="7. Availability and changes">
+        <p>We may change, suspend or withdraw any part of the websites at any time. We do not guarantee that they will always be available, uninterrupted or free from errors.</p>
+      </Section>
+
+      <Section id="liability" title="8. Our responsibility to you">
+        <p>We provide the websites free of charge and “as is”. To the extent the law allows, we make no warranties about their content, accuracy or availability.</p>
+        <p>To the extent the law allows, we are not liable for any indirect or consequential loss, or for loss of profit, revenue, business or data, arising from your use of the websites or your reliance on their content.</p>
+        <p>Nothing in these terms limits or excludes liability that cannot be limited or excluded by law, including liability for death or personal injury caused by negligence, or for fraud. Nothing in these terms affects your statutory rights as a consumer.</p>
+      </Section>
+
+      <Section id="law" title="9. Governing law and disputes">
+        <p>These terms are governed by the law that applies to the company you contract with:</p>
+        <ul>
+          {legalEntities.map(entity => (
+            <li key={entity.name}><strong>{entity.name}</strong>: {entity.governingLaw}, with disputes heard by {entity.courts}.</li>
+          ))}
+        </ul>
+        <p>If you are a consumer, you keep the protection of the mandatory laws of the country where you live. You may also bring proceedings in your local courts where your local law allows it. This includes consumers in the European Union, Scotland, Northern Ireland and Quebec.</p>
+        <p>Before starting formal proceedings, please contact us at <ContactEmail /> so we can try to resolve the issue.</p>
+      </Section>
+
+      <Section id="general" title="10. General">
+        <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/legal/privacy">privacy notice</Link> and <Link href="/legal/cookies">cookie notice</Link> explain how we handle personal information.</p>
+      </Section>
+
+      <Section id="contact" title="11. Contact us">
+        <p>Email <ContactEmail /> with any question about these terms.</p>
+      </Section>
+    </LegalPage>
+  );
+}

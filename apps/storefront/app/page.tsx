@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Brand } from "@bitocard/ui/brand";
+import { legalDocuments } from "@bitocard/ui/legal";
 import { InfoDialog } from "@/components/info-dialog";
 import { StorefrontPreview } from "@/components/storefront-preview";
 
@@ -16,7 +17,7 @@ export default function Home() {
       <header className="site-header">
         <Link className="wordmark brand-lockup" href="/">
           <Brand />
-          <span className="tagline">Start a store in 5 minutes</span>
+          <span className="tagline">Digital store in 5 minutes</span>
         </Link>
         <nav aria-label="Information">
           <InfoDialog id="nav-how" title="How it works" variant="nav"><HowItWorks /></InfoDialog>
@@ -36,7 +37,10 @@ export default function Home() {
         </section>
         <StorefrontPreview />
       </main>
-      <footer><span>A Golojan Ltd venture</span></footer>
+      <footer className="home-footer">
+        <span>A Golojan Ltd venture</span>
+        <nav aria-label="Legal">{legalDocuments.map(doc => <Link key={doc.href} href={doc.href}>{doc.short}</Link>)}</nav>
+      </footer>
     </div>
   );
 }
