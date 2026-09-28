@@ -1,19 +1,27 @@
 import type { Metadata, Viewport } from "next";
 import { brand, siteUrl } from "@bitocard/ui/site";
+import { siteName } from "@/components/seo";
 import "./globals.css";
 import "@bitocard/ui/styles/workspace.css";
 import "@bitocard/ui/styles/brand-lockup.css";
 import "./landing.css";
 
-const description = "Privacy, terms, cookies and company information for BitoCard in Europe, the Americas, Africa and Asia.";
+const title = "BitoCard Legals & Compliance – privacy, terms and cookies";
+const description = "BitoCard's privacy notice, terms of use, cookie notice and company information for resellers and customers in Europe, the Americas, Africa and Asia.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(3005),
-  title: "BitoCard | Legals & Compliance",
+  title: { default: title, template: `%s | ${siteName}` },
   description,
+  applicationName: siteName,
+  keywords: ["BitoCard privacy notice", "BitoCard terms of use", "BitoCard cookies", "GDPR", "CCPA", "PIPEDA", "NDPA", "POPIA", "DPDP Act"],
+  category: "legal",
+  alternates: { canonical: "/" },
   icons: { icon: brand.logo, apple: brand.logo },
-  openGraph: { type: "website", siteName: brand.name, title: "BitoCard | Legals & Compliance", description, locale: "en_GB", images: [{ url: brand.logo, width: 1280, height: 1280, alt: brand.name }] },
-  twitter: { card: "summary", title: "BitoCard | Legals & Compliance", description, images: [brand.logo] },
+  openGraph: { type: "website", url: "/", siteName, title, description, locale: "en_GB" },
+  twitter: { card: "summary_large_image", title, description },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export const viewport: Viewport = { themeColor: "#fcfdff" };

@@ -1,14 +1,26 @@
 import type { ReactNode } from "react";
-import { legalContact, legalEntities, legalUpdated } from "@bitocard/ui/legal";
+import { legalContact, legalEntities, legalUpdated, legalUpdatedIso } from "@bitocard/ui/legal";
+import { JsonLd } from "@bitocard/ui/seo";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { DocTabs } from "@/components/doc-tabs";
+import { documentSchema } from "@/components/seo";
 
-export function LegalPage({ title, intro, children }: { title: string; intro: ReactNode; children: ReactNode }) {
+type PageSeo = { title: string; description: string; path: string };
+
+/** Reading layout for one legal document: breadcrumbs, document tabs, then the article. */
+export function LegalPage({ seo, intro, children }: { seo: PageSeo; intro: ReactNode; children: ReactNode }) {
   return (
-    <article className="legal-article" aria-labelledby="legal-title">
-      <h1 id="legal-title">{title}</h1>
-      <p className="legal-updated">Last updated {legalUpdated}</p>
-      <div className="legal-intro">{intro}</div>
-      {children}
-    </article>
+    <div className="page-inner legal-read">
+      <JsonLd data={documentSchema(seo)} />
+      <Breadcrumbs trail={[{ href: "/", label: "Home" }, { href: "/documents", label: "Documents" }]} current={seo.title} />
+      <DocTabs />
+      <article className="legal-article" aria-labelledby="legal-title">
+        <h1 id="legal-title">{seo.title}</h1>
+        <p className="legal-updated">Last updated <time dateTime={legalUpdatedIso}>{legalUpdated}</time></p>
+        <div className="legal-intro">{intro}</div>
+        {children}
+      </article>
+    </div>
   );
 }
 

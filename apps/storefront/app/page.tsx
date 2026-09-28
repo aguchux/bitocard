@@ -1,6 +1,7 @@
 import { BrandLockup } from "@bitocard/ui/brand-lockup";
 import { legalDocuments } from "@bitocard/ui/legal";
-import { appUrl } from "@bitocard/ui/site";
+import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
+import { appUrl, brand } from "@bitocard/ui/site";
 import { InfoDialog } from "@/components/info-dialog";
 import { StorefrontPreview } from "@/components/storefront-preview";
 
@@ -14,6 +15,13 @@ function ForResellers() {
 export default function Home() {
   return (
     <div className="site-shell">
+      <JsonLd data={{
+        "@context": "https://schema.org",
+        "@graph": [
+          organizationSchema(),
+          { "@type": "WebSite", "@id": `${appUrl("storefront")}#website`, url: appUrl("storefront"), name: brand.name, description: "Build your own branded store for digital gift cards, mobile airtime and data.", inLanguage: "en-GB", publisher: { "@id": organizationId() } },
+        ],
+      }} />
       <header className="site-header">
         <BrandLockup tagline="Digital store in 5 minutes" />
         <nav aria-label="Information">

@@ -83,10 +83,22 @@ The page must communicate that the product is coming soon. Do not add a working 
 - Keep detailed onboarding and reseller capabilities in the dialogs. The API, custom-domain setup, and product availability are planned capabilities; label them accordingly.
 - Do not show provider names in public-facing page copy.
 
+## SEO
+
+- Search and social metadata (titles, descriptions, Open Graph, Twitter, JSON-LD, manifest) must not say "coming soon". Describe the reseller offer instead; the visible page keeps its Coming soon status and caveats.
+- Never claim live products, prices, fulfilment or countries in metadata that the page itself does not support.
+- Shared helpers live in `@bitocard/ui`: `seo` (`JsonLd`, `organizationSchema`) and `og-image` (branded 1200x630 image for each app's `opengraph-image.tsx`). In the legals app, build every document's metadata with `pageMetadata()` in `components/seo.ts` and pass the same `seo` object to `LegalPage`, which adds WebPage and breadcrumb JSON-LD.
+- The logo-and-tagline header is `BrandLockup`; its CSS uses `.wordmark.brand-lockup` so app `.wordmark` rules cannot break the layout. Check the header visually after touching either.
+
 ## Legal pages
 
-- All legal documents live in one app, `apps/legals`, served at `legals.bitocard.com`: `/` is the Legals & Compliance landing page (same look as the storefront coming-soon page, tagline **Legals & Compliance**), and the documents live in the `app/(documents)` route group at `/privacy`, `/terms`, `/cookies` and `/notice`. Add, update or localise legal documents only there; never add legal pages to another app. They target global visitors, with region sections for Europe (UK/EEA/Switzerland), the United States, Canada, Africa and Asia.
-- Every other site links to them with `appUrl("legals", doc.href)` from `@bitocard/ui/site`: the storefront home footer and the shared `ComingSoon` footer (docs, admin, reseller). The storefront permanently redirects its old `/legal/*` paths to the legals app.
+- All legal documents live in one app, `apps/legals`, served at `legals.bitocard.com`: a multi-page site with a main menu of **Home**, **Documents** and **Contact** (tagline **Legals & Compliance**).
+  - `/` Home: full-screen hero in the storefront coming-soon style, region card, signposts, commitments.
+  - `/documents` hub, and each document at `/documents/privacy`, `/documents/terms`, `/documents/cookies` and `/documents/notice` with breadcrumbs and document tabs. Old `/privacy`-style paths redirect permanently.
+  - `/contact`: legal team email, privacy request process, response times, responsible entities and regulators. Keep every timescale and process there consistent with the privacy notice.
+  - Pages other than Home live in the `app/(site)` route group, which supplies the shared header and footer. Reusable pieces are in `components/` (`blocks.tsx`, `content.ts`, `icons.tsx`).
+- Add, update or localise legal documents only in this app; never add legal pages to another app. They target global visitors, with region sections for Europe (UK/EEA/Switzerland), the United States, Canada, Africa and Asia.
+- Every other site links to them with `appUrl("legals", doc.href)` from `@bitocard/ui/site`: the storefront home footer and the shared `ComingSoon` footer (docs, admin, reseller). The storefront permanently redirects its old `/legal/*` paths to the matching `/documents/*` pages.
 - The landing page only summarises what the documents say (regions, laws covered, commitments). Keep its claims in step with the documents and never add certifications or guarantees that are not in place.
 - Entities, regions, governing law, contact (`legal@bitocard.com`) and the "last updated" date live in `packages/ui/src/legal.ts`. Change them there, and bump `legalUpdated` whenever any legal page changes.
 - Entity by region: Golojan Technologies LLC (Delaware) for the Americas, Asia and anywhere unlisted; Golojan LLC (England and Wales) for the UK and Europe; De-Golojan Technologies Ltd (Nigeria) for Africa.

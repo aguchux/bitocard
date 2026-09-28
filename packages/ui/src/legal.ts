@@ -17,6 +17,8 @@ export const legalContact = "legal@bitocard.com";
 
 /** Shown as "Last updated" on every legal page. Update when any legal page changes. */
 export const legalUpdated = "28 September 2026";
+/** The same date in ISO 8601, for sitemaps and structured data. Keep in step with legalUpdated. */
+export const legalUpdatedIso = "2026-09-28";
 
 export const legalEntities: readonly LegalEntity[] = [
   {
@@ -47,8 +49,8 @@ export const defaultEntity = legalEntities[0];
 
 /** Paths within the legals app (legals.bitocard.com). Other apps link to them with appUrl("legals", doc.href). */
 export const legalDocuments = [
-  { href: "/privacy", label: "Privacy notice", short: "Privacy" },
-  { href: "/terms", label: "Terms of use", short: "Terms" },
-  { href: "/cookies", label: "Cookie notice", short: "Cookies" },
-  { href: "/notice", label: "Legal notice", short: "Legal notice" },
+  { href: "/documents/privacy", label: "Privacy notice", short: "Privacy" },
+  { href: "/documents/terms", label: "Terms of use", short: "Terms" },
+  { href: "/documents/cookies", label: "Cookie notice", short: "Cookies" },
+  { href: "/documents/notice", label: "Legal notice", short: "Legal notice" },
 ] as const;

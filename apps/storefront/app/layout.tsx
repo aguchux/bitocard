@@ -3,15 +3,22 @@ import { brand, siteUrl } from "@bitocard/ui/site";
 import "@bitocard/ui/styles/brand-lockup.css";
 import "./globals.css";
 
-const description = "A branded storefront for your digital goods business. BitoCard is coming soon. A Golojan Ltd venture.";
+const title = "BitoCard – Launch your own gift card, airtime & data store";
+const description = "Build your own branded store for digital gift cards, mobile airtime and data. Choose your products, set your prices and grow your reseller business with BitoCard.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(3000),
-  title: "BitoCard | Coming soon",
+  title: { default: title, template: "%s | BitoCard" },
   description,
+  applicationName: brand.name,
+  keywords: ["gift card reseller", "digital gift card store", "airtime reseller", "data bundle reseller", "white-label storefront", "reseller platform", "BitoCard"],
+  category: "business",
+  alternates: { canonical: "/" },
   icons: { icon: brand.logo, apple: brand.logo },
-  openGraph: { type: "website", siteName: brand.name, title: "BitoCard | Coming soon", description, locale: "en_GB", images: [{ url: brand.logo, width: 1280, height: 1280, alt: brand.name }] },
-  twitter: { card: "summary", title: "BitoCard | Coming soon", description, images: [brand.logo] },
+  openGraph: { type: "website", url: "/", siteName: brand.name, title, description, locale: "en_GB" },
+  twitter: { card: "summary_large_image", title, description },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export const viewport: Viewport = { themeColor: "#fcfdff" };

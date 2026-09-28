@@ -1,18 +1,16 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { legalEntities } from "@bitocard/ui/legal";
 import { ContactEmail, EntityTable, LegalPage, Section } from "@/components/legal";
+import { pageMetadata } from "@/components/seo";
 
-export const metadata: Metadata = {
-  title: "Terms of use | BitoCard",
-  description: "The terms for using BitoCard's coming-soon websites.",
-  alternates: { canonical: "/terms" },
-};
+const seo = { title: "Terms of use", description: "The terms for using BitoCard websites: acceptable use, intellectual property and governing law for Europe, the Americas, Africa and Asia.", path: "/documents/terms" };
+
+export const metadata = pageMetadata(seo);
 
 export default function TermsOfUse() {
   return (
     <LegalPage
-      title="Terms of use"
+      seo={seo}
       intro={<p>These terms apply when you use the BitoCard websites. By using them, you agree to these terms. If you do not agree, please do not use the websites.</p>}
     >
       <Section id="who" title="1. Who we are">
@@ -79,7 +77,7 @@ export default function TermsOfUse() {
       </Section>
 
       <Section id="general" title="10. General">
-        <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/privacy">privacy notice</Link> and <Link href="/cookies">cookie notice</Link> explain how we handle personal information.</p>
+        <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/documents/privacy">privacy notice</Link> and <Link href="/documents/cookies">cookie notice</Link> explain how we handle personal information.</p>
       </Section>
 
       <Section id="contact" title="11. Contact us">

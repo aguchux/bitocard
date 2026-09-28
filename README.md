@@ -11,7 +11,7 @@ npm-workspaces Turborepo with five Next.js 16 App Router applications, one NestJ
 | Docs | apps/docs | http://localhost:3002 | No | Coming-soon page |
 | Admin | apps/admin | http://localhost:3003 | No | Coming-soon page |
 | Reseller | apps/reseller | http://localhost:3004 | No | Coming-soon page |
-| Legals | apps/legals | http://localhost:3005 | Yes | Legals & Compliance landing page plus every legal document: privacy, terms, cookies, legal notice (legals.bitocard.com) |
+| Legals | apps/legals | http://localhost:3005 | Yes | Legals & Compliance site (legals.bitocard.com): Home, Documents (privacy, terms, cookies, legal notice under /documents) and Contact |
 
 ## Shared packages
 

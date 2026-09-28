@@ -7,7 +7,7 @@ export default createNextConfig({
   async redirects() {
     return [
       { source: "/legal", destination: legals, permanent: true },
-      { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/:doc`, permanent: true },
+      { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/documents/:doc`, permanent: true },
     ];
   },
 });

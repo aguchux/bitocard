@@ -6,8 +6,9 @@ export function SiteFooter() {
   return (
     <footer className="site-footer">
       <span>{brand.credit}</span>
-      <nav aria-label="Legal documents">
+      <nav aria-label="Footer">
         {legalDocuments.map(doc => <Link key={doc.href} href={doc.href}>{doc.short}</Link>)}
+        <Link href="/contact">Contact</Link>
         <a href={appUrl("storefront")}>bitocard.com</a>
       </nav>
     </footer>

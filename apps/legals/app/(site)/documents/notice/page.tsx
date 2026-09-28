@@ -1,18 +1,16 @@
-import type { Metadata } from "next";
 import { brand } from "@bitocard/ui/site";
 import { legalEntities } from "@bitocard/ui/legal";
 import { ContactEmail, LegalPage, Section } from "@/components/legal";
+import { pageMetadata } from "@/components/seo";
 
-export const metadata: Metadata = {
-  title: "Legal notice | BitoCard",
-  description: "The companies that operate BitoCard and how to contact them.",
-  alternates: { canonical: "/notice" },
-};
+const seo = { title: "Legal notice", description: "The Golojan group companies that operate BitoCard, where they are registered, and how to contact our legal team.", path: "/documents/notice" };
+
+export const metadata = pageMetadata(seo);
 
 export default function LegalNotice() {
   return (
     <LegalPage
-      title="Legal notice"
+      seo={seo}
       intro={<p>{brand.name} is operated by the following companies in the Golojan group.</p>}
     >
       <Section id="operators" title="Website operators">

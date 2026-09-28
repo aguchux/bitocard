@@ -9,6 +9,8 @@
     "./styles/brand-lockup.css": "./src/styles/brand-lockup.css",
     "./coming-soon": "./src/coming-soon.tsx",
     "./legal": "./src/legal.ts",
+    "./og-image": "./src/og-image.tsx",
+    "./seo": "./src/seo.tsx",
     "./site": "./src/site.ts",
     "./styles/workspace.css": "./src/styles/workspace.css"
   },

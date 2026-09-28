@@ -1,17 +1,15 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactEmail, LegalPage, Section } from "@/components/legal";
+import { pageMetadata } from "@/components/seo";
 
-export const metadata: Metadata = {
-  title: "Cookie notice | BitoCard",
-  description: "BitoCard's use of cookies and similar technologies. We set none today.",
-  alternates: { canonical: "/cookies" },
-};
+const seo = { title: "Cookie notice", description: "How BitoCard uses cookies and similar technologies, why we set none today, and how we will ask for your consent.", path: "/documents/cookies" };
+
+export const metadata = pageMetadata(seo);
 
 export default function CookieNotice() {
   return (
     <LegalPage
-      title="Cookie notice"
+      seo={seo}
       intro={<p>This notice explains how the BitoCard websites use cookies and similar technologies. In short: <strong>we do not currently set any cookies</strong>, and we do not use analytics, advertising or tracking technologies.</p>}
     >
       <Section id="what" title="1. What cookies are">
@@ -20,7 +18,7 @@ export default function CookieNotice() {
 
       <Section id="ours" title="2. What we use today">
         <p>Our websites do not set cookies or use local storage, pixels, fingerprinting or other tracking technologies. There is no analytics, advertising or social media tracking.</p>
-        <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/privacy">privacy notice</Link>. This does not involve cookies on your device. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
+        <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/documents/privacy">privacy notice</Link>. This does not involve cookies on your device. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
       </Section>
 
       <Section id="future" title="3. If this changes">
