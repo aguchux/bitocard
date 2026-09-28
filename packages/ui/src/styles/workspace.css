@@ -15,7 +15,10 @@ body { margin: 0; background: var(--background); color: var(--navy); }
 .workspace section { border: 1px solid #e1e6f1; background: white; border-radius: 18px; padding: 24px; max-width: 660px; }
 .workspace h2 { font-size: 22px; font-weight: 700; margin: 0 0 12px; }
 .workspace section p { line-height: 1.7; color: #414f77; margin: 0; }
-.workspace footer { margin-top: auto; padding-top: 48px; color: #647295; font-size: 13px; }
+.workspace footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; margin-top: auto; padding-top: 48px; color: #647295; font-size: 13px; }
+.workspace footer nav { display: flex; flex-wrap: wrap; column-gap: 16px; }
+.workspace footer a { display: inline-flex; align-items: center; min-height: 44px; color: #647295; text-decoration: none; }
+.workspace footer a:hover { color: var(--navy); text-decoration: underline; }
 
 @media (min-width: 800px) {
   .workspace { padding: 48px; }

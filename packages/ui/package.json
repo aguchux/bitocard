@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     "./brand": "./src/brand.tsx",
+    "./brand-lockup": "./src/brand-lockup.tsx",
+    "./styles/brand-lockup.css": "./src/styles/brand-lockup.css",
     "./coming-soon": "./src/coming-soon.tsx",
     "./legal": "./src/legal.ts",
     "./site": "./src/site.ts",

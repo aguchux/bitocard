@@ -45,9 +45,10 @@ export const legalEntities: readonly LegalEntity[] = [
 /** Regions not listed above (for example Oceania and the Middle East) are served by this entity. */
 export const defaultEntity = legalEntities[0];
 
+/** Paths within the legals app (legals.bitocard.com). Other apps link to them with appUrl("legals", doc.href). */
 export const legalDocuments = [
-  { href: "/legal/privacy", label: "Privacy notice", short: "Privacy" },
-  { href: "/legal/terms", label: "Terms of use", short: "Terms" },
-  { href: "/legal/cookies", label: "Cookie notice", short: "Cookies" },
-  { href: "/legal/notice", label: "Legal notice", short: "Legal notice" },
+  { href: "/privacy", label: "Privacy notice", short: "Privacy" },
+  { href: "/terms", label: "Terms of use", short: "Terms" },
+  { href: "/cookies", label: "Cookie notice", short: "Cookies" },
+  { href: "/notice", label: "Legal notice", short: "Legal notice" },
 ] as const;

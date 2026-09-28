@@ -6,7 +6,7 @@ import { ContactEmail, EntityTable, LegalPage, Section } from "@/components/lega
 export const metadata: Metadata = {
   title: "Terms of use | BitoCard",
   description: "The terms for using BitoCard's coming-soon websites.",
-  alternates: { canonical: "/legal/terms" },
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsOfUse() {
@@ -79,7 +79,7 @@ export default function TermsOfUse() {
       </Section>
 
       <Section id="general" title="10. General">
-        <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/legal/privacy">privacy notice</Link> and <Link href="/legal/cookies">cookie notice</Link> explain how we handle personal information.</p>
+        <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/privacy">privacy notice</Link> and <Link href="/cookies">cookie notice</Link> explain how we handle personal information.</p>
       </Section>
 
       <Section id="contact" title="11. Contact us">

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { brand, siteUrl } from "@bitocard/ui/site";
+import "@bitocard/ui/styles/brand-lockup.css";
 import "./globals.css";
 
 const description = "A branded storefront for your digital goods business. BitoCard is coming soon. A Golojan Ltd venture.";

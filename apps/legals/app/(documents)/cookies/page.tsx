@@ -5,7 +5,7 @@ import { ContactEmail, LegalPage, Section } from "@/components/legal";
 export const metadata: Metadata = {
   title: "Cookie notice | BitoCard",
   description: "BitoCard's use of cookies and similar technologies. We set none today.",
-  alternates: { canonical: "/legal/cookies" },
+  alternates: { canonical: "/cookies" },
 };
 
 export default function CookieNotice() {
@@ -20,7 +20,7 @@ export default function CookieNotice() {
 
       <Section id="ours" title="2. What we use today">
         <p>Our websites do not set cookies or use local storage, pixels, fingerprinting or other tracking technologies. There is no analytics, advertising or social media tracking.</p>
-        <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/legal/privacy">privacy notice</Link>. This does not involve cookies on your device. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
+        <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/privacy">privacy notice</Link>. This does not involve cookies on your device. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
       </Section>
 
       <Section id="future" title="3. If this changes">

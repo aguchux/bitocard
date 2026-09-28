@@ -1,22 +1,23 @@
 # BitoCard
 
-npm-workspaces Turborepo with four Next.js 16 App Router applications, one NestJS 12 API and four shared packages. Each Next.js app has its own `app/` directory with no `src/` wrapper; the API follows the standard Nest layout under `apps/api/src`. The repository root contains workspace tooling and AGENTS.md.
+npm-workspaces Turborepo with five Next.js 16 App Router applications, one NestJS 12 API and four shared packages. Each Next.js app has its own `app/` directory with no `src/` wrapper; the API follows the standard Nest layout under `apps/api/src`. The repository root contains workspace tooling and AGENTS.md.
 
 ## Apps
 
 | App | Directory | Local URL | Indexed | Current scope |
 | --- | --- | --- | --- | --- |
-| Storefront | apps/storefront | http://localhost:3000 | Yes | Coming-soon page, logo, dialogs, robots.txt and sitemap |
+| Storefront | apps/storefront | http://localhost:3000 | Yes | Coming-soon page, logo, dialogs, robots.txt and sitemap; `/legal/*` redirects to Legals |
 | API (NestJS) | apps/api | http://localhost:3001 | No | JSON service information, `GET /health`, robots.txt |
 | Docs | apps/docs | http://localhost:3002 | No | Coming-soon page |
 | Admin | apps/admin | http://localhost:3003 | No | Coming-soon page |
 | Reseller | apps/reseller | http://localhost:3004 | No | Coming-soon page |
+| Legals | apps/legals | http://localhost:3005 | Yes | Legals & Compliance landing page plus every legal document: privacy, terms, cookies, legal notice (legals.bitocard.com) |
 
 ## Shared packages
 
 | Package | Purpose |
 | --- | --- |
-| `@bitocard/ui` | `Brand` wordmark, `ComingSoon` workspace page, `workspace.css`, brand constants and `siteUrl()` |
+| `@bitocard/ui` | `Brand` wordmark, `BrandLockup` (logo with tagline), `ComingSoon` workspace page, `workspace.css`, brand constants, `siteUrl()`, `appUrl()` for cross-app links, and legal entity data (`/legal`) |
 | `@bitocard/next-config` | `createNextConfig()` — Turbopack root, output tracing, security headers, `X-Robots-Tag` for private apps |
 | `@bitocard/eslint-config` | Flat ESLint configs: `/next` (Next core-web-vitals + TypeScript) and `/node` (typescript-eslint, for the API) |
 | `@bitocard/typescript-config` | Base `tsconfig` presets for Next apps and React packages |
@@ -30,7 +31,7 @@ Use Node.js 22+ and npm 11.12.0. Run all commands from the repository root:
 ```sh
 npm ci
 npm run dev              # all apps
-npm run dev:storefront   # or dev:api, dev:docs, dev:admin, dev:reseller
+npm run dev:storefront   # or dev:api, dev:docs, dev:admin, dev:reseller, dev:legals
 ```
 
 ## Validation
@@ -67,7 +68,7 @@ What `vercel.json` does for each app:
 - `npm run test --workspace=@bitocard/api` runs a smoke test against the compiled `dist/`.
 - Nest 12 packages are ESM-only; the API compiles to CommonJS and loads them through Node's `require(esm)`, so Node 22.12+ is required.
 
-Suggested domains once confirmed: storefront on the apex domain, then `api.`, `docs.`, `admin.` and `reseller.` subdomains. Put admin and reseller behind Vercel Deployment Protection until authentication exists.
+Domains: storefront on the apex domain (`bitocard.com`) and legals on `legals.bitocard.com`; suggested `api.`, `docs.`, `admin.` and `reseller.` subdomains for the rest. Cross-app links default to those production domains on any Vercel build; override with `STOREFRONT_URL` or `LEGALS_URL` if the domains differ. Put admin and reseller behind Vercel Deployment Protection until authentication exists.
 
 To share build cache between machines and Vercel, run `npx turbo login && npx turbo link` (Vercel Remote Cache).
 

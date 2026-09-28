@@ -22,7 +22,8 @@
     "dev:api": "turbo run dev --filter=@bitocard/api",
     "dev:docs": "turbo run dev --filter=@bitocard/docs",
     "dev:admin": "turbo run dev --filter=@bitocard/admin",
-    "dev:reseller": "turbo run dev --filter=@bitocard/reseller"
+    "dev:reseller": "turbo run dev --filter=@bitocard/reseller",
+    "dev:legals": "turbo run dev --filter=@bitocard/legals"
   },
   "devDependencies": {
     "turbo": "2.11.5"

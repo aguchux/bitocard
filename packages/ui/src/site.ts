@@ -5,6 +5,21 @@ export const brand = {
   logo: "/bitocard-logo.png",
 } as const;
 
+const apps = {
+  storefront: { env: "STOREFRONT_URL", production: "https://bitocard.com", localPort: 3000 },
+  legals: { env: "LEGALS_URL", production: "https://legals.bitocard.com", localPort: 3005 },
+} as const;
+
+/**
+ * Origin of another BitoCard app, for cross-app links (server-side only).
+ * Priority: its env override (STOREFRONT_URL, LEGALS_URL), then the production domain on any Vercel build, then localhost.
+ */
+export function appUrl(app: keyof typeof apps, path = "/"): string {
+  const { env, production, localPort } = apps[app];
+  const origin = process.env[env] ?? (process.env.VERCEL ? production : `http://localhost:${localPort}`);
+  return new URL(path, origin).href;
+}
+
 /**
  * Canonical origin for metadata (Open Graph, sitemaps, robots).
  * Priority: explicit SITE_URL, then the Vercel production domain, then the deployment URL, then localhost.

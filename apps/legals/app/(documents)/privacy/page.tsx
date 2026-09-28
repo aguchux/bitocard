@@ -5,7 +5,7 @@ import { ContactEmail, EntityTable, LegalPage, Section } from "@/components/lega
 export const metadata: Metadata = {
   title: "Privacy notice | BitoCard",
   description: "How BitoCard handles personal information on its websites, and your privacy rights in Europe, the Americas, Africa and Asia.",
-  alternates: { canonical: "/legal/privacy" },
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyNotice() {
@@ -24,7 +24,7 @@ export default function PrivacyNotice() {
       </Section>
 
       <Section id="scope" title="2. What this notice covers">
-        <p>This notice covers the BitoCard websites, including this coming-soon site and our documentation, reseller, administration and API sites, and any email you send us. It does not cover third-party websites we link to.</p>
+        <p>This notice covers bitocard.com and its subdomains, including our coming-soon site, this legal site and our documentation, reseller, administration and API sites, and any email you send us. It does not cover third-party websites we link to.</p>
       </Section>
 
       <Section id="collect" title="3. What we collect">
@@ -33,7 +33,7 @@ export default function PrivacyNotice() {
         <h3>When you contact us</h3>
         <p>If you email us, we receive your email address, your name if you include it, and the content of your message.</p>
         <h3>What we do not collect</h3>
-        <p>We do not currently collect account details, payment information, gift card codes, identity documents or precise location. There is no signup form. We do not use analytics, advertising or tracking cookies. See our <Link href="/legal/cookies">cookie notice</Link>.</p>
+        <p>We do not currently collect account details, payment information, gift card codes, identity documents or precise location. There is no signup form. We do not use analytics, advertising or tracking cookies. See our <Link href="/cookies">cookie notice</Link>.</p>
         <p>We do not collect sensitive personal information, and we do not make decisions about you based solely on automated processing, including profiling.</p>
       </Section>
 

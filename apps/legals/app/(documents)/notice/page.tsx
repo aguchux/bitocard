@@ -6,7 +6,7 @@ import { ContactEmail, LegalPage, Section } from "@/components/legal";
 export const metadata: Metadata = {
   title: "Legal notice | BitoCard",
   description: "The companies that operate BitoCard and how to contact them.",
-  alternates: { canonical: "/legal/notice" },
+  alternates: { canonical: "/notice" },
 };
 
 export default function LegalNotice() {

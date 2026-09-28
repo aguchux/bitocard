@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { legalDocuments } from "@bitocard/ui/legal";
 
-const links = [{ href: "/legal", label: "Overview" }, ...legalDocuments];
+const links = [{ href: "/", label: "Legal home" }, ...legalDocuments];
 
 export function LegalNav() {
   const pathname = usePathname();
