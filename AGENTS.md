@@ -70,7 +70,7 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 - Name: **BitoCard**; ownership credit: **A Golojan Ltd venture**.
 - Preferred icon: the user-supplied interlocking B/exchange-arrow mark, with its original dark navy areas and the original yellow areas changed to vivid pink. Keep the recognisable shape and transparent background. Before the next visual release, align the site icon with this latest approved navy-and-pink treatment.
-- Use a clean, confident navy-and-pink palette with ample white space. Avoid adding slogans or claims of guaranteed income.
+- Approved tagline: **Startup in minutes**, shown beneath the storefront header logo. Use a clean, confident navy-and-pink palette with ample white space. Avoid adding other slogans or claims of guaranteed income.
 - Lead with the reseller offer: a branded store, a BitoCard subdomain first, an optional custom domain later, product selection, reseller-set customer prices, and a pre-funded wallet.
 - Describe the five-minute goal as **store setup**, not guaranteed funding, verification, or first sale. Those steps may take longer.
 - Use plain UK English. Do not promise specific countries, products, payment methods, or launch dates until confirmed.
@@ -79,7 +79,7 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 - Keep the desktop page within the viewport at typical laptop sizes, while allowing scrolling when text enlargement or short viewports require it.
 - On mobile, stack the content in a short, readable sequence and keep tap targets comfortable.
-- The main page should contain the logo, coming-soon status, one clear reseller message, two dialog triggers, an illustrative storefront, and ownership credit.
+- The main page should contain the logo with its tagline, coming-soon status, one clear reseller message, two dialog triggers, an illustrative storefront, and ownership credit.
 - Keep detailed onboarding and reseller capabilities in the dialogs. The API, custom-domain setup, and product availability are planned capabilities; label them accordingly.
 - Do not show provider names in public-facing page copy.
 
