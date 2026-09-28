@@ -10,6 +10,7 @@
     "./coming-soon": "./src/coming-soon.tsx",
     "./legal": "./src/legal.ts",
     "./og-image": "./src/og-image.tsx",
+    "./icon-image": "./src/icon-image.tsx",
     "./seo": "./src/seo.tsx",
     "./site": "./src/site.ts",
     "./styles/workspace.css": "./src/styles/workspace.css"

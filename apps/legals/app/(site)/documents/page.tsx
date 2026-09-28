@@ -2,22 +2,21 @@ import { legalDocuments, legalUpdated, legalUpdatedIso } from "@bitocard/ui/lega
 import { JsonLd, organizationId } from "@bitocard/ui/seo";
 import { appUrl } from "@bitocard/ui/site";
 import { ContactBand, DocumentCards, PageBanner, RegionLinks, Section } from "@/components/blocks";
-import { breadcrumbSchema, pageMetadata } from "@/components/seo";
+import { breadcrumbSchema, pageMetadata, webPageFields } from "@/components/seo";
 
 const seo = { title: "Documents", description: "Every BitoCard legal document in one place: privacy notice, terms of use, cookie notice and legal notice, with your privacy rights by region.", path: "/documents" };
 
 export const metadata = pageMetadata(seo);
 
 export default function DocumentsPage() {
-  const url = appUrl("legals", seo.path);
   return (
     <>
       <JsonLd data={{
         "@context": "https://schema.org",
         "@graph": [
           {
-            "@type": "CollectionPage", "@id": url, url, name: seo.title, description: seo.description, inLanguage: "en-GB", dateModified: legalUpdatedIso,
-            isPartOf: { "@id": `${appUrl("legals")}#website` }, publisher: { "@id": organizationId() }, breadcrumb: { "@id": `${url}#breadcrumb` },
+            "@type": "CollectionPage", ...webPageFields(seo), about: { "@id": organizationId() },
+            mainEntity: { "@type": "ItemList", itemListElement: legalDocuments.map((doc, index) => ({ "@type": "ListItem", position: index + 1, url: appUrl("legals", doc.href), name: doc.label })) },
             hasPart: legalDocuments.map(doc => ({ "@type": "WebPage", "@id": appUrl("legals", doc.href), name: doc.label })),
           },
           breadcrumbSchema(seo),

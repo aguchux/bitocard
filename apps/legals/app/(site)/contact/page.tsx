@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { legalContact } from "@bitocard/ui/legal";
 import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
-import { appUrl } from "@bitocard/ui/site";
 import { EntityCards, PageBanner, Section } from "@/components/blocks";
 import { Icon, type IconName } from "@/components/icons";
-import { breadcrumbSchema, pageMetadata } from "@/components/seo";
+import { breadcrumbSchema, pageMetadata, webPageFields } from "@/components/seo";
 
 const seo = { title: "Contact", description: "Contact BitoCard’s legal and privacy team: ask a question, make a privacy request, report a security issue, and see how quickly we reply in your region.", path: "/contact" };
 
@@ -26,14 +25,13 @@ const steps = [
 ];
 
 export default function ContactPage() {
-  const url = appUrl("legals", seo.path);
   return (
     <>
       <JsonLd data={{
         "@context": "https://schema.org",
         "@graph": [
           organizationSchema(),
-          { "@type": "ContactPage", "@id": url, url, name: seo.title, description: seo.description, inLanguage: "en-GB", isPartOf: { "@id": `${appUrl("legals")}#website` }, about: { "@id": organizationId() }, breadcrumb: { "@id": `${url}#breadcrumb` } },
+          { "@type": "ContactPage", ...webPageFields(seo), about: { "@id": organizationId() }, mainEntity: { "@id": organizationId() } },
           breadcrumbSchema(seo),
         ],
       }} />

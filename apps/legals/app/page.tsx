@@ -4,7 +4,7 @@ import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
 import { appUrl } from "@bitocard/ui/site";
 import { Commitments, ContactBand, RegionLinks, Section } from "@/components/blocks";
 import { Icon } from "@/components/icons";
-import { siteName } from "@/components/seo";
+import { ogImagePath, siteName } from "@/components/seo";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -15,7 +15,7 @@ function homeSchema() {
     "@graph": [
       organizationSchema(),
       { "@type": "WebSite", "@id": `${home}#website`, url: home, name: siteName, inLanguage: "en-GB", publisher: { "@id": organizationId() } },
-      { "@type": "WebPage", "@id": home, url: home, name: "Legals & Compliance", inLanguage: "en-GB", dateModified: legalUpdatedIso, isPartOf: { "@id": `${home}#website` }, about: { "@id": organizationId() } },
+      { "@type": "WebPage", "@id": home, url: home, name: "Legals & Compliance", inLanguage: "en-GB", dateModified: legalUpdatedIso, isPartOf: { "@id": `${home}#website` }, about: { "@id": organizationId() }, primaryImageOfPage: { "@type": "ImageObject", url: appUrl("legals", ogImagePath("/")), width: 1200, height: 630 }, significantLink: legalDocuments.map(doc => appUrl("legals", doc.href)).concat(appUrl("legals", "/contact")) },
     ],
   };
 }

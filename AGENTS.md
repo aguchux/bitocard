@@ -87,7 +87,12 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 - Search and social metadata (titles, descriptions, Open Graph, Twitter, JSON-LD, manifest) must not say "coming soon". Describe the reseller offer instead; the visible page keeps its Coming soon status and caveats.
 - Never claim live products, prices, fulfilment or countries in metadata that the page itself does not support.
-- Shared helpers live in `@bitocard/ui`: `seo` (`JsonLd`, `organizationSchema`) and `og-image` (branded 1200x630 image for each app's `opengraph-image.tsx`). In the legals app, build every document's metadata with `pageMetadata()` in `components/seo.ts` and pass the same `seo` object to `LegalPage`, which adds WebPage and breadcrumb JSON-LD.
+- Shared helpers live in `@bitocard/ui`: `seo` (`JsonLd`, `organizationSchema`), `og-image` (`brandOgImage` light card, `bannerOgImage` gradient banner, both 1200x630 with Inter 600/800 from `packages/ui/assets/fonts`, SIL OFL) and `icon-image` (`brandIcon` favicons).
+- Legals SEO:
+  - Every page's metadata comes from `pageMetadata()` in `apps/legals/components/seo.ts`: canonical, `en-GB`/`x-default` alternates, Open Graph and Twitter with the page's banner image. Pass the same `seo` object to `LegalPage`, which adds WebPage and breadcrumb JSON-LD with `primaryImageOfPage`.
+  - Banner images are served at stable URLs `/og/<name>.png` by `app/og/[image]/route.tsx` (prerendered), configured per page in `components/og.tsx`. Do not use `opengraph-image` files inside route groups: Next.js gives them hashed URLs, which breaks the Twitter, sitemap and JSON-LD references.
+  - Adding a page means adding it to `ogPages`, the sitemap and `pageMetadata()`.
+  - The sitemap lists each page with `lastModified`, its image and language alternates; robots.txt names the host.
 - The logo-and-tagline header is `BrandLockup`; its CSS uses `.wordmark.brand-lockup` so app `.wordmark` rules cannot break the layout. Check the header visually after touching either.
 
 ## Legal pages
