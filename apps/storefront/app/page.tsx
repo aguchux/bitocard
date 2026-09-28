@@ -16,7 +16,7 @@ export default function Home() {
       <header className="site-header">
         <Link className="wordmark brand-lockup" href="/">
           <Brand />
-          <span className="tagline">Startup in five minutes</span>
+          <span className="tagline">Start a store in 5 minutes</span>
         </Link>
         <nav aria-label="Information">
           <InfoDialog id="nav-how" title="How it works" variant="nav"><HowItWorks /></InfoDialog>
