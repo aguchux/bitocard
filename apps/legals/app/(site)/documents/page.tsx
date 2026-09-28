@@ -1,8 +1,7 @@
 import { legalDocuments, legalUpdated, legalUpdatedIso } from "@bitocard/ui/legal";
 import { JsonLd, organizationId } from "@bitocard/ui/seo";
 import { appUrl } from "@bitocard/ui/site";
-import { ContactBand, DocumentCards, PageHero, RegionLinks, Section } from "@/components/blocks";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ContactBand, DocumentCards, PageBanner, RegionLinks, Section } from "@/components/blocks";
 import { breadcrumbSchema, pageMetadata } from "@/components/seo";
 
 const seo = { title: "Documents", description: "Every BitoCard legal document in one place: privacy notice, terms of use, cookie notice and legal notice, with your privacy rights by region.", path: "/documents" };
@@ -24,15 +23,14 @@ export default function DocumentsPage() {
           breadcrumbSchema(seo),
         ],
       }} />
-      <div className="page-inner">
-        <Breadcrumbs trail={[{ href: "/", label: "Home" }]} current="Documents" />
-        <PageHero
-          eyebrow={<>Updated <time dateTime={legalUpdatedIso}>{legalUpdated}</time></>}
-          title="Every document."
-          accent="One place."
-          lead="The documents that govern BitoCard’s websites, written in plain English and kept up to date for every region we serve."
-        />
-      </div>
+      <PageBanner
+        trail={[{ href: "/", label: "Home" }]}
+        current="Documents"
+        eyebrow={<>Updated <time dateTime={legalUpdatedIso}>{legalUpdated}</time></>}
+        title="Every document."
+        accent="One place."
+        lead="The documents that govern BitoCard’s websites, written in plain English and kept up to date for every region we serve."
+      />
 
       <Section id="documents" title="Our documents">
         <DocumentCards />

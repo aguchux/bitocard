@@ -94,7 +94,8 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 - All legal documents live in one app, `apps/legals`, served at `legals.bitocard.com`: a multi-page site with a main menu of **Home**, **Documents** and **Contact** (tagline **Legals & Compliance**).
   - `/` Home: full-screen hero in the storefront coming-soon style, region card, signposts, commitments.
-  - `/documents` hub, and each document at `/documents/privacy`, `/documents/terms`, `/documents/cookies` and `/documents/notice` with breadcrumbs and document tabs. Old `/privacy`-style paths redirect permanently.
+  - `/documents` hub, and each document at `/documents/privacy`, `/documents/terms`, `/documents/cookies` and `/documents/notice`; the header's Documents item is a click-to-open dropdown (All documents plus each document). Old `/privacy`-style paths redirect permanently.
+  - Every page except Home opens with the full-width gradient `PageBanner` (breadcrumbs, eyebrow, title, lead) from `components/blocks.tsx`.
   - `/contact`: legal team email, privacy request process, response times, responsible entities and regulators. Keep every timescale and process there consistent with the privacy notice.
   - Pages other than Home live in the `app/(site)` route group, which supplies the shared header and footer. Reusable pieces are in `components/` (`blocks.tsx`, `content.ts`, `icons.tsx`).
 - Add, update or localise legal documents only in this app; never add legal pages to another app. They target global visitors, with region sections for Europe (UK/EEA/Switzerland), the United States, Canada, Africa and Asia.

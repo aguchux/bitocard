@@ -2,8 +2,7 @@ import Link from "next/link";
 import { legalContact } from "@bitocard/ui/legal";
 import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
 import { appUrl } from "@bitocard/ui/site";
-import { EntityCards, PageHero, Section } from "@/components/blocks";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { EntityCards, PageBanner, Section } from "@/components/blocks";
 import { Icon, type IconName } from "@/components/icons";
 import { breadcrumbSchema, pageMetadata } from "@/components/seo";
 
@@ -38,11 +37,9 @@ export default function ContactPage() {
           breadcrumbSchema(seo),
         ],
       }} />
-      <div className="page-inner">
-        <Breadcrumbs trail={[{ href: "/", label: "Home" }]} current="Contact" />
-        <PageHero eyebrow="Legal & privacy team" title="Talk to our" accent="legal team." lead="One address reaches every Golojan company behind BitoCard, wherever you are. Ask a question, use your privacy rights or report a security issue." />
+      <PageBanner trail={[{ href: "/", label: "Home" }]} current="Contact" eyebrow="Legal & privacy team" title="Talk to our" accent="legal team." lead="One address reaches every Golojan company behind BitoCard, wherever you are. Ask a question, use your privacy rights or report a security issue.">
         <a className="contact-email" href={`mailto:${legalContact}`}><Icon name="mail" /> {legalContact}</a>
-      </div>
+      </PageBanner>
 
       <Section id="reasons" title="How can we help?">
         <ul className="reason-grid">

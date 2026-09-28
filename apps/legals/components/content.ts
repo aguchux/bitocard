@@ -24,9 +24,3 @@ export const commitments: { icon: IconName; title: string; body: string }[] = [
   { icon: "clock", title: "Updated before we launch", body: "We will publish service terms and update these notices before accounts or payments go live." },
 ];
 
-/** Primary navigation. `match` marks the section as current for nested paths. */
-export const sections = [
-  { href: "/", label: "Home", match: (path: string) => path === "/" },
-  { href: "/documents", label: "Documents", match: (path: string) => path.startsWith("/documents") },
-  { href: "/contact", label: "Contact", match: (path: string) => path.startsWith("/contact") },
-] as const;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { legalContact, legalDocuments, legalEntities } from "@bitocard/ui/legal";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { commitments, documentDetails, regions } from "@/components/content";
 import { Icon } from "@/components/icons";
 
@@ -14,12 +15,24 @@ export function Section({ id, title, lead, children }: { id: string; title: stri
   );
 }
 
-export function PageHero({ eyebrow, title, accent, lead }: { eyebrow: ReactNode; title: string; accent: string; lead: string }) {
+type Crumb = { href: string; label: string };
+
+/**
+ * Full-width gradient banner at the top of every page except Home: breadcrumbs, eyebrow, title and lead.
+ * `titleId` lets a page point aria-labelledby at the banner heading.
+ */
+export function PageBanner({ trail, current, eyebrow, title, accent, lead, titleId = "page-title", children }: {
+  trail: Crumb[]; current: string; eyebrow?: ReactNode; title: string; accent?: string; lead?: string; titleId?: string; children?: ReactNode;
+}) {
   return (
-    <section className="page-hero" aria-labelledby="page-title">
-      <p className="lp-status">{eyebrow}</p>
-      <h1 id="page-title">{title} <span>{accent}</span></h1>
-      <p className="lp-lead">{lead}</p>
+    <section className="page-banner" aria-labelledby={titleId}>
+      <div className="page-banner-inner">
+        <Breadcrumbs trail={trail} current={current} />
+        {eyebrow ? <p className="banner-eyebrow">{eyebrow}</p> : null}
+        <h1 id={titleId}>{title}{accent ? <> <span>{accent}</span></> : null}</h1>
+        {lead ? <p className="banner-lead">{lead}</p> : null}
+        {children}
+      </div>
     </section>
   );
 }
