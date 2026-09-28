@@ -1,4 +1,4 @@
-import { Brand } from "@/components/brand";
+import { Brand } from "@bitocard/ui/brand";
 
 type IconName = "gift" | "phone" | "wifi" | "home" | "orders" | "account" | "search";
 function Icon({ name }: { name: IconName }) {

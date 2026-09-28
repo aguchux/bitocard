@@ -85,10 +85,12 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 ## Repository and delivery
 
-- This is an npm-workspaces Turborepo with five Next.js applications in `apps/`: `api`, `docs`, `storefront`, `admin`, and `reseller`. Use App Router directly in each app; do not introduce `src/` wrappers. Root tooling and this file stay at the repository root.
-- The original Sites output and `.openai/hosting.json` are absent from this checkout. No deployment is configured. If that hosting identity is restored, reuse it rather than creating a second Site.
+- This is an npm-workspaces Turborepo with five applications in `apps/`. `docs`, `storefront`, `admin` and `reseller` are Next.js apps: use App Router directly in each and do not introduce `src/` wrappers. `api` is a NestJS 12 app with the standard Nest `src/` layout. Root tooling and this file stay at the repository root.
+- API rules: keep the entrypoint at `apps/api/src/main.ts` and app setup in `src/bootstrap.ts`. Never name a top-level `src/` file `app`, `index` or `server`, because Vercel would pick it as the entrypoint. Build with `nest build` (tsc, decorator metadata on), not an esbuild or SWC bundler. Mark providers `@Injectable()` and rely on constructor injection.
+- Shared code lives in `packages/`: `@bitocard/ui` (brand, coming-soon workspace page, site constants), `@bitocard/next-config` (`createNextConfig`, security headers, noindex for private apps), `@bitocard/eslint-config` and `@bitocard/typescript-config`. Put cross-app code there rather than copying it between apps. Packages ship TypeScript source with no build step.
+- Deployment target is Vercel: one Vercel project per app, Root Directory `apps/<app>`, with install, build and ignore commands in each app's `vercel.json` (static settings; no `@vercel/config` dependency). The original Sites output and `.openai/hosting.json` are absent; if that hosting identity is restored, reuse it rather than creating a second Site.
 - Preserve the existing private audience unless the user explicitly requests a sharing change.
-- For changes, run the relevant workspace lint, typecheck and build tasks. Verify responsive layout and dialog behaviour for storefront edits. Do not claim publication without a configured deployment workflow.
+- For changes, run `npm run check` (lint and typecheck, then build; do not run typecheck and build in parallel). Verify responsive layout and dialog behaviour for storefront edits. Do not claim publication without a configured deployment workflow.
 - Do not commit generated archives or credentials. Keep the source repository and the published version in sync.
 <!-- BEGIN:nextjs-agent-rules -->
 
@@ -99,3 +101,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

@@ -1,0 +1,9 @@
+{
+  "name": "@bitocard/typescript-config",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "nextjs.json",
+    "react-library.json"
+  ]
+}

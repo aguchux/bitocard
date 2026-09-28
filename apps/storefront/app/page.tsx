@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Brand } from "@/components/brand";
+import { Brand } from "@bitocard/ui/brand";
 import { InfoDialog } from "@/components/info-dialog";
 import { StorefrontPreview } from "@/components/storefront-preview";
 

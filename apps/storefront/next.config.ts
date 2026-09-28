@@ -1,9 +1,3 @@
-import type { NextConfig } from "next";
-import path from "node:path";
+import { createNextConfig } from "@bitocard/next-config";
 
-const nextConfig: NextConfig = {
-  turbopack: { root: path.resolve(__dirname, "../..") },
-  outputFileTracingRoot: path.resolve(__dirname, "../.."),
-};
-
-export default nextConfig;
+export default createNextConfig();
