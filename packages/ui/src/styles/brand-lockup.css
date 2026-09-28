@@ -1,10 +1,10 @@
 /*
  * Header lockup: icon flush left spanning both lines; "BitoCard" with the tagline directly beneath.
- * Set --wordmark on .brand-lockup to scale it (default 34px).
+ * Set --wordmark on .brand-lockup to scale it (default 28px).
  * Selectors use `.wordmark.brand-lockup` so an app's own `.wordmark` rules cannot override the grid,
  * whatever order the stylesheets load in.
  */
-.wordmark.brand-lockup { font-size: var(--wordmark, 34px); display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: .24em; row-gap: .06em; line-height: 1; text-decoration: none; }
+.wordmark.brand-lockup { font-size: var(--wordmark, 28px); display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: .24em; row-gap: .06em; line-height: 1; text-decoration: none; }
 .wordmark.brand-lockup .brand-icon { grid-row: 1 / span 2; width: 1.5em; height: 1.5em; flex: none; }
 .wordmark.brand-lockup .brand-name { grid-column: 2; align-self: end; }
 .wordmark.brand-lockup .tagline { grid-column: 2; align-self: start; color: #414f77; font-size: max(13px, .36em); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }

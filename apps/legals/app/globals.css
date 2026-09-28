@@ -61,7 +61,7 @@
   .site-header nav { column-gap: 14px; }
   .site-header nav a { font-size: 17px; }
   .page-top { padding-top: 30px; }
-  .page-top .brand-lockup { --wordmark: clamp(30px, 3vw, 42px); }
+  .page-top .brand-lockup { --wordmark: clamp(26px, 2.2vw, 32px); }
   .site-footer { flex-direction: row; justify-content: center; gap: 20px; }
   .site-footer a { min-height: 32px; }
 }
