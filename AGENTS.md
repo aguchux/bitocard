@@ -1,0 +1,101 @@
+# BitoCard Coming Soon Site
+
+## Project purpose
+
+BitoCard is a reseller-first platform owned by Golojan Ltd. It will let approved resellers launch branded storefronts for digital gift cards, mobile airtime, data, and other supported utilities. BitoCard supplies a unified catalogue and fulfilment layer. Resellers serve their own customers, set customer-facing prices, and pre-fund their reseller wallets before taking paid orders.
+
+The intended markets are the UK, US, and selected African countries, enabled country by country as provider coverage, payments, verification, and operations are ready. BitoCard's consumer-facing offering is buying, selling, and trading eligible digital gift cards and buying supported utility products through reseller storefronts.
+
+The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard selects a suitable source internally using availability and net profitability. Do not expose upstream provider identities, costs, credentials, or routing rules to storefront visitors or resellers. The reseller API is a later phase. Provider coverage, terms, and live access must be confirmed before implementation.
+
+## Product model and planned features
+
+### Who uses BitoCard
+
+- **Platform operators (Golojan Ltd):** manage providers, supported markets, product mapping, pricing rules, reseller approvals, transactions, fulfilment exceptions, and support.
+- **BitoCard's own reselling brand:** the first tenant and reference storefront, launched on a subdomain of the BitoCard platform.
+- **Independent resellers:** create and manage branded storefronts for their own customers. They interact with BitoCard as their supplier, without selecting or seeing the underlying source.
+- **Storefront customers:** browse products, buy digital goods, and, where enabled, submit eligible gift cards for sale or trade.
+
+### Reseller storefronts
+
+- Target a short, self-service store setup: account verification, store name and BitoCard subdomain, branding, product selection, suggested margins or reseller pricing, preview, and launch. **Five minutes is a setup goal**, not a promise that funding, verification, domain propagation, or the first order completes within five minutes.
+- Provide a hosted storefront on a BitoCard subdomain first. Allow an optional verified custom domain with HTTPS later.
+- Give each reseller control of their customer-facing brand, eligible catalogue, prices or margins, store settings, orders, and reports, subject to platform and market rules.
+- Use a **pre-funded reseller wallet**. Require sufficient available balance to cover the BitoCard wholesale cost before accepting an order. A published store may exist before funding, but paid checkout cannot operate until funding and any required verification are complete.
+- Keep the reseller's customer relationship and customer-facing support context distinct from BitoCard's upstream supplier relationships.
+
+### Catalogue and transactions
+
+- Present one BitoCard catalogue across supported countries, currencies, denominations, and product types. Initial categories are digital gift cards, mobile airtime, and data; other utilities or virtual cards are future or market-dependent additions.
+- **Buy:** show a final quote, reserve the required balance, submit one fulfilment order, deliver the result, and record the transaction. Release the reservation if an order fails without delivery.
+- **Sell:** where supported, accept an eligible unused gift card for a time-limited quote and verification. Keep the submission pending until the source confirms acceptance; only then settle the customer or reseller balance. Never treat an unverified card as cleared funds.
+- **Trade:** treat an exchange as a linked verified sale and new purchase. The incoming card must be accepted before an outgoing product is delivered. Show any value difference and applicable fees before confirmation.
+- Availability, exchange methods, funding methods, and final prices vary by market. Do not promise a product or payout route solely because a provider advertises it elsewhere.
+
+### Internal sourcing and switching
+
+- Normalize provider products, country rules, denominations, costs, quotes, order states, and webhook events behind BitoCard-owned interfaces.
+- For purchases, choose an eligible available source by **net margin**, after provider cost, FX, fees, and operational constraints; use fulfilment reliability and market eligibility as routing safeguards.
+- For incoming gift card sales, route to an eligible source offering the best viable net return after verification and settlement costs.
+- Lock the customer-facing quote for its stated validity period. A fallback to another source must still honour that quote and avoid duplicate fulfilment. If neither is possible, fail clearly and release the wallet reservation.
+- Keep provider identities, credentials, cost prices, internal routing decisions, and supplier-specific error details out of reseller and customer interfaces and the future reseller API.
+
+### Wallet, records, and operations
+
+- Keep a durable, auditable transaction ledger for funding, pending funds, available funds, reservations, debits, releases, refunds, settlements, fees, and reseller margins. Do not use a client-side balance as the source of truth.
+- Credit wallet funds only after a payment is confirmed. Make provider orders and webhook handling idempotent so retries cannot charge or fulfil twice.
+- Record the customer price, reseller wholesale cost, BitoCard supplier cost, applicable fees/FX, and resulting margins separately. Show each party only the amounts they are entitled to see.
+- Provide order history, status updates, receipts, exception review, support workflows, and admin reconciliation.
+- Add identity checks, fraud controls, payment integration, market-specific terms, and provider agreements before accepting real funds or gift card codes.
+
+### Reseller API (later phase)
+
+Offer authenticated, scoped access to BitoCard's catalogue, availability, quotes, order creation, order status, wallet balance, and signed webhooks so approved resellers can use their own websites or apps. Apply the same pricing, funding, routing, and data isolation rules as the hosted storefronts. Do not expose upstream APIs directly.
+
+## Release sequence
+
+1. Prove the platform with BitoCard's own reselling storefront: accounts, catalogue, funding, ledger, buying, routing, fulfilment, support, and administration.
+2. Open hosted reseller onboarding, BitoCard subdomains, branding, pricing, reports, and optional custom domains.
+3. Add eligible gift card selling and linked trades where provider verification and settlement flows are ready.
+4. Release the reseller API after the hosted workflows and operational controls are stable.
+
+## Current deliverable
+
+This repository currently contains a **coming soon page**, not the trading platform. The coming-soon page is a compact, mobile-first, single-screen desktop layout in `apps/storefront/app/page.tsx`. `apps/storefront/public/bitocard-logo.png` is the approved logo and site icon. The two information actions, **How it works** and **For resellers**, open native HTML dialogs. Keep keyboard focus, Escape closing, accessible dialog labels, and a usable mobile layout intact.
+
+The page must communicate that the product is coming soon. Do not add a working signup form, wallet, checkout, live prices, supplier catalogue, or claims of active fulfilment unless the necessary backend and provider integrations are implemented. A storefront mockup is illustrative.
+
+## Brand and copy
+
+- Name: **BitoCard**; ownership credit: **A Golojan Ltd venture**.
+- Preferred icon: the user-supplied interlocking B/exchange-arrow mark, with its original dark navy areas and the original yellow areas changed to vivid pink. Keep the recognisable shape and transparent background. Before the next visual release, align the site icon with this latest approved navy-and-pink treatment.
+- Use a clean, confident navy-and-pink palette with ample white space. Avoid adding slogans or claims of guaranteed income.
+- Lead with the reseller offer: a branded store, a BitoCard subdomain first, an optional custom domain later, product selection, reseller-set customer prices, and a pre-funded wallet.
+- Describe the five-minute goal as **store setup**, not guaranteed funding, verification, or first sale. Those steps may take longer.
+- Use plain UK English. Do not promise specific countries, products, payment methods, or launch dates until confirmed.
+
+## Page behaviour and scope
+
+- Keep the desktop page within the viewport at typical laptop sizes, while allowing scrolling when text enlargement or short viewports require it.
+- On mobile, stack the content in a short, readable sequence and keep tap targets comfortable.
+- The main page should contain the logo, coming-soon status, one clear reseller message, two dialog triggers, an illustrative storefront, and ownership credit.
+- Keep detailed onboarding and reseller capabilities in the dialogs. The API, custom-domain setup, and product availability are planned capabilities; label them accordingly.
+- Do not show provider names in public-facing page copy.
+
+## Repository and delivery
+
+- This is an npm-workspaces Turborepo with five Next.js applications in `apps/`: `api`, `docs`, `storefront`, `admin`, and `reseller`. Use App Router directly in each app; do not introduce `src/` wrappers. Root tooling and this file stay at the repository root.
+- The original Sites output and `.openai/hosting.json` are absent from this checkout. No deployment is configured. If that hosting identity is restored, reuse it rather than creating a second Site.
+- Preserve the existing private audience unless the user explicitly requests a sharing change.
+- For changes, run the relevant workspace lint, typecheck and build tasks. Verify responsive layout and dialog behaviour for storefront edits. Do not claim publication without a configured deployment workflow.
+- Do not commit generated archives or credentials. Keep the source repository and the published version in sync.
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

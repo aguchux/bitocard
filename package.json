@@ -1,0 +1,27 @@
+{
+  "name": "bitocard",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@11.12.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "dev:storefront": "turbo run dev --filter=@bitocard/storefront",
+    "dev:api": "turbo run dev --filter=@bitocard/api",
+    "dev:docs": "turbo run dev --filter=@bitocard/docs",
+    "dev:admin": "turbo run dev --filter=@bitocard/admin",
+    "dev:reseller": "turbo run dev --filter=@bitocard/reseller"
+  },
+  "devDependencies": {
+    "turbo": "2.11.5"
+  }
+}
