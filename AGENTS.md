@@ -70,7 +70,7 @@ The page must communicate that the product is coming soon. Do not add a working 
 
 - Name: **BitoCard**; ownership credit: **A Golojan Ltd venture**.
 - Preferred icon: the user-supplied interlocking B/exchange-arrow mark, with its original dark navy areas and the original yellow areas changed to vivid pink. Keep the recognisable shape and transparent background. Before the next visual release, align the site icon with this latest approved navy-and-pink treatment.
-- Approved tagline: **Startup in 5 minutes**, shown directly beneath "BitoCard" in the storefront header, with the logo icon flush left spanning both lines. It refers to the store setup goal; keep the on-page note that verification and funding may take longer. Use a clean, confident navy-and-pink palette with ample white space. Avoid adding other slogans or claims of guaranteed income.
+- Approved tagline: **Startup in five minutes** (spell out "five"), shown directly beneath "BitoCard" in the storefront header, with the logo icon flush left spanning both lines. It refers to the store setup goal; keep the on-page note that verification and funding may take longer. Use a clean, confident navy-and-pink palette with ample white space. Avoid adding other slogans or claims of guaranteed income.
 - Lead with the reseller offer: a branded store, a BitoCard subdomain first, an optional custom domain later, product selection, reseller-set customer prices, and a pre-funded wallet.
 - Describe the five-minute goal as **store setup**, not guaranteed funding, verification, or first sale. Those steps may take longer.
 - Use plain UK English. Do not promise specific countries, products, payment methods, or launch dates until confirmed.
