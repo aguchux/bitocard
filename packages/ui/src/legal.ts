@@ -1,6 +1,6 @@
 /**
  * Single source of truth for BitoCard's legal pages.
- * Fill in companyNumber and registeredAddress when confirmed; pages omit fields that are not set.
+ * Optional fields are omitted from the pages when not set.
  */
 export type LegalEntity = {
   name: string;
@@ -9,16 +9,18 @@ export type LegalEntity = {
   regions: string;
   governingLaw: string;
   courts: string;
+  /** Registration number and what the local registry calls it, e.g. "Company number" or "RC number". */
   companyNumber?: string;
+  companyNumberLabel?: string;
   registeredAddress?: string;
 };
 
 export const legalContact = "legal@bitocard.com";
 
 /** Shown as "Last updated" on every legal page. Update when any legal page changes. */
-export const legalUpdated = "28 September 2026";
+export const legalUpdated = "29 September 2026";
 /** The same date in ISO 8601, for sitemaps and structured data. Keep in step with legalUpdated. */
-export const legalUpdatedIso = "2026-09-28";
+export const legalUpdatedIso = "2026-09-29";
 
 export const legalEntities: readonly LegalEntity[] = [
   {
@@ -27,13 +29,19 @@ export const legalEntities: readonly LegalEntity[] = [
     regions: "North America (including Canada), South America, the Caribbean and Asia",
     governingLaw: "the laws of the State of Delaware, United States",
     courts: "the state and federal courts located in Delaware",
+    companyNumber: "10762897",
+    companyNumberLabel: "Delaware file number",
+    registeredAddress: "1207 Delaware Ave #3036, Wilmington, DE 19806",
   },
   {
-    name: "Golojan LLC",
+    name: "Golojan Ltd",
     jurisdiction: "England and Wales, United Kingdom",
     regions: "United Kingdom, European Economic Area, Switzerland and the rest of Europe",
     governingLaw: "the laws of England and Wales",
     courts: "the courts of England and Wales",
+    companyNumber: "17481904",
+    companyNumberLabel: "Company number",
+    registeredAddress: "12 Devon Road, Canterbury CT1 1RP",
   },
   {
     name: "De-Golojan Technologies Ltd",
@@ -41,6 +49,9 @@ export const legalEntities: readonly LegalEntity[] = [
     regions: "Africa",
     governingLaw: "the laws of the Federal Republic of Nigeria",
     courts: "the courts of Nigeria",
+    companyNumber: "RC 1606658",
+    companyNumberLabel: "RC number",
+    registeredAddress: "3 Agu Street, Upper Housing Estate Extension, Abakpa Nike, Enugu",
   },
 ];
 

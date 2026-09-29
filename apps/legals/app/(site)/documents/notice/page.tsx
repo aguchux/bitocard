@@ -20,7 +20,7 @@ export default function LegalNotice() {
               <h3>{entity.name}</h3>
               <dl>
                 <dt>Registered in</dt><dd>{entity.jurisdiction}</dd>
-                {entity.companyNumber ? <><dt>Company number</dt><dd>{entity.companyNumber}</dd></> : null}
+                {entity.companyNumber ? <><dt>{entity.companyNumberLabel ?? "Company number"}</dt><dd>{entity.companyNumber}</dd></> : null}
                 {entity.registeredAddress ? <><dt>Registered address</dt><dd>{entity.registeredAddress}</dd></> : null}
                 <dt>Responsible for</dt><dd>{entity.regions}</dd>
               </dl>

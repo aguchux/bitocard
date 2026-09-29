@@ -97,7 +97,7 @@ export default function PrivacyNotice() {
 
       <Section id="regions" title="11. Information for your region">
         <h3 id="europe">United Kingdom, European Economic Area and Switzerland</h3>
-        <p>Golojan LLC is the controller under the UK GDPR, the EU General Data Protection Regulation and the Swiss Federal Act on Data Protection. Our legal bases are set out in section 4. You may complain to the UK Information Commissioner’s Office, the data protection authority in the EEA country where you live or work, or the Swiss Federal Data Protection and Information Commissioner. We would appreciate the chance to address your concern first.</p>
+        <p>Golojan Ltd (company no. 17481904, 12 Devon Road, Canterbury CT1 1RP) is the controller under the UK GDPR, the EU General Data Protection Regulation and the Swiss Federal Act on Data Protection. Our legal bases are set out in section 4. You may complain to the UK Information Commissioner’s Office, the data protection authority in the EEA country where you live or work, or the Swiss Federal Data Protection and Information Commissioner. We would appreciate the chance to address your concern first.</p>
 
         <h3 id="united-states">United States</h3>
         <p>This section applies to residents of California and of other states with comprehensive privacy laws, including Colorado, Connecticut, Texas, Utah and Virginia. In the last 12 months we have collected identifiers (such as IP address and email address) and internet activity on our websites (such as pages visited). We collect them from you and your device, for the purposes in section 4, and keep them as set out in section 7. We disclose them only to the service providers and recipients in section 5.</p>

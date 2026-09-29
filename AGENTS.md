@@ -107,9 +107,9 @@ The page must communicate that the product is coming soon. Do not add a working 
 - Every other site links to them with `appUrl("legals", doc.href)` from `@bitocard/ui/site`: the storefront home footer and the shared `ComingSoon` footer (docs, admin, reseller). The storefront permanently redirects its old `/legal/*` paths to the matching `/documents/*` pages.
 - The landing page only summarises what the documents say (regions, laws covered, commitments). Keep its claims in step with the documents and never add certifications or guarantees that are not in place.
 - Entities, regions, governing law, contact (`legal@bitocard.com`) and the "last updated" date live in `packages/ui/src/legal.ts`. Change them there, and bump `legalUpdated` whenever any legal page changes.
-- Entity by region: Golojan Technologies LLC (Delaware) for the Americas, Asia and anywhere unlisted; Golojan LLC (England and Wales) for the UK and Europe; De-Golojan Technologies Ltd (Nigeria) for Africa.
+- Entity by region: Golojan Technologies LLC (Delaware) for the Americas, Asia and anywhere unlisted; Golojan Ltd (England and Wales, company no. 17481904) for the UK and Europe; De-Golojan Technologies Ltd (Nigeria) for Africa.
 - The pages describe what the site actually does: no cookies, local storage, analytics, forms or accounts. Update the privacy and cookie notices **before** adding analytics, a signup form, sign-in or any other data collection, and add a consent banner before any optional cookie.
-- Company numbers, registered addresses and an EU GDPR representative are not yet recorded; never invent them. These drafts need review by qualified lawyers in each target region before launch.
+- Each entity's registration number (with its local label) and registered address are in `legal.ts` and shown on the Legal notice. An EU GDPR representative is not yet recorded; never invent one. These drafts need review by qualified lawyers in each target region before launch.
 
 ## Repository and delivery
 
