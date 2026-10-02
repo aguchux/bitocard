@@ -54,5 +54,15 @@ jobs:
       - name: Lint, typecheck, build and test (in-process database)
         run: npm run check
 
+      - name: Check the Redis REST proxy
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf -X POST -H "Authorization: Bearer local_token" -d '["PING"]' http://localhost:8079 && exit 0
+            sleep 2
+          done
+          docker ps -a
+          docker logs "$(docker ps -aqf ancestor=hiett/serverless-redis-http:latest)" || true
+          exit 1
+
       - name: API tests against Postgres and Redis
         run: npm run test:docker -w @bitocard/api

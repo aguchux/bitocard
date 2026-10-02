@@ -242,8 +242,45 @@ describe('rate limits', () => {
     assert.ok(Number(res.headers.get('ratelimit-remaining')) < 1000);
   });
 
+  test('with Redis configured, counters are stored in Redis', { skip: !useRedis && 'Redis not configured' }, async () => {
+    await post('/v1/fixtures/things/accept', {}, { 'idempotency-key': 'rate-redis-1' });
+    const res = await fetch(process.env.TEST_REDIS_REST_URL, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${process.env.TEST_REDIS_REST_TOKEN}` },
+      body: JSON.stringify(['KEYS', 'bitocard:ratelimit*']),
+    });
+    const { result } = await res.json();
+    assert.ok(result.length > 0, 'expected rate limit keys in Redis');
+  });
+
   test('health checks are not rate limited', async () => {
     const res = await fetch(`${base}/health`);
     assert.equal(res.headers.get('ratelimit-limit'), null);
+  });
+});
+
+describe('rate limiter outage', () => {
+  test('requests are still served when Redis is unreachable', async () => {
+    const saved = { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN };
+    process.env.UPSTASH_REDIS_REST_URL = 'http://127.0.0.1:9';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'unreachable';
+    const db = new PGlite();
+    for (const sql of migrationSql()) await db.exec(sql);
+    const outage = await createApp({ databaseAdapter: new PrismaPGlite(db), extraModules: [FixturesModule] });
+    outage.useLogger(false);
+    try {
+      await outage.listen(0);
+      const url = (await outage.getUrl()).replace('[::1]', 'localhost');
+      const res = await fetch(`${url}/v1/fixtures/things/accept`, { method: 'POST', headers: { 'idempotency-key': 'outage-1' } });
+      assert.equal(res.status, 202);
+      assert.equal(res.headers.get('ratelimit-limit'), null);
+    } finally {
+      await outage.close();
+      await db.close();
+      for (const [name, value] of [['UPSTASH_REDIS_REST_URL', saved.url], ['UPSTASH_REDIS_REST_TOKEN', saved.token]]) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
@@ -27,10 +27,11 @@ class MemoryLimiter {
 
 /**
  * Per-caller request limit on /v1 (RATE_LIMIT_PER_MINUTE). Uses Upstash Redis when configured so the limit holds
- * across every function instance. Callers are identified by API key once sign-in exists, by IP address until then.
+ * across every function instance; if Redis is unreachable requests are allowed and the failure is logged. Callers are identified by API key once sign-in exists, by IP address until then.
  */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
+  private readonly logger = new Logger('RateLimit');
   private readonly limiter: { limitFor(key: string): Promise<Verdict> };
 
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
@@ -52,7 +53,14 @@ export class RateLimitGuard implements CanActivate {
     if (!req.originalUrl.startsWith('/v1/')) return true;
     const scope = callerScope(req);
     const key = scope === 'anonymous' ? `ip:${req.ip ?? 'unknown'}` : `caller:${scope}`;
-    const verdict = await this.limiter.limitFor(key);
+    let verdict: Verdict;
+    try {
+      verdict = await this.limiter.limitFor(key);
+    } catch (error) {
+      // A Redis outage must not take the API down: allow the request and report the failure.
+      this.logger.error({ err: error }, 'Rate limiter unavailable; request allowed');
+      return true;
+    }
     const resetSeconds = Math.max(0, Math.ceil((verdict.reset - Date.now()) / 1000));
 
     res.setHeader('RateLimit-Limit', String(verdict.limit));
