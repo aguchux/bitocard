@@ -1,0 +1,63 @@
+# Local environment: the same services the API uses on Vercel (Postgres and Upstash-style Redis).
+#   npm run docker:up     start everything and wait until healthy
+#   npm run docker:down   stop (data is kept in named volumes; add -v to wipe it)
+name: bitocard
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bitocard
+      POSTGRES_PASSWORD: bitocard
+      POSTGRES_DB: bitocard
+    ports: ["5432:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bitocard -d bitocard"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Speaks the Upstash REST protocol in front of local Redis, so the API uses the same client as on Vercel.
+  redis-http:
+    image: hiett/serverless-redis-http:latest
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local_token
+      SRH_CONNECTION_STRING: redis://redis:6379
+    ports: ["8079:80"]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # The API built the same way as for production. Start with: npm run docker:api
+  api:
+    profiles: ["api"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://bitocard:bitocard@postgres:5432/bitocard
+      UPSTASH_REDIS_REST_URL: http://redis-http:80
+      UPSTASH_REDIS_REST_TOKEN: local_token
+      LOG_LEVEL: info
+    ports: ["3001:3001"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-http:
+        condition: service_started
+
+volumes:
+  postgres-data:

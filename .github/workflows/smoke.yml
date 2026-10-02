@@ -1,0 +1,23 @@
+# After each successful Vercel deployment of the API (preview or production), run the smoke tests against it.
+# Protected previews need the VERCEL_AUTOMATION_BYPASS_SECRET repository secret.
+name: Smoke test deployment
+
+on:
+  deployment_status:
+
+jobs:
+  smoke:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      contains(github.event.deployment.environment, 'api')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Smoke test ${{ github.event.deployment_status.environment_url }}
+        run: node apps/api/scripts/smoke.mjs "${{ github.event.deployment_status.environment_url }}"
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

@@ -1,0 +1,58 @@
+# Every push and pull request: lint, typecheck, build and test everything, then run the API tests again
+# against real Postgres and Upstash-compatible Redis (the same services as the local Docker environment).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bitocard
+          POSTGRES_PASSWORD: bitocard
+          POSTGRES_DB: bitocard_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bitocard -d bitocard_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+      redis-http:
+        image: hiett/serverless-redis-http:latest
+        env:
+          SRH_MODE: env
+          SRH_TOKEN: local_token
+          SRH_CONNECTION_STRING: redis://redis:6379
+        ports: ["8079:80"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint, typecheck, build and test (in-process database)
+        run: npm run check
+
+      - name: API tests against Postgres and Redis
+        run: npm run test:docker -w @bitocard/api

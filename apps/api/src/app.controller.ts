@@ -1,10 +1,12 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 
+@ApiExcludeController()
 @Controller()
 export class AppController {
   @Get()
   info() {
-    return { service: 'bitocard-api', status: 'scaffold', health: '/health' };
+    return { service: 'bitocard-api', version: 'v1', docs: 'https://docs.bitocard.com', openapi: '/v1/openapi.json', health: '/health' };
   }
 
   @Get('robots.txt')

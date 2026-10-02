@@ -1,0 +1,27 @@
+{
+  "openapi": "3.0.0",
+  "paths": {},
+  "info": {
+    "title": "BitoCard API",
+    "description": "One API for catalogue, quotes, orders, wallets and webhooks. Sandbox and live share this address; your API key decides the mode.",
+    "version": "v1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [
+    {
+      "url": "https://api.bitocard.com"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "API key",
+        "type": "http",
+        "description": "API key: bc_test_… (sandbox) or bc_live_… (live)."
+      }
+    },
+    "schemas": {}
+  }
+}

@@ -23,7 +23,11 @@
     "dev:docs": "turbo run dev --filter=@bitocard/docs",
     "dev:admin": "turbo run dev --filter=@bitocard/admin",
     "dev:reseller": "turbo run dev --filter=@bitocard/reseller",
-    "dev:legals": "turbo run dev --filter=@bitocard/legals"
+    "dev:legals": "turbo run dev --filter=@bitocard/legals",
+    "docker:up": "docker compose up -d --wait",
+    "docker:down": "docker compose down",
+    "docker:api": "docker compose --profile api up -d --build --wait",
+    "test:docker": "turbo run build --filter=@bitocard/api && npm run test:docker -w @bitocard/api"
   },
   "devDependencies": {
     "turbo": "2.11.5"

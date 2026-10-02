@@ -267,6 +267,26 @@ Update the legals app before each of these goes live (full list in `AGENTS.md`):
 
 Deferred: physical goods and Jumia/Konga-style integrations.
 
+## Build roadmap
+
+Phase 1, foundation and own-brand pilot:
+
+| # | Milestone | Status |
+|---|---|---|
+| M1 | API groundwork: Postgres + Prisma, `/v1` with OpenAPI, error format, request IDs and logs, idempotency keys, rate limits, tests | **Done** (needs Neon and Upstash connected on Vercel) |
+| M2 | Sign-in and access: accounts, roles, Google, email and mobile sign-in, admin 2-step, API keys | Next |
+| M3 | Stores, countries, settings chain, admin switches, plans | |
+| M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | |
+| M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | |
+| M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | |
+| M7 | Webhooks: outbox, delivery, retries, events API | |
+| M8 | Identity checks: Didit, BVN, bank validation, gating | |
+| M9 | Admin app | |
+| M10 | Own-brand storefront (Golojan's store) | |
+| M11 | Pilot launch: Nigeria, then Ghana and Kenya | |
+
+Phase 2, reseller launch: M12 docs app, M13 reseller dashboard, M14 domains, M15 promotions, M16 reseller launch. Phase 3 onwards: gift-card selling, more bills countries, Microsoft licences, virtual numbers, virtual cards.
+
 ## 12. MVP acceptance criteria
 
 - A reseller can create, configure and publish a subdomain store through a short guided flow.

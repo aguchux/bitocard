@@ -43,3 +43,7 @@ next-env.d.ts
 
 # Turborepo
 .turbo/
+
+# generated Prisma client
+apps/api/src/generated/
+!.env.example

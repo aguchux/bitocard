@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nestjs",
   "installCommand": "cd ../.. && npm ci",
-  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api && npm run db:migrate:deploy -w @bitocard/api",
   "ignoreCommand": "npx turbo-ignore --fallback=HEAD^1"
 }

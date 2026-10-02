@@ -1,0 +1,38 @@
+// BitoCard API database. Change models here, then create a migration with `npm run db:migrate:create -w @bitocard/api -- <name>`.
+// Money is stored in integer minor units; balances are always derived from ledger entries (added in M4).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IdempotencyState {
+  in_progress
+  completed
+}
+
+/// One row per idempotency key, so a retried POST returns the original result instead of acting twice.
+model IdempotencyKey {
+  id             String           @id @default(uuid()) @db.Uuid
+  /// Who sent the request (API key or account once sign-in exists; "anonymous" until then). Keys are unique per scope.
+  scope          String
+  key            String           @db.VarChar(255)
+  method         String           @db.VarChar(10)
+  path           String
+  /// SHA-256 of the request body, to reject a reused key with a different request.
+  requestHash    String           @map("request_hash") @db.Char(64)
+  state          IdempotencyState @default(in_progress)
+  responseStatus Int?             @map("response_status")
+  responseBody   Json?            @map("response_body")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  expiresAt      DateTime         @map("expires_at")
+
+  @@unique([scope, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}

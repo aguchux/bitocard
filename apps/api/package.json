@@ -3,26 +3,48 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
+    "dev": "prisma generate && nest start --watch",
+    "build": "prisma generate && nest build",
     "start": "node dist/main",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test test/api.test.mjs"
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test": "node --test test/api.test.mjs && node scripts/export-openapi.mjs --check",
+    "openapi": "node scripts/export-openapi.mjs",
+    "db:migrate:create": "prisma migrate dev --create-only --name",
+    "db:migrate:deploy": "node scripts/migrate-deploy.mjs",
+    "db:studio": "prisma studio",
+    "test:docker": "node --env-file=test/docker.env --test test/api.test.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.1",
     "@nestjs/core": "^12.1.1",
     "@nestjs/platform-express": "^12.1.1",
+    "@nestjs/swagger": "^12.0.2",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "nestjs-pino": "^5.3.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@bitocard/eslint-config": "*",
+    "@electric-sql/pglite": "^0.4.3",
     "@nestjs/cli": "^12.0.8",
     "@types/express": "^5.0.0",
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
     "eslint": "^9",
+    "pg": "^8.23.1",
+    "pglite-prisma-adapter": "^0.7.2",
+    "prisma": "^7.10.0",
     "typescript": "^6.0.2"
   }
 }

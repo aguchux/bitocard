@@ -1,0 +1,42 @@
+// Smoke tests against a running API: a Vercel deployment or the local Docker API.
+//   node scripts/smoke.mjs https://api.bitocard.com
+// Protected Vercel previews need VERCEL_AUTOMATION_BYPASS_SECRET in the environment.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+const base = (process.argv[2] ?? process.env.SMOKE_URL ?? '').replace(/\/$/, '');
+if (!base) {
+  console.error('Usage: node scripts/smoke.mjs <base-url>');
+  process.exit(2);
+}
+const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const get = path => fetch(`${base}${path}`, { headers: bypass ? { 'x-vercel-protection-bypass': bypass } : {} });
+
+test(`health is ok and the database is reachable (${base})`, async () => {
+  const res = await get('/health');
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.status, 'ok');
+  assert.equal(body.checks.database, 'ok');
+});
+
+test('security headers and request IDs are present', async () => {
+  const res = await get('/health');
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow');
+  assert.ok(res.headers.get('request-id'));
+});
+
+test('the OpenAPI document is served', async () => {
+  const res = await get('/v1/openapi.json');
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).info.title, 'BitoCard API');
+});
+
+test('errors use the BitoCard error format', async () => {
+  const res = await get('/v1/smoke-test-missing-route');
+  assert.equal(res.status, 404);
+  const { error } = await res.json();
+  assert.equal(error.type, 'not_found_error');
+  assert.ok(error.request_id);
+});
