@@ -288,3 +288,53 @@ export async function fakeVtpass() {
   });
   return { ...service, state, env: { VTPASS_API_KEY: 'vt-api', VTPASS_PUBLIC_KEY: 'vt-public', VTPASS_SECRET_KEY: 'vt-secret', VTPASS_API_URL: service.url } };
 }
+
+/**
+ * Vercel Queues. Records sent messages (`state.sent`: topic, payload, delay, idempotency key) and lease calls
+ * (`state.acknowledged`, `state.visibility`), and turns a sent message into the push callback Vercel would make.
+ */
+export async function fakeVercelQueue() {
+  const state = { sent: [], acknowledged: [], visibility: [], nextId: 1 };
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const send = /^\/api\/v3\/topic\/([^/]+)$/.exec(url);
+    if (method === 'POST' && send) {
+      if (headers.authorization !== 'Bearer queue-token') return { status: 401, body: 'unauthorized' };
+      const messageId = `msg-${state.nextId++}`;
+      state.sent.push({
+        messageId,
+        topic: decodeURIComponent(send[1]),
+        payload: body,
+        delaySeconds: Number(headers['vqs-delay-seconds'] ?? 0),
+        idempotencyKey: headers['vqs-idempotency-key'],
+      });
+      return { status: 201, body: { messageId } };
+    }
+    const lease = /^\/api\/v3\/topic\/([^/]+)\/consumer\/([^/]+)\/lease\/([^/]+)$/.exec(url);
+    if (lease && method === 'DELETE') {
+      state.acknowledged.push(decodeURIComponent(lease[3]));
+      return { status: 204, body: '' };
+    }
+    if (lease && method === 'PATCH') {
+      state.visibility.push({ receiptHandle: decodeURIComponent(lease[3]), ...body });
+      return { body: {} };
+    }
+    return { status: 404, body: 'not found' };
+  });
+  /** The CloudEvent (binary mode) Vercel pushes to the consumer function for a sent message. */
+  const callback = (message, receiptHandle = `rh-${message.messageId}`) => ({
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'ce-type': 'com.vercel.queue.v2beta',
+      'ce-vqsqueuename': message.topic,
+      'ce-vqsconsumergroup': 'webhook-consumer',
+      'ce-vqsmessageid': message.messageId,
+      'ce-vqsreceipthandle': receiptHandle,
+      'ce-vqsdeliverycount': '1',
+      'ce-vqscreatedat': new Date().toISOString(),
+      'ce-vqsregion': 'iad1',
+    },
+    body: JSON.stringify(message.payload),
+  });
+  return { ...service, state, callback, env: { WEBHOOK_QUEUE: 'vercel', WEBHOOK_QUEUE_URL: service.url, WEBHOOK_QUEUE_TOKEN: 'queue-token' } };
+}

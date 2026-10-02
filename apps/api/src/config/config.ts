@@ -8,6 +8,8 @@ const flag = z.enum(['on', 'off']).transform(value => value === 'on');
 
 const schema = z.object({
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
+  /** Set to 1 by Vercel at build and run time. */
+  VERCEL: z.string().optional(),
   DATABASE_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
@@ -95,11 +97,19 @@ const schema = z.object({
   // Webhooks to resellers.
   /** Local development and tests only: allows http:// and private addresses as webhook endpoints. Refused in production. */
   WEBHOOK_ALLOW_PRIVATE_URLS: flag.prefault('off'),
+  /**
+   * How deliveries are scheduled: vercel (Vercel Queues pushes each endpoint's work and retries to the API) or database
+   * (runs after each change plus the cron). Defaults to vercel on Vercel, database elsewhere.
+   */
+  WEBHOOK_QUEUE: z.enum(['vercel', 'database']).optional(),
+  /** Tests only: the Vercel Queues address and token. On Vercel the region's address and OIDC are used. */
+  WEBHOOK_QUEUE_URL: z.string().url().optional(),
+  WEBHOOK_QUEUE_TOKEN: z.string().optional(),
   /** GET /v1/events leaves out events newer than this, so a slow transaction cannot be skipped by a reader. */
   EVENTS_SETTLE_SECONDS: z.coerce.number().int().min(0).max(60).default(5),
 });
 
-export type AppConfig = z.infer<typeof schema> & { cookieSecure: boolean };
+export type AppConfig = z.infer<typeof schema> & { cookieSecure: boolean; webhookQueue: 'vercel' | 'database' };
 
 /** Empty strings count as unset, so a blank line in .env never fails validation. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -113,7 +123,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (config.WEBHOOK_ALLOW_PRIVATE_URLS && config.VERCEL_ENV === 'production') {
     throw new Error('Invalid environment configuration: WEBHOOK_ALLOW_PRIVATE_URLS must be off in production');
   }
-  return { ...config, cookieSecure: config.COOKIE_SECURE ?? Boolean(config.VERCEL_ENV) };
+  return {
+    ...config,
+    cookieSecure: config.COOKIE_SECURE ?? Boolean(config.VERCEL_ENV),
+    webhookQueue: config.WEBHOOK_QUEUE ?? (config.VERCEL === '1' ? 'vercel' : 'database'),
+  };
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');

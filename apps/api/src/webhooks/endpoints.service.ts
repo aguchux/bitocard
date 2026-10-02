@@ -145,7 +145,7 @@ export class WebhookEndpointsService {
         ...status,
       },
     });
-    if (updated.status === 'enabled') this.delivery.kick();
+    if (updated.status === 'enabled') this.delivery.wake(id);
     return presentEndpoint(updated);
   }
 

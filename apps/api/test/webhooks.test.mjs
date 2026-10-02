@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, resellerClient, startApp } from './helpers.mjs';
-import { fakeReloadly, fakeVtpass } from './fakes.mjs';
+import { fakeReloadly, fakeVercelQueue, fakeVtpass } from './fakes.mjs';
 
 const { verifySignature, sign, signatureTestVector } = await import('../dist/webhooks/signing.js');
 const { isBlockedAddress, checkDestination } = await import('../dist/webhooks/destinations.js');
@@ -420,6 +420,122 @@ describe('delivery', () => {
     assert.equal(await prisma.event.count({ where: { resellerId } }), 1);
     await delivery.idle();
     assert.ok((await prisma.event.findFirstOrThrow({ where: { resellerId } })).dispatchedAt, 'dispatched with no endpoints to receive it');
+  });
+});
+
+describe('Vercel Queues transport', () => {
+  let queued;
+  let queue;
+  let queuePrisma;
+  let queueDelivery;
+  let consumer;
+  before(async () => {
+    queue = await fakeVercelQueue();
+    queued = await startApp({ env: { ...queue.env, WEBHOOK_ALLOW_PRIVATE_URLS: 'on', EVENTS_SETTLE_SECONDS: '0' }, database: 'pglite' });
+    queuePrisma = queued.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    queueDelivery = queued.app.get((await import('../dist/webhooks/delivery.service.js')).WebhookDeliveryService);
+    const { WebhookQueue } = await import('../dist/webhooks/queue.js');
+    // Stands in for the Vercel function (api/webhook-queue.mjs): Node request with a parsed JSON body.
+    const handle = queued.app.get(WebhookQueue).nodeHandler(message => queueDelivery.handleQueueMessage(message));
+    const { default: express } = await import('express');
+    const fn = express();
+    fn.post('/api/webhook-queue', express.json(), (req, res) => handle(req, res));
+    consumer = await new Promise(resolve => {
+      const listening = fn.listen(0, '127.0.0.1', () => resolve(listening));
+    });
+  });
+  after(async () => {
+    await new Promise(resolve => consumer?.close(resolve));
+    await queued?.close();
+    await queue?.close();
+  });
+
+  const push = message => fetch(`http://127.0.0.1:${consumer.address().port}/api/webhook-queue`, queue.callback(message));
+  const lastFor = endpointId => queue.state.sent.filter(message => message.payload.endpointId === endpointId).at(-1);
+
+  test('a change queues its endpoint, and the pushed message delivers it', async () => {
+    const { browser } = await resellerClient(queued);
+    const hook = await receiver();
+    const { id, secret } = await endpoint(browser, hook.url);
+    await topUp(browser);
+    await queueDelivery.idle();
+    const message = lastFor(id);
+    assert.deepEqual([message.topic, message.delaySeconds], ['webhook-deliveries', 0]);
+    assert.equal(hook.state.calls.length, 0, 'nothing is sent until the queue pushes');
+
+    const res = await push(message);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).status, 'success');
+    assert.equal(hook.state.calls.length, 1);
+    assert.ok(verifySignature(hook.state.calls[0].headers['bitocard-signature'], hook.state.calls[0].body, secret));
+    assert.ok(queue.state.acknowledged.includes(`rh-${message.messageId}`), 'the message is acknowledged');
+  });
+
+  test('a failed delivery queues its retry for when it is due', async () => {
+    const { browser } = await resellerClient(queued);
+    const hook = await receiver({ status: 500 });
+    const { id } = await endpoint(browser, hook.url);
+    await topUp(browser);
+    await queueDelivery.idle();
+    await push(lastFor(id));
+    const retry = lastFor(id);
+    assert.ok(retry.delaySeconds >= 54 && retry.delaySeconds <= 67, `retry queued about a minute later (${retry.delaySeconds}s)`);
+    assert.ok(retry.idempotencyKey.startsWith(`${id}:`) && /^[0-9]+$/.test(retry.idempotencyKey.split(':')[1]), retry.idempotencyKey);
+
+    const early = await push(retry);
+    assert.equal(early.status, 200);
+    assert.equal(hook.state.calls.length, 1, 'an early or repeated message sends nothing that is not due');
+
+    hook.state.status = 200;
+    await queuePrisma.webhookDelivery.updateMany({ where: { endpointId: id }, data: { nextAttemptAt: new Date(Date.now() - 1000) } });
+    await push(retry);
+    assert.equal(hook.state.calls.length, 2);
+    assert.equal((await queuePrisma.webhookDelivery.findFirstOrThrow({ where: { endpointId: id } })).status, 'succeeded');
+  });
+
+  test('a busy endpoint sends the message back for a short wait', async () => {
+    const { browser } = await resellerClient(queued);
+    const hook = await receiver();
+    const { id } = await endpoint(browser, hook.url);
+    await topUp(browser);
+    await queueDelivery.idle();
+    await queuePrisma.webhookEndpoint.update({ where: { id }, data: { leaseUntil: new Date(Date.now() + 60_000) } });
+    const message = lastFor(id);
+    await push(message);
+    assert.equal(hook.state.calls.length, 0);
+    assert.deepEqual(queue.state.visibility.at(-1), { receiptHandle: `rh-${message.messageId}`, visibilityTimeoutSeconds: 10 });
+  });
+
+  test('enabling an endpoint again queues its pending work; malformed messages are dropped', async () => {
+    const { browser } = await resellerClient(queued);
+    const hook = await receiver();
+    const { id } = await endpoint(browser, hook.url);
+    await topUp(browser);
+    await queueDelivery.idle();
+    await browser.patch(`/v1/webhook-endpoints/${id}`, { status: 'disabled' }, sandbox);
+    const before = queue.state.sent.length;
+    await browser.patch(`/v1/webhook-endpoints/${id}`, { status: 'enabled' }, sandbox);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(queue.state.sent.length, before + 1);
+    assert.equal(lastFor(id).payload.endpointId, id);
+
+    const forged = await push({ messageId: 'msg-forged', topic: 'webhook-deliveries', payload: { endpointId: 'not-an-id' } });
+    assert.equal(forged.status, 200);
+    assert.equal(hook.state.calls.length, 0);
+  });
+
+  test('the Vercel function exports the consumer; the database transport has none and queues nothing', async () => {
+    const fn = await import('../api/webhook-queue.mjs');
+    assert.equal(typeof fn.default, 'function');
+    const vercel = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+    assert.deepEqual(vercel.functions['api/webhook-queue.mjs'].experimentalTriggers[0], { type: 'queue/v2beta', topic: 'webhook-deliveries', retryAfterSeconds: 30 });
+    const { WebhookQueue } = await import('../dist/webhooks/queue.js');
+    const databaseQueue = server.app.get(WebhookQueue);
+    assert.equal(databaseQueue.enabled, false);
+    assert.throws(() => databaseQueue.nodeHandler(async () => {}), /not enabled/);
+    const sent = queue.state.sent.length;
+    await databaseQueue.schedule('00000000-0000-4000-8000-000000000000');
+    assert.equal(queue.state.sent.length, sent);
   });
 });
 

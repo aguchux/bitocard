@@ -242,7 +242,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Admin-only endpoints live in the same API behind admin roles.
 - Idempotency keys on every POST; versioned with a changelog.
 - **Docs** at `https://docs.bitocard.com`, public and indexed. The reference is generated from the OpenAPI document. "Try it" requires reseller sign-in and runs against the reseller's own sandbox or live account using a short-lived token; live mode is clearly marked and asks for confirmation before anything that spends money.
-- **Outbound webhooks:** transactional outbox, with Postgres as the delivery queue at launch and Vercel Queues once confirmed; signed (HMAC with timestamp); delivered at least once with unique event IDs; retries for up to 3 days; per-endpoint isolation; auto-disable with alerts; delivery log, resend and test events; `GET /v1/events` catch-up; HTTPS only with internal IPs blocked.
+- **Outbound webhooks:** transactional outbox plus Vercel Queues (Postgres keeps the delivery record); signed (HMAC with timestamp); delivered at least once with unique event IDs; retries for up to 3 days; per-endpoint isolation; auto-disable with alerts; delivery log, resend and test events; `GET /v1/events` catch-up; HTTPS only with internal IPs blocked.
 - **Every event fully documented** before it ships: event catalogue page, example payload, field reference, step-by-step guide, copy-paste code (Node.js, PHP/Laravel, Python), signature test vector, retry and troubleshooting guides.
 - Secrets (eSIM activation codes, licence keys) never appear in webhooks or logs; webhooks announce readiness and the reseller fetches the secret.
 
@@ -309,7 +309,7 @@ Phase 1, foundation and own-brand pilot:
 | M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | **Done** (needs Flutterwave, Monnify and Open Exchange Rates keys, `CRON_SECRET`, and Vercel Pro for hourly jobs) |
 | M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | **Done** (needs Reloadly and VTpass credentials, and the agreed VTpass commission entered per product) |
 | M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | **Done** |
-| M7 | Webhooks: outbox, delivery, retries, events API | **Done** (needs Vercel Pro for the every-minute job; Vercel Queues transport deferred until its trigger is confirmed with the NestJS build) |
+| M7 | Webhooks: outbox, delivery, retries, events API | **Done** (Vercel Queues transport; needs Vercel Pro for the 5-minute backstop job) |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | Next |
 | M9 | Admin app | |
 | M10 | Own-brand storefront (Golojan's store) | |

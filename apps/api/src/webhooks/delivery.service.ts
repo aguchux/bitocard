@@ -10,6 +10,7 @@ import type { Event, WebhookDelivery, WebhookEndpoint } from '../generated/prism
 import { EmailService } from '../notifications/email.service';
 import { webhookEndpointDisabledEmail } from '../notifications/templates';
 import { BlockedDestinationError, isBlockedAddress, safeLookup } from './destinations';
+import { EndpointBusyError, type EndpointMessage, WebhookQueue } from './queue';
 import { signatureHeader, signatureValue } from './signing';
 
 /** Seconds to wait after each failed attempt: 1 min, 5 min, 30 min, 2 h, 6 h, then every 12 h. */
@@ -47,6 +48,7 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly queue: WebhookQueue,
   ) {}
 
   private encryption() {
@@ -66,7 +68,9 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     const run = (async () => {
       do {
         this.again = false;
-        await this.run(15_000);
+        // With Vercel Queues, fan out here and let the queue push each endpoint's work; otherwise deliver now.
+        if (this.queue.enabled) await this.dispatchOutbox();
+        else await this.run(15_000);
       } while (this.again && !this.closing);
     })()
       .catch(error => this.logger.error({ err: error }, 'Webhook run failed'))
@@ -75,6 +79,12 @@ export class WebhookDeliveryService implements OnModuleDestroy {
       });
     this.current = run;
     waitUntil(run);
+  }
+
+  /** An endpoint was enabled again: send what it has pending. */
+  wake(endpointId: string) {
+    if (this.queue.enabled) void this.queue.schedule(endpointId);
+    else this.kick();
   }
 
   /** Resolves when no background run is going (tests, shutdown). */
@@ -98,6 +108,7 @@ export class WebhookDeliveryService implements OnModuleDestroy {
   /** Turns undispatched events into deliveries for every enabled endpoint that wants them. */
   async dispatchOutbox() {
     let total = 0;
+    const endpointIds = new Set<string>();
     for (;;) {
       const count = await this.prisma.$transaction(async tx => {
         const events = await tx.$queryRaw<Array<{ id: string; reseller_id: string; mode: string; type: string }>>`
@@ -115,12 +126,41 @@ export class WebhookDeliveryService implements OnModuleDestroy {
             .map(endpoint => ({ eventId: event.id, endpointId: endpoint.id, nextAttemptAt: now })),
         );
         if (deliveries.length) await tx.webhookDelivery.createMany({ data: deliveries, skipDuplicates: true });
+        for (const delivery of deliveries) endpointIds.add(delivery.endpointId);
         await tx.event.updateMany({ where: { id: { in: events.map(event => event.id) } }, data: { dispatchedAt: now } });
         return events.length;
       });
       total += count;
-      if (count < 100) return total;
+      if (count < 100) break;
     }
+    for (const endpointId of endpointIds) await this.queue.schedule(endpointId);
+    return total;
+  }
+
+  /**
+   * A Vercel Queues message: deliver this endpoint's due work. If another worker holds the endpoint and work is due,
+   * the message is redelivered shortly (that worker may already have finished its look at the queue).
+   */
+  async handleQueueMessage(message: EndpointMessage) {
+    const endpointId = typeof message?.endpointId === 'string' && /^[0-9a-f-]{36}$/i.test(message.endpointId) ? message.endpointId : null;
+    if (!endpointId) return;
+    const done = await this.workEndpoint(endpointId, Date.now() + 40_000);
+    if (done !== null) return;
+    const due = await this.prisma.webhookDelivery.count({
+      where: { endpointId, status: 'pending', nextAttemptAt: { lte: new Date() }, endpoint: { status: 'enabled' } },
+    });
+    if (due > 0) throw new EndpointBusyError(`Endpoint ${endpointId} is busy`);
+  }
+
+  /** With Vercel Queues: ask to come back when the endpoint's next pending delivery is due. */
+  private async scheduleNext(endpointId: string) {
+    if (!this.queue.enabled) return;
+    const next = await this.prisma.webhookDelivery.findFirst({
+      where: { endpointId, status: 'pending', nextAttemptAt: { not: null }, endpoint: { status: 'enabled' } },
+      orderBy: { nextAttemptAt: 'asc' },
+      select: { nextAttemptAt: true },
+    });
+    if (next?.nextAttemptAt) await this.queue.schedule(endpointId, next.nextAttemptAt);
   }
 
   /** Sends due deliveries, one leased worker per endpoint, many endpoints in parallel. */
@@ -175,6 +215,7 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     } finally {
       await this.prisma.webhookEndpoint.updateMany({ where: { id: endpointId, leaseUntil }, data: { leaseUntil: null } });
     }
+    await this.scheduleNext(endpointId);
     return done;
   }
 

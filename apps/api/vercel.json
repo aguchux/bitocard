@@ -4,6 +4,17 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api && npm run db:migrate:deploy -w @bitocard/api",
   "ignoreCommand": "npx turbo-ignore --fallback=HEAD^1",
+  "functions": {
+    "api/webhook-queue.mjs": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "webhook-deliveries",
+          "retryAfterSeconds": 30
+        }
+      ]
+    }
+  },
   "crons": [
     {
       "path": "/v1/cron/exchange-rates",
@@ -31,7 +42,7 @@
     },
     {
       "path": "/v1/cron/webhooks",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/v1/cron/webhooks-cleanup",
