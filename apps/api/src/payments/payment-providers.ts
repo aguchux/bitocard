@@ -1,0 +1,61 @@
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { ApiError } from '../common/errors/api-error';
+import { APP_CONFIG, type AppConfig } from '../config/config';
+import type { LedgerMode } from '../generated/prisma/client';
+import { FlutterwaveProvider } from './flutterwave.provider';
+import { MonnifyProvider } from './monnify.provider';
+import type { CheckoutProvider, ReservedAccountProvider, TransferProvider } from './providers';
+import { SandboxProvider } from './sandbox.provider';
+
+export const providerUnavailable = (what: string) =>
+  new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', `${what} is not available in your country yet.`);
+
+/**
+ * The configured payment providers, chosen by mode, country and currency. Test mode always uses the sandbox;
+ * live mode uses only providers with keys configured, in order of preference.
+ */
+@Injectable()
+export class PaymentProviders {
+  readonly sandbox: SandboxProvider;
+  readonly flutterwave: FlutterwaveProvider | null;
+  readonly monnify: MonnifyProvider | null;
+
+  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+    this.sandbox = new SandboxProvider(config.DASHBOARD_URL);
+    this.flutterwave = config.FLUTTERWAVE_SECRET_KEY
+      ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH)
+      : null;
+    this.monnify =
+      config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE
+        ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
+        : null;
+  }
+
+  checkout(mode: LedgerMode, country: string): CheckoutProvider {
+    if (mode === 'test') return this.sandbox;
+    const provider = [this.flutterwave].find(p => p?.supportsCheckout(country));
+    if (!provider) throw providerUnavailable('Card and bank top-ups');
+    return provider;
+  }
+
+  /** In failover order: Flutterwave first, then Monnify (Nigeria). */
+  reservedAccounts(mode: LedgerMode, country: string, currency: string): ReservedAccountProvider[] {
+    if (mode === 'test') return [this.sandbox];
+    const providers = [this.flutterwave, this.monnify].filter((p): p is FlutterwaveProvider | MonnifyProvider => p !== null && p.supportsReservedAccounts(country, currency));
+    if (providers.length === 0) throw providerUnavailable('Reserved bank accounts');
+    return providers;
+  }
+
+  transfers(mode: LedgerMode, country: string): TransferProvider {
+    if (mode === 'test') return this.sandbox;
+    if (!this.flutterwave?.supportsTransfers(country)) throw providerUnavailable('Bank payouts');
+    return this.flutterwave;
+  }
+
+  /** The transfer provider that handled an existing payout. */
+  transfersByName(name: string): TransferProvider | null {
+    if (name === 'sandbox') return this.sandbox;
+    if (name === 'flutterwave') return this.flutterwave;
+    return null;
+  }
+}

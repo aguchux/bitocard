@@ -1,6 +1,7 @@
-import { createParamDecorator, type ExecutionContext, SetMetadata } from '@nestjs/common';
+import { createParamDecorator, type ExecutionContext, HttpStatus, SetMetadata } from '@nestjs/common';
 import type { Request } from 'express';
 import type { ApiKeyMode, Realm, ResellerRole } from '../generated/prisma/client';
+import { ApiError } from '../common/errors/api-error';
 
 /** Who is making a request: a signed-in person (session) or a reseller system (API key). */
 export type Caller =
@@ -35,9 +36,16 @@ export const ROUTE_ROLES = 'auth:roles';
 export const ROUTE_SCOPES = 'auth:scopes';
 export const ROUTE_SESSION_ONLY = 'auth:session-only';
 export const ROUTE_ADMIN_ROLES = 'auth:admin-roles';
+export const ROUTE_CRON = 'auth:cron';
 
 /** No sign-in needed (a caller is still identified if credentials are sent). */
 export const Public = () => SetMetadata(PUBLIC_ROUTE, true);
+
+/**
+ * Scheduled jobs: no user or API key; the handler checks the cron secret itself (Vercel Cron sends it as a Bearer token,
+ * which the guard would otherwise read as an API key).
+ */
+export const CronOnly = () => SetMetadata(ROUTE_CRON, true);
 
 /** Which realm may call the route. Defaults to `reseller`; admin routes must say `admin`. */
 export const RealmOnly = (realm: Realm) => SetMetadata(ROUTE_REALM, realm);
@@ -53,6 +61,18 @@ export const Scopes = (...scopes: string[]) => SetMetadata(ROUTE_SCOPES, scopes)
 
 /** Only a signed-in person may call the route, never an API key (for example, managing API keys). */
 export const SessionOnly = () => SetMetadata(ROUTE_SESSION_ONLY, true);
+
+/** The reseller a caller acts for; people who belong to several resellers choose one with the BitoCard-Reseller header. */
+export function resellerOf(caller: Caller) {
+  if (!caller.resellerId) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'Choose a reseller account first.');
+  return caller.resellerId;
+}
+
+/** The signed-in person (never an API key) making the request. */
+export function personOf(caller: Caller) {
+  if (caller.kind !== 'session') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'session_required', 'Sign in to do this; API keys cannot.');
+  return caller.userId;
+}
 
 export const CurrentCaller = createParamDecorator((_data: unknown, context: ExecutionContext) => {
   return context.switchToHttp().getRequest<CallerRequest>().caller ?? null;

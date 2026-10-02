@@ -51,6 +51,29 @@ const schema = z.object({
 
   /** Where links in emails point (the reseller dashboard). */
   DASHBOARD_URL: z.string().url().default('https://reseller.bitocard.com'),
+
+  // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
+  FLUTTERWAVE_SECRET_KEY: z.string().optional(),
+  /** The secret hash set in the Flutterwave dashboard; webhooks must carry it in the verif-hash header. */
+  FLUTTERWAVE_WEBHOOK_HASH: z.string().optional(),
+  FLUTTERWAVE_API_URL: z.string().url().default('https://api.flutterwave.com/v3'),
+  MONNIFY_API_KEY: z.string().optional(),
+  MONNIFY_SECRET_KEY: z.string().optional(),
+  MONNIFY_CONTRACT_CODE: z.string().optional(),
+  MONNIFY_API_URL: z.string().url().default('https://api.monnify.com'),
+  /** Where the payment page sends the payer back to when the caller gives no return_url. */
+  PAYMENT_RETURN_URL: z.string().url().default('https://reseller.bitocard.com/wallet'),
+
+  // Exchange rates: Open Exchange Rates as the reference, checked against Flutterwave's offered rates.
+  OPEN_EXCHANGE_RATES_APP_ID: z.string().optional(),
+  OPEN_EXCHANGE_RATES_API_URL: z.string().url().default('https://openexchangerates.org/api'),
+  /** Rates older than this are not used for conversions. */
+  FX_MAX_AGE_MINUTES: z.coerce.number().int().positive().default(180),
+
+  /** Vercel Cron sends it as a Bearer token; scheduled jobs refuse requests without it. */
+  CRON_SECRET: z.string().optional(),
+  /** Where operational alerts go (for example, conversions paused). */
+  ALERT_EMAIL: z.string().email().default('alerts@bitocard.com'),
 });
 
 export type AppConfig = z.infer<typeof schema> & { cookieSecure: boolean };

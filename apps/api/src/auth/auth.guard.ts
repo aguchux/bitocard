@@ -10,6 +10,7 @@ import {
   type CallerRequest,
   PUBLIC_ROUTE,
   ROUTE_ADMIN_ROLES,
+  ROUTE_CRON,
   ROUTE_REALM,
   ROUTE_ROLES,
   ROUTE_SCOPES,
@@ -54,6 +55,7 @@ export class AuthGuard implements CanActivate {
     const meta = <T>(key: string) => this.reflector.getAllAndOverride<T | undefined>(key, [context.getHandler(), context.getClass()]);
     const realm: Realm = meta<Realm>(ROUTE_REALM) ?? 'reseller';
     const isPublic = meta<boolean>(PUBLIC_ROUTE) ?? false;
+    if (meta<boolean>(ROUTE_CRON)) return true;
 
     req.caller = (await this.identify(req, realm)) ?? undefined;
     const caller = req.caller;

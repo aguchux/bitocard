@@ -165,6 +165,11 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Payment providers: Flutterwave (Nigeria, Ghana, Kenya, including M-Pesa), Monnify (Nigeria), Stripe and others, chosen by the payer's country and currency. Reserved accounts through Flutterwave and Monnify.
 - **Exchange rates** come from **Open Exchange Rates** (hourly reference rates, covering NGN, GHS and KES), checked against the rates Flutterwave actually offers. BitoCard uses the less favourable of the two plus a conversion margin set by admins per currency, so rate movements between quote and settlement never cause a loss; the margin is disclosed. If the two sources differ by more than an admin-set threshold, conversions pause and admins are alerted.
 
+- **Starting values (admins can change them):** conversion margin 1.5% per currency; conversions pause when the two rate sources differ by more than 3%; rates older than 3 hours are not used.
+- **Topped-up money pays for orders but is never withdrawn;** only earnings past the payout hold can be withdrawn.
+- **Payouts to a newly added bank account start 24 hours later**, and the owner is emailed whenever one is added. The account name always comes from the bank.
+- **Premium renewals:** if the wallet cannot cover a renewal, the owner is warned and Premium continues for a 7-day grace period, then moves to Standard. Cancelling keeps Premium to the end of the paid month.
+
 ### Ledger (Decided)
 
 - Double-entry ledger in integer minor units; balances come from posted entries, never edited totals.
@@ -202,6 +207,8 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Domains and additional services can carry disclosed margins. Gift-card exchanges use transparent buy and sell quotes with fees shown.
 
 ### Tax
+
+- Starting rates, unconfirmed until a finance admin confirms each after tax advice (live sales are blocked until then): Nigeria VAT 7.5%, Ghana 20% (VAT 15% plus NHIL 2.5% and GETFund 2.5%), Kenya VAT 16%, with customer prices including tax.
 
 - Calculate and record VAT, GST or sales tax on digital sales by the customer's location, kept separate in the ledger, with compliant receipts. **Decided**
 - **BitoCard is the seller of record** for every customer sale, so BitoCard (through the Golojan entity for the region) registers for, collects and pays the tax, and issues the receipts under the reseller's store brand. The reseller's profit is their earnings from the sale. **Decided** Confirm registrations and the reseller's tax position with a tax adviser per country.
@@ -276,8 +283,8 @@ Phase 1, foundation and own-brand pilot:
 | M1 | API groundwork: Postgres + Prisma, `/v1` with OpenAPI, error format, request IDs and logs, idempotency keys, rate limits, tests | **Done** (needs Neon and Upstash connected on Vercel) |
 | M2 | Sign-in and access: accounts, roles, Google, email and mobile sign-in, admin 2-step, API keys, staff invitations | **Done** (needs Google, Resend, MailerSend and Termii keys, and `ENCRYPTION_KEY`, on Vercel) |
 | M3 | Stores, countries, settings chain, admin switches, plans | **Done** |
-| M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | Next |
-| M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | |
+| M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | **Done** (needs Flutterwave, Monnify and Open Exchange Rates keys, `CRON_SECRET`, and Vercel Pro for hourly jobs) |
+| M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | Next |
 | M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | |
 | M7 | Webhooks: outbox, delivery, retries, events API | |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | |

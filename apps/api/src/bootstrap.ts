@@ -19,7 +19,7 @@ const unversioned = ['/', 'health', 'robots.txt'];
  * Named `bootstrap` rather than `app`/`index`/`server`: Vercel treats those names in dist/ as the entrypoint.
  */
 export async function createApp(options: AppOptions = {}) {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(options), { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(options), { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   app.disable('x-powered-by');
   app.set('trust proxy', true);
@@ -30,7 +30,7 @@ export async function createApp(options: AppOptions = {}) {
   app.enableCors({
     origin: (origin, done) => done(null, !origin || originAllowed(origin, config.ALLOWED_ORIGINS)),
     credentials: true,
-    allowedHeaders: ['content-type', 'idempotency-key', 'bitocard-reseller', 'x-request-id'],
+    allowedHeaders: ['content-type', 'idempotency-key', 'bitocard-reseller', 'bitocard-mode', 'x-request-id'],
     exposedHeaders: ['request-id', 'idempotent-replayed', 'ratelimit-limit', 'ratelimit-remaining', 'ratelimit-reset', 'retry-after'],
     maxAge: 600,
   });

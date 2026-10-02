@@ -31,7 +31,7 @@ describe('creating keys', () => {
     assert.equal(created.status, 201);
     assert.match(created.json.secret, /^bc_test_[A-Za-z0-9_-]{40,}$/);
     assert.equal(created.json.prefix, created.json.secret.slice(0, 14));
-    assert.deepEqual(created.json.scopes.length, 8, 'defaults to every scope');
+    assert.deepEqual(created.json.scopes.length, 9, 'defaults to every scope');
 
     const stored = await prisma.apiKey.findUnique({ where: { id: created.json.id } });
     assert.notEqual(stored.keyHash, created.json.secret);

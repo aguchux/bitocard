@@ -11,6 +11,14 @@ import { SettingsModule } from './settings/settings.module';
 import { StoresModule } from './stores/stores.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { TeamModule } from './team/team.module';
+import { BillingModule } from './billing/billing.module';
+import { CronModule } from './cron/cron.module';
+import { FxModule } from './fx/fx.module';
+import { LedgerModule } from './ledger/ledger.module';
+import { PaymentsModule } from './payments/payments.module';
+import { ProvidersModule } from './payments/providers.module';
+import { PayoutsModule } from './payouts/payouts.module';
+import { TaxModule } from './tax/tax.module';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { RateLimitGuard } from './common/rate-limit/rate-limit.guard';
@@ -48,6 +56,14 @@ export class AppModule {
         AuthModule,
         ApiKeysModule,
         TeamModule,
+        LedgerModule,
+        ProvidersModule,
+        FxModule,
+        PaymentsModule,
+        PayoutsModule,
+        TaxModule,
+        BillingModule,
+        CronModule,
         ...(options.extraModules ?? []),
       ],
       controllers: [AppController],

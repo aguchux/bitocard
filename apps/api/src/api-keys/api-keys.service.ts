@@ -11,6 +11,7 @@ export const apiKeyScopes = [
   'orders:read',
   'orders:write',
   'wallet:read',
+  'wallet:write',
   'webhooks:manage',
   'events:read',
   'stores:manage',

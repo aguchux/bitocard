@@ -53,3 +53,21 @@ test('the pilot countries and plans are published', async () => {
   const plans = await (await get('/v1/plans')).json();
   assert.deepEqual(plans.data.map(plan => plan.code), ['standard', 'premium']);
 });
+
+test('exchange rates are listed for the pilot currencies', async () => {
+  const res = await get('/v1/exchange-rates');
+  assert.equal(res.status, 200);
+  const currencies = (await res.json()).data.map(rate => rate.currency);
+  for (const currency of ['NGN', 'GHS', 'KES']) assert.ok(currencies.includes(currency), currency);
+});
+
+test('wallets, provider webhooks and scheduled jobs refuse unauthenticated calls', async () => {
+  assert.equal((await get('/v1/wallet')).status, 401);
+  assert.equal((await get('/v1/cron/earnings')).status, 401);
+  const webhook = await fetch(`${base}/v1/webhooks/flutterwave`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(bypass ? { 'x-vercel-protection-bypass': bypass } : {}) },
+    body: '{}',
+  });
+  assert.equal(webhook.status, 401);
+});

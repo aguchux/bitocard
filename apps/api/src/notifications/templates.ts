@@ -48,3 +48,56 @@ export function invitationEmail(to: string, resellerName: string, role: string, 
     html: message.html.replace(escape(link), `<a href="${escape(link)}">${escape(link)}</a>`),
   };
 }
+
+/** Amount in minor units as a readable figure, for example NGN 15,000.00. */
+export function formatMoney(amount: bigint | number, currency: string) {
+  const value = Number(amount) / 100;
+  return `${currency} ${value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function conversionsPausedEmail(to: string, currency: string, reason: string): EmailMessage {
+  return {
+    to,
+    subject: `Alert: ${currency} conversions paused`,
+    ...layout(`${currency} conversions paused`, [reason, 'Check both rate sources, then resume conversions in the admin app.']),
+  };
+}
+
+export function bankAccountAddedEmail(to: string, bankName: string, last4: string): EmailMessage {
+  return {
+    to,
+    subject: 'A payout bank account was added to your BitoCard wallet',
+    ...layout('New payout bank account', [
+      `A bank account ending ${last4} at ${bankName} was added for withdrawals.`,
+      'Payouts to a new account start 24 hours after it is added.',
+      'If you did not add it, remove it from your dashboard and contact support straight away.',
+    ]),
+  };
+}
+
+export function payoutPaidEmail(to: string, amount: string, last4: string): EmailMessage {
+  return { to, subject: `Your withdrawal of ${amount} has been paid`, ...layout('Withdrawal paid', [`${amount} was sent to your bank account ending ${last4}.`]) };
+}
+
+export function payoutFailedEmail(to: string, amount: string, reason: string): EmailMessage {
+  return {
+    to,
+    subject: `Your withdrawal of ${amount} did not go through`,
+    ...layout('Withdrawal failed', [`Your withdrawal of ${amount} failed: ${reason}`, 'The money is back in your withdrawable earnings.']),
+  };
+}
+
+export function planRenewalFailedEmail(to: string, plan: string, amount: string, graceDays: number): EmailMessage {
+  return {
+    to,
+    subject: `We could not renew your ${plan} plan`,
+    ...layout(`Your ${plan} plan needs funds`, [
+      `We could not take ${amount} from your wallet to renew your ${plan} plan.`,
+      `Top up your wallet within ${graceDays} days to keep it; after that your account moves to the Standard plan.`,
+    ]),
+  };
+}
+
+export function planEndedEmail(to: string, plan: string): EmailMessage {
+  return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Standard plan. You can upgrade again at any time.']) };
+}

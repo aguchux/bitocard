@@ -3,5 +3,23 @@
   "framework": "nestjs",
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api && npm run db:migrate:deploy -w @bitocard/api",
-  "ignoreCommand": "npx turbo-ignore --fallback=HEAD^1"
+  "ignoreCommand": "npx turbo-ignore --fallback=HEAD^1",
+  "crons": [
+    {
+      "path": "/v1/cron/exchange-rates",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/v1/cron/payments",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/v1/cron/earnings",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/v1/cron/plans",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

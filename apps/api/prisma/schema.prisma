@@ -181,23 +181,36 @@ enum ResellerStatus {
 
 /// A reseller business. Stores, wallets and countries attach to it in later milestones.
 model Reseller {
-  id          String           @id @default(uuid()) @db.Uuid
-  name        String
+  id                    String            @id @default(uuid()) @db.Uuid
+  name                  String
   /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
-  country     String?          @db.Char(2)
-  status      ResellerStatus   @default(pending)
+  country               String?           @db.Char(2)
+  status                ResellerStatus    @default(pending)
   /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
-  planCode    String           @default("standard") @map("plan_code")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
-  members     ResellerMember[]
-  invitations Invitation[]
-  apiKeys     ApiKey[]
-  countryRef  Country?         @relation(fields: [country], references: [code])
-  plan        Plan             @relation(fields: [planCode], references: [code])
-  stores      Store[]
-  options     ResellerOption[]
-  switches    FeatureSwitch[]
+  planCode              String            @default("standard") @map("plan_code")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  members               ResellerMember[]
+  invitations           Invitation[]
+  apiKeys               ApiKey[]
+  countryRef            Country?          @relation(fields: [country], references: [code])
+  plan                  Plan              @relation(fields: [planCode], references: [code])
+  stores                Store[]
+  options               ResellerOption[]
+  switches              FeatureSwitch[]
+  /// Premium billing (M4): when the next monthly charge is due. Null means not billed (Standard, or a plan set by an admin).
+  planRenewsAt          DateTime?         @map("plan_renews_at")
+  /// Switch to Standard at the next renewal instead of charging.
+  planCancelAtPeriodEnd Boolean           @default(false) @map("plan_cancel_at_period_end")
+  /// Set when a renewal charge failed; the plan drops to Standard after the grace period.
+  planPastDueSince      DateTime?         @map("plan_past_due_since")
+  ledgerAccounts        LedgerAccount[]
+  holds                 Hold[]
+  earningsLots          EarningsLot[]
+  payments              Payment[]
+  reservedAccounts      ReservedAccount[]
+  bankAccounts          BankAccount[]
+  payouts               Payout[]
 
   @@map("resellers")
 }
@@ -274,25 +287,25 @@ model ApiKey {
 /// A market BitoCard operates in. BitoCard decides what is available in each country.
 model Country {
   /// ISO 3166-1 alpha-2.
-  code                 String            @id @db.Char(2)
-  name                 String
+  code               String            @id @db.Char(2)
+  name               String
   /// ISO 4217, for example NGN. Resellers in this country trade in this currency.
-  currency             String            @db.Char(3)
+  currency           String            @db.Char(3)
   /// Resellers based here can sign up.
-  resellerSignup       Boolean           @default(false) @map("reseller_signup")
+  resellerSignup     Boolean           @default(false) @map("reseller_signup")
   /// Reserved (dedicated) bank accounts for wallet funding; customer wallets exist only where this is on.
-  reservedAccounts     Boolean           @default(false) @map("reserved_accounts")
+  reservedAccounts   Boolean           @default(false) @map("reserved_accounts")
   /// Markup Protection Scheme: highest markup over BitoCard's wholesale price, in percent.
-  markupCapPercent     Int               @default(50) @map("markup_cap_percent")
+  markupCapPercent   Int               @default(50) @map("markup_cap_percent")
   /// Days before a sale's profit can be withdrawn.
-  payoutHoldDays       Int               @default(15) @map("payout_hold_days")
+  payoutHoldDays     Int               @default(15) @map("payout_hold_days")
   /// Smallest withdrawal, in the currency's minor units (for example kobo).
-  minWithdrawalMinor   BigInt            @map("min_withdrawal_minor")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
-  categories           CountryCategory[]
-  options              CountryOption[]
-  resellers            Reseller[]
+  minWithdrawalMinor BigInt            @map("min_withdrawal_minor")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  categories         CountryCategory[]
+  options            CountryOption[]
+  resellers          Reseller[]
 
   @@map("countries")
 }
@@ -324,11 +337,11 @@ model CountryCategory {
 
 /// Settings chain, BitoCard level: the options a country allows for a setting, and its default.
 model CountryOption {
-  countryCode   String   @map("country_code") @db.Char(2)
-  key           String
-  allowed       String[]
-  defaultValue  String   @map("default_value")
-  country       Country  @relation(fields: [countryCode], references: [code], onDelete: Cascade)
+  countryCode  String   @map("country_code") @db.Char(2)
+  key          String
+  allowed      String[]
+  defaultValue String   @map("default_value")
+  country      Country  @relation(fields: [countryCode], references: [code], onDelete: Cascade)
 
   @@id([countryCode, key])
   @@map("country_options")
@@ -363,16 +376,16 @@ model FeatureSwitch {
 
 /// Reseller plans: Standard (free) and Premium. The admin sets Premium's price.
 model Plan {
-  code       String     @id
-  name       String
+  code            String     @id
+  name            String
   /// Monthly price in US cents; converted to the reseller's currency when billed.
-  priceCents Int        @map("price_cents")
+  priceCents      Int        @map("price_cents")
   /// Plan features, for example chargeback_protection or international_selling.
-  features   String[]
+  features        String[]
   /// API features switched off for this plan. Empty means every API feature is on (the default).
-  apiRestrictions String[] @default([]) @map("api_restrictions")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
-  resellers  Reseller[]
+  apiRestrictions String[]   @default([]) @map("api_restrictions")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  resellers       Reseller[]
 
   @@map("plans")
 }
@@ -385,19 +398,19 @@ enum StoreStatus {
 
 /// A reseller's hosted storefront on <subdomain>.bitocard.com.
 model Store {
-  id             String      @id @default(uuid()) @db.Uuid
-  resellerId     String      @map("reseller_id") @db.Uuid
-  name           String
+  id           String      @id @default(uuid()) @db.Uuid
+  resellerId   String      @map("reseller_id") @db.Uuid
+  name         String
   /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.
-  subdomain      String      @unique
-  status         StoreStatus @default(draft)
-  logoUrl        String?     @map("logo_url")
-  primaryColor   String      @default("#070f4c") @map("primary_color")
-  accentColor    String      @default("#ff2382") @map("accent_color")
-  publishedAt    DateTime?   @map("published_at")
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  reseller       Reseller    @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  subdomain    String      @unique
+  status       StoreStatus @default(draft)
+  logoUrl      String?     @map("logo_url")
+  primaryColor String      @default("#070f4c") @map("primary_color")
+  accentColor  String      @default("#ff2382") @map("accent_color")
+  publishedAt  DateTime?   @map("published_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  reseller     Reseller    @relation(fields: [resellerId], references: [id], onDelete: Cascade)
 
   @@index([resellerId])
   @@map("stores")
@@ -417,4 +430,293 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// M4: ledger, wallets, exchange rates, payments, payouts and tax
+// ---------------------------------------------------------------------------
+
+/// Sandbox (test) and live money never mix: every ledger account, payment and payout belongs to one mode.
+enum LedgerMode {
+  test
+  live
+}
+
+/// What a ledger account holds. Reseller accounts are what BitoCard owes the reseller; platform accounts are BitoCard's own.
+enum AccountKind {
+  /// Topped-up money: pays wholesale cost, never withdrawn.
+  reseller_funding
+  /// Profit past its payout hold: pays wholesale cost and can be withdrawn.
+  reseller_earnings
+  /// Profit still inside the payout hold.
+  reseller_earnings_held
+  /// Held for orders in progress.
+  reseller_reserved
+  /// Withdrawals on their way to the reseller's bank.
+  reseller_payouts_pending
+  /// Money BitoCard holds at a payment provider (an asset).
+  provider_balance
+  /// Fees payment providers charge BitoCard (an expense).
+  processing_fees
+  platform_revenue
+  tax_payable
+  /// Counterpart of manual admin adjustments.
+  adjustments
+}
+
+/// One account per kind, mode, currency and owner. The balance is kept in step with the postings in the same transaction.
+model LedgerAccount {
+  id           String          @id @default(uuid()) @db.Uuid
+  kind         AccountKind
+  mode         LedgerMode
+  currency     String          @db.Char(3)
+  /// reseller:<id>, provider:<name> or platform.
+  ownerKey     String          @map("owner_key")
+  resellerId   String?         @map("reseller_id") @db.Uuid
+  /// Natural balance in minor units: positive means money held (assets, expenses) or owed (reseller and liability accounts).
+  balanceMinor BigInt          @default(0) @map("balance_minor")
+  /// Reseller money can never go below zero; a posting that would do so fails.
+  nonNegative  Boolean         @map("non_negative")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  postings     LedgerPosting[]
+  reseller     Reseller?       @relation(fields: [resellerId], references: [id])
+
+  @@unique([kind, mode, currency, ownerKey])
+  @@index([resellerId])
+  @@map("ledger_accounts")
+}
+
+/// A balanced set of postings (debits equal credits). Never edited; corrections are new entries.
+model JournalEntry {
+  id          String          @id @default(uuid()) @db.Uuid
+  mode        LedgerMode
+  /// top_up, deposit, hold, hold_release, hold_capture, earnings, earnings_release, payout, payout_reversal, payout_fee, adjustment, plan_charge.
+  type        String
+  /// Unique business reference, so the same event can never be posted twice (for example payment:<id>).
+  reference   String          @unique
+  resellerId  String?         @map("reseller_id") @db.Uuid
+  description String
+  metadata    Json?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  postings    LedgerPosting[]
+
+  @@index([resellerId, createdAt])
+  @@map("journal_entries")
+}
+
+model LedgerPosting {
+  id          String        @id @default(uuid()) @db.Uuid
+  entryId     String        @map("entry_id") @db.Uuid
+  accountId   String        @map("account_id") @db.Uuid
+  /// Positive is a debit, negative a credit. Each entry's postings sum to zero.
+  amountMinor BigInt        @map("amount_minor")
+  entry       JournalEntry  @relation(fields: [entryId], references: [id])
+  account     LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("ledger_postings")
+}
+
+enum HoldStatus {
+  held
+  captured
+  released
+}
+
+/// Wholesale cost held from a reseller's wallet while an order is fulfilled.
+model Hold {
+  id                String     @id @default(uuid()) @db.Uuid
+  resellerId        String     @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  currency          String     @db.Char(3)
+  amountMinor       BigInt     @map("amount_minor")
+  /// How much came from topped-up funds and how much from earnings, so a release returns it to the same place.
+  fromFundingMinor  BigInt     @map("from_funding_minor")
+  fromEarningsMinor BigInt     @map("from_earnings_minor")
+  status            HoldStatus @default(held)
+  reference         String     @unique
+  createdAt         DateTime   @default(now()) @map("created_at")
+  resolvedAt        DateTime?  @map("resolved_at")
+  reseller          Reseller   @relation(fields: [resellerId], references: [id])
+
+  @@index([resellerId])
+  @@map("holds")
+}
+
+/// Profit from one sale, withdrawable once its payout hold ends.
+model EarningsLot {
+  id          String     @id @default(uuid()) @db.Uuid
+  resellerId  String     @map("reseller_id") @db.Uuid
+  mode        LedgerMode
+  currency    String     @db.Char(3)
+  amountMinor BigInt     @map("amount_minor")
+  reference   String     @unique
+  releaseAt   DateTime   @map("release_at")
+  releasedAt  DateTime?  @map("released_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  reseller    Reseller   @relation(fields: [resellerId], references: [id])
+
+  @@index([releasedAt, releaseAt])
+  @@index([resellerId])
+  @@map("earnings_lots")
+}
+
+/// Latest rate from each source, in units of the currency per US dollar.
+model ExchangeRate {
+  currency    String   @db.Char(3)
+  /// open_exchange_rates or flutterwave.
+  source      String
+  unitsPerUsd Decimal  @map("units_per_usd") @db.Decimal(24, 10)
+  fetchedAt   DateTime @map("fetched_at")
+
+  @@id([currency, source])
+  @@map("exchange_rates")
+}
+
+/// Admin settings per currency: the disclosed conversion margin, and when to pause conversions.
+model CurrencySetting {
+  currency      String   @id @db.Char(3)
+  /// Conversion margin in basis points (150 = 1.5%).
+  marginBps     Int      @default(150) @map("margin_bps")
+  /// Pause conversions when the two rate sources differ by more than this, in basis points.
+  divergenceBps Int      @default(300) @map("divergence_bps")
+  paused        Boolean  @default(false)
+  pausedReason  String?  @map("paused_reason")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("currency_settings")
+}
+
+enum PaymentPurpose {
+  wallet_top_up
+  reserved_account_deposit
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+}
+
+/// Money coming in: checkout top-ups and deposits into reserved bank accounts. Credited once, after the provider confirms.
+model Payment {
+  id                    String           @id @default(uuid()) @db.Uuid
+  resellerId            String           @map("reseller_id") @db.Uuid
+  mode                  LedgerMode
+  purpose               PaymentPurpose
+  /// flutterwave, monnify or sandbox.
+  provider              String
+  /// Our reference sent to the provider (tx_ref).
+  reference             String           @unique
+  /// The provider's own transaction ID, once known. Unique, so one provider transaction is credited once.
+  providerTransactionId String?          @map("provider_transaction_id")
+  amountMinor           BigInt           @map("amount_minor")
+  currency              String           @db.Char(3)
+  feeMinor              BigInt           @default(0) @map("fee_minor")
+  status                PaymentStatus    @default(pending)
+  checkoutUrl           String?          @map("checkout_url")
+  returnUrl             String?          @map("return_url")
+  reservedAccountId     String?          @map("reserved_account_id") @db.Uuid
+  failureReason         String?          @map("failure_reason")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  completedAt           DateTime?        @map("completed_at")
+  reseller              Reseller         @relation(fields: [resellerId], references: [id])
+  reservedAccount       ReservedAccount? @relation(fields: [reservedAccountId], references: [id])
+
+  @@unique([provider, providerTransactionId])
+  @@index([resellerId, createdAt])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+/// A bank account number dedicated to one wallet; transfers into it top the wallet up.
+model ReservedAccount {
+  id                String     @id @default(uuid()) @db.Uuid
+  resellerId        String     @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  provider          String
+  currency          String     @db.Char(3)
+  bankName          String     @map("bank_name")
+  accountNumber     String     @map("account_number")
+  accountName       String     @map("account_name")
+  /// Our reference for the reservation at the provider; deposits carry it.
+  providerReference String     @map("provider_reference")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  reseller          Reseller   @relation(fields: [resellerId], references: [id])
+  payments          Payment[]
+
+  @@unique([provider, accountNumber])
+  @@index([resellerId])
+  @@index([providerReference])
+  @@map("reserved_accounts")
+}
+
+/// Where a reseller's withdrawals go. The account name comes from the bank, never from the reseller.
+model BankAccount {
+  id                     String     @id @default(uuid()) @db.Uuid
+  resellerId             String     @map("reseller_id") @db.Uuid
+  mode                   LedgerMode
+  country                String     @db.Char(2)
+  currency               String     @db.Char(3)
+  bankCode               String     @map("bank_code")
+  bankName               String     @map("bank_name")
+  accountNumberEncrypted String     @map("account_number_encrypted")
+  accountNumberLast4     String     @map("account_number_last4")
+  accountName            String     @map("account_name")
+  createdById            String     @map("created_by_id") @db.Uuid
+  createdAt              DateTime   @default(now()) @map("created_at")
+  removedAt              DateTime?  @map("removed_at")
+  reseller               Reseller   @relation(fields: [resellerId], references: [id])
+  payouts                Payout[]
+
+  @@index([resellerId])
+  @@map("bank_accounts")
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  paid
+  failed
+}
+
+/// A withdrawal of earnings to a bank account.
+model Payout {
+  id                 String       @id @default(uuid()) @db.Uuid
+  resellerId         String       @map("reseller_id") @db.Uuid
+  mode               LedgerMode
+  bankAccountId      String       @map("bank_account_id") @db.Uuid
+  amountMinor        BigInt       @map("amount_minor")
+  currency           String       @db.Char(3)
+  status             PayoutStatus @default(pending)
+  reference          String       @unique
+  provider           String
+  providerTransferId String?      @map("provider_transfer_id")
+  failureReason      String?      @map("failure_reason")
+  requestedById      String       @map("requested_by_id") @db.Uuid
+  createdAt          DateTime     @default(now()) @map("created_at")
+  completedAt        DateTime?    @map("completed_at")
+  reseller           Reseller     @relation(fields: [resellerId], references: [id])
+  bankAccount        BankAccount  @relation(fields: [bankAccountId], references: [id])
+
+  @@index([resellerId, createdAt])
+  @@index([status])
+  @@map("payouts")
+}
+
+/// Tax BitoCard collects as seller of record, by the customer's country. Live sales need a rate a finance admin has confirmed.
+model TaxRate {
+  countryCode      String   @id @map("country_code") @db.Char(2)
+  /// For example VAT.
+  name             String
+  /// Basis points (750 = 7.5%).
+  rateBps          Int      @map("rate_bps")
+  /// Customer prices include the tax (the usual consumer display in the pilot countries).
+  pricesIncludeTax Boolean  @default(true) @map("prices_include_tax")
+  /// Confirmed by a finance admin after tax advice. Unconfirmed rates work in the sandbox only.
+  confirmed        Boolean  @default(false)
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("tax_rates")
 }
