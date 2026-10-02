@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { CallHandler, ExecutionContext, HttpStatus, Injectable, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, HttpStatus, Injectable, NestInterceptor, SetMetadata } from '@nestjs/common';
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
@@ -10,6 +10,13 @@ import { PrismaService } from '../../database/prisma.service';
 import { ApiError } from '../errors/api-error';
 
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
+const SKIP_IDEMPOTENCY = 'idempotency:skip';
+
+/**
+ * Exempts a POST route from idempotency keys. Only for routes whose responses must never be stored or replayed
+ * (they set cookies or return secrets) and that are safe to repeat, such as sign-in.
+ */
+export const SkipIdempotency = () => SetMetadata(SKIP_IDEMPOTENCY, true);
 const keyFormat = /^[\x21-\x7e]{1,255}$/;
 const ttlMs = 24 * 60 * 60 * 1000;
 
@@ -29,6 +36,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
     if (req.method !== 'POST') return next.handle();
+    if (this.reflector.getAllAndOverride<boolean>(SKIP_IDEMPOTENCY, [context.getHandler(), context.getClass()])) return next.handle();
 
     const key = req.header(IDEMPOTENCY_HEADER);
     if (!key) {
@@ -102,7 +110,7 @@ function isHttpError(error: unknown) {
   return typeof (error as { getStatus?: unknown })?.getStatus === 'function';
 }
 
-/** Keys are unique per caller. Until sign-in exists (M2) every caller shares the anonymous scope. */
+/** Keys are unique per caller (a person or an API key); requests without credentials share the anonymous scope. */
 export function callerScope(req: Request) {
   return (req as Request & { caller?: { id: string } }).caller?.id ?? 'anonymous';
 }

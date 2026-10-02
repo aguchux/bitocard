@@ -2,6 +2,15 @@ import { DynamicModule, Module, type Type } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
+import { AuthGuard } from './auth/auth.guard';
+import { AuditModule } from './audit/audit.service';
+import { AuthModule } from './auth/auth.module';
+import { CountriesModule } from './countries/countries.module';
+import { PlansModule } from './plans/plans.module';
+import { SettingsModule } from './settings/settings.module';
+import { StoresModule } from './stores/stores.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { TeamModule } from './team/team.module';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { RateLimitGuard } from './common/rate-limit/rate-limit.guard';
@@ -11,6 +20,7 @@ import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import type { DatabaseAdapter } from './database/prisma.service';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 export type AppOptions = {
   /** Database driver adapter to use instead of DATABASE_URL (tests use an in-process Postgres). */
@@ -28,12 +38,23 @@ export class AppModule {
         ConfigModule,
         LoggerModule.forRootAsync({ inject: [APP_CONFIG], useFactory: (config: AppConfig) => loggerParams(config) }),
         DatabaseModule.register(options.databaseAdapter),
+        NotificationsModule,
+        AuditModule,
+        CountriesModule,
+        SettingsModule,
+        PlansModule,
+        StoresModule,
         HealthModule,
+        AuthModule,
+        ApiKeysModule,
+        TeamModule,
         ...(options.extraModules ?? []),
       ],
       controllers: [AppController],
       providers: [
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
+        // Guards run in this order: identify the caller, then rate-limit per caller.
+        { provide: APP_GUARD, useExisting: AuthGuard },
         { provide: APP_GUARD, useClass: RateLimitGuard },
         { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
       ],

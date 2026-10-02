@@ -36,3 +36,385 @@ model IdempotencyKey {
   @@index([expiresAt])
   @@map("idempotency_keys")
 }
+
+// ---------------------------------------------------------------------------
+// M2: sign-in and access
+// ---------------------------------------------------------------------------
+
+/// Two separate worlds: resellers (and their staff) sign in to the dashboard; admins sign in to admin.bitocard.com.
+/// The same email can exist once in each realm.
+enum Realm {
+  reseller
+  admin
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  realm           Realm
+  /// Stored lower-case.
+  email           String
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  /// E.164, for example +2348012345678. Only resellers use phone sign-in.
+  phone           String?
+  phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  /// Argon2id. Null for Google-only accounts.
+  passwordHash    String?    @map("password_hash")
+  name            String
+  status          UserStatus @default(active)
+  /// Admin roles (super_admin, operations, finance, support). Reseller staff roles live on ResellerMember.
+  adminRoles      String[]   @default([]) @map("admin_roles")
+  failedSignIns   Int        @default(0) @map("failed_sign_ins")
+  lockedUntil     DateTime?  @map("locked_until")
+  lastSignInAt    DateTime?  @map("last_sign_in_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  oauthAccounts     OAuthAccount[]
+  sessions          Session[]
+  verificationCodes VerificationCode[]
+  totp              TotpCredential?
+  memberships       ResellerMember[]
+  apiKeysCreated    ApiKey[]
+
+  @@unique([realm, email])
+  @@unique([realm, phone])
+  @@map("users")
+}
+
+model OAuthAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  provider       String
+  providerUserId String   @map("provider_user_id")
+  email          String
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+/// A Google sign-in in progress (10 minutes). The browser holds the state token in a cookie; this holds the PKCE verifier.
+model OAuthState {
+  /// SHA-256 of the state token.
+  id           String   @id @db.Char(64)
+  codeVerifier String   @map("code_verifier")
+  nonce        String
+  returnTo     String   @map("return_to")
+  /// Set when a signed-in person is linking Google to their existing account.
+  linkUserId   String?  @map("link_user_id") @db.Uuid
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("oauth_states")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  realm      Realm
+  /// SHA-256 of the session token; the token itself only ever lives in the cookie.
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum CodePurpose {
+  email_verification
+  phone_verification
+  password_reset
+  admin_mfa_challenge
+}
+
+/// Single-use codes sent by email or SMS, and short-lived admin sign-in challenges. Only the hash is stored.
+model VerificationCode {
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     String      @map("user_id") @db.Uuid
+  purpose    CodePurpose
+  /// The email address or phone number the code was sent to.
+  target     String
+  codeHash   String      @map("code_hash") @db.Char(64)
+  attempts   Int         @default(0)
+  expiresAt  DateTime    @map("expires_at")
+  consumedAt DateTime?   @map("consumed_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("verification_codes")
+}
+
+/// Admin authenticator-app secret, encrypted at rest. Admins cannot use the admin app until it is confirmed.
+model TotpCredential {
+  userId             String    @id @map("user_id") @db.Uuid
+  secretEncrypted    String    @map("secret_encrypted")
+  confirmedAt        DateTime? @map("confirmed_at")
+  /// SHA-256 hashes of one-time recovery codes; used codes are removed.
+  recoveryCodeHashes String[]  @default([]) @map("recovery_code_hashes")
+  /// Last accepted time step, so a code cannot be replayed.
+  lastUsedStep       BigInt?   @map("last_used_step")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("totp_credentials")
+}
+
+enum ResellerStatus {
+  pending
+  active
+  suspended
+}
+
+/// A reseller business. Stores, wallets and countries attach to it in later milestones.
+model Reseller {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String
+  /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
+  country     String?          @db.Char(2)
+  status      ResellerStatus   @default(pending)
+  /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
+  planCode    String           @default("standard") @map("plan_code")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  members     ResellerMember[]
+  invitations Invitation[]
+  apiKeys     ApiKey[]
+  countryRef  Country?         @relation(fields: [country], references: [code])
+  plan        Plan             @relation(fields: [planCode], references: [code])
+  stores      Store[]
+  options     ResellerOption[]
+  switches    FeatureSwitch[]
+
+  @@map("resellers")
+}
+
+enum ResellerRole {
+  owner
+  admin
+  developer
+  finance
+  support
+}
+
+model ResellerMember {
+  resellerId String       @map("reseller_id") @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  role       ResellerRole
+  createdAt  DateTime     @default(now()) @map("created_at")
+  reseller   Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([resellerId, userId])
+  @@index([userId])
+  @@map("reseller_members")
+}
+
+model Invitation {
+  id          String       @id @default(uuid()) @db.Uuid
+  resellerId  String       @map("reseller_id") @db.Uuid
+  email       String
+  role        ResellerRole
+  tokenHash   String       @unique @map("token_hash") @db.Char(64)
+  invitedById String       @map("invited_by_id") @db.Uuid
+  expiresAt   DateTime     @map("expires_at")
+  acceptedAt  DateTime?    @map("accepted_at")
+  revokedAt   DateTime?    @map("revoked_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  reseller    Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@index([resellerId])
+  @@map("invitations")
+}
+
+enum ApiKeyMode {
+  test
+  live
+}
+
+/// Secret API keys for reseller systems. Only the SHA-256 hash is stored; the key is shown once at creation.
+model ApiKey {
+  id          String     @id @default(uuid()) @db.Uuid
+  resellerId  String     @map("reseller_id") @db.Uuid
+  name        String
+  mode        ApiKeyMode
+  /// First characters of the key (for example bc_live_a1b2c3), shown so people can tell keys apart.
+  prefix      String
+  keyHash     String     @unique @map("key_hash") @db.Char(64)
+  scopes      String[]
+  createdById String     @map("created_by_id") @db.Uuid
+  lastUsedAt  DateTime?  @map("last_used_at")
+  expiresAt   DateTime?  @map("expires_at")
+  revokedAt   DateTime?  @map("revoked_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  reseller    Reseller   @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  createdBy   User       @relation(fields: [createdById], references: [id])
+
+  @@index([resellerId])
+  @@map("api_keys")
+}
+
+// ---------------------------------------------------------------------------
+// M3: countries, settings chain, switches, plans and stores
+// ---------------------------------------------------------------------------
+
+/// A market BitoCard operates in. BitoCard decides what is available in each country.
+model Country {
+  /// ISO 3166-1 alpha-2.
+  code                 String            @id @db.Char(2)
+  name                 String
+  /// ISO 4217, for example NGN. Resellers in this country trade in this currency.
+  currency             String            @db.Char(3)
+  /// Resellers based here can sign up.
+  resellerSignup       Boolean           @default(false) @map("reseller_signup")
+  /// Reserved (dedicated) bank accounts for wallet funding; customer wallets exist only where this is on.
+  reservedAccounts     Boolean           @default(false) @map("reserved_accounts")
+  /// Markup Protection Scheme: highest markup over BitoCard's wholesale price, in percent.
+  markupCapPercent     Int               @default(50) @map("markup_cap_percent")
+  /// Days before a sale's profit can be withdrawn.
+  payoutHoldDays       Int               @default(15) @map("payout_hold_days")
+  /// Smallest withdrawal, in the currency's minor units (for example kobo).
+  minWithdrawalMinor   BigInt            @map("min_withdrawal_minor")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  categories           CountryCategory[]
+  options              CountryOption[]
+  resellers            Reseller[]
+
+  @@map("countries")
+}
+
+/// Product categories sold through BitoCard. Suppliers and products attach to these in M5.
+enum ProductCategory {
+  gift_cards
+  airtime
+  data
+  bills
+  pay_tv
+  esim
+  software
+  virtual_numbers
+  virtual_cards
+}
+
+/// Whether a category is sold in a country, and whether storefront customers must verify their identity to buy it.
+model CountryCategory {
+  countryCode          String          @map("country_code") @db.Char(2)
+  category             ProductCategory
+  enabled              Boolean         @default(false)
+  customerVerification Boolean         @default(false) @map("customer_verification")
+  country              Country         @relation(fields: [countryCode], references: [code], onDelete: Cascade)
+
+  @@id([countryCode, category])
+  @@map("country_categories")
+}
+
+/// Settings chain, BitoCard level: the options a country allows for a setting, and its default.
+model CountryOption {
+  countryCode   String   @map("country_code") @db.Char(2)
+  key           String
+  allowed       String[]
+  defaultValue  String   @map("default_value")
+  country       Country  @relation(fields: [countryCode], references: [code], onDelete: Cascade)
+
+  @@id([countryCode, key])
+  @@map("country_options")
+}
+
+/// Settings chain, reseller level: the reseller's choice among the options their country allows.
+model ResellerOption {
+  resellerId String   @map("reseller_id") @db.Uuid
+  key        String
+  value      String
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  reseller   Reseller @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@id([resellerId, key])
+  @@map("reseller_options")
+}
+
+/// Admin on/off switches for gated features. A reseller switch overrides the country's, which overrides the global one.
+model FeatureSwitch {
+  id          String    @id @default(uuid()) @db.Uuid
+  key         String
+  /// Exactly one scope: global (both null), a country, or a reseller.
+  countryCode String?   @map("country_code") @db.Char(2)
+  resellerId  String?   @map("reseller_id") @db.Uuid
+  enabled     Boolean
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  reseller    Reseller? @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@unique([key, countryCode, resellerId])
+  @@map("feature_switches")
+}
+
+/// Reseller plans: Standard (free) and Premium. The admin sets Premium's price.
+model Plan {
+  code       String     @id
+  name       String
+  /// Monthly price in US cents; converted to the reseller's currency when billed.
+  priceCents Int        @map("price_cents")
+  /// Plan features, for example chargeback_protection or international_selling.
+  features   String[]
+  /// API features switched off for this plan. Empty means every API feature is on (the default).
+  apiRestrictions String[] @default([]) @map("api_restrictions")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  resellers  Reseller[]
+
+  @@map("plans")
+}
+
+enum StoreStatus {
+  draft
+  published
+  suspended
+}
+
+/// A reseller's hosted storefront on <subdomain>.bitocard.com.
+model Store {
+  id             String      @id @default(uuid()) @db.Uuid
+  resellerId     String      @map("reseller_id") @db.Uuid
+  name           String
+  /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.
+  subdomain      String      @unique
+  status         StoreStatus @default(draft)
+  logoUrl        String?     @map("logo_url")
+  primaryColor   String      @default("#070f4c") @map("primary_color")
+  accentColor    String      @default("#ff2382") @map("accent_color")
+  publishedAt    DateTime?   @map("published_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  reseller       Reseller    @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@index([resellerId])
+  @@map("stores")
+}
+
+/// Who changed what in the admin app. Written for every admin change; never edited.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

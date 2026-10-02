@@ -1,10 +1,13 @@
 import 'reflect-metadata';
+import cookieParser from 'cookie-parser';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule, type AppOptions } from './app.module';
+import { originAllowed } from './auth/auth.guard';
+import { APP_CONFIG, type AppConfig } from './config/config';
 import { validationPipe } from './common/errors/validation';
 import { securityHeaders } from './common/security-headers';
 
@@ -21,6 +24,16 @@ export async function createApp(options: AppOptions = {}) {
   app.disable('x-powered-by');
   app.set('trust proxy', true);
   app.use(securityHeaders);
+  app.use(cookieParser());
+  const config = app.get<AppConfig>(APP_CONFIG);
+  // Browsers on BitoCard apps may call the API with cookies; anything else uses API keys and needs no CORS.
+  app.enableCors({
+    origin: (origin, done) => done(null, !origin || originAllowed(origin, config.ALLOWED_ORIGINS)),
+    credentials: true,
+    allowedHeaders: ['content-type', 'idempotency-key', 'bitocard-reseller', 'x-request-id'],
+    exposedHeaders: ['request-id', 'idempotent-replayed', 'ratelimit-limit', 'ratelimit-remaining', 'ratelimit-reset', 'retry-after'],
+    maxAge: 600,
+  });
   app.setGlobalPrefix('v1', { exclude: unversioned });
   app.useGlobalPipes(validationPipe);
   app.enableShutdownHooks();

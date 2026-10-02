@@ -274,9 +274,9 @@ Phase 1, foundation and own-brand pilot:
 | # | Milestone | Status |
 |---|---|---|
 | M1 | API groundwork: Postgres + Prisma, `/v1` with OpenAPI, error format, request IDs and logs, idempotency keys, rate limits, tests | **Done** (needs Neon and Upstash connected on Vercel) |
-| M2 | Sign-in and access: accounts, roles, Google, email and mobile sign-in, admin 2-step, API keys | Next |
-| M3 | Stores, countries, settings chain, admin switches, plans | |
-| M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | |
+| M2 | Sign-in and access: accounts, roles, Google, email and mobile sign-in, admin 2-step, API keys, staff invitations | **Done** (needs Google, Resend, MailerSend and Termii keys, and `ENCRYPTION_KEY`, on Vercel) |
+| M3 | Stores, countries, settings chain, admin switches, plans | **Done** |
+| M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | Next |
 | M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | |
 | M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | |
 | M7 | Webhooks: outbox, delivery, retries, events API | |

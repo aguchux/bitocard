@@ -1,7 +1,9 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
+import { Public } from './auth/caller';
 
 @ApiExcludeController()
+@Public()
 @Controller()
 export class AppController {
   @Get()

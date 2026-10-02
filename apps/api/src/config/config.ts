@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+const list = z
+  .string()
+  .transform(value => value.split(',').map(item => item.trim()).filter(Boolean));
+
+const flag = z.enum(['on', 'off']).transform(value => value === 'on');
+
 const schema = z.object({
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
   DATABASE_URL: z.string().url().optional(),
@@ -7,9 +13,47 @@ const schema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(600),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
+
+  // Browser access. Origins may use a leading wildcard for subdomains, for example https://*.bitocard.com.
+  ALLOWED_ORIGINS: list.prefault('https://bitocard.com,https://*.bitocard.com'),
+  /** Cookie domain shared by the BitoCard apps (.bitocard.com in production); unset means host-only cookies. */
+  SESSION_COOKIE_DOMAIN: z.string().optional(),
+  /** Secure cookies everywhere except plain-HTTP local development and tests. */
+  COOKIE_SECURE: flag.optional(),
+
+  // Passwords.
+  PASSWORD_BREACH_CHECK: flag.prefault('on'),
+  HIBP_API_URL: z.string().url().default('https://api.pwnedpasswords.com'),
+
+  // Email: providers are tried in order; with no API keys, emails are only logged (development and tests).
+  EMAIL_FROM: z.string().default('BitoCard <no-reply@bitocard.com>'),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_API_URL: z.string().url().default('https://api.resend.com'),
+  MAILERSEND_API_KEY: z.string().optional(),
+  MAILERSEND_API_URL: z.string().url().default('https://api.mailersend.com'),
+
+  // SMS for sign-in codes (Termii). The base URL is account-specific; see the Termii dashboard.
+  TERMII_API_KEY: z.string().optional(),
+  TERMII_API_URL: z.string().url().default('https://api.ng.termii.com'),
+  TERMII_SENDER_ID: z.string().default('BitoCard'),
+
+  // Sign in with Google (resellers only). Unset client ID means Google sign-in is switched off.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.string().url().default('https://api.bitocard.com/v1/auth/google/callback'),
+  GOOGLE_AUTH_URL: z.string().url().default('https://accounts.google.com/o/oauth2/v2/auth'),
+  GOOGLE_TOKEN_URL: z.string().url().default('https://oauth2.googleapis.com/token'),
+  GOOGLE_JWKS_URL: z.string().url().default('https://www.googleapis.com/oauth2/v3/certs'),
+
+  // Admins: allowed email domains, and the 32-byte base64 key that encrypts authenticator secrets.
+  ADMIN_EMAIL_DOMAINS: list.prefault('bitocard.com,golojan.co.uk'),
+  ENCRYPTION_KEY: z.string().optional(),
+
+  /** Where links in emails point (the reseller dashboard). */
+  DASHBOARD_URL: z.string().url().default('https://reseller.bitocard.com'),
 });
 
-export type AppConfig = z.infer<typeof schema>;
+export type AppConfig = z.infer<typeof schema> & { cookieSecure: boolean };
 
 /** Empty strings count as unset, so a blank line in .env never fails validation. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -19,7 +63,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const problems = parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
     throw new Error(`Invalid environment configuration: ${problems}`);
   }
-  return parsed.data;
+  const config = parsed.data;
+  return { ...config, cookieSecure: config.COOKIE_SECURE ?? Boolean(config.VERCEL_ENV) };
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');

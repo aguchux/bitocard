@@ -1,6 +1,890 @@
 {
   "openapi": "3.0.0",
-  "paths": {},
+  "paths": {
+    "/v1/countries": {
+      "get": {
+        "description": "Each with its currency and the product categories sold there.",
+        "operationId": "CountriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List countries open to resellers",
+        "tags": [
+          "Countries"
+        ]
+      }
+    },
+    "/v1/countries/{code}": {
+      "get": {
+        "operationId": "CountriesController_get",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Retrieve a country",
+        "tags": [
+          "Countries"
+        ]
+      }
+    },
+    "/v1/settings": {
+      "get": {
+        "description": "Each option shows the effective value, what is allowed in your country, and whether it is your choice or the default.",
+        "operationId": "SettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Retrieve settings",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/v1/settings/options/{key}": {
+      "put": {
+        "description": "The value must be one your country allows.",
+        "operationId": "SettingsController_setOption",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptionValueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Choose an option",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/v1/plans": {
+      "get": {
+        "description": "Standard is free; Premium adds chargeback handling, priority support and international selling.",
+        "operationId": "PlansController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List reseller plans",
+        "tags": [
+          "Plans"
+        ]
+      }
+    },
+    "/v1/reseller": {
+      "patch": {
+        "description": "The business name, and the country if it is not yet set.",
+        "operationId": "ResellerController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResellerProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update business details",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/stores/subdomains/{subdomain}": {
+      "get": {
+        "operationId": "StoresController_availability",
+        "parameters": [
+          {
+            "name": "subdomain",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Check whether a store address is free",
+        "tags": [
+          "Stores"
+        ]
+      }
+    },
+    "/v1/stores": {
+      "post": {
+        "description": "Starts as a draft on <subdomain>.bitocard.com. One store per reseller for now.",
+        "operationId": "StoresController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStoreDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a store",
+        "tags": [
+          "Stores"
+        ]
+      },
+      "get": {
+        "operationId": "StoresController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List stores",
+        "tags": [
+          "Stores"
+        ]
+      }
+    },
+    "/v1/stores/{id}": {
+      "patch": {
+        "description": "Name and branding any time; the address only while it is a draft.",
+        "operationId": "StoresController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreFieldsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a store",
+        "tags": [
+          "Stores"
+        ]
+      }
+    },
+    "/v1/stores/{id}/publish": {
+      "post": {
+        "description": "Needs a confirmed owner email. Paid checkout also needs funding and verification.",
+        "operationId": "StoresController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish a store",
+        "tags": [
+          "Stores"
+        ]
+      }
+    },
+    "/v1/stores/{id}/unpublish": {
+      "post": {
+        "operationId": "StoresController_unpublish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unpublish a store",
+        "tags": [
+          "Stores"
+        ]
+      }
+    },
+    "/v1/storefronts/{subdomain}": {
+      "get": {
+        "operationId": "StorefrontsController_storefront",
+        "parameters": [
+          {
+            "name": "subdomain",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Look up a published store by subdomain",
+        "tags": [
+          "Stores"
+        ]
+      }
+    },
+    "/v1/auth/signup": {
+      "post": {
+        "description": "A 6-digit code is emailed to confirm the address.",
+        "operationId": "AuthController_signUp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a reseller account and sign in",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/signin": {
+      "post": {
+        "operationId": "AuthController_signIn",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Sign in with email or verified mobile number and password",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/signout": {
+      "post": {
+        "operationId": "AuthController_signOut",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "End the current session",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "operationId": "AuthController_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The signed-in person and the reseller accounts they belong to",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/email/verify": {
+      "post": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm your email address with the code that was sent to it",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/email/resend": {
+      "post": {
+        "operationId": "AuthController_resendVerification",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Send a new email confirmation code (at most one a minute)",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/phone": {
+      "post": {
+        "description": "A 6-digit code is sent by SMS; the number is used once confirmed.",
+        "operationId": "AuthController_addPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Add or change your mobile number",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/phone/verify": {
+      "post": {
+        "description": "You can then sign in with it.",
+        "operationId": "AuthController_verifyPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm your mobile number",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/password/forgot": {
+      "post": {
+        "description": "Always reports success, whether or not the account exists.",
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Email a password reset code",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/password/reset": {
+      "post": {
+        "description": "Signs out every existing session.",
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Choose a new password with the emailed code",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/google/start": {
+      "get": {
+        "description": "Afterwards the browser returns to `return_to` (a BitoCard app; defaults to the dashboard), with `?auth_error=<code>` if sign-in failed. With `intent=link`, a signed-in person links Google to their account.",
+        "operationId": "GoogleController_start",
+        "parameters": [
+          {
+            "name": "return_to",
+            "required": false,
+            "in": "query",
+            "description": "A BitoCard app URL to return to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intent",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "signin",
+                "link"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Redirects to Google",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/google/callback": {
+      "get": {
+        "description": "Not called directly.",
+        "operationId": "GoogleController_callback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Google returns here",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/api-keys": {
+      "post": {
+        "description": "The secret is returned only in this response; store it safely.",
+        "operationId": "ApiKeysController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a key",
+        "tags": [
+          "API keys"
+        ]
+      },
+      "get": {
+        "description": "Secrets are never shown again.",
+        "operationId": "ApiKeysController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Every key, including revoked and expired ones",
+        "tags": [
+          "API keys"
+        ]
+      }
+    },
+    "/v1/api-keys/{id}/roll": {
+      "post": {
+        "description": "The old one keeps working for the overlap period.",
+        "operationId": "ApiKeysController_roll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Replace a key with a new secret",
+        "tags": [
+          "API keys"
+        ]
+      }
+    },
+    "/v1/api-keys/{id}": {
+      "delete": {
+        "operationId": "ApiKeysController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke a key immediately",
+        "tags": [
+          "API keys"
+        ]
+      }
+    },
+    "/v1/account": {
+      "get": {
+        "description": "The reseller account and how the request is authenticated. A simple first call to check an API key.",
+        "operationId": "AccountController_account",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retrieve the account",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/team": {
+      "get": {
+        "description": "Every member can see the team.",
+        "operationId": "TeamController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Members and pending invitations",
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/v1/team/invitations": {
+      "post": {
+        "description": "They get a link valid for 7 days.",
+        "operationId": "TeamController_invite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Invite someone by email",
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/v1/team/invitations/{id}": {
+      "delete": {
+        "operationId": "TeamController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Cancel a pending invitation",
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/v1/team/invitations/accept": {
+      "post": {
+        "description": "New people can instead sign up with the token.",
+        "operationId": "TeamController_accept",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Accept an invitation while signed in with the invited email",
+        "tags": [
+          "Team"
+        ]
+      }
+    },
+    "/v1/team/members/{userId}": {
+      "patch": {
+        "description": "The owner cannot be changed.",
+        "operationId": "TeamController_changeRole",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Change a member's role",
+        "tags": [
+          "Team"
+        ]
+      },
+      "delete": {
+        "description": "They lose access at once. The owner cannot be removed.",
+        "operationId": "TeamController_remove",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove a member",
+        "tags": [
+          "Team"
+        ]
+      }
+    }
+  },
   "info": {
     "title": "BitoCard API",
     "description": "One API for catalogue, quotes, orders, wallets and webhooks. Sandbox and live share this address; your API key decides the mode.",
@@ -22,6 +906,338 @@
         "description": "API key: bc_test_… (sandbox) or bc_live_… (live)."
       }
     },
-    "schemas": {}
+    "schemas": {
+      "OptionValueDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "example": "bank"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "ResellerProfileDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "country": {
+            "type": "string",
+            "description": "Business country, if not yet set. Cannot be changed afterwards.",
+            "example": "NG"
+          }
+        }
+      },
+      "CreateStoreDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60,
+            "example": "Ada Digital"
+          },
+          "subdomain": {
+            "type": "string",
+            "description": "The store address: <subdomain>.bitocard.com.",
+            "example": "adadigital"
+          },
+          "logo_url": {
+            "type": "object",
+            "description": "HTTPS URL of the logo, or null to remove it.",
+            "nullable": true
+          },
+          "primary_color": {
+            "type": "string",
+            "example": "#070f4c"
+          },
+          "accent_color": {
+            "type": "string",
+            "example": "#ff2382"
+          }
+        }
+      },
+      "StoreFieldsDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60,
+            "example": "Ada Digital"
+          },
+          "subdomain": {
+            "type": "string",
+            "description": "The store address: <subdomain>.bitocard.com.",
+            "example": "adadigital"
+          },
+          "logo_url": {
+            "type": "object",
+            "description": "HTTPS URL of the logo, or null to remove it.",
+            "nullable": true
+          },
+          "primary_color": {
+            "type": "string",
+            "example": "#070f4c"
+          },
+          "accent_color": {
+            "type": "string",
+            "example": "#ff2382"
+          }
+        }
+      },
+      "SignUpDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Your full name.",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Ada Obi"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address; a 6-digit code is sent to confirm it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "description": "At least 10 characters. Passwords found in public data breaches are refused.",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "correct horse battery"
+          },
+          "business_name": {
+            "type": "string",
+            "description": "Business name shown on the reseller account. Defaults to your name.",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Ada Digital"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE. Not needed with an invitation.",
+            "pattern": "^[A-Z]{2}$",
+            "example": "NG"
+          },
+          "invitation_token": {
+            "type": "string",
+            "description": "Join a reseller's team from an invitation link, instead of creating a reseller account."
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password"
+        ]
+      },
+      "SignInDto": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Email address, or a verified mobile number in international format.",
+            "minLength": 3,
+            "maxLength": 254,
+            "example": "ada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "example": "correct horse battery"
+          }
+        },
+        "required": [
+          "identifier",
+          "password"
+        ]
+      },
+      "CodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code that was sent to you.",
+            "pattern": "^\\d{6}$",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "PhoneDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Mobile number in international format, or local format for your business country.",
+            "minLength": 6,
+            "maxLength": 20,
+            "example": "+2348012345678"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ada@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ada@example.com"
+          },
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code that was sent to you.",
+            "pattern": "^\\d{6}$",
+            "example": "482913"
+          },
+          "password": {
+            "type": "string",
+            "description": "At least 10 characters. Passwords found in public data breaches are refused.",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "correct horse battery"
+          }
+        },
+        "required": [
+          "email",
+          "code",
+          "password"
+        ]
+      },
+      "CreateApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A name to recognise the key by, such as the system that uses it.",
+            "minLength": 1,
+            "maxLength": 60,
+            "example": "Website backend"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ],
+            "description": "test keys use the sandbox; live keys move real money."
+          },
+          "scopes": {
+            "type": "array",
+            "description": "What the key may do. Defaults to every scope.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "catalogue:read",
+                "quotes:write",
+                "orders:read",
+                "orders:write",
+                "wallet:read",
+                "webhooks:manage",
+                "events:read",
+                "stores:manage"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "mode"
+        ]
+      },
+      "RollApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "overlap_hours": {
+            "type": "number",
+            "description": "Hours the old key keeps working, so you can deploy the new one (0 to 72).",
+            "minimum": 0,
+            "maximum": 72,
+            "default": 24
+          }
+        }
+      },
+      "InviteDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "chidi@example.com"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "developer",
+              "finance",
+              "support"
+            ],
+            "description": "admin manages the team and keys; developer manages keys; finance and support have their own areas."
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ]
+      },
+      "AcceptDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the invitation link."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "RoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "developer",
+              "finance",
+              "support"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      }
+    }
   }
 }

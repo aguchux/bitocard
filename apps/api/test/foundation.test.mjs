@@ -1,99 +1,17 @@
-// Runs against the compiled dist/ output, which is what Vercel deploys. Run `npm run build` first.
-// Two modes, both applying the real migrations to an empty database:
-// - `npm test`: in-process Postgres (PGlite) and in-memory rate limits; needs nothing running.
-// - `npm run test:docker`: the Docker Postgres and Upstash-compatible Redis (npm run docker:up), like production.
+// Cross-cutting behaviour: service routes, error format, idempotency and rate limits. See helpers.mjs for the two test modes.
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
 import { after, before, describe, test } from 'node:test';
-import { PGlite } from '@electric-sql/pglite';
-import { PrismaPGlite } from 'pglite-prisma-adapter';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-import { Body, Controller, HttpCode, Module, Post } from '@nestjs/common';
-import { IsInt, IsString, Min } from 'class-validator';
-import { createApp } from '../dist/bootstrap.js';
+import { FixturesModule, fixtureCalls, startApp, useRedis } from './helpers.mjs';
 
-// Fixture endpoints, declared without decorator syntax because this file is plain JavaScript.
-class CreateThing {}
-IsString()(CreateThing.prototype, 'name');
-IsInt()(CreateThing.prototype, 'quantity');
-Min(1)(CreateThing.prototype, 'quantity');
-
-let calls = 0;
-class ThingsController {
-  create(body) {
-    calls += 1;
-    if (body.name === 'explode') throw new Error('boom');
-    return { id: `thing_${calls}`, ...body };
-  }
-
-  accept() {
-    calls += 1;
-    return { accepted: true };
-  }
-}
-Reflect.defineMetadata('design:paramtypes', [CreateThing], ThingsController.prototype, 'create');
-Body()(ThingsController.prototype, 'create', 0);
-const createDescriptor = Object.getOwnPropertyDescriptor(ThingsController.prototype, 'create');
-Post()(ThingsController.prototype, 'create', createDescriptor);
-const acceptDescriptor = Object.getOwnPropertyDescriptor(ThingsController.prototype, 'accept');
-Post('accept')(ThingsController.prototype, 'accept', acceptDescriptor);
-HttpCode(202)(ThingsController.prototype, 'accept', acceptDescriptor);
-Controller('fixtures/things')(ThingsController);
-
-class FixturesModule {}
-Module({ controllers: [ThingsController] })(FixturesModule);
-
-let app;
+let server;
 let base;
-let pglite;
-const dockerUrl = process.env.TEST_DATABASE_URL;
-const useRedis = Boolean(process.env.TEST_REDIS_REST_URL);
-
-function migrationSql() {
-  const dir = new URL('../prisma/migrations/', import.meta.url);
-  return readdirSync(dir)
-    .filter(entry => /^\d+_/.test(entry))
-    .sort()
-    .map(name => readFileSync(new URL(`${name}/migration.sql`, dir), 'utf8'));
-}
-
-/** Empties the Docker test database and applies every migration. Refuses anything not named *_test. */
-async function migratedDockerDatabase(url) {
-  const name = new URL(url).pathname.slice(1);
-  if (!name.endsWith('_test')) throw new Error(`Refusing to reset "${name}": TEST_DATABASE_URL must point at a *_test database.`);
-  const client = new pg.Client({ connectionString: url });
-  await client.connect();
-  await client.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
-  for (const sql of migrationSql()) await client.query(sql);
-  await client.end();
-  return new PrismaPg({ connectionString: url });
-}
-
-async function migratedPglite() {
-  pglite = new PGlite();
-  for (const sql of migrationSql()) await pglite.exec(sql);
-  return new PrismaPGlite(pglite);
-}
 
 before(async () => {
-  process.env.RATE_LIMIT_PER_MINUTE = '1000';
-  if (useRedis) {
-    process.env.UPSTASH_REDIS_REST_URL = process.env.TEST_REDIS_REST_URL;
-    process.env.UPSTASH_REDIS_REST_TOKEN = process.env.TEST_REDIS_REST_TOKEN;
-  }
-  const databaseAdapter = dockerUrl ? await migratedDockerDatabase(dockerUrl) : await migratedPglite();
-  app = await createApp({ databaseAdapter, extraModules: [FixturesModule] });
-  // Keep error logs in the Docker run so infrastructure failures are visible in CI.
-  app.useLogger(dockerUrl ? ['error'] : false);
-  await app.listen(0);
-  base = (await app.getUrl()).replace('[::1]', 'localhost');
+  server = await startApp({ extraModules: [FixturesModule] });
+  base = server.base;
 });
 
-after(async () => {
-  await app?.close();
-  await pglite?.close();
-});
+after(() => server?.close());
 
 const post = (path, body, headers = {}) =>
   fetch(`${base}${path}`, {
@@ -189,14 +107,14 @@ describe('idempotency', () => {
   });
 
   test('a retry with the same key replays the first result without running again', async () => {
-    const start = calls;
+    const start = fixtureCalls.count;
     const first = await post('/v1/fixtures/things', { name: 'card', quantity: 2 }, { 'idempotency-key': 'order-123' });
     const second = await post('/v1/fixtures/things', { name: 'card', quantity: 2 }, { 'idempotency-key': 'order-123' });
     assert.equal(first.status, 201);
     assert.equal(second.status, 201);
     assert.equal(second.headers.get('idempotent-replayed'), 'true');
     assert.deepEqual(await second.json(), await first.json());
-    assert.equal(calls, start + 1);
+    assert.equal(fixtureCalls.count, start + 1);
   });
 
   test('the original status code is replayed', async () => {
@@ -218,20 +136,20 @@ describe('idempotency', () => {
     assert.equal(invalid.status, 400);
     assert.equal(invalid.headers.get('idempotent-replayed'), 'true');
 
-    const start = calls;
+    const start = fixtureCalls.count;
     const retry = await post('/v1/fixtures/things', { name: 'explode', quantity: 1 }, { 'idempotency-key': 'explode-1' });
     assert.equal(retry.status, 500);
     assert.equal(retry.headers.get('idempotent-replayed'), null);
-    assert.equal(calls, start + 1);
+    assert.equal(fixtureCalls.count, start + 1);
   });
 
   test('concurrent requests with one key run once', async () => {
-    const start = calls;
+    const start = fixtureCalls.count;
     const results = await Promise.all(
       Array.from({ length: 5 }, () => post('/v1/fixtures/things', { name: 'race', quantity: 1 }, { 'idempotency-key': 'race-1' })),
     );
     const statuses = results.map(res => res.status);
-    assert.equal(calls, start + 1);
+    assert.equal(fixtureCalls.count, start + 1);
     assert.ok(statuses.every(status => status === 201 || status === 409), `unexpected statuses ${statuses}`);
   });
 });
@@ -262,16 +180,9 @@ describe('rate limits', () => {
 
 describe('rate limit enforcement', () => {
   test('callers over the limit get 429 with Retry-After', async () => {
-    const saved = process.env.RATE_LIMIT_PER_MINUTE;
-    process.env.RATE_LIMIT_PER_MINUTE = '2';
-    const db = new PGlite();
-    for (const sql of migrationSql()) await db.exec(sql);
-    const limited = await createApp({ databaseAdapter: new PrismaPGlite(db), extraModules: [FixturesModule] });
-    limited.useLogger(false);
+    const limited = await startApp({ env: { RATE_LIMIT_PER_MINUTE: '2', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, extraModules: [FixturesModule], database: 'pglite' });
     try {
-      await limited.listen(0);
-      const url = (await limited.getUrl()).replace('[::1]', 'localhost');
-      const send = n => fetch(`${url}/v1/fixtures/things/accept`, { method: 'POST', headers: { 'idempotency-key': `limit-${n}` } });
+      const send = n => fetch(`${limited.base}/v1/fixtures/things/accept`, { method: 'POST', headers: { 'idempotency-key': `limit-${n}` } });
       const statuses = [];
       let last;
       for (let n = 0; n < 3; n += 1) {
@@ -283,34 +194,23 @@ describe('rate limit enforcement', () => {
       assert.equal((await last.json()).error.type, 'rate_limit_error');
     } finally {
       await limited.close();
-      await db.close();
-      process.env.RATE_LIMIT_PER_MINUTE = saved;
     }
   });
 });
 
 describe('rate limiter outage', () => {
   test('requests are still served when Redis is unreachable', async () => {
-    const saved = { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN };
-    process.env.UPSTASH_REDIS_REST_URL = 'http://127.0.0.1:9';
-    process.env.UPSTASH_REDIS_REST_TOKEN = 'unreachable';
-    const db = new PGlite();
-    for (const sql of migrationSql()) await db.exec(sql);
-    const outage = await createApp({ databaseAdapter: new PrismaPGlite(db), extraModules: [FixturesModule] });
-    outage.useLogger(false);
+    const outage = await startApp({
+      env: { UPSTASH_REDIS_REST_URL: 'http://127.0.0.1:9', UPSTASH_REDIS_REST_TOKEN: 'unreachable' },
+      extraModules: [FixturesModule],
+      database: 'pglite',
+    });
     try {
-      await outage.listen(0);
-      const url = (await outage.getUrl()).replace('[::1]', 'localhost');
-      const res = await fetch(`${url}/v1/fixtures/things/accept`, { method: 'POST', headers: { 'idempotency-key': 'outage-1' } });
+      const res = await fetch(`${outage.base}/v1/fixtures/things/accept`, { method: 'POST', headers: { 'idempotency-key': 'outage-1' } });
       assert.equal(res.status, 202);
       assert.equal(res.headers.get('ratelimit-limit'), null);
     } finally {
       await outage.close();
-      await db.close();
-      for (const [name, value] of [['UPSTASH_REDIS_REST_URL', saved.url], ['UPSTASH_REDIS_REST_TOKEN', saved.token]]) {
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
-      }
     }
   });
 });

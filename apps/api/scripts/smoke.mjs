@@ -40,3 +40,16 @@ test('errors use the BitoCard error format', async () => {
   assert.equal(error.type, 'not_found_error');
   assert.ok(error.request_id);
 });
+
+test('protected endpoints refuse requests without credentials', async () => {
+  const res = await get('/v1/account');
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error.type, 'authentication_error');
+});
+
+test('the pilot countries and plans are published', async () => {
+  const countries = await (await get('/v1/countries')).json();
+  assert.ok(countries.data.some(country => country.code === 'NG'));
+  const plans = await (await get('/v1/plans')).json();
+  assert.deepEqual(plans.data.map(plan => plan.code), ['standard', 'premium']);
+});
