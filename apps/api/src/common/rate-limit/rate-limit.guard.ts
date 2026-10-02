@@ -1,5 +1,4 @@
 import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
 import { APP_CONFIG, type AppConfig } from '../../config/config';
@@ -7,6 +6,27 @@ import { ApiError } from '../errors/api-error';
 import { callerScope } from '../idempotency/idempotency.interceptor';
 
 type Verdict = { success: boolean; limit: number; remaining: number; reset: number };
+
+const windowMs = 60_000;
+
+/**
+ * Fixed one-minute windows in Redis using only INCR and PEXPIRE, so it behaves the same on Upstash and on plain
+ * Redis (local Docker and CI). Upstash's own ratelimit library relies on an Upstash-only script flag.
+ */
+class RedisLimiter {
+  constructor(
+    private readonly redis: Redis,
+    private readonly limit: number,
+  ) {}
+
+  async limitFor(key: string): Promise<Verdict> {
+    const windowStart = Math.floor(Date.now() / windowMs) * windowMs;
+    const windowKey = `bitocard:ratelimit:${key}:${windowStart}`;
+    const [count] = await this.redis.pipeline().incr(windowKey).pexpire(windowKey, windowMs * 2).exec<[number, number]>();
+    const reset = windowStart + windowMs;
+    return { success: count <= this.limit, limit: this.limit, remaining: Math.max(0, this.limit - count), reset };
+  }
+}
 
 /** Fixed one-minute windows in memory, for local development and tests when Redis is not configured. */
 class MemoryLimiter {
@@ -17,7 +37,7 @@ class MemoryLimiter {
     const now = Date.now();
     let window = this.windows.get(key);
     if (!window || window.reset <= now) {
-      window = { count: 0, reset: now + 60_000 };
+      window = { count: 0, reset: now + windowMs };
       this.windows.set(key, window);
     }
     window.count += 1;
@@ -36,12 +56,8 @@ export class RateLimitGuard implements CanActivate {
 
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
     if (config.UPSTASH_REDIS_REST_URL && config.UPSTASH_REDIS_REST_TOKEN) {
-      const redis = new Ratelimit({
-        redis: new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN }),
-        limiter: Ratelimit.slidingWindow(config.RATE_LIMIT_PER_MINUTE, '1 m'),
-        prefix: 'bitocard:ratelimit',
-      });
-      this.limiter = { limitFor: key => redis.limit(key) };
+      const redis = new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN });
+      this.limiter = new RedisLimiter(redis, config.RATE_LIMIT_PER_MINUTE);
     } else {
       this.limiter = new MemoryLimiter(config.RATE_LIMIT_PER_MINUTE);
     }

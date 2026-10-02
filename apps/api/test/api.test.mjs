@@ -260,6 +260,35 @@ describe('rate limits', () => {
   });
 });
 
+describe('rate limit enforcement', () => {
+  test('callers over the limit get 429 with Retry-After', async () => {
+    const saved = process.env.RATE_LIMIT_PER_MINUTE;
+    process.env.RATE_LIMIT_PER_MINUTE = '2';
+    const db = new PGlite();
+    for (const sql of migrationSql()) await db.exec(sql);
+    const limited = await createApp({ databaseAdapter: new PrismaPGlite(db), extraModules: [FixturesModule] });
+    limited.useLogger(false);
+    try {
+      await limited.listen(0);
+      const url = (await limited.getUrl()).replace('[::1]', 'localhost');
+      const send = n => fetch(`${url}/v1/fixtures/things/accept`, { method: 'POST', headers: { 'idempotency-key': `limit-${n}` } });
+      const statuses = [];
+      let last;
+      for (let n = 0; n < 3; n += 1) {
+        last = await send(n);
+        statuses.push(last.status);
+      }
+      assert.equal(statuses.at(-1), 429, `statuses ${statuses}`);
+      assert.ok(Number(last.headers.get('retry-after')) >= 1);
+      assert.equal((await last.json()).error.type, 'rate_limit_error');
+    } finally {
+      await limited.close();
+      await db.close();
+      process.env.RATE_LIMIT_PER_MINUTE = saved;
+    }
+  });
+});
+
 describe('rate limiter outage', () => {
   test('requests are still served when Redis is unreachable', async () => {
     const saved = { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN };
