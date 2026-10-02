@@ -70,6 +70,23 @@ const schema = z.object({
   /** Rates older than this are not used for conversions. */
   FX_MAX_AGE_MINUTES: z.coerce.number().int().positive().default(180),
 
+  // Suppliers. A supplier without credentials is used only in the sandbox (test mode), never live.
+  RELOADLY_CLIENT_ID: z.string().optional(),
+  RELOADLY_CLIENT_SECRET: z.string().optional(),
+  /** on: Reloadly sandbox (test credits, no real cards); off: live. */
+  RELOADLY_SANDBOX: flag.prefault('off'),
+  RELOADLY_AUTH_URL: z.string().url().default('https://auth.reloadly.com'),
+  /** Override the gift card and top-up API addresses (tests); by default they follow RELOADLY_SANDBOX. */
+  RELOADLY_GIFTCARDS_URL: z.string().url().optional(),
+  RELOADLY_TOPUPS_URL: z.string().url().optional(),
+  VTPASS_API_KEY: z.string().optional(),
+  VTPASS_PUBLIC_KEY: z.string().optional(),
+  VTPASS_SECRET_KEY: z.string().optional(),
+  /** https://sandbox.vtpass.com/api for the VTpass sandbox. */
+  VTPASS_API_URL: z.string().url().default('https://vtpass.com/api'),
+  /** VTpass needs a phone number on every payment; used when the customer gave none. */
+  VTPASS_CONTACT_PHONE: z.string().default('08011111111'),
+
   /** Vercel Cron sends it as a Bearer token; scheduled jobs refuse requests without it. */
   CRON_SECRET: z.string().optional(),
   /** Where operational alerts go (for example, conversions paused). */

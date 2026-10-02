@@ -10,6 +10,8 @@ import { FxService } from '../fx/fx.service';
 import { WalletService } from '../ledger/wallet.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PayoutsService } from '../payouts/payouts.service';
+import { SuppliersService } from '../suppliers/suppliers.service';
+import { OrdersService } from '../orders/orders.service';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -28,6 +30,8 @@ export class CronController {
     payouts: PayoutsService,
     wallets: WalletService,
     billing: BillingService,
+    suppliers: SuppliersService,
+    orders: OrdersService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -38,6 +42,10 @@ export class CronController {
       earnings: () => wallets.releaseDueEarnings(),
       /** Daily. */
       plans: () => billing.renewDue(),
+      /** Every 2 minutes: check orders the suppliers have not confirmed, and repair interrupted completions. */
+      orders: () => orders.checkDue(),
+      /** Daily: refresh supplier catalogues and costs. */
+      catalogue: () => suppliers.syncAll(),
     };
   }
 

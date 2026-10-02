@@ -211,6 +211,9 @@ model Reseller {
   reservedAccounts      ReservedAccount[]
   bankAccounts          BankAccount[]
   payouts               Payout[]
+  markups               ResellerMarkup[]
+  quotes                Quote[]
+  orders                Order[]
 
   @@map("resellers")
 }
@@ -329,6 +332,8 @@ model CountryCategory {
   category             ProductCategory
   enabled              Boolean         @default(false)
   customerVerification Boolean         @default(false) @map("customer_verification")
+  /// BitoCard collects tax on this category's sales here (set after tax advice; off by default).
+  taxable              Boolean         @default(false)
   country              Country         @relation(fields: [countryCode], references: [code], onDelete: Cascade)
 
   @@id([countryCode, category])
@@ -462,6 +467,10 @@ enum AccountKind {
   tax_payable
   /// Counterpart of manual admin adjustments.
   adjustments
+  /// Money BitoCard has prepaid to a supplier (an asset).
+  supplier_float
+  /// What suppliers charge BitoCard for fulfilled orders (an expense).
+  cost_of_sales
 }
 
 /// One account per kind, mode, currency and owner. The balance is kept in step with the postings in the same transaction.
@@ -719,4 +728,298 @@ model TaxRate {
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@map("tax_rates")
+}
+
+// ---------------------------------------------------------------------------
+// M5: suppliers, catalogue, pricing and quotes
+// ---------------------------------------------------------------------------
+
+enum SupplierStatus {
+  mvp_live
+  mvp_qualify
+  pilot
+  later
+  backup
+}
+
+/// An upstream supplier. Never shown to resellers or customers. Every supplier has an adapter; admins decide which are used.
+model Supplier {
+  /// Adapter code, for example reloadly or vtpass.
+  code                 String            @id
+  name                 String
+  categories           ProductCategory[]
+  /// Where the supplier operates, as published (free text until confirmed).
+  coverage             String
+  status               SupplierStatus
+  /// Master switch: a disabled supplier is never routed to.
+  enabled              Boolean           @default(false)
+  // Funding profile: "pay per item sold" is not "no minimum deposit".
+  /// prepaid_wallet, per_order or credit_terms.
+  billingModel         String?           @map("billing_model")
+  fundingCurrency      String?           @map("funding_currency") @db.Char(3)
+  minFirstDepositMinor BigInt?           @map("min_first_deposit_minor")
+  minTopUpMinor        BigInt?           @map("min_top_up_minor")
+  fees                 String?
+  refunds              String?
+  /// Written permission to serve downstream resellers under BitoCard.
+  resaleApproved       Boolean           @default(false) @map("resale_approved")
+  requiresIpAllowlist  Boolean?          @map("requires_ip_allowlist")
+  notes                String?
+  lastSyncedAt         DateTime?         @map("last_synced_at")
+  lastSyncError        String?           @map("last_sync_error")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  markets              SupplierMarket[]
+  products             SupplierProduct[]
+
+  @@map("suppliers")
+}
+
+/// Which supplier BitoCard uses for which category in which market (the reseller's country). Configuration, not code.
+model SupplierMarket {
+  supplierCode String          @map("supplier_code")
+  countryCode  String          @map("country_code") @db.Char(2)
+  category     ProductCategory
+  enabled      Boolean         @default(false)
+  supplier     Supplier        @relation(fields: [supplierCode], references: [code], onDelete: Cascade)
+
+  @@id([supplierCode, countryCode, category])
+  @@map("supplier_markets")
+}
+
+enum DenominationType {
+  fixed
+  range
+}
+
+/// A BitoCard product. Equivalent supplier products map to one product, so routing between suppliers is invisible.
+model Product {
+  id                 String            @id @default(uuid()) @db.Uuid
+  /// category:country:brand:variant, for example airtime:NG:mtn:topup.
+  key                String            @unique
+  category           ProductCategory
+  /// Where the product is used: the card region, or the network or biller country.
+  country            String            @db.Char(2)
+  brand              String
+  name               String
+  faceCurrency       String            @map("face_currency") @db.Char(3)
+  denominationType   DenominationType  @map("denomination_type")
+  /// Fixed face values in minor units.
+  fixedValues        BigInt[]          @default([]) @map("fixed_values")
+  minValueMinor      BigInt?           @map("min_value_minor")
+  maxValueMinor      BigInt?           @map("max_value_minor")
+  /// What the customer must give: phone, smartcard, meter, or none.
+  recipientType      String            @default("none") @map("recipient_type")
+  description        String?
+  redeemInstructions String?           @map("redeem_instructions")
+  logoUrl            String?           @map("logo_url")
+  /// Admin switch; inactive products are hidden and cannot be quoted.
+  active             Boolean           @default(true)
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+  supplierProducts   SupplierProduct[]
+  quotes             Quote[]
+  orders             Order[]
+
+  @@index([category, country])
+  @@map("products")
+}
+
+/// A supplier offer for a product, and what it costs BitoCard.
+model SupplierProduct {
+  id           String   @id @default(uuid()) @db.Uuid
+  supplierCode String   @map("supplier_code")
+  productId    String   @map("product_id") @db.Uuid
+  /// The supplier identifier, for example a product ID or service:variation.
+  sku          String
+  costCurrency String   @map("cost_currency") @db.Char(3)
+  /// Cost per unit of face value, in cost currency (for example 0.97 USD per 1 USD of face value), from the supplier catalogue.
+  costRatio    Decimal  @map("cost_ratio") @db.Decimal(24, 10)
+  /// Fixed fee per item, minor units of the cost currency.
+  costFeeMinor BigInt   @default(0) @map("cost_fee_minor")
+  /// Commission agreed with the supplier and not in its catalogue (basis points off the cost). Kept across syncs.
+  discountBps  Int      @default(0) @map("discount_bps")
+  /// What the adapter needs to order it (for example the operator ID).
+  meta         Json?
+  available    Boolean  @default(true)
+  /// Lower wins when costs are equal.
+  priority     Int      @default(100)
+  syncedAt     DateTime @map("synced_at")
+  supplier     Supplier @relation(fields: [supplierCode], references: [code])
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierCode, sku])
+  @@index([productId])
+  @@map("supplier_products")
+}
+
+/// BitoCard pricing. The most specific rule wins: product, then category in a market, then category, then the default.
+model PricingRule {
+  id                  String           @id @default(uuid()) @db.Uuid
+  category            ProductCategory?
+  /// The reseller country (market).
+  countryCode         String?          @map("country_code") @db.Char(2)
+  productId           String?          @map("product_id") @db.Uuid
+  /// BitoCard margin on supplier cost, for products priced from cost (gift cards, other currencies).
+  marginBps           Int              @map("margin_bps")
+  /// Face-value products: the discount resellers keep when they sell at face value (the discount earning option).
+  resellerDiscountBps Int              @default(0) @map("reseller_discount_bps")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  @@unique([category, countryCode, productId])
+  @@map("pricing_rules")
+}
+
+/// A reseller markup over BitoCard wholesale price, per category, optionally overridden per product. Capped by the Markup Protection Scheme.
+model ResellerMarkup {
+  id         String          @id @default(uuid()) @db.Uuid
+  resellerId String          @map("reseller_id") @db.Uuid
+  category   ProductCategory
+  productId  String?         @map("product_id") @db.Uuid
+  markupBps  Int             @map("markup_bps")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  reseller   Reseller        @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@unique([resellerId, category, productId])
+  @@map("reseller_markups")
+}
+
+enum QuoteStatus {
+  open
+  used
+}
+
+/// A locked price for one purchase. The supplier and its cost are internal and never returned to the reseller.
+model Quote {
+  id                  String      @id @default(uuid()) @db.Uuid
+  resellerId          String      @map("reseller_id") @db.Uuid
+  mode                LedgerMode
+  productId           String      @map("product_id") @db.Uuid
+  quantity            Int
+  faceValueMinor      BigInt      @map("face_value_minor")
+  faceCurrency        String      @map("face_currency") @db.Char(3)
+  /// The reseller currency; every amount below is in it, for the whole quantity.
+  currency            String      @db.Char(3)
+  wholesaleMinor      BigInt      @map("wholesale_minor")
+  /// What the customer pays, tax included.
+  priceMinor          BigInt      @map("price_minor")
+  taxMinor            BigInt      @map("tax_minor")
+  taxName             String?     @map("tax_name")
+  taxRateBps          Int?        @map("tax_rate_bps")
+  resellerProfitMinor BigInt      @map("reseller_profit_minor")
+  supplierCode        String      @map("supplier_code")
+  supplierProductId   String      @map("supplier_product_id") @db.Uuid
+  /// Total supplier cost in the supplier currency.
+  supplierCostMinor   BigInt      @map("supplier_cost_minor")
+  supplierCurrency    String      @map("supplier_currency") @db.Char(3)
+  /// Reseller currency per unit of supplier currency, when they differ.
+  fxRate              Decimal?    @map("fx_rate") @db.Decimal(24, 10)
+  /// Phone, smartcard or meter number, and what the supplier returned when validating it.
+  recipient           Json?
+  customerReference   String?     @map("customer_reference")
+  status              QuoteStatus @default(open)
+  expiresAt           DateTime    @map("expires_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  reseller            Reseller    @relation(fields: [resellerId], references: [id])
+  product             Product     @relation(fields: [productId], references: [id])
+
+  @@index([resellerId, createdAt])
+  @@map("quotes")
+}
+
+// ---------------------------------------------------------------------------
+// M6: orders, fulfilment, exceptions, receipts and refunds
+// ---------------------------------------------------------------------------
+
+enum OrderStatus {
+  /**
+   * Sent to the supplier, outcome not yet confirmed.
+   */
+  processing
+  completed
+  failed
+  refunded
+}
+
+/// A purchase from a quote. The wholesale cost and tax are held from the wallet until the supplier confirms the outcome.
+model Order {
+  id                    String          @id @default(uuid()) @db.Uuid
+  resellerId            String          @map("reseller_id") @db.Uuid
+  mode                  LedgerMode
+  quoteId               String          @unique @map("quote_id") @db.Uuid
+  productId             String          @map("product_id") @db.Uuid
+  quantity              Int
+  faceValueMinor        BigInt          @map("face_value_minor")
+  faceCurrency          String          @map("face_currency") @db.Char(3)
+  currency              String          @db.Char(3)
+  wholesaleMinor        BigInt          @map("wholesale_minor")
+  taxMinor              BigInt          @map("tax_minor")
+  priceMinor            BigInt          @map("price_minor")
+  resellerProfitMinor   BigInt          @map("reseller_profit_minor")
+  recipient             Json?
+  customerReference     String?         @map("customer_reference")
+  status                OrderStatus     @default(processing)
+  /// In the admin exception queue: the supplier has not confirmed the outcome after repeated checks.
+  needsReview           Boolean         @default(false) @map("needs_review")
+  holdId                String?         @map("hold_id") @db.Uuid
+  /// The supplier handling the current attempt (internal).
+  supplierCode          String          @map("supplier_code")
+  supplierProductId     String          @map("supplier_product_id") @db.Uuid
+  supplierCostMinor     BigInt          @map("supplier_cost_minor")
+  supplierCurrency      String          @map("supplier_currency") @db.Char(3)
+  /// Our reference for the current attempt, sent to the supplier so a status check can find it.
+  supplierReference     String          @unique @map("supplier_reference")
+  supplierTransactionId String?         @map("supplier_transaction_id")
+  /// Sandbox only: the outcome to simulate.
+  simulate              String?
+  checks                Int             @default(0)
+  nextCheckAt           DateTime?       @map("next_check_at")
+  failureReason         String?         @map("failure_reason")
+  /// Sequential receipt number, given when the order completes.
+  receiptNumber         Int?            @unique @map("receipt_number")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+  completedAt           DateTime?       @map("completed_at")
+  reseller              Reseller        @relation(fields: [resellerId], references: [id])
+  product               Product         @relation(fields: [productId], references: [id])
+  deliveries            OrderDelivery[]
+  attempts              OrderAttempt[]
+
+  @@index([resellerId, createdAt])
+  @@index([status, nextCheckAt])
+  @@map("orders")
+}
+
+/// What the customer receives: gift card codes and PINs, electricity tokens, confirmations. Codes and PINs are encrypted.
+model OrderDelivery {
+  id            String   @id @default(uuid()) @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  /// gift_card, token or confirmation.
+  kind          String
+  codeEncrypted String?  @map("code_encrypted")
+  pinEncrypted  String?  @map("pin_encrypted")
+  serial        String?
+  details       Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_deliveries")
+}
+
+/// Each call to a supplier for an order and what came back (internal, for admins tracing an order).
+model OrderAttempt {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @map("order_id") @db.Uuid
+  supplierCode String   @map("supplier_code")
+  reference    String
+  /// place or check.
+  action       String
+  /// completed, failed or pending.
+  outcome      String
+  detail       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_attempts")
 }

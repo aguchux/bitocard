@@ -39,6 +39,8 @@ class UpdateCountryDto {
 class UpdateCategoryDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
   @IsOptional() @IsBoolean() customer_verification?: boolean;
+  /** BitoCard collects tax on this category here; set only after tax advice. */
+  @IsOptional() @IsBoolean() taxable?: boolean;
 }
 
 /** The signed-in admin, for the audit log. */

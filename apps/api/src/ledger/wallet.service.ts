@@ -153,16 +153,24 @@ export class WalletService {
     }));
   }
 
-  /** Takes a held amount as BitoCard's wholesale revenue (the order was delivered). Repeating it does nothing. */
-  async captureHold(holdId: string, description = 'Order delivered: wholesale cost paid') {
-    return this.resolveHold(holdId, 'captured', hold => ({
-      type: 'hold_capture',
-      description,
-      lines: [
-        { account: this.ref(hold.resellerId, hold.currency, 'reseller_reserved'), debit: hold.amountMinor },
-        { account: { kind: 'platform_revenue', currency: hold.currency }, credit: hold.amountMinor },
-      ],
-    }));
+  /**
+   * Takes a held amount (the order was delivered). By default it is all BitoCard revenue; `split` sends parts to
+   * other platform accounts (for example tax payable), and the rest is revenue. Repeating it does nothing.
+   */
+  async captureHold(holdId: string, description = 'Order delivered: wholesale cost paid', split: Array<{ kind: AccountKind; amount: bigint }> = []) {
+    return this.resolveHold(holdId, 'captured', hold => {
+      const parts = split.filter(part => part.amount > 0n);
+      const revenue = hold.amountMinor - parts.reduce((sum, part) => sum + part.amount, 0n);
+      return {
+        type: 'hold_capture',
+        description,
+        lines: [
+          { account: this.ref(hold.resellerId, hold.currency, 'reseller_reserved'), debit: hold.amountMinor },
+          ...(revenue > 0n ? [{ account: { kind: 'platform_revenue' as const, currency: hold.currency }, credit: revenue }] : []),
+          ...parts.map(part => ({ account: { kind: part.kind, currency: hold.currency }, credit: part.amount })),
+        ],
+      };
+    });
   }
 
   private async resolveHold(

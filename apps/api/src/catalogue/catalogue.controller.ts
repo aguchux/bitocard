@@ -1,0 +1,217 @@
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller';
+import { AuditService } from '../audit/audit.service';
+import { adminId } from '../countries/countries.controller';
+import { productCategories } from '../countries/countries.service';
+import type { LedgerMode, ProductCategory } from '../generated/prisma/client';
+import { Mode } from '../ledger/mode';
+import { modeHeader, PageDto } from '../ledger/wallet.controller';
+import { CatalogueService } from './catalogue.service';
+import { PricingService } from './pricing.service';
+import { maxQuantity, QuotesService } from './quotes.service';
+
+class CatalogueFilterDto extends PageDto {
+  @ApiPropertyOptional({ enum: productCategories })
+  @IsOptional() @IsIn(productCategories)
+  category?: ProductCategory;
+
+  @ApiPropertyOptional({ description: 'Where the product is used (the card region, or the network or biller country).', example: 'NG' })
+  @IsOptional() @Matches(/^[A-Za-z]{2}$/)
+  country?: string;
+
+  @ApiPropertyOptional({ description: 'Search by name or brand.' })
+  @IsOptional() @IsString() @Length(1, 60)
+  q?: string;
+}
+
+class RecipientDto {
+  @ApiPropertyOptional({ description: 'Airtime and data: the mobile number to top up.', example: '+2348031234567' })
+  @IsOptional() @IsString() @Length(5, 20)
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'Pay-TV and bills: the smartcard, IUC or meter number.' })
+  @IsOptional() @IsString() @Length(4, 30)
+  account_number?: string;
+
+  @ApiPropertyOptional({ enum: ['change', 'renew'], default: 'change', description: 'Pay-TV: change to this package, or renew it as the current package.' })
+  @IsOptional() @IsIn(['change', 'renew'])
+  transaction_type?: 'change' | 'renew';
+}
+
+class CreateQuoteDto {
+  @ApiProperty()
+  @IsUUID()
+  product_id: string;
+
+  @ApiProperty({ description: 'Face value in minor units of the product face currency: one of its fixed values, or within its range.', example: 100000 })
+  @IsInt() @Min(1)
+  face_value: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: maxQuantity, default: 1, description: 'More than 1 for gift cards only.' })
+  @IsOptional() @IsInt() @Min(1) @Max(maxQuantity)
+  quantity?: number;
+
+  @ApiPropertyOptional({ type: RecipientDto })
+  @IsOptional() @ValidateNested() @Type(() => RecipientDto)
+  recipient?: RecipientDto;
+
+  @ApiPropertyOptional({ description: 'Your own reference for the customer or sale. BitoCard never needs your customers to have accounts.' })
+  @IsOptional() @IsString() @Length(1, 100)
+  customer_reference?: string;
+}
+
+class MarkupDto {
+  @ApiProperty({ enum: productCategories })
+  @IsIn(productCategories)
+  category: ProductCategory;
+
+  @ApiPropertyOptional({ description: 'Set for one product; leave out for the whole category.' })
+  @IsOptional() @IsUUID()
+  product_id?: string;
+
+  @ApiProperty({ description: 'Markup over wholesale price in basis points (1500 = 15%). At most the Markup Protection Scheme cap.', example: 1500 })
+  @IsInt() @Min(0) @Max(10_000)
+  markup_bps: number;
+}
+
+class RemoveMarkupDto {
+  @ApiProperty({ enum: productCategories })
+  @IsIn(productCategories)
+  category: ProductCategory;
+
+  @ApiPropertyOptional()
+  @IsOptional() @IsUUID()
+  product_id?: string;
+}
+
+class PricingRuleDto {
+  @IsOptional() @IsIn(productCategories)
+  category?: ProductCategory;
+
+  @IsOptional() @Matches(/^[A-Za-z]{2}$/)
+  country?: string;
+
+  @IsOptional() @IsUUID()
+  product_id?: string;
+
+  @IsInt() @Min(0) @Max(5000)
+  margin_bps: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(3000)
+  reseller_discount_bps?: number;
+}
+
+@ApiTags('Catalogue')
+@ApiBearerAuth()
+@modeHeader
+@Scopes('catalogue:read')
+@Controller('catalogue')
+export class CatalogueController {
+  constructor(private readonly catalogue: CatalogueService) {}
+
+  @ApiOperation({
+    summary: 'List products',
+    description:
+      'Products you can sell in your country, with your wholesale cost and your price for each denomination (fixed values, or the lowest and highest of a range). Prices are in your currency; a quote locks the exact price.',
+  })
+  @Get('products')
+  list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: CatalogueFilterDto) {
+    return this.catalogue.list(resellerOf(caller), mode, filter);
+  }
+
+  @ApiOperation({ summary: 'Get a product' })
+  @Get('products/:id')
+  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    return this.catalogue.get(resellerOf(caller), mode, id);
+  }
+}
+
+@ApiTags('Quotes')
+@ApiBearerAuth()
+@modeHeader
+@Controller('quotes')
+export class QuotesController {
+  constructor(private readonly quotes: QuotesService) {}
+
+  @ApiOperation({
+    summary: 'Create a quote',
+    description:
+      'Locks the price for 10 minutes: wholesale cost, your price, tax and exchange rate. Airtime and data need the recipient phone number; pay-TV and bills need the smartcard or meter number, which is checked and returns the account name for the customer to confirm.',
+  })
+  @Scopes('quotes:write')
+  @Post()
+  create(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: CreateQuoteDto) {
+    return this.quotes.create(resellerOf(caller), mode, body);
+  }
+
+  @ApiOperation({ summary: 'Get a quote' })
+  @Scopes('quotes:write')
+  @Get(':id')
+  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    return this.quotes.get(resellerOf(caller), mode, id);
+  }
+}
+
+@ApiTags('Catalogue')
+@ApiBearerAuth()
+@Roles('admin')
+@Controller('pricing')
+export class PricingController {
+  constructor(private readonly pricing: PricingService) {}
+
+  @ApiOperation({ summary: 'Get your pricing', description: 'How you earn on face-value products, the markup cap, and your markups.' })
+  @Scopes('catalogue:read')
+  @Get()
+  get(@CurrentCaller() caller: Caller) {
+    return this.pricing.pricingSettings(resellerOf(caller));
+  }
+
+  @ApiOperation({ summary: 'Set a markup', description: 'For a whole category, or one product (which overrides its category). Capped by the Markup Protection Scheme.' })
+  @Scopes('stores:manage')
+  @Put('markups')
+  setMarkup(@CurrentCaller() caller: Caller, @Body() body: MarkupDto) {
+    return this.pricing.setMarkup(resellerOf(caller), body);
+  }
+
+  @ApiOperation({ summary: 'Remove a markup' })
+  @Scopes('stores:manage')
+  @Delete('markups')
+  removeMarkup(@CurrentCaller() caller: Caller, @Query() query: RemoveMarkupDto) {
+    return this.pricing.removeMarkup(resellerOf(caller), query.category, query.product_id ?? null);
+  }
+}
+
+@ApiExcludeController()
+@RealmOnly('admin')
+@Controller('admin/pricing-rules')
+export class AdminPricingController {
+  constructor(
+    private readonly pricing: PricingService,
+    private readonly audit: AuditService,
+  ) {}
+
+  @AdminRoles('finance', 'operations')
+  @Get()
+  list() {
+    return this.pricing.listRules();
+  }
+
+  @AdminRoles('finance')
+  @Put()
+  async set(@CurrentCaller() caller: Caller, @Body() body: PricingRuleDto) {
+    const { before, after, presented } = await this.pricing.setRule(body);
+    await this.audit.record({ actorId: adminId(caller), action: 'pricing_rule.set', targetType: 'pricing_rule', targetId: after.id, before, after });
+    return presented;
+  }
+
+  @AdminRoles('finance')
+  @Delete(':id')
+  async remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    const removed = await this.pricing.deleteRule(id);
+    await this.audit.record({ actorId: adminId(caller), action: 'pricing_rule.removed', targetType: 'pricing_rule', targetId: id, before: removed });
+    return { object: 'pricing_rule' as const, id, removed: true };
+  }
+}

@@ -26,7 +26,7 @@ export type EntryInput = {
 export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ accountId: string; kind: AccountKind; amount: bigint }> };
 
 /** Assets and expenses grow with debits; every other account (what BitoCard owes, revenue, tax) grows with credits. */
-const debitNormal = new Set<AccountKind>(['provider_balance', 'processing_fees']);
+const debitNormal = new Set<AccountKind>(['provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales']);
 const resellerKinds = new Set<AccountKind>(['reseller_funding', 'reseller_earnings', 'reseller_earnings_held', 'reseller_reserved', 'reseller_payouts_pending']);
 
 export const insufficientFunds = () =>

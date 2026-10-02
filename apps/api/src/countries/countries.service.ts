@@ -32,7 +32,7 @@ export function presentCountryAdmin(country: CountryWithCategories) {
     min_withdrawal_minor: Number(country.minWithdrawalMinor),
     categories: country.categories
       .sort((a, b) => productCategories.indexOf(a.category) - productCategories.indexOf(b.category))
-      .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification })),
+      .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification, taxable: c.taxable })),
   };
 }
 
@@ -116,13 +116,13 @@ export class CountriesService {
     return country;
   }
 
-  async updateCategory(actorId: string | null, code: string, category: ProductCategory, input: { enabled?: boolean; customer_verification?: boolean }) {
+  async updateCategory(actorId: string | null, code: string, category: ProductCategory, input: { enabled?: boolean; customer_verification?: boolean; taxable?: boolean }) {
     const country = await this.get(code);
     const before = country.categories.find(c => c.category === category);
     const after = await this.prisma.countryCategory.upsert({
       where: { countryCode_category: { countryCode: country.code, category } },
-      create: { countryCode: country.code, category, enabled: input.enabled ?? false, customerVerification: input.customer_verification ?? false },
-      update: { enabled: input.enabled, customerVerification: input.customer_verification },
+      create: { countryCode: country.code, category, enabled: input.enabled ?? false, customerVerification: input.customer_verification ?? false, taxable: input.taxable ?? false },
+      update: { enabled: input.enabled, customerVerification: input.customer_verification, taxable: input.taxable },
     });
     await this.audit.record({ actorId, action: 'country.category_updated', targetType: 'country', targetId: country.code, before, after });
     return this.get(country.code);

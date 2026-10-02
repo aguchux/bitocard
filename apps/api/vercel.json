@@ -20,6 +20,14 @@
     {
       "path": "/v1/cron/plans",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/v1/cron/catalogue",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/v1/cron/orders",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

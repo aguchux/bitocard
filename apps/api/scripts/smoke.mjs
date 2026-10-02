@@ -63,6 +63,8 @@ test('exchange rates are listed for the pilot currencies', async () => {
 
 test('wallets, provider webhooks and scheduled jobs refuse unauthenticated calls', async () => {
   assert.equal((await get('/v1/wallet')).status, 401);
+  assert.equal((await get('/v1/catalogue/products')).status, 401);
+  assert.equal((await get('/v1/orders')).status, 401);
   assert.equal((await get('/v1/cron/earnings')).status, 401);
   const webhook = await fetch(`${base}/v1/webhooks/flutterwave`, {
     method: 'POST',

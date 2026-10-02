@@ -122,6 +122,21 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 - **Ghana:** qualify Korba Xchange first for API integration and approach Hubtel in parallel; Techlink GH and KiNG FLEXY GH are backups. Confirm which ECG meter types (prepaid, postpaid) each enables.
 - **Kenya:** query Reloadly's live catalogue for KPLC (prepaid and postpaid) and TV billers first. If either is missing, ask iPay/eLipa to confirm current KPLC and TV availability; add Tupay if a separate TV provider is needed.
 
+### Pricing (Decided, starting values admins can change)
+
+- BitoCard margin on cost-priced products (gift cards and anything bought in another currency): **3%** by default, settable per category, market or product.
+- Local face-value products (airtime, data, pay-TV, bills): resellers pay face value and add their markup, or (where admins enable the discount option) sell at face value and keep the discount admins set. BitoCard keeps the supplier commission minus any reseller discount.
+- A product is never offered if BitoCard would pay its supplier more than its wholesale price (for example when the supplier exchange rate is better than BitoCard conversion rate).
+- Quotes hold their price for **10 minutes**, for up to 10 items.
+- Tax is collected only on categories admins mark taxable in a country, after tax advice.
+
+### Orders (Decided, starting values admins can change)
+
+- Unconfirmed orders are checked with the same supplier after 30 s, 1, 2, 5, 10 and 30 minutes, then 1, 2, 4 and 8 hours; still unclear after that (about 16 hours), they join the admin exception queue and are checked every 6 hours until an admin resolves them.
+- Orders placed through the API are charged to the reseller wallet at wholesale cost plus any tax (BitoCard, as seller of record, pays the tax); the reseller collects the customer price.
+- Airtime, data, pay-TV and bills: one per order; gift cards: up to 10 per order.
+- Refunds of completed orders go back to the reseller wallet as topped-up funds (spendable, not withdrawable).
+
 ### Category plans
 
 - **Pay-TV and bills:** pilot in Nigeria, Ghana and Kenya using the sourcing paths above; other countries only once billers are confirmed per country. Electricity tokens (prepaid) and receipts (postpaid) follow the same validate-then-pay flow. Product = country + brand + package (DStv Nigeria and DStv Ghana are separate products). Validate the smartcard and show the account name and current package before payment.
@@ -284,9 +299,9 @@ Phase 1, foundation and own-brand pilot:
 | M2 | Sign-in and access: accounts, roles, Google, email and mobile sign-in, admin 2-step, API keys, staff invitations | **Done** (needs Google, Resend, MailerSend and Termii keys, and `ENCRYPTION_KEY`, on Vercel) |
 | M3 | Stores, countries, settings chain, admin switches, plans | **Done** |
 | M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | **Done** (needs Flutterwave, Monnify and Open Exchange Rates keys, `CRON_SECRET`, and Vercel Pro for hourly jobs) |
-| M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | Next |
-| M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | |
-| M7 | Webhooks: outbox, delivery, retries, events API | |
+| M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | **Done** (needs Reloadly and VTpass credentials, and the agreed VTpass commission entered per product) |
+| M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | **Done** |
+| M7 | Webhooks: outbox, delivery, retries, events API | Next |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | |
 | M9 | Admin app | |
 | M10 | Own-brand storefront (Golojan's store) | |
