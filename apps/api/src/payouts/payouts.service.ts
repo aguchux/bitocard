@@ -14,6 +14,7 @@ import { PaymentProviders } from '../payments/payment-providers';
 import { resellerNotVerified, testModeOnly } from '../payments/payments.service';
 import { ProviderError } from '../payments/provider-error';
 import type { TransferResult } from '../payments/providers';
+import { EventsService } from '../webhooks/events.service';
 
 /** Payouts to a newly added live bank account start after this, so a taken-over account cannot be emptied at once. */
 export const bankAccountCoolingOffMs = 24 * 60 * 60 * 1000;
@@ -71,6 +72,7 @@ export class PayoutsService {
     private readonly wallets: WalletService,
     private readonly providers: PaymentProviders,
     private readonly email: EmailService,
+    private readonly events: EventsService,
   ) {}
 
   private encryption() {
@@ -276,9 +278,14 @@ export class PayoutsService {
           completedAt: new Date(),
         },
       });
-      if (claimed.count === 1) await this.ledger.write(tx, entry);
+      if (claimed.count === 1) {
+        await this.ledger.write(tx, entry);
+        const settled = await tx.payout.findUniqueOrThrow({ where: { id: payout.id } });
+        await this.events.record(tx, { resellerId: settled.resellerId, mode: settled.mode, type: settled.status === 'paid' ? 'payout.paid' : 'payout.failed', object: presentPayout(settled) });
+      }
       return claimed.count === 1;
     });
+    if (changed) this.events.committed();
     const updated = await this.prisma.payout.findUniqueOrThrow({ where: { id: payout.id }, include: { bankAccount: true } });
     if (changed && updated.mode === 'live') {
       const amount = formatMoney(updated.amountMinor, updated.currency);

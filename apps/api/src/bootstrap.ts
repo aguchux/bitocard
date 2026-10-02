@@ -10,6 +10,7 @@ import { originAllowed } from './auth/auth.guard';
 import { APP_CONFIG, type AppConfig } from './config/config';
 import { validationPipe } from './common/errors/validation';
 import { securityHeaders } from './common/security-headers';
+import { addWebhooks } from './webhooks/openapi';
 
 /** Routes outside /v1: service info, health and robots.txt. Everything else is versioned. */
 const unversioned = ['/', 'health', 'robots.txt'];
@@ -56,5 +57,5 @@ export function buildOpenApi(app: NestExpressApplication): OpenAPIObject {
     .addServer('https://api.bitocard.com')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'API key', description: 'API key: bc_test_… (sandbox) or bc_live_… (live).' })
     .build();
-  return SwaggerModule.createDocument(app, config);
+  return addWebhooks(SwaggerModule.createDocument(app, config));
 }

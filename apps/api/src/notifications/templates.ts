@@ -101,3 +101,16 @@ export function planRenewalFailedEmail(to: string, plan: string, amount: string,
 export function planEndedEmail(to: string, plan: string): EmailMessage {
   return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Standard plan. You can upgrade again at any time.']) };
 }
+
+export function webhookEndpointDisabledEmail(to: string, url: string, mode: string, link: string): EmailMessage {
+  const sandbox = mode === 'test' ? ' (sandbox)' : '';
+  return {
+    to,
+    subject: `We stopped sending webhooks to ${url}`,
+    ...layout(`Webhook endpoint disabled${sandbox}`, [
+      `Deliveries to ${url} have failed for 3 days, so we have disabled this endpoint.`,
+      'Fix the endpoint, then enable it again in your dashboard. Events from the last 30 days are available from GET /v1/events, and you can resend any delivery from its log.',
+      `Manage the endpoint: ${link}`,
+    ]),
+  };
+}

@@ -4,11 +4,12 @@ import { ApiError } from '../common/errors/api-error';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { PrismaService } from '../database/prisma.service';
 import { type LedgerMode, type Payment, Prisma, type ReservedAccount } from '../generated/prisma/client';
-import { type Line, LedgerService } from '../ledger/ledger.service';
+import { type Line, LedgerService, type Tx } from '../ledger/ledger.service';
 import { minor } from '../ledger/mode';
 import { WalletService } from '../ledger/wallet.service';
 import { PaymentProviders } from './payment-providers';
 import { ProviderError } from './provider-error';
+import { EventsService } from '../webhooks/events.service';
 import type { ChargeResult } from './providers';
 
 const day = 24 * 60 * 60 * 1000;
@@ -29,6 +30,8 @@ export function presentTopUp(payment: Payment) {
     id: payment.id,
     mode: payment.mode,
     status: payment.status,
+    /** checkout (card or other payment page) or bank_transfer (into a reserved bank account). */
+    source: payment.purpose === 'reserved_account_deposit' ? ('bank_transfer' as const) : ('checkout' as const),
     amount: minor(payment.amountMinor),
     currency: payment.currency,
     checkout_url: payment.status === 'pending' ? payment.checkoutUrl : null,
@@ -65,6 +68,7 @@ export class PaymentsService {
     private readonly ledger: LedgerService,
     private readonly wallets: WalletService,
     private readonly providers: PaymentProviders,
+    private readonly events: EventsService,
   ) {}
 
   /** Who the provider should treat as the payer: the signed-in person, or the business owner for API keys. */
@@ -173,8 +177,18 @@ export class PaymentsService {
   }
 
   private async fail(payment: Payment, reason: string) {
-    await this.prisma.payment.updateMany({ where: { id: payment.id, status: 'pending' }, data: { status: 'failed', failureReason: reason, completedAt: new Date() } });
+    const failed = await this.prisma.$transaction(async tx => {
+      const claimed = await tx.payment.updateMany({ where: { id: payment.id, status: 'pending' }, data: { status: 'failed', failureReason: reason, completedAt: new Date() } });
+      if (claimed.count === 1) await this.recordEvent(tx, 'top_up.failed', payment.id);
+      return claimed.count === 1;
+    });
+    if (failed) this.events.committed();
     return this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+  }
+
+  private async recordEvent(tx: Tx, type: 'top_up.succeeded' | 'top_up.failed', paymentId: string) {
+    const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    await this.events.record(tx, { resellerId: payment.resellerId, mode: payment.mode, type, object: presentTopUp(payment) });
   }
 
   private creditLines(payment: Pick<Payment, 'resellerId' | 'currency' | 'provider' | 'amountMinor'>, fee: bigint): Line[] {
@@ -198,13 +212,18 @@ export class PaymentsService {
       lines: this.creditLines(payment, result.fee),
     });
     try {
-      await this.prisma.$transaction(async tx => {
+      const credited = await this.prisma.$transaction(async tx => {
         const claimed = await tx.payment.updateMany({
           where: { id: payment.id, status: 'pending' },
           data: { status: 'succeeded', providerTransactionId: result.providerTransactionId, feeMinor: result.fee, completedAt: new Date() },
         });
-        if (claimed.count === 1) await this.ledger.write(tx, entry);
+        if (claimed.count === 1) {
+          await this.ledger.write(tx, entry);
+          await this.recordEvent(tx, 'top_up.succeeded', payment.id);
+        }
+        return claimed.count === 1;
       });
+      if (credited) this.events.committed();
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         this.logger.error({ paymentId: payment.id, providerTransactionId: result.providerTransactionId }, 'Provider transaction already credited elsewhere; needs review');
@@ -317,7 +336,9 @@ export class PaymentsService {
           },
         });
         await this.ledger.write(tx, entry);
+        await this.recordEvent(tx, 'top_up.succeeded', id);
       });
+      this.events.committed();
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { credited: false, reason: 'duplicate' };
       throw error;

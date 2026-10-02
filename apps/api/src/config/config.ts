@@ -91,6 +91,12 @@ const schema = z.object({
   CRON_SECRET: z.string().optional(),
   /** Where operational alerts go (for example, conversions paused). */
   ALERT_EMAIL: z.string().email().default('alerts@bitocard.com'),
+
+  // Webhooks to resellers.
+  /** Local development and tests only: allows http:// and private addresses as webhook endpoints. Refused in production. */
+  WEBHOOK_ALLOW_PRIVATE_URLS: flag.prefault('off'),
+  /** GET /v1/events leaves out events newer than this, so a slow transaction cannot be skipped by a reader. */
+  EVENTS_SETTLE_SECONDS: z.coerce.number().int().min(0).max(60).default(5),
 });
 
 export type AppConfig = z.infer<typeof schema> & { cookieSecure: boolean };
@@ -104,6 +110,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid environment configuration: ${problems}`);
   }
   const config = parsed.data;
+  if (config.WEBHOOK_ALLOW_PRIVATE_URLS && config.VERCEL_ENV === 'production') {
+    throw new Error('Invalid environment configuration: WEBHOOK_ALLOW_PRIVATE_URLS must be off in production');
+  }
   return { ...config, cookieSecure: config.COOKIE_SECURE ?? Boolean(config.VERCEL_ENV) };
 }
 

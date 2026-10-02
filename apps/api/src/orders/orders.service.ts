@@ -8,13 +8,14 @@ import { Encryption } from '../common/encryption';
 import { APP_CONFIG, type AppConfig } from '../config/config';
 import { PrismaService } from '../database/prisma.service';
 import type { LedgerMode, Order, OrderDelivery, OrderStatus, Product, ProductCategory } from '../generated/prisma/client';
-import { LedgerService } from '../ledger/ledger.service';
+import { LedgerService, type Tx } from '../ledger/ledger.service';
 import { minor } from '../ledger/mode';
 import { WalletService } from '../ledger/wallet.service';
 import { resellerNotVerified, testModeOnly } from '../payments/payments.service';
 import { ProviderError } from '../payments/provider-error';
 import type { Delivery, FulfilmentRequest, FulfilmentResult } from '../suppliers/adapter';
 import { SupplierAdapters } from '../suppliers/supplier-adapters';
+import { EventsService } from '../webhooks/events.service';
 import { sellerFor } from './seller';
 
 /** When to check an unconfirmed order again, after each check. After the last, it joins the exception queue. */
@@ -55,6 +56,7 @@ export class OrdersService {
     private readonly pricing: PricingService,
     private readonly adapters: SupplierAdapters,
     private readonly audit: AuditService,
+    private readonly events: EventsService,
   ) {}
 
   private encryption() {
@@ -103,6 +105,12 @@ export class OrdersService {
       updated_at: order.updatedAt.toISOString(),
       completed_at: order.completedAt?.toISOString() ?? null,
     };
+  }
+
+  /** The order as the reseller sees it, without delivered codes: webhooks never carry secrets. */
+  private async recordEvent(tx: Tx, type: 'order.completed' | 'order.failed' | 'order.refunded', id: string) {
+    const order = await tx.order.findUniqueOrThrow({ where: { id }, include: { product: true } });
+    await this.events.record(tx, { resellerId: order.resellerId, mode: order.mode, type, object: this.present(order) });
   }
 
   private load(id: string) {
@@ -319,9 +327,13 @@ export class OrdersService {
           },
         });
       }
+      await this.recordEvent(tx, 'order.completed', order.id);
       return true;
     });
-    if (claimed) await this.settle(order.id);
+    if (claimed) {
+      this.events.committed();
+      await this.settle(order.id);
+    }
   }
 
   /** Ledger entries for a completed order. Idempotent, so the scheduled job can repair an interrupted completion. */
@@ -382,11 +394,16 @@ export class OrdersService {
   }
 
   private async fail(orderId: string, reason: string, detail?: string) {
-    const failed = await this.prisma.order.updateMany({
-      where: { id: orderId, status: 'processing' },
-      data: { status: 'failed', failureReason: reason, needsReview: false, nextCheckAt: null, completedAt: new Date() },
+    const failed = await this.prisma.$transaction(async tx => {
+      const claimed = await tx.order.updateMany({
+        where: { id: orderId, status: 'processing' },
+        data: { status: 'failed', failureReason: reason, needsReview: false, nextCheckAt: null, completedAt: new Date() },
+      });
+      if (claimed.count === 1) await this.recordEvent(tx, 'order.failed', orderId);
+      return claimed.count === 1;
     });
-    if (failed.count === 0) return;
+    if (!failed) return;
+    this.events.committed();
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     if (order.holdId) await this.wallets.releaseHold(order.holdId, 'Order failed: funds released');
     this.logger.log({ orderId, detail }, 'Order failed');
@@ -512,10 +529,14 @@ export class OrdersService {
     });
     const refunded = await this.prisma.$transaction(async tx => {
       const claimed = await tx.order.updateMany({ where: { id, status: 'completed' }, data: { status: 'refunded' } });
-      if (claimed.count === 1) await this.ledger.write(tx, entry);
+      if (claimed.count === 1) {
+        await this.ledger.write(tx, entry);
+        await this.recordEvent(tx, 'order.refunded', id);
+      }
       return claimed.count === 1;
     });
     if (!refunded) throw conflict('order_not_refundable', 'Only completed orders can be refunded.');
+    this.events.committed();
     await this.audit.record({ actorId, action: 'order.refunded', targetType: 'order', targetId: id, before: order, after: { status: 'refunded', ...input } });
     return this.adminGet(id);
   }

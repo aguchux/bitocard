@@ -12,6 +12,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { OrdersService } from '../orders/orders.service';
+import { WebhookDeliveryService } from '../webhooks/delivery.service';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -32,6 +33,7 @@ export class CronController {
     billing: BillingService,
     suppliers: SuppliersService,
     orders: OrdersService,
+    webhooks: WebhookDeliveryService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -46,6 +48,10 @@ export class CronController {
       orders: () => orders.checkDue(),
       /** Daily: refresh supplier catalogues and costs. */
       catalogue: () => suppliers.syncAll(),
+      /** Every minute: send the outbox and due webhook retries (runs also start right after each change). */
+      webhooks: () => webhooks.run(),
+      /** Daily: delete events older than 30 days and expired rotated secrets. */
+      'webhooks-cleanup': () => webhooks.purge(),
     };
   }
 

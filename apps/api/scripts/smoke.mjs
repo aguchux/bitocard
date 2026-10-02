@@ -30,7 +30,9 @@ test('security headers and request IDs are present', async () => {
 test('the OpenAPI document is served', async () => {
   const res = await get('/v1/openapi.json');
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).info.title, 'BitoCard API');
+  const document = await res.json();
+  assert.equal(document.info.title, 'BitoCard API');
+  assert.ok(document.webhooks?.['order.completed'], 'webhook events are documented');
 });
 
 test('errors use the BitoCard error format', async () => {
@@ -66,6 +68,9 @@ test('wallets, provider webhooks and scheduled jobs refuse unauthenticated calls
   assert.equal((await get('/v1/catalogue/products')).status, 401);
   assert.equal((await get('/v1/orders')).status, 401);
   assert.equal((await get('/v1/cron/earnings')).status, 401);
+  assert.equal((await get('/v1/cron/webhooks')).status, 401);
+  assert.equal((await get('/v1/events')).status, 401);
+  assert.equal((await get('/v1/webhook-endpoints')).status, 401);
   const webhook = await fetch(`${base}/v1/webhooks/flutterwave`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(bypass ? { 'x-vercel-protection-bypass': bypass } : {}) },

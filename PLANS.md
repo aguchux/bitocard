@@ -137,6 +137,14 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 - Airtime, data, pay-TV and bills: one per order; gift cards: up to 10 per order.
 - Refunds of completed orders go back to the reseller wallet as topped-up funds (spendable, not withdrawable).
 
+### Webhooks (Decided, starting values)
+
+- Events at launch: `order.completed`, `order.failed`, `order.refunded`, `top_up.succeeded`, `top_up.failed`, `payout.paid`, `payout.failed`, plus a `ping` test event. Payload version `2026-10-01`.
+- Up to 16 endpoints per reseller in each mode (sandbox and live); at most 5 requests in flight to one endpoint.
+- Rotated secrets keep signing for 24 hours by default (0 to 168 hours).
+- Events and delivery logs are kept for 30 days.
+- The reseller guide (`apps/docs/content/webhooks.md`) is written; the docs app renders it in M12, before external resellers are onboarded.
+
 ### Category plans
 
 - **Pay-TV and bills:** pilot in Nigeria, Ghana and Kenya using the sourcing paths above; other countries only once billers are confirmed per country. Electricity tokens (prepaid) and receipts (postpaid) follow the same validate-then-pay flow. Product = country + brand + package (DStv Nigeria and DStv Ghana are separate products). Validate the smartcard and show the account name and current package before payment.
@@ -234,7 +242,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Admin-only endpoints live in the same API behind admin roles.
 - Idempotency keys on every POST; versioned with a changelog.
 - **Docs** at `https://docs.bitocard.com`, public and indexed. The reference is generated from the OpenAPI document. "Try it" requires reseller sign-in and runs against the reseller's own sandbox or live account using a short-lived token; live mode is clearly marked and asks for confirmation before anything that spends money.
-- **Outbound webhooks:** transactional outbox plus Vercel Queues; signed (HMAC with timestamp); delivered at least once with unique event IDs; retries for up to 3 days; per-endpoint isolation; auto-disable with alerts; delivery log, resend and test events; `GET /v1/events` catch-up; HTTPS only with internal IPs blocked.
+- **Outbound webhooks:** transactional outbox, with Postgres as the delivery queue at launch and Vercel Queues once confirmed; signed (HMAC with timestamp); delivered at least once with unique event IDs; retries for up to 3 days; per-endpoint isolation; auto-disable with alerts; delivery log, resend and test events; `GET /v1/events` catch-up; HTTPS only with internal IPs blocked.
 - **Every event fully documented** before it ships: event catalogue page, example payload, field reference, step-by-step guide, copy-paste code (Node.js, PHP/Laravel, Python), signature test vector, retry and troubleshooting guides.
 - Secrets (eSIM activation codes, licence keys) never appear in webhooks or logs; webhooks announce readiness and the reseller fetches the secret.
 
@@ -301,8 +309,8 @@ Phase 1, foundation and own-brand pilot:
 | M4 | Money core: ledger, wallets, FX, Flutterwave checkout and reserved accounts, payouts, tax | **Done** (needs Flutterwave, Monnify and Open Exchange Rates keys, `CRON_SECRET`, and Vercel Pro for hourly jobs) |
 | M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | **Done** (needs Reloadly and VTpass credentials, and the agreed VTpass commission entered per product) |
 | M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | **Done** |
-| M7 | Webhooks: outbox, delivery, retries, events API | Next |
-| M8 | Identity checks: Didit, BVN, bank validation, gating | |
+| M7 | Webhooks: outbox, delivery, retries, events API | **Done** (needs Vercel Pro for the every-minute job; Vercel Queues transport deferred until its trigger is confirmed with the NestJS build) |
+| M8 | Identity checks: Didit, BVN, bank validation, gating | Next |
 | M9 | Admin app | |
 | M10 | Own-brand storefront (Golojan's store) | |
 | M11 | Pilot launch: Nigeria, then Ghana and Kenya | |

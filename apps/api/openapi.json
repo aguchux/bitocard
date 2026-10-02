@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.1.0",
   "paths": {
     "/v1/countries": {
       "get": {
@@ -1945,6 +1945,557 @@
         ]
       }
     },
+    "/v1/webhook-endpoints": {
+      "post": {
+        "description": "Returns the signing secret (`whsec_…`) once; store it safely. Test-mode endpoints receive sandbox events, live endpoints live events. The URL must use HTTPS and reach the public internet.",
+        "operationId": "WebhookEndpointsController_create",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEndpointDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a webhook endpoint",
+        "tags": [
+          "Webhooks"
+        ]
+      },
+      "get": {
+        "operationId": "WebhookEndpointsController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List webhook endpoints",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/webhook-endpoints/{id}": {
+      "get": {
+        "operationId": "WebhookEndpointsController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a webhook endpoint",
+        "tags": [
+          "Webhooks"
+        ]
+      },
+      "patch": {
+        "description": "Change its URL, description or event types, or enable it again after it was disabled.",
+        "operationId": "WebhookEndpointsController_update",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEndpointDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a webhook endpoint",
+        "tags": [
+          "Webhooks"
+        ]
+      },
+      "delete": {
+        "description": "Its delivery log is deleted too. Events stay available from `GET /v1/events`.",
+        "operationId": "WebhookEndpointsController_remove",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a webhook endpoint",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/webhook-endpoints/{id}/rotate-secret": {
+      "post": {
+        "description": "Returns the new secret once. Until the old one expires, each delivery carries two `v1` signatures, one for each secret.",
+        "operationId": "WebhookEndpointsController_rotate",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateSecretDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rotate the signing secret",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/webhook-endpoints/{id}/test": {
+      "post": {
+        "description": "Sends a `ping` event to this endpoint now and returns the delivery with its result. Test events are not retried.",
+        "operationId": "WebhookEndpointsController_test",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a test event",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/webhook-endpoints/{id}/deliveries": {
+      "get": {
+        "description": "The delivery log, newest first.",
+        "operationId": "WebhookEndpointsController_deliveries",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "succeeded",
+                "failed"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List deliveries to an endpoint",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/webhook-endpoints/{id}/deliveries/{deliveryId}": {
+      "get": {
+        "description": "Includes each attempt: response status, the start of the response body, any error and the time taken.",
+        "operationId": "WebhookEndpointsController_delivery",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a delivery",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/webhook-endpoints/{id}/deliveries/{deliveryId}/resend": {
+      "post": {
+        "description": "Sends the same event (same ID and body, newly signed) again now, whatever its status.",
+        "operationId": "WebhookEndpointsController_resend",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resend a delivery",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "description": "Every event from the last 30 days, oldest first. Pass the ID of the last event you handled as `since` to catch up on anything missed; keep calling while `has_more` is true. Events appear here a few seconds after they happen. This list, not the webhook, is the source of truth.",
+        "operationId": "EventsController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "The ID of the last event you handled, or an ISO 8601 time. Events after it are returned, oldest first.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "order.completed",
+                "order.failed",
+                "order.refunded",
+                "top_up.succeeded",
+                "top_up.failed",
+                "payout.paid",
+                "payout.failed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List events",
+        "tags": [
+          "Events"
+        ]
+      }
+    },
+    "/v1/events/{id}": {
+      "get": {
+        "operationId": "EventsController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an event",
+        "tags": [
+          "Events"
+        ]
+      }
+    },
     "/v1/orders": {
       "post": {
         "description": "Uses an open quote. Wholesale cost plus tax is held from your wallet and taken only when the order completes; a failed order releases it. `processing` means the supplier has not confirmed yet: check again, or wait for the webhook. Gift card codes, PINs and electricity tokens appear only on this order, never in lists or webhooks.",
@@ -2740,6 +3291,91 @@
           "markup_bps"
         ]
       },
+      "CreateEndpointDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://example.com/webhooks/bitocard",
+            "description": "An HTTPS address on the public internet."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "events": {
+            "type": "array",
+            "default": [
+              "*"
+            ],
+            "description": "Event types to receive; `*` for all, including types added later.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "*",
+                "order.completed",
+                "order.failed",
+                "order.refunded",
+                "top_up.succeeded",
+                "top_up.failed",
+                "payout.paid",
+                "payout.failed"
+              ]
+            }
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "UpdateEndpointDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "*",
+                "order.completed",
+                "order.failed",
+                "order.refunded",
+                "top_up.succeeded",
+                "top_up.failed",
+                "payout.paid",
+                "payout.failed"
+              ]
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ],
+            "description": "Enable an endpoint again after fixing it, or pause it."
+          }
+        }
+      },
+      "RotateSecretDto": {
+        "type": "object",
+        "properties": {
+          "expire_previous_in_hours": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 168,
+            "default": 24,
+            "description": "Hours the old secret keeps signing alongside the new one; 0 stops it now."
+          }
+        }
+      },
       "CreateOrderDto": {
         "type": "object",
         "properties": {
@@ -2775,6 +3411,1439 @@
         "required": [
           "outcome"
         ]
+      },
+      "WebhookOrder": {
+        "type": "object",
+        "title": "Order",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "status",
+          "quote_id",
+          "product",
+          "face_value",
+          "face_currency",
+          "quantity",
+          "currency",
+          "wholesale",
+          "tax",
+          "charged",
+          "price",
+          "reseller_profit",
+          "recipient",
+          "customer_reference",
+          "failure_reason",
+          "receipt_number",
+          "created_at",
+          "updated_at",
+          "completed_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `order`.",
+            "const": "order"
+          },
+          "id": {
+            "type": "string",
+            "description": "Order ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`processing` until the supplier confirms; then `completed` or `failed`. A completed order can later be `refunded`.",
+            "enum": [
+              "processing",
+              "completed",
+              "failed",
+              "refunded"
+            ]
+          },
+          "quote_id": {
+            "type": "string",
+            "description": "The quote the order used.",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "category"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Product ID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "Product name."
+              },
+              "category": {
+                "type": "string",
+                "description": "Product category, for example `gift_cards`, `airtime`, `pay_tv`."
+              }
+            }
+          },
+          "face_value": {
+            "type": "integer",
+            "description": "Face value of one item, in minor units of `face_currency`."
+          },
+          "face_currency": {
+            "type": "string",
+            "description": "ISO 4217 currency of the face value."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Number of items."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency of the amounts below (your wallet currency)."
+          },
+          "wholesale": {
+            "type": "integer",
+            "description": "Your wholesale cost, in minor units of `currency` (for example kobo)."
+          },
+          "tax": {
+            "type": "integer",
+            "description": "Tax BitoCard collects as seller of record, in minor units of `currency` (for example kobo)."
+          },
+          "charged": {
+            "type": "integer",
+            "description": "Taken from your wallet: wholesale plus tax, in minor units of `currency` (for example kobo)."
+          },
+          "price": {
+            "type": "integer",
+            "description": "Price your customer pays, in minor units of `currency` (for example kobo)."
+          },
+          "reseller_profit": {
+            "type": "integer",
+            "description": "Your profit, in minor units of `currency` (for example kobo)."
+          },
+          "recipient": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Who received it: `phone` for airtime and data, `account_number` (smartcard or meter) for pay-TV and bills.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "customer_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own reference for the customer, as given on the quote."
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the order failed, for failed orders."
+          },
+          "receipt_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Receipt number, for completed orders."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the order was placed.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When the order last changed. Use it to ignore an older event that arrives after a newer one.",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the order completed or failed.",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookTopUp": {
+        "type": "object",
+        "title": "Top-up",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "status",
+          "source",
+          "amount",
+          "currency",
+          "checkout_url",
+          "failure_reason",
+          "created_at",
+          "completed_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `top_up`.",
+            "const": "top_up"
+          },
+          "id": {
+            "type": "string",
+            "description": "Top-up ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Final status.",
+            "enum": [
+              "pending",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "`checkout` (payment page) or `bank_transfer` (into your reserved bank account).",
+            "enum": [
+              "checkout",
+              "bank_transfer"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Amount added to your wallet, in minor units of `currency` (for example kobo)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency."
+          },
+          "checkout_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Always null in events."
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the payment failed, for failed top-ups."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the top-up started.",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it succeeded or failed.",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookPayout": {
+        "type": "object",
+        "title": "Payout",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "status",
+          "amount",
+          "currency",
+          "bank_account_id",
+          "failure_reason",
+          "created_at",
+          "completed_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `payout`.",
+            "const": "payout"
+          },
+          "id": {
+            "type": "string",
+            "description": "Payout ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "Final status.",
+            "enum": [
+              "pending",
+              "processing",
+              "paid",
+              "failed"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Amount withdrawn, in minor units of `currency` (for example kobo)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency."
+          },
+          "bank_account_id": {
+            "type": "string",
+            "description": "The bank account paid.",
+            "format": "uuid"
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the transfer failed, for failed payouts."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the withdrawal was requested.",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was paid or failed.",
+            "format": "date-time"
+          }
+        }
+      },
+      "OrderCompletedEvent": {
+        "type": "object",
+        "title": "order.completed event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "order.completed"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookOrder"
+              }
+            }
+          }
+        }
+      },
+      "OrderFailedEvent": {
+        "type": "object",
+        "title": "order.failed event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "order.failed"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookOrder"
+              }
+            }
+          }
+        }
+      },
+      "OrderRefundedEvent": {
+        "type": "object",
+        "title": "order.refunded event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "order.refunded"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookOrder"
+              }
+            }
+          }
+        }
+      },
+      "TopUpSucceededEvent": {
+        "type": "object",
+        "title": "top_up.succeeded event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "top_up.succeeded"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookTopUp"
+              }
+            }
+          }
+        }
+      },
+      "TopUpFailedEvent": {
+        "type": "object",
+        "title": "top_up.failed event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "top_up.failed"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookTopUp"
+              }
+            }
+          }
+        }
+      },
+      "PayoutPaidEvent": {
+        "type": "object",
+        "title": "payout.paid event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "payout.paid"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookPayout"
+              }
+            }
+          }
+        }
+      },
+      "PayoutFailedEvent": {
+        "type": "object",
+        "title": "payout.failed event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "payout.failed"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookPayout"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "order.completed": {
+      "post": {
+        "operationId": "webhook_order_completed",
+        "summary": "An order was delivered",
+        "description": "Fires once when the supplier confirms delivery: straight away for most orders, or after a later status check if the order was `processing` when you placed it. The wholesale cost and tax have been taken from your wallet.\n\nDoes not fire for orders that fail, and never carries gift card codes, PINs or electricity tokens: call `GET /v1/orders/{id}` to fetch them.\n\nComes after you place the order (`POST /v1/orders`). Can be followed by `order.refunded`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCompletedEvent"
+              },
+              "example": {
+                "id": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a",
+                "object": "event",
+                "type": "order.completed",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-06T09:15:04.870Z",
+                "data": {
+                  "object": {
+                    "object": "order",
+                    "id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                    "mode": "live",
+                    "status": "completed",
+                    "quote_id": "0b9d8c7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+                    "product": {
+                      "id": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                      "name": "MTN Nigeria airtime",
+                      "category": "airtime"
+                    },
+                    "face_value": 100000,
+                    "face_currency": "NGN",
+                    "quantity": 1,
+                    "currency": "NGN",
+                    "wholesale": 97000,
+                    "tax": 0,
+                    "charged": 97000,
+                    "price": 100000,
+                    "reseller_profit": 3000,
+                    "recipient": {
+                      "phone": "+2348031234567"
+                    },
+                    "customer_reference": "cust-1042",
+                    "failure_reason": null,
+                    "receipt_number": "BC-000123",
+                    "created_at": "2026-10-06T09:15:02.114Z",
+                    "updated_at": "2026-10-06T09:15:04.870Z",
+                    "completed_at": "2026-10-06T09:15:04.870Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "order.failed": {
+      "post": {
+        "operationId": "webhook_order_failed",
+        "summary": "An order could not be fulfilled",
+        "description": "Fires once when an order fails for good: every eligible supplier refused it, or the supplier confirmed it failed. The amount held from your wallet has been returned.\n\nDoes not fire while an order is still `processing` (an unclear supplier answer is checked again, not treated as failure).\n\nComes after you place the order. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderFailedEvent"
+              },
+              "example": {
+                "id": "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
+                "object": "event",
+                "type": "order.failed",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-06T09:15:04.870Z",
+                "data": {
+                  "object": {
+                    "object": "order",
+                    "id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                    "mode": "live",
+                    "status": "failed",
+                    "quote_id": "0b9d8c7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+                    "product": {
+                      "id": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                      "name": "MTN Nigeria airtime",
+                      "category": "airtime"
+                    },
+                    "face_value": 100000,
+                    "face_currency": "NGN",
+                    "quantity": 1,
+                    "currency": "NGN",
+                    "wholesale": 97000,
+                    "tax": 0,
+                    "charged": 97000,
+                    "price": 100000,
+                    "reseller_profit": 3000,
+                    "recipient": {
+                      "phone": "+2348031234567"
+                    },
+                    "customer_reference": "cust-1042",
+                    "failure_reason": "The order could not be fulfilled. The amount held has been returned to your wallet.",
+                    "receipt_number": null,
+                    "created_at": "2026-10-06T09:15:02.114Z",
+                    "updated_at": "2026-10-06T09:15:04.870Z",
+                    "completed_at": "2026-10-06T09:15:04.870Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "order.refunded": {
+      "post": {
+        "operationId": "webhook_order_refunded",
+        "summary": "A completed order was refunded",
+        "description": "Fires when BitoCard refunds a completed order after reviewing it. The wholesale cost and tax are back in your wallet as topped-up funds.\n\nDoes not fire for failed orders (their hold is simply released).\n\nComes after `order.completed`. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderRefundedEvent"
+              },
+              "example": {
+                "id": "3f4a5b6c-7d8e-4f9a-8b1c-2d3e4f5a6b7c",
+                "object": "event",
+                "type": "order.refunded",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-07T14:30:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "order",
+                    "id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                    "mode": "live",
+                    "status": "refunded",
+                    "quote_id": "0b9d8c7e-6f5a-4b3c-8d2e-1f0a9b8c7d6e",
+                    "product": {
+                      "id": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                      "name": "MTN Nigeria airtime",
+                      "category": "airtime"
+                    },
+                    "face_value": 100000,
+                    "face_currency": "NGN",
+                    "quantity": 1,
+                    "currency": "NGN",
+                    "wholesale": 97000,
+                    "tax": 0,
+                    "charged": 97000,
+                    "price": 100000,
+                    "reseller_profit": 3000,
+                    "recipient": {
+                      "phone": "+2348031234567"
+                    },
+                    "customer_reference": "cust-1042",
+                    "failure_reason": null,
+                    "receipt_number": "BC-000123",
+                    "created_at": "2026-10-06T09:15:02.114Z",
+                    "updated_at": "2026-10-07T14:30:00.000Z",
+                    "completed_at": "2026-10-06T09:15:04.870Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "top_up.succeeded": {
+      "post": {
+        "operationId": "webhook_top_up_succeeded",
+        "summary": "Money was added to your wallet",
+        "description": "Fires once when a payment into your wallet is confirmed: a checkout top-up (`source: checkout`) or a transfer into your reserved bank account (`source: bank_transfer`). The amount is available to spend.\n\nDoes not fire for payments still pending with the payment provider.\n\nFor checkout, comes after you create the top-up. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUpSucceededEvent"
+              },
+              "example": {
+                "id": "4a5b6c7d-8e9f-4a0b-9c2d-3e4f5a6b7c8d",
+                "object": "event",
+                "type": "top_up.succeeded",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-06T08:01:12.000Z",
+                "data": {
+                  "object": {
+                    "object": "top_up",
+                    "id": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d",
+                    "mode": "live",
+                    "status": "succeeded",
+                    "source": "checkout",
+                    "amount": 5000000,
+                    "currency": "NGN",
+                    "checkout_url": null,
+                    "failure_reason": null,
+                    "created_at": "2026-10-06T08:00:00.000Z",
+                    "completed_at": "2026-10-06T08:01:12.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "top_up.failed": {
+      "post": {
+        "operationId": "webhook_top_up_failed",
+        "summary": "A checkout top-up failed",
+        "description": "Fires once when a checkout top-up fails or is abandoned, or the amount paid does not match. Nothing was added to your wallet.\n\nDoes not fire for reserved bank account transfers (they only arrive once they have succeeded).\n\nComes after you create the top-up. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUpFailedEvent"
+              },
+              "example": {
+                "id": "5b6c7d8e-9f0a-4b1c-8d3e-4f5a6b7c8d9e",
+                "object": "event",
+                "type": "top_up.failed",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-06T08:01:12.000Z",
+                "data": {
+                  "object": {
+                    "object": "top_up",
+                    "id": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d",
+                    "mode": "live",
+                    "status": "failed",
+                    "source": "checkout",
+                    "amount": 5000000,
+                    "currency": "NGN",
+                    "checkout_url": null,
+                    "failure_reason": "The payment failed.",
+                    "created_at": "2026-10-06T08:00:00.000Z",
+                    "completed_at": "2026-10-06T08:01:12.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "payout.paid": {
+      "post": {
+        "operationId": "webhook_payout_paid",
+        "summary": "A withdrawal reached your bank",
+        "description": "Fires once when the bank transfer for a withdrawal of your earnings is confirmed.\n\nDoes not fire while the transfer is still in progress.\n\nComes after you request the payout. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutPaidEvent"
+              },
+              "example": {
+                "id": "6c7d8e9f-0a1b-4c2d-9e4f-5a6b7c8d9e0f",
+                "object": "event",
+                "type": "payout.paid",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-21T10:02:30.000Z",
+                "data": {
+                  "object": {
+                    "object": "payout",
+                    "id": "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+                    "mode": "live",
+                    "status": "paid",
+                    "amount": 2500000,
+                    "currency": "NGN",
+                    "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
+                    "failure_reason": null,
+                    "created_at": "2026-10-21T10:00:00.000Z",
+                    "completed_at": "2026-10-21T10:02:30.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "payout.failed": {
+      "post": {
+        "operationId": "webhook_payout_failed",
+        "summary": "A withdrawal failed",
+        "description": "Fires once when the bank refuses or fails the transfer. The amount is back in your withdrawable earnings.\n\nDoes not fire while the outcome is unclear: BitoCard keeps checking with the bank.\n\nComes after you request the payout. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayoutFailedEvent"
+              },
+              "example": {
+                "id": "7d8e9f0a-1b2c-4d3e-8f5a-6b7c8d9e0f1a",
+                "object": "event",
+                "type": "payout.failed",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-21T10:02:30.000Z",
+                "data": {
+                  "object": {
+                    "object": "payout",
+                    "id": "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+                    "mode": "live",
+                    "status": "failed",
+                    "amount": 2500000,
+                    "currency": "NGN",
+                    "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
+                    "failure_reason": "The bank transfer was refused.",
+                    "created_at": "2026-10-21T10:00:00.000Z",
+                    "completed_at": "2026-10-21T10:02:30.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
       }
     }
   }

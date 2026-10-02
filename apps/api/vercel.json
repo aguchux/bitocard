@@ -28,6 +28,14 @@
     {
       "path": "/v1/cron/orders",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/v1/cron/webhooks",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/v1/cron/webhooks-cleanup",
+      "schedule": "45 3 * * *"
     }
   ]
 }
