@@ -19,6 +19,10 @@ export const optionDefinitions = {
 export const switchDefinitions = {
   startup_allowance: { scopes: ['global', 'country', 'reseller'], description: 'The one-time $500 startup allowance.' },
   welcome_bonus: { scopes: ['reseller'], description: 'The $1 customer welcome bonus; only ever per reseller.' },
+  manual_reseller_approval: {
+    scopes: ['global', 'country'],
+    description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
+  },
 } as const;
 
 export type OptionKey = keyof typeof optionDefinitions;

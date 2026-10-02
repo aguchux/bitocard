@@ -2426,7 +2426,9 @@
                 "top_up.succeeded",
                 "top_up.failed",
                 "payout.paid",
-                "payout.failed"
+                "payout.failed",
+                "customer_verification.approved",
+                "customer_verification.declined"
               ]
             }
           },
@@ -2493,6 +2495,188 @@
         "summary": "Get an event",
         "tags": [
           "Events"
+        ]
+      }
+    },
+    "/v1/account/verification": {
+      "get": {
+        "operationId": "ResellerVerificationController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the identity check status",
+        "tags": [
+          "Account"
+        ]
+      },
+      "post": {
+        "description": "Business owner only. Returns a Didit page where the owner photographs an ID document and takes a selfie. An unfinished check is returned again for a day.",
+        "operationId": "ResellerVerificationController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start the identity check",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/v1/customers/{reference}/verification": {
+      "post": {
+        "description": "Optional for your own systems: you are responsible for knowing your customers. In Nigeria the customer approves sharing their BVN record on the bank’s consent page, and it must match their name; elsewhere they photograph an ID document and take a selfie. Send the customer to `url`; the outcome arrives as a `customer_verification.*` webhook. An approved or unfinished check for the same customer is returned instead of a new one. In test mode no page is shown: finish the check with the simulate endpoint.",
+        "operationId": "CustomerVerificationController_start",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reference",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCustomerVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a customer identity check",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerVerificationController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reference",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a customer’s latest identity check",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/v1/customers/{reference}/verification/simulate": {
+      "post": {
+        "operationId": "CustomerVerificationController_simulate",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reference",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateVerificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Simulate the outcome of a customer identity check (test mode)",
+        "tags": [
+          "Customers"
         ]
       }
     },
@@ -3014,7 +3198,8 @@
                 "wallet:write",
                 "webhooks:manage",
                 "events:read",
-                "stores:manage"
+                "stores:manage",
+                "customers:verify"
               ]
             }
           }
@@ -3319,7 +3504,9 @@
                 "top_up.succeeded",
                 "top_up.failed",
                 "payout.paid",
-                "payout.failed"
+                "payout.failed",
+                "customer_verification.approved",
+                "customer_verification.declined"
               ]
             }
           }
@@ -3350,7 +3537,9 @@
                 "top_up.succeeded",
                 "top_up.failed",
                 "payout.paid",
-                "payout.failed"
+                "payout.failed",
+                "customer_verification.approved",
+                "customer_verification.declined"
               ]
             }
           },
@@ -3375,6 +3564,72 @@
             "description": "Hours the old secret keeps signing alongside the new one; 0 stops it now."
           }
         }
+      },
+      "ConsentDto": {
+        "type": "object",
+        "properties": {
+          "consent": {
+            "type": "boolean",
+            "description": "The owner agrees to the identity check, including the face (biometric) check."
+          }
+        },
+        "required": [
+          "consent"
+        ]
+      },
+      "StartCustomerVerificationDto": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "example": "NG",
+            "description": "The customer’s country (ISO 3166-1 alpha-2). Nigeria uses the BVN; elsewhere an ID document and face check."
+          },
+          "first_name": {
+            "type": "string",
+            "example": "Chinedu"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Okafor"
+          },
+          "bvn": {
+            "type": "string",
+            "description": "Nigeria only: the 11-digit BVN. Passed to the bank’s consent service and never stored by BitoCard.",
+            "example": "22222222222"
+          },
+          "redirect_url": {
+            "type": "string",
+            "description": "Where the customer returns after the check (HTTPS).",
+            "example": "https://example.com/account/verified"
+          },
+          "consent": {
+            "type": "boolean",
+            "description": "The customer agreed to the check (and, outside Nigeria, to the face check)."
+          }
+        },
+        "required": [
+          "country",
+          "first_name",
+          "last_name",
+          "redirect_url",
+          "consent"
+        ]
+      },
+      "SimulateVerificationDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "declined"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
       },
       "CreateOrderDto": {
         "type": "object",
@@ -3747,6 +4002,105 @@
               "null"
             ],
             "description": "When it was paid or failed.",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookCustomerVerification": {
+        "type": "object",
+        "title": "Customer verification",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "customer_reference",
+          "status",
+          "method",
+          "country",
+          "url",
+          "verified_name",
+          "reason",
+          "created_at",
+          "decided_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `customer_verification`.",
+            "const": "customer_verification"
+          },
+          "id": {
+            "type": "string",
+            "description": "Verification ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "customer_reference": {
+            "type": "string",
+            "description": "Your own reference for the customer."
+          },
+          "status": {
+            "type": "string",
+            "description": "`approved` or `declined` in events.",
+            "enum": [
+              "in_progress",
+              "approved",
+              "declined",
+              "in_review",
+              "expired"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "description": "`bvn` (Nigeria: BVN with the customer’s consent) or `document` (ID document and face check).",
+            "enum": [
+              "bvn",
+              "document"
+            ]
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country of the customer."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Always null in events."
+          },
+          "verified_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name on the verified record, for approved checks."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For declined checks: `name_mismatch` (the BVN record has a different name), `bvn_consent_declined`, or `not_verified`."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the check started.",
+            "format": "date-time"
+          },
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was decided.",
             "format": "date-time"
           }
         }
@@ -4159,6 +4513,124 @@
             "properties": {
               "object": {
                 "$ref": "#/components/schemas/WebhookPayout"
+              }
+            }
+          }
+        }
+      },
+      "CustomerVerificationApprovedEvent": {
+        "type": "object",
+        "title": "customer_verification.approved event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "customer_verification.approved"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookCustomerVerification"
+              }
+            }
+          }
+        }
+      },
+      "CustomerVerificationDeclinedEvent": {
+        "type": "object",
+        "title": "customer_verification.declined event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "customer_verification.declined"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/WebhookCustomerVerification"
               }
             }
           }
@@ -4833,6 +5305,188 @@
                     "failure_reason": "The bank transfer was refused.",
                     "created_at": "2026-10-21T10:00:00.000Z",
                     "completed_at": "2026-10-21T10:02:30.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "customer_verification.approved": {
+      "post": {
+        "operationId": "webhook_customer_verification_approved",
+        "summary": "A customer's identity was verified",
+        "description": "Fires once when a customer check you started (`POST /v1/customers/{reference}/verification`) passes: the BVN record released with the customer’s consent matches their name, or their ID document and face check passed.\n\nDoes not fire while the customer has not finished the check, or for checks still in review.\n\nComes after you start the check. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerVerificationApprovedEvent"
+              },
+              "example": {
+                "id": "8e9f0a1b-2c3d-4e5f-9a6b-7c8d9e0f1a2b",
+                "object": "event",
+                "type": "customer_verification.approved",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-06T09:04:10.000Z",
+                "data": {
+                  "object": {
+                    "object": "customer_verification",
+                    "id": "8b9c0d1e-2f3a-4b4c-9d5e-6f7a8b9c0d1e",
+                    "mode": "live",
+                    "customer_reference": "cust-1042",
+                    "status": "approved",
+                    "method": "bvn",
+                    "country": "NG",
+                    "url": null,
+                    "verified_name": "Chinedu Okafor",
+                    "reason": null,
+                    "created_at": "2026-10-06T09:00:00.000Z",
+                    "decided_at": "2026-10-06T09:04:10.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "customer_verification.declined": {
+      "post": {
+        "operationId": "webhook_customer_verification_declined",
+        "summary": "A customer's identity check did not pass",
+        "description": "Fires once when a customer check fails: the name on the BVN record differs, the customer refused consent, or the document or face check failed. `reason` says which.\n\nDoes not fire for checks that simply expire unfinished (the check shows `expired` when you get it).\n\nComes after you start the check. You can start a new check for the same customer afterwards.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerVerificationDeclinedEvent"
+              },
+              "example": {
+                "id": "9f0a1b2c-3d4e-4f5a-8b7c-8d9e0f1a2b3c",
+                "object": "event",
+                "type": "customer_verification.declined",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-06T09:04:10.000Z",
+                "data": {
+                  "object": {
+                    "object": "customer_verification",
+                    "id": "8b9c0d1e-2f3a-4b4c-9d5e-6f7a8b9c0d1e",
+                    "mode": "live",
+                    "customer_reference": "cust-1042",
+                    "status": "declined",
+                    "method": "bvn",
+                    "country": "NG",
+                    "url": null,
+                    "verified_name": null,
+                    "reason": "name_mismatch",
+                    "created_at": "2026-10-06T09:00:00.000Z",
+                    "decided_at": "2026-10-06T09:04:10.000Z"
                   }
                 }
               }

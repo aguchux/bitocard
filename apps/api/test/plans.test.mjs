@@ -83,6 +83,10 @@ describe('admin: resellers', () => {
   test('activating, upgrading and suspending are audited; suspension stops API keys at once', async () => {
     const { browser, resellerId } = await resellerClient(server);
     const secret = await apiKey(browser);
+    const unverified = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active' });
+    assert.deepEqual([unverified.status, unverified.json.error.code], [409, 'verification_required'], 'never live before the identity check');
+    const { PrismaService } = await import('../dist/database/prisma.service.js');
+    await server.app.get(PrismaService).reseller.update({ where: { id: resellerId }, data: { verifiedAt: new Date(), verifiedName: 'Ada Obi' } });
     const activated = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active', plan: 'premium' });
     assert.deepEqual([activated.json.status, activated.json.plan.code], ['active', 'premium']);
     assert.equal((await browser.post('/v1/api-keys', { name: 'Live', mode: 'live' })).status, 201, 'live keys once active');

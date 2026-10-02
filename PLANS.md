@@ -137,6 +137,14 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 - Airtime, data, pay-TV and bills: one per order; gift cards: up to 10 per order.
 - Refunds of completed orders go back to the reseller wallet as topped-up funds (spendable, not withdrawable).
 
+### Identity checks (Decided, starting values admins can change)
+
+- A reseller whose owner passes Didit goes live automatically; admins can require manual approval per country or globally (`manual_reseller_approval`). Admins can never activate an unverified reseller.
+- Customers of resellers' own systems are the reseller's responsibility; BitoCard offers an optional customer check API (BVN in Nigeria, Didit elsewhere). Hosted storefronts enforce it where the category and country require it.
+- A BVN check passes only when the name on the BVN record matches the customer's first and last names.
+- Live payout accounts must be in the verified owner's or the business's name.
+- Unfinished checks are offered again for a day and closed after 7 days.
+
 ### Webhooks (Decided, starting values)
 
 - Events at launch: `order.completed`, `order.failed`, `order.refunded`, `top_up.succeeded`, `top_up.failed`, `payout.paid`, `payout.failed`, plus a `ping` test event. Payload version `2026-10-01`.
@@ -310,8 +318,8 @@ Phase 1, foundation and own-brand pilot:
 | M5 | Supplier adapters and registry, catalogue, pricing rules, quotes; Reloadly and VTpass | **Done** (needs Reloadly and VTpass credentials, and the agreed VTpass commission entered per product) |
 | M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | **Done** |
 | M7 | Webhooks: outbox, delivery, retries, events API | **Done** (Vercel Queues transport; needs Vercel Pro for the 5-minute backstop job) |
-| M8 | Identity checks: Didit, BVN, bank validation, gating | Next |
-| M9 | Admin app | |
+| M8 | Identity checks: Didit, BVN, bank validation, gating | **Done** (needs Didit API key, workflow and webhook secret, and Flutterwave BVN access; privacy notice update before live) |
+| M9 | Admin app | Next |
 | M10 | Own-brand storefront (Golojan's store) | |
 | M11 | Pilot launch: Nigeria, then Ghana and Kenya | |
 

@@ -114,3 +114,24 @@ export function webhookEndpointDisabledEmail(to: string, url: string, mode: stri
     ]),
   };
 }
+
+export function resellerVerificationEmail(to: string, status: 'approved' | 'declined' | 'in_review' | 'expired' | 'in_progress', active: boolean, link: string): EmailMessage {
+  if (status === 'approved') {
+    return {
+      to,
+      subject: 'Your identity is verified',
+      ...layout('Identity verified', [
+        active ? 'Your identity check passed and your account is now live: you can top up your wallet and take live orders.' : 'Your identity check passed. Our team will finish reviewing your account and email you when it is live.',
+        `See your account: ${link}`,
+      ]),
+    };
+  }
+  return {
+    to,
+    subject: 'We could not verify your identity',
+    ...layout('Identity check not passed', [
+      'Your identity check did not pass. This can happen if the photo of your document or face was unclear, or the details did not match.',
+      `You can try again from your dashboard: ${link}`,
+    ]),
+  };
+}

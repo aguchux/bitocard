@@ -80,6 +80,10 @@ export class PlansService {
     if (input.plan && !(await this.prisma.plan.findUnique({ where: { code: input.plan } }))) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such plan.', 'plan');
     }
+    // Going live needs the owner's identity check first.
+    if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet.", 'status');
+    }
     const after = await this.prisma.reseller.update({ where: { id }, data: { status: input.status, planCode: input.plan } });
     await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
     return this.resellerDetail(id);

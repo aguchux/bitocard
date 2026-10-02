@@ -47,6 +47,10 @@
     {
       "path": "/v1/cron/webhooks-cleanup",
       "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/v1/cron/identity",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

@@ -10,6 +10,8 @@ export const eventTypes = [
   'top_up.failed',
   'payout.paid',
   'payout.failed',
+  'customer_verification.approved',
+  'customer_verification.declined',
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

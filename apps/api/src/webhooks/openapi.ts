@@ -71,6 +71,20 @@ export const eventObjectSchemas: Record<string, Schema> = {
     created_at: time('When the withdrawal was requested.'),
     completed_at: nullableTime('When it was paid or failed.'),
   }),
+  WebhookCustomerVerification: objectSchema('Customer verification', {
+    object: str('Always `customer_verification`.', { const: 'customer_verification' }),
+    id: str('Verification ID.', { format: 'uuid' }),
+    mode,
+    customer_reference: str('Your own reference for the customer.'),
+    status: str('`approved` or `declined` in events.', { enum: ['in_progress', 'approved', 'declined', 'in_review', 'expired'] }),
+    method: str('`bvn` (Nigeria: BVN with the customer’s consent) or `document` (ID document and face check).', { enum: ['bvn', 'document'] }),
+    country: str('ISO 3166-1 alpha-2 country of the customer.'),
+    url: nullableStr('Always null in events.'),
+    verified_name: nullableStr('The name on the verified record, for approved checks.'),
+    reason: nullableStr('For declined checks: `name_mismatch` (the BVN record has a different name), `bvn_consent_declined`, or `not_verified`.'),
+    created_at: time('When the check started.'),
+    decided_at: nullableTime('When it was decided.'),
+  }),
 };
 
 const exampleOrder = (status: string, extra: Schema = {}) => ({
@@ -125,6 +139,22 @@ const examplePayout = (status: string, extra: Schema = {}) => ({
   failure_reason: null,
   created_at: '2026-10-21T10:00:00.000Z',
   completed_at: '2026-10-21T10:02:30.000Z',
+  ...extra,
+});
+
+const exampleVerification = (status: string, extra: Schema = {}) => ({
+  object: 'customer_verification',
+  id: '8b9c0d1e-2f3a-4b4c-9d5e-6f7a8b9c0d1e',
+  mode: 'live',
+  customer_reference: 'cust-1042',
+  status,
+  method: 'bvn',
+  country: 'NG',
+  url: null,
+  verified_name: status === 'approved' ? 'Chinedu Okafor' : null,
+  reason: null,
+  created_at: '2026-10-06T09:00:00.000Z',
+  decided_at: '2026-10-06T09:04:10.000Z',
   ...extra,
 });
 
@@ -202,6 +232,26 @@ export const eventDocs: Record<EventType, EventDoc> = {
     ].join('\n\n'),
     example: examplePayout('failed', { failure_reason: 'The bank transfer was refused.' }),
   },
+  'customer_verification.approved': {
+    schema: 'WebhookCustomerVerification',
+    summary: "A customer's identity was verified",
+    description: [
+      'Fires once when a customer check you started (`POST /v1/customers/{reference}/verification`) passes: the BVN record released with the customer’s consent matches their name, or their ID document and face check passed.',
+      'Does not fire while the customer has not finished the check, or for checks still in review.',
+      'Comes after you start the check. Nothing follows it.',
+    ].join('\n\n'),
+    example: exampleVerification('approved'),
+  },
+  'customer_verification.declined': {
+    schema: 'WebhookCustomerVerification',
+    summary: "A customer's identity check did not pass",
+    description: [
+      'Fires once when a customer check fails: the name on the BVN record differs, the customer refused consent, or the document or face check failed. `reason` says which.',
+      'Does not fire for checks that simply expire unfinished (the check shows `expired` when you get it).',
+      'Comes after you start the check. You can start a new check for the same customer afterwards.',
+    ].join('\n\n'),
+    example: exampleVerification('declined', { reason: 'name_mismatch' }),
+  },
 };
 
 const exampleEventIds: Record<EventType, string> = {
@@ -212,6 +262,13 @@ const exampleEventIds: Record<EventType, string> = {
   'top_up.failed': '5b6c7d8e-9f0a-4b1c-8d3e-4f5a6b7c8d9e',
   'payout.paid': '6c7d8e9f-0a1b-4c2d-9e4f-5a6b7c8d9e0f',
   'payout.failed': '7d8e9f0a-1b2c-4d3e-8f5a-6b7c8d9e0f1a',
+  'customer_verification.approved': '8e9f0a1b-2c3d-4e5f-9a6b-7c8d9e0f1a2b',
+  'customer_verification.declined': '9f0a1b2c-3d4e-4f5a-8b7c-8d9e0f1a2b3c',
+};
+
+const exampleTime = (object: object) => {
+  const times = object as { updated_at?: string; completed_at?: string; decided_at?: string };
+  return times.updated_at ?? times.completed_at ?? times.decided_at;
 };
 
 function envelope(type: EventType): Schema {
@@ -258,7 +315,7 @@ export function addWebhooks<T extends { openapi: string; components?: { schemas?
           content: {
             'application/json': {
               schema: { $ref: `#/components/schemas/${name}` },
-              example: { id: exampleEventIds[type], object: 'event', type, api_version: eventApiVersion, mode: 'live', created_at: (doc.example as { updated_at?: string; completed_at?: string }).updated_at ?? (doc.example as { completed_at: string }).completed_at, data: { object: doc.example } },
+              example: { id: exampleEventIds[type], object: 'event', type, api_version: eventApiVersion, mode: 'live', created_at: exampleTime(doc.example), data: { object: doc.example } },
             },
           },
         },

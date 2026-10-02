@@ -11,7 +11,8 @@ const flwError = (status, message) => ({ status, body: { status: 'error', messag
  * Set `state.fail` to make a path fail: { '/virtual-account-numbers': 500 }.
  */
 export async function fakeFlutterwave() {
-  const state = { charges: {}, transfers: {}, rates: {}, fail: {}, nextId: 1000, accounts: { '0123456789': 'ADA OBI DIGITAL' } };
+  // `bvns` maps a BVN to the name on its record; `bvnChecks` maps a consent reference to { bvn, status }.
+  const state = { charges: {}, transfers: {}, rates: {}, fail: {}, nextId: 1000, accounts: { '0123456789': 'ADA OBI DIGITAL', '0987654321': 'JOHN STRANGER' }, bvns: {}, bvnChecks: {} };
   const service = await fakeService(({ method, url, body }) => {
     const path = url.split('?')[0];
     const query = new URLSearchParams(url.split('?')[1] ?? '');
@@ -45,6 +46,19 @@ export async function fakeFlutterwave() {
       const id = (state.nextId += 1);
       state.transfers[id] = { id, status: 'NEW', fee: 10.75, reference: body.reference, amount: body.amount, account_number: body.account_number };
       return flwOk(state.transfers[id]);
+    }
+    if (method === 'POST' && path === '/bvn/verifications') {
+      if (!/^\d{11}$/.test(body.bvn ?? '')) return flwError(400, 'Invalid BVN');
+      const reference = `FLWBVN${(state.nextId += 1)}`;
+      state.bvnChecks[reference] = { bvn: body.bvn, status: 'PENDING', redirect_url: body.redirect_url };
+      return flwOk({ url: `https://nibss-consent.flutterwave.test/cms/BvnConsent?session=${reference}`, reference });
+    }
+    const bvnCheck = /^\/bvn\/verifications\/([A-Z0-9]+)$/.exec(path);
+    if (method === 'GET' && bvnCheck) {
+      const check = state.bvnChecks[bvnCheck[1]];
+      if (!check) return flwError(404, 'Not found');
+      const [first_name, last_name] = (state.bvns[check.bvn] ?? 'Unknown Person').split(' ');
+      return flwOk({ status: check.status, reference: bvnCheck[1], ...(check.status === 'COMPLETED' ? { first_name, last_name, bvn_data: { bvn: check.bvn } } : {}) });
     }
     const transfer = /^\/transfers\/(\d+)$/.exec(path);
     if (method === 'GET' && transfer) return state.transfers[transfer[1]] ? flwOk(state.transfers[transfer[1]]) : flwError(404, 'Not found');
@@ -337,4 +351,30 @@ export async function fakeVercelQueue() {
     body: JSON.stringify(message.payload),
   });
   return { ...service, state, callback, env: { WEBHOOK_QUEUE: 'vercel', WEBHOOK_QUEUE_URL: service.url, WEBHOOK_QUEUE_TOKEN: 'queue-token' } };
+}
+
+/**
+ * Didit v3 sessions. `state.sessions` maps session_id to { status, first_name, last_name, issuing_state, vendor_data };
+ * change a session's status and names to play out the check. Webhooks are signed with `secret`.
+ */
+export async function fakeDidit() {
+  const state = { sessions: {}, nextId: 1, created: [] };
+  const service = await fakeService(({ method, url, headers, body }) => {
+    if (headers['x-api-key'] !== 'didit-key') return { status: 403, body: { detail: 'Invalid API key' } };
+    if (method === 'POST' && url === '/v3/session/') {
+      const session_id = `00000000-0000-4000-8000-${String(state.nextId++).padStart(12, '0')}`;
+      state.sessions[session_id] = { status: 'Not Started', vendor_data: body.vendor_data, expected: body.expected_details ?? null };
+      state.created.push(body);
+      return { status: 201, body: { session_id, url: `https://verify.didit.test/session/${session_id}`, status: 'Not Started', workflow_id: body.workflow_id, vendor_data: body.vendor_data } };
+    }
+    const decision = /^\/v3\/session\/([^/]+)\/decision\/$/.exec(url);
+    if (method === 'GET' && decision) {
+      const session = state.sessions[decision[1]];
+      if (!session) return { status: 404, body: { detail: 'Not found' } };
+      const document = session.first_name ? [{ first_name: session.first_name, last_name: session.last_name, issuing_state: session.issuing_state ?? 'NGA', document_number: 'A12345678', status: session.status }] : null;
+      return { body: { session_id: decision[1], status: session.status, vendor_data: session.vendor_data, id_verifications: document, reviews: session.review ? [{ comment: session.review }] : [] } };
+    }
+    return { status: 404, body: { detail: `Fake Didit has no ${method} ${url}` } };
+  });
+  return { ...service, state, secret: 'didit-webhook-secret', env: { DIDIT_API_KEY: 'didit-key', DIDIT_WORKFLOW_ID: 'wf-test', DIDIT_WEBHOOK_SECRET: 'didit-webhook-secret', DIDIT_API_URL: service.url } };
 }

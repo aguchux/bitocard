@@ -27,7 +27,7 @@ const sandbox = { 'bitocard-mode': 'test' };
 /** A reseller with withdrawable earnings in the given mode. */
 async function earner({ mode = 'test', earnings = 5_000_000, country = 'NG' } = {}) {
   const reseller = await resellerClient(server, { country });
-  if (mode === 'live') await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active' } });
+  if (mode === 'live') await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', verifiedAt: new Date(), verifiedName: 'Ada Obi' } });
   if (earnings) await wallets.adjust(null, { resellerId: reseller.resellerId, mode, balance: 'earnings', amount: earnings, reason: 'Matured test earnings' });
   return reseller;
 }

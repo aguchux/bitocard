@@ -186,6 +186,10 @@ model Reseller {
   /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
   country               String?           @db.Char(2)
   status                ResellerStatus    @default(pending)
+  /// When the business owner passed the identity check (Didit); required before going live.
+  verifiedAt            DateTime?         @map("verified_at")
+  /// The owner's name as verified, for matching payout bank accounts.
+  verifiedName          String?           @map("verified_name")
   /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
   planCode              String            @default("standard") @map("plan_code")
   createdAt             DateTime          @default(now()) @map("created_at")
@@ -216,6 +220,7 @@ model Reseller {
   orders                Order[]
   events                Event[]
   webhookEndpoints      WebhookEndpoint[]
+  verifications         IdentityVerification[]
 
   @@map("resellers")
 }
@@ -1131,4 +1136,62 @@ model WebhookAttempt {
 
   @@index([deliveryId, createdAt])
   @@map("webhook_attempts")
+}
+
+// -- Identity checks ----------------------------------------------------------------------------------------------
+
+enum VerificationSubject {
+  reseller
+  customer
+}
+
+/// document: ID document and face check (Didit); bvn: Nigerian Bank Verification Number with consent (Flutterwave).
+enum VerificationMethod {
+  document
+  bvn
+}
+
+enum VerificationStatus {
+  in_progress
+  approved
+  declined
+  in_review
+  expired
+}
+
+/// One identity check. Keeps only the outcome and the verified name: never document images, ID numbers or the BVN.
+model IdentityVerification {
+  id                String               @id @default(uuid()) @db.Uuid
+  subject           VerificationSubject
+  resellerId        String               @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  /// The reseller's own reference for the customer (customer checks only).
+  customerReference String?              @map("customer_reference")
+  method            VerificationMethod
+  /// didit, flutterwave or sandbox.
+  provider          String
+  /// The provider's session or consent reference.
+  providerReference String               @map("provider_reference")
+  status            VerificationStatus   @default(in_progress)
+  /// Where the person completes the check (provider-hosted).
+  url               String?
+  country           String               @db.Char(2)
+  /// When the person agreed to the check (biometric and BVN data need explicit consent).
+  consentAt         DateTime             @map("consent_at")
+  expectedName      String?              @map("expected_name")
+  verifiedName      String?              @map("verified_name")
+  documentCountry   String?              @map("document_country") @db.Char(2)
+  /// Why it was declined or sent for review (shown to admins; a short code to resellers).
+  reason            String?
+  requestedById     String?              @map("requested_by_id") @db.Uuid
+  decidedById       String?              @map("decided_by_id") @db.Uuid
+  decidedAt         DateTime?            @map("decided_at")
+  lastCheckedAt     DateTime?            @map("last_checked_at")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  reseller          Reseller             @relation(fields: [resellerId], references: [id])
+
+  @@unique([provider, providerReference])
+  @@index([resellerId, subject, mode, customerReference, createdAt])
+  @@index([status, createdAt])
+  @@map("identity_verifications")
 }

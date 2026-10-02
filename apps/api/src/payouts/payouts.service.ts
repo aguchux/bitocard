@@ -15,6 +15,7 @@ import { resellerNotVerified, testModeOnly } from '../payments/payments.service'
 import { ProviderError } from '../payments/provider-error';
 import type { TransferResult } from '../payments/providers';
 import { EventsService } from '../webhooks/events.service';
+import { accountNameMatches } from '../identity/providers';
 
 /** Payouts to a newly added live bank account start after this, so a taken-over account cannot be emptied at once. */
 export const bankAccountCoolingOffMs = 24 * 60 * 60 * 1000;
@@ -114,7 +115,8 @@ export class PayoutsService {
 
   /** Adds a payout account. The bank confirms it exists and supplies the account name; the owner is emailed. */
   async addBankAccount(resellerId: string, mode: LedgerMode, userId: string, input: { bank_code: string; account_number: string }) {
-    const { country, currency } = await this.wallets.currencyOf(resellerId);
+    const { reseller, country, currency } = await this.wallets.currencyOf(resellerId);
+    if (mode === 'live' && !reseller.verifiedAt) throw resellerNotVerified();
     const active = await this.prisma.bankAccount.count({ where: { resellerId, mode, removedAt: null } });
     if (active >= maxBankAccounts) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'bank_account_limit_reached', `You can have up to ${maxBankAccounts} payout accounts. Remove one first.`);
@@ -131,6 +133,16 @@ export class PayoutsService {
         throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'bank_account_invalid', 'The bank could not find this account. Check the number and bank.', 'account_number');
       }
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The bank could not be reached. Try again shortly.');
+    }
+    // Live payouts go only to the verified owner's or the business's own account.
+    if (mode === 'live' && !accountNameMatches(accountName, [reseller.verifiedName, reseller.name])) {
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'invalid_request_error',
+        'account_name_mismatch',
+        `This account is in the name of ${accountName}. Payouts can only go to an account in your verified name or your business name.`,
+        'account_number',
+      );
     }
     const account = await this.prisma.bankAccount.create({
       data: {

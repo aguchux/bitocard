@@ -89,6 +89,14 @@ const schema = z.object({
   /** VTpass needs a phone number on every payment; used when the customer gave none. */
   VTPASS_CONTACT_PHONE: z.string().default('08011111111'),
 
+  // Identity checks (Didit): reseller owners everywhere, customers outside Nigeria. Unset API key switches Didit off.
+  DIDIT_API_KEY: z.string().optional(),
+  /** The Didit workflow (document plus liveness and face match) sessions run. */
+  DIDIT_WORKFLOW_ID: z.string().optional(),
+  /** The webhook destination's secret_shared_key; signs X-Signature. */
+  DIDIT_WEBHOOK_SECRET: z.string().optional(),
+  DIDIT_API_URL: z.string().url().default('https://verification.didit.me'),
+
   /** Vercel Cron sends it as a Bearer token; scheduled jobs refuse requests without it. */
   CRON_SECRET: z.string().optional(),
   /** Where operational alerts go (for example, conversions paused). */

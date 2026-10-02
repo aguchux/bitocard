@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import type { BvnProvider, CheckResult } from '../identity/providers';
 import { ProviderError, providerRequest } from './provider-error';
 import {
   type ChargeResult,
@@ -19,7 +20,7 @@ const checkoutCountries = new Set(['NG', 'GH', 'KE']);
 const reservedAccountCountries = new Set(['NG', 'GH']);
 
 /** Flutterwave v3: checkout, reserved (virtual) accounts, bank payouts and offered exchange rates. */
-export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountProvider, TransferProvider {
+export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountProvider, TransferProvider, BvnProvider {
   readonly name = 'flutterwave';
 
   constructor(
@@ -38,6 +39,27 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
     const expected = Buffer.from(this.webhookHash);
     const given = Buffer.from(header);
     return expected.length === given.length && timingSafeEqual(expected, given);
+  }
+
+  // -- BVN (Nigeria) ---------------------------------------------------------------------------------------------
+
+  /** Starts BVN consent: the holder approves on the NIBSS page, then the record is released to us. */
+  async startBvnConsent(input: { bvn: string; firstName: string; lastName: string; redirectUrl: string }) {
+    const res = await this.call<{ url?: string; reference?: string }>('/bvn/verifications', {
+      method: 'POST',
+      body: { bvn: input.bvn, firstname: input.firstName, lastname: input.lastName, redirect_url: input.redirectUrl },
+    });
+    if (!res.data?.url || !res.data.reference) throw new ProviderError(this.name, 'no consent link returned', false);
+    return { providerReference: res.data.reference, url: res.data.url };
+  }
+
+  /** COMPLETED releases the name on the BVN record; anything else is still waiting for consent. The BVN data is not kept. */
+  async bvnResult(reference: string): Promise<CheckResult> {
+    const res = await this.call<{ status?: string; first_name?: string; last_name?: string }>(`/bvn/verifications/${encodeURIComponent(reference)}`);
+    const status = String(res.data?.status ?? '').toUpperCase();
+    if (status === 'COMPLETED') return { status: 'approved', firstName: res.data.first_name, lastName: res.data.last_name };
+    if (status === 'FAILED' || status === 'DECLINED') return { status: 'declined', reason: 'bvn_consent_declined' };
+    return { status: 'in_progress' };
   }
 
   supportsCheckout(country: string) {

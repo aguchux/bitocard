@@ -635,7 +635,8 @@ describe('events API', () => {
 });
 
 describe('published docs', () => {
-  const guide = readFileSync(new URL('../../docs/content/webhooks.md', import.meta.url), 'utf8');
+  // Windows checkouts may use CRLF; the guide's code is read with LF line endings.
+  const guide = readFileSync(new URL('../../docs/content/webhooks.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const block = language => {
     const match = new RegExp('```' + language + '\\n([\\s\\S]*?)```').exec(guide);
     assert.ok(match, `the guide has ${language} code`);

@@ -15,6 +15,7 @@ export const apiKeyScopes = [
   'webhooks:manage',
   'events:read',
   'stores:manage',
+  'customers:verify',
 ] as const;
 
 export const maxActiveKeys = 20;
