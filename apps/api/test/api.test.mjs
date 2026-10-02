@@ -84,7 +84,8 @@ before(async () => {
   }
   const databaseAdapter = dockerUrl ? await migratedDockerDatabase(dockerUrl) : await migratedPglite();
   app = await createApp({ databaseAdapter, extraModules: [FixturesModule] });
-  app.useLogger(false);
+  // Keep error logs in the Docker run so infrastructure failures are visible in CI.
+  app.useLogger(dockerUrl ? ['error'] : false);
   await app.listen(0);
   base = (await app.getUrl()).replace('[::1]', 'localhost');
 });
@@ -246,7 +247,7 @@ describe('rate limits', () => {
     await post('/v1/fixtures/things/accept', {}, { 'idempotency-key': 'rate-redis-1' });
     const res = await fetch(process.env.TEST_REDIS_REST_URL, {
       method: 'POST',
-      headers: { authorization: `Bearer ${process.env.TEST_REDIS_REST_TOKEN}` },
+      headers: { authorization: `Bearer ${process.env.TEST_REDIS_REST_TOKEN}`, 'content-type': 'application/json' },
       body: JSON.stringify(['KEYS', 'bitocard:ratelimit*']),
     });
     const { result } = await res.json();
