@@ -6,7 +6,7 @@ BitoCard is a reseller-first platform owned by Golojan Ltd. It will let approved
 
 The intended markets are the UK, US, and selected African countries, enabled country by country as provider coverage, payments, verification, and operations are ready. BitoCard's consumer-facing offering is buying, selling, and trading eligible digital gift cards and buying supported utility products through reseller storefronts.
 
-The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard selects a suitable source internally using availability and net profitability. Do not expose upstream provider identities, costs, credentials, or routing rules to storefront visitors or resellers. The reseller API is a later phase. Provider coverage, terms, and live access must be confirmed before implementation.
+The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard selects a suitable source internally using availability and net profitability. Do not expose upstream provider identities, costs, credentials, or routing rules to storefront visitors or resellers. BitoCard is API-first: the reseller API is the core product, not a later add-on. Provider coverage, terms, and live access must be confirmed before implementation.
 
 ## Product model and planned features
 
@@ -39,7 +39,7 @@ The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard sel
 - For purchases, choose an eligible available source by **net margin**, after provider cost, FX, fees, and operational constraints; use fulfilment reliability and market eligibility as routing safeguards.
 - For incoming gift card sales, route to an eligible source offering the best viable net return after verification and settlement costs.
 - Lock the customer-facing quote for its stated validity period. A fallback to another source must still honour that quote and avoid duplicate fulfilment. If neither is possible, fail clearly and release the wallet reservation.
-- Keep provider identities, credentials, cost prices, internal routing decisions, and supplier-specific error details out of reseller and customer interfaces and the future reseller API.
+- Keep provider identities, credentials, cost prices, internal routing decisions, and supplier-specific error details out of reseller and customer interfaces and the reseller API.
 
 ### Wallet, records, and operations
 
@@ -49,16 +49,71 @@ The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard sel
 - Provide order history, status updates, receipts, exception review, support workflows, and admin reconciliation.
 - Add identity checks, fraud controls, payment integration, market-specific terms, and provider agreements before accepting real funds or gift card codes.
 
-### Reseller API (later phase)
+### Reseller API (API-first)
 
-Offer authenticated, scoped access to BitoCard's catalogue, availability, quotes, order creation, order status, wallet balance, and signed webhooks so approved resellers can use their own websites or apps. Apply the same pricing, funding, routing, and data isolation rules as the hosted storefronts. Do not expose upstream APIs directly.
+BitoCard is API-first. Every capability is built as a public, versioned API before any screen uses it, so a reseller can run entirely on their own website, app or back office without a BitoCard storefront. Hosted storefronts, the reseller dashboard and BitoCard's own store are clients of that same API, with no private shortcuts.
+
+- Offer authenticated, scoped access to the catalogue, availability, quotes, order creation, order status, wallet balance and signed webhooks.
+- Apply the same pricing, funding, routing and data isolation rules whether an order comes from a hosted storefront or a reseller's own system.
+- Resellers own their end customers: the API accepts the reseller's own customer reference and does not require customers to hold BitoCard accounts.
+- Give every reseller a sandbox with test keys and simulated fulfilment.
+- Never expose upstream provider APIs, identities or costs.
+
+### API documentation (`apps/docs`)
+
+- The API documentation is public at `https://docs.bitocard.com` (indexed by search engines) and hosted only in `apps/docs` (Next.js): guides, the full API reference, webhook events, errors, changelog and sandbox behaviour.
+- The reference is generated from the API's own OpenAPI document, never written by hand, so docs and API cannot drift. A change to a public endpoint ships with its docs in the same change.
+- Reading the docs needs no account. Calling the API from the docs ("Try it") requires the reseller to sign in; it then runs against that reseller's own **sandbox** (simulated fulfilment) or **production** account. Requests go from the browser straight to the API.
+- Production calls from the docs are real: they can debit wallets and fulfil orders. Default to the sandbox, clearly mark live mode, require explicit confirmation before any live write, and offer a read-only option for production testing.
+- "Try it" uses a short-lived, tenant-scoped token issued from the reseller's sign-in, never a pasted or stored API key. Never send tokens to the docs server, log them or store them.
+
+### Platform decisions
+
+- **Stack:** Next.js + React + RTK Query clients; NestJS API; PostgreSQL + Prisma. No GraphQL.
+- **One unified REST API:** `/v1`, described by OpenAPI, chosen for speed and scale (CDN-cacheable reads, simple rate limits, works from any language). Reseller systems, hosted storefronts, the reseller dashboard, the docs and the admin app all use it; admin-only endpoints sit in the same API behind admin roles. RTK Query hooks are generated from the OpenAPI document.
+- **Vendor aggregation:** BitoCard aggregates many vendor and partner APIs (gift cards, airtime, data, utilities, payments, email, SMS) behind its own unified API. Each vendor is a server-side adapter implementing a BitoCard-owned interface for its kind (supplier, payment, email, SMS), so adding or removing a vendor never changes the public API. Vendor credentials, raw responses and errors stay inside the adapter; the public API returns only BitoCard's own models and error codes.
+- **Sign-in:** resellers (and hosted storefront customers) can use Google, email + password or mobile number + password; a mobile number is verified by SMS code before it can sign in. Admins cannot use Google (see Admin address). Reseller systems use scoped API keys (test and live).
+- **Who signs in on BitoCard:** only resellers (and their staff) and BitoCard admins hold BitoCard accounts. End customers never do.
+- **Customers belong to the reseller:** customers are authenticated at the reseller's end. Resellers on their own systems use their own sign-in and pass their own customer reference to the API. Hosted storefronts have no guest checkout: customers sign in before ordering, with accounts scoped to that one store and owned by its reseller (an account at one store does not exist at another).
+- **Admin address:** `https://admin.bitocard.com` (private, never indexed). Admins have no Google sign-in: email + password only, limited to `@bitocard.com` and `@golojan.co.uk` addresses (checked server-side), with 2-step verification required.
+- **API address:** `https://api.bitocard.com` for both sandbox and production. The key decides the mode (`bc_test_…` sandbox, `bc_live_…` live); test data is kept separate from live data and never touches real suppliers or money.
+- **SMS:** Termii, behind the SMS adapter interface, for mobile verification and sign-in codes.
+- **Email:** Resend and MailerSend, behind one email interface so either can send. Configure SPF, DKIM and DMARC for each sending domain.
+- **Payments:** multiple providers (Stripe, Flutterwave and others), each behind one payment adapter interface, chosen by the payer's country and currency. Credit a wallet only after the provider's signed webhook confirms payment; handle each webhook idempotently.
+- **Data region:** United States. Keep the database and the API's Vercel Functions region together. The privacy notice must name these processors and the US storage location before any personal data is collected.
+
+### Hosting
+
+- The API runs on **Vercel Functions** (its own Vercel project, `apps/api`), with Vercel Queues, Workflow and Cron for background work, alongside the frontends.
+- Before building each vendor adapter, confirm whether the vendor requires calls from allowlisted IP addresses. If any do, enable Vercel Static IPs for the API project; if the plan cannot provide them, that is the trigger to reconsider hosting (for example DigitalOcean).
+- Keep the API portable: standard NestJS, no Vercel-specific code in business logic, queues behind an interface, Postgres through Prisma. Moving hosts must be a deployment change, not a rewrite.
+
+### Outbound webhooks to resellers
+
+- **Transactional outbox:** write each event to an outbox table in the same database transaction as the change it describes. Dispatch from the outbox through Vercel Queues to a delivery function. Do not use RabbitMQ or Redis Streams unless long-running workers are introduced; then swap them in behind the same interface.
+- Log every delivery attempt (status, response code, timing) in Postgres.
+- **Signed:** HMAC-SHA256 over the timestamp and body with a per-endpoint secret; reject anything older than 5 minutes; rotate secrets with an overlap window.
+- **At least once:** every event has a unique `id`; tell resellers to ignore IDs they have handled. Order is not guaranteed, so include the object's version or `updated_at`.
+- **Retries:** about 1 min, 5 min, 30 min, 2 h, 6 h, then every 12 h for up to 3 days, with jitter. 10-second timeout; any 2xx is success.
+- **Isolation:** a concurrency limit per endpoint, so one slow reseller never delays others. Disable an endpoint after 3 days of failures and alert the reseller by email and in the dashboard.
+- **Self-service:** delivery log, resend and test-event buttons in the dashboard; the sandbox sends test events.
+- **Catch-up:** `GET /v1/events?since=…` lets resellers fetch anything they missed; the API, not the webhook, is the source of truth.
+- **Safe destinations:** HTTPS only; block private and internal IP addresses when an endpoint is saved and again at every delivery.
+
+### Legal updates owed
+
+Update the legals app (`apps/legals`) **before** each of these goes live, and bump `legalUpdated`:
+
+- **Reseller sign-in and API keys:** privacy notice (reseller account data, US storage, processors: database host, Vercel, Resend, MailerSend, Termii, payment providers; mobile numbers), cookie notice (strictly necessary session cookie on `.bitocard.com`), and new **Reseller terms** and **API terms**.
+- **Wallet top-ups:** reseller terms (pre-funding, refunds, chargebacks) and the payment providers in the privacy notice.
+- **Hosted storefronts with customer accounts:** a **Data processing agreement** (BitoCard processes storefront customers' data for the reseller, who is the controller), and guidance that each reseller needs its own customer-facing privacy notice and terms.
+- **Waitlist:** the Africa-wide waitlist privacy notice (on hold until Legals supplies the text and its effective date).
 
 ## Release sequence
 
-1. Prove the platform with BitoCard's own reselling storefront: accounts, catalogue, funding, ledger, buying, routing, fulfilment, support, and administration.
-2. Open hosted reseller onboarding, BitoCard subdomains, branding, pricing, reports, and optional custom domains.
-3. Add eligible gift card selling and linked trades where provider verification and settlement flows are ready.
-4. Release the reseller API after the hosted workflows and operational controls are stable.
+1. Build the public API first and prove it with BitoCard's own reselling storefront as its first client: accounts, API keys, catalogue, funding, ledger, buying, routing, fulfilment, support and administration.
+2. Open reseller onboarding: API keys and sandbox for resellers using their own systems, and hosted storefronts on BitoCard subdomains (branding, pricing, reports, optional custom domains) for those who are not.
+3. Add eligible gift card selling and linked trades, in the API and the storefronts together, where provider verification and settlement flows are ready.
 
 ## Current deliverable
 
@@ -109,7 +164,7 @@ The page must communicate that the product is coming soon. Do not add a working 
 - Entities, regions, governing law, contact (`legal@bitocard.com`) and the "last updated" date live in `packages/ui/src/legal.ts`. Change them there, and bump `legalUpdated` whenever any legal page changes.
 - Entity by region: Golojan Technologies LLC (Delaware) for the Americas, Asia and anywhere unlisted; Golojan Ltd (England and Wales, company no. 17481904) for the UK and Europe; De-Golojan Technologies Ltd (Nigeria) for Africa.
 - The pages describe what the site actually does: no cookies, local storage, analytics, forms or accounts. Update the privacy and cookie notices **before** adding analytics, a signup form, sign-in or any other data collection, and add a consent banner before any optional cookie.
-- Each entity's registration number (with its local label) and registered address are in `legal.ts` and shown on the Legal notice. An EU GDPR representative is not yet recorded; never invent one. These drafts need review by qualified lawyers in each target region before launch.
+- Each entity's registration number (with its local label) and registered address are in `legal.ts` and shown on the Legal notice. No EU GDPR representative is appointed (decided by the owner); do not add one. These drafts need review by qualified lawyers in each target region before launch.
 
 ## Repository and delivery
 
