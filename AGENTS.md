@@ -6,9 +6,11 @@ BitoCard is a reseller-first platform owned by Golojan Ltd. It will let approved
 
 The intended markets are the UK, US, and selected African countries, enabled country by country as provider coverage, payments, verification, and operations are ready. BitoCard's consumer-facing offering is buying, selling, and trading eligible digital gift cards and buying supported utility products through reseller storefronts.
 
-The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard selects a suitable source internally using availability and net profitability. Do not expose upstream provider identities, costs, credentials, or routing rules to storefront visitors or resellers. BitoCard is API-first: the reseller API is the core product, not a later add-on. Provider coverage, terms, and live access must be confirmed before implementation.
+The planned upstream sources are Reloadly, Prestmit and Cardtonic (gift cards, airtime and data); DIDWW, Telnyx, Vonage, Twilio, Plivo and Africa's Talking (virtual phone numbers, voice and SMS); eSIM Access, eSimerge, Airalo Partners and eSIM Go (eSIM data packages); Nexway, Ingram Micro, TD SYNNEX, ALSO and Pax8 (software and digital licences); Flutterwave, Maplerad and Onafriq (virtual payment cards); and for pay-TV and bills VTpass and Interswitch/Quickteller (Nigeria), Korba Xchange, Hubtel, Techlink GH and KiNG FLEXY GH (Ghana), Reloadly utilities, iPay/eLipa and Tupay (Kenya), and Cellulant/Tingg (wider Africa). The full registry is in `PLANS.md`. BitoCard selects a suitable source internally using availability and net profitability. Do not expose upstream provider identities, costs, credentials, or routing rules to storefront visitors or resellers. BitoCard is API-first: the reseller API is the core product, not a later add-on. Provider coverage, terms, and live access must be confirmed before implementation.
 
 ## Product model and planned features
+
+`PLANS.md` is the current, consolidated feature brief. The briefs in `docs/` are historical references; where they conflict with `PLANS.md` or this file, `PLANS.md` and this file win. Keep `PLANS.md` up to date whenever a product decision changes.
 
 ### Who uses BitoCard
 
@@ -28,18 +30,179 @@ The planned upstream sources are Reloadly, Prestmit, and Cardtonic. BitoCard sel
 ### Catalogue and transactions
 
 - Present one BitoCard catalogue across supported countries, currencies, denominations, and product types. Initial categories are digital gift cards, mobile airtime, and data; other utilities or virtual cards are future or market-dependent additions.
+- **Pay-TV subscriptions** (for example DStv, GOtv and StarTimes) are a planned utility category; see **Pay-TV rollout** below.
+- **Virtual phone numbers, voice and SMS** are a planned telecom category; see **Telecom rollout** below.
+- **eSIM data packages** are a planned category; see **eSIM rollout** below.
+- **Software and digital licences** are a planned category; see **Software and licences rollout** below.
+- **Virtual payment cards** are a planned category; see **Virtual cards rollout** below.
 - **Buy:** show a final quote, reserve the required balance, submit one fulfilment order, deliver the result, and record the transaction. Release the reservation if an order fails without delivery.
+- **Who sells and trades:** gift-card sales and trades are made by **storefront customers** through a reseller's store (or a reseller's own system via the API). Resellers do not sell gift cards to BitoCard themselves.
 - **Sell:** where supported, accept an eligible unused gift card for a time-limited quote and verification. Keep the submission pending until the source confirms acceptance; only then settle the customer or reseller balance. Never treat an unverified card as cleared funds.
 - **Trade:** treat an exchange as a linked verified sale and new purchase. The incoming card must be accepted before an outgoing product is delivered. Show any value difference and applicable fees before confirmation.
 - Availability, exchange methods, funding methods, and final prices vary by market. Do not promise a product or payout route solely because a provider advertises it elsewhere.
 
 ### Internal sourcing and switching
 
+- **A base adapter for every supplier.** Build an adapter for each planned supplier against its documentation and sandbox, behind the shared interface for its kind. Which suppliers are live is configuration, not code: each is enabled or disabled per country and product by an admin, and only the suppliers chosen for the MVP are switched on at launch. A supplier without confirmed API access gets a stub adapter until access is confirmed.
+- **MVP suppliers:** Reloadly (gift cards, airtime, data) and VTpass (Nigerian pay-TV and bills) are live at launch. eSIM Access (eSIMs) and Nexway (software) join once their pilots succeed. All other adapters are built but switched off.
+- **Supplier funding profile.** Record for every supplier how it bills and what it needs up front, and never treat these as the same thing: *pay per item sold* (charged per order) is not *no minimum deposit*. Many suppliers advertise pay-as-you-go but still require a prepaid wallet with a minimum first deposit or minimum top-up. Record: billing model (prepaid wallet, per order, credit terms), minimum first deposit, minimum top-up, payment and FX fees, refunds of unused items, and written permission to serve downstream resellers. Small deposits reduce startup capital; they do not remove prefunding.
+
 - Normalize provider products, country rules, denominations, costs, quotes, order states, and webhook events behind BitoCard-owned interfaces.
 - For purchases, choose an eligible available source by **net margin**, after provider cost, FX, fees, and operational constraints; use fulfilment reliability and market eligibility as routing safeguards.
 - For incoming gift card sales, route to an eligible source offering the best viable net return after verification and settlement costs.
 - Lock the customer-facing quote for its stated validity period. A fallback to another source must still honour that quote and avoid duplicate fulfilment. If neither is possible, fail clearly and release the wallet reservation.
+- **Unclear is not failed.** A timeout, network error or ambiguous supplier response leaves the order pending. Query the same supplier for its status (with backoff) and switch to another source only once that supplier confirms the transaction failed. Never retry with a second source while the first may still complete, because the customer could be charged twice. Unresolved orders go to an admin exception queue.
 - Keep provider identities, credentials, cost prices, internal routing decisions, and supplier-specific error details out of reseller and customer interfaces and the reseller API.
+
+### Pay-TV rollout
+
+Pay-TV suppliers are subscription-payment sources: BitoCard pays the customer's subscription with the TV operator through them.
+
+1. **Pilot: Nigeria, Ghana and Kenya.** Nigeria: VTpass and Interswitch/Quickteller. Ghana: Korba Xchange first, Hubtel in parallel (Techlink GH and KiNG FLEXY GH as backups). Kenya: Reloadly utilities first; iPay/eLipa if Reloadly lacks KPLC or TV; Tupay as a separate TV provider if needed. Electricity (ECG, KPLC) and water bills follow the same rules as pay-TV.
+2. **Then other African countries** via Cellulant/Tingg and others. Never assume continent-wide availability: enable each country only once a supplier confirms its billers there.
+
+Ask each supplier, and record the answers before building its adapter:
+
+- Enabled countries, TV brands and packages.
+- Wholesale commission, fees and minimum funding.
+- Written permission to serve downstream resellers under BitoCard.
+- Smartcard/IUC validation, renewal versus package change support, and how pending payments are resolved (status query, callbacks).
+- Sandbox access and any IP allowlisting.
+
+Catalogue and routing rules:
+
+- A product is a **country, brand and package**: DStv Nigeria and DStv Ghana are separate products, as are their packages.
+- Each order has a **transaction type**: renewal of the current package, or package change.
+- Before payment, validate the smartcard or IUC number with the supplier and show the returned account name and current package for the customer to confirm.
+- Route only between sources that support the same country, package and transaction type.
+- Timeouts follow the "Unclear is not failed" rule: keep the order pending and requery its status before switching suppliers. VTpass explicitly requires requerying unclear or timed-out transactions.
+
+### Telecom rollout
+
+Telecom products work differently from one-off purchases:
+
+- **Recurring:** numbers are monthly subscriptions, renewed automatically from the reseller wallet; a failed renewal must warn before the number is released.
+- **Regulated:** many countries require the end user's identity or address documents before a number is activated. Resellers need a way to collect and submit them, and the API must expose each product's requirements.
+- **Billed after use:** calls and SMS are charged after they happen, not quoted upfront.
+
+Suppliers (all to be confirmed):
+
+| Supplier | Offering | Notes |
+|---|---|---|
+| DIDWW | International virtual numbers (90+ countries), SIP trunks, voice and SMS, OTP; API provisioning | Strong candidate for wholesale number resale. SMS capability varies by number. |
+| Telnyx | Global numbers, SMS API, programmatic provisioning | Check its separate voice and SMS coverage filters. |
+| Vonage | Virtual numbers for messaging and calls | Publishes an SMS-number matrix by country. |
+| Twilio | SMS-enabled numbers, messaging APIs | Confirm inbound SMS and international reach per number type. |
+| Plivo | Voice and SMS business numbers | Catalogue separates voice-only from SMS-capable numbers. |
+| Africa's Talking | African SMS, two-way short codes, virtual voice | Regional complement; short codes and virtual voice numbers are separate services. |
+
+Ask each supplier, and record the answers before building its adapter: enabled countries and number types; voice, inbound SMS and outbound SMS capability per number type; monthly and usage pricing, fees and minimum funding; written permission to resell to downstream resellers under BitoCard; regulatory document rules per country; porting and release rules; sandbox access and any IP allowlisting.
+
+Catalogue and routing rules:
+
+- A number product is a **country, number type (local, mobile, national, toll-free) and capability set** (voice, inbound SMS, outbound SMS). Show capabilities explicitly; never imply SMS on a voice-only number.
+- Route only between sources offering the same country, number type and capabilities, and that accept the same regulatory documents.
+- Once provisioned, a number stays with its supplier: renewals and usage go to that supplier, never re-routed.
+- These suppliers sell products to resellers; they are separate from Termii, which BitoCard uses for its own sign-in codes.
+
+### eSIM rollout
+
+eSIM data packages for travellers and secondary lines, sold on demand (never pre-bought stock).
+
+Suppliers, in order of evaluation (all to be confirmed):
+
+| Supplier | Published model | Status |
+|---|---|---|
+| eSIM Access | API ordering and top-ups; no minimum order, no monthly or setup fee, free activation | **First choice.** Confirm the smallest wallet deposit and payment fees, then pilot. |
+| eSimerge | REST API, webhooks; no monthly fee, no minimum order, no minimum deposit advertised; prepaid wallet, credit terms advertised | **Second.** Request a sandbox; validate access and fulfilment with a small pilot. |
+| Airalo Partners | API for packages, orders and installation instructions; minimum selling price applies | Alternative; small or no-deposit entry not verified. |
+| eSIM Go | Prepaid API; docs state a $1,000 minimum top-up (other docs say limits vary by account) | Poor fit for launch unless a lower minimum is agreed. |
+
+Ask each shortlisted supplier: minimum funding (first deposit and top-up), every fee, refunds for unused eSIMs, top-up support, usage reporting (API or webhook), sandbox access, IP allowlisting, and written permission to serve multiple downstream reseller storefronts.
+
+Choose the cheapest supplier by comparing **identical packages**, not public claims: same coverage, networks, data allowance, validity, activation rule and top-up support, at the delivered cost after fees and FX.
+
+Product model:
+
+- A package is defined by **coverage** (one country, a region or global), included networks, data allowance (or unlimited with its fair-use limit), validity in days, **activation rule** (validity starts at purchase, at installation or at first connection), speed, hotspot support, top-up support, and any included voice or SMS.
+- Route only between suppliers whose packages match on all of these.
+- Show device requirements before purchase: an eSIM-capable, carrier-unlocked device.
+
+Order flow:
+
+1. The reseller's wallet (or the startup allowance) covers the wholesale cost; the customer pays the reseller's price.
+2. BitoCard reserves the wholesale cost and orders the eSIM from the supplier on demand. Timeouts follow "Unclear is not failed".
+3. Deliver the installation details securely: QR code, manual activation code (SM-DP+ address and matching ID), and one-tap install links where the device supports them, with step-by-step activation instructions.
+4. Show status (not installed, installed, active, expired), data usage and remaining validity, and offer top-ups where supported.
+
+Rules:
+
+- **Activation codes are secrets.** An eSIM can be installed only once, so whoever holds the code owns the eSIM. Encrypt codes at rest, return them only on the owning reseller's order endpoint, never put them in webhook payloads or logs (webhooks say the eSIM is ready and the reseller fetches it), and never re-send them to a changed email address without checks.
+- **An eSIM stays with its supplier.** Top-ups and usage always go to the supplier that issued it (keyed by ICCID), never re-routed.
+- **Refunds follow the supplier's rules:** typically only unused, uninstalled eSIMs within a window. Show the refund rule before purchase.
+- Before selling, update the legal documents: eSIM terms (refunds, device compatibility, fair use) and the privacy notice (ICCID, usage data, the eSIM suppliers).
+
+### Software and licences rollout
+
+Only buy from authorised distributors; never source grey-market keys. API availability is verified for the shortlist below; a zero-deposit or low-cost start is not yet confirmed for any of them.
+
+| Supplier | Suited to | Phase |
+|---|---|---|
+| Nexway Connect | Downloadable consumer software and antivirus; ordering and download/key delivery via its Connect API | **A: first** |
+| Ingram Micro | Broad software distribution, Microsoft; reseller APIs and Cloud Marketplace API (approval and sandbox) | **B**: Microsoft retail/ESD (choose Ingram or TD SYNNEX) |
+| TD SYNNEX | Software distribution; Digital Bridge (products, pricing, orders) and StreamOne (cloud subscriptions, billing) APIs | **B**: alternative to Ingram |
+| Pax8 | Recurring business software and cloud subscriptions; public APIs and webhooks | **C**: business subscriptions |
+| ALSO Cloud Marketplace | Microsoft cloud and business security subscriptions (for example Sophos), mainly Europe | **C**: alternative to Pax8 |
+
+Ask each supplier in writing before choosing it:
+
+- **Multi-tier resale rights:** can BitoCard supply independent resellers selling under their own brands?
+- **Countries:** UK, US and each intended African market, including export or sanctions restrictions.
+- **Funding:** minimum deposit, monthly fees, minimum orders, credit and payment terms (record in the supplier funding profile).
+- **Fulfilment:** instant key, activation link, download, or provisioning into the customer's account.
+- **Commercial terms:** margins, failed activations, refunds, renewals and cancellation commitments.
+
+Licence types are separate catalogue channels, never interchangeable:
+
+- **Retail/ESD:** genuine standalone licences with electronic delivery. The default for consumer software, including Windows.
+- **OEM:** device-bound; Microsoft ties OEM licence transfers to the licensed device. Do not sell OEM licences to end customers unless a supplier grants explicit written rights, and then show the device conditions before purchase. Excluded from the MVP.
+- **CSP and other subscriptions:** eligible perpetual software and subscriptions provisioned into the customer's own tenant or account (for example Microsoft 365). CSP does not imply standalone Windows Home/Pro keys; confirm each SKU and whether it needs an existing qualifying licence. Microsoft requires the customer's acceptance of its customer agreement.
+
+Product model and routing:
+
+- A licence product is defined by publisher, product and edition, **licence type**, **term** (perpetual, monthly, annual), **device or user count**, region lock, platform and language, and **fulfilment type**.
+- Route only between suppliers matching licence type, region, term and device or user count.
+- A subscription stays with its original supplier for renewals, changes and cancellation, unless an explicit migration process exists.
+
+Rules:
+
+- **Keys and activation links are secrets**, handled like eSIM activation codes: encrypted at rest, shown only on the owning reseller's order endpoint, never in webhooks or logs.
+- **Refunds:** a revealed or delivered key is normally non-refundable; failed activations go through the supplier's replacement process. Show the rule before purchase.
+- **Subscription commitments:** some subscriptions (for example Microsoft's annual terms) cannot be cancelled after a short window, and BitoCard owes the supplier for the full term. Collect the commitment up front or make the reseller liable for it in the reseller terms before selling committed subscriptions; follow each supplier's cancellation window exactly.
+- **Renewals** are charged from the reseller wallet, with warnings before a renewal fails or a subscription lapses.
+- Before selling, update the legal documents: software terms (end-user licence pass-through, refunds, activation), the privacy notice (licence and account data, the suppliers), and check digital-services tax (for example UK and EU VAT) on sales to consumers.
+
+### Virtual cards rollout
+
+Virtual payment cards issued to storefront customers through a licensed card issuer. Every partner choice depends on the issuer approving BitoCard's reseller distribution model and commercial terms in writing.
+
+| Partner | Role |
+|---|---|
+| Flutterwave | **First choice** for a Nigeria-focused pilot |
+| Maplerad | Alternative for Nigeria |
+| Onafriq | Pan-African expansion conversation |
+
+Ask each issuer, and record the answers before building its adapter: approval of the multi-reseller model, card currencies (naira and dollar cards) and current regulatory status, cardholder verification requirements, fees (issuance, monthly maintenance, funding, FX, declines, termination), funding and spending limits, dispute and chargeback handling, card termination and balance return, transaction webhooks, sandbox and IP allowlisting.
+
+Rules:
+
+- **The issuer owns the card programme.** BitoCard distributes; the cardholder accepts the issuer's cardholder terms. Cards stay with their original issuer for life.
+- **Cardholders are verified before issue** (BVN in Nigeria, Didit elsewhere, plus whatever the issuer requires).
+- **Never store or log card numbers, CVVs or PINs.** Show card details only through the issuer's secure display (for example a hosted iframe or one-time token), so BitoCard stays out of PCI DSS card-data scope. The API returns only masked numbers and card IDs.
+- Funding a card, its fees and FX are separate ledger entries; show every fee and the exchange rate before the customer confirms.
+- Support freeze, unfreeze and terminate; on termination, return any remaining balance to the customer's wallet or bank account according to the payout settings chain.
+- Card transactions arrive by issuer webhook and are processed idempotently; declines and disputes are shown to the customer and reseller.
+- Before selling, update the legal documents: card terms (pointing to the issuer's cardholder agreement), the privacy notice (the issuer, cardholder data) and fee disclosures.
 
 ### Wallet, records, and operations
 
@@ -75,11 +238,40 @@ BitoCard is API-first. Every capability is built as a public, versioned API befo
 - **Sign-in:** resellers (and hosted storefront customers) can use Google, email + password or mobile number + password; a mobile number is verified by SMS code before it can sign in. Admins cannot use Google (see Admin address). Reseller systems use scoped API keys (test and live).
 - **Who signs in on BitoCard:** only resellers (and their staff) and BitoCard admins hold BitoCard accounts. End customers never do.
 - **Customers belong to the reseller:** customers are authenticated at the reseller's end. Resellers on their own systems use their own sign-in and pass their own customer reference to the API. Hosted storefronts have no guest checkout: customers sign in before ordering, with accounts scoped to that one store and owned by its reseller (an account at one store does not exist at another).
+- **Pilot markets:** Nigeria, Ghana and Kenya; only resellers based there can sign up during the pilot.
+- **Reserved-account order:** Flutterwave first in all pilot countries; Monnify as a second Nigerian source with failover.
+- **Failed-order refunds:** to the customer's wallet if they have one, otherwise to the original payment method.
+- **Currencies:** BitoCard's base currency is USD (main treasury wallets). It also keeps a country base wallet in each local currency, synced with its local bank accounts; conversion between the USD wallets and country wallets uses live market rates refreshed on a schedule. Resellers trade in their own country's currency; selling internationally requires the Premium plan. Every quote locks the exchange rate it used.
+- **Customer verification is gated per category and country by admins.** Defaults: not required for utilities (airtime, data, pay-TV, electricity, internet/Wi-Fi); required for gift cards (buy and sell), virtual numbers, virtual cards, wallets and payouts; other categories set by admins.
+- **Reseller pricing:** markup on top of face value within the Markup Protection Scheme cap; where admins enable it, selling at face value and earning BitoCard's discount instead. On customer gift-card sales, the reseller may take a spread on the payout rate, capped by admins.
+- **Exchange rates:** Open Exchange Rates for reference rates, checked against Flutterwave's offered rates. Use the less favourable rate plus an admin-set margin per currency (disclosed), so conversions never lose money; pause conversions and alert admins if the two sources diverge beyond a threshold.
+- **Supplier registry:** the full list of suppliers and vendors, their countries and pilot status is in `PLANS.md` (section 4). Every one gets a base adapter.
+- **Reseller payouts:** each sale's profit becomes withdrawable 15 days after the sale, with a minimum withdrawal amount (for example $10 or local equivalent); admins set both.
 - **Admin address:** `https://admin.bitocard.com` (private, never indexed). Admins have no Google sign-in: email + password only, limited to `@bitocard.com` and `@golojan.co.uk` addresses (checked server-side), with 2-step verification required.
 - **API address:** `https://api.bitocard.com` for both sandbox and production. The key decides the mode (`bc_test_…` sandbox, `bc_live_…` live); test data is kept separate from live data and never touches real suppliers or money.
+- **Domains:** MVP sells **.com only**. Vercel is the registrar (Domains Registrar API) and connects reseller domains to storefronts (Vercel for Platforms). It cannot register country endings such as .co.uk, .ng, .com.ng or .co.za; resellers can still connect those. Keep the domain registrar behind an adapter interface; BitoCard's resell.biz reseller account is the candidate second registrar for country endings. Always show renewal prices as prominently as first-year prices.
+- **BitoCard nameservers.** Branded `ns1.bitocard.com` / `ns2.bitocard.com` on resell.biz, which supports branded nameservers (manage its DNS by API). A reseller's domain, bought through BitoCard or anywhere else (including .ng and .co.uk), can point its nameservers to BitoCard, and BitoCard then runs its DNS through a DNS adapter interface. When taking over a domain, import its existing records first (especially email MX, SPF and DKIM) so nothing breaks, and let resellers manage their own extra records in the dashboard. Also offer a records-only connection (A/CNAME) for resellers who keep their own DNS.
+- **Caching:** Redis (Upstash via the Vercel Marketplace) for catalogue and price caching, per-key rate limits and short-lived locks. Postgres remains the durable record for the ledger, orders and idempotency keys.
 - **SMS:** Termii, behind the SMS adapter interface, for mobile verification and sign-in codes.
 - **Email:** Resend and MailerSend, behind one email interface so either can send. Configure SPF, DKIM and DMARC for each sending domain.
-- **Payments:** multiple providers (Stripe, Flutterwave and others), each behind one payment adapter interface, chosen by the payer's country and currency. Credit a wallet only after the provider's signed webhook confirms payment; handle each webhook idempotently.
+- **Reseller wallets everywhere.** Every reseller has a wallet so wholesale cost is always covered before an order. They top it up through checkout (card or another payment provider) in any country, and also through their own reserved bank account where reserved accounts are enabled.
+- **Reserved bank accounts.** Provided through Flutterwave (and Monnify in Nigeria), starting with Nigeria and Ghana and extending to every country where Flutterwave offers them (confirm each country with Flutterwave before enabling it). Where enabled, every wallet owner, reseller or customer, gets their own reserved account. Deposits are received from the provider connection, matched to the owner and synced to their BitoCard wallet; credit only on confirmed settlement, idempotently.
+- **Customers pay at checkout where reserved accounts are not enabled.** Customer wallets exist only in reserved-account countries; elsewhere each customer purchase is paid at checkout.
+- **$500 startup allowance (market-entry promotion).** A one-time promotional allowance that lets an eligible new reseller start selling without pre-funding their wallet.
+  - It covers only the wholesale cost of **customer-paid orders**. The reseller cannot spend it directly, withdraw it, transfer it or have it paid out. The ledger keeps it in its own restricted account, never counted as cash.
+  - It does **not** refill: each order uses up its wholesale cost. Once it is used up, the reseller funds their wallet as normal.
+  - Customers must pay through BitoCard's payment channels. When payment settles, BitoCard keeps its wholesale cost, the reseller's profit goes to their wallet, and the customer receives the product.
+  - Admins can stop or re-enable the programme and revoke any reseller's remaining allowance at any time, including mid-use.
+  - Reseller verification must come before any allowance is granted. Eligibility is set per country and gated by admins; expiry and accounting treatment must be confirmed with the accountant before launch.
+- **Reseller profit belongs to the reseller** and can be withdrawn to their verified bank account.
+- **Chargebacks are absorbed by the reseller** (taken from their wallet), unless they subscribe to the Premium plan.
+- **Reseller plans.** A free standard plan and a single paid monthly **Premium plan** (price set by admins, charged from the wallet). Premium adds chargeback handling and protection by BitoCard, priority support including chat, and further benefits. There are no API fees: API features can be restricted by plan, but all are enabled on every plan by default.
+- **Markup Protection Scheme.** Reseller prices may be at most 50% above BitoCard's wholesale price. Admins control the scheme and the cap; enforce it in the API, not only in the dashboard.
+- **$1 customer welcome bonus.** In the MVP but fully gated: off by default, and an admin enables it per reseller (never globally). It applies to eligible purchases during the promotional period, once per customer. It is funded 100% by BitoCard as a marketing expense, recorded separately from the startup allowance, with expiry and anti-abuse limits.
+- **Settings chain for payout options.** BitoCard enables the options per country (for example, gift-card sale proceeds to the customer's wallet, to their bank account, or both); each reseller chooses from what BitoCard has enabled for their store. A reseller can never switch on an option BitoCard has not enabled.
+- **Identity checks.** Resellers are verified with **Didit** before approval (and before any allowance). Customers are verified with **BVN** checks and **bank account validation through Flutterwave** (account name matched before any payout). BVN exists only in Nigeria; customers in other countries are verified with Didit.
+- **Tax.** **BitoCard is the seller of record** for every customer sale: it registers for, collects and pays VAT, GST or sales tax by the customer's location (through the Golojan entity for the region), keeps tax separate in the ledger, and issues compliant receipts under the reseller's store brand. Confirm registrations per country with a tax adviser.
+- **Payments:** multiple providers (Flutterwave, Monnify, Stripe and others), each behind one payment adapter interface, chosen by the payer's country and currency. Credit a wallet only after the provider's signed webhook confirms payment; handle each webhook idempotently.
 - **Data region:** United States. Keep the database and the API's Vercel Functions region together. The privacy notice must name these processors and the US storage location before any personal data is collected.
 
 ### Hosting
@@ -99,6 +291,15 @@ BitoCard is API-first. Every capability is built as a public, versioned API befo
 - **Self-service:** delivery log, resend and test-event buttons in the dashboard; the sandbox sends test events.
 - **Catch-up:** `GET /v1/events?since=…` lets resellers fetch anything they missed; the API, not the webhook, is the source of truth.
 - **Safe destinations:** HTTPS only; block private and internal IP addresses when an endpoint is saved and again at every delivery.
+- **Documented so any reseller can implement them.** An event without complete docs does not ship. In `apps/docs`:
+  - Define every event in the OpenAPI document's `webhooks` section, so its reference is generated, never hand-written.
+  - **Event catalogue:** one page per event type (for example `order.completed`) covering when it fires and when it does not, which object it carries, a full realistic example payload, every field with its type and meaning, and which events can come before or after it.
+  - **Step-by-step guide:** create an endpoint, verify the signature, acknowledge fast and process later, ignore duplicate IDs, handle out-of-order events, then catch up with `GET /v1/events`.
+  - **Copy-paste code** for receiving and verifying, at least in Node.js, PHP (including Laravel) and Python.
+  - **Signature test vector:** a published secret, timestamp, body and expected signature, so resellers can check their own code.
+  - **Delivery details:** headers, retry schedule, timeouts, auto-disable rules and sandbox test events.
+  - **Troubleshooting:** common failures with their fixes.
+  - **Versioning:** payload versions and a changelog. Adding fields is not a breaking change; removing or renaming one is.
 
 ### Legal updates owed
 
@@ -106,7 +307,11 @@ Update the legals app (`apps/legals`) **before** each of these goes live, and bu
 
 - **Reseller sign-in and API keys:** privacy notice (reseller account data, US storage, processors: database host, Vercel, Resend, MailerSend, Termii, payment providers; mobile numbers), cookie notice (strictly necessary session cookie on `.bitocard.com`), and new **Reseller terms** and **API terms**.
 - **Wallet top-ups:** reseller terms (pre-funding, refunds, chargebacks) and the payment providers in the privacy notice.
-- **Hosted storefronts with customer accounts:** a **Data processing agreement** (BitoCard processes storefront customers' data for the reseller, who is the controller), and guidance that each reseller needs its own customer-facing privacy notice and terms.
+- **Identity checks:** privacy notice for Didit (ID documents and likely face biometrics, a special category needing explicit consent), BVN and bank account validation, with retention periods.
+- **Reseller plans and promotions:** Premium plan terms (price, chargeback protection, cancellation), startup allowance terms (eligibility, revocation) and welcome bonus terms.
+- **Customer wallets and reserved accounts:** take legal advice per country on holding customer balances (e-money or payments licensing, or a licensed partner holding the funds) before enabling them; add customer wallet terms and the banking partners to the privacy notice.
+- **BitoCard as seller of record:** customer sale terms in BitoCard's name (refunds, delivery, the regional Golojan entity), receipts, and a review of data protection roles: as the seller BitoCard is likely a controller of transaction data, not only a processor for the reseller.
+- **Hosted storefronts with customer accounts:** an agreement with resellers setting out who is controller of which customer data (BitoCard, as seller of record, is likely a controller of transaction data; the reseller controls its own marketing and relationship data), and guidance that each reseller needs its own customer-facing privacy notice for what it controls.
 - **Waitlist:** the Africa-wide waitlist privacy notice (on hold until Legals supplies the text and its effective date).
 
 ## Release sequence
