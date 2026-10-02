@@ -60,6 +60,7 @@ jobs:
             curl -sf -X POST -H "Authorization: Bearer local_token" -d '["PING"]' http://localhost:8079 && exit 0
             sleep 2
           done
+          curl -s -i -X POST -H "Authorization: Bearer local_token" -d '["PING"]' http://localhost:8079 || true
           docker ps -a
           docker logs "$(docker ps -aqf ancestor=hiett/serverless-redis-http:latest)" || true
           exit 1
