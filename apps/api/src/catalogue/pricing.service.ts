@@ -193,12 +193,14 @@ export class PricingService {
 
   async pricingSettings(resellerId: string) {
     const ctx = await this.context(resellerId, 'live');
+    const productIds = ctx.markups.flatMap(m => (m.productId ? [m.productId] : []));
+    const names = new Map((productIds.length ? await this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, name: true } }) : []).map(p => [p.id, p.name]));
     return {
       object: 'pricing' as const,
       currency: ctx.currency,
       earning: ctx.earning,
       markup_cap_percent: ctx.country.markupCapPercent,
-      markups: ctx.markups.map(m => ({ category: m.category, product_id: m.productId, markup_bps: m.markupBps })),
+      markups: ctx.markups.map(m => ({ category: m.category, product_id: m.productId, product_name: m.productId ? (names.get(m.productId) ?? null) : null, markup_bps: m.markupBps })),
     };
   }
 

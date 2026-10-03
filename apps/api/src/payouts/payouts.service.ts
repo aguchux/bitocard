@@ -42,7 +42,11 @@ export function presentBankAccount(account: BankAccount) {
   };
 }
 
-export function presentPayout(payout: Payout) {
+/**
+ * A payout. With its bank account (list and get), it names the bank and last four digits, which stay readable after the
+ * account is removed; webhook payloads leave the account details out.
+ */
+export function presentPayout(payout: Payout & { bankAccount?: BankAccount | null }) {
   return {
     object: 'payout' as const,
     id: payout.id,
@@ -51,6 +55,9 @@ export function presentPayout(payout: Payout) {
     amount: minor(payout.amountMinor),
     currency: payout.currency,
     bank_account_id: payout.bankAccountId,
+    ...(payout.bankAccount
+      ? { bank_account: { bank_name: payout.bankAccount.bankName, account_number_last4: payout.bankAccount.accountNumberLast4, removed: payout.bankAccount.removedAt !== null } }
+      : {}),
     failure_reason: payout.failureReason,
     created_at: payout.createdAt.toISOString(),
     completed_at: payout.completedAt?.toISOString() ?? null,
@@ -174,6 +181,7 @@ export class PayoutsService {
     const limit = page.limit ?? 25;
     const payouts = await this.prisma.payout.findMany({
       where: { resellerId, mode },
+      include: { bankAccount: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(page.starting_after ? { cursor: { id: page.starting_after }, skip: 1 } : {}),
@@ -182,7 +190,7 @@ export class PayoutsService {
   }
 
   async getPayout(resellerId: string, mode: LedgerMode, id: string) {
-    const payout = await this.prisma.payout.findFirst({ where: { id, resellerId, mode } });
+    const payout = await this.prisma.payout.findFirst({ where: { id, resellerId, mode }, include: { bankAccount: true } });
     if (!payout) throw notFound('payout');
     return presentPayout(payout);
   }
@@ -231,14 +239,14 @@ export class PayoutsService {
         currency,
         narration: `${reseller.name} BitoCard earnings`,
       });
-      return presentPayout(await this.apply(payout, result));
+      return presentPayout({ ...(await this.apply(payout, result)), bankAccount: account });
     } catch (error) {
       if (error instanceof ProviderError && error.definite) {
-        return presentPayout(await this.apply(payout, { status: 'failed', providerTransferId: '', fee: 0n, failureReason: 'The bank transfer was refused.' }));
+        return presentPayout({ ...(await this.apply(payout, { status: 'failed', providerTransferId: '', fee: 0n, failureReason: 'The bank transfer was refused.' })), bankAccount: account });
       }
       // Unclear: the transfer may still happen. The payout stays pending for the exception queue; money stays set aside.
       this.logger.error({ err: error, payoutId: payout.id }, 'Payout transfer outcome unclear; needs review');
-      return presentPayout(payout);
+      return presentPayout({ ...payout, bankAccount: account });
     }
   }
 
@@ -344,9 +352,9 @@ export class PayoutsService {
 
   async simulatePayout(resellerId: string, mode: LedgerMode, id: string, outcome: 'paid' | 'failed') {
     if (mode !== 'test') throw testModeOnly();
-    const payout = await this.prisma.payout.findFirst({ where: { id, resellerId, mode: 'test' } });
+    const payout = await this.prisma.payout.findFirst({ where: { id, resellerId, mode: 'test' }, include: { bankAccount: true } });
     if (!payout) throw notFound('payout');
     const result: TransferResult = { status: outcome, providerTransferId: payout.providerTransferId ?? `sandbox_${payout.reference}`, fee: 0n, failureReason: outcome === 'failed' ? 'Simulated failure.' : undefined };
-    return presentPayout(await this.apply(payout, result));
+    return presentPayout({ ...(await this.apply(payout, result)), bankAccount: payout.bankAccount });
   }
 }

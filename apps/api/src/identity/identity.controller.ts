@@ -96,6 +96,42 @@ export class ResellerVerificationController {
   }
 }
 
+class BvnCheckDto {
+  @ApiProperty({ description: "The business owner's 11-digit BVN. Passed to Flutterwave and kept encrypted only until your reserved accounts are opened." })
+  @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
+  bvn: string;
+
+  @ApiProperty({ description: 'The owner agrees to the BVN check.' })
+  @IsBoolean()
+  consent: boolean;
+}
+
+/** Nigeria: the owner's BVN check, needed before reserved bank accounts are opened. */
+@ApiTags('Account')
+@ApiBearerAuth()
+@SessionOnly()
+@Controller('account/bvn')
+export class ResellerBvnController {
+  constructor(private readonly identity: IdentityService) {}
+
+  @ApiOperation({ summary: 'Get the BVN check status', description: 'An unfinished check is re-read from Flutterwave first.' })
+  @Get()
+  get(@CurrentCaller() caller: Caller) {
+    return this.identity.resellerBvnCheck(resellerOf(caller));
+  }
+
+  @ApiOperation({
+    summary: 'Start the BVN check',
+    description:
+      "Business owner only, Nigeria, after the identity check. Returns Flutterwave's consent page; the BVN record's name must match the verified owner. Needed before reserved bank accounts are opened.",
+  })
+  @Roles()
+  @Post()
+  start(@CurrentCaller() caller: Caller, @Body() body: BvnCheckDto) {
+    return this.identity.startResellerBvnCheck(resellerOf(caller), body.bvn, body.consent);
+  }
+}
+
 @ApiTags('Customers')
 @ApiBearerAuth()
 @modeHeader

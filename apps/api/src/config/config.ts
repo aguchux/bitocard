@@ -52,7 +52,7 @@ export const configSchema = z.object({
   ENCRYPTION_KEY: z.string().optional(),
 
   /** Where links in emails point (the reseller dashboard). */
-  DASHBOARD_URL: z.string().url().default('https://reseller.bitocard.com'),
+  DASHBOARD_URL: z.string().url().default('https://shq.bitocard.com'),
 
   // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),
@@ -64,7 +64,7 @@ export const configSchema = z.object({
   MONNIFY_CONTRACT_CODE: z.string().optional(),
   MONNIFY_API_URL: z.string().url().default('https://api.monnify.com'),
   /** Where the payment page sends the payer back to when the caller gives no return_url. */
-  PAYMENT_RETURN_URL: z.string().url().default('https://reseller.bitocard.com/wallet'),
+  PAYMENT_RETURN_URL: z.string().url().default('https://shq.bitocard.com/wallet'),
 
   // Exchange rates: Open Exchange Rates as the reference, checked against Flutterwave's offered rates.
   OPEN_EXCHANGE_RATES_APP_ID: z.string().optional(),

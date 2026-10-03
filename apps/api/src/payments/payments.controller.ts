@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsUrl, Matches, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsUrl, Max, Min } from 'class-validator';
 import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
@@ -24,12 +24,6 @@ class SimulateTopUpDto {
   @ApiProperty({ enum: ['succeeded', 'failed'] })
   @IsIn(['succeeded', 'failed'])
   outcome: 'succeeded' | 'failed';
-}
-
-class CreateReservedAccountDto {
-  @ApiPropertyOptional({ description: 'Nigeria: the BVN the bank needs to open the account. Passed to the bank, never stored by BitoCard.' })
-  @IsOptional() @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
-  bvn?: string;
 }
 
 class SimulateDepositDto {
@@ -59,7 +53,7 @@ export class PaymentsController {
     return this.payments.createTopUp(resellerId, mode, payer, body);
   }
 
-  @ApiOperation({ summary: 'List top-ups' })
+  @ApiOperation({ summary: 'List top-ups', description: 'Checkout payments and bank transfers into your reserved accounts, newest first; `source` is `checkout` or `bank_transfer`.' })
   @Scopes('wallet:read')
   @Get('top-ups')
   listTopUps(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() page: PageDto) {
@@ -90,14 +84,15 @@ export class PaymentsController {
 
   @ApiOperation({
     summary: 'Create reserved bank accounts',
-    description: 'Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business.',
+    description:
+      'Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business and BitoCard to switch them on for you; in Nigeria the owner must pass the BVN check first (`POST /v1/account/bvn`), whose BVN the bank uses.',
   })
   @Scopes('wallet:write')
   @Post('reserved-accounts')
-  async createReservedAccounts(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: CreateReservedAccountDto) {
+  async createReservedAccounts(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
     const resellerId = resellerOf(caller);
     const owner = await this.payments.contactFor(resellerId, caller.kind === 'session' ? caller.userId : null);
-    return this.payments.createReservedAccounts(resellerId, mode, owner, body);
+    return this.payments.createReservedAccounts(resellerId, mode, owner);
   }
 
   @ApiOperation({ summary: 'Simulate a bank transfer into a reserved account (test mode)' })

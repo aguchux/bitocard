@@ -24,7 +24,9 @@ describe('public listing', () => {
     assert.deepEqual(ng.categories.map(c => c.category).sort(), ['airtime', 'bills', 'data', 'gift_cards', 'pay_tv']);
     assert.equal(ng.categories.find(c => c.category === 'gift_cards').customer_verification, true);
     assert.equal(ng.categories.find(c => c.category === 'airtime').customer_verification, false);
-    assert.equal(ng.markup_cap_percent, undefined, 'money rules are admin-only');
+    // Resellers see the money rules they work under; tax settings stay admin-only.
+    assert.equal(ng.markup_cap_percent, 50);
+    assert.ok(ng.categories.every(c => !('taxable' in c)));
   });
 
   test('a single country, case-insensitively; unknown codes are 404', async () => {

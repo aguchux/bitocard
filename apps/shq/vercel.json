@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm ci",
-  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/reseller",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/shq",
   "ignoreCommand": "npx turbo-ignore"
 }

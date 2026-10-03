@@ -1,4 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { Mode } from '../ledger/mode.js';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsString, Length } from 'class-validator';
 import { type Caller, CurrentCaller, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller.js';
@@ -26,13 +29,15 @@ export class BillingController {
   @ApiOperation({
     summary: 'Change your plan',
     description:
-      'Dashboard only. Upgrading charges the first month from your live wallet straight away, in your currency at the rate shown on the exchange-rates list. Moving to Standard keeps Premium until the end of the paid month.',
+      'Dashboard only, and live only: a plan is paid from your live wallet, so the sandbox refuses the change (`live_only`). Upgrading charges the first month straight away, in your currency at the rate shown on the exchange-rates list. Moving to Standard keeps Premium until the end of the paid month.',
   })
   @SessionOnly()
   @Roles('finance')
   @Post()
   @HttpCode(HttpStatus.OK)
-  change(@CurrentCaller() caller: Caller, @Body() body: ChangePlanDto) {
+  change(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: ChangePlanDto) {
+    // Plans are real (paid from the live wallet): never change one from sandbox mode by mistake.
+    if (mode === 'test') throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'live_only', 'Plans are paid from your live wallet. Switch to live to change your plan.');
     return this.billing.change(resellerOf(caller), body.plan);
   }
 }

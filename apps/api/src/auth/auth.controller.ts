@@ -1,8 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { CodeDto, ForgotPasswordDto, PhoneDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { ChangeEmailDto, ChangePasswordDto, CodeDto, ForgotPasswordDto, PhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { SessionsService } from './sessions.service.js';
@@ -72,6 +72,43 @@ export class AuthController {
   async resendVerification(@CurrentCaller() caller: Caller) {
     await this.auth.resendVerification(caller.kind === 'session' ? caller.userId : '');
     return { object: 'notice', message: 'A new code is on its way.' };
+  }
+
+  /** Change your name. */
+  @ApiOperation({ summary: 'Change your name' })
+  @SessionOnly()
+  @Patch('profile')
+  updateProfile(@CurrentCaller() caller: Caller, @Body() body: ProfileDto) {
+    return this.auth.updateProfile(caller.kind === 'session' ? caller.userId : '', body.name);
+  }
+
+  /** Change your password with the current one. Signs out your other sessions. */
+  @ApiOperation({ summary: 'Change your password', description: 'Needs your current password. Signs out your other sessions; this one stays signed in.' })
+  @SessionOnly()
+  @Post('password/change')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@CurrentCaller() caller: Caller, @Body() body: ChangePasswordDto) {
+    if (caller.kind === 'session') await this.auth.changePassword(caller.userId, caller.sessionId, body.current_password, body.new_password);
+    return { object: 'notice', message: 'Your password was changed.' };
+  }
+
+  /** Change your sign-in email: a 6-digit code is sent to the new address. */
+  @ApiOperation({ summary: 'Change your sign-in email', description: 'Needs your current password. A 6-digit code is sent to the new address; confirm it to finish.' })
+  @SessionOnly()
+  @Post('email/change')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async changeEmail(@CurrentCaller() caller: Caller, @Body() body: ChangeEmailDto) {
+    await this.auth.requestEmailChange(caller.kind === 'session' ? caller.userId : '', body.email, body.password);
+    return { object: 'notice', message: 'A code is on its way to the new address.' };
+  }
+
+  /** Confirm the new sign-in email with the code sent to it. */
+  @ApiOperation({ summary: 'Confirm your new sign-in email', description: 'Your old address is told about the change.' })
+  @SessionOnly()
+  @Post('email/change/verify')
+  @HttpCode(HttpStatus.OK)
+  confirmEmailChange(@CurrentCaller() caller: Caller, @Body() body: CodeDto) {
+    return this.auth.confirmEmailChange(caller.kind === 'session' ? caller.userId : '', body.code);
   }
 
   /** Add or change your mobile number. A 6-digit code is sent by SMS; the number is used once confirmed. */

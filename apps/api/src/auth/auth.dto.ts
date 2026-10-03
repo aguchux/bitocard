@@ -107,6 +107,39 @@ export class ResetPasswordDto {
   password: string;
 }
 
+export class ProfileDto {
+  @ApiProperty({ description: 'Your full name.', minLength: 2, maxLength: 100, example: 'Ada Obi' })
+  @Transform(trim)
+  @IsString()
+  @Length(2, 100)
+  name: string;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty({ description: 'Your current password.', minLength: 1, maxLength: passwordLength.max })
+  @IsString()
+  @Length(1, passwordLength.max)
+  current_password: string;
+
+  @ApiProperty(passwordDoc)
+  @IsString()
+  @Length(passwordLength.min, passwordLength.max)
+  new_password: string;
+}
+
+export class ChangeEmailDto {
+  @ApiProperty({ description: 'The new email address; a 6-digit code is sent to it.', format: 'email', maxLength: 254, example: 'ada@newmail.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+
+  @ApiProperty({ description: 'Your current password.', minLength: 1, maxLength: passwordLength.max })
+  @IsString()
+  @Length(1, passwordLength.max)
+  password: string;
+}
+
 export class PhoneDto {
   @ApiProperty({
     description: 'Mobile number in international format, or local format for your business country.',

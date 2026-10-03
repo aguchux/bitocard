@@ -6,7 +6,7 @@ import { Prisma, type User } from '../generated/prisma/client.js';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
-import { passwordResetEmail, verificationEmail } from '../notifications/templates.js';
+import { emailChangeCodeEmail, emailChangedEmail, passwordChangedEmail, passwordResetEmail, verificationEmail } from '../notifications/templates.js';
 import { TeamService } from '../team/team.service.js';
 import { CountriesService } from '../countries/countries.service.js';
 import { CodesService } from './codes.service.js';
@@ -17,6 +17,7 @@ import type { SignUpDto } from './auth.dto.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 
+const emailInUse = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'Another account already uses this email.', 'email');
 const phoneInUse = () =>
   new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this mobile number.', 'phone');
 
@@ -177,6 +178,73 @@ export class AuthService {
       },
     });
     await this.sessions.revokeAllForUser(user.id);
+  }
+
+  async updateProfile(userId: string, name: string) {
+    await this.prisma.user.update({ where: { id: userId }, data: { name } });
+    return this.describe(userId);
+  }
+
+  /**
+   * Checks the signed-in person's current password before a sensitive change. Wrong passwords count towards the same
+   * lockout as sign-in, so a stolen session cannot guess its way to a new password or email.
+   */
+  private async confirmPassword(user: User, password: string, param: string) {
+    if (!user.passwordHash) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'password_not_set', 'Your account has no password yet. Set one with "Forgot password" first.');
+    }
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many failed attempts. Try again in 15 minutes.');
+    }
+    if (!(await this.passwords.verify(user.passwordHash, password))) {
+      const failures = user.failedSignIns + 1;
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: failures >= lockout.maxFailures ? { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockout.durationMs) } : { failedSignIns: failures },
+      });
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'password_incorrect', 'Your current password is not right.', param);
+    }
+    if (user.failedSignIns) await this.prisma.user.update({ where: { id: user.id }, data: { failedSignIns: 0 } });
+  }
+
+  /** Changes the password with the current one, and signs out every other session (this one stays signed in). */
+  async changePassword(userId: string, sessionId: string, current: string, next: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    await this.confirmPassword(user, current, 'current_password');
+    await this.passwords.assertAcceptable(next);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await this.passwords.hash(next) } });
+    await this.prisma.session.updateMany({ where: { userId, revokedAt: null, id: { not: sessionId } }, data: { revokedAt: new Date() } });
+    await this.email.send(passwordChangedEmail(user.email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the password changed notice'));
+  }
+
+  /** Step 1 of changing the sign-in email: the current password, then a code sent to the new address. */
+  async requestEmailChange(userId: string, email: string, password: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    await this.confirmPassword(user, password, 'password');
+    if (email === user.email) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'email_unchanged', 'That is already your email.', 'email');
+    if (await this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } })) throw emailInUse();
+    const code = await this.codes.issue(userId, 'email_change', email);
+    try {
+      await this.email.send(emailChangeCodeEmail(email, code));
+    } catch (error) {
+      await this.codes.cancel(userId, 'email_change');
+      this.logger.error({ err: error }, 'Could not send the email change code');
+      throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'email_delivery_failed', 'We could not send the email. Try again shortly.');
+    }
+  }
+
+  /** Step 2: the code proves control of the new address, which becomes the sign-in email. The old address is told. */
+  async confirmEmailChange(userId: string, code: string) {
+    const email = await this.codes.consume(userId, 'email_change', code);
+    const before = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    try {
+      await this.prisma.user.update({ where: { id: userId }, data: { email, emailVerifiedAt: new Date() } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw emailInUse();
+      throw error;
+    }
+    await this.email.send(emailChangedEmail(before.email, email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the email changed notice'));
+    return this.describe(userId);
   }
 
   /** Sends a code to a mobile number; it becomes the account's sign-in number once confirmed. */

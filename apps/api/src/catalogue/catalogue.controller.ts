@@ -157,12 +157,12 @@ export class QuotesController {
 
 @ApiTags('Catalogue')
 @ApiBearerAuth()
-@Roles('admin')
 @Controller('pricing')
 export class PricingController {
   constructor(private readonly pricing: PricingService) {}
 
-  @ApiOperation({ summary: 'Get your pricing', description: 'How you earn on face-value products, the markup cap, and your markups.' })
+  /** Readable by every team member; only owners and admins change markups. */
+  @ApiOperation({ summary: 'Get your pricing', description: 'How you earn on face-value products, the markup cap, and your markups (with the product name for product markups).' })
   @Scopes('catalogue:read')
   @Get()
   get(@CurrentCaller() caller: Caller) {
@@ -170,6 +170,7 @@ export class PricingController {
   }
 
   @ApiOperation({ summary: 'Set a markup', description: 'For a whole category, or one product (which overrides its category). Capped by the Markup Protection Scheme.' })
+  @Roles('admin')
   @Scopes('stores:manage')
   @Put('markups')
   setMarkup(@CurrentCaller() caller: Caller, @Body() body: MarkupDto) {
@@ -177,6 +178,7 @@ export class PricingController {
   }
 
   @ApiOperation({ summary: 'Remove a markup' })
+  @Roles('admin')
   @Scopes('stores:manage')
   @Delete('markups')
   removeMarkup(@CurrentCaller() caller: Caller, @Query() query: RemoveMarkupDto) {

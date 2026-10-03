@@ -21,7 +21,7 @@ describe('settings chain', () => {
     assert.equal(status, 200);
     assert.deepEqual(json.options.gift_card_payout, { value: 'wallet', allowed: ['wallet', 'bank'], source: 'country_default' });
     assert.deepEqual(json.options.fixed_price_earning, { value: 'markup', allowed: ['markup'], source: 'country_default' });
-    assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, manual_reseller_approval: false });
+    assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, reserved_accounts: false, manual_reseller_approval: false });
   });
 
   test('a reseller can choose only what their country allows', async () => {

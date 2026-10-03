@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { adminApi } from '../src/admin';
-import { makeStore, toApiError } from '../src';
+import { resellerSessionApi } from '../src/reseller';
+import { makeStore, setRequestContext, toApiError } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
 
@@ -18,7 +19,10 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  setRequestContext({ reseller: null, mode: 'live' });
+});
 
 describe('base query', () => {
   test('sends cookies, and an Idempotency-Key on every POST but not on GET', async () => {
@@ -38,6 +42,22 @@ describe('base query', () => {
     expect(keys[0]).toBeTruthy();
     expect(keys[0]).not.toEqual(keys[1]);
     expect(JSON.parse(calls[1].body!)).toEqual({ email: 'a@bitocard.com', password: 'secret passphrase' });
+  });
+
+  test('SHQ requests name the reseller account and sandbox mode; nothing is sent until SHQ sets them', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ object: 'account' });
+    await store.dispatch(resellerSessionApi.endpoints.account.initiate());
+    expect([calls[0].headers.get('bitocard-reseller'), calls[0].headers.get('bitocard-mode')]).toEqual([null, null]);
+
+    setRequestContext({ reseller: 'res_1', mode: 'test' });
+    await store.dispatch(resellerSessionApi.endpoints.signIn.initiate({ identifier: 'ada@example.com', password: 'secret passphrase' }));
+    expect([calls[1].headers.get('bitocard-reseller'), calls[1].headers.get('bitocard-mode')]).toEqual(['res_1', 'test']);
+
+    // Live mode sends no header: the dashboard is live unless it asks for the sandbox.
+    setRequestContext({ mode: 'live' });
+    await store.dispatch(resellerSessionApi.endpoints.signIn.initiate({ identifier: 'ada@example.com', password: 'secret passphrase' }));
+    expect([calls[2].headers.get('bitocard-reseller'), calls[2].headers.get('bitocard-mode')]).toEqual(['res_1', null]);
   });
 
   test('errors come back in the BitoCard shape', async () => {

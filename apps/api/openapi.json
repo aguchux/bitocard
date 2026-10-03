@@ -456,6 +456,109 @@
         ]
       }
     },
+    "/v1/auth/profile": {
+      "patch": {
+        "operationId": "AuthController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Change your name",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/password/change": {
+      "post": {
+        "description": "Needs your current password. Signs out your other sessions; this one stays signed in.",
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Change your password",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/email/change": {
+      "post": {
+        "description": "Needs your current password. A 6-digit code is sent to the new address; confirm it to finish.",
+        "operationId": "AuthController_changeEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Change your sign-in email",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/email/change/verify": {
+      "post": {
+        "description": "Your old address is told about the change.",
+        "operationId": "AuthController_confirmEmailChange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm your new sign-in email",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/v1/auth/phone": {
       "post": {
         "description": "A 6-digit code is sent by SMS; the number is used once confirmed.",
@@ -1023,6 +1126,7 @@
         ]
       },
       "get": {
+        "description": "Checkout payments and bank transfers into your reserved accounts, newest first; `source` is `checkout` or `bank_transfer`.",
         "operationId": "PaymentsController_listTopUps",
         "parameters": [
           {
@@ -1190,7 +1294,7 @@
         ]
       },
       "post": {
-        "description": "Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business.",
+        "description": "Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business and BitoCard to switch them on for you; in Nigeria the owner must pass the BVN check first (`POST /v1/account/bvn`), whose BVN the bank uses.",
         "operationId": "PaymentsController_createReservedAccounts",
         "parameters": [
           {
@@ -1203,16 +1307,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateReservedAccountDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
             "description": ""
@@ -1612,7 +1706,7 @@
         ]
       },
       "post": {
-        "description": "Dashboard only. Upgrading charges the first month from your live wallet straight away, in your currency at the rate shown on the exchange-rates list. Moving to Standard keeps Premium until the end of the paid month.",
+        "description": "Dashboard only, and live only: a plan is paid from your live wallet, so the sandbox refuses the change (`live_only`). Upgrading charges the first month straight away, in your currency at the rate shown on the exchange-rates list. Moving to Standard keeps Premium until the end of the paid month.",
         "operationId": "BillingController_change",
         "parameters": [],
         "requestBody": {
@@ -1849,7 +1943,7 @@
     },
     "/v1/pricing": {
       "get": {
-        "description": "How you earn on face-value products, the markup cap, and your markups.",
+        "description": "How you earn on face-value products, the markup cap, and your markups (with the product name for product markups).",
         "operationId": "PricingController_get",
         "parameters": [],
         "responses": {
@@ -2547,6 +2641,56 @@
         ]
       }
     },
+    "/v1/account/bvn": {
+      "get": {
+        "description": "An unfinished check is re-read from Flutterwave first.",
+        "operationId": "ResellerBvnController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the BVN check status",
+        "tags": [
+          "Account"
+        ]
+      },
+      "post": {
+        "description": "Business owner only, Nigeria, after the identity check. Returns Flutterwave's consent page; the BVN record's name must match the verified owner. Needed before reserved bank accounts are opened.",
+        "operationId": "ResellerBvnController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BvnCheckDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start the BVN check",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
     "/v1/customers/{reference}/verification": {
       "post": {
         "description": "Optional for your own systems: you are responsible for knowing your customers. In Nigeria the customer approves sharing their BVN record on the bank’s consent page, and it must match their name; elsewhere they photograph an ID document and take a selfie. Send the customer to `url`; the outcome arrives as a `customer_verification.*` webhook. An approved or unfinished check for the same customer is returned instead of a new one. In test mode no page is shown: finish the check with the simulate endpoint.",
@@ -3110,6 +3254,65 @@
           "code"
         ]
       },
+      "ProfileDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Your full name.",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Ada Obi"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "current_password": {
+            "type": "string",
+            "description": "Your current password.",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "new_password": {
+            "type": "string",
+            "description": "At least 10 characters. Passwords found in public data breaches are refused.",
+            "minLength": 10,
+            "maxLength": 128,
+            "example": "correct horse battery"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ]
+      },
+      "ChangeEmailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The new email address; a 6-digit code is sent to it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@newmail.com"
+          },
+          "password": {
+            "type": "string",
+            "description": "Your current password.",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
       "PhoneDto": {
         "type": "object",
         "properties": {
@@ -3306,15 +3509,6 @@
         "required": [
           "outcome"
         ]
-      },
-      "CreateReservedAccountDto": {
-        "type": "object",
-        "properties": {
-          "bvn": {
-            "type": "string",
-            "description": "Nigeria: the BVN the bank needs to open the account. Passed to the bank, never stored by BitoCard."
-          }
-        }
       },
       "SimulateDepositDto": {
         "type": "object",
@@ -3574,6 +3768,23 @@
           }
         },
         "required": [
+          "consent"
+        ]
+      },
+      "BvnCheckDto": {
+        "type": "object",
+        "properties": {
+          "bvn": {
+            "type": "string",
+            "description": "The business owner's 11-digit BVN. Passed to Flutterwave and kept encrypted only until your reserved accounts are opened."
+          },
+          "consent": {
+            "type": "boolean",
+            "description": "The owner agrees to the BVN check."
+          }
+        },
+        "required": [
+          "bvn",
           "consent"
         ]
       },

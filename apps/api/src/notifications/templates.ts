@@ -35,6 +35,41 @@ export function passwordResetEmail(to: string, code: string): EmailMessage {
   };
 }
 
+export function emailChangeCodeEmail(to: string, code: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard code to change your email`,
+    ...layout(
+      'Confirm your new email',
+      ['Enter this code to make this your BitoCard sign-in email. It expires in 30 minutes.', 'If you did not ask for this, you can ignore this email.'],
+      code,
+    ),
+  };
+}
+
+/** Sent to the old address once the change is done, so an unexpected change is noticed. */
+export function emailChangedEmail(to: string, newEmail: string): EmailMessage {
+  return {
+    to,
+    subject: 'Your BitoCard sign-in email was changed',
+    ...layout('Your sign-in email was changed', [
+      `Your BitoCard account now signs in with ${newEmail}. This address no longer works for signing in.`,
+      'If you did not make this change, contact support@bitocard.com straight away.',
+    ]),
+  };
+}
+
+export function passwordChangedEmail(to: string): EmailMessage {
+  return {
+    to,
+    subject: 'Your BitoCard password was changed',
+    ...layout('Your password was changed', [
+      'Your BitoCard password was just changed and your other sessions were signed out.',
+      'If you did not make this change, reset your password and contact support@bitocard.com.',
+    ]),
+  };
+}
+
 export function invitationEmail(to: string, resellerName: string, role: string, link: string): EmailMessage {
   const message = layout(`Join ${resellerName} on BitoCard`, [
     `You have been invited to join ${resellerName} on BitoCard as ${role}.`,

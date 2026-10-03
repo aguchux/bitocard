@@ -9,8 +9,8 @@ npm-workspaces Turborepo with five Next.js 16 App Router applications, one NestJ
 | Storefront | apps/storefront | http://localhost:3000 | Yes | Coming-soon page, logo, dialogs, robots.txt and sitemap; `/legal/*` redirects to Legals |
 | API (NestJS) | apps/api | http://localhost:3001 | No | JSON service information, `GET /health`, robots.txt |
 | Docs | apps/docs | http://localhost:3002 | No | Coming-soon page |
-| Admin | apps/admin | http://localhost:3003 | No | Coming-soon page |
-| Reseller | apps/reseller | http://localhost:3004 | No | Coming-soon page |
+| Admin | apps/admin | http://localhost:3003 | No | Admin console (admin.bitocard.com) |
+| SHQ | apps/shq | http://localhost:3004 | No | Seller Head Quarters, the reseller back office (shq.bitocard.com) |
 | Legals | apps/legals | http://localhost:3005 | Yes | Legals & Compliance site (legals.bitocard.com): Home, Documents (privacy, terms, cookies, legal notice under /documents) and Contact |
 
 ## Shared packages
@@ -31,7 +31,7 @@ Use Node.js 22+ and npm 11.12.0. Run all commands from the repository root:
 ```sh
 npm ci
 npm run dev              # all apps
-npm run dev:storefront   # or dev:api, dev:docs, dev:admin, dev:reseller, dev:legals
+npm run dev:storefront   # or dev:api, dev:docs, dev:admin, dev:shq, dev:legals
 ```
 
 ## Validation

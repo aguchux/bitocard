@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { type AccountKind, type Hold, type JournalEntry, type LedgerAccount, type LedgerMode, type LedgerPosting, Prisma } from '../generated/prisma/client.js';
+import { allowanceStatus } from './allowance.service.js';
 import { type AccountRef, insufficientFunds, LedgerService } from './ledger.service.js';
 import { minor } from './mode.js';
 
@@ -30,6 +31,8 @@ export function presentEntry(entry: EntryWithPostings, resellerId: string) {
     reserved_change: minor(change(kind => kind === 'reseller_reserved')),
     /** Change to earnings still inside the payout hold. */
     earnings_on_hold_change: minor(change(kind => kind === 'reseller_earnings_held')),
+    /** Change to the startup allowance (US dollars, cents); never part of `amount`. */
+    allowance_change: minor(change(kind => kind === 'reseller_allowance')),
     created_at: entry.createdAt.toISOString(),
   };
 }
@@ -72,6 +75,8 @@ export class WalletService {
       },
       payouts_in_progress: minor(balance('reseller_payouts_pending')),
       minimum_withdrawal: minor(country.minWithdrawalMinor),
+      /** The startup allowance (live only; null if never granted). Not cash: never part of `available`. */
+      startup_allowance: mode === 'live' ? await allowanceStatus(this.prisma, resellerId) : null,
     };
   }
 

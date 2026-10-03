@@ -138,6 +138,7 @@ enum CodePurpose {
   email_verification
   phone_verification
   password_reset
+  email_change
   admin_mfa_challenge
 }
 
@@ -191,6 +192,8 @@ model Reseller {
   verifiedAt            DateTime?         @map("verified_at")
   /// The owner's name as verified, for matching payout bank accounts.
   verifiedName          String?           @map("verified_name")
+  /// The owner's BVN was checked with Flutterwave and its name matched the verified owner (Nigeria; reserved accounts).
+  bvnVerifiedAt         DateTime?         @map("bvn_verified_at")
   /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
   planCode              String            @default("standard") @map("plan_code")
   createdAt             DateTime          @default(now()) @map("created_at")
@@ -467,6 +470,11 @@ enum AccountKind {
   reseller_reserved
   /// Withdrawals on their way to the reseller's bank.
   reseller_payouts_pending
+  /// The startup allowance (USD): restricted, never cash. Pays only the wholesale cost of customer-paid orders; never
+  /// withdrawn, transferred or spent directly.
+  reseller_allowance
+  /// What BitoCard grants as promotions such as the startup allowance (a marketing expense).
+  promotions
   /// Money BitoCard holds at a payment provider (an asset).
   provider_balance
   /// Fees payment providers charge BitoCard (an expense).
@@ -1180,6 +1188,9 @@ model IdentityVerification {
   /// When the person agreed to the check (biometric and BVN data need explicit consent).
   consentAt         DateTime             @map("consent_at")
   expectedName      String?              @map("expected_name")
+  /// A reseller owner's BVN, encrypted, kept only until their reserved accounts are opened (the bank needs it), then erased;
+  /// erased at once if the check fails or expires.
+  secretEncrypted   String?              @map("secret_encrypted")
   verifiedName      String?              @map("verified_name")
   documentCountry   String?              @map("document_country") @db.Char(2)
   /// Why it was declined or sent for review (shown to admins; a short code to resellers).

@@ -1,3 +1,5 @@
+import { Encryption } from '../common/encryption.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
@@ -74,6 +76,7 @@ export class PaymentsService {
     private readonly wallets: WalletService,
     private readonly providers: PaymentProviders,
     private readonly events: EventsService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Who the provider should treat as the payer: the signed-in person, or the business owner for API keys. */
@@ -124,7 +127,8 @@ export class PaymentsService {
   async listTopUps(resellerId: string, mode: LedgerMode, page: { limit?: number; starting_after?: string }) {
     const limit = page.limit ?? 25;
     const payments = await this.prisma.payment.findMany({
-      where: { resellerId, mode, purpose: 'wallet_top_up' },
+      // Checkout payments and bank transfers into reserved accounts (`source` tells them apart).
+      where: { resellerId, mode },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(page.starting_after ? { cursor: { id: page.starting_after }, skip: 1 } : {}),
@@ -263,26 +267,37 @@ export class PaymentsService {
 
   /**
    * Creates the wallet's reserved bank account(s), trying each provider in turn (Flutterwave, then Monnify in Nigeria).
-   * Asking again returns the existing accounts. The BVN is passed to the provider and never stored.
+   * Asking again returns the existing accounts. Live accounts need the country to offer them, BitoCard's
+   * `reserved_accounts` switch on for the reseller, and an active reseller; in Nigeria the owner's BVN check must have
+   * passed, and its BVN (held encrypted only for this) goes to the bank and is erased once the accounts exist.
    */
-  async createReservedAccounts(resellerId: string, mode: LedgerMode, owner: { email: string }, input: { bvn?: string }) {
+  async createReservedAccounts(resellerId: string, mode: LedgerMode, owner: { email: string }) {
     const { reseller, country, currency } = await this.wallets.currencyOf(resellerId);
     if (!country.reservedAccounts) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'reserved_accounts_unavailable', 'Reserved bank accounts are not available in your country yet. Top up through checkout instead.');
     }
-    if (mode === 'live' && reseller.status !== 'active') throw resellerNotVerified();
     const existing = await this.listReservedAccounts(resellerId, mode);
     if (existing.data.length) return existing;
+    let bvn: { recordId: string; value: string } | undefined;
+    if (mode === 'live') {
+      if (reseller.status !== 'active') throw resellerNotVerified();
+      if (!(await this.settings.isOn('reserved_accounts', resellerId))) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'reserved_accounts_not_enabled', 'Bank transfer accounts are not switched on for your account yet. Contact BitoCard support, or top up through checkout.');
+      }
+      if (country.code === 'NG') bvn = await this.verifiedBvn(resellerId);
+    }
 
     let refused = false;
     for (const provider of this.providers.reservedAccounts(mode, country.code, currency)) {
       const reference = `bc_ra_${mode}_${resellerId.replaceAll('-', '')}`;
       try {
-        const accounts = await provider.createReservedAccount({ reference, email: owner.email, name: reseller.name, currency, bvn: input.bvn });
+        const accounts = await provider.createReservedAccount({ reference, email: owner.email, name: reseller.name, currency, bvn: bvn?.value });
         await this.prisma.reservedAccount.createMany({
           data: accounts.map(account => ({ resellerId, mode, provider: provider.name, currency, providerReference: reference, ...account })),
           skipDuplicates: true,
         });
+        // The bank has it now: BitoCard keeps no BVN.
+        if (bvn) await this.prisma.identityVerification.update({ where: { id: bvn.recordId }, data: { secretEncrypted: null } });
         return this.listReservedAccounts(resellerId, mode);
       } catch (error) {
         refused ||= error instanceof ProviderError && error.definite;
@@ -293,6 +308,21 @@ export class PaymentsService {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'reserved_account_refused', 'The bank could not create your account. Check your BVN and business details, then try again.', 'bvn');
     }
     throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'Reserved accounts are unavailable right now. Try again shortly.');
+  }
+
+  /** The owner's verified BVN, held encrypted on their passed BVN check until the accounts are opened. */
+  private async verifiedBvn(resellerId: string) {
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    const check = await this.prisma.identityVerification.findFirst({
+      where: { resellerId, subject: 'reseller', method: 'bvn', status: 'approved', secretEncrypted: { not: null } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!reseller.bvnVerifiedAt || !check?.secretEncrypted) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'bvn_check_required', "The business owner's BVN must be checked first (POST /v1/account/bvn).");
+    }
+    const key = this.integrations.env.ENCRYPTION_KEY;
+    if (!key) throw new Error('ENCRYPTION_KEY is not configured');
+    return { recordId: check.id, value: new Encryption(key).decrypt(check.secretEncrypted) };
   }
 
   /**

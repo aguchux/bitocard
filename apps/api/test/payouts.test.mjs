@@ -95,6 +95,17 @@ describe('sandbox payouts', () => {
     assert.equal((await browser.get('/v1/payouts', sandbox)).json.data[0].status, 'paid');
   });
 
+  test('payouts name their bank account, even after it is removed (webhooks leave it out)', async () => {
+    const { browser } = await earner();
+    const account = (await browser.post('/v1/bank-accounts', { bank_code: 'SBX001', account_number: '1234567890' }, sandbox)).json;
+    const payout = await browser.post('/v1/payouts', { amount: 2_000_000, bank_account_id: account.id }, sandbox);
+    assert.deepEqual(payout.json.bank_account, { bank_name: account.bank_name, account_number_last4: '7890', removed: false });
+    await browser.delete(`/v1/bank-accounts/${account.id}`, sandbox);
+    const [listed] = (await browser.get('/v1/payouts', sandbox)).json.data;
+    assert.deepEqual(listed.bank_account, { bank_name: account.bank_name, account_number_last4: '7890', removed: true });
+    assert.equal((await browser.get(`/v1/payouts/${payout.json.id}`, sandbox)).json.bank_account.removed, true);
+  });
+
   test('a failed payout returns the money to withdrawable earnings', async () => {
     const { browser } = await earner();
     const account = (await browser.post('/v1/bank-accounts', { bank_code: 'SBX001', account_number: '1234567890' }, sandbox)).json;

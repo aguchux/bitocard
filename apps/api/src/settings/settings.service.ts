@@ -19,6 +19,10 @@ export const optionDefinitions = {
 export const switchDefinitions = {
   startup_allowance: { scopes: ['global', 'country', 'reseller'], description: 'The one-time $500 startup allowance.' },
   welcome_bonus: { scopes: ['reseller'], description: 'The $1 customer welcome bonus; only ever per reseller.' },
+  reserved_accounts: {
+    scopes: ['global', 'country', 'reseller'],
+    description: 'Live reserved bank accounts (top-ups by bank transfer), on top of the country offering them. In Nigeria the owner also needs a verified BVN.',
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

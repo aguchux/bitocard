@@ -91,7 +91,9 @@ export type ResellerDetail = {
   features: Record<string, boolean>;
   created_at: string;
 };
-export type ResellerWallet = Record<string, unknown> & { currency: string };
+/** The $500 startup allowance (US cents): restricted, never cash. */
+export type StartupAllowance = { currency: 'USD'; granted: number; remaining: number; status: 'active' | 'used' | 'revoked'; granted_at: string; revoked_at: string | null };
+export type ResellerWallet = Record<string, unknown> & { currency: string; available: number; startup_allowance: StartupAllowance | null };
 
 export type VerificationStatus = 'in_progress' | 'approved' | 'declined' | 'in_review' | 'expired';
 export type Verification = {

@@ -136,8 +136,8 @@ describe('signing in', () => {
 
   test('returns to the requested BitoCard app, never to another site', async () => {
     const email = uniqueEmail();
-    const ok = await googleSignIn({ sub: `sub-${email}`, email }, { startQuery: `?return_to=${encodeURIComponent('https://reseller.bitocard.com/welcome')}` });
-    assert.equal(ok.location.toString(), 'https://reseller.bitocard.com/welcome');
+    const ok = await googleSignIn({ sub: `sub-${email}`, email }, { startQuery: `?return_to=${encodeURIComponent('https://shq.bitocard.com/welcome')}` });
+    assert.equal(ok.location.toString(), 'https://shq.bitocard.com/welcome');
     const other = uniqueEmail();
     const evil = await googleSignIn({ sub: `sub-${other}`, email: other }, { startQuery: `?return_to=${encodeURIComponent('https://evil.example/steal')}` });
     assert.equal(evil.location.origin, appOrigin);

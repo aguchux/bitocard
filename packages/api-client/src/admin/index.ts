@@ -19,6 +19,8 @@ import type {
   ResellerDetail,
   ResellerStatus,
   ResellerSummary,
+  ResellerWallet,
+  StartupAllowance,
   Supplier,
   SupplierWebhook,
   SupplierWebhookStatus,
@@ -73,6 +75,17 @@ export const adminApi = bitocardApi.injectEndpoints({
     updateReseller: build.mutation<ResellerDetail, { id: string; status?: ResellerStatus; plan?: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+    resellerWallet: build.query<ResellerWallet, string>({ query: id => `/v1/admin/resellers/${id}/wallet`, providesTags: (_result, _error, id) => [{ type: 'Reseller', id }] }),
+    /** Finance: grants the startup allowance (verified reseller, switch on, once only). */
+    grantStartupAllowance: build.mutation<StartupAllowance, string>({
+      query: id => ({ url: `/v1/admin/resellers/${id}/startup-allowance`, method: 'POST' }),
+      invalidatesTags: (_result, _error, id) => [{ type: 'Reseller', id }, 'Activity'],
+    }),
+    /** Finance: takes back what remains, with a reason. */
+    revokeStartupAllowance: build.mutation<StartupAllowance, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/resellers/${id}/startup-allowance/revoke`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, 'Activity'],
     }),
     plans: build.query<List<Plan>, void>({ query: () => '/v1/plans', providesTags: ['Plan'] }),
 
@@ -177,6 +190,9 @@ export const adminApi = bitocardApi.injectEndpoints({
 });
 
 export const {
+  useResellerWalletQuery,
+  useGrantStartupAllowanceMutation,
+  useRevokeStartupAllowanceMutation,
   useAdminSessionQuery,
   useAdminSignInMutation,
   useAdminMfaSetupMutation,

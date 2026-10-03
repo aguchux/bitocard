@@ -10,7 +10,7 @@ type CountryWithCategories = Country & { categories: CountryCategory[] };
 
 const missing = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such country.');
 
-/** Public view: what is open in a country. */
+/** Public view: what is open in a country, and the money rules its resellers work under. */
 export function presentCountry(country: CountryWithCategories) {
   return {
     object: 'country' as const,
@@ -18,6 +18,10 @@ export function presentCountry(country: CountryWithCategories) {
     name: country.name,
     currency: country.currency,
     reseller_signup: country.resellerSignup,
+    reserved_accounts: country.reservedAccounts,
+    markup_cap_percent: country.markupCapPercent,
+    payout_hold_days: country.payoutHoldDays,
+    min_withdrawal_minor: Number(country.minWithdrawalMinor),
     categories: country.categories.filter(c => c.enabled).map(c => ({ category: c.category, customer_verification: c.customerVerification })),
   };
 }
@@ -26,10 +30,6 @@ export function presentCountry(country: CountryWithCategories) {
 export function presentCountryAdmin(country: CountryWithCategories) {
   return {
     ...presentCountry(country),
-    reserved_accounts: country.reservedAccounts,
-    markup_cap_percent: country.markupCapPercent,
-    payout_hold_days: country.payoutHoldDays,
-    min_withdrawal_minor: Number(country.minWithdrawalMinor),
     categories: country.categories
       .sort((a, b) => productCategories.indexOf(a.category) - productCategories.indexOf(b.category))
       .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification, taxable: c.taxable })),

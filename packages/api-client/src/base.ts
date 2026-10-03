@@ -6,6 +6,16 @@ export type ApiError = { status: number; type: string; code: string; message: st
 /** Where the API lives: NEXT_PUBLIC_API_URL (for example http://localhost:3001 in development), else production. */
 export const apiBaseUrl = () => (process.env.NEXT_PUBLIC_API_URL ?? 'https://api.bitocard.com').replace(/\/$/, '');
 
+/**
+ * Headers SHQ adds to every request: which of the person's reseller accounts it acts for (`BitoCard-Reseller`) and
+ * sandbox mode (`BitoCard-Mode: test`). The admin app never sets them. Reset the API cache after changing either.
+ */
+const requestContext: { reseller?: string; mode?: 'live' | 'test' } = {};
+export function setRequestContext(next: { reseller?: string | null; mode?: 'live' | 'test' }) {
+  if ('reseller' in next) requestContext.reseller = next.reseller ?? undefined;
+  if ('mode' in next) requestContext.mode = next.mode;
+}
+
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 /** Turns any failure into an ApiError, so screens show the API's own message. */
@@ -26,7 +36,13 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
   return async (args, api, extra) => {
     const request: FetchArgs = typeof args === 'string' ? { url: args } : { ...args };
     const method = (request.method ?? 'GET').toUpperCase();
-    request.headers = { accept: 'application/json', ...(request.headers as Record<string, string> | undefined), ...(method === 'POST' ? { 'idempotency-key': newKey() } : {}) };
+    request.headers = {
+      accept: 'application/json',
+      ...(requestContext.reseller ? { 'bitocard-reseller': requestContext.reseller } : {}),
+      ...(requestContext.mode === 'test' ? { 'bitocard-mode': 'test' } : {}),
+      ...(request.headers as Record<string, string> | undefined),
+      ...(method === 'POST' ? { 'idempotency-key': newKey() } : {}),
+    };
     const raw = fetchBaseQuery({ baseUrl: baseUrl(), credentials: 'include' });
     const result = await raw(request, api, extra);
     if (result.error) return { error: toApiError(result.error.status, result.error.data), meta: result.meta };
@@ -35,7 +51,38 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
 }
 
 /** Tag types shared by every endpoint module, so a change on one screen refreshes the others. */
-export const tagTypes = ['Session', 'Overview', 'Reseller', 'Verification', 'Order', 'Supplier', 'Product', 'PricingRule', 'Switch', 'Country', 'Activity', 'Plan', 'Integration'] as const;
+export const tagTypes = [
+  'Session',
+  'Overview',
+  'Reseller',
+  'Verification',
+  'Order',
+  'Supplier',
+  'Product',
+  'PricingRule',
+  'Switch',
+  'Country',
+  'Activity',
+  'Plan',
+  'Integration',
+  // Reseller (SHQ)
+  'Account',
+  'Wallet',
+  'TopUp',
+  'ReservedAccount',
+  'BankAccount',
+  'Payout',
+  'Subscription',
+  'Store',
+  'ApiKey',
+  'WebhookEndpoint',
+  'Event',
+  'Team',
+  'Pricing',
+  'Catalogue',
+  'Settings',
+  'IdentityCheck',
+] as const;
 
 /** The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache. */
 export const bitocardApi = createApi({

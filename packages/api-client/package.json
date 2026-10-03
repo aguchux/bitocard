@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./admin": "./src/admin/index.ts"
+    "./admin": "./src/admin/index.ts",
+    "./reseller": "./src/reseller/index.ts"
   },
   "scripts": {
     "lint": "eslint .",

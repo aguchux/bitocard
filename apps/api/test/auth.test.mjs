@@ -333,8 +333,8 @@ describe('browser access (CORS)', () => {
     const allowed = await fetch(`${base}/v1/auth/session`, { method: 'OPTIONS', headers: { origin: appOrigin, 'access-control-request-method': 'GET' } });
     assert.equal(allowed.headers.get('access-control-allow-origin'), appOrigin);
     assert.equal(allowed.headers.get('access-control-allow-credentials'), 'true');
-    const subdomain = await fetch(`${base}/v1/auth/session`, { method: 'OPTIONS', headers: { origin: 'https://reseller.bitocard.com', 'access-control-request-method': 'GET' } });
-    assert.equal(subdomain.headers.get('access-control-allow-origin'), 'https://reseller.bitocard.com');
+    const subdomain = await fetch(`${base}/v1/auth/session`, { method: 'OPTIONS', headers: { origin: 'https://shq.bitocard.com', 'access-control-request-method': 'GET' } });
+    assert.equal(subdomain.headers.get('access-control-allow-origin'), 'https://shq.bitocard.com');
     const other = await fetch(`${base}/v1/auth/session`, { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' } });
     assert.equal(other.headers.get('access-control-allow-origin'), null);
   });

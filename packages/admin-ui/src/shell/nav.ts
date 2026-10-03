@@ -2,7 +2,7 @@ import { AlertTriangle, BellRing, PlugZap, BadgePercent, Boxes, Building2, Chart
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'settings';
 
-export type NavItem = { key: SectionKey; label: string; href: string; icon: LucideIcon };
+export type NavItem<K extends string = SectionKey> = { key: K; label: string; href: string; icon: LucideIcon };
 
 /** The left rail, in order. */
 export const sections: NavItem[] = [

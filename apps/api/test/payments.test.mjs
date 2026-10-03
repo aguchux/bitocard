@@ -34,6 +34,24 @@ async function verifiedReseller(options) {
   return reseller;
 }
 
+/**
+ * A verified Nigerian reseller ready for live reserved accounts: BitoCard's switch on for them, and the owner's BVN
+ * checked with Flutterwave (its name matching the verified owner).
+ */
+async function bvnReseller(options) {
+  const reseller = await verifiedReseller(options);
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { verifiedAt: new Date(), verifiedName: 'Ada Obi' } });
+  await prisma.featureSwitch.create({ data: { key: 'reserved_accounts', resellerId: reseller.resellerId, enabled: true } });
+  flw.state.bvns['22222222222'] = 'ADA OBI';
+  const started = await reseller.browser.post('/v1/account/bvn', { bvn: '22222222222', consent: true });
+  assert.equal(started.status, 201, JSON.stringify(started.json));
+  const check = await prisma.identityVerification.findFirstOrThrow({ where: { resellerId: reseller.resellerId, method: 'bvn' }, orderBy: { createdAt: 'desc' } });
+  flw.state.bvnChecks[check.providerReference].status = 'COMPLETED';
+  const done = await reseller.browser.get('/v1/account/bvn');
+  assert.deepEqual([done.json.status, done.json.verified], ['approved', true], JSON.stringify(done.json));
+  return reseller;
+}
+
 const flutterwaveWebhook = (body, hash = 'flw-webhook-hash') =>
   fetch(`${server.base}/v1/webhooks/flutterwave`, { method: 'POST', headers: { 'content-type': 'application/json', 'verif-hash': hash }, body: JSON.stringify(body) });
 
@@ -205,28 +223,77 @@ describe('reserved bank accounts', () => {
     assert.equal((await browser.post('/v1/wallet/reserved-accounts', {}, sandbox)).json.error.code, 'reserved_accounts_unavailable');
   });
 
-  test('live: Flutterwave first, with the BVN passed through and never stored', async () => {
-    const { browser, resellerId } = await verifiedReseller();
-    const created = await browser.post('/v1/wallet/reserved-accounts', { bvn: '22222222222' });
-    assert.equal(created.status, 201);
+  test('live: Flutterwave first, with the checked BVN passed to the bank and then erased', async () => {
+    const { browser, resellerId } = await bvnReseller();
+    const held = await prisma.identityVerification.findFirstOrThrow({ where: { resellerId, method: 'bvn' } });
+    assert.ok(held.secretEncrypted && !held.secretEncrypted.includes('22222222222'), 'held encrypted until the accounts exist');
+    const created = await browser.post('/v1/wallet/reserved-accounts');
+    assert.equal(created.status, 201, JSON.stringify(created.json));
     assert.equal(created.json.data[0].bank_name, 'Wema Bank');
     assert.equal(flw.calls.findLast(c => c.url === '/virtual-account-numbers').body.bvn, '22222222222');
-    const stored = JSON.stringify(await prisma.reservedAccount.findMany({ where: { resellerId } }));
+    assert.equal((await prisma.identityVerification.findUniqueOrThrow({ where: { id: held.id } })).secretEncrypted, null, 'erased once the bank has it');
+    const stored = JSON.stringify([await prisma.reservedAccount.findMany({ where: { resellerId } }), await prisma.identityVerification.findMany({ where: { resellerId } })]);
     assert.ok(!stored.includes('22222222222'));
-    assert.equal((await browser.post('/v1/wallet/reserved-accounts', { bvn: '123' })).json.error.param, 'bvn');
+  });
+
+  test('live: off until BitoCard switches them on for the reseller', async () => {
+    const { browser } = await verifiedReseller();
+    const res = await browser.post('/v1/wallet/reserved-accounts');
+    assert.deepEqual([res.status, res.json.error.code], [409, 'reserved_accounts_not_enabled']);
+  });
+
+  test('live, Nigeria: the owner must pass the BVN check first, and its name must match the verified owner', async () => {
+    const reseller = await verifiedReseller();
+    await prisma.featureSwitch.create({ data: { key: 'reserved_accounts', resellerId: reseller.resellerId, enabled: true } });
+    assert.equal((await reseller.browser.post('/v1/wallet/reserved-accounts')).json.error.code, 'bvn_check_required');
+    // Not before the identity check (the BVN is matched to the verified owner).
+    assert.equal((await reseller.browser.post('/v1/account/bvn', { bvn: '44444444444', consent: true })).json.error.code, 'verification_required');
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { verifiedAt: new Date(), verifiedName: 'Ada Obi' } });
+    assert.equal((await reseller.browser.post('/v1/account/bvn', { bvn: '44444444444', consent: false })).json.error.code, 'consent_required');
+
+    flw.state.bvns['44444444444'] = 'SOMEONE ELSE';
+    const started = await reseller.browser.post('/v1/account/bvn', { bvn: '44444444444', consent: true });
+    assert.equal(started.json.status, 'in_progress');
+    assert.match(started.json.url, /nibss-consent/);
+    assert.equal(flw.calls.findLast(c => c.url === '/bvn/verifications').body.redirect_url, 'https://shq.bitocard.com/wallet/reserved-accounts');
+    const check = await prisma.identityVerification.findFirstOrThrow({ where: { resellerId: reseller.resellerId, method: 'bvn' } });
+    flw.state.bvnChecks[check.providerReference].status = 'COMPLETED';
+    const declined = (await reseller.browser.get('/v1/account/bvn')).json;
+    assert.deepEqual([declined.status, declined.reason, declined.verified], ['declined', 'name_mismatch', false]);
+    assert.equal((await prisma.identityVerification.findUniqueOrThrow({ where: { id: check.id } })).secretEncrypted, null, 'a failed check keeps no BVN');
+    assert.equal((await reseller.browser.post('/v1/wallet/reserved-accounts')).json.error.code, 'bvn_check_required');
+    // The owner's document check is not affected by the BVN check.
+    assert.equal((await reseller.browser.get('/v1/account/verification')).json.status, 'not_started');
+    assert.equal((await prisma.reseller.findUniqueOrThrow({ where: { id: reseller.resellerId } })).status, 'active');
+  });
+
+  test('live: only the owner starts the BVN check', async () => {
+    const owner = await verifiedReseller();
+    const person = await resellerClient(server);
+    await prisma.resellerMember.create({ data: { resellerId: owner.resellerId, userId: person.userId, role: 'finance' } });
+    const res = await person.browser.post('/v1/account/bvn', { bvn: '22222222222', consent: true }, { 'bitocard-reseller': owner.resellerId });
+    assert.equal(res.status, 403);
+  });
+
+  test('bank transfers into reserved accounts are listed with top-ups', async () => {
+    const { browser } = await resellerClient(server);
+    const [account] = (await browser.post('/v1/wallet/reserved-accounts', {}, sandbox)).json.data;
+    await browser.post(`/v1/wallet/reserved-accounts/${account.id}/simulate-deposit`, { amount: 40_000 }, sandbox);
+    const listed = (await browser.get('/v1/wallet/top-ups', sandbox)).json.data;
+    assert.deepEqual([listed[0].source, listed[0].status, listed[0].amount], ['bank_transfer', 'succeeded', 40_000]);
   });
 
   test('live: Monnify takes over when Flutterwave fails; both failing is reported', async () => {
     flw.state.fail['/virtual-account-numbers'] = 500;
     try {
-      const first = await verifiedReseller();
-      const created = await first.browser.post('/v1/wallet/reserved-accounts', { bvn: '22222222222' });
+      const first = await bvnReseller();
+      const created = await first.browser.post('/v1/wallet/reserved-accounts');
       assert.equal(created.json.data[0].bank_name, 'Moniepoint MFB');
       assert.equal(monnify.calls.findLast(c => c.url === '/api/v2/bank-transfer/reserved-accounts').headers.authorization, 'Bearer monnify-token');
 
       monnify.state.down = true;
-      const second = await verifiedReseller();
-      const failed = await second.browser.post('/v1/wallet/reserved-accounts', { bvn: '22222222222' });
+      const second = await bvnReseller();
+      const failed = await second.browser.post('/v1/wallet/reserved-accounts');
       assert.deepEqual([failed.status, failed.json.error.code], [502, 'provider_error']);
     } finally {
       delete flw.state.fail['/virtual-account-numbers'];
@@ -235,8 +302,8 @@ describe('reserved bank accounts', () => {
   });
 
   test('live: Flutterwave transfers into the account credit the wallet exactly once', async () => {
-    const { browser, resellerId } = await verifiedReseller();
-    await browser.post('/v1/wallet/reserved-accounts', { bvn: '22222222222' });
+    const { browser, resellerId } = await bvnReseller();
+    await browser.post('/v1/wallet/reserved-accounts');
     const account = await prisma.reservedAccount.findFirst({ where: { resellerId, provider: 'flutterwave' } });
     flw.state.charges[account.providerReference] = { id: 9100, status: 'successful', amount: 25000, currency: 'NGN', app_fee: 50 };
     await flutterwaveWebhook({ event: 'charge.completed', data: { id: 9100 } });
@@ -248,8 +315,8 @@ describe('reserved bank accounts', () => {
     flw.state.fail['/virtual-account-numbers'] = 500;
     let reseller;
     try {
-      reseller = await verifiedReseller();
-      await reseller.browser.post('/v1/wallet/reserved-accounts', { bvn: '22222222222' });
+      reseller = await bvnReseller();
+      await reseller.browser.post('/v1/wallet/reserved-accounts');
     } finally {
       delete flw.state.fail['/virtual-account-numbers'];
     }

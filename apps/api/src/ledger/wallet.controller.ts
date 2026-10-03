@@ -5,6 +5,7 @@ import { IsIn, IsInt, IsNotIn, IsOptional, IsString, IsUUID, Length, Max, Min } 
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
+import { AllowanceService } from './allowance.service.js';
 import { LedgerService } from './ledger.service.js';
 import { Mode } from './mode.js';
 import { WalletService } from './wallet.service.js';
@@ -22,6 +23,10 @@ export class PageDto {
 class AdminModeDto extends PageDto {
   @IsOptional() @IsIn(['test', 'live'])
   mode?: LedgerMode;
+}
+
+class RevokeAllowanceDto {
+  @IsString() @Length(5, 500) reason: string;
 }
 
 class AdjustmentDto {
@@ -78,7 +83,22 @@ export class AdminWalletController {
   constructor(
     private readonly wallets: WalletService,
     private readonly ledger: LedgerService,
+    private readonly allowance: AllowanceService,
   ) {}
+
+  /** Grants the startup allowance now (verified reseller, switch on, never granted before). Audited. */
+  @AdminRoles('finance')
+  @Post('resellers/:id/startup-allowance')
+  grantAllowance(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.allowance.grant(adminId(caller), id);
+  }
+
+  /** Takes back what remains of the startup allowance. It cannot be granted again. Audited with the reason. */
+  @AdminRoles('finance')
+  @Post('resellers/:id/startup-allowance/revoke')
+  revokeAllowance(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: RevokeAllowanceDto) {
+    return this.allowance.revoke(adminId(caller), id, body.reason);
+  }
 
   @AdminRoles('finance', 'operations', 'support')
   @Get('resellers/:id/wallet')

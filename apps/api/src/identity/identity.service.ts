@@ -1,3 +1,5 @@
+import { Encryption } from '../common/encryption.js';
+import { AllowanceService } from '../ledger/allowance.service.js';
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -66,6 +68,20 @@ function presentResellerVerification(record: IdentityVerification | null, resell
   };
 }
 
+/** The owner's BVN check for reserved accounts. The BVN itself is never returned. */
+function presentBvnCheck(record: IdentityVerification | null, reseller: { bvnVerifiedAt: Date | null }) {
+  return {
+    object: 'bvn_check' as const,
+    verified: reseller.bvnVerifiedAt !== null,
+    verified_at: reseller.bvnVerifiedAt?.toISOString() ?? null,
+    status: record?.status ?? 'not_started',
+    /** Flutterwave's consent page, while the check is in progress. */
+    url: record?.status === 'in_progress' ? record.url : null,
+    reason: record ? publicReason(record) : null,
+    started_at: record?.createdAt.toISOString() ?? null,
+  };
+}
+
 const fullName = (result: CheckResult) => [result.firstName, result.lastName].filter(Boolean).join(' ').trim() || null;
 
 /**
@@ -91,6 +107,7 @@ export class IdentityService {
     private readonly events: EventsService,
     private readonly audit: AuditService,
     private readonly email: EmailService,
+    private readonly allowance: AllowanceService,
   ) {
     this.diditClient = integrations.derive(config =>
       config.DIDIT_API_KEY && config.DIDIT_WORKFLOW_ID ? new DiditProvider(config.DIDIT_API_KEY, config.DIDIT_WORKFLOW_ID, config.DIDIT_API_URL, config.DIDIT_WEBHOOK_SECRET) : null,
@@ -114,7 +131,7 @@ export class IdentityService {
 
   async resellerVerification(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-    const record = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller' }, orderBy: { createdAt: 'desc' } });
+    const record = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
     return presentResellerVerification(record, reseller);
   }
 
@@ -123,7 +140,7 @@ export class IdentityService {
     if (!consent) throw consentRequired();
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     if (reseller.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', 'Your identity is already verified.');
-    const latest = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller' }, orderBy: { createdAt: 'desc' } });
+    const latest = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
     if (latest?.status === 'in_review') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_in_review', 'Your check is being reviewed. We will email you the outcome.');
     if (latest?.status === 'in_progress' && latest.url && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentResellerVerification(latest, reseller);
     if (!this.didit) throw unavailable('Identity verification');
@@ -151,6 +168,72 @@ export class IdentityService {
       },
     });
     return presentResellerVerification(record, reseller);
+  }
+
+  // -- Reseller owner's BVN (reserved accounts in Nigeria) ---------------------------------------------------------
+
+  private encryption() {
+    const key = this.integrations.env.ENCRYPTION_KEY;
+    if (!key) throw new Error('ENCRYPTION_KEY is not configured');
+    return new Encryption(key);
+  }
+
+  private latestBvnCheck(resellerId: string) {
+    return this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'bvn' }, orderBy: { createdAt: 'desc' } });
+  }
+
+  /** The owner's BVN check; an open one is re-read from Flutterwave first (they return from the consent page to SHQ). */
+  async resellerBvnCheck(resellerId: string) {
+    let record = await this.latestBvnCheck(resellerId);
+    if (record && openStatuses.includes(record.status)) record = await this.refresh(record).catch(() => record!);
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    return presentBvnCheck(record, reseller);
+  }
+
+  /**
+   * Starts the owner's BVN check (Nigeria, live): Flutterwave's consent page, then the BVN record's name must match the
+   * owner's verified name. The BVN is kept encrypted only until the reseller's reserved accounts are opened (the bank
+   * needs it), then erased; it is erased at once if the check fails or expires.
+   */
+  async startResellerBvnCheck(resellerId: string, bvn: string, consent: boolean) {
+    if (!consent) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'consent_required', 'The owner must agree to the BVN check first.', 'consent');
+    }
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    if (reseller.country !== 'NG') throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'bvn_not_needed', 'Only Nigerian businesses need a BVN check.');
+    if (!reseller.verifiedAt || !reseller.verifiedName) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', 'Pass the identity check first: the BVN must match the verified owner.');
+    }
+    if (reseller.bvnVerifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', 'Your BVN is already verified.');
+    const latest = await this.latestBvnCheck(resellerId);
+    if (latest?.status === 'in_progress' && latest.url && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentBvnCheck(latest, reseller);
+    const flutterwave = this.providers.flutterwave;
+    if (!flutterwave) throw unavailable('BVN verification');
+    const [firstName, ...rest] = reseller.verifiedName.trim().split(/\s+/);
+    let session: { providerReference: string; url: string };
+    try {
+      session = await flutterwave.startBvnConsent({ bvn, firstName, lastName: rest.join(' ') || firstName, redirectUrl: `${this.config.DASHBOARD_URL}/wallet/reserved-accounts` });
+    } catch (error) {
+      throw this.providerFailure(error, 'BVN check');
+    }
+    // A newer check replaces the older one: nothing from it is needed any more.
+    await this.prisma.identityVerification.updateMany({ where: { resellerId, subject: 'reseller', method: 'bvn', secretEncrypted: { not: null } }, data: { secretEncrypted: null } });
+    const record = await this.prisma.identityVerification.create({
+      data: {
+        subject: 'reseller',
+        resellerId,
+        mode: 'live',
+        method: 'bvn',
+        provider: flutterwave.name,
+        providerReference: session.providerReference,
+        url: session.url,
+        country: 'NG',
+        consentAt: new Date(),
+        expectedName: reseller.verifiedName,
+        secretEncrypted: this.encryption().encrypt(bvn),
+      },
+    });
+    return presentBvnCheck(record, reseller);
   }
 
   // -- Customers -------------------------------------------------------------------------------------------------
@@ -282,7 +365,9 @@ export class IdentityService {
       status = 'declined';
       reason = 'name_mismatch';
     }
-    const autoApprove = record.subject === 'reseller' && status === 'approved' && !(await this.settings.isOn('manual_reseller_approval', record.resellerId));
+    const ownerBvn = record.subject === 'reseller' && record.method === 'bvn';
+    const ownerDocument = record.subject === 'reseller' && record.method === 'document';
+    const autoApprove = ownerDocument && status === 'approved' && !(await this.settings.isOn('manual_reseller_approval', record.resellerId));
     const changed = await this.prisma.$transaction(async tx => {
       const claimed = await tx.identityVerification.updateMany({
         where: { id: record.id, status: { in: openStatuses } },
@@ -294,10 +379,13 @@ export class IdentityService {
           decidedAt: status === 'in_review' ? null : now,
           decidedById: actorId,
           lastCheckedAt: now,
+          // A BVN is kept only while it can still open reserved accounts.
+          ...(status === 'approved' || status === 'in_review' ? {} : { secretEncrypted: null }),
         },
       });
       if (claimed.count === 0) return false;
-      if (record.subject === 'reseller' && status === 'approved') {
+      if (ownerBvn && status === 'approved') await tx.reseller.update({ where: { id: record.resellerId }, data: { bvnVerifiedAt: now } });
+      if (ownerDocument && status === 'approved') {
         await tx.reseller.update({ where: { id: record.resellerId }, data: { verifiedAt: now, verifiedName } });
         if (autoApprove) await tx.reseller.updateMany({ where: { id: record.resellerId, status: 'pending' }, data: { status: 'active' } });
       }
@@ -314,10 +402,11 @@ export class IdentityService {
     });
     if (!changed) return;
     this.events.committed();
+    if (ownerDocument && status === 'approved') await this.allowance.grantIfEligible(record.resellerId).catch(error => this.logger.error({ err: error }, 'Could not grant the startup allowance'));
     if (actorId !== null || record.subject === 'reseller') {
       await this.audit.record({ actorId, action: `verification.${status}`, targetType: 'reseller', targetId: record.resellerId, before: { verification_id: record.id, status: record.status }, after: { status, reason } });
     }
-    if (record.subject === 'reseller' && (status === 'approved' || status === 'declined')) {
+    if (ownerDocument && (status === 'approved' || status === 'declined')) {
       const owner = await this.prisma.resellerMember.findFirst({ where: { resellerId: record.resellerId, role: 'owner' }, include: { user: true } });
       if (owner?.user.email) {
         await this.email
@@ -353,6 +442,11 @@ export class IdentityService {
         this.logger.warn({ err: error, verificationId: record.id }, 'Identity check refresh failed; will retry');
       }
     }
+    // A verified BVN not used to open reserved accounts within the check's lifetime is erased.
+    await this.prisma.identityVerification.updateMany({
+      where: { secretEncrypted: { not: null }, createdAt: { lt: new Date(now.getTime() - expireAfterMs) } },
+      data: { secretEncrypted: null },
+    });
     const sandbox = await this.prisma.identityVerification.updateMany({
       where: { provider: 'sandbox', status: 'in_progress', createdAt: { lt: new Date(now.getTime() - expireAfterMs) } },
       data: { status: 'expired', decidedAt: now },

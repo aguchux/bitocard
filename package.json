@@ -22,7 +22,7 @@
     "dev:api": "turbo run dev --filter=@bitocard/api",
     "dev:docs": "turbo run dev --filter=@bitocard/docs",
     "dev:admin": "turbo run dev --filter=@bitocard/admin",
-    "dev:reseller": "turbo run dev --filter=@bitocard/reseller",
+    "dev:shq": "turbo run dev --filter=@bitocard/shq",
     "dev:legals": "turbo run dev --filter=@bitocard/legals",
     "docker:up": "docker compose up -d --wait",
     "docker:down": "docker compose down",
