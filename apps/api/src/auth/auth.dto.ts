@@ -58,6 +58,21 @@ export class SignUpDto {
   invitation_token?: string;
 }
 
+/** A signed-in person opens their own reseller account (for example after leaving another reseller's team). */
+export class CreateResellerAccountDto {
+  @ApiProperty({ description: 'Business name shown on the reseller account.', minLength: 2, maxLength: 100, example: 'Ada Digital' })
+  @Transform(trim)
+  @IsString()
+  @Length(2, 100)
+  business_name: string;
+
+  @ApiProperty({ description: 'Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE.', pattern: '^[A-Z]{2}$', example: 'NG' })
+  @Transform(upperTrim)
+  @IsString()
+  @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter country code' })
+  country: string;
+}
+
 export class SignInDto {
   @ApiProperty({
     description: 'Email address, or a verified mobile number in international format.',

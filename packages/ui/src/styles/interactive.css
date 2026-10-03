@@ -1,0 +1,38 @@
+/*
+ * Every clickable thing shows the hand cursor, in every app (Tailwind 4 gives buttons the default arrow). Disabled
+ * controls show "not allowed". Taps respond at once on touch screens (no double-tap-to-zoom wait). In the base layer,
+ * so a `cursor-*` utility on an element still wins. Apps import this after `@import "tailwindcss";`.
+ */
+@layer base {
+  a[href],
+  button,
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  [role="radio"],
+  summary,
+  label[for],
+  label:has(> input:not([type="hidden"])),
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  input[type="file"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  input[type="color"] {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :disabled,
+  [aria-disabled="true"],
+  label:has(> input:disabled) {
+    cursor: not-allowed;
+  }
+}

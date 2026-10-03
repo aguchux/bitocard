@@ -23,11 +23,20 @@ export type Account = {
   authenticated_as: { type: 'session'; user_id: string; role: ResellerRole | null } | { type: 'api_key'; api_key_id: string; mode: 'test' | 'live'; scopes: string[] };
 };
 export type Notice = { object: 'notice'; message: string };
+/** `country` and `business_name` open a reseller account; `invitation_token` joins the inviting team instead. */
+export type SignUpInput = { name: string; email: string; password: string } & ({ country: string; business_name?: string } | { invitation_token: string });
 
 /** Sign-in and the signed-in person (`/v1/auth`), and the account the dashboard acts for (`/v1/account`). */
 export const resellerSessionApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     session: build.query<Session, void>({ query: () => '/v1/auth/session', providesTags: ['Session'] }),
+    /** Creates the person and, without an invitation, their reseller account (they own it); signs them in. A code is emailed to confirm the address. */
+    signUp: build.mutation<Session, SignUpInput>({ query: body => ({ url: '/v1/auth/signup', method: 'POST', body }), invalidatesTags: ['Session'] }),
+    /** A signed-in person with a confirmed email opens their own reseller account (one owned account each). */
+    createResellerAccount: build.mutation<Session, { business_name: string; country: string }>({
+      query: body => ({ url: '/v1/auth/reseller-account', method: 'POST', body }),
+      invalidatesTags: ['Session'],
+    }),
     signIn: build.mutation<Session, { identifier: string; password: string }>({ query: body => ({ url: '/v1/auth/signin', method: 'POST', body }), invalidatesTags: ['Session'] }),
     signOut: build.mutation<void, void>({ query: () => ({ url: '/v1/auth/signout', method: 'POST' }) }),
     verifyEmail: build.mutation<Session, { code: string }>({ query: body => ({ url: '/v1/auth/email/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
@@ -50,6 +59,8 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
 export const {
   useSessionQuery,
   useSignInMutation,
+  useSignUpMutation,
+  useCreateResellerAccountMutation,
   useSignOutMutation,
   useVerifyEmailMutation,
   useResendEmailCodeMutation,

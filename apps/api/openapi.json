@@ -361,6 +361,32 @@
         ]
       }
     },
+    "/v1/auth/reseller-account": {
+      "post": {
+        "description": "For a person who joined through an invitation, or left a team, and now wants their own business. Needs a confirmed email; one owned account per person.",
+        "operationId": "AuthController_createResellerAccount",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateResellerAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Open a reseller account for the signed-in person",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/v1/auth/signin": {
       "post": {
         "operationId": "AuthController_signIn",
@@ -665,7 +691,7 @@
     },
     "/v1/auth/google/start": {
       "get": {
-        "description": "Afterwards the browser returns to `return_to` (a BitoCard app; defaults to the dashboard), with `?auth_error=<code>` if sign-in failed. With `intent=link`, a signed-in person links Google to their account.",
+        "description": "Afterwards the browser returns to `return_to` (a BitoCard app; defaults to the dashboard), with `?auth_error=<code>` if it failed. `intent=signup` creates an account for a new Google account (the reseller account is opened in onboarding afterwards); `signin` (the default) fails with `google_account_not_found` instead. With `intent=link`, a signed-in person links Google to their account.",
         "operationId": "GoogleController_start",
         "parameters": [
           {
@@ -684,6 +710,7 @@
             "schema": {
               "enum": [
                 "signin",
+                "signup",
                 "link"
               ],
               "type": "string"
@@ -3216,6 +3243,28 @@
           "name",
           "email",
           "password"
+        ]
+      },
+      "CreateResellerAccountDto": {
+        "type": "object",
+        "properties": {
+          "business_name": {
+            "type": "string",
+            "description": "Business name shown on the reseller account.",
+            "minLength": 2,
+            "maxLength": 100,
+            "example": "Ada Digital"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE.",
+            "pattern": "^[A-Z]{2}$",
+            "example": "NG"
+          }
+        },
+        "required": [
+          "business_name",
+          "country"
         ]
       },
       "SignInDto": {

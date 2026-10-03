@@ -7,7 +7,6 @@ import { Button, errorMessage, Notice, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { useAcceptInvitationMutation, useSessionQuery, useSignOutMutation } from "@bitocard/api-client/reseller";
 import { goToSignIn } from "@/components/reseller";
-import { mainSiteUrl } from "@/components/links";
 
 /** The dashboard remembers the chosen reseller account under this key (see components/reseller.tsx). */
 const resellerKey = "shq-reseller";
@@ -26,7 +25,7 @@ function Heading({ title, children }: { title: string; children?: React.ReactNod
 
 /**
  * Accepting a team invitation from its emailed link (`?token=`). Signed-in people accept with the invited email; new
- * people sign up on the main site with the invitation, or sign in and come back here.
+ * people sign up here with the invitation (/signup?invitation=), or sign in and come back.
  */
 export function AcceptInvitation() {
   const token = useSearchParams().get("token")?.trim() ?? "";
@@ -70,12 +69,12 @@ export function AcceptInvitation() {
           >
             I have an account: sign in
           </AppLink>
-          <a
-            href={mainSiteUrl(`/signup?invitation=${encodeURIComponent(token)}`)}
+          <AppLink
+            href={`/signup?invitation=${encodeURIComponent(token)}`}
             className="inline-flex min-h-12 items-center justify-center rounded-lg border border-brand-500 px-4 text-sm font-semibold text-brand-600 hover:bg-brand-50"
           >
             I&apos;m new: create an account
-          </a>
+          </AppLink>
         </div>
         <p className="text-xs text-muted">Invitations last 7 days. If yours has expired, ask the person who invited you to send a new one.</p>
       </div>

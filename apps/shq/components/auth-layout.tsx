@@ -25,7 +25,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
 
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
-          <img src="/bitocard-logo.png" alt="" className="size-10 rounded-xl" />
+          <img src="/bitocard-logo-light.png" alt="" className="size-10" />
           <span className="text-lg font-extrabold tracking-[0.25em]">BITOCARD</span>
         </div>
 

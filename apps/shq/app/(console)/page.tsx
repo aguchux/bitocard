@@ -55,6 +55,10 @@ export default function HomePage() {
   const currency = wallet.data?.currency;
 
   const steps: Step[] = [
+    // Accounts opened before onboarding asked for the country (sign-up and onboarding ask for it now).
+    ...(membership.reseller.country
+      ? []
+      : [{ done: false, title: "Choose your business country", detail: "You sell in its currency. It is needed before anything else.", href: "/settings", action: "Choose" }]),
     {
       done: membership.reseller.status === "active" || Boolean(verification.data?.verified),
       title: "Verify your identity",

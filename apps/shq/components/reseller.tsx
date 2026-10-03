@@ -4,9 +4,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useDispatch } from "react-redux";
 import { Building2, LogOut, MailCheck } from "lucide-react";
 import { bitocardApi, setRequestContext } from "@bitocard/api-client";
-import { type Membership, type Mode, type ResellerRole, type User, useResendEmailCodeMutation, useSessionQuery, useSignOutMutation, useVerifyEmailMutation } from "@bitocard/api-client/reseller";
-import { Button, Card, CodeInput, ErrorState, errorMessage, Notice, Skeleton } from "@bitocard/admin-ui";
-import { mainSiteUrl } from "./links";
+import {
+  type Membership,
+  type Mode,
+  type ResellerRole,
+  type User,
+  useCreateResellerAccountMutation,
+  usePublicCountriesQuery,
+  useResendEmailCodeMutation,
+  useSessionQuery,
+  useSignOutMutation,
+  useVerifyEmailMutation,
+} from "@bitocard/api-client/reseller";
+import { Button, Card, CodeInput, ErrorState, errorMessage, Field, Input, Notice, Select, Skeleton } from "@bitocard/admin-ui";
 
 const resellerKey = "shq-reseller";
 const modeKey = "shq-mode";
@@ -121,27 +131,67 @@ function VerifyEmail({ user }: { user: User }) {
   );
 }
 
-/** Signed in, but not a member of any reseller account (for example an invitation not yet accepted). */
-function NoAccount({ user }: { user: User }) {
+/**
+ * Onboarding: signed in, but not a member of any reseller account. Google sign-ups land here first; so do people with
+ * an invitation not yet accepted, or removed from a team. They open their own reseller account here.
+ */
+function Onboarding({ user }: { user: User }) {
   const [signOut, signingOut] = useSignOut();
+  const countries = usePublicCountriesQuery();
+  const open = countries.data?.data.filter(item => item.reseller_signup) ?? [];
+  const [business, setBusiness] = useState("");
+  const [country, setCountry] = useState("");
+  const [create, state] = useCreateResellerAccountMutation();
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    // The session refetches and the gate opens the new account.
+    void create({ business_name: business.trim(), country }).unwrap().catch(() => null);
+  };
   return (
     <Centered>
       <Card className="w-full max-w-md space-y-4 p-6 sm:p-8">
         <span className="grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-600">
           <Building2 className="size-6" aria-hidden />
         </span>
-        <h1 className="text-2xl font-extrabold tracking-tight text-ink">No reseller account yet</h1>
-        <p className="text-sm text-muted">
-          {user.email} is not part of a reseller account. Create one on BitoCard, or open the invitation a reseller sent you while signed in with this email.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <a href={mainSiteUrl("/signup")} className="inline-flex min-h-11 items-center rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600">
-            Create a reseller account
-          </a>
-          <Button variant="secondary" loading={signingOut} onClick={signOut}>
-            Sign out
-          </Button>
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink">Set up your business</h1>
+          <p className="mt-1 text-sm text-muted">
+            Welcome, {user.name.trim().split(/\s+/)[0]}. Name your business and choose its country to open your reseller account.
+          </p>
         </div>
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Business name" htmlFor="new-business">
+            <Input id="new-business" autoComplete="organization" required minLength={2} maxLength={100} value={business} onChange={event => setBusiness(event.target.value)} />
+          </Field>
+          <Field label="Business country" htmlFor="new-country" hint="You sell in its currency.">
+            {countries.isLoading ? (
+              <Skeleton className="h-11 w-full" />
+            ) : (
+              <Select id="new-country" required value={country} onChange={event => setCountry(event.target.value)}>
+                <option value="" disabled>
+                  Choose a country
+                </option>
+                {open.map(item => (
+                  <option key={item.code} value={item.code}>
+                    {item.name} ({item.currency})
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" loading={state.isLoading} disabled={!country || business.trim().length < 2}>
+              Open my reseller account
+            </Button>
+            <Button type="button" variant="secondary" loading={signingOut} onClick={signOut}>
+              Sign out
+            </Button>
+          </div>
+        </form>
+        <p className="text-xs text-muted">
+          Joining a reseller&apos;s team instead? Open the invitation they sent to <span className="break-all">{user.email}</span>.
+        </p>
       </Card>
     </Centered>
   );
@@ -149,7 +199,7 @@ function NoAccount({ user }: { user: User }) {
 
 /**
  * Renders its children only for a signed-in person with a confirmed email and a reseller account; otherwise sign-in,
- * email confirmation or the "no account" screen. Chooses the reseller account (remembered in this browser) and live or
+ * email confirmation or onboarding. Chooses the reseller account (remembered in this browser) and live or
  * sandbox mode, and sends both with every API request.
  */
 export function ResellerGate({ children }: { children: ReactNode }) {
@@ -206,6 +256,6 @@ export function ResellerGate({ children }: { children: ReactNode }) {
   }
   if (error || !data) return <ErrorState message={errorMessage(error, "Could not check your session.")} onRetry={refetch} />;
   if (!data.user.email_verified) return <VerifyEmail user={data.user} />;
-  if (!value) return <NoAccount user={data.user} />;
+  if (!value) return <Onboarding user={data.user} />;
   return <ResellerContext.Provider value={value}>{children}</ResellerContext.Provider>;
 }

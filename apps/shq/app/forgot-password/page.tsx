@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { useForgotPasswordMutation, useResetPasswordMutation } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
@@ -9,10 +9,12 @@ import { Button, CodeInput, errorMessage, Notice } from "@bitocard/admin-ui";
 import { AuthLayout } from "@/components/auth-layout";
 import { IconInput } from "../signin/sign-in";
 
-/** Forgotten password: an emailed 6-digit code, then a new password (which signs out every other session). */
-export default function ForgotPasswordPage() {
+/** Forgotten password (`?email=` prefills the address): an emailed 6-digit code, then a new password (which signs out every other session). */
+function ForgotPassword() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  // Prefilled from sign-in or sign-up.
+  const prefill = useSearchParams().get("email") ?? "";
+  const [email, setEmail] = useState(prefill);
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -81,5 +83,13 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense>
+      <ForgotPassword />
+    </Suspense>
   );
 }

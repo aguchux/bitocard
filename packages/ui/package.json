@@ -13,7 +13,8 @@
     "./icon-image": "./src/icon-image.tsx",
     "./seo": "./src/seo.tsx",
     "./site": "./src/site.ts",
-    "./styles/workspace.css": "./src/styles/workspace.css"
+    "./styles/workspace.css": "./src/styles/workspace.css",
+    "./styles/interactive.css": "./src/styles/interactive.css"
   },
   "scripts": {
     "lint": "eslint .",

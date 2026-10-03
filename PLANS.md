@@ -19,7 +19,7 @@ Supplier names are internal. Never show them on public pages, in the API or to r
 | User | Signs in on BitoCard? | How | Identity check |
 |---|---|---|---|
 | Admins | Yes, `admin.bitocard.com` | Email + password only (no Google), `@bitocard.com` / `@golojan.co.uk`, 2-step verification required | Staff |
-| Resellers and their staff | Yes: sign up on the main site (`bitocard.com/signup`), sign in on **SHQ** (`shq.bitocard.com`) | Google, email + password, or mobile + password (SMS-verified) | **Didit** before approval |
+| Resellers and their staff | Yes: sign up, sign in and reset passwords on **SHQ** (`shq.bitocard.com`); the main site is for retail customers. Sign-up is deliberate (Google sign-in never creates an account) and followed by onboarding (business name and country) | Google, email + password, or mobile + password (SMS-verified) | **Didit** before approval |
 | Reseller systems | API | Scoped API keys: `bc_test_…` sandbox, `bc_live_…` live | Belongs to a verified reseller |
 | Hosted storefront customers | No BitoCard account | Per-store account owned by the reseller (Google, email or mobile + password); no guest checkout | Only where required (see below): **BVN** + Flutterwave bank account validation in Nigeria; **Didit** elsewhere |
 | Customers of resellers' own systems | No | The reseller's own sign-in; the API sees only the reseller's customer reference | Reseller's responsibility |
@@ -181,7 +181,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - **Markup Protection Scheme:** reseller prices may be at most **50% above BitoCard's wholesale price**, so customers are protected from excessive prices. Admins control the scheme and its cap. **Decided**
 - **Fixed-price products** (airtime, data, pay-TV, electricity and other face-value items): resellers can add a markup on top of face value, within the cap. Where admins enable it, they can instead sell at face value and earn the discount BitoCard gives them. **Decided**
 - **Gift-card sales by customers:** the reseller can take a spread on the payout rate, capped by admins. **Decided**
-- Dashboard: **SHQ (Seller Head Quarters)** at `shq.bitocard.com`: store settings, balances, top-ups and withdrawals, orders, catalogue and pricing, API keys, webhook endpoints and delivery logs, team and settings. Resellers sign up on the main site and sign in on SHQ. **Decided**
+- Dashboard: **SHQ (Seller Head Quarters)** at `shq.bitocard.com`: store settings, balances, top-ups and withdrawals, orders, catalogue and pricing, API keys, webhook endpoints and delivery logs, team and settings. All reseller authentication (sign-up, sign-in, password reset, team invitations) is on SHQ, so the main site, `bitocard.com`, stays for BitoCard's retail customers. **Decided**
 - Hosted storefronts are **clones of BitoCard's parent store** (the main site's store at `bitocard.com/catalogs`) under the reseller's brand, prices and domain. **Decided**
 - **Reseller's own suppliers (planned). Decided in principle:** where an admin enables it for a reseller (feature switch, off by default; also allowed per country or globally), the reseller can connect their own supplier or vendor accounts (their own API credentials) in SHQ and sell those products through BitoCard. BitoCard's markup is enforced on every such sale, as on BitoCard-sourced products. **Open:** how BitoCard collects that markup (for example from the reseller wallet at sale time), which suppliers can be connected this way, and who handles failures and refunds with the reseller's supplier.
 - **Five-minute setup goal:** verify account, choose store name and subdomain, add branding, select products, accept suggested margins or set prices, preview, publish. Funding, verification and domain activation may take longer. **Decided**
@@ -335,7 +335,7 @@ Phase 1, foundation and own-brand pilot:
 | M7 | Webhooks: outbox, delivery, retries, events API | **Done** (Vercel Queues transport; needs Vercel Pro for the 5-minute backstop job) |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | **Done** (needs Didit API key, workflow and webhook secret, and Flutterwave BVN access; privacy notice update before live) |
 | M9 | Admin app | **Done** (needs the `bitocard-admin` Vercel project on admin.bitocard.com with `NEXT_PUBLIC_API_URL`, and the API's `ALLOWED_ORIGINS` to include it) |
-| M10 | Own-brand storefront: BitoCard's parent store on the main site (`bitocard.com`, catalogue at `/catalogs`) and reseller sign-up | Next |
+| M10 | Own-brand storefront: BitoCard's parent store on the main site (`bitocard.com`, catalogue at `/catalogs`) for retail customers | Next |
 | M11 | Pilot launch: Nigeria, then Ghana and Kenya | |
 
 Phase 2, reseller launch: M12 docs app, M13 SHQ reseller dashboard (**in progress**: sign-in, overview, orders, catalogue and pricing, wallet and withdrawals, store, developers, team and settings built; needs the `bitocard-shq` Vercel project on shq.bitocard.com), M13b reseller's own suppliers (admin-gated, enforced BitoCard markup), M14 domains, M15 promotions, M16 reseller launch. Phase 3 onwards: gift-card selling, more bills countries, Microsoft licences, virtual numbers, virtual cards.

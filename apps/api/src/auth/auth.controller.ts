@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Req, Res } fr
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { ChangeEmailDto, ChangePasswordDto, CodeDto, ForgotPasswordDto, PhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { ChangeEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, ForgotPasswordDto, PhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { SessionsService } from './sessions.service.js';
@@ -26,6 +26,17 @@ export class AuthController {
   @Post('signup')
   signUp(@Body() body: SignUpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.auth.signUp(body, req, res);
+  }
+
+  /** Open a reseller account for the signed-in person, who becomes its owner. */
+  @ApiOperation({
+    summary: 'Open a reseller account for the signed-in person',
+    description: 'For a person who joined through an invitation, or left a team, and now wants their own business. Needs a confirmed email; one owned account per person.',
+  })
+  @SessionOnly()
+  @Post('reseller-account')
+  createResellerAccount(@CurrentCaller() caller: Caller, @Body() body: CreateResellerAccountDto) {
+    return this.auth.createResellerAccount(caller.kind === 'session' ? caller.userId : '', body);
   }
 
   /** Sign in with email or verified mobile number and password. */

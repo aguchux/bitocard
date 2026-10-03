@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
-import { appOrigin, client, fakeService, startApp } from './helpers.mjs';
+import { appOrigin, client, fakeService, lastEmailCode, startApp } from './helpers.mjs';
 
 const clientId = 'test-client.apps.googleusercontent.com';
 let server;
@@ -60,6 +60,7 @@ after(async () => {
 
 let counter = 0;
 const uniqueEmail = () => `google${(counter += 1)}-${Date.now()}@gmail.com`;
+const signup = '?intent=signup';
 
 /**
  * Runs the whole browser round trip: start, (pretend) Google consent, callback. `identity` describes who Google
@@ -113,21 +114,33 @@ describe('starting the flow', () => {
   });
 });
 
-describe('signing in', () => {
-  test('a new Google user gets a confirmed account, a reseller account and a session', async () => {
+describe('signing up and in', () => {
+  test('signing up with Google gives a confirmed person and a session; the reseller account comes with onboarding', async () => {
     const email = uniqueEmail();
-    const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email, name: 'Grace Hopper' });
+    const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email, name: 'Grace Hopper' }, { startQuery: signup });
     assert.equal(location.toString(), `${appOrigin}/dashboard`);
     const session = await browser.get('/v1/auth/session');
     assert.equal(session.status, 200);
     assert.deepEqual([session.json.user.email, session.json.user.email_verified, session.json.user.has_password], [email, true, false]);
-    assert.equal(session.json.memberships[0].role, 'owner');
-    assert.equal(session.json.memberships[0].reseller.country, null, 'the country is chosen during onboarding');
+    assert.deepEqual(session.json.memberships, [], 'no reseller account until onboarding');
+
+    const onboarded = await browser.post('/v1/auth/reseller-account', { business_name: 'Grace Digital', country: 'NG' });
+    assert.equal(onboarded.status, 201, JSON.stringify(onboarded.json));
+    assert.deepEqual([onboarded.json.memberships[0].role, onboarded.json.memberships[0].reseller.country], ['owner', 'NG']);
+  });
+
+  test('signing in with a Google account that never signed up fails and creates nothing', async () => {
+    const email = uniqueEmail();
+    const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email });
+    assert.equal(location.searchParams.get('auth_error'), 'google_account_not_found');
+    assert.equal((await browser.get('/v1/auth/session')).status, 401);
+    const { PrismaService } = await import('../dist/database/prisma.service.js');
+    assert.equal(await server.app.get(PrismaService).user.count({ where: { email } }), 0);
   });
 
   test('the same Google account signs in to the same user next time', async () => {
     const email = uniqueEmail();
-    const first = await googleSignIn({ sub: `sub-${email}`, email });
+    const first = await googleSignIn({ sub: `sub-${email}`, email }, { startQuery: signup });
     const second = await googleSignIn({ sub: `sub-${email}`, email });
     const a = await first.browser.get('/v1/auth/session');
     const b = await second.browser.get('/v1/auth/session');
@@ -136,11 +149,30 @@ describe('signing in', () => {
 
   test('returns to the requested BitoCard app, never to another site', async () => {
     const email = uniqueEmail();
-    const ok = await googleSignIn({ sub: `sub-${email}`, email }, { startQuery: `?return_to=${encodeURIComponent('https://shq.bitocard.com/welcome')}` });
+    const ok = await googleSignIn({ sub: `sub-${email}`, email }, { startQuery: `${signup}&return_to=${encodeURIComponent('https://shq.bitocard.com/welcome')}` });
     assert.equal(ok.location.toString(), 'https://shq.bitocard.com/welcome');
     const other = uniqueEmail();
-    const evil = await googleSignIn({ sub: `sub-${other}`, email: other }, { startQuery: `?return_to=${encodeURIComponent('https://evil.example/steal')}` });
+    const evil = await googleSignIn({ sub: `sub-${other}`, email: other }, { startQuery: `${signup}&return_to=${encodeURIComponent('https://evil.example/steal')}` });
     assert.equal(evil.location.origin, appOrigin);
+  });
+
+  test('a Google-only person signs in with Google until they set a password; then both work', async () => {
+    const email = uniqueEmail();
+    const sub = `sub-${email}`;
+    await googleSignIn({ sub, email }, { startQuery: signup });
+    const password = 'my new long passphrase';
+    const before = await client(server.base).post('/v1/auth/signin', { identifier: email, password });
+    assert.deepEqual([before.status, before.json.error.code], [401, 'invalid_credentials'], 'no password yet');
+
+    assert.equal((await client(server.base).post('/v1/auth/password/forgot', { email })).status, 202);
+    const reset = await client(server.base).post('/v1/auth/password/reset', { email, code: await lastEmailCode(server.app, email), password });
+    assert.equal(reset.status, 200, JSON.stringify(reset.json));
+
+    const withPassword = client(server.base);
+    assert.equal((await withPassword.post('/v1/auth/signin', { identifier: email, password })).status, 200);
+    const withGoogle = await googleSignIn({ sub, email });
+    assert.equal(withGoogle.location.searchParams.get('auth_error'), null);
+    assert.equal((await withGoogle.browser.get('/v1/auth/session')).json.user.id, (await withPassword.get('/v1/auth/session')).json.user.id);
   });
 });
 
@@ -148,9 +180,11 @@ describe('protections', () => {
   test('an email/password account is not taken over by a Google account with the same email', async () => {
     const email = uniqueEmail();
     await client(server.base).post('/v1/auth/signup', { name: 'Ada', email, password: 'correct horse battery', country: 'NG' });
-    const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email });
-    assert.equal(location.searchParams.get('auth_error'), 'account_exists_sign_in_to_link');
-    assert.equal((await browser.get('/v1/auth/session')).status, 401);
+    for (const startQuery of ['', signup]) {
+      const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email }, { startQuery });
+      assert.equal(location.searchParams.get('auth_error'), 'account_exists_sign_in_to_link', startQuery);
+      assert.equal((await browser.get('/v1/auth/session')).status, 401);
+    }
   });
 
   test('a signed-in person can link Google, then sign in with it', async () => {
@@ -179,7 +213,7 @@ describe('protections', () => {
       [{ emailVerified: false }, 'google_email_unverified'],
     ]) {
       const email = uniqueEmail();
-      const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email, ...identity });
+      const { location, browser } = await googleSignIn({ sub: `sub-${email}`, email, ...identity }, { startQuery: signup });
       assert.equal(location.searchParams.get('auth_error'), code, JSON.stringify(identity));
       assert.equal((await browser.get('/v1/auth/session')).status, 401);
     }

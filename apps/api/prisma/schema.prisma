@@ -109,7 +109,9 @@ model OAuthState {
   nonce        String
   returnTo     String   @map("return_to")
   /// Set when a signed-in person is linking Google to their existing account.
-  linkUserId   String?  @map("link_user_id") @db.Uuid
+  linkUserId   String?     @map("link_user_id") @db.Uuid
+  /// Only `signup` creates an account; `signin` with an unknown Google account fails.
+  intent       OAuthIntent @default(signin)
   expiresAt    DateTime @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -132,6 +134,13 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+/// Why the Google round trip was started.
+enum OAuthIntent {
+  signin
+  signup
+  link
 }
 
 enum CodePurpose {

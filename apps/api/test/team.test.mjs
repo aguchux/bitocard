@@ -156,3 +156,44 @@ describe('managing members', () => {
     assert.deepEqual([res.status, res.json.error.code], [403, 'owner_protected']);
   });
 });
+
+describe('opening an own reseller account', () => {
+  test('a removed member opens their own account and becomes its owner', async () => {
+    const { browser } = await owner();
+    const email = unique('leaver');
+    await invite(browser, email);
+    const leaver = client(server.base);
+    const { json } = await leaver.post('/v1/auth/signup', { name: 'Chidi', email, password, invitation_token: invitationToken(email) });
+    assert.equal((await browser.delete(`/v1/team/members/${json.user.id}`)).status, 204);
+    assert.equal((await leaver.get('/v1/auth/session')).json.memberships.length, 0);
+
+    const closed = await leaver.post('/v1/auth/reseller-account', { business_name: 'Chidi Digital', country: 'US' });
+    assert.deepEqual([closed.status, closed.json.error.code], [400, 'country_not_supported']);
+    const opened = await leaver.post('/v1/auth/reseller-account', { business_name: ' Chidi Digital ', country: 'gh' });
+    assert.equal(opened.status, 201, JSON.stringify(opened.json));
+    assert.equal(opened.json.memberships.length, 1);
+    assert.deepEqual(
+      [opened.json.memberships[0].role, opened.json.memberships[0].reseller.name, opened.json.memberships[0].reseller.country, opened.json.memberships[0].reseller.status],
+      ['owner', 'Chidi Digital', 'GH', 'pending'],
+    );
+    const again = await leaver.post('/v1/auth/reseller-account', { business_name: 'Second', country: 'GH' });
+    assert.deepEqual([again.status, again.json.error.code], [409, 'already_owner']);
+  });
+
+  test('a staff member of another reseller can open their own, but an unconfirmed email cannot', async () => {
+    const { browser, resellerId } = await owner();
+    const email = unique('staff');
+    await invite(browser, email);
+    const staff = client(server.base);
+    await staff.post('/v1/auth/signup', { name: 'Chidi', email, password, invitation_token: invitationToken(email) });
+    const opened = await staff.post('/v1/auth/reseller-account', { business_name: 'Chidi Digital', country: 'NG' });
+    assert.equal(opened.status, 201);
+    assert.deepEqual(opened.json.memberships.map(m => [m.reseller.id === resellerId, m.role]), [[true, 'developer'], [false, 'owner']]);
+
+    const fresh = client(server.base);
+    await fresh.post('/v1/auth/signup', { name: 'Eve', email: unique('fresh'), password, country: 'NG' });
+    const unconfirmed = await fresh.post('/v1/auth/reseller-account', { business_name: 'Eve Digital', country: 'NG' });
+    assert.deepEqual([unconfirmed.status, unconfirmed.json.error.code], [403, 'email_unverified']);
+    assert.equal((await client(server.base).post('/v1/auth/reseller-account', { business_name: 'X Digital', country: 'NG' })).status, 401);
+  });
+});

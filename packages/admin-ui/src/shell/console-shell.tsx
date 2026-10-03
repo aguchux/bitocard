@@ -12,8 +12,8 @@ function Rail({ brand, sections, active, onNavigate }: { brand: string; sections
   return (
     <nav aria-label="Main" className="flex h-full flex-col items-stretch gap-1 bg-navy-900 px-2 py-4 text-white">
       <AppLink href="/" className="mb-4 flex flex-col items-center gap-1 px-1 py-1 text-center" onClick={onNavigate}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo from the app's public folder */}
-        <img src="/bitocard-logo.png" alt="" className="size-9 rounded-lg" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- the light logo for the navy rail, from the app's public folder (bitocard-logo-light.png) */}
+        <img src="/bitocard-logo-light.png" alt="" className="size-9" />
         <span className="text-sm font-extrabold tracking-tight">{brand}</span>
       </AppLink>
       {sections.map(section => {

@@ -7,7 +7,6 @@ import { apiBaseUrl } from "@bitocard/api-client";
 import { useSessionQuery, useSignInMutation } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { Button, cn, errorMessage, Input, Notice } from "@bitocard/admin-ui";
-import { mainSiteUrl } from "@/components/links";
 
 /** Only same-site paths, so a crafted link cannot send a reseller elsewhere after sign-in. */
 export function safeNext(value: string | null) {
@@ -25,7 +24,7 @@ export function IconInput({ icon: Icon, end, className, ...props }: React.Compon
   );
 }
 
-function GoogleMark() {
+export function GoogleMark() {
   return (
     <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
       <path fill="#4285F4" d="M22.6 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8z" />
@@ -36,14 +35,30 @@ function GoogleMark() {
   );
 }
 
-const googleErrors: Record<string, string> = {
+/**
+ * Google, returning to `next` in SHQ (with `?auth_error=` if it failed). Only `signup` creates an account; signing in
+ * with a Google account that never signed up fails with `google_account_not_found`.
+ */
+export function continueWithGoogle(next: string, intent: "signin" | "signup" = "signin") {
+  const returnTo = `${window.location.origin}${next}`;
+  // The API's Google start page, on another origin.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign(`${apiBaseUrl()}/v1/auth/google/start?intent=${intent}&return_to=${encodeURIComponent(returnTo)}`);
+}
+
+export const googleErrors: Record<string, string> = {
   google_not_configured: "Google sign-in is not available yet. Use your email and password.",
   access_denied: "Google sign-in was cancelled.",
+  google_cancelled: "Google sign-in was cancelled.",
+  account_exists_sign_in_to_link: "An account already uses this email. Sign in with your email and password instead.",
+  google_account_not_found: "No BitoCard account uses this Google account yet. Sign up first, then you can sign in with Google.",
+  google_email_unverified: "Google has not confirmed this email address. Use another Google account or your email and password.",
+  account_disabled: "This account is disabled. Contact support.",
 };
 
 /**
- * Reseller sign-in: email (or a confirmed mobile number) and password, or Google. Accounts are created on the main
- * BitoCard site, never here. The session is a cookie set by the API.
+ * Reseller sign-in: email (or a confirmed mobile number) and password, or Google. New resellers sign up at /signup.
+ * The session is a cookie set by the API.
  */
 export function SignIn() {
   const router = useRouter();
@@ -66,13 +81,6 @@ export function SignIn() {
     if (done) router.replace(next);
   }
 
-  const google = () => {
-    const returnTo = `${window.location.origin}${next}`;
-    // The API's Google start page, on another origin.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.assign(`${apiBaseUrl()}/v1/auth/google/start?return_to=${encodeURIComponent(returnTo)}`);
-  };
-
   return (
     <div className="w-full max-w-md">
       <div className="mb-8 flex items-center gap-3 lg:hidden">
@@ -85,8 +93,28 @@ export function SignIn() {
 
       <div className="mt-6 space-y-4">
         {search.get("reset") ? <Notice tone="green">Your password was changed. Sign in with the new one.</Notice> : null}
-        {authError ?<Notice tone="red">{googleErrors[authError] ?? "Google sign-in did not complete. Try again or use your email and password."}</Notice> : null}
-        {signInState.error ? <Notice tone="red">{errorMessage(signInState.error)}</Notice> : null}
+        {authError ? (
+          <Notice tone="red">
+            {googleErrors[authError] ?? "Google sign-in did not complete. Try again or use your email and password."}
+            {authError === "google_account_not_found" ? (
+              <>
+                {" "}
+                <AppLink href="/signup" className="font-semibold underline">
+                  Create a reseller account
+                </AppLink>
+              </>
+            ) : null}
+          </Notice>
+        ) : null}
+        {signInState.error ? (
+          <Notice tone="red">
+            {errorMessage(signInState.error)}
+            {"code" in signInState.error && signInState.error.code === "invalid_credentials" ? (
+              // Never says whether the account exists: the hint is for everyone.
+              <span className="mt-1 block text-xs">Signed up with Google? Use Sign in with Google, or reset your password to add one.</span>
+            ) : null}
+          </Notice>
+        ) : null}
 
         <form onSubmit={submit} className="space-y-4">
           <div>
@@ -100,7 +128,7 @@ export function SignIn() {
               <label htmlFor="password" className="block text-sm font-semibold text-ink">
                 Password
               </label>
-              <AppLink href="/forgot-password" className="text-sm font-semibold text-brand-600 hover:underline">
+              <AppLink href={identifier.includes("@") ? `/forgot-password?email=${encodeURIComponent(identifier.trim())}` : "/forgot-password"} className="text-sm font-semibold text-brand-600 hover:underline">
                 Forgot password?
               </AppLink>
             </div>
@@ -134,15 +162,15 @@ export function SignIn() {
           or
           <span className="h-px flex-1 bg-line" />
         </div>
-        <Button type="button" variant="secondary" className="min-h-12 w-full text-base" icon={<GoogleMark />} onClick={google}>
-          Continue with Google
+        <Button type="button" variant="secondary" className="min-h-12 w-full text-base" icon={<GoogleMark />} onClick={() => continueWithGoogle(next)}>
+          Sign in with Google
         </Button>
 
         <p className="pt-2 text-center text-sm text-muted">
           New to BitoCard?{" "}
-          <a href={mainSiteUrl("/signup")} className="font-semibold text-brand-600 hover:underline">
+          <AppLink href={next === "/" ? "/signup" : `/signup?next=${encodeURIComponent(next)}`} className="font-semibold text-brand-600 hover:underline">
             Create a reseller account
-          </a>
+          </AppLink>
         </p>
       </div>
     </div>

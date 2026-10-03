@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@bitocard/ui/styles/interactive.css";
 
 /* Brand tokens, .wordmark and .brand-icon come from @bitocard/ui/styles/workspace.css; the lockup from brand-lockup.css. */
 

@@ -22,9 +22,17 @@ class GoogleSignInError extends Error {
 
 type GoogleClaims = JWTPayload & { email?: string; email_verified?: boolean; name?: string; nonce?: string };
 
+/** Why the Google round trip was started. */
+export type GoogleIntent = 'signin' | 'signup' | 'link';
+
 /**
  * "Sign in with Google" for resellers (never admins): authorization code flow with PKCE, a one-time state,
  * and an ID token verified against Google's published keys.
+ *
+ * Sign-up is deliberate: only a round trip started with `intent=signup` creates an account, and it creates only the
+ * person (Google has confirmed the email); they then open their reseller account in SHQ's onboarding (business name
+ * and country). Signing in with a Google account that has no BitoCard account fails with `google_account_not_found`.
+ * A Google-only person has no password until they set one with "Forgot password"; then both ways work.
  *
  * Linking rules: a Google account already linked signs in. A signed-in person can link Google to their account.
  * If an email/password account already uses the Google email, Google is not linked automatically: the person
@@ -47,7 +55,7 @@ export class GoogleService {
   ) {}
 
   /** Starts the flow and returns the Google URL to redirect to. */
-  async start(req: Request, res: Response, returnTo: string | undefined, linkUserId: string | null) {
+  async start(req: Request, res: Response, returnTo: string | undefined, intent: GoogleIntent, linkUserId: string | null) {
     const { GOOGLE_CLIENT_ID: clientId, GOOGLE_REDIRECT_URI: redirectUri } = this.config;
     if (!clientId || !this.config.GOOGLE_CLIENT_SECRET) {
       throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'google_not_configured', 'Google sign-in is not available yet.');
@@ -63,6 +71,7 @@ export class GoogleService {
         nonce,
         returnTo: this.safeReturnTo(returnTo),
         linkUserId,
+        intent: linkUserId ? 'link' : intent === 'signup' ? 'signup' : 'signin',
         expiresAt: new Date(Date.now() + stateLifetimeMs),
       },
     });
@@ -103,7 +112,7 @@ export class GoogleService {
       if (!query.code) throw new GoogleSignInError('google_failed');
 
       const claims = await this.exchange(query.code, pending.codeVerifier, pending.nonce);
-      const userId = await this.resolveUser(claims, pending.linkUserId);
+      const userId = await this.resolveUser(claims, pending.intent, pending.linkUserId);
       await this.prisma.user.update({ where: { id: userId }, data: { lastSignInAt: new Date() } });
       await this.sessions.create(userId, 'reseller', req, res);
       return returnTo;
@@ -153,12 +162,12 @@ export class GoogleService {
     return claims;
   }
 
-  private async resolveUser(claims: GoogleClaims, linkUserId: string | null): Promise<string> {
+  private async resolveUser(claims: GoogleClaims, intent: GoogleIntent, linkUserId: string | null): Promise<string> {
     const sub = claims.sub as string;
     const email = (claims.email as string).toLowerCase();
     const linked = await this.prisma.oAuthAccount.findUnique({ where: { provider_providerUserId: { provider: 'google', providerUserId: sub } }, include: { user: true } });
 
-    if (linkUserId) {
+    if (intent === 'link' && linkUserId) {
       if (linked && linked.userId !== linkUserId) throw new GoogleSignInError('google_account_in_use');
       if (!linked) await this.prisma.oAuthAccount.create({ data: { userId: linkUserId, provider: 'google', providerUserId: sub, email } });
       return linkUserId;
@@ -172,13 +181,14 @@ export class GoogleService {
     const existing = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } });
     if (existing) throw new GoogleSignInError('account_exists_sign_in_to_link');
 
-    // A new reseller: Google has confirmed the email. The country is chosen during onboarding.
+    // Signing in never creates an account: the person signs up first, on purpose.
+    if (intent !== 'signup') throw new GoogleSignInError('google_account_not_found');
+
+    // A new person: Google has confirmed the email. Their reseller account is opened during onboarding.
     return this.prisma.$transaction(async tx => {
       const user = await tx.user.create({
         data: { realm: 'reseller', email, emailVerifiedAt: new Date(), name: claims.name?.trim() || email.split('@')[0] },
       });
-      const reseller = await tx.reseller.create({ data: { name: user.name } });
-      await tx.resellerMember.create({ data: { resellerId: reseller.id, userId: user.id, role: 'owner' } });
       await tx.oAuthAccount.create({ data: { userId: user.id, provider: 'google', providerUserId: sub, email } });
       return user.id;
     });

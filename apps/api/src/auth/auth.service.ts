@@ -13,7 +13,7 @@ import { CodesService } from './codes.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { presentMembership, presentUser } from './presenters.js';
 import { SessionsService } from './sessions.service.js';
-import type { SignUpDto } from './auth.dto.js';
+import type { CreateResellerAccountDto, SignUpDto } from './auth.dto.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 
@@ -85,6 +85,25 @@ export class AuthService {
     if (!user.emailVerifiedAt) await this.sendVerification(user).catch(error => this.logger.error({ err: error }, 'Could not send the sign-up confirmation code'));
     await this.sessions.create(user.id, 'reseller', req, res);
     return this.describe(user.id);
+  }
+
+  /** A signed-in person with a confirmed email opens their own reseller account; one owned account per person. */
+  async createResellerAccount(userId: string, input: CreateResellerAccountDto) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!user.emailVerifiedAt) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_unverified', 'Confirm your email before opening a reseller account.');
+    }
+    await this.countries.assertSignupOpen(input.country);
+    await this.prisma.$transaction(async tx => {
+      // Locks the person's row, so two requests at once cannot both open an account.
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      if (await tx.resellerMember.findFirst({ where: { userId, role: 'owner' } })) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_owner', 'You already own a reseller account.');
+      }
+      const reseller = await tx.reseller.create({ data: { name: input.business_name, country: input.country } });
+      await tx.resellerMember.create({ data: { resellerId: reseller.id, userId, role: 'owner' } });
+    });
+    return this.describe(userId);
   }
 
   async signIn(identifier: string, password: string, req: Request, res: Response) {
