@@ -12,6 +12,7 @@ import { PaymentsService } from '../payments/payments.service.js';
 import { PayoutsService } from '../payouts/payouts.service.js';
 import { SuppliersService } from '../suppliers/suppliers.service.js';
 import { OrdersService } from '../orders/orders.service.js';
+import { SupplierWebhooksService } from '../orders/supplier-webhooks.js';
 import { WebhookDeliveryService } from '../webhooks/delivery.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 
@@ -36,6 +37,7 @@ export class CronController {
     orders: OrdersService,
     webhooks: WebhookDeliveryService,
     identity: IdentityService,
+    supplierWebhooks: SupplierWebhooksService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -54,6 +56,8 @@ export class CronController {
       webhooks: () => webhooks.run(),
       /** Every 30 minutes: re-read identity checks the providers have not reported, and close abandoned ones. */
       identity: () => identity.checkOpen(),
+      /** Every 5 minutes: retry supplier notifications that are due, and drop old processed ones. */
+      'supplier-webhooks': () => supplierWebhooks.processDue(),
       /** Daily: delete events older than 30 days and expired rotated secrets. */
       'webhooks-cleanup': () => webhooks.purge(),
     };

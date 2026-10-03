@@ -19,7 +19,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
         size === 'sm' ? 'min-h-9 px-3 text-sm' : 'min-h-11 px-4 text-sm',
         variants[variant],
         className,
@@ -62,7 +62,7 @@ export function PageHeader({ title, description, actions }: { title: ReactNode; 
   );
 }
 
-const fieldBase = 'w-full rounded-xl border border-line bg-white px-3 text-sm text-ink placeholder:text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-canvas';
+const fieldBase = 'w-full rounded-lg border border-line bg-white px-3 text-sm text-ink placeholder:text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-canvas';
 
 export function Field({ label, hint, error, children, htmlFor }: { label: string; hint?: ReactNode; error?: string; children: ReactNode; htmlFor: string }) {
   return (
@@ -101,7 +101,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 /** A labelled filter: label above a select, as in the catalogue template. */
 export function FilterSelect({ label, value, onChange, options, id }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; id: string }) {
   return (
-    <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-2xl border border-line bg-white px-3 py-2 sm:flex-none">
+    <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-lg border border-line bg-white px-3 py-2 sm:flex-none">
       <label htmlFor={id} className="text-xs font-medium text-muted">
         {label}
       </label>

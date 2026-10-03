@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
-import { Button, cn, Field, Input, Notice } from "@bitocard/admin-ui";
+import { Button, cn, CodeInput, Field, Input, Notice } from "@bitocard/admin-ui";
 import { useAdminMfaSetupMutation, useAdminMfaVerifyMutation, useAdminSessionQuery, useAdminSignInMutation, type MfaSetup } from "@bitocard/api-client/admin";
 import type { ApiError } from "@bitocard/api-client";
 
@@ -20,7 +20,7 @@ function IconInput({ icon: Icon, end, className, ...props }: React.ComponentProp
   return (
     <div className="relative">
       <Icon className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-subtle" aria-hidden />
-      <Input {...props} className={cn("min-h-14 rounded-xl pl-12 text-base", end ? "pr-14" : undefined, className)} />
+      <Input {...props} className={cn("min-h-14 rounded-lg pl-12 text-base", end ? "pr-14" : undefined, className)} />
       {end ? <div className="absolute top-1/2 right-2 -translate-y-1/2">{end}</div> : null}
     </div>
   );
@@ -41,6 +41,7 @@ export function SignIn() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
   const [signIn, signInState] = useAdminSignInMutation();
   const [setup, setupState] = useAdminMfaSetupMutation();
@@ -70,13 +71,21 @@ export function SignIn() {
     setStep({ kind: "code", challenge: challenge.challenge_token, setup: secret });
   }
 
-  async function submitCode(event: FormEvent) {
-    event.preventDefault();
-    if (step.kind !== "code") return;
-    const result = await verify({ challenge_token: step.challenge, code: code.trim().toLowerCase() }).unwrap().catch(() => null);
-    if (!result) return;
+  async function verifyCode(value: string) {
+    if (step.kind !== "code" || verifyState.isLoading) return;
+    const result = await verify({ challenge_token: step.challenge, code: value.trim().toLowerCase() }).unwrap().catch(() => null);
+    if (!result) {
+      // Let the admin type the next code straight away.
+      if (!useRecovery) setCode("");
+      return;
+    }
     if (result.recovery_codes?.length) setStep({ kind: "recovery", codes: result.recovery_codes });
     else router.replace(next);
+  }
+
+  function submitCode(event: FormEvent) {
+    event.preventDefault();
+    void verifyCode(code);
   }
 
   return (
@@ -144,11 +153,13 @@ export function SignIn() {
             <p className="mt-1 text-muted">
               {step.setup
                 ? "Scan this with an authenticator app (such as Google Authenticator or 1Password), then enter the 6-digit code it shows."
-                : "Enter the 6-digit code from your authenticator app, or a recovery code."}
+                : useRecovery
+                  ? "Enter one of your recovery codes. Each works only once."
+                  : "Enter the 6-digit code from your authenticator app."}
             </p>
           </div>
           {step.setup ? (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-white p-5">
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-line bg-white p-5">
               {/* eslint-disable-next-line @next/next/no-img-element -- generated data URL */}
               {qr ? <img src={qr} alt="Authenticator QR code" className="size-48" /> : null}
               <p className="text-center text-xs text-muted">
@@ -157,25 +168,55 @@ export function SignIn() {
             </div>
           ) : null}
           {verifyState.error ? <Notice tone="red">{message(verifyState.error)}</Notice> : null}
-          <Field label="Code" htmlFor="code">
-            <Input
-              id="code"
-              inputMode="text"
-              autoComplete="one-time-code"
-              autoFocus
-              required
-              maxLength={9}
-              value={code}
-              onChange={event => setCode(event.target.value)}
-              className="text-center font-mono text-lg tracking-[0.3em]"
-            />
-          </Field>
+          {useRecovery ? (
+            <Field label="Recovery code" htmlFor="code" hint="One of the codes you saved when you set up 2-step verification, for example abcd-1234.">
+              <Input
+                id="code"
+                autoComplete="off"
+                autoFocus
+                required
+                maxLength={9}
+                value={code}
+                onChange={event => setCode(event.target.value)}
+                className="text-center font-mono text-lg tracking-[0.2em]"
+              />
+            </Field>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-ink">
+                Authentication code
+              </p>
+              <CodeInput label="Authentication code" value={code} onChange={setCode} onComplete={value => void verifyCode(value)} autoFocus invalid={Boolean(verifyState.error)} disabled={verifyState.isLoading} />
+            </div>
+          )}
           <Button type="submit" className="w-full" loading={verifyState.isLoading} icon={<ShieldCheck className="size-4" aria-hidden />}>
             Verify and sign in
           </Button>
-          <button type="button" className="w-full text-sm font-semibold text-muted hover:text-ink" onClick={() => setStep({ kind: "password" })}>
-            Start again
-          </button>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm font-semibold">
+            {step.setup ? null : (
+              <button
+                type="button"
+                className="text-brand-600 hover:text-brand-700"
+                onClick={() => {
+                  setUseRecovery(value => !value);
+                  setCode("");
+                }}
+              >
+                {useRecovery ? "Use your authenticator app" : "Use a recovery code instead"}
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-muted hover:text-ink"
+              onClick={() => {
+                setStep({ kind: "password" });
+                setCode("");
+                setUseRecovery(false);
+              }}
+            >
+              Start again
+            </button>
+          </div>
         </form>
       ) : null}
 
@@ -185,7 +226,7 @@ export function SignIn() {
             <h1 className="text-3xl font-extrabold tracking-tight">Save your recovery codes</h1>
             <p className="mt-1 text-muted">Each code signs you in once if you lose your authenticator. They are shown only now.</p>
           </div>
-          <ol className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-white p-5 font-mono text-sm">
+          <ol className="grid grid-cols-2 gap-2 rounded-lg border border-line bg-white p-5 font-mono text-sm">
             {step.codes.map(item => (
               <li key={item}>{item}</li>
             ))}

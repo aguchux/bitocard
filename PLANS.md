@@ -152,6 +152,10 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 - Service keys are set in the admin app, not the server environment (Settings > Integrations, super admins only): email, SMS, Google sign-in, Flutterwave, Monnify, exchange rates, Reloadly, VTpass and Didit, plus links and alerts. The API starts with only its required environment (database, encryption key, cron secret, allowed origins, admin email domains), and each service is connected as BitoCard subscribes to it, without a restart. Secrets are encrypted, never shown again, and changes need a fresh authenticator code and are audited without their values.
 - The dashboard shows sales and orders by currency (live or sandbox), money held for resellers, active resellers, supplier health, items needing attention, and recent orders.
 
+### Supplier notifications (Decided)
+
+- Suppliers that send status notifications (Reloadly first) post them to the API, which stores every one before acknowledging it, so none is lost even if processing fails. A notification never decides an outcome: it makes BitoCard re-check that order with the supplier straight away instead of waiting for the next scheduled check. Notifications that match no order, or keep failing, are kept for admins to review and retry.
+
 ### Webhooks (Decided, starting values)
 
 - Events at launch: `order.completed`, `order.failed`, `order.refunded`, `top_up.succeeded`, `top_up.failed`, `payout.paid`, `payout.failed`, plus a `ping` test event. Payload version `2026-10-01`.

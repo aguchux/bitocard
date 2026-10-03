@@ -7,10 +7,10 @@ import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/calle
 import { AuditService } from '../audit/audit.service.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
-import { configSchema } from '../config/config.js';
+import { type AppConfig, configSchema } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { integrationGroups, type IntegrationField, type IntegrationGroup } from './definitions.js';
-import { IntegrationsService } from './integrations.service.js';
+import { integrationGroups, isPlatformKey, type IntegrationField, type IntegrationGroup } from './definitions.js';
+import { IntegrationsService, schemaFor } from './integrations.service.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -79,7 +79,7 @@ export class IntegrationsAdminService {
     if (value === null) throw invalidValue(key, `${field.label} must be ${field.kind === 'flag' ? 'true or false' : field.kind === 'number' ? 'a number' : 'text'}, or null to clear it.`);
     if (value.length === 0) throw invalidValue(key, `${field.label} cannot be empty. Send null to clear it.`);
     if (value.length > maxValueLength) throw invalidValue(key, `${field.label} is too long.`);
-    const parsed = configSchema.shape[field.key].safeParse(value);
+    const parsed = schemaFor(field.key)!.safeParse(value);
     if (!parsed.success) throw invalidValue(key, `${field.label} is not valid: ${parsed.error.issues[0]?.message ?? 'check the value'}.`);
     return { field, value };
   }
@@ -104,6 +104,9 @@ export class IntegrationsAdminService {
       name: group.name,
       description: group.description,
       status: connected ? ('connected' as const) : started ? ('incomplete' as const) : ('not_connected' as const),
+      section: group.section,
+      /** False while the supplier's adapter is not built: its credentials are saved for later and not used yet. */
+      adapter_ready: group.adapterReady,
       webhook_url: group.webhookPath ? `https://api.bitocard.com${group.webhookPath}` : null,
       updated_at: updates.sort().at(-1) ?? null,
       fields,
@@ -112,14 +115,16 @@ export class IntegrationsAdminService {
 
   private presentField(field: IntegrationField) {
     const stored = this.integrations.stored.get(field.key);
-    const effective = this.integrations.config[field.key];
-    const fallback = configSchema.shape[field.key].safeParse(undefined);
-    const fromEnv = this.integrations.env[field.key];
+    // Supplier credentials live only in the admin app; platform settings fall back to the environment, then the default.
+    const platform = isPlatformKey(field.key);
+    const effective: unknown = platform ? this.integrations.config[field.key as keyof AppConfig] : stored?.value;
+    const fallback = platform ? configSchema.shape[field.key as keyof typeof configSchema.shape].safeParse(undefined) : null;
+    const fromEnv: unknown = platform ? this.integrations.env[field.key as keyof AppConfig] : undefined;
     const source: Source = stored
       ? 'admin'
       : fromEnv === undefined
         ? 'unset'
-        : fallback.success && fallback.data !== undefined && JSON.stringify(fallback.data) === JSON.stringify(fromEnv)
+        : fallback?.success && fallback.data !== undefined && JSON.stringify(fallback.data) === JSON.stringify(fromEnv)
           ? 'default'
           : 'environment';
     const raw = stored?.value ?? (effective === undefined ? null : String(effective));
@@ -132,7 +137,7 @@ export class IntegrationsAdminService {
       help: field.help ?? null,
       source,
       /** Never set for secrets. */
-      value: field.secret ? null : (effective ?? null),
+      value: field.secret ? null : ((effective as string | number | boolean | undefined) ?? null),
       /** Secrets only: the last four characters, when set. */
       hint: field.secret && raw ? hintOf(raw) : null,
       updated_at: stored?.updatedAt.toISOString() ?? null,

@@ -250,8 +250,11 @@ export class OrdersService {
     return { status: 'completed', supplierTransactionId: `sandbox_${order.supplierReference}`, deliveries: sandboxDeliveries(order.product.category, order.quantity) };
   }
 
-  /** Calls the supplier (to place the order, or to check it) and applies what comes back. */
-  async attempt(id: string, action: 'place' | 'check') {
+  /**
+   * Calls the supplier (to place the order, or to check it) and applies what comes back. An unscheduled check (a
+   * supplier notification) leaves the order's check schedule alone, so notifications never hurry it into the exception queue.
+   */
+  async attempt(id: string, action: 'place' | 'check', options: { scheduled?: boolean } = {}) {
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id }, include: { product: true } });
     if (order.status !== 'processing') return this.load(id);
     let result: FulfilmentResult;
@@ -278,8 +281,16 @@ export class OrdersService {
     });
     if (result.status === 'completed') await this.complete(order, result);
     else if (result.status === 'failed') await this.failOrFallBack(order, result.detail);
+    else if (options.scheduled === false) await this.noteTransaction(order, result);
     else await this.wait(order, result);
     return this.load(id);
+  }
+
+  /** Still pending after an unscheduled check: keep the supplier's transaction ID, change nothing else. */
+  private async noteTransaction(order: Order, result: FulfilmentResult) {
+    if (result.supplierTransactionId && !order.supplierTransactionId) {
+      await this.prisma.order.updateMany({ where: { id: order.id, status: 'processing' }, data: { supplierTransactionId: result.supplierTransactionId } });
+    }
   }
 
   private async wait(order: Order, result: FulfilmentResult) {
@@ -460,6 +471,7 @@ export class OrdersService {
     if (!order) throw notFound();
     const references = [`order_cost:${id}`, `order_refund:${id}`, ...(order.holdId ? [`hold:${order.holdId}`, `hold_capture:${order.holdId}`, `hold_release:${order.holdId}`] : [])];
     const entries = await this.prisma.journalEntry.findMany({ where: { reference: { in: references } }, include: { postings: { include: { account: true } } }, orderBy: { createdAt: 'asc' } });
+    const notifications = await this.prisma.supplierWebhook.findMany({ where: { orderId: id }, orderBy: { receivedAt: 'asc' } });
     return {
       ...this.present(order),
       reseller_id: order.resellerId,
@@ -468,6 +480,7 @@ export class OrdersService {
       checks: order.checks,
       next_check_at: order.nextCheckAt?.toISOString() ?? null,
       attempts: order.attempts.map(a => ({ supplier: a.supplierCode, reference: a.reference, action: a.action, outcome: a.outcome, detail: a.detail, at: a.createdAt.toISOString() })),
+      notifications: notifications.map(n => ({ id: n.id, supplier: n.supplierCode, event_type: n.eventType, status: n.status, received_at: n.receivedAt.toISOString() })),
       ledger: entries.map(e => ({
         type: e.type,
         reference: e.reference,

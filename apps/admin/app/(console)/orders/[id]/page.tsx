@@ -170,6 +170,26 @@ export default function OrderPage() {
             </div>
           </Card>
 
+          {order.notifications.length ? (
+            <Card>
+              <CardHeader title="Supplier notifications" description="What the supplier told us about this order. Each one made BitoCard re-check the order with the supplier." />
+              <div className="mt-4">
+                <DataTable
+                  caption="Supplier notifications"
+                  rows={order.notifications}
+                  rowKey={item => item.id}
+                  empty="No notifications."
+                  columns={[
+                    { key: "when", header: "Received", cell: item => formatDateTime(item.received_at) },
+                    { key: "supplier", header: "Supplier", cell: item => item.supplier },
+                    { key: "event", header: "Event", cell: item => <span className="font-mono text-xs">{item.event_type ?? "—"}</span>, hideOnMobile: true },
+                    { key: "status", header: "Status", cell: item => <StatusBadge status={item.status} /> },
+                  ]}
+                />
+              </div>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader title="Ledger" description="Every money movement for this order (amounts in minor units; positive is a debit)." />
             <div className="space-y-4 p-5 sm:p-6">

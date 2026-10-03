@@ -1209,3 +1209,41 @@ model IntegrationSetting {
 
   @@map("integration_settings")
 }
+
+enum SupplierWebhookStatus {
+  /// Stored, not yet processed (or waiting for its next try).
+  received
+  /// The order it names was checked with the supplier.
+  processed
+  /// No order matches its reference (yet): retried a few times, then kept for admins.
+  unmatched
+  /// Processing kept failing: kept for admins; the order's own scheduled checks continue regardless.
+  failed
+}
+
+/// Every notification a supplier sends (Reloadly first), stored before it is acknowledged so none is lost. The body is
+/// never trusted: it only says which order to re-check with the supplier. Retries of the same delivery are stored once.
+model SupplierWebhook {
+  id            String                @id @default(uuid()) @db.Uuid
+  supplierCode  String                @map("supplier_code")
+  eventType     String?               @map("event_type")
+  /// SHA-256 of the raw body: a supplier's retry of the same delivery is recognised and stored once.
+  bodyHash      String                @map("body_hash")
+  /// The raw body, encrypted with ENCRYPTION_KEY (it may carry customer details); never returned by the API.
+  bodyEncrypted String                @map("body_encrypted")
+  /// Our order reference the notification names (Reloadly's customIdentifier), and the supplier's transaction ID.
+  reference     String?
+  supplierTransactionId String?       @map("supplier_transaction_id")
+  orderId       String?               @map("order_id") @db.Uuid
+  status        SupplierWebhookStatus @default(received)
+  attempts      Int                   @default(0)
+  lastError     String?               @map("last_error")
+  nextAttemptAt DateTime              @default(now()) @map("next_attempt_at")
+  receivedAt    DateTime              @default(now()) @map("received_at")
+  processedAt   DateTime?             @map("processed_at")
+
+  @@unique([supplierCode, bodyHash])
+  @@index([status, nextAttemptAt])
+  @@index([orderId])
+  @@map("supplier_webhooks")
+}

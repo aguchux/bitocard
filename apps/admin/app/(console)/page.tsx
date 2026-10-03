@@ -68,24 +68,28 @@ export default function OverviewPage() {
   // The hour is only known in the browser; the page is client-rendered behind the session check.
   const [hour] = useState(() => new Date().getHours());
 
-  const currency = chosenCurrency && data?.currencies.includes(chosenCurrency) ? chosenCurrency : (data?.currencies[0] ?? data?.wallet_float[0]?.currency ?? "NGN");
-  const total = data?.totals.find(item => item.currency === currency);
+  // USD (BitoCard's base currency) across every market by default; a single market's own currency when chosen.
+  const allMarkets = "ALL";
+  const currency = chosenCurrency && data?.currencies.includes(chosenCurrency) ? chosenCurrency : allMarkets;
+  const inUsd = currency === allMarkets;
+  const shown = inUsd ? "USD" : currency;
+  const total = inUsd ? data?.usd.total : data?.totals.find(item => item.currency === currency);
   const orders = data?.totals.reduce((sum, item) => sum + item.orders, 0) ?? 0;
   const previousOrders = data?.totals.reduce((sum, item) => sum + item.previous_orders, 0) ?? 0;
-  const float = data?.wallet_float.find(item => item.currency === currency);
-  const series = data?.series.find(item => item.currency === currency);
+  const float = inUsd ? data?.usd.wallet_float : data?.wallet_float.find(item => item.currency === currency)?.amount;
+  const series = useMemo(() => (inUsd ? (data ? { points: data.usd.series } : undefined) : data?.series.find(item => item.currency === currency)), [inUsd, data, currency]);
   const chart = useMemo(
     () =>
       series
         ? {
             labels: series.points.map(point => formatShortDate(point.date)),
             series: [
-              { name: `Gross sales (${currency})`, color: "#ff2382", values: series.points.map(point => point.gross), format: (value: number) => formatMoney(value, currency, { compact: true }) },
+              { name: `Gross sales (${shown})`, color: "#ff2382", values: series.points.map(point => point.gross), format: (value: number) => formatMoney(value, shown, { compact: true }) },
               { name: "Orders", color: "#2563eb", values: series.points.map(point => point.orders), format: (value: number) => formatNumber(Math.round(value)), axis: "right" as const },
             ],
           }
         : null,
-    [series, currency],
+    [series, shown],
   );
 
   return (
@@ -98,10 +102,11 @@ export default function OverviewPage() {
           <p className="mt-1 text-lg text-muted">Here’s what’s happening across your reseller network.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {data && data.currencies.length > 1 ? (
+          {data && data.currencies.length > 0 ? (
             <Select aria-label="Currency" value={currency} onChange={event => setCurrency(event.target.value)} className="w-auto">
+              <option value={allMarkets}>USD · all markets</option>
               {data.currencies.map(item => (
-                <option key={item}>{item}</option>
+                <option key={item} value={item}>{`${item} only`}</option>
               ))}
             </Select>
           ) : null}
@@ -122,7 +127,7 @@ export default function OverviewPage() {
               label="Gross sales"
               icon={<BarChart3 />}
               tone="pink"
-              value={formatMoney(total?.gross ?? 0, currency)}
+              value={formatMoney(total?.gross ?? 0, shown)}
               footer={<Trend change={percentChange(total?.gross ?? 0, total?.previous_gross ?? 0)} />}
             />
             <StatCard loading={isLoading} label="Orders" icon={<ShoppingCart />} tone="blue" value={formatNumber(orders)} footer={<Trend change={percentChange(orders, previousOrders)} />} />
@@ -131,8 +136,8 @@ export default function OverviewPage() {
               label="Wallet float"
               icon={<Wallet />}
               tone="violet"
-              value={formatMoney(float?.amount ?? 0, currency)}
-              footer={<p className="text-xs text-muted">Held for resellers right now</p>}
+              value={formatMoney(float ?? 0, shown)}
+              footer={<p className="text-xs text-muted">{inUsd ? "Held for resellers, all markets in USD" : "Held for resellers right now"}</p>}
             />
             <StatCard
               loading={isLoading}
@@ -146,10 +151,19 @@ export default function OverviewPage() {
 
           <div className="grid gap-6 xl:grid-cols-3">
             <Card className="xl:col-span-2">
-              <CardHeader title="Sales overview" description={`Daily completed sales, ${mode === "test" ? "sandbox" : "live"}`} />
+              <CardHeader
+                title="Sales overview"
+                description={[
+                  `Daily completed sales, ${mode === "test" ? "sandbox" : "live"}`,
+                  inUsd && data?.usd.rates_as_of ? `converted to USD at reference rates from ${formatDateTime(data.usd.rates_as_of)}` : null,
+                  inUsd && data?.usd.unconverted.length ? `${data.usd.unconverted.join(", ")} not included (no exchange rate yet)` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              />
               <div className="px-3 pb-5 sm:px-5">
                 {chart && orders > 0 ? (
-                  <LineChart label={`Daily gross sales and orders in ${currency}`} labels={chart.labels} series={chart.series} />
+                  <LineChart label={`Daily gross sales and orders in ${shown}`} labels={chart.labels} series={chart.series} />
                 ) : (
                   <p className="px-3 py-16 text-center text-sm text-muted">{isLoading ? "Loading…" : "No completed sales in this period yet."}</p>
                 )}

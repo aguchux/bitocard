@@ -20,6 +20,8 @@ import type {
   ResellerStatus,
   ResellerSummary,
   Supplier,
+  SupplierWebhook,
+  SupplierWebhookStatus,
   Switches,
   Verification,
   VerificationStatus,
@@ -89,6 +91,15 @@ export const adminApi = bitocardApi.injectEndpoints({
       infiniteQueryOptions: cursorPages,
       query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/orders', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
       providesTags: [{ type: 'Order', id: 'LIST' }],
+    }),
+    supplierWebhooks: build.infiniteQuery<List<SupplierWebhook>, { status?: SupplierWebhookStatus; supplier?: string }, string>({
+      infiniteQueryOptions: cursorPages,
+      query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/supplier-webhooks', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
+      providesTags: [{ type: 'Order', id: 'NOTIFICATIONS' }],
+    }),
+    retrySupplierWebhook: build.mutation<SupplierWebhook, string>({
+      query: id => ({ url: `/v1/admin/supplier-webhooks/${id}/retry`, method: 'POST' }),
+      invalidatesTags: [{ type: 'Order', id: 'NOTIFICATIONS' }, { type: 'Order', id: 'LIST' }, 'Activity'],
     }),
     order: build.query<AdminOrderDetail, string>({ query: id => `/v1/admin/orders/${id}`, providesTags: (_result, _error, id) => [{ type: 'Order', id }] }),
     requeryOrder: build.mutation<AdminOrderDetail, string>({
@@ -182,6 +193,8 @@ export const {
   useDecideVerificationMutation,
   useOrdersInfiniteQuery,
   useOrderQuery,
+  useSupplierWebhooksInfiniteQuery,
+  useRetrySupplierWebhookMutation,
   useRequeryOrderMutation,
   useResolveOrderMutation,
   useRefundOrderMutation,

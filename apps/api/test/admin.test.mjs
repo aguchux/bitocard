@@ -58,12 +58,28 @@ describe('admin overview', () => {
     assert.equal(series.length, 7);
     assert.equal(series.at(-1).orders, 2, 'today has both sales');
     assert.ok(overview.wallet_float.find(item => item.currency === 'NGN').amount > 0);
+    // Every market in USD (the base currency) at the reference rate: NGN 1,500 per dollar here.
+    const toUsdCents = kobo => Math.round(kobo / 100 / 1500 * 100);
+    assert.equal(overview.usd.currency, 'USD');
+    assert.deepEqual([overview.usd.total.orders, overview.usd.total.gross, overview.usd.total.previous_orders], [2, toUsdCents(2 * done.price), 1]);
+    assert.equal(overview.usd.series.length, 7);
+    assert.equal(overview.usd.series.at(-1).gross, toUsdCents(2 * done.price));
+    assert.equal(overview.usd.wallet_float, toUsdCents(overview.wallet_float.find(item => item.currency === 'NGN').amount));
+    assert.ok(overview.usd.rates_as_of);
+    assert.deepEqual(overview.usd.unconverted, []);
     assert.ok(overview.resellers.joined >= 1);
     assert.ok(overview.attention.orders_processing >= 1);
     const supplier = overview.suppliers.find(item => item.code === 'reloadly');
     assert.equal(supplier.health, 'operational');
     assert.equal(overview.recent_orders[0].reseller.id, resellerId);
     assert.equal(JSON.stringify(overview).includes('SANDBOX-'), false, 'no delivered codes');
+
+    // A currency without any exchange rate is left out of the USD view and named, never guessed.
+    const ghana = await resellerClient(server, { country: 'GH' });
+    await wallets.adjust(null, { resellerId: ghana.resellerId, mode: 'test', balance: 'funding', amount: 50_000, reason: 'Test funding' });
+    const withGhs = (await admin.get('/v1/admin/overview?days=7&mode=test')).json;
+    assert.deepEqual(withGhs.usd.unconverted, ['GHS']);
+    assert.equal(withGhs.usd.wallet_float, overview.usd.wallet_float);
 
     const live = (await admin.get('/v1/admin/overview?days=7')).json;
     assert.equal(live.totals.find(total => total.currency === 'NGN'), undefined, 'live and test are separate');

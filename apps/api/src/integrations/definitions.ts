@@ -1,4 +1,5 @@
 import type { AppConfig } from '../config/config.js';
+import { supplierCredentialGroups, supplierCredentialKey } from './supplier-credentials.js';
 
 /**
  * Settings an admin sets in the admin app (Settings > Integrations) instead of the environment, so the API can start
@@ -13,7 +14,8 @@ import type { AppConfig } from '../config/config.js';
 export type IntegrationKind = 'text' | 'url' | 'email' | 'number' | 'flag';
 
 export type IntegrationField = {
-  key: IntegrationKey;
+  /** The environment variable it replaces (platform settings), or the supplier credential's name (`DIDWW_API_KEY`). */
+  key: string;
   label: string;
   /** Write-only: encrypted at rest and never returned (the API shows only the last four characters). */
   secret: boolean;
@@ -23,7 +25,17 @@ export type IntegrationField = {
   help?: string;
 };
 
-export type IntegrationGroup = { id: string; name: string; description: string; fields: IntegrationField[]; webhookPath?: string };
+export type IntegrationGroup = {
+  id: string;
+  name: string;
+  description: string;
+  fields: IntegrationField[];
+  webhookPath?: string;
+  /** Platform services, or suppliers from the registry. */
+  section: 'platform' | 'suppliers';
+  /** False while the supplier's adapter is a stub: its credentials are stored for later and nothing uses them yet. */
+  adapterReady: boolean;
+};
 
 const integrationKeyList = [
   'DASHBOARD_URL',
@@ -49,6 +61,7 @@ const integrationKeyList = [
   'RELOADLY_CLIENT_ID',
   'RELOADLY_CLIENT_SECRET',
   'RELOADLY_SANDBOX',
+  'RELOADLY_WEBHOOK_SECRET',
   'VTPASS_API_KEY',
   'VTPASS_PUBLIC_KEY',
   'VTPASS_SECRET_KEY',
@@ -65,7 +78,7 @@ export const integrationKeys: readonly IntegrationKey[] = integrationKeyList;
 /** The settings services read: the same names and types as AppConfig, with admin values applied. */
 export type IntegrationConfig = Pick<AppConfig, IntegrationKey>;
 
-const field = (key: IntegrationKey, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}): IntegrationField => ({
+const field = (key: string, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}): IntegrationField => ({
   key,
   label,
   secret: false,
@@ -73,9 +86,9 @@ const field = (key: IntegrationKey, label: string, options: Partial<Omit<Integra
   required: false,
   ...options,
 });
-const secret = (key: IntegrationKey, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}) => field(key, label, { secret: true, required: true, ...options });
+const secret = (key: string, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}) => field(key, label, { secret: true, required: true, ...options });
 
-export const integrationGroups: IntegrationGroup[] = [
+const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> = [
   {
     id: 'general',
     name: 'Links and alerts',
@@ -151,10 +164,15 @@ export const integrationGroups: IntegrationGroup[] = [
     id: 'reloadly',
     name: 'Reloadly',
     description: 'Gift cards, airtime and data. Without credentials it serves only the sandbox, never live orders.',
+    webhookPath: '/v1/webhooks/reloadly',
     fields: [
       field('RELOADLY_CLIENT_ID', 'Client ID', { required: true }),
       secret('RELOADLY_CLIENT_SECRET', 'Client secret'),
       field('RELOADLY_SANDBOX', 'Use Reloadly’s sandbox', { kind: 'flag', help: 'On: Reloadly test credits, no real cards. Off: live.' }),
+      secret('RELOADLY_WEBHOOK_SECRET', 'Webhook signature secret', {
+        required: false,
+        help: 'Developers > Webhooks in the Reloadly dashboard. Subscribe to the gift card and airtime transaction status events. Without it, notifications are refused and orders are still checked on schedule.',
+      }),
     ],
   },
   {
@@ -182,4 +200,22 @@ export const integrationGroups: IntegrationGroup[] = [
   },
 ];
 
+/** Suppliers with a built adapter, whose groups live with the platform settings above. */
+const builtSuppliers = new Set(['reloadly', 'vtpass']);
+
+export const integrationGroups: IntegrationGroup[] = [
+  ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),
+  ...supplierCredentialGroups.map(group => ({
+    id: group.code,
+    name: group.name,
+    description: group.description,
+    section: 'suppliers' as const,
+    adapterReady: false,
+    fields: group.fields.map(item => ({ key: supplierCredentialKey(group.code, item.suffix), label: item.label, secret: item.secret, kind: item.kind, required: item.required, help: item.help })),
+  })),
+];
+
 export const integrationFields = new Map(integrationGroups.flatMap(group => group.fields.map(item => [item.key, item] as const)));
+
+/** Platform settings: named after environment variables, read through `IntegrationsService.config`. */
+export const isPlatformKey = (key: string): key is IntegrationKey => (integrationKeys as readonly string[]).includes(key);

@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Check, Copy, KeyRound, Pencil } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, ErrorState, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type Integration, type IntegrationField, type IntegrationSource, useIntegrationsQuery, useUpdateIntegrationMutation } from "@bitocard/api-client/admin";
 
@@ -44,7 +44,10 @@ function IntegrationCard({ integration, editable, onEdit }: { integration: Integ
         description={integration.description}
         actions={
           <>
-            <StatusBadge status={integration.status} label={statusLabels[integration.status]} />
+            <StatusBadge
+              status={integration.adapter_ready ? integration.status : integration.status === "connected" ? "pending" : integration.status}
+              label={integration.adapter_ready ? statusLabels[integration.status] : integration.status === "connected" ? "Saved for later" : statusLabels[integration.status]}
+            />
             {editable ? (
               <Button variant="secondary" size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={onEdit} aria-label={`Edit ${integration.name}`}>
                 Edit
@@ -53,6 +56,11 @@ function IntegrationCard({ integration, editable, onEdit }: { integration: Integ
           </>
         }
       />
+      {integration.adapter_ready ? null : (
+        <p className="mx-5 mt-4 rounded-lg bg-canvas px-3 py-2 text-xs text-muted sm:mx-6">
+          Not connected yet: BitoCard’s adapter for this supplier is still to be built. Keys saved now are kept encrypted and used once it is.
+        </p>
+      )}
       <dl className="mt-4 divide-y divide-line border-t border-line">
         {integration.fields.map(field => (
           <div key={field.key} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 sm:px-6">
@@ -170,18 +178,12 @@ function EditDialog({ integration, onClose }: { integration: Integration; onClos
           </div>
         );
       })}
-      <div className="rounded-xl bg-canvas p-4">
-        <Field label="Authenticator code" htmlFor={`${id}-code`} hint="Changing credentials needs a fresh code from your authenticator app.">
-          <Input
-            id={`${id}-code`}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            placeholder="123456"
-            value={code}
-            onChange={event => setCode(event.target.value.replace(/\D/g, ""))}
-          />
-        </Field>
+      <div className="rounded-lg bg-canvas p-4">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-ink">Authenticator code</p>
+          <CodeInput label="Authenticator code" value={code} onChange={setCode} />
+          <p className="text-xs text-muted">Changing credentials needs a fresh code from your authenticator app.</p>
+        </div>
       </div>
     </ActionDialog>
   );
@@ -193,8 +195,11 @@ export default function IntegrationsPage() {
   const allowed = can(admin);
   const { data, error, isLoading, refetch } = useIntegrationsQuery(undefined, { skip: !allowed });
   const [editing, setEditing] = useState<string | null>(null);
+  const [section, setSection] = useState<Integration["section"]>("platform");
+  const shown = data?.data.filter(item => item.section === section) ?? [];
   const current = data?.data.find(item => item.id === editing) ?? null;
-  const connected = data?.data.filter(item => item.status === "connected").length ?? 0;
+  const connected = data?.data.filter(item => item.status === "connected" && item.adapter_ready).length ?? 0;
+  const live = data?.data.filter(item => item.adapter_ready).length ?? 0;
 
   return (
     <AdminShell section="settings" current="/settings/integrations" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Integrations" }]}>
@@ -221,11 +226,20 @@ export default function IntegrationsPage() {
           <Notice tone="blue">
             <span className="inline-flex items-center gap-2">
               <KeyRound className="size-4 shrink-0" aria-hidden />
-              {`${connected} of ${data.data.length} connected. Secrets are encrypted at rest, never shown again, and every change is recorded in the activity log without its value.`}
+              {`${connected} of ${live} connected. Secrets are encrypted at rest, never shown again, and every change is recorded in the activity log without its value.`}
             </span>
           </Notice>
+          <Tabs
+            label="Integrations"
+            value={section}
+            onChange={setSection}
+            items={[
+              { value: "platform", label: "Platform", count: data.data.filter(item => item.section === "platform").length },
+              { value: "suppliers", label: "Suppliers", count: data.data.filter(item => item.section === "suppliers").length },
+            ]}
+          />
           <div className="grid gap-4 lg:grid-cols-2">
-            {data.data.map(integration => (
+            {shown.map(integration => (
               <IntegrationCard key={integration.id} integration={integration} editable={allowed} onEdit={() => setEditing(integration.id)} />
             ))}
           </div>

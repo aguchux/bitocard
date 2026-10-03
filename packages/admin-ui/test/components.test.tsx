@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { categoryName, DataTable, formatBps, formatMoney, formatRelative, LineChart, percentChange, StatusBadge, Trend } from '../src';
+import { categoryName, CodeInput, DataTable, formatBps, formatMoney, formatRelative, LineChart, percentChange, StatusBadge, Trend } from '../src';
+import { useState } from 'react';
 import { AdminGate, AdminProviders, AdminShell, can, useAdmin } from '../src/shell';
 
 afterEach(cleanup);
@@ -140,5 +141,50 @@ describe('session', () => {
     expect(can({ object: 'admin', id: '1', name: 'A', email: 'a@bitocard.com', roles: ['super_admin'] }, 'finance')).toBe(true);
     expect(can({ object: 'admin', id: '1', name: 'A', email: 'a@bitocard.com', roles: ['support'] }, 'finance', 'operations')).toBe(false);
     expect(can(null, 'support')).toBe(false);
+  });
+});
+
+describe('code input', () => {
+  function Harness({ onComplete }: { onComplete: (code: string) => void }) {
+    const [value, setValue] = useState('');
+    return <CodeInput label="Authentication code" value={value} onChange={setValue} onComplete={onComplete} />;
+  }
+  const boxes = () => screen.getAllByRole('textbox') as HTMLInputElement[];
+
+  test('six labelled boxes; typing moves along and completes the code', () => {
+    const onComplete = vi.fn();
+    render(<Harness onComplete={onComplete} />);
+    expect(screen.getByRole('group', { name: 'Authentication code' })).toBeTruthy();
+    expect(boxes()).toHaveLength(6);
+    expect(boxes()[0].getAttribute('aria-label')).toBe('Digit 1 of 6');
+    expect(boxes()[0].getAttribute('autocomplete')).toBe('one-time-code');
+    for (const [index, digit] of [...'12345'].entries()) fireEvent.change(boxes()[index], { target: { value: digit } });
+    expect(document.activeElement).toBe(boxes()[5]);
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.change(boxes()[5], { target: { value: '6' } });
+    expect(boxes().map(box => box.value).join('')).toBe('123456');
+    expect(onComplete).toHaveBeenCalledWith('123456');
+  });
+
+  test('pasting or autofilling fills every box; letters are ignored; Backspace goes back', () => {
+    const onComplete = vi.fn();
+    render(<Harness onComplete={onComplete} />);
+    fireEvent.paste(boxes()[0], { clipboardData: { getData: () => '98 76-54' } });
+    expect(boxes().map(box => box.value).join('')).toBe('987654');
+    expect(onComplete).toHaveBeenCalledWith('987654');
+
+    fireEvent.keyDown(boxes()[5], { key: 'Backspace' });
+    expect(boxes()[5].value).toBe('');
+    fireEvent.keyDown(boxes()[5], { key: 'Backspace' });
+    expect(boxes()[4].value).toBe('');
+    expect(document.activeElement).toBe(boxes()[4]);
+
+    fireEvent.change(boxes()[4], { target: { value: 'a' } });
+    expect(boxes()[4].value).toBe('');
+    // A whole code autofilled into one box spreads across the rest.
+    cleanup();
+    render(<Harness onComplete={onComplete} />);
+    fireEvent.change(boxes()[0], { target: { value: '246810' } });
+    expect(boxes().map(box => box.value).join('')).toBe('246810');
   });
 });

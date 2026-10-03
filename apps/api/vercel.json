@@ -51,6 +51,10 @@
     {
       "path": "/v1/cron/identity",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/v1/cron/supplier-webhooks",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

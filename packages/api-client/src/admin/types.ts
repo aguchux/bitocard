@@ -32,6 +32,16 @@ export type Overview = {
   totals: Array<{ currency: string; gross: number; orders: number; previous_gross: number; previous_orders: number }>;
   series: Array<{ currency: string; points: Array<{ date: string; gross: number; orders: number }> }>;
   wallet_float: Array<{ currency: string; amount: number }>;
+  /** Every market converted to USD (minor units, cents) at the latest reference rates, for reporting. */
+  usd: {
+    currency: 'USD';
+    rates_as_of: string | null;
+    /** Currencies left out because no exchange rate is stored for them. */
+    unconverted: string[];
+    total: { gross: number; orders: number; previous_gross: number; previous_orders: number };
+    series: Array<{ date: string; gross: number; orders: number }>;
+    wallet_float: number;
+  };
   resellers: { active: number; pending: number; joined: number; previously_joined: number };
   attention: { orders_needing_review: number; orders_processing: number; verifications_in_review: number; supplier_problems: number };
   suppliers: Array<{ code: string; name: string; categories: ProductCategory[]; enabled: boolean; configured: boolean; health: SupplierHealth; last_synced_at: string | null; last_sync_error: string | null }>;
@@ -142,6 +152,8 @@ export type AdminOrderDetail = Order & {
   checks: number;
   next_check_at: string | null;
   attempts: Array<{ supplier: string; reference: string; action: 'place' | 'check'; outcome: string; detail: string | null; at: string }>;
+  /** Supplier notifications about this order (never their bodies). */
+  notifications: Array<{ id: string; supplier: string; event_type: string | null; status: SupplierWebhookStatus; received_at: string }>;
   ledger: Array<{ type: string; reference: string; at: string; postings: Array<{ account: string; owner: string; currency: string; amount: number }> }>;
 };
 
@@ -244,8 +256,29 @@ export type Integration = {
   name: string;
   description: string;
   status: 'connected' | 'incomplete' | 'not_connected';
+  section: 'platform' | 'suppliers';
+  /** False while the supplier's adapter is not built: credentials are saved for later and not used yet. */
+  adapter_ready: boolean;
   /** The address to paste into the provider's dashboard, when it sends webhooks. */
   webhook_url: string | null;
   updated_at: string | null;
   fields: IntegrationField[];
+};
+
+export type SupplierWebhookStatus = 'received' | 'processed' | 'unmatched' | 'failed';
+/** A notification a supplier sent (for example a Reloadly transaction status), and what became of it. */
+export type SupplierWebhook = {
+  object: 'supplier_webhook';
+  id: string;
+  supplier: string;
+  event_type: string | null;
+  reference: string | null;
+  supplier_transaction_id: string | null;
+  order_id: string | null;
+  status: SupplierWebhookStatus;
+  attempts: number;
+  last_error: string | null;
+  next_attempt_at: string | null;
+  received_at: string;
+  processed_at: string | null;
 };

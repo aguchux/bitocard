@@ -34,9 +34,14 @@ describe('integration settings', () => {
     const { status, json } = await admin.get('/v1/admin/integrations');
     assert.equal(status, 200);
     assert.deepEqual(
-      json.data.map(item => item.id),
-      ['general', 'email', 'sms', 'google', 'flutterwave', 'monnify', 'exchange_rates', 'reloadly', 'vtpass', 'didit'],
+      json.data.filter(item => item.section === 'platform').map(item => item.id),
+      ['general', 'email', 'sms', 'google', 'flutterwave', 'monnify', 'exchange_rates', 'didit'],
     );
+    // Every supplier in the registry has a group (Flutterwave virtual cards use the Flutterwave keys).
+    const registry = await prisma.supplier.findMany({ select: { code: true } });
+    const suppliers = json.data.filter(item => item.section === 'suppliers');
+    assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'flutterwave_cards')));
+    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['reloadly', 'vtpass']);
     const sms = json.data.find(item => item.id === 'sms');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').source, 'environment');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').value, 'EnvSender');
@@ -148,5 +153,27 @@ describe('integration settings', () => {
     integrations.loadedAt = 0;
     await admin.get('/v1/admin/overview');
     assert.equal(integrations.config.VTPASS_CONTACT_PHONE, '08099999999');
+  });
+
+  test('suppliers without an adapter yet: credentials are saved encrypted, write-only, for the adapter to read later', async () => {
+    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
+    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'DIDWW_API_KEY').source], ['not_connected', false, 'unset']);
+
+    const key = 'didww-live-key-abcd1234';
+    const saved = await update('didww', { DIDWW_API_KEY: key, DIDWW_API_URL: 'https://sandbox-api.didww.com/v3' });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.equal(saved.json.status, 'connected');
+    assert.deepEqual([fieldOf(saved.json, 'DIDWW_API_KEY').hint, fieldOf(saved.json, 'DIDWW_API_KEY').value], ['…1234', null]);
+    assert.equal(fieldOf(saved.json, 'DIDWW_API_URL').value, 'https://sandbox-api.didww.com/v3');
+    assert.ok(!JSON.stringify(saved.json).includes(key));
+    assert.deepEqual(integrations.supplier('didww'), { API_KEY: key, API_URL: 'https://sandbox-api.didww.com/v3' });
+    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { key: 'DIDWW_API_KEY' } });
+    assert.ok(row.encrypted && !row.value.includes(key));
+
+    assert.equal((await update('didww', { DIDWW_API_URL: 'not a url' })).json.error.param, 'values.DIDWW_API_URL');
+    assert.equal((await update('didww', { TWILIO_AUTH_TOKEN: 'x' })).status, 400, 'another supplier’s field');
+    const cleared = await update('didww', { DIDWW_API_KEY: null });
+    assert.equal(fieldOf(cleared.json, 'DIDWW_API_KEY').source, 'unset');
+    assert.equal(integrations.supplier('didww').API_KEY, undefined);
   });
 });

@@ -158,7 +158,13 @@ export function LoadMore({ hasMore, loading, onClick }: { hasMore?: boolean; loa
 /** Underlined tabs (or segmented pills) with buttons; the page keeps the selected value. */
 export function Tabs<V extends string>({ value, onChange, items, variant = 'underline', label }: { value: V; onChange: (value: V) => void; items: Array<{ value: V; label: string; count?: number }>; variant?: 'underline' | 'pills'; label: string }) {
   return (
-    <div role="tablist" aria-label={label} className={cn('flex gap-1 overflow-x-auto', variant === 'underline' ? 'border-b border-line' : 'rounded-xl border border-line bg-white p-1')}>
+    // Scrolls sideways on narrow screens, never vertically: the underline's base line is drawn inside the bar (an inset
+    // shadow the selected tab's border covers), so nothing sticks out below it and no vertical scrollbar appears.
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cn('flex gap-1 overflow-x-auto overflow-y-hidden', variant === 'underline' ? 'shadow-[inset_0_-1px_0_var(--color-line)]' : 'rounded-lg border border-line bg-white p-1')}
+    >
       {items.map(item => {
         const selected = item.value === value;
         return (
@@ -171,8 +177,8 @@ export function Tabs<V extends string>({ value, onChange, items, variant = 'unde
             className={cn(
               'inline-flex min-h-10 shrink-0 items-center gap-2 px-4 text-sm font-semibold transition-colors',
               variant === 'underline'
-                ? cn('-mb-px border-b-2', selected ? 'border-brand-500 text-brand-600' : 'border-transparent text-muted hover:text-ink')
-                : cn('rounded-lg', selected ? 'bg-brand-500 text-white' : 'text-muted hover:bg-canvas'),
+                ? cn('border-b-2', selected ? 'border-brand-500 text-brand-600' : 'border-transparent text-muted hover:text-ink')
+                : cn('rounded-md', selected ? 'bg-brand-500 text-white' : 'text-muted hover:bg-canvas'),
             )}
           >
             {item.label}

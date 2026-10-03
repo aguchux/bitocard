@@ -75,6 +75,8 @@ export const configSchema = z.object({
   // Suppliers. A supplier without credentials is used only in the sandbox (test mode), never live.
   RELOADLY_CLIENT_ID: z.string().optional(),
   RELOADLY_CLIENT_SECRET: z.string().optional(),
+  /** The webhook signature secret (Reloadly dashboard > Developers > Webhooks); signs X-Reloadly-Signature. */
+  RELOADLY_WEBHOOK_SECRET: z.string().optional(),
   /** on: Reloadly sandbox (test credits, no real cards); off: live. */
   RELOADLY_SANDBOX: flag.prefault('off'),
   RELOADLY_AUTH_URL: z.string().url().default('https://auth.reloadly.com'),
