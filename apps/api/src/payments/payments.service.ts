@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../database/prisma.service';
 import { type LedgerMode, type Payment, Prisma, type ReservedAccount } from '../generated/prisma/client';
 import { type Line, LedgerService, type Tx } from '../ledger/ledger.service';
@@ -62,8 +62,13 @@ export function presentReservedAccount(account: ReservedAccount) {
 export class PaymentsService {
   private readonly logger = new Logger('Payments');
 
+  /** Admin integration settings over the environment, read fresh on every use. */
+  private get config() {
+    return this.integrations.config;
+  }
+
   constructor(
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly integrations: IntegrationsService,
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly wallets: WalletService,

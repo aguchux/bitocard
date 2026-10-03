@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../database/prisma.service';
 import { randomToken, sha256 } from '../common/crypto';
 import { ApiError } from '../common/errors/api-error';
@@ -35,10 +35,15 @@ export class GoogleService {
   private readonly logger = new Logger('GoogleSignIn');
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
+  /** Admin integration settings over the environment, read fresh on every use. */
+  private get config() {
+    return this.integrations.config;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsService,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   /** Starts the flow and returns the Google URL to redirect to. */

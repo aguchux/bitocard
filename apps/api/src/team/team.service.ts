@@ -1,5 +1,5 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../database/prisma.service';
 import { randomToken, sha256 } from '../common/crypto';
 import { ApiError } from '../common/errors/api-error';
@@ -28,10 +28,15 @@ function presentInvitation(invitation: Invitation) {
 /** A reseller's staff: invitations by email, roles, and removal. The owner cannot be changed or removed here. */
 @Injectable()
 export class TeamService {
+  /** Admin integration settings over the environment, read fresh on every use. */
+  private get config() {
+    return this.integrations.config;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   async team(resellerId: string) {

@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { Injectable, Logger } from '@nestjs/common';
+import { IntegrationsService } from '../integrations/integrations.service';
 
 export type SmsMessage = { to: string; text: string };
 
@@ -12,7 +12,12 @@ export class SmsService {
   private readonly logger = new Logger('Sms');
   readonly outbox: SmsMessage[] = [];
 
-  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+  /** Admin integration settings over the environment, read fresh on every use. */
+  private get config() {
+    return this.integrations.config;
+  }
+
+  constructor(private readonly integrations: IntegrationsService) {}
 
   /** `to` is E.164 (+2348012345678). Throws if Termii rejects the message or cannot be reached. */
   async send(message: SmsMessage): Promise<string> {

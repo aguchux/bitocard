@@ -222,3 +222,30 @@ export type Country = {
   min_withdrawal_minor: number;
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;
 };
+
+/** Where a setting's value comes from: set in the admin app, the API's environment, the built-in default, or nowhere. */
+export type IntegrationSource = 'admin' | 'environment' | 'default' | 'unset';
+export type IntegrationField = {
+  key: string;
+  label: string;
+  kind: 'text' | 'url' | 'email' | 'number' | 'flag';
+  /** Secrets are write-only: `value` is always null and `hint` shows the last four characters. */
+  secret: boolean;
+  required: boolean;
+  help: string | null;
+  source: IntegrationSource;
+  value: string | number | boolean | null;
+  hint: string | null;
+  updated_at: string | null;
+};
+export type Integration = {
+  object: 'integration';
+  id: string;
+  name: string;
+  description: string;
+  status: 'connected' | 'incomplete' | 'not_connected';
+  /** The address to paste into the provider's dashboard, when it sends webhooks. */
+  webhook_url: string | null;
+  updated_at: string | null;
+  fields: IntegrationField[];
+};

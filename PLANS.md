@@ -149,6 +149,7 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 
 - One admin app at `admin.bitocard.com` (one Vercel project, `bitocard-admin`): sign-in, dashboard, orders, catalogue, resellers, identity checks, activity log and settings. Microfrontends were tried and dropped: with one team and a few dozen pages they added deployments and slower navigation for no benefit. Each area keeps its own folder and the UI lives in shared packages, so an area can be split out later if a separate team needs to own it.
 - Admins sign in with email, password and an authenticator app only (never Google). Sessions, roles and every change are enforced and audited by the API; the app hides actions an admin's roles do not allow.
+- Service keys are set in the admin app, not the server environment (Settings > Integrations, super admins only): email, SMS, Google sign-in, Flutterwave, Monnify, exchange rates, Reloadly, VTpass and Didit, plus links and alerts. The API starts with only its required environment (database, encryption key, cron secret, allowed origins, admin email domains), and each service is connected as BitoCard subscribes to it, without a restart. Secrets are encrypted, never shown again, and changes need a fresh authenticator code and are audited without their values.
 - The dashboard shows sales and orders by currency (live or sandbox), money held for resellers, active resellers, supplier health, items needing attention, and recent orders.
 
 ### Webhooks (Decided, starting values)

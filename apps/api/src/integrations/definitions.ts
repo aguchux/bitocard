@@ -1,0 +1,185 @@
+import type { AppConfig } from '../config/config';
+
+/**
+ * Settings an admin sets in the admin app (Settings > Integrations) instead of the environment, so the API can start
+ * with only its required environment (database, encryption key, cron secret and the like) and services are connected
+ * as BitoCard subscribes to them. Each field is named after the environment variable it replaces: an admin value wins,
+ * the environment is the fallback (local development and tests), then the default in `config.ts`.
+ *
+ * Keep out of here anything the API needs before it can reach the database, or that protects admin access itself
+ * (ALLOWED_ORIGINS, cookie settings, ADMIN_EMAIL_DOMAINS, ENCRYPTION_KEY, CRON_SECRET): a mistaken admin edit must
+ * never be able to lock admins out or widen who can sign in.
+ */
+export type IntegrationKind = 'text' | 'url' | 'email' | 'number' | 'flag';
+
+export type IntegrationField = {
+  key: IntegrationKey;
+  label: string;
+  /** Write-only: encrypted at rest and never returned (the API shows only the last four characters). */
+  secret: boolean;
+  kind: IntegrationKind;
+  /** Needed for the integration to work; it shows as not connected until every required field has a value. */
+  required: boolean;
+  help?: string;
+};
+
+export type IntegrationGroup = { id: string; name: string; description: string; fields: IntegrationField[]; webhookPath?: string };
+
+const integrationKeyList = [
+  'DASHBOARD_URL',
+  'PAYMENT_RETURN_URL',
+  'ALERT_EMAIL',
+  'EMAIL_FROM',
+  'RESEND_API_KEY',
+  'MAILERSEND_API_KEY',
+  'TERMII_API_KEY',
+  'TERMII_API_URL',
+  'TERMII_SENDER_ID',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REDIRECT_URI',
+  'FLUTTERWAVE_SECRET_KEY',
+  'FLUTTERWAVE_WEBHOOK_HASH',
+  'MONNIFY_API_KEY',
+  'MONNIFY_SECRET_KEY',
+  'MONNIFY_CONTRACT_CODE',
+  'MONNIFY_API_URL',
+  'OPEN_EXCHANGE_RATES_APP_ID',
+  'FX_MAX_AGE_MINUTES',
+  'RELOADLY_CLIENT_ID',
+  'RELOADLY_CLIENT_SECRET',
+  'RELOADLY_SANDBOX',
+  'VTPASS_API_KEY',
+  'VTPASS_PUBLIC_KEY',
+  'VTPASS_SECRET_KEY',
+  'VTPASS_API_URL',
+  'VTPASS_CONTACT_PHONE',
+  'DIDIT_API_KEY',
+  'DIDIT_WORKFLOW_ID',
+  'DIDIT_WEBHOOK_SECRET',
+] as const satisfies ReadonlyArray<keyof AppConfig>;
+
+export type IntegrationKey = (typeof integrationKeyList)[number];
+export const integrationKeys: readonly IntegrationKey[] = integrationKeyList;
+
+/** The settings services read: the same names and types as AppConfig, with admin values applied. */
+export type IntegrationConfig = Pick<AppConfig, IntegrationKey>;
+
+const field = (key: IntegrationKey, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}): IntegrationField => ({
+  key,
+  label,
+  secret: false,
+  kind: 'text',
+  required: false,
+  ...options,
+});
+const secret = (key: IntegrationKey, label: string, options: Partial<Omit<IntegrationField, 'key' | 'label'>> = {}) => field(key, label, { secret: true, required: true, ...options });
+
+export const integrationGroups: IntegrationGroup[] = [
+  {
+    id: 'general',
+    name: 'Links and alerts',
+    description: 'Where emails and payment pages send people back to, and where operational alerts go.',
+    fields: [
+      field('DASHBOARD_URL', 'Reseller dashboard address', { kind: 'url', help: 'Links in emails point here.' }),
+      field('PAYMENT_RETURN_URL', 'Payment return address', { kind: 'url', help: 'Where a payment page returns the payer when the caller gives none.' }),
+      field('ALERT_EMAIL', 'Alerts email', { kind: 'email', help: 'Operational alerts, for example conversions paused.' }),
+    ],
+  },
+  {
+    id: 'email',
+    name: 'Email',
+    description: 'Sign-in codes, receipts and notices. Resend is tried first, then MailerSend. With neither, emails are only logged.',
+    fields: [
+      secret('RESEND_API_KEY', 'Resend API key', { required: false }),
+      secret('MAILERSEND_API_KEY', 'MailerSend API key', { required: false }),
+      field('EMAIL_FROM', 'Sender', { help: 'For example: BitoCard <no-reply@bitocard.com>. The domain must be verified with the email providers.' }),
+    ],
+  },
+  {
+    id: 'sms',
+    name: 'SMS (Termii)',
+    description: 'Mobile number verification and sign-in codes. Without a key, texts are only logged.',
+    fields: [
+      secret('TERMII_API_KEY', 'API key'),
+      field('TERMII_API_URL', 'API address', { kind: 'url', help: 'Account-specific; shown in the Termii dashboard.' }),
+      field('TERMII_SENDER_ID', 'Sender ID'),
+    ],
+  },
+  {
+    id: 'google',
+    name: 'Google sign-in',
+    description: 'Sign in with Google for resellers (never admins). Switched off until the client ID and secret are set.',
+    fields: [
+      field('GOOGLE_CLIENT_ID', 'Client ID', { required: true }),
+      secret('GOOGLE_CLIENT_SECRET', 'Client secret'),
+      field('GOOGLE_REDIRECT_URI', 'Redirect URI', { kind: 'url', help: 'Must match the Google Cloud console: https://api.bitocard.com/v1/auth/google/callback' }),
+    ],
+  },
+  {
+    id: 'flutterwave',
+    name: 'Flutterwave',
+    description: 'Card and bank top-ups, reserved accounts, payouts, BVN checks and offered exchange rates.',
+    webhookPath: '/v1/webhooks/flutterwave',
+    fields: [
+      secret('FLUTTERWAVE_SECRET_KEY', 'Secret key'),
+      secret('FLUTTERWAVE_WEBHOOK_HASH', 'Webhook secret hash', { help: 'The secret hash set under Webhooks in the Flutterwave dashboard.' }),
+    ],
+  },
+  {
+    id: 'monnify',
+    name: 'Monnify',
+    description: 'Nigerian reserved accounts, after Flutterwave.',
+    webhookPath: '/v1/webhooks/monnify',
+    fields: [
+      secret('MONNIFY_API_KEY', 'API key'),
+      secret('MONNIFY_SECRET_KEY', 'Secret key'),
+      field('MONNIFY_CONTRACT_CODE', 'Contract code', { required: true }),
+      field('MONNIFY_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://sandbox.monnify.com' }),
+    ],
+  },
+  {
+    id: 'exchange_rates',
+    name: 'Exchange rates (Open Exchange Rates)',
+    description: 'Reference rates, checked against Flutterwave’s offered rates.',
+    fields: [
+      secret('OPEN_EXCHANGE_RATES_APP_ID', 'App ID'),
+      field('FX_MAX_AGE_MINUTES', 'Maximum rate age (minutes)', { kind: 'number', help: 'Older rates are not used; conversions pause until rates refresh.' }),
+    ],
+  },
+  {
+    id: 'reloadly',
+    name: 'Reloadly',
+    description: 'Gift cards, airtime and data. Without credentials it serves only the sandbox, never live orders.',
+    fields: [
+      field('RELOADLY_CLIENT_ID', 'Client ID', { required: true }),
+      secret('RELOADLY_CLIENT_SECRET', 'Client secret'),
+      field('RELOADLY_SANDBOX', 'Use Reloadly’s sandbox', { kind: 'flag', help: 'On: Reloadly test credits, no real cards. Off: live.' }),
+    ],
+  },
+  {
+    id: 'vtpass',
+    name: 'VTpass',
+    description: 'Nigerian pay-TV and electricity. Without credentials it serves only the sandbox, never live orders.',
+    fields: [
+      secret('VTPASS_API_KEY', 'API key'),
+      secret('VTPASS_PUBLIC_KEY', 'Public key'),
+      secret('VTPASS_SECRET_KEY', 'Secret key'),
+      field('VTPASS_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://sandbox.vtpass.com/api' }),
+      field('VTPASS_CONTACT_PHONE', 'Fallback phone number', { help: 'VTpass needs a phone number on every payment; used when the customer gave none.' }),
+    ],
+  },
+  {
+    id: 'didit',
+    name: 'Didit identity checks',
+    description: 'Reseller owners everywhere, and customers outside Nigeria. Switched off until the API key and workflow are set.',
+    webhookPath: '/v1/webhooks/didit',
+    fields: [
+      secret('DIDIT_API_KEY', 'API key'),
+      field('DIDIT_WORKFLOW_ID', 'Workflow ID', { required: true, help: 'The workflow with document, liveness and face match.' }),
+      secret('DIDIT_WEBHOOK_SECRET', 'Webhook secret', { help: 'The webhook destination’s secret_shared_key (Didit console > API & Webhooks).' }),
+    ],
+  },
+];
+
+export const integrationFields = new Map(integrationGroups.flatMap(group => group.fields.map(item => [item.key, item] as const)));

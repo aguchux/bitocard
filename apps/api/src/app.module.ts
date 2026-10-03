@@ -25,6 +25,8 @@ import { OrdersModule } from './orders/orders.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { IdentityModule } from './identity/identity.module';
 import { AdminModule } from './admin/admin.module';
+import { IntegrationsAdminModule } from './integrations/integrations.admin';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
 import { RateLimitGuard } from './common/rate-limit/rate-limit.guard';
@@ -52,6 +54,7 @@ export class AppModule {
         ConfigModule,
         LoggerModule.forRootAsync({ inject: [APP_CONFIG], useFactory: (config: AppConfig) => loggerParams(config) }),
         DatabaseModule.register(options.databaseAdapter),
+        IntegrationsModule,
         NotificationsModule,
         AuditModule,
         CountriesModule,
@@ -74,6 +77,7 @@ export class AppModule {
         WebhooksModule,
         IdentityModule,
         AdminModule,
+        IntegrationsAdminModule,
         OrdersModule,
         CronModule,
         ...(options.extraModules ?? []),

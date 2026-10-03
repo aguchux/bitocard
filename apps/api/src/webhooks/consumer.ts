@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from '../app.module';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { WebhookDeliveryService } from './delivery.service';
 import { WebhookQueue } from './queue';
 
@@ -17,7 +18,12 @@ export async function webhookQueueHandler(...args: Parameters<NodeHandler>) {
     const app = await NestFactory.createApplicationContext(AppModule.register(), { bufferLogs: true });
     app.useLogger(app.get(Logger));
     const delivery = app.get(WebhookDeliveryService);
-    return app.get(WebhookQueue).nodeHandler(message => delivery.handleQueueMessage(message));
+    const integrations = app.get(IntegrationsService);
+    return app.get(WebhookQueue).nodeHandler(async message => {
+      // Not an HTTP request, so the refresh interceptor does not run: bring admin settings up to date here.
+      await integrations.refresh();
+      return delivery.handleQueueMessage(message);
+    });
   })().catch(error => {
     handler = null;
     throw error;

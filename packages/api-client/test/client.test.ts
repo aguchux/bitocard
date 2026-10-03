@@ -77,3 +77,19 @@ describe('base query', () => {
     subscription.unsubscribe();
   });
 });
+
+describe('integrations', () => {
+  test('saving sends a PUT with the values and code, then refetches the list', async () => {
+    const store = makeStore();
+    reply = call => Response.json(call.method === 'PUT' ? { object: 'integration', id: 'email' } : { object: 'list', data: [] });
+    const list = store.dispatch(adminApi.endpoints.integrations.initiate());
+    await list;
+    await store.dispatch(adminApi.endpoints.updateIntegration.initiate({ id: 'email', values: { RESEND_API_KEY: 're_key', EMAIL_FROM: null }, code: '123456' }));
+    await vi.waitFor(() => expect(calls.filter(call => call.url.endsWith('/v1/admin/integrations'))).toHaveLength(2));
+    const put = calls.find(call => call.method === 'PUT')!;
+    expect(put.url).toBe('http://api.test/v1/admin/integrations/email');
+    expect(put.headers.get('idempotency-key')).toBeNull();
+    expect(JSON.parse(put.body!)).toEqual({ values: { RESEND_API_KEY: 're_key', EMAIL_FROM: null }, code: '123456' });
+    list.unsubscribe();
+  });
+});

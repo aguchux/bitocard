@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { EmailService } from '../dist/notifications/email.service.js';
 import { SmsService } from '../dist/notifications/sms.service.js';
+import { IntegrationsService } from '../dist/integrations/integrations.service.js';
 import { loadConfig } from '../dist/config/config.js';
 import { fakeService } from './helpers.mjs';
+
+/** Services read their settings through IntegrationsService; here, the environment only. */
+const withSettings = env => IntegrationsService.fromConfig(loadConfig(env));
 
 const message = { to: 'ada@example.com', subject: 'Hello', text: 'Hi', html: '<p>Hi</p>' };
 
 function service(env) {
-  return new EmailService(loadConfig({ EMAIL_FROM: 'BitoCard <no-reply@bitocard.com>', ...env }));
+  return new EmailService(withSettings({ EMAIL_FROM: 'BitoCard <no-reply@bitocard.com>', ...env }));
 }
 
 describe('email delivery', () => {
@@ -69,7 +73,7 @@ describe('SMS delivery (Termii)', () => {
   test('sends with the Termii API shape, number without the plus sign', async () => {
     const termii = await fakeService(() => ({ body: { message_id: '1', message: 'Successfully Sent' } }));
     try {
-      const sms = new SmsService(loadConfig({ TERMII_API_KEY: 'tm_test', TERMII_API_URL: termii.url, TERMII_SENDER_ID: 'BitoCard' }));
+      const sms = new SmsService(withSettings({ TERMII_API_KEY: 'tm_test', TERMII_API_URL: termii.url, TERMII_SENDER_ID: 'BitoCard' }));
       assert.equal(await sms.send({ to: '+2348031234567', text: 'Your code is 123456' }), 'termii');
       const [call] = termii.calls;
       assert.equal(call.url, '/api/sms/send');
@@ -82,7 +86,7 @@ describe('SMS delivery (Termii)', () => {
   test('rejected messages throw', async () => {
     const termii = await fakeService(() => ({ status: 400, body: { message: 'Insufficient balance' } }));
     try {
-      const sms = new SmsService(loadConfig({ TERMII_API_KEY: 'tm_test', TERMII_API_URL: termii.url }));
+      const sms = new SmsService(withSettings({ TERMII_API_KEY: 'tm_test', TERMII_API_URL: termii.url }));
       await assert.rejects(sms.send({ to: '+2348031234567', text: 'x' }), /Termii HTTP 400/);
     } finally {
       await termii.close();
@@ -90,7 +94,7 @@ describe('SMS delivery (Termii)', () => {
   });
 
   test('without a key, messages are captured instead of sent', async () => {
-    const sms = new SmsService(loadConfig({}));
+    const sms = new SmsService(withSettings({}));
     assert.equal(await sms.send({ to: '+2348031234567', text: 'x' }), 'outbox');
     assert.equal(sms.outbox.length, 1);
   });

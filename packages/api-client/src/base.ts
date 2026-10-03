@@ -35,7 +35,7 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
 }
 
 /** Tag types shared by every endpoint module, so a change on one screen refreshes the others. */
-export const tagTypes = ['Session', 'Overview', 'Reseller', 'Verification', 'Order', 'Supplier', 'Product', 'PricingRule', 'Switch', 'Country', 'Activity', 'Plan'] as const;
+export const tagTypes = ['Session', 'Overview', 'Reseller', 'Verification', 'Order', 'Supplier', 'Product', 'PricingRule', 'Switch', 'Country', 'Activity', 'Plan', 'Integration'] as const;
 
 /** The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache. */
 export const bitocardApi = createApi({

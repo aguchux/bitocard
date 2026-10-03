@@ -6,6 +6,7 @@ import type {
   AdminSession,
   AuditEntry,
   Country,
+  Integration,
   List,
   MfaChallenge,
   MfaSetup,
@@ -155,6 +156,12 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ code, category, ...body }) => ({ url: `/v1/admin/countries/${code}/categories/${category}`, method: 'PUT', body }),
       invalidatesTags: ['Country', 'Activity'],
     }),
+    integrations: build.query<List<Integration>, void>({ query: () => '/v1/admin/integrations', providesTags: ['Integration'] }),
+    /** Sets fields (null clears an admin value). Needs the admin's current authenticator code. */
+    updateIntegration: build.mutation<Integration, { id: string; values: Record<string, string | number | boolean | null>; code: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/integrations/${id}`, method: 'PUT', body }),
+      invalidatesTags: ['Integration', 'Activity'],
+    }),
   }),
 });
 
@@ -193,4 +200,6 @@ export const {
   useSetSwitchMutation,
   useCountriesQuery,
   useUpdateCountryCategoryMutation,
+  useIntegrationsQuery,
+  useUpdateIntegrationMutation,
 } = adminApi;

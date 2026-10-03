@@ -1,5 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { Injectable, Logger } from '@nestjs/common';
+import { IntegrationsService } from '../integrations/integrations.service';
 
 export type EmailMessage = { to: string; subject: string; text: string; html: string };
 
@@ -60,18 +60,26 @@ export class MailerSendProvider implements EmailProvider {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger('Email');
-  private readonly providers: EmailProvider[];
-  private readonly from: string;
+  private readonly configured: () => { from: string; providers: EmailProvider[] };
   /** Messages captured when no provider is configured. */
   readonly outbox: EmailMessage[] = [];
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
-    this.from = config.EMAIL_FROM;
-    const providers: Array<EmailProvider | null> = [
-      config.RESEND_API_KEY ? new ResendProvider(config.RESEND_API_KEY, config.RESEND_API_URL) : null,
-      config.MAILERSEND_API_KEY ? new MailerSendProvider(config.MAILERSEND_API_KEY, config.MAILERSEND_API_URL) : null,
-    ];
-    this.providers = providers.filter((provider): provider is EmailProvider => provider !== null);
+  constructor(integrations: IntegrationsService) {
+    this.configured = integrations.derive(config => ({
+      from: config.EMAIL_FROM,
+      providers: ([
+        config.RESEND_API_KEY ? new ResendProvider(config.RESEND_API_KEY, config.RESEND_API_URL) : null,
+        config.MAILERSEND_API_KEY ? new MailerSendProvider(config.MAILERSEND_API_KEY, config.MAILERSEND_API_URL) : null,
+      ] as Array<EmailProvider | null>).filter((provider): provider is EmailProvider => provider !== null),
+    }));
+  }
+
+  private get providers() {
+    return this.configured().providers;
+  }
+
+  private get from() {
+    return this.configured().from;
   }
 
   /** Returns the provider that sent it ('outbox' when none is configured). Throws only if every provider fails. */

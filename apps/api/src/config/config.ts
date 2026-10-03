@@ -6,7 +6,7 @@ const list = z
 
 const flag = z.enum(['on', 'off']).transform(value => value === 'on');
 
-const schema = z.object({
+export const configSchema = z.object({
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
   /** Set to 1 by Vercel at build and run time. */
   VERCEL: z.string().optional(),
@@ -117,12 +117,12 @@ const schema = z.object({
   EVENTS_SETTLE_SECONDS: z.coerce.number().int().min(0).max(60).default(5),
 });
 
-export type AppConfig = z.infer<typeof schema> & { cookieSecure: boolean; webhookQueue: 'vercel' | 'database' };
+export type AppConfig = z.infer<typeof configSchema> & { cookieSecure: boolean; webhookQueue: 'vercel' | 'database' };
 
 /** Empty strings count as unset, so a blank line in .env never fails validation. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const cleaned = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ''));
-  const parsed = schema.safeParse(cleaned);
+  const parsed = configSchema.safeParse(cleaned);
   if (!parsed.success) {
     const problems = parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
     throw new Error(`Invalid environment configuration: ${problems}`);

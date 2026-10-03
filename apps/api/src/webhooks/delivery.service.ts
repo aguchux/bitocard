@@ -1,10 +1,10 @@
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
-import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { waitUntil } from '@vercel/functions';
 import { Encryption } from '../common/encryption';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../database/prisma.service';
 import type { Event, WebhookDelivery, WebhookEndpoint } from '../generated/prisma/client';
 import { EmailService } from '../notifications/email.service';
@@ -44,8 +44,13 @@ export class WebhookDeliveryService implements OnModuleDestroy {
   private again = false;
   private closing = false;
 
+  /** Admin integration settings over the environment, read fresh on every use. */
+  private get config() {
+    return this.integrations.config;
+  }
+
   constructor(
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly integrations: IntegrationsService,
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly queue: WebhookQueue,

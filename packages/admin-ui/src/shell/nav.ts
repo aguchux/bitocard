@@ -1,4 +1,4 @@
-import { AlertTriangle, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, PlugZap, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'settings';
 
@@ -50,6 +50,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     items: [
       { label: 'Feature switches', href: '/settings', icon: ToggleRight },
       { label: 'Markets', href: '/settings/markets', icon: Globe2 },
+      { label: 'Integrations', href: '/settings/integrations', icon: PlugZap },
     ],
   },
 };

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { ApiError } from '../common/errors/api-error';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../database/prisma.service';
 import type { IdentityVerification, LedgerMode, VerificationStatus } from '../generated/prisma/client';
 import { EmailService } from '../notifications/email.service';
@@ -76,10 +76,15 @@ const fullName = (result: CheckResult) => [result.firstName, result.lastName].fi
 @Injectable()
 export class IdentityService {
   private readonly logger = new Logger('Identity');
-  readonly didit: DiditProvider | null;
+  private readonly diditClient: () => DiditProvider | null;
+
+  /** Admin integration settings over the environment, read fresh on every use. */
+  private get config() {
+    return this.integrations.config;
+  }
 
   constructor(
-    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly integrations: IntegrationsService,
     private readonly prisma: PrismaService,
     private readonly providers: PaymentProviders,
     private readonly settings: SettingsService,
@@ -87,8 +92,14 @@ export class IdentityService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
   ) {
-    this.didit =
-      config.DIDIT_API_KEY && config.DIDIT_WORKFLOW_ID ? new DiditProvider(config.DIDIT_API_KEY, config.DIDIT_WORKFLOW_ID, config.DIDIT_API_URL, config.DIDIT_WEBHOOK_SECRET) : null;
+    this.diditClient = integrations.derive(config =>
+      config.DIDIT_API_KEY && config.DIDIT_WORKFLOW_ID ? new DiditProvider(config.DIDIT_API_KEY, config.DIDIT_WORKFLOW_ID, config.DIDIT_API_URL, config.DIDIT_WEBHOOK_SECRET) : null,
+    );
+  }
+
+  /** Didit with the current admin settings; null until its API key and workflow are set. */
+  get didit(): DiditProvider | null {
+    return this.diditClient();
   }
 
   private providerFailure(error: unknown, what: string) {

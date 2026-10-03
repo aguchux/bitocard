@@ -119,6 +119,19 @@ export class AdminAuthService {
     return { object: 'admin_session' as const, admin: this.present(user) };
   }
 
+  /**
+   * Step-up check for sensitive changes (for example service credentials): the admin's current authenticator code.
+   * Wrong codes count towards the sign-in lockout, so a stolen session cannot guess its way through.
+   */
+  async confirmCode(userId: string, code: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { totp: true } });
+    if (!user || user.realm !== 'admin' || !user.totp?.confirmedAt) throw invalidCode();
+    if (!(await this.useTotp(user, user.totp, code))) {
+      await this.recordFailure(user);
+      throw invalidCode();
+    }
+  }
+
   private present(user: User) {
     return { object: 'admin' as const, id: user.id, name: user.name, email: user.email, roles: user.adminRoles };
   }

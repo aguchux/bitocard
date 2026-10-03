@@ -1,6 +1,6 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { IntegrationsService } from '../integrations/integrations.service';
 import type { LedgerMode } from '../generated/prisma/client';
 import { FlutterwaveProvider } from './flutterwave.provider';
 import { MonnifyProvider } from './monnify.provider';
@@ -16,19 +16,30 @@ export const providerUnavailable = (what: string) =>
  */
 @Injectable()
 export class PaymentProviders {
-  readonly sandbox: SandboxProvider;
-  readonly flutterwave: FlutterwaveProvider | null;
-  readonly monnify: MonnifyProvider | null;
+  private readonly clients: () => { sandbox: SandboxProvider; flutterwave: FlutterwaveProvider | null; monnify: MonnifyProvider | null };
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
-    this.sandbox = new SandboxProvider(config.DASHBOARD_URL);
-    this.flutterwave = config.FLUTTERWAVE_SECRET_KEY
-      ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH)
-      : null;
-    this.monnify =
-      config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE
-        ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
-        : null;
+  constructor(integrations: IntegrationsService) {
+    this.clients = integrations.derive(config => ({
+      sandbox: new SandboxProvider(config.DASHBOARD_URL),
+      flutterwave: config.FLUTTERWAVE_SECRET_KEY ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH) : null,
+      monnify:
+        config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE
+          ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
+          : null,
+    }));
+  }
+
+  get sandbox() {
+    return this.clients().sandbox;
+  }
+
+  /** Null until its secret key is set (admin Settings > Integrations, or the environment). */
+  get flutterwave() {
+    return this.clients().flutterwave;
+  }
+
+  get monnify() {
+    return this.clients().monnify;
   }
 
   checkout(mode: LedgerMode, country: string): CheckoutProvider {

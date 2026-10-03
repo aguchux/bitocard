@@ -1195,3 +1195,16 @@ model IdentityVerification {
   @@index([status, createdAt])
   @@map("identity_verifications")
 }
+
+/// Service credentials and settings an admin sets in the admin app (Settings > Integrations) instead of the environment.
+/// `key` is the environment variable name it replaces; an admin value wins over the environment. Secrets are encrypted
+/// with ENCRYPTION_KEY and never returned by the API.
+model IntegrationSetting {
+  key         String   @id
+  value       String
+  encrypted   Boolean
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("integration_settings")
+}

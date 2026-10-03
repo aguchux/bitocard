@@ -183,7 +183,20 @@ export async function adminClient(server, roles = ['super_admin']) {
   const code = new TOTP({ issuer: 'BitoCard Admin', label: email, secret: Secret.fromBase32(setup.secret) }).generate();
   const verified = await browser.post('/v1/admin/auth/mfa/verify', { challenge_token: challenge.challenge_token, code });
   if (verified.status !== 200) throw new Error(`Admin sign-in failed: ${JSON.stringify(verified.json)}`);
+  browser.admin = { email, secret: setup.secret };
   return browser;
+}
+
+/**
+ * A current authenticator code for an admin client, for step-up checks. A code's time step can be used only once, so
+ * this forgets the last used step first (tests may need several codes within 30 seconds).
+ */
+export async function adminCode(server, browser) {
+  const { PrismaService } = await import('../dist/database/prisma.service.js');
+  const prisma = server.app.get(PrismaService);
+  const user = await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email: browser.admin.email } });
+  await prisma.totpCredential.update({ where: { userId: user.id }, data: { lastUsedStep: null } });
+  return new TOTP({ issuer: 'BitoCard Admin', label: browser.admin.email, secret: Secret.fromBase32(browser.admin.secret) }).generate();
 }
 
 /** A newly signed-up reseller owner. */
