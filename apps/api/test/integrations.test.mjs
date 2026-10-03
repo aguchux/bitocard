@@ -41,7 +41,7 @@ describe('integration settings', () => {
     const registry = await prisma.supplier.findMany({ select: { code: true } });
     const suppliers = json.data.filter(item => item.section === 'suppliers');
     assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'flutterwave_cards')));
-    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['reloadly', 'vtpass']);
+    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['didww', 'reloadly', 'vtpass']);
     const sms = json.data.find(item => item.id === 'sms');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').source, 'environment');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').value, 'EnvSender');
@@ -156,24 +156,33 @@ describe('integration settings', () => {
   });
 
   test('suppliers without an adapter yet: credentials are saved encrypted, write-only, for the adapter to read later', async () => {
-    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
-    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'DIDWW_API_KEY').source], ['not_connected', false, 'unset']);
+    const before = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'airalo');
+    assert.deepEqual([before.status, before.adapter_ready, fieldOf(before, 'AIRALO_CLIENT_SECRET').source], ['not_connected', false, 'unset']);
 
-    const key = 'didww-live-key-abcd1234';
-    const saved = await update('didww', { DIDWW_API_KEY: key, DIDWW_API_URL: 'https://sandbox-api.didww.com/v3' });
+    const key = 'airalo-live-secret-abcd1234';
+    const saved = await update('airalo', { AIRALO_CLIENT_ID: 'airalo-client', AIRALO_CLIENT_SECRET: key, AIRALO_API_URL: 'https://sandbox-partners-api.airalo.com' });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
     assert.equal(saved.json.status, 'connected');
-    assert.deepEqual([fieldOf(saved.json, 'DIDWW_API_KEY').hint, fieldOf(saved.json, 'DIDWW_API_KEY').value], ['…1234', null]);
-    assert.equal(fieldOf(saved.json, 'DIDWW_API_URL').value, 'https://sandbox-api.didww.com/v3');
+    assert.deepEqual([fieldOf(saved.json, 'AIRALO_CLIENT_SECRET').hint, fieldOf(saved.json, 'AIRALO_CLIENT_SECRET').value], ['…1234', null]);
+    assert.equal(fieldOf(saved.json, 'AIRALO_API_URL').value, 'https://sandbox-partners-api.airalo.com');
     assert.ok(!JSON.stringify(saved.json).includes(key));
-    assert.deepEqual(integrations.supplier('didww'), { API_KEY: key, API_URL: 'https://sandbox-api.didww.com/v3' });
-    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { key: 'DIDWW_API_KEY' } });
+    assert.deepEqual(integrations.supplier('airalo'), { CLIENT_ID: 'airalo-client', CLIENT_SECRET: key, API_URL: 'https://sandbox-partners-api.airalo.com' });
+    const row = await prisma.integrationSetting.findUniqueOrThrow({ where: { key: 'AIRALO_CLIENT_SECRET' } });
     assert.ok(row.encrypted && !row.value.includes(key));
 
-    assert.equal((await update('didww', { DIDWW_API_URL: 'not a url' })).json.error.param, 'values.DIDWW_API_URL');
-    assert.equal((await update('didww', { TWILIO_AUTH_TOKEN: 'x' })).status, 400, 'another supplier’s field');
-    const cleared = await update('didww', { DIDWW_API_KEY: null });
-    assert.equal(fieldOf(cleared.json, 'DIDWW_API_KEY').source, 'unset');
-    assert.equal(integrations.supplier('didww').API_KEY, undefined);
+    assert.equal((await update('airalo', { AIRALO_API_URL: 'not a url' })).json.error.param, 'values.AIRALO_API_URL');
+    assert.equal((await update('airalo', { TWILIO_AUTH_TOKEN: 'x' })).status, 400, 'another supplier’s field');
+    const cleared = await update('airalo', { AIRALO_CLIENT_SECRET: null });
+    assert.equal(fieldOf(cleared.json, 'AIRALO_CLIENT_SECRET').source, 'unset');
+    assert.equal(integrations.supplier('airalo').CLIENT_SECRET, undefined);
+  });
+
+  test('DIDWW has a built adapter: its settings are integration keys with environment fallback', async () => {
+    const didww = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
+    assert.deepEqual([didww.section, didww.adapter_ready], ['suppliers', true]);
+    assert.deepEqual(didww.fields.map(item => item.key), ['DIDWW_API_KEY', 'DIDWW_API_URL', 'DIDWW_COUNTRIES', 'DIDWW_CALLBACK_URL']);
+    const saved = await update('didww', { DIDWW_COUNTRIES: 'GB, US,CA' });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.deepEqual(integrations.config.DIDWW_COUNTRIES, ['GB', 'US', 'CA']);
   });
 });

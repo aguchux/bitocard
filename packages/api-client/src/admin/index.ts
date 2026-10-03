@@ -108,7 +108,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     }),
     resolveOrder: build.mutation<
       AdminOrderDetail,
-      { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'token' | 'confirmation'; code?: string; pin?: string; serial?: string }> }
+      { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'token' | 'confirmation' | 'virtual_number'; code?: string; pin?: string; serial?: string }> }
     >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/orders/${id}/resolve`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity'],

@@ -7,7 +7,7 @@ import type { IntegrationKind } from './definitions.js';
  * fallback for these: they are set in the admin app only.
  *
  * The fields follow each supplier's published authentication scheme as far as it is known; confirm them against the
- * credentials the supplier actually issues (and adjust here) before building its adapter. Reloadly and VTpass have
+ * credentials the supplier actually issues (and adjust here) before building its adapter. Reloadly, VTpass and DIDWW have
  * their own groups in `definitions.ts`. Flutterwave virtual cards use the Flutterwave group's keys.
  */
 export type SupplierCredentialField = { suffix: string; label: string; secret: boolean; kind: IntegrationKind; required: boolean; help?: string };
@@ -40,7 +40,6 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   { code: 'prestmit', name: 'Prestmit', description: 'Gift card sales and trades.', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Prestmit API base address')] },
   { code: 'cardtonic', name: 'Cardtonic', description: 'Gift card sales and trades.', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Cardtonic API base address')] },
   // Virtual numbers, voice and SMS.
-  { code: 'didww', name: 'DIDWW', description: 'International virtual numbers, voice and SMS.', fields: [key('API key', 'Sent as the Api-Key header.'), address('Sandbox: https://sandbox-api.didww.com/v3 · Live: https://api.didww.com/v3')] },
   { code: 'telnyx', name: 'Telnyx', description: 'Global numbers and SMS.', fields: [key('API key'), optional('WEBHOOK_PUBLIC_KEY', 'Webhook public key', 'Verifies Telnyx webhook signatures.')] },
   { code: 'vonage', name: 'Vonage', description: 'Virtual numbers for messaging and calls.', fields: [key('API key'), secret('API_SECRET', 'API secret'), optionalSecret('SIGNATURE_SECRET', 'Signature secret', 'Verifies Vonage webhook signatures.')] },
   { code: 'twilio', name: 'Twilio', description: 'SMS-enabled numbers and messaging.', fields: [id('ACCOUNT_SID', 'Account SID'), secret('AUTH_TOKEN', 'Auth token', 'Also verifies Twilio webhook signatures.')] },
@@ -59,5 +58,5 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   { code: 'esim_go', name: 'eSIM Go', description: 'eSIM packages (backup).', fields: [key('API key'), address('Default: https://api.esim-go.com/v2.4')] },
 ];
 
-/** `DIDWW_API_KEY`, `ESIM_ACCESS_SECRET_KEY`: the supplier code in capitals, then the field. */
+/** `TELNYX_API_KEY`, `ESIM_ACCESS_SECRET_KEY`: the supplier code in capitals, then the field. */
 export const supplierCredentialKey = (code: string, suffix: string) => `${code.toUpperCase()}_${suffix}`;

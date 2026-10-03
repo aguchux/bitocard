@@ -23,7 +23,7 @@ type Decimal = Prisma.Decimal;
 /** Categories sold at a face value in local currency, where resellers earn a markup or a discount. */
 export const faceValueCategories = new Set<ProductCategory>(['airtime', 'data', 'pay_tv', 'bills']);
 /** Categories bought for use anywhere, so any market can sell them without the international plan feature. */
-export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'esim', 'software']);
+export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'esim', 'software', 'virtual_numbers']);
 
 export type Offer = SupplierProduct & { supplier: Supplier };
 export type ProductWithOffers = Product & { supplierProducts: Offer[] };

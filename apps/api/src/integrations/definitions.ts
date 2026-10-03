@@ -14,7 +14,7 @@ import { supplierCredentialGroups, supplierCredentialKey } from './supplier-cred
 export type IntegrationKind = 'text' | 'url' | 'email' | 'number' | 'flag';
 
 export type IntegrationField = {
-  /** The environment variable it replaces (platform settings), or the supplier credential's name (`DIDWW_API_KEY`). */
+  /** The environment variable it replaces (platform settings), or the supplier credential's name (`TELNYX_API_KEY`). */
   key: string;
   label: string;
   /** Write-only: encrypted at rest and never returned (the API shows only the last four characters). */
@@ -67,6 +67,10 @@ const integrationKeyList = [
   'VTPASS_SECRET_KEY',
   'VTPASS_API_URL',
   'VTPASS_CONTACT_PHONE',
+  'DIDWW_API_KEY',
+  'DIDWW_API_URL',
+  'DIDWW_COUNTRIES',
+  'DIDWW_CALLBACK_URL',
   'DIDIT_API_KEY',
   'DIDIT_WORKFLOW_ID',
   'DIDIT_WEBHOOK_SECRET',
@@ -188,6 +192,18 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     ],
   },
   {
+    id: 'didww',
+    name: 'DIDWW',
+    description: 'Virtual phone numbers (voice and SMS). Without an API key it serves only the sandbox, never live orders.',
+    webhookPath: '/v1/webhooks/didww',
+    fields: [
+      secret('DIDWW_API_KEY', 'API key', { help: 'DIDWW dashboard > API. Also verifies DIDWW’s order callbacks.' }),
+      field('DIDWW_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://sandbox-api.didww.com/v3' }),
+      field('DIDWW_COUNTRIES', 'Number countries', { help: 'ISO codes of the countries whose numbers are synced, separated by commas, for example GB,US.' }),
+      field('DIDWW_CALLBACK_URL', 'API public address', { kind: 'url', help: 'Order callbacks go to this address plus /v1/webhooks/didww. Default: https://api.bitocard.com' }),
+    ],
+  },
+  {
     id: 'didit',
     name: 'Didit identity checks',
     description: 'Reseller owners everywhere, and customers outside Nigeria. Switched off until the API key and workflow are set.',
@@ -201,7 +217,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww']);
 
 export const integrationGroups: IntegrationGroup[] = [
   ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),

@@ -56,7 +56,7 @@ export class IntegrationsService implements OnModuleInit {
   }
 
   /**
-   * A supplier's credentials set in the admin app (Settings > Integrations), by field: `supplier('didww').API_KEY`.
+   * A supplier's credentials set in the admin app (Settings > Integrations), by field: `supplier('telnyx').API_KEY`.
    * For suppliers whose adapters are not built yet; Reloadly and VTpass use `config`.
    */
   supplier(code: string): Record<string, string | undefined> {

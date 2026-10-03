@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { StubAdapter, type SupplierAdapter } from './adapter.js';
+import { DidwwAdapter } from './didww.adapter.js';
 import { ReloadlyAdapter } from './reloadly.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
 
@@ -26,6 +27,7 @@ export class SupplierAdapters {
           },
         ),
         new VtpassAdapter({ apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
+        new DidwwAdapter({ apiKey: config.DIDWW_API_KEY, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL }),
       ];
       return new Map(adapters.map(adapter => [adapter.code, adapter]));
     });

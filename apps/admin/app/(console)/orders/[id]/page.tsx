@@ -28,7 +28,7 @@ import {
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useOrderQuery, useRefundOrderMutation, useRequeryOrderMutation, useResolveOrderMutation } from "@bitocard/api-client/admin";
 
-type Delivery = { kind: "gift_card" | "token" | "confirmation"; code: string; pin: string; serial: string };
+type Delivery = { kind: "gift_card" | "token" | "confirmation" | "virtual_number"; code: string; pin: string; serial: string };
 const emptyDelivery = (): Delivery => ({ kind: "gift_card", code: "", pin: "", serial: "" });
 
 export default function OrderPage() {
@@ -243,6 +243,7 @@ export default function OrderPage() {
                     <Select id={`kind-${index}`} value={row.kind} onChange={event => setDelivery(index, { kind: event.target.value as Delivery["kind"] })}>
                       <option value="gift_card">Gift card</option>
                       <option value="token">Token</option>
+                      <option value="virtual_number">Phone number</option>
                       <option value="confirmation">Confirmation only</option>
                     </Select>
                   </Field>
@@ -254,7 +255,7 @@ export default function OrderPage() {
                   </Field>
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
-                      <Field label="Serial" htmlFor={`serial-${index}`}>
+                      <Field label={row.kind === "virtual_number" ? "Phone number" : "Serial"} htmlFor={`serial-${index}`}>
                         <Input id={`serial-${index}`} value={row.serial} onChange={event => setDelivery(index, { serial: event.target.value })} autoComplete="off" />
                       </Field>
                     </div>

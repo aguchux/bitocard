@@ -35,7 +35,7 @@ export type RecipientCheck =
   | { valid: false; reason: string };
 
 /** What the customer receives. Codes and PINs are secrets: encrypted at rest, never logged or sent in webhooks. */
-export type Delivery = { kind: 'gift_card' | 'token' | 'confirmation'; code?: string; pin?: string; serial?: string; details?: Record<string, string> };
+export type Delivery = { kind: 'gift_card' | 'token' | 'confirmation' | 'virtual_number'; code?: string; pin?: string; serial?: string; details?: Record<string, string> };
 
 /**
  * A supplier outcome. `pending` means not yet confirmed (including timeouts and unclear replies): the order waits

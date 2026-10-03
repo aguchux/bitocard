@@ -13,6 +13,7 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type SupplierWebhook, type SupplierWebhookStatus } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
+import { didwwNotice, didwwSignatureValid } from '../suppliers/didww.webhooks.js';
 import { reloadlyNotice, reloadlySignatureValid } from '../suppliers/reloadly.webhooks.js';
 import { OrdersService } from './orders.service.js';
 
@@ -28,7 +29,7 @@ const keepOthersMs = 365 * 24 * 3600_000;
 const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'signature_invalid', 'Webhook signature is missing or wrong.');
 
 /**
- * Supplier notifications (Reloadly first). Nothing is lost: each one is verified and stored (encrypted) before it is
+ * Supplier notifications (Reloadly and DIDWW). Nothing is lost: each one is verified and stored (encrypted) before it is
  * acknowledged; a supplier's retry of the same delivery is stored once. Processing happens after the reply (suppliers
  * allow a few seconds) and never trusts the body: the order it names is re-checked with the supplier, exactly like a
  * scheduled check. Failures are retried on `supplierWebhookRetryMs` by the `supplier-webhooks` job; notifications that
@@ -54,6 +55,21 @@ export class SupplierWebhooksService {
       // Stored all the same: an admin can look at it, and nothing is acted on without a reference.
     }
     return this.store('reloadly', rawBody!, reloadlyNotice(payload));
+  }
+
+  /**
+   * DIDWW order callbacks: form fields (`id`, `type`, `status`) signed with the API key over the address DIDWW called,
+   * which is our callback base plus the path and query received (the query names our reference).
+   */
+  async receiveDidww(pathAndQuery: string, fields: unknown, rawBody: Buffer | undefined, signature: string | undefined) {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(fields && typeof fields === 'object' ? fields : {})) if (typeof value === 'string') params[key] = value;
+    const url = `${this.integrations.config.DIDWW_CALLBACK_URL.replace(/\/+$/, '')}${pathAndQuery}`;
+    if (!didwwSignatureValid(this.integrations.config.DIDWW_API_KEY, url, params, signature)) throw untrusted();
+    const reference = new URL(url).searchParams.get('reference') ?? undefined;
+    // The query is part of what is stored (and of the body hash): it is what names the order.
+    const stored = Buffer.concat([Buffer.from(`${pathAndQuery}\n`), rawBody ?? Buffer.from(new URLSearchParams(params).toString())]);
+    return this.store('didww', stored, didwwNotice(params, reference));
   }
 
   /** Stores the notification (once per distinct body) and starts processing it after the reply. */
@@ -223,6 +239,12 @@ export class SupplierWebhooksController {
   @HttpCode(HttpStatus.OK)
   reloadly(@Req() req: Request & { rawBody?: Buffer }) {
     return this.webhooks.receiveReloadly(req.rawBody, req.get('x-reloadly-signature'), req.get('x-reloadly-request-timestamp'));
+  }
+
+  @Post('didww')
+  @HttpCode(HttpStatus.OK)
+  didww(@Req() req: Request & { rawBody?: Buffer }) {
+    return this.webhooks.receiveDidww(req.originalUrl, req.body, req.rawBody, req.get('x-didww-signature'));
   }
 }
 

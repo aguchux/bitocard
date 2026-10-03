@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
+import { worldwideCategories } from '../catalogue/pricing.service.js';
 import type { CatalogueItem, CatalogueScope } from './adapter.js';
 import { SupplierAdapters } from './supplier-adapters.js';
 
@@ -111,14 +112,14 @@ export class SuppliersService {
     return this.get(code);
   }
 
-  /** What to sync for a supplier: each enabled market, with worldwide categories (gift cards) fetched once. */
+  /** What to sync for a supplier: each enabled market, with worldwide categories (gift cards, numbers) fetched once. */
   private async scopes(code: string): Promise<CatalogueScope[]> {
     const adapter = this.adapters.get(code);
     const markets = await this.prisma.supplierMarket.findMany({ where: { supplierCode: code, enabled: true } });
     const scopes = new Map<string, CatalogueScope>();
     for (const market of markets) {
       if (!adapter.syncs.includes(market.category)) continue;
-      const country = market.category === 'gift_cards' ? null : market.countryCode;
+      const country = worldwideCategories.has(market.category) ? null : market.countryCode;
       scopes.set(`${market.category}:${country}`, { category: market.category, country });
     }
     return [...scopes.values()];

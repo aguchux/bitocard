@@ -1001,7 +1001,7 @@ model Order {
 model OrderDelivery {
   id            String   @id @default(uuid()) @db.Uuid
   orderId       String   @map("order_id") @db.Uuid
-  /// gift_card, token or confirmation.
+  /// gift_card, token, confirmation or virtual_number.
   kind          String
   codeEncrypted String?  @map("code_encrypted")
   pinEncrypted  String?  @map("pin_encrypted")

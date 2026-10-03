@@ -90,6 +90,13 @@ export const configSchema = z.object({
   VTPASS_API_URL: z.string().url().default('https://vtpass.com/api'),
   /** VTpass needs a phone number on every payment; used when the customer gave none. */
   VTPASS_CONTACT_PHONE: z.string().default('08011111111'),
+  DIDWW_API_KEY: z.string().optional(),
+  /** https://sandbox-api.didww.com/v3 for the DIDWW sandbox. */
+  DIDWW_API_URL: z.string().url().default('https://api.didww.com/v3'),
+  /** Countries whose numbers are synced (ISO codes); numbers are sold to resellers in every market. */
+  DIDWW_COUNTRIES: list.prefault('GB,US'),
+  /** BitoCard's public API address: DIDWW order callbacks go to <this>/v1/webhooks/didww and are signed over it. */
+  DIDWW_CALLBACK_URL: z.string().url().default('https://api.bitocard.com'),
 
   // Identity checks (Didit): reseller owners everywhere, customers outside Nigeria. Unset API key switches Didit off.
   DIDIT_API_KEY: z.string().optional(),

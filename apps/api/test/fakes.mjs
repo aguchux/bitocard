@@ -378,3 +378,92 @@ export async function fakeDidit() {
   });
   return { ...service, state, secret: 'didit-webhook-secret', env: { DIDIT_API_KEY: 'didit-key', DIDIT_WORKFLOW_ID: 'wf-test', DIDIT_WEBHOOK_SECRET: 'didit-webhook-secret', DIDIT_API_URL: service.url } };
 }
+
+/**
+ * DIDWW (JSON:API). `state.groups` are DID groups with their SKUs; `state.orderReply` decides what a new order does
+ * ('Completed' | 'Pending' | 'Canceled', or { http: 500, recorded } for an unclear reply after the order was recorded).
+ * Completing an order (`complete(id)`) assigns it a number. Every request must carry the API key.
+ */
+export async function fakeDidww() {
+  const country = { id: 'country-gb', type: 'countries', attributes: { name: 'United Kingdom', iso: 'GB', prefix: '44' } };
+  const local = { id: 'type-local', type: 'did_group_types', attributes: { name: 'Local' } };
+  const tollFree = { id: 'type-tollfree', type: 'did_group_types', attributes: { name: 'Toll-free' } };
+  const sku = (id, setup, monthly, channels) => ({ id, type: 'stock_keeping_units', attributes: { setup_price: setup, monthly_price: monthly, channels_included_count: channels } });
+  const group = (id, attributes, type, skus, meta = {}) => ({ id, attributes: { allow_additional_channels: true, ...attributes }, type, skus, meta: { needs_registration: false, is_available: true, ...meta } });
+  const state = {
+    groups: [
+      group('grp-london', { prefix: '20', features: ['voice', 'sms', 't38'], is_metered: false, area_name: 'London' }, local, [sku('sku-london-0', '0.0', '1.5', 0), sku('sku-london-2', '0.5', '3.0', 2)]),
+      // Regulated, metered and fax-only groups are never sold.
+      group('grp-manchester', { prefix: '161', features: ['voice'], is_metered: false, area_name: 'Manchester' }, local, [sku('sku-manchester', '0', '1', 0)], { needs_registration: true }),
+      group('grp-freephone', { prefix: '800', features: ['voice'], is_metered: true, area_name: '' }, tollFree, [sku('sku-freephone', '0', '5', 0)]),
+      group('grp-fax', { prefix: '113', features: ['t38'], is_metered: false, area_name: 'Leeds' }, local, [sku('sku-fax', '0', '1', 0)]),
+    ],
+    orders: {},
+    dids: [],
+    orderReply: 'Completed',
+    next: 1000,
+  };
+  const resource = order => ({ id: order.id, type: 'orders', attributes: { status: order.status, reference: order.reference, amount: order.amount, callback_url: order.callback_url, callback_method: order.callback_method, created_at: order.created_at } });
+  const complete = id => {
+    const order = state.orders[id];
+    order.status = 'Completed';
+    state.dids.push({ id: `did-${id}`, type: 'dids', attributes: { number: `4420790${String((state.next += 1)).padStart(5, '0')}`, expires_at: '2026-11-03T00:00:00.000Z' }, order: id });
+    return order;
+  };
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (headers['api-key'] !== 'didww-key') return { status: 401, body: { errors: [{ title: 'Unauthorized', detail: 'Invalid API key' }] } };
+    if (state.fail && path.startsWith(state.fail)) return { status: 500, body: { errors: [{ title: 'Simulated outage' }] } };
+    if (method === 'GET' && path === '/countries') return { body: { data: query.get('filter[iso]') === 'GB' ? [country] : [] } };
+    if (method === 'GET' && path === '/did_groups') {
+      const groups = state.groups.filter(
+        g =>
+          query.get('filter[country.id]') === country.id &&
+          (query.get('filter[needs_registration]') !== 'false' || !g.meta.needs_registration) &&
+          (query.get('filter[is_metered]') !== 'false' || !g.attributes.is_metered),
+      );
+      const size = Number(query.get('page[size]') ?? 50);
+      const page = groups.slice((Number(query.get('page[number]') ?? 1) - 1) * size).slice(0, size);
+      return {
+        body: {
+          data: page.map(g => ({
+            id: g.id,
+            type: 'did_groups',
+            attributes: g.attributes,
+            relationships: { did_group_type: { data: { id: g.type.id, type: g.type.type } }, stock_keeping_units: { data: g.skus.map(s => ({ id: s.id, type: s.type })) } },
+            meta: g.meta,
+          })),
+          included: [...new Map(page.flatMap(g => [g.type, ...g.skus]).map(item => [item.id, item])).values()],
+        },
+      };
+    }
+    if (method === 'POST' && path === '/orders') {
+      const attributes = body.data.attributes;
+      const item = attributes.items[0].attributes;
+      const skuFound = state.groups.flatMap(g => g.skus).find(s => s.id === item.sku_id);
+      if (!skuFound) return { status: 422, body: { errors: [{ title: 'is invalid', detail: 'sku_id - is invalid' }] } };
+      const reply = state.orderReply;
+      const id = `order-${(state.next += 1)}`;
+      const order = { id, reference: `ABC-${state.next}`, status: 'Pending', amount: String(Number(skuFound.attributes.setup_price) + Number(skuFound.attributes.monthly_price)), callback_url: attributes.callback_url, callback_method: attributes.callback_method, created_at: new Date().toISOString(), request: body };
+      state.orders[id] = order;
+      const status = typeof reply === 'object' ? reply.recorded : reply;
+      if (status === 'Completed') complete(id);
+      else if (status) order.status = status;
+      if (typeof reply === 'object') {
+        if (!reply.recorded) delete state.orders[id];
+        return { status: reply.http, body: { errors: [{ title: 'Simulated error' }] } };
+      }
+      return { status: 201, body: { data: resource(order) } };
+    }
+    const one = /^\/orders\/([\w-]+)$/.exec(path);
+    if (method === 'GET' && one) return state.orders[one[1]] ? { body: { data: resource(state.orders[one[1]]) } } : { status: 404, body: { errors: [{ title: 'Not found' }] } };
+    if (method === 'GET' && path === '/orders') {
+      const orders = Object.values(state.orders).sort((a, b) => b.created_at.localeCompare(a.created_at));
+      return { body: { data: orders.map(resource) } };
+    }
+    if (method === 'GET' && path === '/dids') return { body: { data: state.dids.filter(d => d.order === query.get('filter[order.id]')).map(did => ({ id: did.id, type: did.type, attributes: did.attributes })) } };
+    return { status: 404, body: { errors: [{ title: `Fake DIDWW has no ${method} ${path}` }] } };
+  });
+  return { ...service, state, complete, env: { DIDWW_API_KEY: 'didww-key', DIDWW_API_URL: service.url, DIDWW_COUNTRIES: 'GB' } };
+}

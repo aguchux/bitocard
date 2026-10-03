@@ -505,7 +505,9 @@ export class OrdersService {
     const before = await this.prisma.order.findUnique({ where: { id }, include: { product: true } });
     if (!before) throw notFound();
     if (before.status !== 'processing') throw conflict('order_not_processing', 'Only orders still processing can be resolved.');
-    if (input.outcome === 'completed') await this.complete(before, { deliveries: input.deliveries ?? [] });
+    // A number handed over by an admin is shown like one DIDWW delivered.
+    const deliveries = (input.deliveries ?? []).map(d => (d.kind === 'virtual_number' && d.serial && !d.details ? { ...d, details: { number: d.serial } } : d));
+    if (input.outcome === 'completed') await this.complete(before, { deliveries });
     else await this.fail(id, 'The order could not be fulfilled. The amount held has been returned to your wallet.', input.reason);
     const after = await this.prisma.order.findUniqueOrThrow({ where: { id } });
     await this.audit.record({ actorId, action: `order.resolved_${input.outcome}`, targetType: 'order', targetId: id, before, after: { ...after, reason: input.reason } });
@@ -560,5 +562,10 @@ function sandboxDeliveries(category: ProductCategory, quantity: number): Deliver
   const code = () => `SANDBOX-${randomBytes(6).toString('hex').toUpperCase()}`;
   if (category === 'gift_cards') return Array.from({ length: quantity }, () => ({ kind: 'gift_card' as const, code: code(), pin: String(1000 + Math.floor(Math.random() * 9000)) }));
   if (category === 'bills') return [{ kind: 'token', code: '0000-0000-0000-0000-0000', details: { units: '0.0' } }];
+  if (category === 'virtual_numbers') {
+    // 555-0100 to 555-0199 are reserved for fiction in North America: never a real subscriber.
+    const number = `+120255501${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
+    return [{ kind: 'virtual_number', serial: number, details: { number, sandbox: 'true' } }];
+  }
   return [{ kind: 'confirmation' }];
 }
