@@ -1,0 +1,48 @@
+/*
+ * BitoCard admin theme (Tailwind 4). Apps import this after `@import "tailwindcss";`.
+ * Navy and pink brand, white cards on a soft canvas.
+ */
+@source "./";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-navy-950: #040935;
+  --color-navy-900: #070f4c;
+  --color-navy-800: #111a5e;
+  --color-navy-700: #1d2873;
+  --color-navy-100: #e7e9f6;
+
+  --color-brand-50: #fff0f7;
+  --color-brand-100: #ffe0ef;
+  --color-brand-200: #ffc0de;
+  --color-brand-500: #ff2382;
+  --color-brand-600: #e3106b;
+  --color-brand-700: #c00b58;
+
+  --color-ink: #0d1433;
+  --color-muted: #5b6488;
+  --color-subtle: #8a92ad;
+  --color-line: #e6e9f2;
+  --color-canvas: #f6f7fb;
+
+  --shadow-card: 0 1px 2px rgb(13 20 51 / 0.04), 0 1px 3px rgb(13 20 51 / 0.04);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  dialog::backdrop {
+    background: rgb(4 9 53 / 0.45);
+  }
+}

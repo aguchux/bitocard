@@ -145,6 +145,12 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 - Live payout accounts must be in the verified owner's or the business's name.
 - Unfinished checks are offered again for a day and closed after 7 days.
 
+### Admin app (Decided)
+
+- One admin app at `admin.bitocard.com` (one Vercel project, `bitocard-admin`): sign-in, dashboard, orders, catalogue, resellers, identity checks, activity log and settings. Microfrontends were tried and dropped: with one team and a few dozen pages they added deployments and slower navigation for no benefit. Each area keeps its own folder and the UI lives in shared packages, so an area can be split out later if a separate team needs to own it.
+- Admins sign in with email, password and an authenticator app only (never Google). Sessions, roles and every change are enforced and audited by the API; the app hides actions an admin's roles do not allow.
+- The dashboard shows sales and orders by currency (live or sandbox), money held for resellers, active resellers, supplier health, items needing attention, and recent orders.
+
 ### Webhooks (Decided, starting values)
 
 - Events at launch: `order.completed`, `order.failed`, `order.refunded`, `top_up.succeeded`, `top_up.failed`, `payout.paid`, `payout.failed`, plus a `ping` test event. Payload version `2026-10-01`.
@@ -319,8 +325,8 @@ Phase 1, foundation and own-brand pilot:
 | M6 | Orders and fulfilment, requery and exception queue, receipts, refunds | **Done** |
 | M7 | Webhooks: outbox, delivery, retries, events API | **Done** (Vercel Queues transport; needs Vercel Pro for the 5-minute backstop job) |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | **Done** (needs Didit API key, workflow and webhook secret, and Flutterwave BVN access; privacy notice update before live) |
-| M9 | Admin app | Next |
-| M10 | Own-brand storefront (Golojan's store) | |
+| M9 | Admin app | **Done** (needs the `bitocard-admin` Vercel project on admin.bitocard.com with `NEXT_PUBLIC_API_URL`, and the API's `ALLOWED_ORIGINS` to include it) |
+| M10 | Own-brand storefront (Golojan's store) | Next |
 | M11 | Pilot launch: Nigeria, then Ghana and Kenya | |
 
 Phase 2, reseller launch: M12 docs app, M13 reseller dashboard, M14 domains, M15 promotions, M16 reseller launch. Phase 3 onwards: gift-card selling, more bills countries, Microsoft licences, virtual numbers, virtual cards.

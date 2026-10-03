@@ -14,7 +14,11 @@
     "@bitocard/ui": "*",
     "next": "16.3.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "@bitocard/admin-ui": "*",
+    "@bitocard/api-client": "*",
+    "lucide-react": "^1.50.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@bitocard/eslint-config": "*",
@@ -25,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@types/qrcode": "^1.5.5"
   }
 }

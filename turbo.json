@@ -1,11 +1,28 @@
 {
   "$schema": "https://turborepo.com/schema.json",
-  "globalEnv": ["SITE_URL", "STOREFRONT_URL", "LEGALS_URL", "VERCEL", "VERCEL_ENV", "VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"],
+  "globalEnv": [
+    "SITE_URL",
+    "STOREFRONT_URL",
+    "LEGALS_URL",
+    "VERCEL",
+    "VERCEL_ENV",
+    "VERCEL_URL",
+    "VERCEL_PROJECT_PRODUCTION_URL",
+    "NEXT_PUBLIC_API_URL"
+  ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ]
     },
     "dev": {
       "cache": false,
@@ -16,14 +33,22 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "test": {
-      "dependsOn": ["build"]
+      "dependsOn": [
+        "build"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"],
-      "outputs": [".next/types/**"]
+      "dependsOn": [
+        "^typecheck"
+      ],
+      "outputs": [
+        ".next/types/**"
+      ]
     }
   }
 }

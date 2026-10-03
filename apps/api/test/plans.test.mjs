@@ -89,6 +89,7 @@ describe('admin: resellers', () => {
     await server.app.get(PrismaService).reseller.update({ where: { id: resellerId }, data: { verifiedAt: new Date(), verifiedName: 'Ada Obi' } });
     const activated = await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'active', plan: 'premium' });
     assert.deepEqual([activated.json.status, activated.json.plan.code], ['active', 'premium']);
+    assert.deepEqual([activated.json.verified_name, typeof activated.json.verified_at], ['Ada Obi', 'string']);
     assert.equal((await browser.post('/v1/api-keys', { name: 'Live', mode: 'live' })).status, 201, 'live keys once active');
 
     await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'suspended' });

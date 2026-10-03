@@ -1,16 +1,28 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import { AppProviders } from "@bitocard/admin-ui/shell";
 import { brand, siteUrl } from "@bitocard/ui/site";
 import "./globals.css";
-import "@bitocard/ui/styles/workspace.css";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(3003),
-  title: "BitoCard | Administration",
-  description: "The future workspace for BitoCard platform operators.",
+  title: { default: "BitoCard Admin", template: "%s | BitoCard Admin" },
+  description: "BitoCard platform administration.",
   icons: { icon: brand.logo },
   robots: { index: false, follow: false },
 };
 
+export const viewport: Viewport = { themeColor: "#070f4c", width: "device-width", initialScale: 1 };
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en-GB"><body>{children}</body></html>;
+  return (
+    <html lang="en-GB" className={inter.variable}>
+      {/* Browser extensions (e.g. ColorZilla) add attributes to <body> before React loads. */}
+      <body className="min-h-svh antialiased" suppressHydrationWarning>
+        <AppProviders>{children}</AppProviders>
+      </body>
+    </html>
+  );
 }

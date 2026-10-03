@@ -1,0 +1,4 @@
+{
+  "extends": "@bitocard/typescript-config/react-library.json",
+  "include": ["src", "test"]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@bitocard/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./admin": "./src/admin/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
+    "react-redux": "^9.3.0"
+  },
+  "peerDependencies": {
+    "react": "19.2.8"
+  },
+  "devDependencies": {
+    "@bitocard/eslint-config": "*",
+    "@bitocard/typescript-config": "*",
+    "@types/react": "^19",
+    "eslint": "^9",
+    "react": "19.2.8",
+    "typescript": "^5",
+    "vitest": "^5"
+  }
+}

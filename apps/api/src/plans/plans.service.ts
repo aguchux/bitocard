@@ -49,7 +49,7 @@ export class PlansService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return { object: 'list' as const, data: resellers.map(r => ({ object: 'reseller' as const, id: r.id, name: r.name, country: r.country, status: r.status, plan: r.planCode, created_at: r.createdAt.toISOString() })) };
+    return { object: 'list' as const, data: resellers.map(r => ({ object: 'reseller' as const, id: r.id, name: r.name, country: r.country, status: r.status, verified_at: r.verifiedAt?.toISOString() ?? null, plan: r.planCode, created_at: r.createdAt.toISOString() })) };
   }
 
   async resellerDetail(id: string) {
@@ -64,6 +64,8 @@ export class PlansService {
       name: reseller.name,
       country: reseller.country,
       status: reseller.status,
+      verified_at: reseller.verifiedAt?.toISOString() ?? null,
+      verified_name: reseller.verifiedName,
       plan: presentPlan(reseller.plan),
       members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role })),
       stores: reseller.stores.map(s => ({ id: s.id, name: s.name, subdomain: s.subdomain, status: s.status })),
