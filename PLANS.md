@@ -19,7 +19,7 @@ Supplier names are internal. Never show them on public pages, in the API or to r
 | User | Signs in on BitoCard? | How | Identity check |
 |---|---|---|---|
 | Admins | Yes, `admin.bitocard.com` | Email + password only (no Google), `@bitocard.com` / `@golojan.co.uk`, 2-step verification required | Staff |
-| Resellers and their staff | Yes: sign up, sign in and reset passwords on **SHQ** (`shq.bitocard.com`); the main site is for retail customers. Sign-up is deliberate (Google sign-in never creates an account) and followed by onboarding (business name and country) | Google, email + password, or mobile + password (SMS-verified) | **Didit** before approval |
+| Resellers and their staff | Yes: sign up, sign in and reset passwords on **SHQ** (`shq.bitocard.com`); the main site is for retail customers. Sign-up is deliberate and step by step (name and email, email code, business name and country, password); Google sign-in never creates an account, and Google sign-up is followed by onboarding (business name and country) | Google, email + password, or mobile + password (SMS-verified) | **Didit** before approval |
 | Reseller systems | API | Scoped API keys: `bc_test_…` sandbox, `bc_live_…` live | Belongs to a verified reseller |
 | Hosted storefront customers | No BitoCard account | Per-store account owned by the reseller (Google, email or mobile + password); no guest checkout | Only where required (see below): **BVN** + Flutterwave bank account validation in Nigeria; **Didit** elsewhere |
 | Customers of resellers' own systems | No | The reseller's own sign-in; the API sees only the reseller's customer reference | Reseller's responsibility |

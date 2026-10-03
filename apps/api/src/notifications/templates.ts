@@ -15,6 +15,18 @@ function layout(heading: string, paragraphs: string[], code?: string) {
   return { html, text };
 }
 
+export function signupCodeEmail(to: string, code: string): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard sign-up code`,
+    ...layout(
+      'Confirm your email',
+      ['Enter this code to confirm your email and continue creating your BitoCard reseller account. It expires in 30 minutes.', 'If you did not start signing up, you can ignore this email.'],
+      code,
+    ),
+  };
+}
+
 export function verificationEmail(to: string, code: string): EmailMessage {
   return {
     to,

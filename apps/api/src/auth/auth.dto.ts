@@ -51,6 +51,14 @@ export class SignUpDto {
   @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter country code' })
   country?: string;
 
+  @ApiPropertyOptional({
+    description: 'From `POST /v1/auth/signup/email/verify`: the email is already confirmed, so no code is emailed afterwards. Must belong to `email`; used once.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(20, 100)
+  signup_token?: string;
+
   @ApiPropertyOptional({ description: "Join a reseller's team from an invitation link, instead of creating a reseller account." })
   @IsOptional()
   @IsString()
@@ -92,6 +100,21 @@ export class SignInDto {
 }
 
 export class CodeDto {
+  @ApiProperty(codeDoc)
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}
+
+export class SignupEmailDto {
+  @ApiProperty({ description: 'The email to sign up with; a 6-digit code is sent to it.', format: 'email', maxLength: 254, example: 'ada@example.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+}
+
+export class SignupEmailVerifyDto extends SignupEmailDto {
   @ApiProperty(codeDoc)
   @Transform(trim)
   @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })

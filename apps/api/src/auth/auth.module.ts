@@ -10,12 +10,13 @@ import { CodesService } from './codes.service.js';
 import { GoogleController } from './google.controller.js';
 import { GoogleService } from './google.service.js';
 import { PasswordsService } from './passwords.service.js';
+import { SignupVerificationService } from './signup-verification.service.js';
 import { SessionsService } from './sessions.service.js';
 
 @Module({
   imports: [TeamModule, CountriesModule],
   controllers: [AuthController, GoogleController, AdminAuthController],
-  providers: [AuthService, AdminAuthService, GoogleService, CodesService, PasswordsService, SessionsService, AuthGuard],
+  providers: [AuthService, AdminAuthService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard],
   exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService],
 })
 export class AuthModule {}

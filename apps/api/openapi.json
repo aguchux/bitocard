@@ -335,9 +335,61 @@
         ]
       }
     },
+    "/v1/auth/signup/email": {
+      "post": {
+        "description": "Sends a 6-digit code (30 minutes, 5 attempts, one a minute). Refused with `email_in_use` if an account already uses the email.",
+        "operationId": "AuthController_startSignupEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Start sign-up: email a confirmation code",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/signup/email/verify": {
+      "post": {
+        "description": "Returns `signup_token`, valid for one hour and once, to pass to `POST /v1/auth/signup` with the same email.",
+        "operationId": "AuthController_verifySignupEmail",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupEmailVerifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Confirm the sign-up code",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
     "/v1/auth/signup": {
       "post": {
-        "description": "A 6-digit code is emailed to confirm the address.",
+        "description": "With a `signup_token` (from confirming the email first) the email is already confirmed; otherwise a 6-digit code is emailed to confirm it.",
         "operationId": "AuthController_signUp",
         "parameters": [],
         "requestBody": {
@@ -3197,6 +3249,43 @@
           }
         }
       },
+      "SignupEmailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email to sign up with; a 6-digit code is sent to it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "SignupEmailVerifyDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The email to sign up with; a 6-digit code is sent to it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@example.com"
+          },
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code that was sent to you.",
+            "pattern": "^\\d{6}$",
+            "example": "482913"
+          }
+        },
+        "required": [
+          "email",
+          "code"
+        ]
+      },
       "SignUpDto": {
         "type": "object",
         "properties": {
@@ -3233,6 +3322,10 @@
             "description": "Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE. Not needed with an invitation.",
             "pattern": "^[A-Z]{2}$",
             "example": "NG"
+          },
+          "signup_token": {
+            "type": "string",
+            "description": "From `POST /v1/auth/signup/email/verify`: the email is already confirmed, so no code is emailed afterwards. Must belong to `email`; used once."
           },
           "invitation_token": {
             "type": "string",

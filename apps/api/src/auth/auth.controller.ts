@@ -2,10 +2,11 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Req, Res } fr
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { ChangeEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, ForgotPasswordDto, PhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { ChangeEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { SessionsService } from './sessions.service.js';
+import { SignupVerificationService } from './signup-verification.service.js';
 
 /**
  * Reseller sign-in for the dashboard. These endpoints set or read the session cookie, so they skip idempotency keys:
@@ -18,10 +19,39 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly sessions: SessionsService,
+    private readonly signupVerification: SignupVerificationService,
   ) {}
 
-  /** Create a reseller account and sign in. A 6-digit code is emailed to confirm the address. */
-  @ApiOperation({ summary: 'Create a reseller account and sign in', description: 'A 6-digit code is emailed to confirm the address.' })
+  /** Step-by-step sign-up, step 1: email a code to confirm the address before the account exists. */
+  @ApiOperation({
+    summary: 'Start sign-up: email a confirmation code',
+    description: 'Sends a 6-digit code (30 minutes, 5 attempts, one a minute). Refused with `email_in_use` if an account already uses the email.',
+  })
+  @Public()
+  @Post('signup/email')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async startSignupEmail(@Body() body: SignupEmailDto) {
+    await this.signupVerification.start(body.email);
+    return { object: 'notice', message: 'A code is on its way.' };
+  }
+
+  /** Step-by-step sign-up, step 2: confirm the code; returns a one-hour token for `POST /v1/auth/signup`. */
+  @ApiOperation({
+    summary: 'Confirm the sign-up code',
+    description: 'Returns `signup_token`, valid for one hour and once, to pass to `POST /v1/auth/signup` with the same email.',
+  })
+  @Public()
+  @Post('signup/email/verify')
+  @HttpCode(HttpStatus.OK)
+  verifySignupEmail(@Body() body: SignupEmailVerifyDto) {
+    return this.signupVerification.verify(body.email, body.code);
+  }
+
+  /** Create a reseller account and sign in. Without a `signup_token`, a 6-digit code is emailed to confirm the address. */
+  @ApiOperation({
+    summary: 'Create a reseller account and sign in',
+    description: 'With a `signup_token` (from confirming the email first) the email is already confirmed; otherwise a 6-digit code is emailed to confirm it.',
+  })
   @Public()
   @Post('signup')
   signUp(@Body() body: SignUpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {

@@ -13,6 +13,7 @@ import { CodesService } from './codes.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { presentMembership, presentUser } from './presenters.js';
 import { SessionsService } from './sessions.service.js';
+import { SignupVerificationService } from './signup-verification.service.js';
 import type { CreateResellerAccountDto, SignUpDto } from './auth.dto.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
@@ -51,6 +52,7 @@ export class AuthService {
     private readonly sms: SmsService,
     private readonly team: TeamService,
     private readonly countries: CountriesService,
+    private readonly signupVerification: SignupVerificationService,
   ) {}
 
   async signUp(input: SignUpDto, req: Request, res: Response) {
@@ -69,7 +71,11 @@ export class AuthService {
           await tx.invitation.update({ where: { id: invitation.id }, data: { acceptedAt: new Date() } });
           return created;
         }
-        const created = await tx.user.create({ data: { realm: 'reseller', email: input.email, name: input.name, passwordHash } });
+        // A sign-up token proves the email was confirmed with a code before the account existed.
+        if (input.signup_token) await this.signupVerification.consume(tx, input.email, input.signup_token);
+        const created = await tx.user.create({
+          data: { realm: 'reseller', email: input.email, name: input.name, passwordHash, emailVerifiedAt: input.signup_token ? new Date() : null },
+        });
         const reseller = await tx.reseller.create({ data: { name: input.business_name ?? input.name, country: input.country } });
         await tx.resellerMember.create({ data: { resellerId: reseller.id, userId: created.id, role: 'owner' } });
         return created;

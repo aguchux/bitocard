@@ -24,12 +24,21 @@ export type Account = {
 };
 export type Notice = { object: 'notice'; message: string };
 /** `country` and `business_name` open a reseller account; `invitation_token` joins the inviting team instead. */
-export type SignUpInput = { name: string; email: string; password: string } & ({ country: string; business_name?: string } | { invitation_token: string });
+export type SignUpInput = { name: string; email: string; password: string } & (
+  | { country: string; business_name?: string; signup_token?: string }
+  | { invitation_token: string }
+);
+/** From confirming the sign-up code: pass `signup_token` to sign-up with the same email (one hour, once). */
+export type SignupVerification = { object: 'signup_verification'; email: string; signup_token: string; expires_at: string };
 
 /** Sign-in and the signed-in person (`/v1/auth`), and the account the dashboard acts for (`/v1/account`). */
 export const resellerSessionApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     session: build.query<Session, void>({ query: () => '/v1/auth/session', providesTags: ['Session'] }),
+    /** Step-by-step sign-up: emails a code to confirm the address before the account exists. */
+    startSignupEmail: build.mutation<Notice, { email: string }>({ query: body => ({ url: '/v1/auth/signup/email', method: 'POST', body }) }),
+    /** Confirms the code; the token finishes sign-up with the email already confirmed. */
+    verifySignupEmail: build.mutation<SignupVerification, { email: string; code: string }>({ query: body => ({ url: '/v1/auth/signup/email/verify', method: 'POST', body }) }),
     /** Creates the person and, without an invitation, their reseller account (they own it); signs them in. A code is emailed to confirm the address. */
     signUp: build.mutation<Session, SignUpInput>({ query: body => ({ url: '/v1/auth/signup', method: 'POST', body }), invalidatesTags: ['Session'] }),
     /** A signed-in person with a confirmed email opens their own reseller account (one owned account each). */
@@ -60,6 +69,8 @@ export const {
   useSessionQuery,
   useSignInMutation,
   useSignUpMutation,
+  useStartSignupEmailMutation,
+  useVerifySignupEmailMutation,
   useCreateResellerAccountMutation,
   useSignOutMutation,
   useVerifyEmailMutation,
