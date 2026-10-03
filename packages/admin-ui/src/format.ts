@@ -17,16 +17,27 @@ export function currencyDigits(currency: string) {
   return digits;
 }
 
-/** Money from integer minor units, for example 1234567 NGN → "NGN 12,345.67" (code first, unambiguous across markets). */
+const compactUnits: Array<[number, string]> = [
+  [1e12, 'T'],
+  [1e9, 'B'],
+  [1e6, 'M'],
+  [1e3, 'K'],
+];
+
+/**
+ * Money from integer minor units, for example 1234567 NGN → "NGN 12,345.67" (code first, unambiguous across markets).
+ * `compact` gives "NGN 2.5M". Its suffixes are fixed here because Intl's compact notation differs between ICU versions
+ * (newer en-GB data says "2.5m"), which would differ between browsers and between the server and the browser.
+ */
 export function formatMoney(minor: number, currency: string, options: { compact?: boolean } = {}) {
   const digits = currencyDigits(currency);
   const major = minor / 10 ** digits;
-  const formatter = new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency,
-    currencyDisplay: 'code',
-    ...(options.compact ? { notation: 'compact', maximumFractionDigits: 1 } : { minimumFractionDigits: digits, maximumFractionDigits: digits }),
-  });
+  if (options.compact) {
+    const [size, suffix] = compactUnits.find(([unit]) => Math.abs(major) >= unit) ?? [1, ''];
+    const amount = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(major / size);
+    return `${currency} ${amount}${suffix}`;
+  }
+  const formatter = new Intl.NumberFormat('en-GB', { style: 'currency', currency, currencyDisplay: 'code', minimumFractionDigits: digits, maximumFractionDigits: digits });
   return formatter.format(major).replace(/ /g, ' ');
 }
 
