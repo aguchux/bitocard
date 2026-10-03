@@ -3,7 +3,7 @@
   "framework": "nestjs",
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api && npm run db:migrate:deploy -w @bitocard/api",
-  "ignoreCommand": "npx turbo-ignore --fallback=HEAD^1",
+  "ignoreCommand": "npx turbo-ignore",
   "functions": {
     "api/webhook-queue.mjs": {
       "experimentalTriggers": [
