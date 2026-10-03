@@ -13,10 +13,11 @@ const features = [
 
 export default function SignInPage() {
   return (
-    <main className="grid min-h-svh lg:grid-cols-[1.1fr_1fr]">
+    <main className="grid min-h-svh lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      {/* Sized to the screen and never taller: it sticks while the form side scrolls on short windows. */}
       <section
         aria-label="BitoCard admin workspace"
-        className="relative isolate hidden overflow-hidden bg-navy-950 px-12 py-14 text-white lg:flex lg:flex-col xl:px-20"
+        className="relative isolate hidden overflow-hidden bg-navy-950 px-10 py-10 text-white lg:sticky lg:top-0 lg:flex lg:h-svh lg:flex-col xl:px-14"
       >
         {/* Brand glow: soft navy-to-pink waves, drawn with gradients (no images). */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -26,33 +27,35 @@ export default function SignInPage() {
           <div className="absolute right-[-15%] bottom-[22%] h-[30%] w-[80%] rotate-[-18deg] rounded-[50%] border-t-2 border-brand-500/60 blur-[1px]" />
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bitocard-logo.png" alt="" className="size-14 rounded-2xl" />
-          <span className="text-2xl font-extrabold tracking-[0.25em]">BITOCARD</span>
+          <img src="/bitocard-logo.png" alt="" className="size-10 rounded-xl" />
+          <span className="text-lg font-extrabold tracking-[0.25em]">BITOCARD</span>
         </div>
 
-        <div className="mt-20 max-w-xl">
-          <h1 className="text-7xl font-extrabold leading-[0.95] tracking-tight xl:text-8xl">
+        <div className="my-auto max-w-md py-8">
+          <h1 className="text-5xl font-extrabold leading-[0.95] tracking-tight xl:text-6xl">
             Admin
             <br />
             <span className="text-brand-500">workspace</span>
           </h1>
-          <p className="mt-6 text-2xl leading-snug text-white/75">Sign in to manage products, resellers and platform operations.</p>
-          <ul className="mt-12 space-y-5">
+          <p className="mt-4 text-lg leading-snug text-white/75">Sign in to manage products, resellers and platform operations.</p>
+          <ul className="mt-8 space-y-3">
             {features.map(({ icon: Icon, label }) => (
-              <li key={label} className="flex items-center gap-5 text-xl font-medium">
-                <span className="grid size-14 place-items-center rounded-2xl border border-white/10 bg-white/10 backdrop-blur">
-                  <Icon className="size-6 text-brand-200" aria-hidden />
+              <li key={label} className="flex items-center gap-3 text-base font-medium">
+                <span className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/10 backdrop-blur">
+                  <Icon className="size-5 text-brand-200" aria-hidden />
                 </span>
                 {label}
               </li>
             ))}
           </ul>
         </div>
+
+        <p className="text-xs text-white/50">A Golojan Ltd venture</p>
       </section>
 
-      <section className="flex flex-col items-center justify-center bg-white px-6 py-12 sm:px-12">
+      <section className="flex flex-col items-center justify-center bg-white px-6 py-10 sm:px-12">
         <Suspense>
           <SignIn />
         </Suspense>

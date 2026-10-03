@@ -90,7 +90,7 @@ export function SignIn() {
       {step.kind === "password" ? (
         <form onSubmit={submitPassword} className="space-y-5" noValidate>
           <div className="text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-navy-900 sm:text-5xl">Welcome back</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">Welcome back</h1>
             <p className="mt-2 text-lg text-muted">Sign in to your admin account.</p>
           </div>
           {signInState.error || setupState.error ? <Notice tone="red">{message(signInState.error ?? setupState.error)}</Notice> : null}
