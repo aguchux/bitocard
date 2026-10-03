@@ -1,4 +1,4 @@
-import type { AppConfig } from '../config/config';
+import type { AppConfig } from '../config/config.js';
 
 /**
  * Settings an admin sets in the admin app (Settings > Integrations) instead of the environment, so the API can start

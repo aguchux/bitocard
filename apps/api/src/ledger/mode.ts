@@ -1,7 +1,7 @@
 import { createParamDecorator, type ExecutionContext, HttpStatus } from '@nestjs/common';
-import type { CallerRequest } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import type { LedgerMode } from '../generated/prisma/client';
+import type { CallerRequest } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
 
 export const MODE_HEADER = 'bitocard-mode';
 

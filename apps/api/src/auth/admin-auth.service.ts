@@ -1,15 +1,15 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Secret, TOTP } from 'otpauth';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import { randomToken, sameDigest, sha256 } from '../common/crypto';
-import { Encryption } from '../common/encryption';
-import { ApiError } from '../common/errors/api-error';
-import { Prisma, type User } from '../generated/prisma/client';
-import { lockout } from './auth.service';
-import { PasswordsService } from './passwords.service';
-import { SessionsService } from './sessions.service';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { randomToken, sameDigest, sha256 } from '../common/crypto.js';
+import { Encryption } from '../common/encryption.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { Prisma, type User } from '../generated/prisma/client.js';
+import { lockout } from './auth.service.js';
+import { PasswordsService } from './passwords.service.js';
+import { SessionsService } from './sessions.service.js';
 
 const challengeLifetimeMs = 5 * 60 * 1000;
 const maxChallengeAttempts = 5;

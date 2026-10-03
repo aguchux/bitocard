@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
-import { SupplierAdapters } from './supplier-adapters';
-import { AdminSuppliersController } from './suppliers.controller';
-import { SuppliersService } from './suppliers.service';
+import { SupplierAdapters } from './supplier-adapters.js';
+import { AdminSuppliersController } from './suppliers.controller.js';
+import { SuppliersService } from './suppliers.service.js';
 
 @Global()
 @Module({

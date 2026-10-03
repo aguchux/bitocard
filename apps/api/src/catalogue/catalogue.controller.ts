@@ -2,16 +2,16 @@ import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query }
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller';
-import { AuditService } from '../audit/audit.service';
-import { adminId } from '../countries/countries.controller';
-import { productCategories } from '../countries/countries.service';
-import type { LedgerMode, ProductCategory } from '../generated/prisma/client';
-import { Mode } from '../ledger/mode';
-import { modeHeader, PageDto } from '../ledger/wallet.controller';
-import { CatalogueService } from './catalogue.service';
-import { PricingService } from './pricing.service';
-import { maxQuantity, QuotesService } from './quotes.service';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { AuditService } from '../audit/audit.service.js';
+import { adminId } from '../countries/countries.controller.js';
+import { productCategories } from '../countries/countries.service.js';
+import type { LedgerMode, ProductCategory } from '../generated/prisma/client.js';
+import { Mode } from '../ledger/mode.js';
+import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { CatalogueService } from './catalogue.service.js';
+import { PricingService } from './pricing.service.js';
+import { maxQuantity, QuotesService } from './quotes.service.js';
 
 class CatalogueFilterDto extends PageDto {
   @ApiPropertyOptional({ enum: productCategories })

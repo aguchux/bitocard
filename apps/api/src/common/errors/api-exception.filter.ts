@@ -1,6 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { ApiError, type ApiErrorBody, type ApiErrorType } from './api-error';
+import { ApiError, type ApiErrorBody, type ApiErrorType } from './api-error.js';
 
 const typeForStatus: Partial<Record<number, ApiErrorType>> = {
   400: 'invalid_request_error',

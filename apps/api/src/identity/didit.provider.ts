@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { ProviderError, providerRequest } from '../payments/provider-error';
-import type { CheckResult, CheckStatus, DocumentCheckProvider } from './providers';
+import { ProviderError, providerRequest } from '../payments/provider-error.js';
+import type { CheckResult, CheckStatus, DocumentCheckProvider } from './providers.js';
 
 type DiditSession = { session_id: string; url: string; status: string };
 type DiditDecision = {

@@ -1,6 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { Public } from './auth/caller';
+import { Public } from './auth/caller.js';
 
 @ApiExcludeController()
 @Public()

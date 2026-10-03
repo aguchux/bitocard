@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { SettingsModule } from '../settings/settings.module';
-import { AdminVerificationsController, CustomerVerificationController, IdentityWebhooksController, ResellerVerificationController } from './identity.controller';
-import { IdentityService } from './identity.service';
+import { SettingsModule } from '../settings/settings.module.js';
+import { AdminVerificationsController, CustomerVerificationController, IdentityWebhooksController, ResellerVerificationController } from './identity.controller.js';
+import { IdentityService } from './identity.service.js';
 
 @Module({
   imports: [SettingsModule],

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { CatalogueModule } from '../catalogue/catalogue.module';
-import { AdminOrdersController, OrdersController } from './orders.controller';
-import { OrdersService } from './orders.service';
+import { CatalogueModule } from '../catalogue/catalogue.module.js';
+import { AdminOrdersController, OrdersController } from './orders.controller.js';
+import { OrdersService } from './orders.service.js';
 
 @Module({
   imports: [CatalogueModule],

@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsOptional, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller';
-import { adminId } from '../countries/countries.controller';
-import { FxService } from './fx.service';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { adminId } from '../countries/countries.controller.js';
+import { FxService } from './fx.service.js';
 
 class CurrencySettingDto {
   @IsOptional() @IsInt() @Min(0) @Max(2000)

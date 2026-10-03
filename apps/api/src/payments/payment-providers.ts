@@ -1,11 +1,11 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { IntegrationsService } from '../integrations/integrations.service';
-import type { LedgerMode } from '../generated/prisma/client';
-import { FlutterwaveProvider } from './flutterwave.provider';
-import { MonnifyProvider } from './monnify.provider';
-import type { CheckoutProvider, ReservedAccountProvider, TransferProvider } from './providers';
-import { SandboxProvider } from './sandbox.provider';
+import { ApiError } from '../common/errors/api-error.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { FlutterwaveProvider } from './flutterwave.provider.js';
+import { MonnifyProvider } from './monnify.provider.js';
+import type { CheckoutProvider, ReservedAccountProvider, TransferProvider } from './providers.js';
+import { SandboxProvider } from './sandbox.provider.js';
 
 export const providerUnavailable = (what: string) =>
   new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', `${what} is not available in your country yet.`);

@@ -1,9 +1,9 @@
 import { Controller, Get, HttpStatus } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { type Caller, CurrentCaller } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import { presentPlan } from '../plans/plans.service';
+import { type Caller, CurrentCaller } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { presentPlan } from '../plans/plans.service.js';
 
 /** The reseller account a request acts for. A simple first call to check an API key works. */
 @ApiTags('Account')

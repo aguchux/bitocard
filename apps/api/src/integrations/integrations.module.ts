@@ -1,7 +1,7 @@
 import { type CallHandler, type ExecutionContext, Global, Injectable, Module, type NestInterceptor } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { from, switchMap } from 'rxjs';
-import { IntegrationsService } from './integrations.service';
+import { IntegrationsService } from './integrations.service.js';
 
 /** Brings this instance's copy of the admin integration settings up to date (at most every 30 seconds) before a request. */
 @Injectable()

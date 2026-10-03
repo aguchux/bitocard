@@ -1,9 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import type { LedgerMode, Product, ProductCategory } from '../generated/prisma/client';
-import { minor } from '../ledger/mode';
-import { type PricingContext, PricingService, type ProductWithOffers, worldwideCategories } from './pricing.service';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { LedgerMode, Product, ProductCategory } from '../generated/prisma/client.js';
+import { minor } from '../ledger/mode.js';
+import { type PricingContext, PricingService, type ProductWithOffers, worldwideCategories } from './pricing.service.js';
 
 /** At most this many denominations are priced in a catalogue listing; quotes price any valid value. */
 const maxListedValues = 20;

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { StubAdapter, type SupplierAdapter } from './adapter';
-import { ReloadlyAdapter } from './reloadly.adapter';
-import { VtpassAdapter } from './vtpass.adapter';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { StubAdapter, type SupplierAdapter } from './adapter.js';
+import { ReloadlyAdapter } from './reloadly.adapter.js';
+import { VtpassAdapter } from './vtpass.adapter.js';
 
 /**
  * Every supplier in the registry has an adapter. Suppliers whose API access is not yet confirmed get a stub until

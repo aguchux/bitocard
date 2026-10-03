@@ -1,10 +1,10 @@
 import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import { sha256 } from '../common/crypto';
-import { ApiError } from '../common/errors/api-error';
-import type { Realm, ResellerRole } from '../generated/prisma/client';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { Realm, ResellerRole } from '../generated/prisma/client.js';
 import {
   type Caller,
   type CallerRequest,
@@ -15,8 +15,8 @@ import {
   ROUTE_ROLES,
   ROUTE_SCOPES,
   ROUTE_SESSION_ONLY,
-} from './caller';
-import { SessionsService, sessionPolicy } from './sessions.service';
+} from './caller.js';
+import { SessionsService, sessionPolicy } from './sessions.service.js';
 
 const apiKeyPattern = /^bc_(test|live)_[A-Za-z0-9_-]{20,}$/;
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);

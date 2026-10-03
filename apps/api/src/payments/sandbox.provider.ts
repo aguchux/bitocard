@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
-import { ProviderError } from './provider-error';
-import type { CheckoutProvider, ReservedAccountProvider, TransferProvider, TransferResult } from './providers';
+import { ProviderError } from './provider-error.js';
+import type { CheckoutProvider, ReservedAccountProvider, TransferProvider, TransferResult } from './providers.js';
 
 /** Account number the sandbox refuses to resolve, so integrations can test the failure. */
 export const sandboxUnknownAccount = '0000000000';

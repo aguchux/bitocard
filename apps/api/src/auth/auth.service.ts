@@ -1,19 +1,19 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { PrismaService } from '../database/prisma.service';
-import { ApiError } from '../common/errors/api-error';
-import { Prisma, type User } from '../generated/prisma/client';
+import { PrismaService } from '../database/prisma.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { Prisma, type User } from '../generated/prisma/client.js';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
-import { EmailService } from '../notifications/email.service';
-import { SmsService } from '../notifications/sms.service';
-import { passwordResetEmail, verificationEmail } from '../notifications/templates';
-import { TeamService } from '../team/team.service';
-import { CountriesService } from '../countries/countries.service';
-import { CodesService } from './codes.service';
-import { PasswordsService } from './passwords.service';
-import { presentMembership, presentUser } from './presenters';
-import { SessionsService } from './sessions.service';
-import type { SignUpDto } from './auth.dto';
+import { EmailService } from '../notifications/email.service.js';
+import { SmsService } from '../notifications/sms.service.js';
+import { passwordResetEmail, verificationEmail } from '../notifications/templates.js';
+import { TeamService } from '../team/team.service.js';
+import { CountriesService } from '../countries/countries.service.js';
+import { CodesService } from './codes.service.js';
+import { PasswordsService } from './passwords.service.js';
+import { presentMembership, presentUser } from './presenters.js';
+import { SessionsService } from './sessions.service.js';
+import type { SignUpDto } from './auth.dto.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 

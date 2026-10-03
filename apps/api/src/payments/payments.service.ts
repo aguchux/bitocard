@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { PrismaService } from '../database/prisma.service';
-import { type LedgerMode, type Payment, Prisma, type ReservedAccount } from '../generated/prisma/client';
-import { type Line, LedgerService, type Tx } from '../ledger/ledger.service';
-import { minor } from '../ledger/mode';
-import { WalletService } from '../ledger/wallet.service';
-import { PaymentProviders } from './payment-providers';
-import { ProviderError } from './provider-error';
-import { EventsService } from '../webhooks/events.service';
-import type { ChargeResult } from './providers';
+import { ApiError } from '../common/errors/api-error.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { type LedgerMode, type Payment, Prisma, type ReservedAccount } from '../generated/prisma/client.js';
+import { type Line, LedgerService, type Tx } from '../ledger/ledger.service.js';
+import { minor } from '../ledger/mode.js';
+import { WalletService } from '../ledger/wallet.service.js';
+import { PaymentProviders } from './payment-providers.js';
+import { ProviderError } from './provider-error.js';
+import { EventsService } from '../webhooks/events.service.js';
+import type { ChargeResult } from './providers.js';
 
 const day = 24 * 60 * 60 * 1000;
 /** A checkout not paid within this time is closed as failed. */

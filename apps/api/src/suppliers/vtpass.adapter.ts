@@ -1,7 +1,7 @@
-import type { ProductCategory } from '../generated/prisma/client';
-import { providerRequest } from '../payments/provider-error';
-import { toMajor } from '../payments/providers';
-import { type CatalogueItem, type CatalogueScope, type Delivery, type FulfilmentRequest, type FulfilmentResult, minorOf, type RecipientCheck, slug, type SupplierAdapter } from './adapter';
+import type { ProductCategory } from '../generated/prisma/client.js';
+import { providerRequest } from '../payments/provider-error.js';
+import { toMajor } from '../payments/providers.js';
+import { type CatalogueItem, type CatalogueScope, type Delivery, type FulfilmentRequest, type FulfilmentResult, minorOf, type RecipientCheck, slug, type SupplierAdapter } from './adapter.js';
 
 type Variation = { variation_code: string; name: string; variation_amount: string | number; fixedPrice?: string };
 type VariationsResponse = { response_description?: string; content?: { ServiceName?: string; serviceID?: string; variations?: Variation[]; varations?: Variation[] } };

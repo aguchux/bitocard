@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import { FxService } from '../fx/fx.service';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { FxService } from '../fx/fx.service.js';
 import {
   type Country,
   type CountryCategory,
@@ -13,9 +13,9 @@ import {
   type ResellerMarkup,
   type Supplier,
   type SupplierProduct,
-} from '../generated/prisma/client';
-import { SettingsService } from '../settings/settings.service';
-import { SupplierAdapters } from '../suppliers/supplier-adapters';
+} from '../generated/prisma/client.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;

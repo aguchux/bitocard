@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsString, Length } from 'class-validator';
-import { type Caller, CurrentCaller, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller';
-import { BillingService } from './billing.service';
+import { type Caller, CurrentCaller, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller.js';
+import { BillingService } from './billing.service.js';
 
 class ChangePlanDto {
   @ApiProperty({ description: 'Plan code from the plan list.', example: 'premium' })

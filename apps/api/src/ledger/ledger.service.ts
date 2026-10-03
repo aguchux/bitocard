@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import { type AccountKind, type LedgerMode, Prisma } from '../generated/prisma/client';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { type AccountKind, type LedgerMode, Prisma } from '../generated/prisma/client.js';
 
 export type Tx = Prisma.TransactionClient;
 

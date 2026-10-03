@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from 'nestjs-pino';
-import { AppModule } from '../app.module';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { WebhookDeliveryService } from './delivery.service';
-import { WebhookQueue } from './queue';
+import { AppModule } from '../app.module.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { WebhookDeliveryService } from './delivery.service.js';
+import { WebhookQueue } from './queue.js';
 
 type NodeHandler = ReturnType<WebhookQueue['nodeHandler']>;
 let handler: Promise<NodeHandler> | null = null;

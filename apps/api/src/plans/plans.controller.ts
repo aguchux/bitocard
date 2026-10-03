@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller';
-import { adminId } from '../countries/countries.controller';
-import type { ResellerStatus } from '../generated/prisma/client';
-import { PlansService, presentPlan } from './plans.service';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { adminId } from '../countries/countries.controller.js';
+import type { ResellerStatus } from '../generated/prisma/client.js';
+import { PlansService, presentPlan } from './plans.service.js';
 
 const statuses = ['pending', 'active', 'suspended'] as const;
 

@@ -1,11 +1,11 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsUrl, Matches, Max, Min } from 'class-validator';
-import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller';
-import type { LedgerMode } from '../generated/prisma/client';
-import { Mode } from '../ledger/mode';
-import { modeHeader, PageDto } from '../ledger/wallet.controller';
-import { PaymentsService } from './payments.service';
+import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { Mode } from '../ledger/mode.js';
+import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { PaymentsService } from './payments.service.js';
 
 /** Largest single top-up or deposit simulation, in minor units. */
 const maxAmount = 100_000_000_00;

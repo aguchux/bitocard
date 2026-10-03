@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { type Algorithm, hash, verify } from '@node-rs/argon2';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { ApiError } from '../common/errors/api-error';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { ApiError } from '../common/errors/api-error.js';
 
 // OWASP-recommended Argon2id settings: 19 MiB memory, 2 iterations, 1 lane.
 // Algorithm.Argon2id is a const enum, which isolated modules cannot read; its value is 2.

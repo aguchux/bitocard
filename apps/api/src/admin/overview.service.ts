@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
-import type { LedgerMode } from '../generated/prisma/client';
-import { minor } from '../ledger/mode';
-import { receiptNumber } from '../orders/orders.service';
-import { SupplierAdapters } from '../suppliers/supplier-adapters';
+import { PrismaService } from '../database/prisma.service.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { minor } from '../ledger/mode.js';
+import { receiptNumber } from '../orders/orders.service.js';
+import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 
 const day = 24 * 3600 * 1000;
 /** A supplier whose catalogue has not synced for this long is shown as degraded. */

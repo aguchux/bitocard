@@ -5,9 +5,9 @@ import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { Observable, from, of, throwError } from 'rxjs';
 import { catchError, mergeMap } from 'rxjs/operators';
-import { Prisma } from '../../generated/prisma/client';
-import { PrismaService } from '../../database/prisma.service';
-import { ApiError } from '../errors/api-error';
+import { Prisma } from '../../generated/prisma/client.js';
+import { PrismaService } from '../../database/prisma.service.js';
+import { ApiError } from '../errors/api-error.js';
 
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
 const SKIP_IDEMPOTENCY = 'idempotency:skip';

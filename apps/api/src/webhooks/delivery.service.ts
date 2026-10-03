@@ -3,15 +3,15 @@ import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { waitUntil } from '@vercel/functions';
-import { Encryption } from '../common/encryption';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { PrismaService } from '../database/prisma.service';
-import type { Event, WebhookDelivery, WebhookEndpoint } from '../generated/prisma/client';
-import { EmailService } from '../notifications/email.service';
-import { webhookEndpointDisabledEmail } from '../notifications/templates';
-import { BlockedDestinationError, isBlockedAddress, safeLookup } from './destinations';
-import { EndpointBusyError, type EndpointMessage, WebhookQueue } from './queue';
-import { signatureHeader, signatureValue } from './signing';
+import { Encryption } from '../common/encryption.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { Event, WebhookDelivery, WebhookEndpoint } from '../generated/prisma/client.js';
+import { EmailService } from '../notifications/email.service.js';
+import { webhookEndpointDisabledEmail } from '../notifications/templates.js';
+import { BlockedDestinationError, isBlockedAddress, safeLookup } from './destinations.js';
+import { EndpointBusyError, type EndpointMessage, WebhookQueue } from './queue.js';
+import { signatureHeader, signatureValue } from './signing.js';
 
 /** Seconds to wait after each failed attempt: 1 min, 5 min, 30 min, 2 h, 6 h, then every 12 h. */
 export const retryScheduleSeconds = [60, 300, 1800, 7200, 21_600];

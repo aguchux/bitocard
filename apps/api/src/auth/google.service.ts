@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { PrismaService } from '../database/prisma.service';
-import { randomToken, sha256 } from '../common/crypto';
-import { ApiError } from '../common/errors/api-error';
-import { originAllowed } from './auth.guard';
-import { SessionsService } from './sessions.service';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { randomToken, sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { originAllowed } from './auth.guard.js';
+import { SessionsService } from './sessions.service.js';
 
 export const oauthCookie = 'bc_oauth_state';
 const stateLifetimeMs = 10 * 60 * 1000;

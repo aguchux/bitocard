@@ -1,8 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
-import { randomToken, sha256 } from '../common/crypto';
-import { ApiError } from '../common/errors/api-error';
-import type { ApiKey, ApiKeyMode } from '../generated/prisma/client';
+import { PrismaService } from '../database/prisma.service.js';
+import { randomToken, sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { ApiKey, ApiKeyMode } from '../generated/prisma/client.js';
 
 /** Every scope an API key can hold. New endpoints add their scope here and document it. */
 export const apiKeyScopes = [

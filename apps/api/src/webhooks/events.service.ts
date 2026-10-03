@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import type { Event, LedgerMode } from '../generated/prisma/client';
-import type { Tx } from '../ledger/ledger.service';
-import { WebhookDeliveryService } from './delivery.service';
-import { eventPayload, type EventType } from './events';
+import { ApiError } from '../common/errors/api-error.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { Event, LedgerMode } from '../generated/prisma/client.js';
+import type { Tx } from '../ledger/ledger.service.js';
+import { WebhookDeliveryService } from './delivery.service.js';
+import { eventPayload, type EventType } from './events.js';
 
 const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 

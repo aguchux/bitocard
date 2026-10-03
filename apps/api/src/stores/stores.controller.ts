@@ -2,10 +2,10 @@ import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, IsUrl, Length, Matches, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, Roles, Scopes } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { adminId } from '../countries/countries.controller';
-import { StoresService } from './stores.service';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, Roles, Scopes } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { adminId } from '../countries/countries.controller.js';
+import { StoresService } from './stores.service.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const lower = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);

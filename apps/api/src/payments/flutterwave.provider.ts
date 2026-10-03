@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
-import type { BvnProvider, CheckResult } from '../identity/providers';
-import { ProviderError, providerRequest } from './provider-error';
+import type { BvnProvider, CheckResult } from '../identity/providers.js';
+import { ProviderError, providerRequest } from './provider-error.js';
 import {
   type ChargeResult,
   type CheckoutProvider,
@@ -10,7 +10,7 @@ import {
   toMajor,
   type TransferProvider,
   type TransferResult,
-} from './providers';
+} from './providers.js';
 
 type FlwResponse<T> = { status: string; message?: string; data: T };
 type FlwCharge = { id: number; tx_ref: string; status: string; amount: number; currency: string; app_fee?: number; processor_response?: string };

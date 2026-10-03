@@ -2,11 +2,11 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsIn, IsString, Length } from 'class-validator';
-import { type Caller, CurrentCaller, Roles, SessionOnly } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import type { ResellerRole } from '../generated/prisma/client';
-import { TeamService, staffRoles } from './team.service';
+import { type Caller, CurrentCaller, Roles, SessionOnly } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import type { ResellerRole } from '../generated/prisma/client.js';
+import { TeamService, staffRoles } from './team.service.js';
 
 class InviteDto {
   @ApiProperty({ format: 'email', example: 'chidi@example.com' })

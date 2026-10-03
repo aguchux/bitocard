@@ -1,4 +1,4 @@
-import type { EmailMessage } from './email.service';
+import type { EmailMessage } from './email.service.js';
 
 const escape = (value: string) => value.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 

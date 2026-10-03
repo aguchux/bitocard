@@ -1,4 +1,4 @@
-import { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client.js';
 
 /** Minor units (bigint) to a provider's decimal amount. All pilot currencies and USD use two decimal places. */
 export function toMajor(amount: bigint) {

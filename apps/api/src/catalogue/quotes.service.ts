@@ -1,14 +1,14 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import { type LedgerMode, Prisma, type Product, type Quote } from '../generated/prisma/client';
-import { minor } from '../ledger/mode';
-import type { RecipientCheck } from '../suppliers/adapter';
-import { SupplierAdapters } from '../suppliers/supplier-adapters';
-import { TaxService } from '../tax/tax.service';
-import { offersInclude } from './catalogue.service';
-import { type Offer, PricingService } from './pricing.service';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { type LedgerMode, Prisma, type Product, type Quote } from '../generated/prisma/client.js';
+import { minor } from '../ledger/mode.js';
+import type { RecipientCheck } from '../suppliers/adapter.js';
+import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
+import { TaxService } from '../tax/tax.service.js';
+import { offersInclude } from './catalogue.service.js';
+import { type Offer, PricingService } from './pricing.service.js';
 
 /** How long a quote price is held. */
 export const quoteLifetimeMs = 10 * 60 * 1000;

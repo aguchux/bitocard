@@ -2,10 +2,10 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, type PipeTransform, Po
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import type { ProductCategory } from '../generated/prisma/client';
-import { CountriesService, presentCountry, presentCountryAdmin, productCategories } from './countries.service';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { ProductCategory } from '../generated/prisma/client.js';
+import { CountriesService, presentCountry, presentCountryAdmin, productCategories } from './countries.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toUpperCase() : value);
 

@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, type Prisma } from '../generated/prisma/client';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 
 export const PRISMA_ADAPTER = Symbol('PRISMA_ADAPTER');
 

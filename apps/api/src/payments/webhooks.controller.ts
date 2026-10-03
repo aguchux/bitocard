@@ -1,13 +1,13 @@
 import { Body, Controller, HttpCode, HttpStatus, Logger, Post, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { Public } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import { IdentityService } from '../identity/identity.service';
-import { PayoutsService } from '../payouts/payouts.service';
-import { PaymentProviders } from './payment-providers';
-import { PaymentsService } from './payments.service';
+import { Public } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { IdentityService } from '../identity/identity.service.js';
+import { PayoutsService } from '../payouts/payouts.service.js';
+import { PaymentProviders } from './payment-providers.js';
+import { PaymentsService } from './payments.service.js';
 
 const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'signature_invalid', 'Webhook signature is missing or wrong.');
 

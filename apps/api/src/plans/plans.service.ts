@@ -1,10 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { apiKeyScopes } from '../api-keys/api-keys.service';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import type { Plan, ResellerStatus } from '../generated/prisma/client';
-import { SettingsService } from '../settings/settings.service';
+import { apiKeyScopes } from '../api-keys/api-keys.service.js';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 export const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling'] as const;
 

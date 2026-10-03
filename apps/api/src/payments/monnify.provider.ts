@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { ProviderError, providerRequest } from './provider-error';
-import { type ChargeResult, fromMajor, type ReservedAccountDetails, type ReservedAccountProvider } from './providers';
+import { ProviderError, providerRequest } from './provider-error.js';
+import { type ChargeResult, fromMajor, type ReservedAccountDetails, type ReservedAccountProvider } from './providers.js';
 
 type MonnifyResponse<T> = { requestSuccessful: boolean; responseMessage?: string; responseBody: T };
 type MonnifyTransaction = {

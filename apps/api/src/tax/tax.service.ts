@@ -1,8 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import type { LedgerMode, TaxRate } from '../generated/prisma/client';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { LedgerMode, TaxRate } from '../generated/prisma/client.js';
 
 export type TaxBreakdown = { name: string; rateBps: number; pricesIncludeTax: boolean; net: bigint; tax: bigint; gross: bigint };
 

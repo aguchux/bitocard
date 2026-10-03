@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Params } from 'nestjs-pino';
-import type { AppConfig } from '../../config/config';
+import type { AppConfig } from '../../config/config.js';
 
 const callerId = /^[A-Za-z0-9._-]{8,64}$/;
 

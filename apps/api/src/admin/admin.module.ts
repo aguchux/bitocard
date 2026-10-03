@@ -2,10 +2,10 @@ import { Controller, Get, Module, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
-import { AdminRoles, RealmOnly } from '../auth/caller';
-import type { LedgerMode } from '../generated/prisma/client';
-import { PrismaService } from '../database/prisma.service';
-import { AdminOverviewService } from './overview.service';
+import { AdminRoles, RealmOnly } from '../auth/caller.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { AdminOverviewService } from './overview.service.js';
 
 class OverviewQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365) days?: number;

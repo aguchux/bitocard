@@ -1,12 +1,12 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import type { Reseller } from '../generated/prisma/client';
-import { FxService } from '../fx/fx.service';
-import { WalletService } from '../ledger/wallet.service';
-import { EmailService } from '../notifications/email.service';
-import { formatMoney, planEndedEmail, planRenewalFailedEmail } from '../notifications/templates';
-import { presentPlan } from '../plans/plans.service';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { Reseller } from '../generated/prisma/client.js';
+import { FxService } from '../fx/fx.service.js';
+import { WalletService } from '../ledger/wallet.service.js';
+import { EmailService } from '../notifications/email.service.js';
+import { formatMoney, planEndedEmail, planRenewalFailedEmail } from '../notifications/templates.js';
+import { presentPlan } from '../plans/plans.service.js';
 
 /** Days a Premium plan stays on after a failed renewal before it drops to Standard. */
 export const renewalGraceDays = 7;

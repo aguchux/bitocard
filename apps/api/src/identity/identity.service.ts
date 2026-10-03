@@ -1,19 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { PrismaService } from '../database/prisma.service';
-import type { IdentityVerification, LedgerMode, VerificationStatus } from '../generated/prisma/client';
-import { EmailService } from '../notifications/email.service';
-import { resellerVerificationEmail } from '../notifications/templates';
-import { PaymentProviders } from '../payments/payment-providers';
-import { resellerNotVerified, testModeOnly } from '../payments/payments.service';
-import { ProviderError } from '../payments/provider-error';
-import { SettingsService } from '../settings/settings.service';
-import { EventsService } from '../webhooks/events.service';
-import { DiditProvider } from './didit.provider';
-import { type CheckResult, namesMatch } from './providers';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { IdentityVerification, LedgerMode, VerificationStatus } from '../generated/prisma/client.js';
+import { EmailService } from '../notifications/email.service.js';
+import { resellerVerificationEmail } from '../notifications/templates.js';
+import { PaymentProviders } from '../payments/payment-providers.js';
+import { resellerNotVerified, testModeOnly } from '../payments/payments.service.js';
+import { ProviderError } from '../payments/provider-error.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { EventsService } from '../webhooks/events.service.js';
+import { DiditProvider } from './didit.provider.js';
+import { type CheckResult, namesMatch } from './providers.js';
 
 /** Statuses a provider (or an admin, for in_review) can still change. */
 const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];

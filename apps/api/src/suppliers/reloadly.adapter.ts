@@ -1,7 +1,7 @@
-import { Prisma, type ProductCategory } from '../generated/prisma/client';
-import { ProviderError, providerRequest } from '../payments/provider-error';
-import { toMajor } from '../payments/providers';
-import { type CatalogueItem, type CatalogueScope, type Delivery, type FulfilmentRequest, type FulfilmentResult, minorOf, slug, type SupplierAdapter } from './adapter';
+import { Prisma, type ProductCategory } from '../generated/prisma/client.js';
+import { ProviderError, providerRequest } from '../payments/provider-error.js';
+import { toMajor } from '../payments/providers.js';
+import { type CatalogueItem, type CatalogueScope, type Delivery, type FulfilmentRequest, type FulfilmentResult, minorOf, slug, type SupplierAdapter } from './adapter.js';
 
 const Decimal = Prisma.Decimal;
 

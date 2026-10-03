@@ -2,14 +2,14 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsOptional, IsString, IsUrl, IsUUID, Length, Matches } from 'class-validator';
 import type { Request } from 'express';
-import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import { adminId } from '../countries/countries.controller';
-import type { LedgerMode, VerificationStatus } from '../generated/prisma/client';
-import { Mode } from '../ledger/mode';
-import { modeHeader, PageDto } from '../ledger/wallet.controller';
-import { IdentityService } from './identity.service';
+import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { adminId } from '../countries/countries.controller.js';
+import type { LedgerMode, VerificationStatus } from '../generated/prisma/client.js';
+import { Mode } from '../ledger/mode.js';
+import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { IdentityService } from './identity.service.js';
 
 const referencePattern = /^[A-Za-z0-9._:@-]{1,100}$/;
 

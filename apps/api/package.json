@@ -2,6 +2,7 @@
   "name": "@bitocard/api",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "prisma generate && nest start --watch",
     "build": "prisma generate && nest build",

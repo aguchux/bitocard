@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { IntegrationsService } from '../integrations/integrations.service.js';
 
 export type SmsMessage = { to: string; text: string };
 

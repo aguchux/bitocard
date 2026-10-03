@@ -1,12 +1,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller';
-import { adminId, ParseCategoryPipe } from '../countries/countries.controller';
-import { productCategories } from '../countries/countries.service';
-import type { ProductCategory, SupplierStatus } from '../generated/prisma/client';
-import { PageDto } from '../ledger/wallet.controller';
-import { SuppliersService } from './suppliers.service';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
+import { productCategories } from '../countries/countries.service.js';
+import type { ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
+import { PageDto } from '../ledger/wallet.controller.js';
+import { SuppliersService } from './suppliers.service.js';
 
 const statuses = ['mvp_live', 'mvp_qualify', 'pilot', 'later', 'backup'] as const;
 const nullable = (_dto: unknown, value: unknown) => value !== null;

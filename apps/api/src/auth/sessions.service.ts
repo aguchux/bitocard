@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { CookieOptions, Request, Response } from 'express';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import { randomToken, sha256 } from '../common/crypto';
-import type { Realm } from '../generated/prisma/client';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { randomToken, sha256 } from '../common/crypto.js';
+import type { Realm } from '../generated/prisma/client.js';
 
 const hour = 60 * 60 * 1000;
 

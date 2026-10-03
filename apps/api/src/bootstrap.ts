@@ -5,12 +5,12 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
-import { AppModule, type AppOptions } from './app.module';
-import { originAllowed } from './auth/auth.guard';
-import { APP_CONFIG, type AppConfig } from './config/config';
-import { validationPipe } from './common/errors/validation';
-import { securityHeaders } from './common/security-headers';
-import { addWebhooks } from './webhooks/openapi';
+import { AppModule, type AppOptions } from './app.module.js';
+import { originAllowed } from './auth/auth.guard.js';
+import { APP_CONFIG, type AppConfig } from './config/config.js';
+import { validationPipe } from './common/errors/validation.js';
+import { securityHeaders } from './common/security-headers.js';
+import { addWebhooks } from './webhooks/openapi.js';
 
 /** Routes outside /v1: service info, health and robots.txt. Everything else is versioned. */
 const unversioned = ['/', 'health', 'robots.txt'];

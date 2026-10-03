@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { SettingsModule } from '../settings/settings.module';
-import { AdminPlansController, PlansController } from './plans.controller';
-import { PlansService } from './plans.service';
+import { SettingsModule } from '../settings/settings.module.js';
+import { AdminPlansController, PlansController } from './plans.controller.js';
+import { PlansService } from './plans.service.js';
 
 @Module({
   imports: [SettingsModule],

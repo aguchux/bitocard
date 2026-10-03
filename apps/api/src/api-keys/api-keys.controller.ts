@@ -2,10 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
-import { type Caller, CurrentCaller, Roles, SessionOnly } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import { ApiKeysService, apiKeyScopes } from './api-keys.service';
+import { type Caller, CurrentCaller, Roles, SessionOnly } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { ApiKeysService, apiKeyScopes } from './api-keys.service.js';
 
 class CreateApiKeyDto {
   @ApiProperty({ description: 'A name to recognise the key by, such as the system that uses it.', minLength: 1, maxLength: 60, example: 'Website backend' })

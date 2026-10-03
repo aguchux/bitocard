@@ -1,9 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { CountriesService } from '../countries/countries.service';
-import { PrismaService } from '../database/prisma.service';
-import { Prisma, type Store } from '../generated/prisma/client';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { CountriesService } from '../countries/countries.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { Prisma, type Store } from '../generated/prisma/client.js';
 
 export const maxStoresPerReseller = 1;
 

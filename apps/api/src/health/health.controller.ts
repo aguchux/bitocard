@@ -1,8 +1,8 @@
 import { Controller, Get, Header, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { Public } from '../auth/caller';
+import { Public } from '../auth/caller.js';
 import type { Response } from 'express';
-import { HealthService } from './health.service';
+import { HealthService } from './health.service.js';
 
 @ApiExcludeController()
 @Public()

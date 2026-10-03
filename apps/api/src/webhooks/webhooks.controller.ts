@@ -2,14 +2,14 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUrl, Length, Max, MaxLength, Min } from 'class-validator';
-import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import type { LedgerMode, WebhookDeliveryStatus } from '../generated/prisma/client';
-import { Mode } from '../ledger/mode';
-import { modeHeader, PageDto } from '../ledger/wallet.controller';
-import { WebhookEndpointsService } from './endpoints.service';
-import { eventTypes } from './events';
-import { EventsService } from './events.service';
+import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import type { LedgerMode, WebhookDeliveryStatus } from '../generated/prisma/client.js';
+import { Mode } from '../ledger/mode.js';
+import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { WebhookEndpointsService } from './endpoints.service.js';
+import { eventTypes } from './events.js';
+import { EventsService } from './events.service.js';
 
 const eventChoices = ['*', ...eventTypes];
 const urlRules = { require_protocol: true, require_tld: false, protocols: ['https', 'http'] };

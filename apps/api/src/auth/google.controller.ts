@@ -1,8 +1,8 @@
 import { Controller, Get, HttpStatus, Query, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { type Caller, type CallerRequest, Public } from './caller';
-import { GoogleService } from './google.service';
+import { type Caller, type CallerRequest, Public } from './caller.js';
+import { GoogleService } from './google.service.js';
 
 /** Browser redirects for "Sign in with Google". Not for API keys; reseller accounts only. */
 @ApiTags('Authentication')

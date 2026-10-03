@@ -1,9 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { WebhookDeliveryService } from './delivery.service';
-import { WebhookEndpointsService } from './endpoints.service';
-import { EventsService } from './events.service';
-import { WebhookQueue } from './queue';
-import { EventsController, WebhookEndpointsController } from './webhooks.controller';
+import { WebhookDeliveryService } from './delivery.service.js';
+import { WebhookEndpointsService } from './endpoints.service.js';
+import { EventsService } from './events.service.js';
+import { WebhookQueue } from './queue.js';
+import { EventsController, WebhookEndpointsController } from './webhooks.controller.js';
 
 /** Global: orders, payments and payouts record events in their own transactions. */
 @Global()

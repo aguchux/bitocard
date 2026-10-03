@@ -1,8 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
-import { ApiError } from '../common/errors/api-error';
-import { AuditService } from '../audit/audit.service';
-import { type Country, type CountryCategory, ProductCategory } from '../generated/prisma/client';
+import { PrismaService } from '../database/prisma.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { AuditService } from '../audit/audit.service.js';
+import { type Country, type CountryCategory, ProductCategory } from '../generated/prisma/client.js';
 
 export const productCategories = Object.values(ProductCategory);
 

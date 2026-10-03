@@ -1,21 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { Encryption } from '../common/encryption';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import type { BankAccount, LedgerMode, Payout } from '../generated/prisma/client';
-import { LedgerService } from '../ledger/ledger.service';
-import { minor } from '../ledger/mode';
-import { WalletService } from '../ledger/wallet.service';
-import { EmailService } from '../notifications/email.service';
-import { bankAccountAddedEmail, formatMoney, payoutFailedEmail, payoutPaidEmail } from '../notifications/templates';
-import { PaymentProviders } from '../payments/payment-providers';
-import { resellerNotVerified, testModeOnly } from '../payments/payments.service';
-import { ProviderError } from '../payments/provider-error';
-import type { TransferResult } from '../payments/providers';
-import { EventsService } from '../webhooks/events.service';
-import { accountNameMatches } from '../identity/providers';
+import { ApiError } from '../common/errors/api-error.js';
+import { Encryption } from '../common/encryption.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { BankAccount, LedgerMode, Payout } from '../generated/prisma/client.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { minor } from '../ledger/mode.js';
+import { WalletService } from '../ledger/wallet.service.js';
+import { EmailService } from '../notifications/email.service.js';
+import { bankAccountAddedEmail, formatMoney, payoutFailedEmail, payoutPaidEmail } from '../notifications/templates.js';
+import { PaymentProviders } from '../payments/payment-providers.js';
+import { resellerNotVerified, testModeOnly } from '../payments/payments.service.js';
+import { ProviderError } from '../payments/provider-error.js';
+import type { TransferResult } from '../payments/providers.js';
+import { EventsService } from '../webhooks/events.service.js';
+import { accountNameMatches } from '../identity/providers.js';
 
 /** Payouts to a newly added live bank account start after this, so a taken-over account cannot be emptied at once. */
 export const bankAccountCoolingOffMs = 24 * 60 * 60 * 1000;

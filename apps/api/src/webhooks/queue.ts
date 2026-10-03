@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { QueueClient, type RetryHandler } from '@vercel/queue';
-import { APP_CONFIG, type AppConfig } from '../config/config';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
 
 /** The Vercel Queues topic; its consumer trigger is configured in vercel.json. */
 export const webhookTopic = 'webhook-deliveries';

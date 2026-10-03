@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import { type AccountKind, type Hold, type JournalEntry, type LedgerAccount, type LedgerMode, type LedgerPosting, Prisma } from '../generated/prisma/client';
-import { type AccountRef, insufficientFunds, LedgerService } from './ledger.service';
-import { minor } from './mode';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { type AccountKind, type Hold, type JournalEntry, type LedgerAccount, type LedgerMode, type LedgerPosting, Prisma } from '../generated/prisma/client.js';
+import { type AccountRef, insufficientFunds, LedgerService } from './ledger.service.js';
+import { minor } from './mode.js';
 
 const day = 24 * 60 * 60 * 1000;
 

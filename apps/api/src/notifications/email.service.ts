@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { IntegrationsService } from '../integrations/integrations.service.js';
 
 export type EmailMessage = { to: string; subject: string; text: string; html: string };
 

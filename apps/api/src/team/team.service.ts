@@ -1,11 +1,11 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { PrismaService } from '../database/prisma.service';
-import { randomToken, sha256 } from '../common/crypto';
-import { ApiError } from '../common/errors/api-error';
-import type { Invitation, ResellerRole } from '../generated/prisma/client';
-import { EmailService } from '../notifications/email.service';
-import { invitationEmail } from '../notifications/templates';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { randomToken, sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { Invitation, ResellerRole } from '../generated/prisma/client.js';
+import { EmailService } from '../notifications/email.service.js';
+import { invitationEmail } from '../notifications/templates.js';
 
 export const staffRoles = ['admin', 'developer', 'finance', 'support'] as const;
 const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1000;

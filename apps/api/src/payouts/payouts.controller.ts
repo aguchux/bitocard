@@ -1,11 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
-import { type Caller, CurrentCaller, personOf, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller';
-import type { LedgerMode } from '../generated/prisma/client';
-import { Mode } from '../ledger/mode';
-import { modeHeader, PageDto } from '../ledger/wallet.controller';
-import { PayoutsService } from './payouts.service';
+import { type Caller, CurrentCaller, personOf, resellerOf, Roles, Scopes, SessionOnly } from '../auth/caller.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { Mode } from '../ledger/mode.js';
+import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { PayoutsService } from './payouts.service.js';
 
 class AddBankAccountDto {
   @ApiProperty({ description: 'Bank code from the bank list.' })

@@ -2,12 +2,12 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestj
 import { ApiBearerAuth, ApiExcludeController, ApiHeader, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsNotIn, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller';
-import { adminId } from '../countries/countries.controller';
-import type { LedgerMode } from '../generated/prisma/client';
-import { LedgerService } from './ledger.service';
-import { Mode } from './mode';
-import { WalletService } from './wallet.service';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { adminId } from '../countries/countries.controller.js';
+import type { LedgerMode } from '../generated/prisma/client.js';
+import { LedgerService } from './ledger.service.js';
+import { Mode } from './mode.js';
+import { WalletService } from './wallet.service.js';
 
 export class PageDto {
   @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 25 })

@@ -1,13 +1,13 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { IntegrationsService } from '../integrations/integrations.service';
-import { PrismaService } from '../database/prisma.service';
-import { Prisma } from '../generated/prisma/client';
-import { EmailService } from '../notifications/email.service';
-import { conversionsPausedEmail } from '../notifications/templates';
-import { PaymentProviders } from '../payments/payment-providers';
-import { providerRequest } from '../payments/provider-error';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { Prisma } from '../generated/prisma/client.js';
+import { EmailService } from '../notifications/email.service.js';
+import { conversionsPausedEmail } from '../notifications/templates.js';
+import { PaymentProviders } from '../payments/payment-providers.js';
+import { providerRequest } from '../payments/provider-error.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;

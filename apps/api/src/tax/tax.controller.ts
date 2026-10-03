@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsString, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller';
-import { adminId } from '../countries/countries.controller';
-import { TaxService } from './tax.service';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { adminId } from '../countries/countries.controller.js';
+import { TaxService } from './tax.service.js';
 
 class TaxRateDto {
   @IsString() @Length(2, 40)

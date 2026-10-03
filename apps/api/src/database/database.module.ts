@@ -1,5 +1,5 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
-import { PRISMA_ADAPTER, PrismaService, type DatabaseAdapter } from './prisma.service';
+import { PRISMA_ADAPTER, PrismaService, type DatabaseAdapter } from './prisma.service.js';
 
 @Global()
 @Module({})

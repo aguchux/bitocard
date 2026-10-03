@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, type OnModuleInit, Optional } from '@nestjs/common';
-import { APP_CONFIG, type AppConfig, configSchema } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import { Encryption } from '../common/encryption';
-import { integrationFields, integrationKeys, type IntegrationKey } from './definitions';
+import { APP_CONFIG, type AppConfig, configSchema } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { Encryption } from '../common/encryption.js';
+import { integrationFields, integrationKeys, type IntegrationKey } from './definitions.js';
 
 /** How long an instance trusts its copy of the admin settings before reading them again. */
 export const integrationsMaxAgeMs = 30_000;

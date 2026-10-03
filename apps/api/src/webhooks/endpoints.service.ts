@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { ApiError } from '../common/errors/api-error';
-import { Encryption } from '../common/encryption';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import type { Event, LedgerMode, WebhookAttempt, WebhookDelivery, WebhookDeliveryStatus, WebhookEndpoint } from '../generated/prisma/client';
-import { WebhookDeliveryService } from './delivery.service';
-import { checkDestination } from './destinations';
-import { eventPayload, eventTypes, pingEvent } from './events';
-import { newWebhookSecret } from './signing';
+import { ApiError } from '../common/errors/api-error.js';
+import { Encryption } from '../common/encryption.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import type { Event, LedgerMode, WebhookAttempt, WebhookDelivery, WebhookDeliveryStatus, WebhookEndpoint } from '../generated/prisma/client.js';
+import { WebhookDeliveryService } from './delivery.service.js';
+import { checkDestination } from './destinations.js';
+import { eventPayload, eventTypes, pingEvent } from './events.js';
+import { newWebhookSecret } from './signing.js';
 
 /** Endpoints per reseller in each mode. */
 export const maxEndpoints = 16;

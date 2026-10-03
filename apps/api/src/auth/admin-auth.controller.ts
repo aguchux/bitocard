@@ -3,11 +3,11 @@ import { ApiExcludeController, ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsString, Length, Matches } from 'class-validator';
 import type { Request, Response } from 'express';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import { AdminAuthService } from './admin-auth.service';
-import { type Caller, CurrentCaller, Public, RealmOnly } from './caller';
-import { passwordLength } from './passwords.service';
-import { SessionsService } from './sessions.service';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { AdminAuthService } from './admin-auth.service.js';
+import { type Caller, CurrentCaller, Public, RealmOnly } from './caller.js';
+import { passwordLength } from './passwords.service.js';
+import { SessionsService } from './sessions.service.js';
 
 class AdminSignInDto {
   @ApiProperty({ format: 'email', example: 'ops@bitocard.com' })

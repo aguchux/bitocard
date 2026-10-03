@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
-import { CountriesModule } from '../countries/countries.module';
-import { TeamModule } from '../team/team.module';
-import { AdminAuthController } from './admin-auth.controller';
-import { AdminAuthService } from './admin-auth.service';
-import { AuthController } from './auth.controller';
-import { AuthGuard } from './auth.guard';
-import { AuthService } from './auth.service';
-import { CodesService } from './codes.service';
-import { GoogleController } from './google.controller';
-import { GoogleService } from './google.service';
-import { PasswordsService } from './passwords.service';
-import { SessionsService } from './sessions.service';
+import { CountriesModule } from '../countries/countries.module.js';
+import { TeamModule } from '../team/team.module.js';
+import { AdminAuthController } from './admin-auth.controller.js';
+import { AdminAuthService } from './admin-auth.service.js';
+import { AuthController } from './auth.controller.js';
+import { AuthGuard } from './auth.guard.js';
+import { AuthService } from './auth.service.js';
+import { CodesService } from './codes.service.js';
+import { GoogleController } from './google.controller.js';
+import { GoogleService } from './google.service.js';
+import { PasswordsService } from './passwords.service.js';
+import { SessionsService } from './sessions.service.js';
 
 @Module({
   imports: [TeamModule, CountriesModule],

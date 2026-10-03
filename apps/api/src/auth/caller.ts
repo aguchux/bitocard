@@ -1,7 +1,7 @@
 import { createParamDecorator, type ExecutionContext, HttpStatus, SetMetadata } from '@nestjs/common';
 import type { Request } from 'express';
-import type { ApiKeyMode, Realm, ResellerRole } from '../generated/prisma/client';
-import { ApiError } from '../common/errors/api-error';
+import type { ApiKeyMode, Realm, ResellerRole } from '../generated/prisma/client.js';
+import { ApiError } from '../common/errors/api-error.js';
 
 /** Who is making a request: a signed-in person (session) or a reseller system (API key). */
 export type Caller =

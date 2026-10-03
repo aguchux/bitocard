@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { FxModule } from '../fx/fx.module';
-import { BillingController } from './billing.controller';
-import { BillingService } from './billing.service';
+import { FxModule } from '../fx/fx.module.js';
+import { BillingController } from './billing.controller.js';
+import { BillingService } from './billing.service.js';
 
 @Module({
   imports: [FxModule],

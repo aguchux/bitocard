@@ -1,4 +1,4 @@
-import type { Reseller, ResellerMember, User } from '../generated/prisma/client';
+import type { Reseller, ResellerMember, User } from '../generated/prisma/client.js';
 
 /** Public JSON shapes. Field names are snake_case and every object says what it is. */
 export function presentUser(user: User) {

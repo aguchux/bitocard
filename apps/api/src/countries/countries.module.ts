@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { AdminCountriesController, CountriesController } from './countries.controller';
-import { CountriesService } from './countries.service';
+import { AdminCountriesController, CountriesController } from './countries.controller.js';
+import { CountriesService } from './countries.service.js';
 
 @Module({
   controllers: [CountriesController, AdminCountriesController],

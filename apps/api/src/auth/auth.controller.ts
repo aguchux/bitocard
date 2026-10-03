@@ -1,11 +1,11 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor';
-import { CodeDto, ForgotPasswordDto, PhoneDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto';
-import { AuthService } from './auth.service';
-import { type Caller, CurrentCaller, Public, SessionOnly } from './caller';
-import { SessionsService } from './sessions.service';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { CodeDto, ForgotPasswordDto, PhoneDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { AuthService } from './auth.service.js';
+import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
+import { SessionsService } from './sessions.service.js';
 
 /**
  * Reseller sign-in for the dashboard. These endpoints set or read the session cookie, so they skip idempotency keys:

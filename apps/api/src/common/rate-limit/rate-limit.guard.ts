@@ -1,9 +1,9 @@
 import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
-import { APP_CONFIG, type AppConfig } from '../../config/config';
-import { ApiError } from '../errors/api-error';
-import { callerScope } from '../idempotency/idempotency.interceptor';
+import { APP_CONFIG, type AppConfig } from '../../config/config.js';
+import { ApiError } from '../errors/api-error.js';
+import { callerScope } from '../idempotency/idempotency.interceptor.js';
 
 type Verdict = { success: boolean; limit: number; remaining: number; reset: number };
 

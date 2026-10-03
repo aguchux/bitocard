@@ -1,5 +1,5 @@
-import { eventApiVersion, type EventType, eventTypes } from './events';
-import { signatureHeader, signatureTestVector, signatureToleranceSeconds, signatureValue } from './signing';
+import { eventApiVersion, type EventType, eventTypes } from './events.js';
+import { signatureHeader, signatureTestVector, signatureToleranceSeconds, signatureValue } from './signing.js';
 
 /**
  * The `webhooks` section of the OpenAPI document: one entry per event type, with its payload schema, a full example

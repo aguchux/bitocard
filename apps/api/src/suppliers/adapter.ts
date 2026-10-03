@@ -1,4 +1,4 @@
-import type { DenominationType, ProductCategory } from '../generated/prisma/client';
+import type { DenominationType, ProductCategory } from '../generated/prisma/client.js';
 
 /** One product as a supplier offers it, already in BitoCard terms. Amounts are minor units. */
 export type CatalogueItem = {

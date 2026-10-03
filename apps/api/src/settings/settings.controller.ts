@@ -1,10 +1,10 @@
 import { Body, Controller, Get, HttpStatus, Param, Put } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { ArrayUnique, IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length, Matches, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, Roles, SessionOnly } from '../auth/caller';
-import { ApiError } from '../common/errors/api-error';
-import { adminId } from '../countries/countries.controller';
-import { SettingsService } from './settings.service';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, Roles, SessionOnly } from '../auth/caller.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { adminId } from '../countries/countries.controller.js';
+import { SettingsService } from './settings.service.js';
 
 class OptionValueDto {
   @ApiProperty({ example: 'bank' })

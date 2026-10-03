@@ -1,6 +1,6 @@
 import { Global, Injectable, Module } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
-import { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../database/prisma.service.js';
+import { Prisma } from '../generated/prisma/client.js';
 
 /** JSON-safe copy of a record for the audit trail (BigInt and Date become strings). */
 function snapshot(value: unknown): Prisma.InputJsonValue | undefined {

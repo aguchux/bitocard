@@ -1,5 +1,5 @@
 import { HttpStatus, ValidationPipe, type ValidationError } from '@nestjs/common';
-import { ApiError } from './api-error';
+import { ApiError } from './api-error.js';
 
 function firstProblem(errors: ValidationError[], parent = ''): { param: string; message: string } {
   const [error] = errors;

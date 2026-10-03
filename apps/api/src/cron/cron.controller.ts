@@ -2,18 +2,18 @@ import { timingSafeEqual } from 'node:crypto';
 import { Controller, Get, HttpStatus, Inject, Param, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { CronOnly } from '../auth/caller';
-import { BillingService } from '../billing/billing.service';
-import { ApiError } from '../common/errors/api-error';
-import { APP_CONFIG, type AppConfig } from '../config/config';
-import { FxService } from '../fx/fx.service';
-import { WalletService } from '../ledger/wallet.service';
-import { PaymentsService } from '../payments/payments.service';
-import { PayoutsService } from '../payouts/payouts.service';
-import { SuppliersService } from '../suppliers/suppliers.service';
-import { OrdersService } from '../orders/orders.service';
-import { WebhookDeliveryService } from '../webhooks/delivery.service';
-import { IdentityService } from '../identity/identity.service';
+import { CronOnly } from '../auth/caller.js';
+import { BillingService } from '../billing/billing.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { FxService } from '../fx/fx.service.js';
+import { WalletService } from '../ledger/wallet.service.js';
+import { PaymentsService } from '../payments/payments.service.js';
+import { PayoutsService } from '../payouts/payouts.service.js';
+import { SuppliersService } from '../suppliers/suppliers.service.js';
+import { OrdersService } from '../orders/orders.service.js';
+import { WebhookDeliveryService } from '../webhooks/delivery.service.js';
+import { IdentityService } from '../identity/identity.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.

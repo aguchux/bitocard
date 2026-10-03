@@ -1,10 +1,10 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { AuditService } from '../audit/audit.service';
-import { ApiError } from '../common/errors/api-error';
-import { PrismaService } from '../database/prisma.service';
-import { Prisma, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client';
-import type { CatalogueItem, CatalogueScope } from './adapter';
-import { SupplierAdapters } from './supplier-adapters';
+import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { Prisma, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
+import type { CatalogueItem, CatalogueScope } from './adapter.js';
+import { SupplierAdapters } from './supplier-adapters.js';
 
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
 

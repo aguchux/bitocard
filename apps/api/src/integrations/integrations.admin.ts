@@ -1,16 +1,16 @@
 import { Body, Controller, Get, HttpStatus, Injectable, Module, Param, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsObject, IsString, Matches } from 'class-validator';
-import { AdminAuthService } from '../auth/admin-auth.service';
-import { AuthModule } from '../auth/auth.module';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller';
-import { AuditService } from '../audit/audit.service';
-import { Encryption } from '../common/encryption';
-import { ApiError } from '../common/errors/api-error';
-import { configSchema } from '../config/config';
-import { PrismaService } from '../database/prisma.service';
-import { integrationGroups, type IntegrationField, type IntegrationGroup } from './definitions';
-import { IntegrationsService } from './integrations.service';
+import { AdminAuthService } from '../auth/admin-auth.service.js';
+import { AuthModule } from '../auth/auth.module.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { AuditService } from '../audit/audit.service.js';
+import { Encryption } from '../common/encryption.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { configSchema } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { integrationGroups, type IntegrationField, type IntegrationGroup } from './definitions.js';
+import { IntegrationsService } from './integrations.service.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;

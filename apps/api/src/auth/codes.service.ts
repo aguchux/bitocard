@@ -1,8 +1,8 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
-import { numericCode, sameDigest, sha256 } from '../common/crypto';
-import { ApiError } from '../common/errors/api-error';
-import type { CodePurpose } from '../generated/prisma/client';
+import { PrismaService } from '../database/prisma.service.js';
+import { numericCode, sameDigest, sha256 } from '../common/crypto.js';
+import { ApiError } from '../common/errors/api-error.js';
+import type { CodePurpose } from '../generated/prisma/client.js';
 
 const lifetimeMs = 30 * 60 * 1000;
 const resendAfterMs = 60 * 1000;
