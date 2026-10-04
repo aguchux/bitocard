@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { BellRing, Check, Copy, CreditCard, DownloadCloud, Package, Plug, RefreshCw, Unplug } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, ExternalLinks, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   type IntegrationAccessReason,
@@ -206,6 +206,7 @@ function IntegrationCard({ integration, manage, onConnect, onDisconnect }: { int
     <Card className="flex flex-col">
       <CardHeader title={integration.name} description={integration.description} actions={<StatusBadge status={status} label={statusLabels[status]} />} />
       <div className="flex flex-1 flex-col gap-3 px-5 pb-5 sm:px-6">
+        <ExternalLinks links={integration.links} />
         {connection ? (
           <dl className="grid gap-2 text-sm">
             {integration.fields

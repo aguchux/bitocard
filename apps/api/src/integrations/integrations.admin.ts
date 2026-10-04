@@ -11,6 +11,7 @@ import { type AppConfig, configSchema } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { integrationGroups, isPlatformKey, type IntegrationField, type IntegrationGroup } from './definitions.js';
 import { IntegrationsService, schemaFor } from './integrations.service.js';
+import { linksFor } from './links.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -103,6 +104,8 @@ export class IntegrationsAdminService {
       id: group.id,
       name: group.name,
       description: group.description,
+      /** Where to sign up with the provider and find the credentials. */
+      links: linksFor(group.id),
       status: connected ? ('connected' as const) : started ? ('incomplete' as const) : ('not_connected' as const),
       section: group.section,
       /** False while the supplier's adapter is not built: its credentials are saved for later and not used yet. */

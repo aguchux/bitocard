@@ -270,6 +270,8 @@ export type Integration = {
   adapter_ready: boolean;
   /** The address to paste into the provider's dashboard, when it sends webhooks. */
   webhook_url: string | null;
+  /** Where to sign up with the provider and find the credentials. */
+  links: Array<{ label: string; url: string }>;
   updated_at: string | null;
   fields: IntegrationField[];
 };

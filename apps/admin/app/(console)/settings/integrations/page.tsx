@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Check, Copy, KeyRound, Pencil } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, ExternalLinks, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type Integration, type IntegrationField, type IntegrationSource, useIntegrationsQuery, useUpdateIntegrationMutation } from "@bitocard/api-client/admin";
 import { ResellerAvailability } from "@/components/reseller-availability";
@@ -57,6 +57,7 @@ function IntegrationCard({ integration, editable, onEdit }: { integration: Integ
           </>
         }
       />
+      <ExternalLinks links={integration.links} className="mx-5 mt-3 sm:mx-6" />
       {integration.adapter_ready ? null : (
         <p className="mx-5 mt-4 rounded-lg bg-canvas px-3 py-2 text-xs text-muted sm:mx-6">
           Not connected yet: BitoCard’s adapter for this supplier is still to be built. Keys saved now are kept encrypted and used once it is.
@@ -142,6 +143,7 @@ function EditDialog({ integration, onClose }: { integration: Integration; onClos
         await update({ id: integration.id, values, code }).unwrap();
       }}
     >
+      <ExternalLinks links={integration.links} className="mb-4" />
       {integration.fields.map(field => {
         const inputId = `${id}-${field.key}`;
         const entry = draft[field.key];

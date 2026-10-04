@@ -53,7 +53,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     name: 'Reloadly',
     description: 'Gift cards, airtime and data from your own Reloadly account and prices.',
     fields: [
-      field('client_id', 'Client ID'),
+      field('client_id', 'Client ID', { help: 'Reloadly dashboard > Developers > API settings.' }),
       secret('client_secret', 'Client secret'),
       secret('webhook_secret', 'Webhook signature secret', { required: false, help: 'From Reloadly’s Developers > Webhooks, once BitoCard gives you a webhook address.' }),
     ],

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Badge, Button, Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type Supplier, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
+import { type ProductCategory, type Supplier, useCountriesQuery, useSetSupplierMarketMutation, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
 import { healthOf } from "../supplier-health";
 
 type Filter = "live" | "all";
@@ -29,6 +29,70 @@ function SupplierLogo({ supplier, editable }: { supplier: Supplier; editable: bo
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** Categories sold worldwide: one switched-on market is enough for the whole catalogue (the API's worldwideCategories). */
+const worldwide = new Set<ProductCategory>(["gift_cards", "esim", "software", "virtual_numbers"]);
+
+/**
+ * Where BitoCard uses this supplier: per market (country) and category. The catalogue sync fetches only switched-on
+ * markets, so a supplier with none syncs nothing.
+ */
+function SupplierMarkets({ supplier, editable }: { supplier: Supplier; editable: boolean }) {
+  const countries = useCountriesQuery();
+  const [setMarket, state] = useSetSupplierMarketMutation();
+  const [busy, setBusy] = useState<string | null>(null);
+  const on = (country: string, category: ProductCategory) => supplier.markets?.some(market => market.country === country && market.category === category && market.enabled) ?? false;
+  const none = !supplier.markets?.some(market => market.enabled);
+  const global = supplier.categories.filter(category => worldwide.has(category));
+  return (
+    <section aria-label={`${supplier.name} markets`} className="space-y-2">
+      <h3 className="text-sm font-semibold text-ink">Markets</h3>
+      <p className="text-xs text-muted">
+        The catalogue sync fetches only switched-on markets.{global.length ? ` ${global.map(categoryName).join(", ")} ${global.length === 1 ? "is" : "are"} worldwide: switching it on in one country syncs the whole catalogue.` : ""}
+      </p>
+      {none ? <Notice tone="amber">No market is switched on, so a sync fetches nothing. Switch on at least one below.</Notice> : null}
+      {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      {countries.isLoading ? (
+        <Skeleton className="h-20 w-full" />
+      ) : (
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {(countries.data?.data ?? []).map(country => (
+            <li key={country.code} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5">
+              <span className="w-28 shrink-0 text-sm font-medium text-ink">{country.name}</span>
+              <span className="flex flex-wrap gap-1.5">
+                {supplier.categories.map(category => {
+                  const enabled = on(country.code, category);
+                  const key = `${country.code}:${category}`;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      aria-pressed={enabled}
+                      disabled={!editable || busy === key}
+                      onClick={async () => {
+                        setBusy(key);
+                        try {
+                          await setMarket({ code: supplier.code, country: country.code, category, enabled: !enabled }).unwrap();
+                        } catch {
+                          /* shown above */
+                        } finally {
+                          setBusy(null);
+                        }
+                      }}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition disabled:opacity-60 ${enabled ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-white text-muted hover:border-brand-500 hover:text-ink"}`}
+                    >
+                      {categoryName(category)}
+                    </button>
+                  );
+                })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -96,6 +160,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
           ]}
         />
         {supplier.notes ? <p className="text-sm text-muted">{supplier.notes}</p> : null}
+        <SupplierMarkets supplier={supplier} editable={operator} />
         <SupplierLogo key={supplier.logo_url ?? ""} supplier={supplier} editable={operator} />
       </div>
     </Card>

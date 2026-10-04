@@ -92,6 +92,16 @@ describe('supplier registry and sync', () => {
 
   test('a supplier without credentials cannot sync; a failed sync is recorded and withdraws nothing', async () => {
     assert.equal((await admin.post('/v1/admin/suppliers/didww/sync')).json.error.code, 'supplier_not_configured');
+    // With credentials but no market switched on there is nothing to fetch: refused, not an empty success.
+    const markets = await prisma.supplierMarket.findMany({ where: { supplierCode: 'reloadly', enabled: true } });
+    await prisma.supplierMarket.updateMany({ where: { supplierCode: 'reloadly' }, data: { enabled: false } });
+    try {
+      const empty = await admin.post('/v1/admin/suppliers/reloadly/sync');
+      assert.deepEqual([empty.status, empty.json.error.code], [409, 'supplier_no_markets']);
+      assert.match(empty.json.error.message, /Switch on at least one market for Reloadly/);
+    } finally {
+      await prisma.supplierMarket.updateMany({ where: { supplierCode: 'reloadly', OR: markets.map(market => ({ countryCode: market.countryCode, category: market.category })) }, data: { enabled: true } });
+    }
     const available = await prisma.supplierProduct.count({ where: { supplierCode: 'reloadly', available: true } });
     reloadly.state.fail = '/topups';
     try {

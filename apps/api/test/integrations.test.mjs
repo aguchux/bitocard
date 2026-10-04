@@ -186,3 +186,31 @@ describe('integration settings', () => {
     assert.deepEqual(integrations.config.DIDWW_COUNTRIES, ['GB', 'US', 'CA']);
   });
 });
+
+describe('every integration explains itself', () => {
+  test('a short description, and links to sign up or get credentials unless it is internal', async () => {
+    const { integrationGroups } = await import('../dist/integrations/definitions.js');
+    const { integrationLinks, internalIntegrations } = await import('../dist/integrations/links.js');
+    const { connectableIntegrations } = await import('../dist/reseller-integrations/connectable.js');
+    const all = [...integrationGroups, ...connectableIntegrations];
+    for (const item of all) {
+      assert.ok(item.description.trim().length >= 10 && item.description.length <= 400, `${item.id}: a short description`);
+      const links = integrationLinks[item.id] ?? [];
+      if (internalIntegrations.has(item.id)) continue;
+      assert.ok(links.length > 0, `${item.id}: where to sign up or get credentials (src/integrations/links.ts)`);
+      for (const link of links) {
+        assert.match(link.url, /^https:\/\/[a-z0-9.-]+\.[a-z]{2,}(\/\S*)?$/i, `${item.id}: ${link.url}`);
+        assert.ok(link.label.trim().length > 0 && link.label.length <= 40, `${item.id}: ${link.label}`);
+      }
+    }
+    const ids = new Set(all.map(item => item.id));
+    for (const id of Object.keys(integrationLinks)) assert.ok(ids.has(id), `links for an unknown integration: ${id}`);
+  });
+
+  test('the admin app gets each integration’s links', async () => {
+    const list = (await admin.get('/v1/admin/integrations')).json.data;
+    assert.ok(list.find(item => item.id === 'email').links.some(link => link.url === 'https://resend.com/api-keys'));
+    assert.ok(list.find(item => item.id === 'telnyx').links.length > 0, 'suppliers whose adapter is not built too');
+    assert.deepEqual(list.find(item => item.id === 'general').links, []);
+  });
+});

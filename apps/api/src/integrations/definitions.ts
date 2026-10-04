@@ -130,7 +130,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     name: 'SMS (Termii)',
     description: 'Mobile number verification and sign-in codes. Without a key, texts are only logged.',
     fields: [
-      secret('TERMII_API_KEY', 'API key'),
+      secret('TERMII_API_KEY', 'API key', { help: 'Termii dashboard > API (sign up at termii.com).' }),
       field('TERMII_API_URL', 'API address', { kind: 'url', help: 'Account-specific; shown in the Termii dashboard.' }),
       field('TERMII_SENDER_ID', 'Sender ID'),
     ],
@@ -208,7 +208,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     description: 'Gift cards, airtime and data. Without credentials it serves only the sandbox, never live orders.',
     webhookPath: '/v1/webhooks/reloadly',
     fields: [
-      field('RELOADLY_CLIENT_ID', 'Client ID', { required: true }),
+      field('RELOADLY_CLIENT_ID', 'Client ID', { required: true, help: 'Reloadly dashboard > Developers > API settings. Test and live keys differ.' }),
       secret('RELOADLY_CLIENT_SECRET', 'Client secret'),
       field('RELOADLY_SANDBOX', 'Use Reloadly’s sandbox', { kind: 'flag', help: 'On: Reloadly test credits, no real cards. Off: live.' }),
       secret('RELOADLY_WEBHOOK_SECRET', 'Webhook signature secret', {

@@ -1,8 +1,19 @@
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Gift, X } from "lucide-react";
 import type { StoreCountry, StoreList, StoreNavigationGroup, StoreProduct } from "@bitocard/api-client/storefront";
 import { query, storeApi } from "@/lib/api";
 import { ProductCard } from "./product-card";
+import { groupIcon } from "./theme";
+
+/** Each menu group's icon chip on white (the hero's colours are for the navy background). */
+const groupChip: Record<string, string> = {
+  "gift-cards": "bg-pink-50 text-pink-600",
+  mobile: "bg-sky-50 text-sky-600",
+  bills: "bg-emerald-50 text-emerald-600",
+  esims: "bg-fuchsia-50 text-fuchsia-600",
+  software: "bg-amber-50 text-amber-600",
+  "virtual-cards": "bg-cyan-50 text-cyan-600",
+};
 
 export const pageSize = 24;
 
@@ -80,25 +91,45 @@ export function CatalogueView({
           <Link href="/catalogs" aria-current={active === undefined ? "page" : undefined} className={`block rounded-lg px-3 py-2 font-semibold ${active === undefined ? "bg-pink-50 text-[#e0116d]" : "text-[#070f4c] hover:bg-slate-50"}`}>
             Everything
           </Link>
-          {groups.map(group => (
-            <div key={group.key} className="mt-3">
-              <p className="px-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">{group.label}</p>
-              <ul>
-                {group.categories.map(category => (
-                  <li key={category.category}>
-                    <Link
-                      href={`/catalogs/${category.category}`}
-                      aria-current={active === category.category ? "page" : undefined}
-                      className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-700 hover:bg-slate-50"}`}
-                    >
-                      {category.label}
-                      <span className="text-xs text-slate-500">{category.on_sale ? category.products : "Soon"}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {groups.map(group => {
+            const Icon = groupIcon[group.key] ?? Gift;
+            const href = `/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`;
+            const current = path === `/catalogs/${group.key}`;
+            return (
+              <div key={group.key} className="mt-5">
+                {/* The group stands out: its icon on a tinted chip and a bold name, linking to the whole group. */}
+                <Link
+                  href={href}
+                  aria-current={current ? "page" : undefined}
+                  className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[15px] font-bold tracking-tight ${current ? "bg-pink-50 text-[#e0116d]" : "text-[#070f4c] hover:bg-slate-50"}`}
+                >
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${groupChip[group.key] ?? "bg-pink-50 text-pink-600"}`}>
+                    <Icon className="size-[18px]" aria-hidden="true" />
+                  </span>
+                  {group.label}
+                </Link>
+                {/* Its categories, indented under a guide line. */}
+                <ul className="mt-1 ml-[1.45rem] space-y-0.5 border-l border-slate-200 pl-3">
+                  {group.categories.map(category => (
+                    <li key={category.category}>
+                      <Link
+                        href={`/catalogs/${category.category}`}
+                        aria-current={active === category.category ? "page" : undefined}
+                        className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#070f4c]"}`}
+                      >
+                        {category.label}
+                        {category.on_sale ? (
+                          <span className="text-xs text-slate-500">{category.products}</span>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
         <form method="get" action={path} className="mt-0 grid grid-cols-2 gap-2 lg:mt-6 lg:grid-cols-1">
           {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}

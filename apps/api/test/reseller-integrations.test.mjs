@@ -170,6 +170,8 @@ describe('connecting', () => {
     answer = 'ok';
     assert.deepEqual([res.status, res.json.connection.status, res.json.connection.mode], [200, 'active', 'test']);
     assert.equal((await browser.get('/v1/integrations')).json.data.find(item => item.id === 'vtpass').connection, null, 'live is separate');
+    const reloadly = (await browser.get('/v1/integrations')).json.data.find(item => item.id === 'reloadly');
+    assert.ok(reloadly.links.some(link => link.label === 'Sign up' && link.url.startsWith('https://')), 'where to sign up and get credentials');
   });
 
   test('disconnecting erases the credentials', async () => {

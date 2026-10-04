@@ -8,6 +8,7 @@ import { IntegrationsService } from '../integrations/integrations.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { connectionEmail } from '../notifications/templates.js';
+import { linksFor } from '../integrations/links.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { connectable, connectableIntegrations, type ConnectableIntegration } from './connectable.js';
@@ -376,6 +377,7 @@ function presentIntegration(integration: ConnectableIntegration, approval: Integ
     kind: integration.kind,
     name: integration.name,
     description: integration.description,
+    links: linksFor(integration.id),
     approval,
     fields: integration.fields.map(item => ({
       key: item.key,

@@ -58,6 +58,8 @@ export type ResellerIntegration = {
   kind: IntegrationKind;
   name: string;
   description: string;
+  /** Where to sign up with the provider and find your credentials. */
+  links: Array<{ label: string; url: string }>;
   /** Live connections are active at once, or reviewed by BitoCard first. */
   approval: 'automatic' | 'review';
   fields: IntegrationField[];

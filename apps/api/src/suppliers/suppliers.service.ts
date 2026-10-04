@@ -139,11 +139,21 @@ export class SuppliersService {
     if (!adapter.configured()) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'supplier_not_configured', `${supplier.name} has no API credentials configured.`);
     }
+    const scopes = await this.scopes(code);
+    if (scopes.length === 0) {
+      // Nothing to fetch: say so rather than report an empty success.
+      throw new ApiError(
+        HttpStatus.CONFLICT,
+        'conflict_error',
+        'supplier_no_markets',
+        `Switch on at least one market for ${supplier.name} first (a country and one of its categories). The catalogue is fetched only for switched-on markets; worldwide categories need just one country.`,
+      );
+    }
     const seen = new Set<string>();
     let created = 0;
     let updated = 0;
     try {
-      for (const scope of await this.scopes(code)) {
+      for (const scope of scopes) {
         for (const item of await adapter.catalogue(scope)) {
           if (seen.has(item.sku)) continue;
           seen.add(item.sku);

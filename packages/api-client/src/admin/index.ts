@@ -140,7 +140,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     }),
     setSupplierMarket: build.mutation<Supplier, { code: string; country: string; category: ProductCategory; enabled: boolean }>({
       query: ({ code, country, category, enabled }) => ({ url: `/v1/admin/suppliers/${code}/markets/${country}/${category}`, method: 'PUT', body: { enabled } }),
-      invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, 'Activity'],
+      invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, 'Activity'],
     }),
     syncSupplier: build.mutation<{ object: 'supplier_sync'; supplier: string; products_created: number; offers_updated: number; offers_withdrawn: number }, string>({
       query: code => ({ url: `/v1/admin/suppliers/${code}/sync`, method: 'POST' }),
