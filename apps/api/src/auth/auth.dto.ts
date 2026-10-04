@@ -165,17 +165,26 @@ export class ChangePasswordDto {
   new_password: string;
 }
 
-export class ChangeEmailDto {
-  @ApiProperty({ description: 'The new email address; a 6-digit code is sent to it.', format: 'email', maxLength: 254, example: 'ada@newmail.com' })
+export class AddEmailDto {
+  @ApiProperty({ description: 'The address to add; a 6-digit code is sent to it.', format: 'email', maxLength: 254, example: 'ada@newmail.com' })
+  @Transform(lowerTrim)
+  @IsEmail()
+  @MaxLength(254)
+  email: string;
+}
+
+export class PrimaryEmailDto {
+  @ApiProperty({ description: 'One of your confirmed addresses, to sign in with from now on.', format: 'email', maxLength: 254, example: 'ada@newmail.com' })
   @Transform(lowerTrim)
   @IsEmail()
   @MaxLength(254)
   email: string;
 
-  @ApiProperty({ description: 'Your current password.', minLength: 1, maxLength: passwordLength.max })
+  @ApiPropertyOptional({ description: 'Your current password; required when your account has one.', minLength: 1, maxLength: passwordLength.max })
+  @IsOptional()
   @IsString()
   @Length(1, passwordLength.max)
-  password: string;
+  password?: string;
 }
 
 export class PhoneDto {

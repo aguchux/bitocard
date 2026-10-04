@@ -47,15 +47,27 @@ export function passwordResetEmail(to: string, code: string): EmailMessage {
   };
 }
 
-export function emailChangeCodeEmail(to: string, code: string): EmailMessage {
+export function emailAddCodeEmail(to: string, code: string): EmailMessage {
   return {
     to,
-    subject: `${code} is your BitoCard code to change your email`,
+    subject: `${code} is your BitoCard code to add this email`,
     ...layout(
-      'Confirm your new email',
-      ['Enter this code to make this your BitoCard sign-in email. It expires in 30 minutes.', 'If you did not ask for this, you can ignore this email.'],
+      'Confirm this email address',
+      ['Enter this code to add this address to your BitoCard account. It expires in 30 minutes.', 'If you did not ask for this, you can ignore this email.'],
       code,
     ),
+  };
+}
+
+/** Sent to the primary address when another address is added, so an unexpected addition is noticed. */
+export function emailAddedEmail(to: string, added: string): EmailMessage {
+  return {
+    to,
+    subject: 'An email address was added to your BitoCard account',
+    ...layout('An email address was added', [
+      `${added} was added to your BitoCard account. It cannot be used to sign in unless you make it your primary email.`,
+      'If you did not do this, remove it in SHQ (Settings > Your profile), change your password and contact support@bitocard.com.',
+    ]),
   };
 }
 
@@ -64,7 +76,7 @@ export function emailChangedEmail(to: string, newEmail: string): EmailMessage {
   return {
     to,
     subject: 'Your BitoCard sign-in email was changed',
-    ...layout('Your sign-in email was changed', [
+    ...layout('Your primary email was changed', [
       `Your BitoCard account now signs in with ${newEmail}. This address no longer works for signing in.`,
       'If you did not make this change, contact support@bitocard.com straight away.',
     ]),

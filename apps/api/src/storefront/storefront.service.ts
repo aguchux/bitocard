@@ -120,7 +120,8 @@ export class StorefrontService {
       from: minor(from),
       to: minor(to),
       description: product.description,
-      logo_url: product.logoUrl,
+      /** The admin's image, else the supplier's logo. */
+      logo_url: product.imageUrl ?? product.logoUrl,
       brand: this.presentBrand(product.brand, brand),
     };
   }
@@ -245,7 +246,7 @@ export class StorefrontService {
 
   async categories() {
     const { where, categories } = await this.availability();
-    const counts = await this.prisma.product.groupBy({ by: ['category'], where, _count: { _all: true } });
+    const [counts, presentation] = await Promise.all([this.prisma.product.groupBy({ by: ['category'], where, _count: { _all: true } }), this.prisma.categoryPresentation.findMany()]);
     return (Object.keys(categoryLabels) as ProductCategory[])
       .filter(category => categories.has(category))
       .map(category => ({
@@ -253,6 +254,8 @@ export class StorefrontService {
         category,
         label: categoryLabels[category],
         group: navigationGroups.find(group => group.categories.includes(category))?.key ?? null,
+        icon_url: presentation.find(row => row.category === category)?.iconUrl ?? null,
+        image_url: presentation.find(row => row.category === category)?.imageUrl ?? null,
         products: counts.find(row => row.category === category)?._count._all ?? 0,
       }))
       .filter(item => item.products > 0);

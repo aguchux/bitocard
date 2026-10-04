@@ -118,6 +118,7 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | Domains | Vercel (registrar and connection); resell.biz (country endings) | MVP: Vercel |
 | DNS (branded nameservers) | resell.biz | MVP |
 | Exchange rates | Open Exchange Rates (reference rates), checked against Flutterwave's rates | MVP |
+| File storage (logos, icons, images) | DigitalOcean Spaces (US region, CDN), S3-compatible | MVP: built; needs the bucket, keys and its CORS rule |
 
 **Pilot sourcing paths**
 
@@ -310,7 +311,12 @@ Rules resolve like feature switches: **reseller, then country, then global**. At
 ### In-app notifications (Decided)
 
 - SHQ and the admin app both have a notifications inbox (the bell in the header, and a Notifications page). Each notification is for the roles that act on it: reseller owners see everything in their account; admins, developers, finance and support staff see what concerns their role (for example finance: top-ups, withdrawals, plan renewals; developers: webhook endpoints, own-supplier problems; support: orders whose outcome is unclear). In the admin app, super admins see everything and operations, finance and support see their own work (reviews, the exception queue, failed withdrawals, paused conversions, new resellers).
-- Security notices (password or sign-in email changed) go to the person only, whichever account they are using. Sandbox notifications are labelled.
+- Security notices (password or primary email changed, an email address added) go to the person only, whichever account they are using. Sandbox notifications are labelled.
+- **Email addresses. Decided**
+  - A person can add several email addresses, each confirmed with a code sent to it.
+  - Exactly one is primary: it signs in and gets notices, and it cannot be removed.
+  - To change it, the person makes another confirmed address primary (with their password). The old primary address is told, and is kept as another address.
+  - An address belongs to one person only.
 - In-app notifications add to the existing emails, which are unchanged. Per-person email preferences are a later option.
 - Kept 90 days; each person reads and marks their own.
 - **Push to devices (built):** each browser a person turns push on in (SHQ or the admin app, desktop or phone; on iPhone from the Home Screen app) is registered with its own ID and gets their notifications even when BitoCard is closed, while they stay signed in there. Signing out, removing the device or the browser's push service dropping it stops pushes. People choose which notifications are pushed; urgent and security ones always are. Pushes are encrypted end to end (only the browser can read them) and never carry codes, PINs or secrets. Native mobile apps can use the same device registry later (Firebase and Apple push channels).
@@ -342,6 +348,11 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Admins lay out its home page in the Storefront Manager (admin app): sections on a 12-column desktop grid (6 on tablets, one column on phones), dragged into place and sized per screen. The sections are a hero with search and category shortcuts; product rails (trending, top selling, new, featured, a category, a brand or hand-picked); category and brand grids; promo cards; and a trust bar. Every publish is a version that can be restored; previews show the draft before it goes live.
 - Search covers everything on sale: brands and the companies behind them, products, categories (including the words people use, such as "top up" or "electricity") and countries. It never shows BitoCard's own suppliers.
 - Brands are presented with their name, company, logo, card art, colour, tags and search aliases, set by admins.
+- **Images are uploaded, not only linked. Decided** Admins upload brand logos (network operators are brands), gift-card and brand card art, product images (shown instead of the supplier's logo), supplier logos (admin only), category icons and images, and storefront images. Resellers upload their store's logo and images in SHQ.
+  - Files go straight from the browser to DigitalOcean Spaces with signed links, and are kept in clear folders: `platform/brands/<brand>/logos`, `platform/products/<category>/<country>/<brand>/<variant>`, `resellers/<reseller>/store/logos`, and so on.
+  - The API checks every file before it can be used: really an image of the declared type and size; SVG from admins only, and only plain drawings.
+  - A media library lists every file, where it is used and who uploaded it. Files can be reused; a file in use cannot be deleted.
+  - Resellers only ever see their own files.
 - Until checkout exists (M10b) the store shows face values only, and nothing can be bought. Until a home page is published, bitocard.com shows the reseller landing page.
 - The reseller landing page is bitocard.com/resellers: what BitoCard offers resellers, with Register leading to SHQ sign-up. "Open a reseller store" throughout the store leads there first.
 
@@ -518,7 +529,7 @@ Phase 1, foundation and own-brand pilot:
 | M7 | Webhooks: outbox, delivery, retries, events API | **Done** (Vercel Queues transport; needs Vercel Pro for the 5-minute backstop job) |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | **Done** (needs Didit API key, workflow and webhook secret, and Flutterwave BVN access; privacy notice update before live) |
 | M9 | Admin app | **Done** (needs the `bitocard-admin` Vercel project on admin.bitocard.com with `NEXT_PUBLIC_API_URL`, and the API's `ALLOWED_ORIGINS` to include it) |
-| M10 | Own-brand storefront: BitoCard's parent store on the main site (`bitocard.com`, catalogue at `/catalogs`) for retail customers | **M10a built**: public catalogue API, search, trending and top selling, brand presentation, the Storefront Manager (drag-and-drop home page grid, versions, previews, publishing), the store's home, catalogue, search and product pages, and the reseller landing page at `/resellers`. **Next, M10b**: customer accounts and sign-in, checkout and payment, order delivery and customer notifications |
+| M10 | Own-brand storefront: BitoCard's parent store on the main site (`bitocard.com`, catalogue at `/catalogs`) for retail customers | **M10a built**: public catalogue API, search, trending and top selling, brand presentation, image uploads to DigitalOcean Spaces (brands, gift-card art, products, suppliers, categories, storefront and reseller store images, with a media library), the Storefront Manager (drag-and-drop home page grid, versions, previews, publishing), the store's home, catalogue, search and product pages, and the reseller landing page at `/resellers`. **Next, M10b**: customer accounts and sign-in, checkout and payment, order delivery and customer notifications |
 | M11 | Pilot launch: Nigeria, then Ghana and Kenya | |
 
 Phase 2, reseller launch: M12 docs app, M13 SHQ reseller dashboard (**in progress**: sign-in, overview, orders, catalogue and pricing, wallet and withdrawals, store, developers, team and settings built; needs the `bitocard-shq` Vercel project on shq.bitocard.com), M13b reseller's own integrations (suppliers and payment gateways, admin-gated per integration and country, fees from the wallet; **phase 1 built**: availability per country, gates, encrypted and checked connections, admin review, SHQ Integrations; **phase 2 built**: fee rules in parts per billion, exact fees with the carry, wallet holds, `platform_fees` ledger, statements, reports and reconciliation; **phase 3 built**: own catalogues synced with the reseller's credentials, routing, quotes and orders charging only the fee, sandbox simulation; **built**: per-connection supplier notifications (Reloadly and DIDWW), in-app notifications for every role in SHQ and the admin app, and browser push to each person's registered devices; next: phase 4 own payment gateways), M13c supplier registry and directory (planned: one searchable registry for admins and resellers, coverage per country, channel rules per country and reseller; see section 4), M14 domains, M15 promotions, M16 reseller launch. Phase 3 onwards: gift-card selling, more bills countries, Microsoft licences, virtual numbers, virtual cards.

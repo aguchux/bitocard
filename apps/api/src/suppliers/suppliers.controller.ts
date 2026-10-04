@@ -10,6 +10,7 @@ import { SuppliersService } from './suppliers.service.js';
 
 const statuses = ['mvp_live', 'mvp_qualify', 'pilot', 'later', 'backup'] as const;
 const nullable = (_dto: unknown, value: unknown) => value !== null;
+const httpsUrl = /^https:\/\/\S+$/;
 
 class UpdateSupplierDto {
   @IsOptional() @IsBoolean() enabled?: boolean;
@@ -23,6 +24,7 @@ class UpdateSupplierDto {
   @IsOptional() @IsBoolean() resale_approved?: boolean;
   @IsOptional() @ValidateIf(nullable) @IsBoolean() requires_ip_allowlist?: boolean | null;
   @IsOptional() @ValidateIf(nullable) @IsString() @Length(0, 2000) notes?: string | null;
+  @IsOptional() @ValidateIf(nullable) @Matches(httpsUrl, { message: 'logo_url must be an https:// address' }) @Length(0, 1000) logo_url?: string | null;
 }
 
 class MarketDto {
@@ -39,6 +41,8 @@ class UpdateProductDto {
   @IsOptional() @IsBoolean() active?: boolean;
   @IsOptional() @IsString() @Length(2, 120) name?: string;
   @IsOptional() @ValidateIf(nullable) @IsString() @Length(0, 2000) description?: string | null;
+  /** Shown instead of the supplier's logo; null goes back to it. */
+  @IsOptional() @ValidateIf(nullable) @Matches(httpsUrl, { message: 'image_url must be an https:// address' }) @Length(0, 1000) image_url?: string | null;
 }
 
 class UpdateOfferDto {

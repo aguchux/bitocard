@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { categoryName, CodeInput, DataTable, formatBps, formatMoney, formatRelative, LineChart, percentChange, StatusBadge, Trend } from '../src';
+import { categoryName, CodeInput, DataTable, formatBps, ImageField, formatMoney, formatRelative, LineChart, percentChange, StatusBadge, Trend } from '../src';
 import { useState } from 'react';
 import { AdminGate, AdminProviders, AdminShell, can, NotificationBell, NotificationsInbox, PushSettings, useAdmin } from '../src/shell';
 import { pushServiceWorker } from '../src/push-worker';
@@ -328,5 +328,86 @@ describe('push', () => {
     listeners.notificationclick({ notification: { close: () => undefined, data: shown[0].options.data }, waitUntil: (p: Promise<unknown>) => waits.push(p) });
     await Promise.all(waits);
     expect(opened).toEqual(['https://shq.bitocard.com/wallet/payouts?account=r1&mode=test']);
+  });
+});
+
+describe('image field', () => {
+  let calls: Array<{ method: string; url: string; credentials?: RequestCredentials }>;
+  let configured: boolean;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_API_URL = 'http://api.test';
+    calls = [];
+    configured = true;
+    vi.stubGlobal('fetch', async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      calls.push({ method: request.method, url: url.origin === 'http://api.test' ? url.pathname : url.href, credentials: init?.credentials ?? request.credentials });
+      if (url.origin === 'https://storage.test') return new Response(null, { status: 200 });
+      if (url.pathname.endsWith('/settings')) {
+        return Response.json({ object: 'media_settings', configured, purposes: [{ purpose: 'brand_logo', label: 'Brand logo', max_bytes: 1024, content_types: ['image/png', 'image/svg+xml'] }] });
+      }
+      if (url.pathname.endsWith('/uploads')) {
+        return Response.json({ object: 'media_upload', id: 'm1', upload: { method: 'PUT', url: 'https://storage.test/b/k', headers: { 'Content-Type': 'image/png' } } }, { status: 201 });
+      }
+      if (url.pathname.endsWith('/complete')) return Response.json({ object: 'media_asset', id: 'm1', url: 'https://media.test/k.png', status: 'ready' });
+      return Response.json({ object: 'list', data: [{ object: 'media_asset', id: 'm0', url: 'https://media.test/old.png', filename: 'old.png' }], has_more: false });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  function Harness({ initial = '' }: { initial?: string }) {
+    const [value, setValue] = useState(initial);
+    return (
+      <AdminProviders>
+        <ImageField label="Logo" realm="admin" purpose="brand_logo" targetId="amazon" value={value} onChange={setValue} />
+        <output data-testid="value">{value}</output>
+      </AdminProviders>
+    );
+  }
+
+  test('uploads a chosen file straight to storage and uses the checked address', async () => {
+    render(<Harness />);
+    await screen.findByRole('button', { name: 'Upload' });
+    expect(screen.getByText('PNG, SVG, up to 1 KB.')).toBeTruthy();
+    const file = new File([new Uint8Array(10)], 'logo.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Logo file'), { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByTestId('value').textContent).toBe('https://media.test/k.png'));
+    expect(calls.filter(call => call.method !== 'GET').map(call => [call.method, call.url])).toEqual([
+      ['POST', '/v1/admin/media/uploads'],
+      ['PUT', 'https://storage.test/b/k'],
+      ['POST', '/v1/admin/media/m1/complete'],
+    ]);
+    expect(calls.find(call => call.method === 'PUT')!.credentials).toBe('omit');
+    expect(screen.getByAltText('Logo preview').getAttribute('src')).toBe('https://media.test/k.png');
+  });
+
+  test('refuses the wrong type or a file too large before uploading', async () => {
+    render(<Harness />);
+    await screen.findByRole('button', { name: 'Upload' });
+    fireEvent.change(screen.getByLabelText('Logo file'), { target: { files: [new File(['x'], 'a.gif', { type: 'image/gif' })] } });
+    expect(await screen.findByText('Choose a PNG, SVG image.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Logo file'), { target: { files: [new File([new Uint8Array(2048)], 'big.png', { type: 'image/png' })] } });
+    expect(await screen.findByText('The image is too large: at most 1 KB.')).toBeTruthy();
+    expect(calls.some(call => call.method === 'POST')).toBe(false);
+  });
+
+  test('picks a file from the library, removes it, and checks typed addresses', async () => {
+    render(<Harness initial="https://media.test/current.png" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Library' }));
+    fireEvent.click(await screen.findByTitle('old.png'));
+    expect(screen.getByTestId('value').textContent).toBe('https://media.test/old.png');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(screen.getByTestId('value').textContent).toBe('');
+    fireEvent.change(screen.getByLabelText('Logo'), { target: { value: 'http://insecure.test/a.png' } });
+    expect(screen.getByText('Use an https:// address.')).toBeTruthy();
+  });
+
+  test('without file storage only the address can be typed', async () => {
+    configured = false;
+    render(<Harness />);
+    await waitFor(() => expect(calls.some(call => call.url.endsWith('/settings'))).toBe(true));
+    expect(screen.queryByRole('button', { name: 'Upload' })).toBeNull();
+    expect(screen.getByLabelText('Logo')).toBeTruthy();
   });
 });

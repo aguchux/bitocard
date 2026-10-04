@@ -104,6 +104,20 @@ export const configSchema = z.object({
   /** BitoCard's public API address: DIDWW order callbacks go to <this>/v1/webhooks/didww and are signed over it. */
   DIDWW_CALLBACK_URL: z.string().url().default('https://api.bitocard.com'),
 
+  // File storage (DigitalOcean Spaces, S3-compatible): logos, icons and images uploaded by admins and resellers.
+  // Browsers upload straight to the bucket with signed links; uploads are refused until the key, secret and bucket are set.
+  SPACES_KEY: z.string().optional(),
+  SPACES_SECRET: z.string().optional(),
+  SPACES_BUCKET: z.string().optional(),
+  /** The bucket's region, for example nyc3 (keep it in the United States, with the database). */
+  SPACES_REGION: z.string().default('nyc3'),
+  /** The S3 address; defaults to https://<region>.digitaloceanspaces.com. Tests point it at a local fake. */
+  SPACES_ENDPOINT: z.string().url().optional(),
+  /** Public address files are served from (the Spaces CDN or a custom domain); defaults to the bucket's own address. */
+  SPACES_PUBLIC_URL: z.string().url().optional(),
+  /** Top folder for everything this deployment stores, so environments sharing a bucket never mix. */
+  SPACES_ROOT: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/).default('bitocard'),
+
   // Identity checks (Didit): reseller owners everywhere, customers outside Nigeria. Unset API key switches Didit off.
   DIDIT_API_KEY: z.string().optional(),
   /** The Didit workflow (document plus liveness and face match) sessions run. */

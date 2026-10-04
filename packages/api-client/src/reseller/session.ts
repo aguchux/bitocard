@@ -23,6 +23,9 @@ export type Account = {
   authenticated_as: { type: 'session'; user_id: string; role: ResellerRole | null } | { type: 'api_key'; api_key_id: string; mode: 'test' | 'live'; scopes: string[] };
 };
 export type Notice = { object: 'notice'; message: string };
+
+/** One of a person's email addresses. Exactly one is primary: it signs in and gets notices, and cannot be removed. */
+export type UserEmail = { object: 'user_email'; email: string; primary: boolean; verified: boolean; added_at: string };
 /** `country` and `business_name` open a reseller account; `invitation_token` joins the inviting team instead. */
 export type SignUpInput = { name: string; email: string; password: string } & (
   | { country: string; business_name?: string; signup_token?: string }
@@ -57,10 +60,19 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     updateProfile: build.mutation<Session, { name: string }>({ query: body => ({ url: '/v1/auth/profile', method: 'PATCH', body }), invalidatesTags: ['Session'] }),
     /** Needs the current password; signs out the person's other sessions. */
     changePassword: build.mutation<Notice, { current_password: string; new_password: string }>({ query: body => ({ url: '/v1/auth/password/change', method: 'POST', body }) }),
-    /** Step 1: the current password; a code goes to the new address. */
-    requestEmailChange: build.mutation<Notice, { email: string; password: string }>({ query: body => ({ url: '/v1/auth/email/change', method: 'POST', body }) }),
-    /** Step 2: the code from the new address. */
-    confirmEmailChange: build.mutation<Session, { code: string }>({ query: body => ({ url: '/v1/auth/email/change/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
+    /** Your addresses: the primary one (sign-in and notices) first. */
+    emails: build.query<{ object: 'list'; data: UserEmail[] }, void>({ query: () => '/v1/auth/emails', providesTags: ['Email'] }),
+    /** Step 1 of adding an address: a code is sent to it. */
+    addEmail: build.mutation<Notice, { email: string }>({ query: body => ({ url: '/v1/auth/emails', method: 'POST', body }) }),
+    /** Step 2: the code from that address adds it. */
+    confirmEmail: build.mutation<{ object: 'list'; data: UserEmail[] }, { code: string }>({ query: body => ({ url: '/v1/auth/emails/verify', method: 'POST', body }), invalidatesTags: ['Email'] }),
+    /** Sign in with another confirmed address from now on (the current password when the account has one). */
+    makePrimaryEmail: build.mutation<{ object: 'list'; data: UserEmail[] }, { email: string; password?: string }>({
+      query: body => ({ url: '/v1/auth/emails/primary', method: 'POST', body }),
+      invalidatesTags: ['Email', 'Session'],
+    }),
+    /** Removes another address; the primary one cannot be removed. */
+    removeEmail: build.mutation<{ object: 'list'; data: UserEmail[] }, string>({ query: email => ({ url: `/v1/auth/emails/${encodeURIComponent(email)}`, method: 'DELETE' }), invalidatesTags: ['Email'] }),
     account: build.query<Account, void>({ query: () => '/v1/account', providesTags: ['Account'] }),
   }),
 });
@@ -82,6 +94,9 @@ export const {
   useAccountQuery,
   useUpdateProfileMutation,
   useChangePasswordMutation,
-  useRequestEmailChangeMutation,
-  useConfirmEmailChangeMutation,
+  useEmailsQuery,
+  useAddEmailMutation,
+  useConfirmEmailMutation,
+  useMakePrimaryEmailMutation,
+  useRemoveEmailMutation,
 } = resellerSessionApi;

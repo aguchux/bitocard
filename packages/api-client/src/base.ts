@@ -95,6 +95,9 @@ export const tagTypes = [
   // Storefront Manager (admin)
   'Storefront',
   'Brand',
+  'Media',
+  'Email',
+  'Category',
 ] as const;
 
 /** The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache. */

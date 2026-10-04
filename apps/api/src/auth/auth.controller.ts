@@ -1,8 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Req, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { ChangeEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { SessionsService } from './sessions.service.js';
@@ -133,23 +133,51 @@ export class AuthController {
     return { object: 'notice', message: 'Your password was changed.' };
   }
 
-  /** Change your sign-in email: a 6-digit code is sent to the new address. */
-  @ApiOperation({ summary: 'Change your sign-in email', description: 'Needs your current password. A 6-digit code is sent to the new address; confirm it to finish.' })
+  /** Your email addresses: the primary one (sign-in and notices) first, then the others. */
+  @ApiOperation({ summary: 'List your email addresses', description: 'The primary address (you sign in with it and notices go to it) first, then your other confirmed addresses.' })
   @SessionOnly()
-  @Post('email/change')
-  @HttpCode(HttpStatus.ACCEPTED)
-  async changeEmail(@CurrentCaller() caller: Caller, @Body() body: ChangeEmailDto) {
-    await this.auth.requestEmailChange(caller.kind === 'session' ? caller.userId : '', body.email, body.password);
-    return { object: 'notice', message: 'A code is on its way to the new address.' };
+  @Get('emails')
+  listEmails(@CurrentCaller() caller: Caller) {
+    return this.auth.listEmails(caller.kind === 'session' ? caller.userId : '');
   }
 
-  /** Confirm the new sign-in email with the code sent to it. */
-  @ApiOperation({ summary: 'Confirm your new sign-in email', description: 'Your old address is told about the change.' })
+  /** Add an email address: a 6-digit code is sent to it. */
+  @ApiOperation({ summary: 'Add an email address', description: 'A 6-digit code is sent to the address; confirm it to add the address. Up to five addresses in all.' })
   @SessionOnly()
-  @Post('email/change/verify')
+  @Post('emails')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async addEmail(@CurrentCaller() caller: Caller, @Body() body: AddEmailDto) {
+    await this.auth.addEmail(caller.kind === 'session' ? caller.userId : '', body.email);
+    return { object: 'notice', message: 'A code is on its way to the address.' };
+  }
+
+  /** Confirm an address you are adding with the code sent to it. */
+  @ApiOperation({ summary: 'Confirm an email address', description: 'Adds the address the last code was sent to. Your primary address is told.' })
+  @SessionOnly()
+  @Post('emails/verify')
   @HttpCode(HttpStatus.OK)
-  confirmEmailChange(@CurrentCaller() caller: Caller, @Body() body: CodeDto) {
-    return this.auth.confirmEmailChange(caller.kind === 'session' ? caller.userId : '', body.code);
+  confirmEmail(@CurrentCaller() caller: Caller, @Body() body: CodeDto) {
+    return this.auth.confirmEmail(caller.kind === 'session' ? caller.userId : '', body.code);
+  }
+
+  /** Sign in with another of your confirmed addresses from now on. */
+  @ApiOperation({
+    summary: 'Make an email address primary',
+    description: 'You sign in with it and notices go to it. The old primary stays as another address. Needs your current password if your account has one; your old primary address is told.',
+  })
+  @SessionOnly()
+  @Post('emails/primary')
+  @HttpCode(HttpStatus.OK)
+  makePrimary(@CurrentCaller() caller: Caller, @Body() body: PrimaryEmailDto) {
+    return this.auth.makePrimary(caller.kind === 'session' ? caller.userId : '', body.email, body.password);
+  }
+
+  /** Remove one of your other addresses. The primary one cannot be removed. */
+  @ApiOperation({ summary: 'Remove an email address', description: 'Your primary address cannot be removed: make another address primary first.' })
+  @SessionOnly()
+  @Delete('emails/:email')
+  removeEmail(@CurrentCaller() caller: Caller, @Param('email') email: string) {
+    return this.auth.removeEmail(caller.kind === 'session' ? caller.userId : '', email.trim().toLowerCase());
   }
 
   /** Add or change your mobile number. A 6-digit code is sent by SMS; the number is used once confirmed. */

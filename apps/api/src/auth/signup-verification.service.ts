@@ -32,7 +32,12 @@ export class SignupVerificationService {
   ) {}
 
   async start(email: string) {
-    if (await this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } })) {
+    // Taken as someone's primary address or as one of their other addresses.
+    const [primary, other] = await Promise.all([
+      this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } }),
+      this.prisma.userEmail.findUnique({ where: { realm_email: { realm: 'reseller', email } } }),
+    ]);
+    if (primary || other) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
     }
     await this.prisma.signupVerification.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - keepMs) } } });

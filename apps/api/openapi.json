@@ -839,17 +839,31 @@
         ]
       }
     },
-    "/v1/auth/email/change": {
+    "/v1/auth/emails": {
+      "get": {
+        "description": "The primary address (you sign in with it and notices go to it) first, then your other confirmed addresses.",
+        "operationId": "AuthController_listEmails",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your email addresses",
+        "tags": [
+          "Authentication"
+        ]
+      },
       "post": {
-        "description": "Needs your current password. A 6-digit code is sent to the new address; confirm it to finish.",
-        "operationId": "AuthController_changeEmail",
+        "description": "A 6-digit code is sent to the address; confirm it to add the address. Up to five addresses in all.",
+        "operationId": "AuthController_addEmail",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ChangeEmailDto"
+                "$ref": "#/components/schemas/AddEmailDto"
               }
             }
           }
@@ -859,16 +873,16 @@
             "description": ""
           }
         },
-        "summary": "Change your sign-in email",
+        "summary": "Add an email address",
         "tags": [
           "Authentication"
         ]
       }
     },
-    "/v1/auth/email/change/verify": {
+    "/v1/auth/emails/verify": {
       "post": {
-        "description": "Your old address is told about the change.",
-        "operationId": "AuthController_confirmEmailChange",
+        "description": "Adds the address the last code was sent to. Your primary address is told.",
+        "operationId": "AuthController_confirmEmail",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -885,7 +899,58 @@
             "description": ""
           }
         },
-        "summary": "Confirm your new sign-in email",
+        "summary": "Confirm an email address",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/emails/primary": {
+      "post": {
+        "description": "You sign in with it and notices go to it. The old primary stays as another address. Needs your current password if your account has one; your old primary address is told.",
+        "operationId": "AuthController_makePrimary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrimaryEmailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Make an email address primary",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/v1/auth/emails/{email}": {
+      "delete": {
+        "description": "Your primary address cannot be removed: make another address primary first.",
+        "operationId": "AuthController_removeEmail",
+        "parameters": [
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Remove an email address",
         "tags": [
           "Authentication"
         ]
@@ -4398,26 +4463,40 @@
           "new_password"
         ]
       },
-      "ChangeEmailDto": {
+      "AddEmailDto": {
         "type": "object",
         "properties": {
           "email": {
             "type": "string",
-            "description": "The new email address; a 6-digit code is sent to it.",
+            "description": "The address to add; a 6-digit code is sent to it.",
+            "format": "email",
+            "maxLength": 254,
+            "example": "ada@newmail.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "PrimaryEmailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "One of your confirmed addresses, to sign in with from now on.",
             "format": "email",
             "maxLength": 254,
             "example": "ada@newmail.com"
           },
           "password": {
             "type": "string",
-            "description": "Your current password.",
+            "description": "Your current password; required when your account has one.",
             "minLength": 1,
             "maxLength": 128
           }
         },
         "required": [
-          "email",
-          "password"
+          "email"
         ]
       },
       "PhoneDto": {

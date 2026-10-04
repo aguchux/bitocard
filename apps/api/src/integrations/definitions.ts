@@ -77,6 +77,13 @@ const integrationKeyList = [
   'DIDIT_API_KEY',
   'DIDIT_WORKFLOW_ID',
   'DIDIT_WEBHOOK_SECRET',
+  'SPACES_KEY',
+  'SPACES_SECRET',
+  'SPACES_BUCKET',
+  'SPACES_REGION',
+  'SPACES_ENDPOINT',
+  'SPACES_PUBLIC_URL',
+  'SPACES_ROOT',
 ] as const satisfies ReadonlyArray<keyof AppConfig>;
 
 export type IntegrationKey = (typeof integrationKeyList)[number];
@@ -135,6 +142,21 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       field('WEB_PUSH_PUBLIC_KEY', 'Public key (VAPID)', { required: true, help: 'The browser uses it to subscribe.' }),
       secret('WEB_PUSH_PRIVATE_KEY', 'Private key (VAPID)'),
       field('WEB_PUSH_SUBJECT', 'Contact', { help: 'A mailto: or https: address push services can contact. Default: mailto:support@bitocard.com' }),
+    ],
+  },
+  {
+    id: 'file_storage',
+    name: 'File storage (DigitalOcean Spaces)',
+    description:
+      'Logos, icons and images uploaded by admins and resellers. Browsers upload straight to the bucket with links signed for 10 minutes. The bucket needs a CORS rule allowing PUT from the admin app and SHQ. Uploads are switched off until the key, secret and bucket are set; image addresses can still be typed in.',
+    fields: [
+      field('SPACES_KEY', 'Access key', { required: true, help: 'A Spaces access key limited to this bucket (DigitalOcean > Spaces Object Storage > Access Keys).' }),
+      secret('SPACES_SECRET', 'Secret key'),
+      field('SPACES_BUCKET', 'Bucket', { required: true }),
+      field('SPACES_REGION', 'Region', { help: 'For example nyc3 or sfo3. Default: nyc3' }),
+      field('SPACES_ENDPOINT', 'API address', { kind: 'url', help: 'Default: https://<region>.digitaloceanspaces.com' }),
+      field('SPACES_PUBLIC_URL', 'Public address', { kind: 'url', help: 'The CDN endpoint or custom domain files are served from, for example https://media.bitocard.com. Default: the bucket address.' }),
+      field('SPACES_ROOT', 'Top folder', { help: 'Everything is stored under this folder, so environments can share a bucket. Default: bitocard' }),
     ],
   },
   {

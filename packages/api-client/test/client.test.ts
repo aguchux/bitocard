@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { adminApi, percentToPpb } from '../src/admin';
 import { resellerSessionApi } from '../src/reseller';
-import { makeStore, notificationsApi, pushApi, setRequestContext, toApiError } from '../src';
+import { makeStore, notificationsApi, pushApi, setRequestContext, toApiError, uploadMedia } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
 
@@ -164,5 +164,57 @@ describe('percentToPpb', () => {
 
   test('refuses anything outside 0% to 10% or finer than 0.0000001%', () => {
     for (const text of ['10.0000001', '11', '0.00000001', '-1', 'abc', '', '1e-3']) expect(percentToPpb(text)).toBeNull();
+  });
+});
+
+describe('media uploads', () => {
+  const created = {
+    object: 'media_upload',
+    id: 'm1',
+    purpose: 'brand_logo',
+    folder: 'bitocard/platform/brands/amazon/logos',
+    url: 'https://media.example/bitocard/platform/brands/amazon/logos/m1.png',
+    upload: { method: 'PUT', url: 'https://nyc3.storage.test/bucket/key?X-Amz-Signature=abc', headers: { 'Content-Type': 'image/png', 'x-amz-acl': 'public-read' } },
+    expires_at: '2026-10-04T12:00:00Z',
+  };
+  type Sent = { url: string; method: string; credentials?: RequestCredentials; headers: Headers; idempotent: boolean };
+  let sent: Sent[];
+  let storageStatus: number;
+
+  beforeEach(() => {
+    sent = [];
+    storageStatus = 200;
+    // The API goes through the base query (a Request); storage gets a plain fetch(url, init).
+    vi.stubGlobal('fetch', async (input: Request | string, init?: RequestInit) => {
+      if (typeof input === 'string') {
+        sent.push({ url: input, method: init?.method ?? 'GET', credentials: init?.credentials, headers: new Headers(init?.headers), idempotent: false });
+        return new Response(null, { status: storageStatus });
+      }
+      sent.push({ url: input.url, method: input.method, credentials: input.credentials, headers: input.headers, idempotent: input.headers.has('idempotency-key') });
+      return input.url.endsWith('/uploads') ? Response.json(created, { status: 201 }) : Response.json({ object: 'media_asset', id: 'm1', url: created.url, status: 'ready' });
+    });
+  });
+
+  test('asks for a link, sends the file straight to storage without cookies, then asks for the check', async () => {
+    const store = makeStore();
+    const file = new File([new Uint8Array(16)], 'logo.png', { type: 'image/png' });
+    const asset = await uploadMedia(store.dispatch, 'admin', { purpose: 'brand_logo', target_id: 'amazon' }, file);
+    expect(asset.url).toBe(created.url);
+    expect(sent.map(call => [call.method, call.url])).toEqual([
+      ['POST', 'http://api.test/v1/admin/media/uploads'],
+      ['PUT', created.upload.url],
+      ['POST', 'http://api.test/v1/admin/media/m1/complete'],
+    ]);
+    expect(sent[1].credentials).toBe('omit');
+    expect(sent[1].headers.get('x-amz-acl')).toBe('public-read');
+    expect([sent[0].idempotent, sent[2].idempotent]).toEqual([true, true]);
+  });
+
+  test('SHQ uses its own address, and a refused upload is reported without checking', async () => {
+    storageStatus = 403;
+    const store = makeStore();
+    const file = new File([new Uint8Array(4)], 'store.png', { type: 'image/png' });
+    await expect(uploadMedia(store.dispatch, 'reseller', { purpose: 'store_logo' }, file)).rejects.toMatchObject({ code: 'upload_failed' });
+    expect(sent.map(call => call.url)).toEqual(['http://api.test/v1/media/uploads', created.upload.url]);
   });
 });

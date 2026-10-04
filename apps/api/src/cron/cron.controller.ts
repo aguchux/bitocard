@@ -18,6 +18,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { PushService } from '../notifications/push.service.js';
+import { MediaService } from '../media/media.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -44,6 +45,7 @@ export class CronController {
     ownSuppliers: OwnSuppliersService,
     inbox: InboxService,
     push: PushService,
+    media: MediaService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -70,6 +72,8 @@ export class CronController {
       push: () => push.runDue(),
       /** Daily: delete in-app notifications older than 90 days (and their pushes). */
       'notifications-cleanup': () => inbox.purge(),
+      /** Daily: remove uploads that were started but never completed. */
+      'media-cleanup': () => media.purgeAbandoned(),
     };
   }
 

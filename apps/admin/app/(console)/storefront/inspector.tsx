@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useId, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Search, X } from "lucide-react";
-import { Button, Card, CardHeader, cn, errorMessage, Field, Input, Notice, Select, Skeleton, Textarea, Toggle } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, cn, errorMessage, Field, ImageField, Input, Notice, Select, Skeleton, Textarea, Toggle } from "@bitocard/admin-ui";
 import { sectionTypeLabel } from "@bitocard/admin-ui/storefront";
 import { useProductsInfiniteQuery, useStorefrontBrandsQuery } from "@bitocard/api-client/admin";
 import {
@@ -339,9 +339,15 @@ function PromoForm({ section, onChange }: FormProps<PromoSection>) {
           <Input id={`${id}-cta-href`} value={cta.href} maxLength={500} onChange={event => setCta({ ...cta, href: event.target.value })} placeholder="/catalogs/esim" />
         </Field>
       </div>
-      <Field label="Image address" htmlFor={`${id}-image`} hint="An https:// image. Leave blank to use the illustration.">
-        <Input id={`${id}-image`} value={section.imageUrl ?? ""} maxLength={1000} onChange={event => onChange({ ...section, imageUrl: optional(event.target.value) })} placeholder="https://" />
-      </Field>
+      <ImageField
+        label="Image"
+        realm="admin"
+        purpose="storefront_image"
+        value={section.imageUrl ?? ""}
+        onChange={value => onChange({ ...section, imageUrl: optional(value) })}
+        shape="wide"
+        hint="Leave empty to use the illustration."
+      />
       <fieldset>
         <legend className="mb-1.5 text-sm font-semibold">Theme</legend>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Theme">

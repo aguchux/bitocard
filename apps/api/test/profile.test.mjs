@@ -1,4 +1,4 @@
-// What SHQ needs from the API: a signed-in person changes their name, password and sign-in email; every team member
+// What SHQ needs from the API: a signed-in person changes their name and password and manages their email addresses; every team member
 // can read pricing; the public country view gives resellers their money rules; plans are never changed in sandbox mode.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
@@ -60,36 +60,112 @@ describe('profile', () => {
     assert.deepEqual([locked.status, locked.json.error.code], [429, 'account_locked']);
   });
 
-  test('changing the sign-in email: password, then a code sent to the new address; the old address is told', async () => {
-    const { browser, email } = await resellerClient(server);
-    const next = `changed-${Date.now()}@example.com`;
-    assert.equal((await browser.post('/v1/auth/email/change', { email: next, password: 'wrong password' })).json.error.code, 'password_incorrect');
-    const sent = await browser.post('/v1/auth/email/change', { email: next, password: 'correct horse battery' });
+  /** Adds a confirmed address with the code emailed to it (lets the one-a-minute resend rule pass first). */
+  async function addEmail(browser, address) {
+    await prisma.verificationCode.updateMany({ where: { purpose: 'email_change' }, data: { createdAt: new Date(Date.now() - 120_000) } });
+    const sent = await browser.post('/v1/auth/emails', { email: address });
     assert.equal(sent.status, 202, JSON.stringify(sent.json));
-    const code = await lastEmailCode(server.app, next);
+    return browser.post('/v1/auth/emails/verify', { code: await lastEmailCode(server.app, address) });
+  }
+
+  test('more email addresses are added with a code sent to each; the primary one is told', async () => {
+    const { browser, email } = await resellerClient(server);
+    await prisma.user.updateMany({ where: { email }, data: { emailVerifiedAt: new Date() } });
+    const first = await browser.get('/v1/auth/emails');
+    assert.deepEqual(first.json.data.map(item => [item.email, item.primary]), [[email, true]]);
+
+    const work = `work-${Date.now()}@example.com`;
+    const sent = await browser.post('/v1/auth/emails', { email: ` ${work.toUpperCase()} ` });
+    assert.equal(sent.status, 202, JSON.stringify(sent.json));
+    // Nothing is added until the code is confirmed.
+    assert.equal((await browser.get('/v1/auth/emails')).json.data.length, 1);
+    const code = await lastEmailCode(server.app, work);
     assert.match(code ?? '', /^\d{6}$/);
-
-    // Nothing changes until the code is confirmed.
-    assert.equal((await browser.get('/v1/auth/session')).json.user.email, email);
-    const wrong = await browser.post('/v1/auth/email/change/verify', { code: code === '000000' ? '111111' : '000000' });
+    const wrong = await browser.post('/v1/auth/emails/verify', { code: code === '000000' ? '111111' : '000000' });
     assert.equal(wrong.json.error.code, 'code_invalid');
-    const confirmed = await browser.post('/v1/auth/email/change/verify', { code });
-    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
-    assert.deepEqual([confirmed.json.user.email, confirmed.json.user.email_verified], [next, true]);
-    assert.ok(outbox.some(message => message.to === email && message.subject === 'Your BitoCard sign-in email was changed'));
+    const added = await browser.post('/v1/auth/emails/verify', { code });
+    assert.equal(added.status, 200, JSON.stringify(added.json));
+    assert.deepEqual(added.json.data.map(item => [item.email, item.primary, item.verified]), [
+      [email, true, true],
+      [work, false, true],
+    ]);
+    assert.ok(outbox.some(message => message.to === email && message.subject === 'An email address was added to your BitoCard account'));
+    assert.ok(await prisma.notification.findFirst({ where: { type: 'security.email_added' } }));
 
-    // The new address signs in; the old one no longer does.
-    await secondSession(next);
-    assert.equal((await client(server.base).post('/v1/auth/signin', { identifier: email, password: 'correct horse battery' })).status, 401);
+    // The session still names the primary address, and only the primary signs in.
+    assert.equal((await browser.get('/v1/auth/session')).json.user.email, email);
+    assert.equal((await client(server.base).post('/v1/auth/signin', { identifier: work, password: 'correct horse battery' })).status, 401);
+
+    const again = await browser.post('/v1/auth/emails', { email: work });
+    assert.deepEqual([again.status, again.json.error.code], [409, 'email_already_added']);
+    const primaryAgain = await browser.post('/v1/auth/emails', { email });
+    assert.equal(primaryAgain.json.error.code, 'email_already_added');
   });
 
-  test("another account's email cannot be taken, and the same email is refused", async () => {
+  test('the primary email cannot be removed or changed except by making another address primary', async () => {
+    const { browser, email } = await resellerClient(server);
+    await prisma.user.updateMany({ where: { email }, data: { emailVerifiedAt: new Date() } });
+    const refused = await browser.delete(`/v1/auth/emails/${encodeURIComponent(email)}`);
+    assert.deepEqual([refused.status, refused.json.error.code], [409, 'primary_email']);
+    const notMine = await browser.post('/v1/auth/emails/primary', { email: `never-added-${Date.now()}@example.com`, password: 'correct horse battery' });
+    assert.equal(notMine.status, 404, 'only a confirmed address of yours can become primary');
+    assert.equal((await browser.post('/v1/auth/email/change', { email: 'x@example.com', password: 'correct horse battery' })).status, 404, 'the old direct change is gone');
+
+    const next = `next-${Date.now()}@example.com`;
+    await addEmail(browser, next);
+    const noPassword = await browser.post('/v1/auth/emails/primary', { email: next });
+    assert.deepEqual([noPassword.status, noPassword.json.error.param], [400, 'password']);
+    const wrong = await browser.post('/v1/auth/emails/primary', { email: next, password: 'wrong password' });
+    assert.equal(wrong.json.error.code, 'password_incorrect');
+
+    const swapped = await browser.post('/v1/auth/emails/primary', { email: next, password: 'correct horse battery' });
+    assert.equal(swapped.status, 200, JSON.stringify(swapped.json));
+    assert.deepEqual(swapped.json.data.map(item => [item.email, item.primary]), [
+      [next, true],
+      [email, false],
+    ]);
+    assert.equal((await browser.get('/v1/auth/session')).json.user.email, next);
+    assert.ok(outbox.some(message => message.to === email && message.subject === 'Your BitoCard sign-in email was changed'));
+    // The new primary signs in; the old one is kept as another address but no longer signs in.
+    await secondSession(next);
+    assert.equal((await client(server.base).post('/v1/auth/signin', { identifier: email, password: 'correct horse battery' })).status, 401);
+
+    const removed = await browser.delete(`/v1/auth/emails/${encodeURIComponent(email)}`);
+    assert.deepEqual(removed.json.data.map(item => item.email), [next]);
+    assert.equal((await browser.delete(`/v1/auth/emails/${encodeURIComponent(email)}`)).status, 404);
+  });
+
+  test('an address belongs to one person: taken addresses are refused, and sign-up refuses other addresses too', async () => {
     const first = await resellerClient(server);
     const second = await resellerClient(server);
-    const taken = await second.browser.post('/v1/auth/email/change', { email: first.email, password: 'correct horse battery' });
+    const taken = await second.browser.post('/v1/auth/emails', { email: first.email });
     assert.deepEqual([taken.status, taken.json.error.code], [409, 'email_in_use']);
-    const same = await second.browser.post('/v1/auth/email/change', { email: second.email, password: 'correct horse battery' });
-    assert.equal(same.json.error.code, 'email_unchanged');
+
+    const extra = `extra-${Date.now()}@example.com`;
+    await addEmail(first.browser, extra);
+    assert.equal((await second.browser.post('/v1/auth/emails', { email: extra })).json.error.code, 'email_in_use');
+    const signup = await client(server.base).post('/v1/auth/signup', { name: 'Someone Else', email: extra, password: 'correct horse battery', country: 'NG', business_name: 'Else' }, { 'idempotency-key': `s-${Date.now()}` });
+    assert.deepEqual([signup.status, signup.json.error.code], [409, 'email_in_use']);
+    const code = await client(server.base).post('/v1/auth/signup/email', { email: extra }, { 'idempotency-key': `c-${Date.now()}` });
+    assert.deepEqual([code.status, code.json.error.code], [409, 'email_in_use']);
+  });
+
+  test('at most five addresses in all', async () => {
+    const { browser } = await resellerClient(server);
+    for (let i = 0; i < 4; i += 1) assert.equal((await addEmail(browser, `many-${i}-${Date.now()}@example.com`)).status, 200);
+    await prisma.verificationCode.updateMany({ where: { purpose: 'email_change' }, data: { createdAt: new Date(Date.now() - 120_000) } });
+    const fifth = await browser.post('/v1/auth/emails', { email: `many-x-${Date.now()}@example.com` });
+    assert.deepEqual([fifth.status, fifth.json.error.code], [409, 'too_many_emails']);
+  });
+
+  test('an account without a password (Google only) makes another address primary without one', async () => {
+    const { browser, email } = await resellerClient(server);
+    const other = `google-${Date.now()}@example.com`;
+    await addEmail(browser, other);
+    await prisma.user.updateMany({ where: { email }, data: { passwordHash: null } });
+    const swapped = await browser.post('/v1/auth/emails/primary', { email: other });
+    assert.equal(swapped.status, 200, JSON.stringify(swapped.json));
+    assert.deepEqual(swapped.json.data.map(item => item.email), [other], 'an unconfirmed old primary is not kept');
   });
 
   test('an account without a password (Google only) is told to set one first', async () => {

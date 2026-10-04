@@ -69,6 +69,7 @@ export const notificationTypes = {
   // Personal (security) ----------------------------------------------------------------------------------------------
   'security.password_changed': { realm: 'personal', severity: 'warning', label: 'Password changed' },
   'security.email_changed': { realm: 'personal', severity: 'warning', label: 'Sign-in email changed' },
+  'security.email_added': { realm: 'personal', severity: 'warning', label: 'Email address added' },
 
   // BitoCard admins --------------------------------------------------------------------------------------------------
   'admin.reseller.signed_up': { realm: 'admin', roles: ['operations', 'support'], severity: 'info', label: 'New reseller' },

@@ -84,6 +84,7 @@ model User {
   notifications           Notification[]
   devices                 Device[]
   notificationPreferences NotificationPreference[]
+  emails                  UserEmail[]
 
   @@unique([realm, email])
   @@unique([realm, phone])
@@ -441,6 +442,7 @@ model Reseller {
   feeCharges            FeeCharge[]
   webhookEndpoints      WebhookEndpoint[]
   verifications         IdentityVerification[]
+  mediaAssets           MediaAsset[]
 
   @@map("resellers")
 }
@@ -983,6 +985,8 @@ model Supplier {
   /// Adapter code, for example reloadly or vtpass.
   code                 String            @id
   name                 String
+  /// Admin-only logo (the admin app and, for suppliers resellers can connect, SHQ). Never shown to customers.
+  logoUrl              String?           @map("logo_url")
   categories           ProductCategory[]
   /// Where the supplier operates, as published (free text until confirmed).
   coverage             String
@@ -1047,7 +1051,10 @@ model Product {
   recipientType      String            @default("none") @map("recipient_type")
   description        String?
   redeemInstructions String?           @map("redeem_instructions")
+  /// From the supplier's catalogue (refreshed on every sync).
   logoUrl            String?           @map("logo_url")
+  /// Set by an admin (an uploaded image or an https address); shown instead of the supplier's logo. Never synced over.
+  imageUrl           String?           @map("image_url")
   /// Admin switch; inactive products are hidden and cannot be quoted.
   active             Boolean           @default(true)
   createdAt          DateTime          @default(now()) @map("created_at")
@@ -1703,4 +1710,79 @@ model StorefrontPageVersion {
 
   @@id([pageKey, version])
   @@map("storefront_page_versions")
+}
+
+/// How a category is shown on storefronts: its icon and banner image (uploaded by admins). Labels stay in code.
+model CategoryPresentation {
+  category    ProductCategory @id
+  iconUrl     String?         @map("icon_url")
+  imageUrl    String?         @map("image_url")
+  updatedById String?         @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@map("category_presentations")
+}
+
+enum MediaStatus {
+  /// A signed upload link was issued; the file is not checked yet.
+  pending
+  /// Uploaded and checked: a real image of the declared type and size.
+  ready
+}
+
+/**
+ * A file in object storage (DigitalOcean Spaces), uploaded by a browser with a signed link. Platform files (brands,
+ * products, suppliers, categories, storefront images) have no reseller; a reseller's files sit in their own folder.
+ * Entities keep the public address (`logoUrl` and the like); this row is the library and the record of who uploaded it.
+ */
+model MediaAsset {
+  id           String      @id @default(uuid()) @db.Uuid
+  /// The object key: <root>/platform/brands/<slug>/logos/<id>.png or <root>/resellers/<id>/store/logos/<id>.png.
+  key          String      @unique
+  /// The folder the key is in, for browsing (the key without the file name).
+  folder       String
+  url          String
+  /// What it is for, for example brand_logo or store_logo (`src/media/purposes.ts`).
+  purpose      String
+  /// The brand slug, product key, supplier code or category it was uploaded for, when there is one.
+  targetId     String?     @map("target_id")
+  /// Null for platform files.
+  resellerId   String?     @map("reseller_id") @db.Uuid
+  uploadedById String?     @map("uploaded_by_id") @db.Uuid
+  filename     String
+  contentType  String      @map("content_type")
+  sizeBytes    Int         @map("size_bytes")
+  width        Int?
+  height       Int?
+  status       MediaStatus @default(pending)
+  /// The signed upload link stops working at this time; unfinished uploads are removed after it.
+  expiresAt    DateTime    @map("expires_at")
+  completedAt  DateTime?   @map("completed_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  reseller     Reseller?   @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+
+  @@index([resellerId, status, createdAt])
+  @@index([folder, status])
+  @@index([status, expiresAt])
+  @@map("media_assets")
+}
+
+/**
+ * A person's other confirmed email addresses. The primary one stays `users.email` (sign-in and notices); another becomes
+ * primary only by swapping with it, so the primary can never be removed. An address belongs to one person per realm:
+ * each table is unique on (realm, email) and the API checks both before adding or signing up.
+ */
+model UserEmail {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  realm      Realm
+  /// Stored lower-case.
+  email      String
+  verifiedAt DateTime @map("verified_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([realm, email])
+  @@index([userId])
+  @@map("user_emails")
 }

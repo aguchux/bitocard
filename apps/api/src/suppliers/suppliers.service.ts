@@ -21,6 +21,7 @@ export type SupplierUpdate = Partial<{
   resale_approved: boolean;
   requires_ip_allowlist: boolean | null;
   notes: string | null;
+  logo_url: string | null;
 }>;
 
 /** Admin view of a supplier. Never returned by reseller endpoints. */
@@ -29,6 +30,7 @@ export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[
     object: 'supplier' as const,
     code: supplier.code,
     name: supplier.name,
+    logo_url: supplier.logoUrl,
     categories: supplier.categories,
     coverage: supplier.coverage,
     status: supplier.status,
@@ -91,6 +93,7 @@ export class SuppliersService {
         resaleApproved: input.resale_approved,
         requiresIpAllowlist: input.requires_ip_allowlist,
         notes: input.notes,
+        logoUrl: input.logo_url,
       },
     });
     await this.audit.record({ actorId, action: 'supplier.updated', targetType: 'supplier', targetId: code, before, after });
@@ -241,6 +244,9 @@ export class SuppliersService {
         category: product.category,
         country: product.country,
         name: product.name,
+        brand: product.brand,
+        logo_url: product.logoUrl,
+        image_url: product.imageUrl,
         face_currency: product.faceCurrency,
         active: product.active,
         offers: product.supplierProducts.map(offer => ({
@@ -260,12 +266,12 @@ export class SuppliersService {
     };
   }
 
-  async updateProduct(actorId: string | null, id: string, input: { active?: boolean; name?: string; description?: string | null }) {
+  async updateProduct(actorId: string | null, id: string, input: { active?: boolean; name?: string; description?: string | null; image_url?: string | null }) {
     const before = await this.prisma.product.findUnique({ where: { id } });
     if (!before) throw notFound('product');
-    const after = await this.prisma.product.update({ where: { id }, data: { active: input.active, name: input.name, description: input.description } });
+    const after = await this.prisma.product.update({ where: { id }, data: { active: input.active, name: input.name, description: input.description, imageUrl: input.image_url } });
     await this.audit.record({ actorId, action: 'product.updated', targetType: 'product', targetId: id, before, after });
-    return { object: 'admin_product' as const, id, key: after.key, name: after.name, description: after.description, active: after.active };
+    return { object: 'admin_product' as const, id, key: after.key, name: after.name, description: after.description, image_url: after.imageUrl, active: after.active };
   }
 
   /** The commission agreed with a supplier for one offer, and its routing priority. */

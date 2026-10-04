@@ -166,6 +166,8 @@ export type Supplier = {
   object: 'supplier';
   code: string;
   name: string;
+  /** Admin-only logo; never shown to customers. */
+  logo_url: string | null;
   categories: ProductCategory[];
   coverage: string;
   status: SupplierStatus;
@@ -205,6 +207,11 @@ export type AdminProduct = {
   category: ProductCategory;
   country: string;
   name: string;
+  brand: string;
+  /** From the supplier's catalogue. */
+  logo_url: string | null;
+  /** Set by an admin; shown instead of the supplier's logo. */
+  image_url: string | null;
   face_currency: string;
   active: boolean;
   offers: SupplierOffer[];

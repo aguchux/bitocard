@@ -12,6 +12,7 @@ import {
   errorMessage,
   Field,
   formatDateTime,
+  ImageField,
   Input,
   KeyValue,
   Notice,
@@ -268,9 +269,7 @@ function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }
               disabled={!canManage || !draft}
               hint={draft ? "You can change the address while the store is a draft." : "Unpublish the store to change its address."}
             />
-            <Field label="Logo address" htmlFor="edit-store-logo" hint="An https:// link to your logo image. Leave empty for no logo.">
-              <Input id="edit-store-logo" type="url" inputMode="url" value={logo} onChange={event => setLogo(event.target.value)} placeholder="https://" disabled={!canManage} />
-            </Field>
+            <ImageField label="Logo" realm="reseller" purpose="store_logo" value={logo} onChange={setLogo} disabled={!canManage} hint="Square or wide, on a transparent or white background. Save to use it." />
             <div className="grid gap-5 sm:grid-cols-2">
               <ColourField id="edit-store-primary" label="Main colour" value={primary} onChange={setPrimary} disabled={!canManage} />
               <ColourField id="edit-store-accent" label="Accent colour" value={accent} onChange={setAccent} disabled={!canManage} />

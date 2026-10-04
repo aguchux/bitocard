@@ -134,9 +134,9 @@ export const adminApi = bitocardApi.injectEndpoints({
     // -- Catalogue and suppliers ------------------------------------------------------------------------------------
     suppliers: build.query<List<Supplier>, void>({ query: () => '/v1/admin/suppliers', providesTags: [{ type: 'Supplier', id: 'LIST' }] }),
     supplier: build.query<Supplier, string>({ query: code => `/v1/admin/suppliers/${code}`, providesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }] }),
-    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean }>>({
+    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null }>>({
       query: ({ code, ...body }) => ({ url: `/v1/admin/suppliers/${code}`, method: 'PATCH', body }),
-      invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, 'Overview', 'Activity'],
+      invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, 'Overview', 'Activity', 'Media'],
     }),
     setSupplierMarket: build.mutation<Supplier, { code: string; country: string; category: ProductCategory; enabled: boolean }>({
       query: ({ code, country, category, enabled }) => ({ url: `/v1/admin/suppliers/${code}/markets/${country}/${category}`, method: 'PUT', body: { enabled } }),
@@ -151,9 +151,9 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/products', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
       providesTags: [{ type: 'Product', id: 'LIST' }],
     }),
-    updateProduct: build.mutation<{ id: string; active: boolean; name: string }, { id: string; active?: boolean; name?: string; description?: string | null }>({
+    updateProduct: build.mutation<{ id: string; active: boolean; name: string; image_url: string | null }, { id: string; active?: boolean; name?: string; description?: string | null; image_url?: string | null }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/products/${id}`, method: 'PATCH', body }),
-      invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity'],
+      invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity', 'Media'],
     }),
     updateOffer: build.mutation<{ id: string; discount_bps: number; priority: number; available: boolean }, { id: string; discount_bps?: number; priority?: number; available?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/supplier-products/${id}`, method: 'PATCH', body }),

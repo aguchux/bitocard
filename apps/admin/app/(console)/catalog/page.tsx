@@ -12,6 +12,7 @@ import {
   errorMessage,
   FilterSelect,
   formatBps,
+  ImageField,
   formatRelative,
   Input,
   LoadMore,
@@ -34,6 +35,33 @@ import {
   useUpdateProductMutation,
 } from "@bitocard/api-client/admin";
 import { healthOf, SupplierHealth } from "./supplier-health";
+
+/** The product's own image, shown on storefronts instead of the supplier's logo. */
+function ProductImage({ product, editable }: { product: AdminProduct; editable: boolean }) {
+  const [update, state] = useUpdateProductMutation();
+  const [image, setImage] = useState(product.image_url ?? "");
+  const changed = image.trim() !== (product.image_url ?? "");
+  return (
+    <div className="space-y-3 rounded-xl border border-line p-4">
+      <ImageField
+        label="Product image"
+        realm="admin"
+        purpose="product_image"
+        targetId={product.key}
+        value={image}
+        onChange={setImage}
+        disabled={!editable}
+        hint={product.logo_url ? "Replaces the supplier's logo on storefronts. Remove it to go back to the supplier's." : "Shown on storefronts."}
+      />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {state.error ? <span className="mr-auto text-sm text-red-700">{errorMessage(state.error)}</span> : null}
+        <Button size="sm" disabled={!editable || !changed || (image.trim() !== "" && !image.trim().startsWith("https://"))} loading={state.isLoading} onClick={() => update({ id: product.id, image_url: image.trim() || null })}>
+          Save image
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function OfferRow({ offer, editable }: { offer: SupplierOffer; editable: boolean }) {
   const [update, state] = useUpdateOfferMutation();
@@ -139,9 +167,15 @@ export default function ProductsPage() {
                   key: "product",
                   header: "Product",
                   cell: product => (
-                    <span>
-                      <span className="font-semibold">{product.name}</span>
-                      <span className="block font-mono text-xs text-muted">{product.key}</span>
+                    <span className="flex min-w-0 items-center gap-3">
+                      {product.image_url || product.logo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- uploaded files and supplier logos on outside hosts
+                        <img src={(product.image_url ?? product.logo_url)!} alt="" className="size-9 shrink-0 rounded-lg border border-line bg-white object-contain p-0.5" loading="lazy" />
+                      ) : null}
+                      <span className="min-w-0">
+                        <span className="font-semibold">{product.name}</span>
+                        <span className="block font-mono text-xs text-muted">{product.key}</span>
+                      </span>
                     </span>
                   ),
                 },
@@ -178,6 +212,7 @@ export default function ProductsPage() {
               </span>
               <Toggle label="Product active" checked={current.active} disabled={!operator || productState.isLoading} onChange={active => updateProduct({ id: current.id, active })} />
             </div>
+            <ProductImage key={`${current.id}:${current.image_url ?? ""}`} product={current} editable={operator} />
             <ul className="space-y-3">
               {current.offers.map(offer => (
                 <OfferRow key={offer.id} offer={offer} editable={offerEditor} />

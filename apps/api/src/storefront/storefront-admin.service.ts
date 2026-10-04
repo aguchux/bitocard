@@ -2,8 +2,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma, type StorefrontPage } from '../generated/prisma/client.js';
-import { defaultHome, sections as sectionsSchema } from './layout.js';
+import { Prisma, type ProductCategory, type StorefrontPage } from '../generated/prisma/client.js';
+import { categoryLabels, defaultHome, sections as sectionsSchema } from './layout.js';
 import { StorefrontService } from './storefront.service.js';
 
 const homeKey = 'home';
@@ -177,5 +177,34 @@ export class StorefrontAdminService {
     const row = await this.prisma.brand.upsert({ where: { slug }, create: { slug, ...data }, update: data });
     await this.audit.record({ actorId, action: before ? 'brand.updated' : 'brand.created', targetType: 'brand', targetId: slug, before, after: row });
     return (await this.brands()).data.find(item => item.slug === slug)!;
+  }
+
+  // -- Categories ------------------------------------------------------------------------------------------------
+
+  /** Every category with its icon and image (labels are fixed in code), and how many products it has. */
+  async categories() {
+    const [rows, counts] = await Promise.all([this.prisma.categoryPresentation.findMany(), this.prisma.product.groupBy({ by: ['category'], _count: { _all: true } })]);
+    return {
+      object: 'list' as const,
+      data: (Object.keys(categoryLabels) as ProductCategory[]).map(category => {
+        const row = rows.find(item => item.category === category);
+        return {
+          object: 'admin_category' as const,
+          category,
+          label: categoryLabels[category],
+          icon_url: row?.iconUrl ?? null,
+          image_url: row?.imageUrl ?? null,
+          products: counts.find(item => item.category === category)?._count._all ?? 0,
+        };
+      }),
+    };
+  }
+
+  async saveCategory(actorId: string | null, category: ProductCategory, input: { icon_url?: string | null; image_url?: string | null }) {
+    const data = { iconUrl: input.icon_url?.trim() || null, imageUrl: input.image_url?.trim() || null, updatedById: actorId };
+    const before = await this.prisma.categoryPresentation.findUnique({ where: { category } });
+    const row = await this.prisma.categoryPresentation.upsert({ where: { category }, create: { category, ...data }, update: data });
+    await this.audit.record({ actorId, action: 'category.presentation_updated', targetType: 'category', targetId: category, before, after: row });
+    return (await this.categories()).data.find(item => item.category === category)!;
   }
 }

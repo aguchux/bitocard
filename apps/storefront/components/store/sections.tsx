@@ -153,8 +153,13 @@ function CategoryGrid({ section }: { section: Extract<ResolvedSection, { type: "
           return (
             <li key={category.category}>
               <Link href={`/catalogs/${category.category}`} className="flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <span className={`grid size-12 place-items-center rounded-xl ${theme.tile} ${theme.ink}`}>
-                  <Icon className="size-6" aria-hidden="true" />
+                <span className={`grid size-12 place-items-center overflow-hidden rounded-xl ${theme.tile} ${theme.ink}`}>
+                  {category.icon_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- icons uploaded by admins, served from the storage CDN
+                    <img src={category.icon_url} alt="" className="size-8 object-contain" loading="lazy" />
+                  ) : (
+                    <Icon className="size-6" aria-hidden="true" />
+                  )}
                 </span>
                 <span>
                   <span className="font-display block font-bold text-[#070f4c]">{category.label}</span>

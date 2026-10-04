@@ -3,7 +3,7 @@ import { ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, A
 import { Transform, Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsHexColor, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
-import { adminId } from '../countries/countries.controller.js';
+import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
 import { categoryLabels, navigationGroups } from './layout.js';
 import { StorefrontAdminService } from './storefront-admin.service.js';
@@ -207,6 +207,11 @@ class BrandDto {
   @IsOptional() @IsBoolean() visible?: boolean;
 }
 
+class CategoryPresentationDto {
+  @IsOptional() @IsString() @Matches(httpsUrl, { message: 'icon_url must be an https:// address' }) @MaxLength(1000) icon_url?: string | null;
+  @IsOptional() @IsString() @Matches(httpsUrl, { message: 'image_url must be an https:// address' }) @MaxLength(1000) image_url?: string | null;
+}
+
 /** Admins: the Storefront Manager (home page layout, publishing, previews, brands). */
 @ApiExcludeController()
 @RealmOnly('admin')
@@ -271,5 +276,17 @@ export class AdminStorefrontController {
   @Put('brands/:slug')
   saveBrand(@CurrentCaller() caller: Caller, @Param('slug') slug: string, @Body() body: BrandDto) {
     return this.admin.saveBrand(adminId(caller), slug.trim().toLowerCase(), body);
+  }
+
+  @AdminRoles('operations', 'support')
+  @Get('categories')
+  categories() {
+    return this.admin.categories();
+  }
+
+  @AdminRoles('operations')
+  @Put('categories/:category')
+  saveCategory(@CurrentCaller() caller: Caller, @Param('category', new ParseCategoryPipe()) category: ProductCategory, @Body() body: CategoryPresentationDto) {
+    return this.admin.saveCategory(adminId(caller), category, body);
   }
 }

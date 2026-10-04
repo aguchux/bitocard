@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useId, useState } from "react";
 import { Search } from "lucide-react";
-import { ActionDialog, Badge, Card, type Column, DataTable, Dialog, errorMessage, Field, Input, PageHeader, StatusBadge, Textarea, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Card, type Column, DataTable, Dialog, errorMessage, Field, ImageField, Input, PageHeader, StatusBadge, Textarea, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type AdminBrand, type BrandInput, useSaveStorefrontBrandMutation, useStorefrontBrandsQuery } from "@bitocard/api-client/admin";
 import { categoryLabels } from "@bitocard/api-client/storefront";
@@ -64,16 +64,17 @@ function BrandDialog({ brand, editable, onClose }: { brand: AdminBrand; editable
       <Field label="Description" htmlFor={`${id}-description`}>
         <Textarea id={`${id}-description`} value={description} maxLength={500} onChange={event => setDescription(event.target.value)} />
       </Field>
-      <Field label="Logo address" htmlFor={`${id}-logo`} error={problems.logo} hint="An https:// image, square works best.">
-        <Input id={`${id}-logo`} value={logo} maxLength={1000} onChange={event => setLogo(event.target.value)} placeholder="https://" />
-      </Field>
-      <Field label="Card image address" htmlFor={`${id}-image`} error={problems.image} hint="Shown on product cards. An https:// image.">
-        <Input id={`${id}-image`} value={image} maxLength={1000} onChange={event => setImage(event.target.value)} placeholder="https://" />
-      </Field>
-      {image.trim() && !problems.image ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a preview of an outside address the admin typed
-        <img src={image.trim()} alt="Card image preview" className="h-28 w-full max-w-xs rounded-xl border border-line object-cover" />
-      ) : null}
+      <ImageField
+        label="Logo"
+        realm="admin"
+        purpose="brand_logo"
+        targetId={brand.slug}
+        value={logo}
+        onChange={setLogo}
+        disabled={!editable}
+        hint="Square works best. Network operators (MTN, Airtel…) are brands too."
+      />
+      <ImageField label="Card image" realm="admin" purpose="brand_card" targetId={brand.slug} value={image} onChange={setImage} disabled={!editable} shape="wide" hint="The gift card art shown on product cards." />
       <Field label="Colour" htmlFor={`${id}-color`} error={problems.color} hint="The brand's main colour, used behind its logo.">
         <div className="flex items-center gap-2">
           <span aria-hidden className="size-11 shrink-0 rounded-lg border border-line" style={{ background: !problems.color && color.trim() ? color.trim() : "transparent" }} />

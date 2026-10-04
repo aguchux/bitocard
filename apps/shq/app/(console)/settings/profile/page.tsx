@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { KeyRound, LogOut, Mail, Pencil, Smartphone } from "lucide-react";
+import { KeyRound, LogOut, Mail, Pencil, Plus, Smartphone, Star, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   useAddPhoneMutation,
   useChangePasswordMutation,
-  useConfirmEmailChangeMutation,
-  useRequestEmailChangeMutation,
+  useAddEmailMutation,
+  useConfirmEmailMutation,
+  useEmailsQuery,
+  useMakePrimaryEmailMutation,
+  useRemoveEmailMutation,
   useUpdateProfileMutation,
   useVerifyPhoneMutation,
 } from "@bitocard/api-client/reseller";
@@ -140,75 +143,188 @@ function NameForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Changing the sign-in email: the current password, then the code sent to the new address. The old address is told. */
-function EmailForm({ onDone }: { onDone: (changed: boolean) => void }) {
+/**
+ * Email addresses: the primary one signs in and gets notices; others are added with a code sent to each. The primary
+ * address is never removed or typed over: another confirmed address is made primary instead.
+ */
+function EmailAddresses() {
+  const { user } = useReseller();
+  const emails = useEmailsQuery();
+  const [adding, setAdding] = useState(false);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState("");
-  const [request, requestState] = useRequestEmailChangeMutation();
-  const [confirm, confirmState] = useConfirmEmailChangeMutation();
+  const [promoting, setPromoting] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [add, addState] = useAddEmailMutation();
+  const [confirm, confirmState] = useConfirmEmailMutation();
+  const [makePrimary, primaryState] = useMakePrimaryEmailMutation();
+  const [remove, removeState] = useRemoveEmailMutation();
+  const others = emails.data?.data.filter(item => !item.primary) ?? [];
+
+  const reset = () => {
+    setAdding(false);
+    setEmail("");
+    setSentTo(null);
+    setCode("");
+  };
 
   const submitCode = async (value: string) => {
     if (confirmState.isLoading) return;
-    if (await confirm({ code: value }).unwrap().catch(() => null)) onDone(true);
-    else setCode("");
+    if (await confirm({ code: value }).unwrap().catch(() => null)) {
+      setNotice(`${sentTo} was added.`);
+      reset();
+    } else setCode("");
   };
 
-  if (sentTo) {
-    return (
-      <form
-        onSubmit={event => {
-          event.preventDefault();
-          void submitCode(code);
-        }}
-        className="space-y-4"
-      >
-        <p className="text-sm text-muted">
-          Enter the 6-digit code we sent to <span className="font-semibold break-all text-ink">{sentTo}</span>. It expires in 30 minutes.
-        </p>
-        {confirmState.error ? <Notice tone="red">{errorMessage(confirmState.error)}</Notice> : null}
-        <CodeInput label="Code from the email" value={code} onChange={setCode} onComplete={submitCode} autoFocus disabled={confirmState.isLoading} invalid={Boolean(confirmState.error)} />
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" loading={confirmState.isLoading} disabled={code.length !== 6}>
-            Confirm new email
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setSentTo(null)}>
-            Use a different email
-          </Button>
-        </div>
-      </form>
-    );
-  }
   return (
-    <form
-      onSubmit={async event => {
-        event.preventDefault();
-        const next = email.trim();
-        if (await request({ email: next, password }).unwrap().catch(() => null)) {
-          setSentTo(next);
-          setPassword("");
-          setCode("");
+    <Card>
+      <CardHeader
+        title="Email addresses"
+        description="You sign in with your primary email and notices go to it. To change it, add another address and make it primary."
+        actions={
+          adding || others.length >= 4 ? null : (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Plus className="size-4" aria-hidden />}
+              onClick={() => {
+                setNotice(null);
+                setAdding(true);
+              }}
+            >
+              Add email
+            </Button>
+          )
         }
-      }}
-      className="space-y-4"
-    >
-      {requestState.error ? <Notice tone="red">{errorMessage(requestState.error)}</Notice> : null}
-      <Field label="New email" htmlFor="profile-email">
-        <Input id="profile-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required />
-      </Field>
-      <Field label="Current password" htmlFor="profile-email-password" hint="To confirm it is you.">
-        <Input id="profile-email-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
-      </Field>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" loading={requestState.isLoading} disabled={!email.trim() || !password}>
-          Send code
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => onDone(false)}>
-          Cancel
-        </Button>
+      />
+      <div className="space-y-4 p-5 sm:p-6">
+        {notice ? <Notice tone="green">{notice}</Notice> : null}
+        {removeState.error ? <Notice tone="red">{errorMessage(removeState.error)}</Notice> : null}
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {(emails.data?.data ?? [{ object: "user_email" as const, email: user.email, primary: true, verified: user.email_verified, added_at: user.created_at }]).map(item => (
+            <li key={item.email} className="space-y-3 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Mail className="size-4 shrink-0 text-subtle" aria-hidden />
+                  <span className="font-medium break-all">{item.email}</span>
+                  {item.primary ? <Badge tone="blue">Primary</Badge> : null}
+                  <Badge tone={item.verified ? "green" : "amber"}>{item.verified ? "Confirmed" : "Not confirmed"}</Badge>
+                </span>
+                {item.primary ? (
+                  <span className="text-xs text-muted">Signs in · cannot be removed</span>
+                ) : (
+                  <span className="flex flex-wrap gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Star className="size-4" aria-hidden />}
+                      disabled={primaryState.isLoading}
+                      onClick={async () => {
+                        setNotice(null);
+                        if (user.has_password) {
+                          setPromoting(item.email);
+                          setPassword("");
+                        } else if (await makePrimary({ email: item.email }).unwrap().catch(() => null)) setNotice(`You now sign in with ${item.email}.`);
+                      }}
+                    >
+                      Make primary
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<Trash2 className="size-4" aria-hidden />}
+                      loading={removeState.isLoading && removeState.originalArgs === item.email}
+                      onClick={async () => {
+                        setNotice(null);
+                        if (await remove(item.email).unwrap().catch(() => null)) setNotice(`${item.email} was removed.`);
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </span>
+                )}
+              </div>
+              {promoting === item.email ? (
+                <form
+                  className="space-y-3"
+                  onSubmit={async event => {
+                    event.preventDefault();
+                    if (await makePrimary({ email: item.email, password }).unwrap().catch(() => null)) {
+                      setPromoting(null);
+                      setPassword("");
+                      setNotice(`You now sign in with ${item.email}. We told your old address too.`);
+                    }
+                  }}
+                >
+                  {primaryState.error ? <Notice tone="red">{errorMessage(primaryState.error)}</Notice> : null}
+                  <Field label="Current password" htmlFor="primary-email-password" hint={`To confirm it is you. You will sign in with ${item.email} from now on.`}>
+                    <Input id="primary-email-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required autoFocus />
+                  </Field>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" size="sm" loading={primaryState.isLoading} disabled={!password}>
+                      Make primary
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setPromoting(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {adding && sentTo ? (
+          <form
+            onSubmit={event => {
+              event.preventDefault();
+              void submitCode(code);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-muted">
+              Enter the 6-digit code we sent to <span className="font-semibold break-all text-ink">{sentTo}</span>. It expires in 30 minutes.
+            </p>
+            {confirmState.error ? <Notice tone="red">{errorMessage(confirmState.error)}</Notice> : null}
+            <CodeInput label="Code from the email" value={code} onChange={setCode} onComplete={submitCode} autoFocus disabled={confirmState.isLoading} invalid={Boolean(confirmState.error)} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={confirmState.isLoading} disabled={code.length !== 6}>
+                Add email
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setSentTo(null)}>
+                Use a different email
+              </Button>
+            </div>
+          </form>
+        ) : adding ? (
+          <form
+            onSubmit={async event => {
+              event.preventDefault();
+              const next = email.trim();
+              if (await add({ email: next }).unwrap().catch(() => null)) {
+                setSentTo(next);
+                setCode("");
+              }
+            }}
+            className="space-y-4"
+          >
+            {addState.error ? <Notice tone="red">{errorMessage(addState.error)}</Notice> : null}
+            <Field label="Email to add" htmlFor="profile-add-email" hint="We send a code to it to confirm it is yours.">
+              <Input id="profile-add-email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required autoFocus />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" loading={addState.isLoading} disabled={!email.trim()}>
+                Send code
+              </Button>
+              <Button type="button" variant="ghost" onClick={reset}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
       </div>
-    </form>
+    </Card>
   );
 }
 
@@ -279,8 +395,7 @@ function PasswordCard() {
 export default function ProfilePage() {
   const { user, membership } = useReseller();
   const [signOut, signingOut] = useSignOut();
-  const [editing, setEditing] = useState<"name" | "email" | null>(null);
-  const [emailChanged, setEmailChanged] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   return (
     <ShqShell section="settings" current="/settings/profile" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Your profile" }]}>
@@ -292,32 +407,20 @@ export default function ProfilePage() {
           actions={
             editing ? null : (
               <div className="flex flex-wrap gap-2">
-                <Button variant="ghost" size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing("name")}>
+                <Button variant="ghost" size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(true)}>
                   Name
-                </Button>
-                <Button variant="ghost" size="sm" icon={<Mail className="size-4" aria-hidden />} onClick={() => setEditing("email")}>
-                  Email
                 </Button>
               </div>
             )
           }
         />
         <div className="space-y-4 p-5 sm:p-6">
-          {emailChanged ? <Notice tone="green">Your sign-in email was changed. We told your old address too.</Notice> : null}
-          {editing === "name" ? <NameForm onDone={() => setEditing(null)} /> : null}
-          {editing === "email" ? (
-            <EmailForm
-              onDone={changed => {
-                setEditing(null);
-                setEmailChanged(changed);
-              }}
-            />
-          ) : null}
+          {editing ? <NameForm onDone={() => setEditing(false)} /> : null}
           <KeyValue
             items={[
               { label: "Name", value: user.name },
               {
-                label: "Email",
+                label: "Primary email",
                 value: (
                   <span className="inline-flex flex-wrap items-center gap-2">
                     <span className="break-all">{user.email}</span>
@@ -331,6 +434,8 @@ export default function ProfilePage() {
           />
         </div>
       </Card>
+
+      <EmailAddresses />
 
       <MobileNumber />
 

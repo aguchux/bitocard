@@ -6,7 +6,7 @@ import { Prisma, type User } from '../generated/prisma/client.js';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
-import { emailChangeCodeEmail, emailChangedEmail, passwordChangedEmail, passwordResetEmail, verificationEmail } from '../notifications/templates.js';
+import { emailAddCodeEmail, emailAddedEmail, emailChangedEmail, passwordChangedEmail, passwordResetEmail, verificationEmail } from '../notifications/templates.js';
 import { TeamService } from '../team/team.service.js';
 import { CountriesService } from '../countries/countries.service.js';
 import { CodesService } from './codes.service.js';
@@ -19,6 +19,8 @@ import { InboxService } from '../notifications/inbox.service.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 
+/** Addresses besides the primary one a person can keep. */
+const maxOtherEmails = 4;
 const emailInUse = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'Another account already uses this email.', 'email');
 const phoneInUse = () =>
   new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this mobile number.', 'phone');
@@ -61,6 +63,9 @@ export class AuthService {
     const invitation = input.invitation_token ? await this.team.findValid(input.invitation_token, input.email) : null;
     if (!invitation) await this.countries.assertSignupOpen(input.country ?? '');
     await this.passwords.assertAcceptable(input.password);
+    if (await this.emailTaken(input.email)) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
+    }
     const passwordHash = await this.passwords.hash(input.password);
 
     let user: User;
@@ -273,40 +278,112 @@ export class AuthService {
     });
   }
 
-  /** Step 1 of changing the sign-in email: the current password, then a code sent to the new address. */
-  async requestEmailChange(userId: string, email: string, password: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    await this.confirmPassword(user, password, 'password');
-    if (email === user.email) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'email_unchanged', 'That is already your email.', 'email');
-    if (await this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } })) throw emailInUse();
+  // -- Email addresses --------------------------------------------------------------------------------------------
+  // The primary address (`users.email`) signs in and gets notices. Others are added with a code sent to them, and one
+  // becomes primary only by swapping with the current primary, so a person always has exactly one and it is never removed.
+
+  /** Whether an address already belongs to someone in the realm, as a primary or another address. */
+  async emailTaken(email: string, exceptUserId?: string) {
+    const [primary, other] = await Promise.all([
+      this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } }, select: { id: true } }),
+      this.prisma.userEmail.findUnique({ where: { realm_email: { realm: 'reseller', email } }, select: { userId: true } }),
+    ]);
+    return Boolean((primary && primary.id !== exceptUserId) || (other && other.userId !== exceptUserId));
+  }
+
+  async listEmails(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { emails: { orderBy: { createdAt: 'asc' } } } });
+    return {
+      object: 'list' as const,
+      data: [
+        { object: 'user_email' as const, email: user.email, primary: true, verified: user.emailVerifiedAt !== null, added_at: user.createdAt.toISOString() },
+        ...user.emails.map(item => ({ object: 'user_email' as const, email: item.email, primary: false, verified: true, added_at: item.createdAt.toISOString() })),
+      ],
+    };
+  }
+
+  /** Step 1 of adding an address: a code is sent to it. Nothing is saved until the code is confirmed. */
+  async addEmail(userId: string, email: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { emails: true } });
+    if (email === user.email || user.emails.some(item => item.email === email)) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_already_added', 'That address is already on your account.', 'email');
+    }
+    if (user.emails.length >= maxOtherEmails) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'too_many_emails', `You can have up to ${maxOtherEmails + 1} addresses. Remove one first.`, 'email');
+    }
+    if (await this.emailTaken(email, userId)) throw emailInUse();
     const code = await this.codes.issue(userId, 'email_change', email);
     try {
-      await this.email.send(emailChangeCodeEmail(email, code));
+      await this.email.send(emailAddCodeEmail(email, code));
     } catch (error) {
       await this.codes.cancel(userId, 'email_change');
-      this.logger.error({ err: error }, 'Could not send the email change code');
+      this.logger.error({ err: error }, 'Could not send the email confirmation code');
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'email_delivery_failed', 'We could not send the email. Try again shortly.');
     }
   }
 
-  /** Step 2: the code proves control of the new address, which becomes the sign-in email. The old address is told. */
-  async confirmEmailChange(userId: string, code: string) {
+  /** Step 2: the code proves control of the address, which is added (not primary). The primary address is told. */
+  async confirmEmail(userId: string, code: string) {
     const email = await this.codes.consume(userId, 'email_change', code);
-    const before = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    try {
-      await this.prisma.user.update({ where: { id: userId }, data: { email, emailVerifiedAt: new Date() } });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw emailInUse();
-      throw error;
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (email !== user.email) {
+      if (await this.emailTaken(email, userId)) throw emailInUse();
+      try {
+        await this.prisma.userEmail.create({ data: { userId, realm: user.realm, email, verifiedAt: new Date() } });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+        // Added already (a repeated confirmation), or taken by someone else in the meantime.
+        const mine = await this.prisma.userEmail.findUnique({ where: { realm_email: { realm: user.realm, email } } });
+        if (mine?.userId !== userId) throw emailInUse();
+      }
+      await this.email.send(emailAddedEmail(user.email, email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the email added notice'));
+      await this.inbox.person(userId, 'security.email_added', {
+        subject: `${email}:${Date.now()}`,
+        title: 'An email address was added',
+        body: `${email} was added to your account. If this was not you, remove it and change your password.`,
+        link: '/settings/profile',
+      });
     }
-    await this.email.send(emailChangedEmail(before.email, email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the email changed notice'));
+    return this.listEmails(userId);
+  }
+
+  /**
+   * Makes a confirmed address the primary (sign-in) one; the old primary stays as another address when it was
+   * confirmed. Needs the current password when the account has one. The old primary address is told.
+   */
+  async makePrimary(userId: string, email: string, password: string | undefined) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (email === user.email) return this.listEmails(userId);
+    const other = await this.prisma.userEmail.findFirst({ where: { userId, email } });
+    if (!other) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'Add and confirm that address first.', 'email');
+    if (user.passwordHash) {
+      if (!password) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your current password.', 'password');
+      await this.confirmPassword(user, password, 'password');
+    }
+    await this.prisma.$transaction(async tx => {
+      await tx.userEmail.delete({ where: { id: other.id } });
+      await tx.user.update({ where: { id: userId }, data: { email, emailVerifiedAt: other.verifiedAt } });
+      if (user.emailVerifiedAt) await tx.userEmail.create({ data: { userId, realm: user.realm, email: user.email, verifiedAt: user.emailVerifiedAt } });
+    });
+    await this.email.send(emailChangedEmail(user.email, email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the email changed notice'));
     await this.inbox.person(userId, 'security.email_changed', {
       subject: String(Date.now()),
-      title: 'Your sign-in email was changed',
-      body: `You now sign in with ${email} instead of ${before.email}. If this was not you, contact support@bitocard.com.`,
+      title: 'Your primary email was changed',
+      body: `You now sign in with ${email} instead of ${user.email}. If this was not you, contact support@bitocard.com.`,
       link: '/settings/profile',
     });
-    return this.describe(userId);
+    return this.listEmails(userId);
+  }
+
+  /** Removes another address. The primary one cannot be removed: make another address primary first. */
+  async removeEmail(userId: string, email: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (email === user.email) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'primary_email', 'Your primary email cannot be removed. Make another address primary first.', 'email');
+    }
+    const removed = await this.prisma.userEmail.deleteMany({ where: { userId, email } });
+    if (!removed.count) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'That address is not on your account.', 'email');
+    return this.listEmails(userId);
   }
 
   /** Sends a code to a mobile number; it becomes the account's sign-in number once confirmed. */

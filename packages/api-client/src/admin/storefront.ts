@@ -36,6 +36,9 @@ export type AdminBrand = {
   categories: ProductCategory[];
 };
 
+/** A category's icon and image on storefronts (labels are fixed). */
+export type AdminCategory = { object: 'admin_category'; category: ProductCategory; label: string; icon_url: string | null; image_url: string | null; products: number };
+
 export type BrandInput = {
   name: string;
   company?: string | null;
@@ -70,7 +73,12 @@ export const adminStorefrontApi = bitocardApi.injectEndpoints({
     storefrontBrands: build.query<List<AdminBrand>, void>({ query: () => '/v1/admin/storefront/brands', providesTags: ['Brand'] }),
     saveStorefrontBrand: build.mutation<AdminBrand, { slug: string; brand: BrandInput }>({
       query: ({ slug, brand }) => ({ url: `/v1/admin/storefront/brands/${encodeURIComponent(slug)}`, method: 'PUT', body: brand }),
-      invalidatesTags: ['Brand', 'Activity'],
+      invalidatesTags: ['Brand', 'Media', 'Activity'],
+    }),
+    storefrontCategories: build.query<List<AdminCategory>, void>({ query: () => '/v1/admin/storefront/categories', providesTags: ['Category'] }),
+    saveStorefrontCategory: build.mutation<AdminCategory, { category: ProductCategory; icon_url: string | null; image_url: string | null }>({
+      query: ({ category, ...body }) => ({ url: `/v1/admin/storefront/categories/${category}`, method: 'PUT', body }),
+      invalidatesTags: ['Category', 'Media', 'Activity'],
     }),
   }),
 });
@@ -85,4 +93,6 @@ export const {
   useStorefrontPreviewMutation,
   useStorefrontBrandsQuery,
   useSaveStorefrontBrandMutation,
+  useStorefrontCategoriesQuery,
+  useSaveStorefrontCategoryMutation,
 } = adminStorefrontApi;

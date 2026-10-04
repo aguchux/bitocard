@@ -61,7 +61,7 @@ export type StoreProductDetail = StoreProduct & {
   related: StoreProduct[];
 };
 
-export type StoreCategory = { object: 'store_category'; category: ProductCategory; label: string; group: string | null; products: number };
+export type StoreCategory = { object: 'store_category'; category: ProductCategory; label: string; group: string | null; icon_url: string | null; image_url: string | null; products: number };
 export type StoreCountry = { code: string; name: string; products: number };
 export type StoreNavigationGroup = { key: string; label: string; categories: StoreCategory[]; brands: StoreBrand[] };
 export type StoreList<T> = { object: 'list'; data: T[]; has_more?: boolean; total?: number };

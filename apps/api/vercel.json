@@ -63,6 +63,10 @@
     {
       "path": "/v1/cron/notifications-cleanup",
       "schedule": "50 3 * * *"
+    },
+    {
+      "path": "/v1/cron/media-cleanup",
+      "schedule": "55 3 * * *"
     }
   ]
 }

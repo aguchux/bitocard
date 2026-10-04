@@ -2,12 +2,35 @@
 
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { Badge, Button, Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, formatRelative, humanise, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type Supplier, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
 import { healthOf } from "../supplier-health";
 
 type Filter = "live" | "all";
+
+/** The supplier's logo, for the admin app (and SHQ where resellers can connect it). Never shown to customers. */
+function SupplierLogo({ supplier, editable }: { supplier: Supplier; editable: boolean }) {
+  const [update, state] = useUpdateSupplierMutation();
+  const [logo, setLogo] = useState(supplier.logo_url ?? "");
+  const changed = logo.trim() !== (supplier.logo_url ?? "");
+  return (
+    <div className="space-y-2">
+      <ImageField label="Logo" realm="admin" purpose="supplier_logo" targetId={supplier.code} value={logo} onChange={setLogo} disabled={!editable} hint="Only admins and resellers who can connect this supplier see it." />
+      {changed ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {state.error ? <span className="mr-auto text-sm text-red-700">{errorMessage(state.error)}</span> : null}
+          <Button size="sm" variant="ghost" onClick={() => setLogo(supplier.logo_url ?? "")}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={logo.trim() !== "" && !logo.trim().startsWith("https://")} loading={state.isLoading} onClick={() => update({ code: supplier.code, logo_url: logo.trim() || null })}>
+            Save logo
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function SupplierCard({ supplier }: { supplier: Supplier }) {
   const admin = useAdmin();
@@ -23,6 +46,10 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
       <CardHeader
         title={
           <span className="flex flex-wrap items-center gap-2">
+            {supplier.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- uploaded logos on the storage CDN
+              <img src={supplier.logo_url} alt="" className="size-8 rounded-lg border border-line bg-white object-contain p-0.5" />
+            ) : null}
             {supplier.name}
             <StatusBadge status={healthOf(supplier)} />
             <Badge dot={false} tone="blue">
@@ -69,6 +96,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
           ]}
         />
         {supplier.notes ? <p className="text-sm text-muted">{supplier.notes}</p> : null}
+        <SupplierLogo key={supplier.logo_url ?? ""} supplier={supplier} editable={operator} />
       </div>
     </Card>
   );

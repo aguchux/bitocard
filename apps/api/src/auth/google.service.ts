@@ -180,6 +180,8 @@ export class GoogleService {
 
     const existing = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'reseller', email } } });
     if (existing) throw new GoogleSignInError('account_exists_sign_in_to_link');
+    // Someone's other address: never a new account, and never linked to them automatically.
+    if (await this.prisma.userEmail.findUnique({ where: { realm_email: { realm: 'reseller', email } } })) throw new GoogleSignInError('account_exists_sign_in_to_link');
 
     // Signing in never creates an account: the person signs up first, on purpose.
     if (intent !== 'signup') throw new GoogleSignInError('google_account_not_found');
