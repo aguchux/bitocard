@@ -6,7 +6,7 @@ import { brand as site } from "@bitocard/ui/site";
 import { BrandArt, ProductCard, ProductRow } from "./product-card";
 import { SearchForm } from "./layout";
 import { CategoryIcon, GroupIcon } from "./category-icon";
-import { categoryTheme, groupInk, trustIcon } from "./theme";
+import { groupInk, trustIcon } from "./theme";
 
 // Literal class names, so Tailwind generates them.
 const lgSpan = { 3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 9: "lg:col-span-9", 12: "lg:col-span-12" } as const;
@@ -65,7 +65,7 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
               {groups.map(group => (
                 <li key={group.key}>
                   <Link href={groupHref(group)} className="flex min-h-12 items-center gap-2 rounded-full border border-white/25 bg-white/5 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/10">
-                    <GroupIcon group={group} className="size-6" ink={groupInk[group.key] ?? "text-pink-400"} />
+                    <GroupIcon group={group} className="size-8" ink={groupInk[group.key] ?? "text-pink-400"} tile="bg-white/10" />
                     {group.label}
                   </Link>
                 </li>
@@ -176,13 +176,10 @@ function CategoryGrid({ section }: { section: Extract<ResolvedSection, { type: "
       <Heading title={section.title} subtitle={section.subtitle} />
       <ul className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-5 @6xl:grid-cols-9">
         {section.data.categories.map(category => {
-          const theme = categoryTheme[category.category];
           return (
             <li key={category.category}>
               <Link href={`/catalogs/${category.category}`} className="flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <span className={`grid size-12 place-items-center overflow-hidden rounded-xl ${theme.tile}`}>
-                  <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-8" />
-                </span>
+                <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-14 rounded-xl" />
                 <span>
                   <span className="font-display block font-bold text-[#070f4c]">{category.label}</span>
                   <span className="text-sm text-slate-500">{category.products} {category.products === 1 ? "product" : "products"}</span>

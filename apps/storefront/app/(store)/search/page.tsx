@@ -49,7 +49,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<R
                   return (
                     <li key={category.category}>
                       <Link href={`/catalogs/${category.category}`} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 font-semibold hover:border-slate-300">
-                        <CategoryIcon category={category.category} iconUrl={art.get(category.category)?.icon} className="size-5" />
+                        <CategoryIcon category={category.category} iconUrl={art.get(category.category)?.icon} className="size-8" />
                         {category.label}
                         <span className="text-sm font-normal text-slate-500">{category.products}</span>
                       </Link>

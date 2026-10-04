@@ -48,7 +48,7 @@ function NavGroup({ group }: { group: StoreNavigationGroup }) {
               <li key={category.category}>
                 <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
                   <span className="flex min-w-0 items-center gap-2.5">
-                    <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-5" />
+                    <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-9" />
                     {category.label}
                   </span>
                   {category.on_sale ? (
@@ -128,16 +128,16 @@ export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                   {groups.map(group => (
                     <div key={group.key}>
                       <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex items-center gap-2.5 text-lg font-bold text-[#070f4c]">
-                        <GroupIcon group={group} className="size-6" ink="text-[#e0116d]" />
+                        <GroupIcon group={group} className="size-10" />
                         {group.label}
                       </Link>
                       {group.categories.length > 1 || !group.on_sale ? (
                         <ul className="mt-1">
                           {group.categories.map(category => (
                             <li key={category.category}>
-                              <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center justify-between gap-3 pl-8 text-slate-600">
+                              <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center justify-between gap-3 pl-12 text-slate-600">
                                 <span className="flex min-w-0 items-center gap-2">
-                                  <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-4" ink="text-slate-400" />
+                                  <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-8" ink="text-slate-500" tile="bg-slate-100" />
                                   {category.label}
                                 </span>
                                 {category.on_sale ? null : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>}

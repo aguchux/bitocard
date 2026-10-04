@@ -140,9 +140,7 @@ export function CatalogueView({
                   aria-current={current ? "page" : undefined}
                   className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[15px] font-bold tracking-tight ${current ? "bg-pink-50 text-[#e0116d]" : "text-[#070f4c] hover:bg-slate-50"}`}
                 >
-                  <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${groupChip[group.key] ?? "bg-pink-50 text-pink-600"}`}>
-                    <GroupIcon group={group} className="size-[18px]" />
-                  </span>
+                  <GroupIcon group={group} className="size-10" ink="" tile={groupChip[group.key] ?? "bg-pink-50 text-pink-600"} />
                   {group.label}
                 </Link>
                 {/* Its categories, indented under a guide line. */}
@@ -155,7 +153,7 @@ export function CatalogueView({
                         className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#070f4c]"}`}
                       >
                         <span className="flex min-w-0 items-center gap-2">
-                          <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-4" ink="text-slate-400" />
+                          <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-7" ink="text-slate-500" tile="bg-slate-100" />
                           {category.label}
                         </span>
                         {category.on_sale ? (
@@ -213,7 +211,7 @@ export function CatalogueView({
         <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">
           {groups.map(group => (
             <Link key={group.key} href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700">
-              <GroupIcon group={group} className="size-4" ink="text-[#e0116d]" />
+              <GroupIcon group={group} className="size-7" />
               {group.label}
             </Link>
           ))}

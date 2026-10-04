@@ -70,7 +70,7 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
         </div>
         <div>
           <p className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${theme.tile} ${theme.ink}`}>
-            <CategoryIcon category={product.category} iconUrl={art.get(product.category)?.icon} className="size-4" />
+            <CategoryIcon category={product.category} iconUrl={art.get(product.category)?.icon} className="size-7" />
             {product.category_label}
             {product.global ? " · Usable anywhere" : ` · ${product.country_name}`}
           </p>
