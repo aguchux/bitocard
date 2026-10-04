@@ -61,10 +61,11 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
             </div>
           ) : null}
           {section.categoryChips && groups.length ? (
-            <ul className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            // One line, no pills: icon and label only. On narrow screens the line scrolls sideways instead of wrapping.
+            <ul className="-mx-1 mt-5 flex max-w-3xl items-center gap-x-4 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:gap-x-5 [&::-webkit-scrollbar]:hidden">
               {groups.map(group => (
-                <li key={group.key}>
-                  <Link href={groupHref(group)} className="flex min-h-12 items-center gap-2 rounded-full border border-white/25 bg-white/5 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/10">
+                <li key={group.key} className="shrink-0">
+                  <Link href={groupHref(group)} className="flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold whitespace-nowrap text-white/90 transition hover:text-white">
                     <GroupIcon group={group} className="size-8" ink={groupInk[group.key] ?? "text-pink-400"} tile="bg-white/10" />
                     {group.label}
                   </Link>
