@@ -169,7 +169,9 @@ export class SuppliersService {
     }
     const removed = await this.prisma.supplierProduct.updateMany({ where: { supplierCode: code, available: true, sku: { notIn: [...seen] } }, data: { available: false } });
     await this.prisma.supplier.update({ where: { code }, data: { lastSyncedAt: new Date(), lastSyncError: null } });
-    return { object: 'supplier_sync' as const, supplier: code, products_created: created, offers_updated: updated, offers_withdrawn: removed.count };
+    // When nothing came back, say why (the adapter's report: what the supplier returned and what was left out).
+    const note = created + updated === 0 ? (adapter.syncReport?.() ?? 'The supplier returned no products for the switched-on markets.') : null;
+    return { object: 'supplier_sync' as const, supplier: code, products_created: created, offers_updated: updated, offers_withdrawn: removed.count, note };
   }
 
   /** Syncs every enabled, configured supplier. Run daily; one failing supplier does not stop the others. */

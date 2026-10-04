@@ -142,7 +142,8 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ code, country, category, enabled }) => ({ url: `/v1/admin/suppliers/${code}/markets/${country}/${category}`, method: 'PUT', body: { enabled } }),
       invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, 'Activity'],
     }),
-    syncSupplier: build.mutation<{ object: 'supplier_sync'; supplier: string; products_created: number; offers_updated: number; offers_withdrawn: number }, string>({
+    /** `note` says why a sync brought back nothing (what the supplier returned and what was left out). */
+    syncSupplier: build.mutation<{ object: 'supplier_sync'; supplier: string; products_created: number; offers_updated: number; offers_withdrawn: number; note: string | null }, string>({
       query: code => ({ url: `/v1/admin/suppliers/${code}/sync`, method: 'POST' }),
       invalidatesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, { type: 'Product', id: 'LIST' }, 'Overview'],
     }),

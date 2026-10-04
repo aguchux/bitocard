@@ -73,6 +73,8 @@ export interface SupplierAdapter {
   /** Categories this adapter can sync. */
   readonly syncs: ProductCategory[];
   catalogue(scope: CatalogueScope): Promise<CatalogueItem[]>;
+  /** Optional: what the last catalogue fetch found, so a sync that brings back nothing can say why. */
+  syncReport?(): string | null;
   /** Pay-TV and bills: confirm a smartcard or meter number before a quote. */
   validateRecipient?(meta: Record<string, unknown>, accountNumber: string): Promise<RecipientCheck>;
   /**

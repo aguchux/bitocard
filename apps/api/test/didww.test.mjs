@@ -102,6 +102,37 @@ describe('DIDWW catalogue', () => {
     assert.equal(groupsCall.headers['x-didww-api-version'], '2022-05-10');
   });
 
+  test('newer feature names (voice_in, sms_in) are read too; a fetch says what it found and left out', async () => {
+    const { DidwwAdapter } = await import('../dist/suppliers/didww.adapter.js');
+    const adapter = new DidwwAdapter({ apiKey: 'didww-key', baseUrl: didww.url, countries: ['GB', 'ZZ'], callbackBase });
+    const original = didww.state.groups;
+    didww.state.groups = original.map(group => ({ ...group, attributes: { ...group.attributes, features: group.attributes.features.map(feature => ({ voice: 'voice_in', sms: 'sms_in' })[feature] ?? feature) } }));
+    try {
+      const items = await adapter.catalogue({ category: 'virtual_numbers', country: null });
+      assert.deepEqual(items.map(item => item.productKey).sort(), [londonKey, 'virtual_numbers:GB:local:london-voice-sms-2ch']);
+      assert.deepEqual(items[0].meta.capabilities, ['voice', 'sms']);
+      assert.equal(
+        adapter.syncReport(),
+        'GB: 2 number groups in stock without documents or per-minute billing, 2 products; 1 have neither calls nor SMS (features: t38). ZZ: not a DIDWW country.',
+      );
+    } finally {
+      didww.state.groups = original;
+    }
+  });
+
+  test('a sync that brings back nothing says why', async () => {
+    const original = didww.state.groups;
+    didww.state.groups = original.filter(group => group.id !== 'grp-london');
+    try {
+      const sync = await admin.post('/v1/admin/suppliers/didww/sync');
+      assert.deepEqual([sync.status, sync.json.products_created + sync.json.offers_updated], [200, 0]);
+      assert.equal(sync.json.note, 'GB: 1 number groups in stock without documents or per-minute billing, 0 products; 1 have neither calls nor SMS (features: t38).');
+    } finally {
+      didww.state.groups = original;
+      assert.equal((await admin.post('/v1/admin/suppliers/didww/sync')).json.note, null);
+    }
+  });
+
   test('numbers are sold in every market: a Nigerian reseller sees UK numbers, priced in naira, without the supplier', async () => {
     const client = await reseller();
     const product = await prisma.product.findUniqueOrThrow({ where: { key: londonKey } });

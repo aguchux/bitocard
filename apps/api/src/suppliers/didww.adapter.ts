@@ -19,6 +19,8 @@ type DidAttributes = { number: string; expires_at?: string | null; channels_incl
 
 /** Number capabilities BitoCard shows, in DIDWW's names. Fax (t38) is not sold. */
 const capabilities = ['voice', 'voice_out', 'sms', 'sms_out'] as const;
+/** Newer DIDWW API versions name incoming calls and SMS `voice_in` and `sms_in`; read both. */
+const featureAliases: Record<string, (typeof capabilities)[number]> = { voice: 'voice', voice_in: 'voice', voice_out: 'voice_out', sms: 'sms', sms_in: 'sms', sms_out: 'sms_out' };
 const capabilityLabels: Record<(typeof capabilities)[number], string> = { voice: 'incoming calls', voice_out: 'outgoing calls', sms: 'incoming SMS', sms_out: 'outgoing SMS' };
 const pageSize = 100;
 
@@ -71,9 +73,17 @@ export class DidwwAdapter implements SupplierAdapter {
   }
 
   /** Numbers are bought for use anywhere, so they are synced once for the configured countries, not per market. */
+  /** What the last catalogue fetch found per country, so an empty sync says why. */
+  private report: string[] = [];
+
+  syncReport() {
+    return this.report.length ? this.report.join(' ') : null;
+  }
+
   async catalogue(scope: CatalogueScope): Promise<CatalogueItem[]> {
     if (scope.category !== 'virtual_numbers') return [];
     const countries = scope.country ? [scope.country] : this.settings.countries;
+    this.report = countries.length ? [] : ['No number countries are set (Settings > Integrations > DIDWW).'];
     const items: CatalogueItem[] = [];
     for (const iso of countries) items.push(...(await this.country(iso.toUpperCase())));
     return items;
@@ -82,8 +92,14 @@ export class DidwwAdapter implements SupplierAdapter {
   private async country(iso: string): Promise<CatalogueItem[]> {
     const found = await this.request<Document<CountryAttributes>>(`/countries?filter[iso]=${encodeURIComponent(iso)}`);
     const country = found.data[0];
-    if (!country) return [];
+    if (!country) {
+      this.report.push(`${iso}: not a DIDWW country.`);
+      return [];
+    }
     const items: CatalogueItem[] = [];
+    let groups = 0;
+    const skipped = { documents: 0, metered: 0, unavailable: 0, features: 0, prices: 0 };
+    const seen = new Set<string>();
     for (let page = 1; ; page += 1) {
       const query = [
         `filter[country.id]=${country.id}`,
@@ -96,9 +112,31 @@ export class DidwwAdapter implements SupplierAdapter {
       ].join('&');
       const res = await this.request<Document<DidGroupAttributes, SkuAttributes & TypeAttributes>>(`/did_groups?${query}`);
       const included = new Map((res.included ?? []).map(item => [`${item.type}:${item.id}`, item]));
-      for (const group of res.data) items.push(...this.groupItems(country.attributes, group as Resource<DidGroupAttributes> & { meta?: DidGroupMeta }, included));
+      for (const group of res.data as Array<Resource<DidGroupAttributes> & { meta?: DidGroupMeta }>) {
+        groups += 1;
+        if (group.meta?.needs_registration) skipped.documents += 1;
+        else if (group.attributes.is_metered) skipped.metered += 1;
+        else if (group.meta?.is_available === false) skipped.unavailable += 1;
+        const found = this.groupItems(country.attributes, group, included);
+        if (!group.meta?.needs_registration && !group.attributes.is_metered && group.meta?.is_available !== false && found.length === 0) {
+          if (this.features(group).length === 0) {
+            skipped.features += 1;
+            for (const feature of group.attributes.features ?? []) seen.add(feature);
+          } else skipped.prices += 1;
+        }
+        items.push(...found);
+      }
       if (res.data.length < pageSize) break;
     }
+    const reasons = [
+      skipped.documents && `${skipped.documents} need the end user's documents`,
+      skipped.metered && `${skipped.metered} are billed per minute`,
+      skipped.unavailable && `${skipped.unavailable} are out of stock`,
+      skipped.features && `${skipped.features} have neither calls nor SMS (features: ${[...seen].join(', ') || 'none'})`,
+      skipped.prices && `${skipped.prices} have no prices`,
+    ].filter(Boolean);
+    // DIDWW is asked only for numbers in stock that need no documents and are not billed per minute.
+    this.report.push(`${iso}: ${groups} number groups in stock without documents or per-minute billing, ${items.length} products${reasons.length ? `; ${reasons.join(', ')}` : ''}.`);
     return items;
   }
 
@@ -110,8 +148,8 @@ export class DidwwAdapter implements SupplierAdapter {
       return (Array.isArray(data) ? data : data ? [data] : []).map(ref => included.get(`${ref.type}:${ref.id}`)).filter(Boolean) as Resource<unknown>[];
     };
     const typeName = (related('did_group_type')[0]?.attributes as TypeAttributes | undefined)?.name ?? 'Local';
-    const features = capabilities.filter(feature => group.attributes.features.includes(feature));
-    if (!features.includes('voice') && !features.includes('sms')) return [];
+    const features = this.features(group);
+    if (features.length === 0) return [];
     const skus = related('stock_keeping_units') as Resource<SkuAttributes>[];
     const area = group.attributes.area_name?.trim() || typeName;
     const numberType = slug(typeName);
@@ -149,6 +187,13 @@ export class DidwwAdapter implements SupplierAdapter {
         },
       } satisfies CatalogueItem;
     });
+  }
+
+  /** The group's capabilities in BitoCard's names; empty when it has neither calls nor SMS (fax only, for example). */
+  private features(group: Resource<DidGroupAttributes>) {
+    const names = new Set((group.attributes.features ?? []).map(feature => featureAliases[feature]).filter(Boolean));
+    const list = capabilities.filter(feature => names.has(feature));
+    return list.includes('voice') || list.includes('sms') ? list : [];
   }
 
   /** The callback address for one order: it names our reference, which is how a lost order is found again. */

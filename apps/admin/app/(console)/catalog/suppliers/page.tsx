@@ -146,6 +146,11 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
         {syncState.data ? (
           <Notice tone="green">{`Synced: ${syncState.data.products_created} new products, ${syncState.data.offers_updated} offers updated, ${syncState.data.offers_withdrawn} withdrawn.`}</Notice>
         ) : null}
+        {syncState.data?.note ? (
+          <Notice tone="amber" title="Nothing came back">
+            {syncState.data.note}
+          </Notice>
+        ) : null}
         {syncState.error || updateState.error ? <Notice tone="red">{errorMessage(syncState.error ?? updateState.error)}</Notice> : null}
         {supplier.last_sync_error ? <Notice tone="amber" title="Last sync failed">{supplier.last_sync_error}</Notice> : null}
         {!supplier.configured ? <Notice tone="amber">No API credentials are configured, so it serves the sandbox only.</Notice> : null}
