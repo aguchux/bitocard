@@ -5,7 +5,8 @@ import type { ResolvedSection, StoreBrand, StoreCountry, StoreNavigationGroup } 
 import { brand as site } from "@bitocard/ui/site";
 import { BrandArt, ProductCard, ProductRow } from "./product-card";
 import { SearchForm } from "./layout";
-import { categoryTheme, groupIcon, groupInk, trustIcon } from "./theme";
+import { CategoryIcon, GroupIcon } from "./category-icon";
+import { categoryTheme, groupInk, trustIcon } from "./theme";
 
 // Literal class names, so Tailwind generates them.
 const lgSpan = { 3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 9: "lg:col-span-9", 12: "lg:col-span-12" } as const;
@@ -61,17 +62,14 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
           ) : null}
           {section.categoryChips && groups.length ? (
             <ul className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              {groups.map(group => {
-                const Icon = groupIcon[group.key] ?? Gift;
-                return (
-                  <li key={group.key}>
-                    <Link href={groupHref(group)} className="flex min-h-12 items-center gap-2 rounded-full border border-white/25 bg-white/5 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/10">
-                      <Icon className={`size-5 ${groupInk[group.key] ?? "text-pink-400"}`} aria-hidden="true" />
-                      {group.label}
-                    </Link>
-                  </li>
-                );
-              })}
+              {groups.map(group => (
+                <li key={group.key}>
+                  <Link href={groupHref(group)} className="flex min-h-12 items-center gap-2 rounded-full border border-white/25 bg-white/5 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/10">
+                    <GroupIcon group={group} className="size-6" ink={groupInk[group.key] ?? "text-pink-400"} />
+                    {group.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           ) : null}
         </div>
@@ -179,17 +177,11 @@ function CategoryGrid({ section }: { section: Extract<ResolvedSection, { type: "
       <ul className="grid grid-cols-2 gap-3 @2xl:grid-cols-3 @4xl:grid-cols-5 @6xl:grid-cols-9">
         {section.data.categories.map(category => {
           const theme = categoryTheme[category.category];
-          const Icon = theme.icon;
           return (
             <li key={category.category}>
               <Link href={`/catalogs/${category.category}`} className="flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <span className={`grid size-12 place-items-center overflow-hidden rounded-xl ${theme.tile} ${theme.ink}`}>
-                  {category.icon_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- icons uploaded by admins, served from the storage CDN
-                    <img src={category.icon_url} alt="" className="size-8 object-contain" loading="lazy" />
-                  ) : (
-                    <Icon className="size-6" aria-hidden="true" />
-                  )}
+                <span className={`grid size-12 place-items-center overflow-hidden rounded-xl ${theme.tile}`}>
+                  <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-8" />
                 </span>
                 <span>
                   <span className="font-display block font-bold text-[#070f4c]">{category.label}</span>

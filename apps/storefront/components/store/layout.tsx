@@ -49,10 +49,10 @@ export function SearchForm({ countries, q = "", country = "", size = "lg" }: { c
   const tall = size === "lg" ? "min-h-16" : "min-h-14";
   return (
     <form action="/search" method="get" role="search" className={`flex w-full flex-col gap-2 rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200 sm:flex-row sm:items-stretch sm:gap-0 ${tall}`}>
-      <label className="flex min-h-12 flex-1 items-center gap-3 px-3 sm:px-4">
+      <label className="flex min-h-12 flex-1 items-center gap-3 rounded-xl px-3 transition-colors focus-within:bg-slate-50 sm:px-4">
         <Search className="size-5 shrink-0 text-[#070f4c]" aria-hidden="true" />
         <span className="sr-only">Search</span>
-        <input name="q" type="search" defaultValue={q} placeholder="Find a product, brand or service" className="w-full min-w-0 bg-transparent text-base text-[#070f4c] outline-none placeholder:text-slate-400 sm:text-[17px]" />
+        <input name="q" type="search" autoComplete="off" defaultValue={q} placeholder="Find a product, brand or service" className="w-full min-w-0 bg-transparent text-base text-[#070f4c] outline-none placeholder:text-slate-400 sm:text-[17px]" />
       </label>
       <div className="flex items-stretch gap-1.5 border-t border-slate-100 pt-1.5 sm:border-t-0 sm:pt-0">
         <CountryPicker countries={countries} value={country} className="min-h-12 flex-1 sm:w-52 sm:flex-none sm:border-l sm:border-slate-200" />

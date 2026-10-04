@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Gift, X } from "lucide-react";
+import { X } from "lucide-react";
 import { productFeatureLabels, type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
 import { query, storeApi } from "@/lib/api";
 import { featureIcon, filterFeatures, isFeature } from "./features";
 import { ProductCard } from "./product-card";
-import { groupIcon } from "./theme";
+import { CategoryIcon, GroupIcon } from "./category-icon";
 
 /** Each menu group's icon chip on white (the hero's colours are for the navy background). */
 const groupChip: Record<string, string> = {
@@ -95,6 +95,7 @@ export function CatalogueView({
   active,
   page,
   result,
+  banner,
 }: {
   path: string;
   title: string;
@@ -103,6 +104,8 @@ export function CatalogueView({
   groups: StoreNavigationGroup[];
   countries: StoreCountry[];
   active?: string;
+  /** The category's banner (Storefront > Categories), shown above the title. */
+  banner?: string | null;
   page: number;
   result: Awaited<ReturnType<typeof loadCatalogue>>["result"];
 }) {
@@ -127,7 +130,6 @@ export function CatalogueView({
             Everything
           </Link>
           {groups.map(group => {
-            const Icon = groupIcon[group.key] ?? Gift;
             const href = `/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`;
             const current = path === `/catalogs/${group.key}`;
             return (
@@ -139,7 +141,7 @@ export function CatalogueView({
                   className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[15px] font-bold tracking-tight ${current ? "bg-pink-50 text-[#e0116d]" : "text-[#070f4c] hover:bg-slate-50"}`}
                 >
                   <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${groupChip[group.key] ?? "bg-pink-50 text-pink-600"}`}>
-                    <Icon className="size-[18px]" aria-hidden="true" />
+                    <GroupIcon group={group} className="size-[18px]" />
                   </span>
                   {group.label}
                 </Link>
@@ -152,7 +154,10 @@ export function CatalogueView({
                         aria-current={active === category.category ? "page" : undefined}
                         className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#070f4c]"}`}
                       >
-                        {category.label}
+                        <span className="flex min-w-0 items-center gap-2">
+                          <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-4" ink="text-slate-400" />
+                          {category.label}
+                        </span>
                         {category.on_sale ? (
                           <span className="text-xs text-slate-500">{category.products}</span>
                         ) : (
@@ -172,7 +177,7 @@ export function CatalogueView({
           {params.features ? <input type="hidden" name="features" value={params.features} /> : null}
           <label className="text-sm">
             <span className="mb-1 block font-semibold">Country</span>
-            <select name="country" defaultValue={params.country ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3">
+            <select name="country" defaultValue={params.country ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none">
               <option value="">All countries</option>
               <option value="global">Usable anywhere</option>
               {countries.map(item => (
@@ -184,7 +189,7 @@ export function CatalogueView({
           </label>
           <label className="text-sm">
             <span className="mb-1 block font-semibold">Sort by</span>
-            <select name="sort" defaultValue={params.sort ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3">
+            <select name="sort" defaultValue={params.sort ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none">
               <option value="">Most popular</option>
               <option value="name">Name</option>
               <option value="new">Newest</option>
@@ -197,11 +202,18 @@ export function CatalogueView({
       </aside>
 
       <div className="min-w-0">
+        {banner ? (
+          <div className="mb-5 aspect-[12/5] overflow-hidden rounded-2xl bg-slate-100 shadow-sm sm:aspect-[4/1]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- banners uploaded by admins, served from the storage CDN */}
+            <img src={banner} alt="" className="size-full object-cover" />
+          </div>
+        ) : null}
         <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-1 text-slate-500">{description}</p>
         <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">
           {groups.map(group => (
-            <Link key={group.key} href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700">
+            <Link key={group.key} href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700">
+              <GroupIcon group={group} className="size-4" ink="text-[#e0116d]" />
               {group.label}
             </Link>
           ))}

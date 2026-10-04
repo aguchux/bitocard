@@ -36,6 +36,7 @@ export default async function CataloguePage({ params, searchParams }: { params: 
       groups={groups}
       countries={countries}
       active={found.active}
+      banner={(isCategory(slug) ? groups.flatMap(group => group.categories).filter(category => category.category === slug) : (groups.find(group => group.key === slug)?.categories ?? [])).find(category => category.image_url)?.image_url ?? null}
       page={page}
       result={result}
     />

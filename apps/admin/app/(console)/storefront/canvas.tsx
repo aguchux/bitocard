@@ -140,7 +140,7 @@ function SectionCard({
               value={section.span[spanBreakpoint]}
               disabled={!editable}
               onChange={event => actions.setSpan(section.id, spanBreakpoint, Number(event.target.value))}
-              className="h-8 cursor-pointer rounded-md border border-line bg-white px-1.5 text-xs font-semibold text-ink disabled:cursor-not-allowed disabled:bg-canvas"
+              className="h-8 cursor-pointer rounded-md border border-line bg-white px-1.5 text-xs font-semibold text-ink focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none disabled:cursor-not-allowed disabled:bg-canvas"
             >
               {(spanBreakpoint === "lg" ? lgSpans : mdSpans).map(value => (
                 <option key={value} value={value}>

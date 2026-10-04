@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Menu, Store, X } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
+import { CategoryIcon, GroupIcon } from "./category-icon";
 
 const catalogueHref = (group: StoreNavigationGroup) => (group.categories.length === 1 ? `/catalogs/${group.categories[0].category}` : `/catalogs/${group.key}`);
 
@@ -45,8 +46,11 @@ function NavGroup({ group }: { group: StoreNavigationGroup }) {
           <ul className="space-y-1">
             {group.categories.map(category => (
               <li key={category.category}>
-                <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
-                  {category.label}
+                <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-5" />
+                    {category.label}
+                  </span>
                   {category.on_sale ? (
                     <span className="text-xs font-normal text-slate-500">{category.products}</span>
                   ) : (
@@ -123,15 +127,19 @@ export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                 <nav aria-label="Categories" className="mt-2 space-y-4">
                   {groups.map(group => (
                     <div key={group.key}>
-                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display block text-lg font-bold text-[#070f4c]">
+                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex items-center gap-2.5 text-lg font-bold text-[#070f4c]">
+                        <GroupIcon group={group} className="size-6" ink="text-[#e0116d]" />
                         {group.label}
                       </Link>
                       {group.categories.length > 1 || !group.on_sale ? (
                         <ul className="mt-1">
                           {group.categories.map(category => (
                             <li key={category.category}>
-                              <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center justify-between gap-3 text-slate-600">
-                                {category.label}
+                              <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center justify-between gap-3 pl-8 text-slate-600">
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-4" ink="text-slate-400" />
+                                  {category.label}
+                                </span>
                                 {category.on_sale ? null : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>}
                               </Link>
                             </li>

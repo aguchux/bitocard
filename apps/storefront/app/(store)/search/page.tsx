@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { StoreSearch } from "@bitocard/api-client/storefront";
 import { SearchForm } from "@/components/store/layout";
 import { BrandArt, ProductCard } from "@/components/store/product-card";
-import { categoryTheme } from "@/components/store/theme";
+import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
 import { query, storeApi } from "@/lib/api";
 import { storeNavigation } from "@/lib/navigation";
 
@@ -17,8 +17,9 @@ export default async function Search({ searchParams }: { searchParams: Promise<R
   const q = one(search.q).trim().slice(0, 100);
   const country = one(search.country).toLowerCase();
   const validCountry = /^([a-z]{2}|global)$/.test(country) ? country : "";
-  const [{ countries }, result] = await Promise.all([storeNavigation(), q ? storeApi<StoreSearch>(`/v1/store/search${query({ q, country: validCountry, limit: 36 })}`) : null]);
+  const [{ countries, groups }, result] = await Promise.all([storeNavigation(), q ? storeApi<StoreSearch>(`/v1/store/search${query({ q, country: validCountry, limit: 36 })}`) : null]);
   const data = result?.ok ? result.data : null;
+  const art = categoryArt(groups);
   const found = data ? data.products.length + data.brands.length + data.categories.length + data.countries.length : 0;
 
   return (
@@ -45,12 +46,10 @@ export default async function Search({ searchParams }: { searchParams: Promise<R
             <section aria-label="Categories and countries">
               <ul className="flex flex-wrap gap-2">
                 {data.categories.map(category => {
-                  const theme = categoryTheme[category.category];
-                  const Icon = theme.icon;
                   return (
                     <li key={category.category}>
                       <Link href={`/catalogs/${category.category}`} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 font-semibold hover:border-slate-300">
-                        <Icon className={`size-5 ${theme.ink}`} aria-hidden="true" />
+                        <CategoryIcon category={category.category} iconUrl={art.get(category.category)?.icon} className="size-5" />
                         {category.label}
                         <span className="text-sm font-normal text-slate-500">{category.products}</span>
                       </Link>

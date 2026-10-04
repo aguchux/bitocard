@@ -5,7 +5,9 @@ import { ChevronRight, Info } from "lucide-react";
 import { formatFace, type StoreProductDetail } from "@bitocard/api-client/storefront";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
 import { FeatureIcons } from "@/components/store/features";
+import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
 import { categoryTheme } from "@/components/store/theme";
+import { storeNavigation } from "@/lib/navigation";
 import { storeApi } from "@/lib/api";
 
 export const revalidate = 60;
@@ -37,7 +39,7 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
   if (!result.ok) notFound();
   const product = result.data;
   const theme = categoryTheme[product.category];
-  const Icon = theme.icon;
+  const art = categoryArt((await storeNavigation()).groups);
   const values = product.denominations ?? [];
 
   return (
@@ -68,7 +70,7 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
         </div>
         <div>
           <p className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${theme.tile} ${theme.ink}`}>
-            <Icon className="size-4" aria-hidden="true" />
+            <CategoryIcon category={product.category} iconUrl={art.get(product.category)?.icon} className="size-4" />
             {product.category_label}
             {product.global ? " · Usable anywhere" : ` · ${product.country_name}`}
           </p>
