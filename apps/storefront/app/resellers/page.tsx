@@ -4,6 +4,7 @@ import { legalDocuments } from "@bitocard/ui/legal";
 import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { InfoDialog } from "@/components/info-dialog";
+import { ResellerFeatures } from "@/components/reseller-features";
 import { StorefrontPreview } from "@/components/storefront-preview";
 import "./resellers.css";
 
@@ -42,7 +43,10 @@ function ForResellers() {
   );
 }
 
-/** The reseller landing page: what BitoCard offers resellers, before they register in SHQ. */
+/**
+ * The reseller landing page: what BitoCard offers resellers, before they register in SHQ. The first screen fits the
+ * viewport (headline, Register, the illustrative store); every feature follows below, each with its own Register.
+ */
 export default function Resellers() {
   const signup = appUrl("shq", "/signup");
   return (
@@ -56,41 +60,62 @@ export default function Resellers() {
           ],
         }}
       />
-      <header className="site-header">
-        <BrandLockup tagline="Digital store in 5 minutes" />
-        <nav aria-label="Resellers">
-          <InfoDialog id="nav-how" title="How it works" variant="nav">
-            <HowItWorks />
-          </InfoDialog>
-          <a className="button button-nav" href={appUrl("shq", "/signin")}>
-            Sign in
-          </a>
-        </nav>
-      </header>
-      <main>
-        <section className="hero-copy" aria-labelledby="headline">
-          <p className="status">For resellers</p>
-          <h1 id="headline">
-            Your digital store.
-            <br />
-            <span>Ready in minutes.</span>
-          </h1>
-          <p className="lead">Launch your branded storefront for gift cards, airtime and data. BitoCard handles the products and fulfilment.</p>
-          <div className="actions">
-            <a className="button button-primary" href={signup}>
-              Register<span aria-hidden="true"> →</span>
-            </a>
-            <InfoDialog id="how-it-works" title="How it works" label="See how it works">
+      <div className="first-screen">
+        <header className="site-header">
+          <BrandLockup tagline="Digital store in 5 minutes" />
+          <nav aria-label="Resellers">
+            <InfoDialog id="nav-how" title="How it works" variant="nav">
               <HowItWorks />
             </InfoDialog>
-            <InfoDialog id="for-resellers" title="For resellers">
-              <ForResellers />
-            </InfoDialog>
-          </div>
-          <p className="setup-note">Five-minute store setup is our goal. Verification and funding may take longer.</p>
-        </section>
-        <StorefrontPreview />
-      </main>
+            <a className="button button-nav" href="#features-title">
+              Features
+            </a>
+            <a className="button button-nav" href={appUrl("shq", "/signin")}>
+              Sign in
+            </a>
+          </nav>
+        </header>
+        <main>
+          <section className="hero-copy" aria-labelledby="headline">
+            <p className="status">For resellers</p>
+            <h1 id="headline">
+              Your digital store.
+              <br />
+              <span>Ready in minutes.</span>
+            </h1>
+            <p className="lead">Launch your branded storefront for gift cards, airtime and data. BitoCard handles the products and fulfilment.</p>
+            <div className="actions">
+              <a className="button button-primary" href={signup}>
+                Register<span aria-hidden="true"> →</span>
+              </a>
+              <InfoDialog id="how-it-works" title="How it works" label="See how it works">
+                <HowItWorks />
+              </InfoDialog>
+              <InfoDialog id="for-resellers" title="For resellers">
+                <ForResellers />
+              </InfoDialog>
+            </div>
+            <p className="setup-note">Five-minute store setup is our goal. Verification and funding may take longer.</p>
+          </section>
+          <StorefrontPreview />
+        </main>
+        <a className="scroll-hint" href="#features-title">
+          See every feature<span aria-hidden="true"> ↓</span>
+        </a>
+      </div>
+      <ResellerFeatures signup={signup} />
+      <section className="final-cta" aria-labelledby="final-cta-title">
+        <h2 id="final-cta-title">Ready to open your store?</h2>
+        <p>Register in SHQ, pass the identity check and set up your store. Registration is open to resellers based in Nigeria, Ghana and Kenya.</p>
+        <div className="actions">
+          <a className="button button-primary" href={signup}>
+            Register<span aria-hidden="true"> →</span>
+          </a>
+          <a className="button button-light" href={appUrl("shq", "/signin")}>
+            Sign in
+          </a>
+        </div>
+      </section>
       <footer className="home-footer">
         <span>{brand.credit}</span>
         <nav aria-label="Legal">

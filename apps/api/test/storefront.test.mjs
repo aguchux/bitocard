@@ -138,8 +138,13 @@ describe('search', () => {
 });
 
 describe('the Storefront Manager', () => {
-  test('the home page is offline until published; the draft starts from the approved layout', async () => {
-    assert.deepEqual([(await visitor.get('/v1/store/home')).status, (await visitor.get('/v1/store/home')).json.error.code], [404, 'storefront_not_published']);
+  test('until a layout is published the store shows the approved default; the draft starts from it', async () => {
+    const shown = await visitor.get('/v1/store/home');
+    assert.equal(shown.status, 200, JSON.stringify(shown.json));
+    assert.deepEqual([shown.json.published, shown.json.version], [false, null]);
+    assert.deepEqual(shown.json.sections.slice(0, 4).map(item => item.type), ['hero', 'product_rail', 'promo', 'promo']);
+    assert.ok(shown.json.sections.find(item => item.type === 'product_rail').data.products.length > 0, 'filled with what is on sale');
+    noSuppliers(shown.json);
     const page = (await admin.get('/v1/admin/storefront/home')).json;
     assert.deepEqual([page.live, page.version, page.unpublished_changes], [false, 0, true]);
     assert.deepEqual(page.draft.slice(0, 4).map(item => item.type), ['hero', 'product_rail', 'promo', 'promo']);
@@ -172,7 +177,7 @@ describe('the Storefront Manager', () => {
     ];
     const saved = await admin.put('/v1/admin/storefront/home/draft', { sections: draft });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
-    assert.equal((await visitor.get('/v1/store/home')).status, 404, 'saving does not publish');
+    assert.equal((await visitor.get('/v1/store/home')).json.published, false, 'saving does not publish');
 
     const { token } = (await admin.post('/v1/admin/storefront/home/preview')).json;
     const preview = await visitor.get(`/v1/store/home?preview=${encodeURIComponent(token)}`);
@@ -193,7 +198,7 @@ describe('the Storefront Manager', () => {
 
     const home = await visitor.get('/v1/store/home');
     assert.equal(home.status, 200);
-    assert.deepEqual([home.json.version, home.json.preview], [1, false]);
+    assert.deepEqual([home.json.version, home.json.preview, home.json.published], [1, false, true]);
     const types = home.json.sections.map(item => item.type);
     assert.ok(types.includes('hero') && types.includes('category_grid') && types.includes('brand_grid') && !types.includes('trust_bar'));
     const trending = home.json.sections.find(item => item.type === 'product_rail' && item.source === 'trending');
@@ -211,7 +216,8 @@ describe('the Storefront Manager', () => {
 
     const offline = await admin.post('/v1/admin/storefront/home/unpublish');
     assert.equal(offline.json.live, false);
-    assert.equal((await visitor.get('/v1/store/home')).status, 404);
+    const fallback = await visitor.get('/v1/store/home');
+    assert.deepEqual([fallback.status, fallback.json.published, fallback.json.sections[0].type], [200, false, 'hero'], 'taken offline: back to the default layout, never a redirect');
     assert.equal((await admin.post('/v1/admin/storefront/home/unpublish')).json.error.code, 'storefront_not_published');
     await admin.post('/v1/admin/storefront/home/publish');
     const reseller = await resellerClient(server);

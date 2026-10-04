@@ -86,9 +86,11 @@ test('the public storefront catalogue answers, and never names suppliers', async
   const products = await get('/v1/store/products?limit=5');
   assert.equal(products.status, 200);
   assert.ok(!/reloadly|vtpass|didww/i.test(await products.text()));
-  // The home page is either published (200) or not yet (404 storefront_not_published); never an error.
+  // The home page always renders: the published layout, or the approved default until one is published.
   const home = await get('/v1/store/home');
-  assert.ok([200, 404].includes(home.status), `home ${home.status}`);
-  if (home.status === 404) assert.equal((await home.json()).error.code, 'storefront_not_published');
+  assert.equal(home.status, 200, `home ${home.status}`);
+  const homeBody = await home.json();
+  assert.ok(Array.isArray(homeBody.sections) && homeBody.sections.length > 0, 'home has sections');
+  assert.equal(typeof homeBody.published, 'boolean');
   assert.equal((await get('/v1/admin/storefront/home')).status, 401, 'the Storefront Manager needs an admin');
 });

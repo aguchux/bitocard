@@ -6,7 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Brand, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
-import { categoryLabels, categorySynonyms, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
+import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
 
 const homeKey = 'home';
 const previewLifetimeMs = 30 * 60_000;
@@ -443,23 +443,24 @@ export class StorefrontService {
 
   /**
    * The published home page, ready to render: its sections filled in, the menu and the countries on sale. With a
-   * valid preview token (from the Storefront Manager), the draft instead. Unpublished (and no preview): not found,
-   * and the site shows its reseller landing page.
+   * valid preview token (from the Storefront Manager), the draft instead. Until a layout is published (or after it is
+   * taken offline), the approved default layout (`defaultHome()`), so bitocard.com is always the store.
    */
   async home(previewToken?: string) {
     const page = await this.prisma.storefrontPage.findUnique({ where: { key: homeKey } });
     const preview = previewToken ? this.verifyPreview(previewToken) : false;
     if (previewToken && !preview) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'preview_expired', 'This preview link has expired. Open a new one from the Storefront Manager.');
-    const source = preview ? page?.draft : page?.published;
-    if (!page || !source) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'storefront_not_published', 'The storefront is not published yet.');
-    const parsed = sectionsSchema.safeParse(source);
-    if (!parsed.success) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'storefront_not_published', 'The storefront is not published yet.');
-    const [sections, navigation, countries] = await Promise.all([this.resolve(parsed.data), this.navigation(), this.countries()]);
+    const parsed = sectionsSchema.safeParse(preview ? page?.draft : page?.published);
+    const published = !preview && parsed.success && Boolean(page?.published);
+    const layout = parsed.success && (preview || published) ? parsed.data : defaultHome();
+    const [sections, navigation, countries] = await Promise.all([this.resolve(layout), this.navigation(), this.countries()]);
     return {
       object: 'store_home' as const,
       preview,
-      version: preview ? null : page.version,
-      published_at: preview ? null : (page.publishedAt?.toISOString() ?? null),
+      /** False while the default layout is shown (nothing published yet, or taken offline). */
+      published,
+      version: published ? page!.version : null,
+      published_at: published ? (page!.publishedAt?.toISOString() ?? null) : null,
       sections,
       navigation,
       countries,

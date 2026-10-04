@@ -129,6 +129,8 @@ export type ResolvedSection =
 export type StoreHome = {
   object: 'store_home';
   preview: boolean;
+  /** False while the default layout is shown: nothing is published yet, or the page was taken offline. */
+  published: boolean;
   version: number | null;
   published_at: string | null;
   sections: ResolvedSection[];

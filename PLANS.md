@@ -353,7 +353,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
   - The API checks every file before it can be used: really an image of the declared type and size; SVG from admins only, and only plain drawings.
   - A media library lists every file, where it is used and who uploaded it. Files can be reused; a file in use cannot be deleted.
   - Resellers only ever see their own files.
-- Until checkout exists (M10b) the store shows face values only, and nothing can be bought. Until a home page is published, bitocard.com shows the reseller landing page.
+- Until checkout exists (M10b) the store shows face values only, and nothing can be bought. bitocard.com is always the store: until admins publish a home page, it shows the approved default layout. The reseller landing page (`/resellers`) is where resellers learn about BitoCard before registering: a first screen with Register, then every feature in alternating rows, each with a sign-up button.
 - The reseller landing page is bitocard.com/resellers: what BitoCard offers resellers, with Register leading to SHQ sign-up. "Open a reseller store" throughout the store leads there first.
 
 - Hosted storefront per reseller: its own tenant with branding, products, customer-facing prices, customers, orders and reports. **Decided**
