@@ -1053,6 +1053,8 @@ model Product {
   redeemInstructions String?           @map("redeem_instructions")
   /// From the supplier's catalogue (refreshed on every sync).
   logoUrl            String?           @map("logo_url")
+  /// What the product can do (`src/catalogue/features.ts`), for example sms_in or app_codes on a virtual number.
+  features           String[]          @default([])
   /// Set by an admin (an uploaded image or an https address); shown instead of the supplier's logo. Never synced over.
   imageUrl           String?           @map("image_url")
   /// Admin switch; inactive products are hidden and cannot be quoted.

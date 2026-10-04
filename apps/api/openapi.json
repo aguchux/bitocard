@@ -3688,6 +3688,18 @@
             }
           },
           {
+            "name": "features",
+            "required": false,
+            "in": "query",
+            "description": "Products that can do all of these, separated by commas: calls_in, calls_out, sms_in, sms_out, sms_people, app_codes, emergency, caller_name. For example virtual numbers that receive SMS and app codes.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
             "name": "limit",
             "required": false,
             "in": "query",

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Gift, X } from "lucide-react";
-import type { StoreCountry, StoreList, StoreNavigationGroup, StoreProduct } from "@bitocard/api-client/storefront";
+import { productFeatureLabels, type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
 import { query, storeApi } from "@/lib/api";
+import { featureIcon, filterFeatures, isFeature } from "./features";
 import { ProductCard } from "./product-card";
 import { groupIcon } from "./theme";
 
@@ -17,7 +18,8 @@ const groupChip: Record<string, string> = {
 
 export const pageSize = 24;
 
-export type CatalogueParams = { country?: string; brand?: string; tag?: string; sort?: string; page?: string };
+/** `features`: comma-separated product features every product must have (numbers that receive SMS, for example). */
+export type CatalogueParams = { country?: string; brand?: string; tag?: string; sort?: string; features?: string; page?: string };
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -26,11 +28,16 @@ export function readParams(search: Record<string, string | string[] | undefined>
   const country = one(search.country)?.toLowerCase();
   const sort = one(search.sort);
   const page = one(search.page);
+  const features = (one(search.features) ?? "")
+    .split(",")
+    .map(item => item.trim().toLowerCase())
+    .filter(isFeature);
   return {
     country: country && /^([a-z]{2}|global)$/.test(country) ? country : undefined,
     brand: one(search.brand)?.slice(0, 80) || undefined,
     tag: one(search.tag)?.toLowerCase().slice(0, 40) || undefined,
     sort: sort === "name" || sort === "new" ? sort : undefined,
+    features: features.length ? [...new Set(features)].join(",") : undefined,
     page: page && /^\d{1,3}$/.test(page) && Number(page) > 1 ? page : undefined,
   };
 }
@@ -39,7 +46,7 @@ export function readParams(search: Record<string, string | string[] | undefined>
 export async function loadCatalogue(base: { category?: string; group?: string }, params: CatalogueParams) {
   const page = Number(params.page ?? 1);
   const result = await storeApi<StoreList<StoreProduct>>(
-    `/v1/store/products${query({ ...base, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, limit: pageSize, offset: (page - 1) * pageSize })}`,
+    `/v1/store/products${query({ ...base, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, features: params.features, limit: pageSize, offset: (page - 1) * pageSize })}`,
   );
   return { page, result };
 }
@@ -48,6 +55,34 @@ export async function loadCatalogue(base: { category?: string; group?: string },
 export function hrefWith(path: string, params: CatalogueParams, change: Partial<CatalogueParams>) {
   const next = { ...params, page: undefined, ...change };
   return `${path}${query(next)}`;
+}
+
+/** Number filters: each chip switches one feature on or off (products must have every chosen feature). */
+function FeatureFilters({ path, params }: { path: string; params: CatalogueParams }) {
+  const chosen = new Set((params.features ?? "").split(",").filter(Boolean));
+  return (
+    <ul aria-label="Filter by what it can do" className="mt-4 flex flex-wrap gap-2">
+      {filterFeatures.map(feature => {
+        const Icon = featureIcon[feature];
+        const on = chosen.has(feature);
+        const next = new Set(chosen);
+        if (on) next.delete(feature);
+        else next.add(feature);
+        return (
+          <li key={feature}>
+            <Link
+              href={hrefWith(path, params, { features: next.size ? [...next].join(",") : undefined })}
+              aria-current={on ? "true" : undefined}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition ${on ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-[#070f4c]"}`}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+              {productFeatureLabels[feature]}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export function CatalogueView({
@@ -134,6 +169,7 @@ export function CatalogueView({
         <form method="get" action={path} className="mt-0 grid grid-cols-2 gap-2 lg:mt-6 lg:grid-cols-1">
           {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
           {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
+          {params.features ? <input type="hidden" name="features" value={params.features} /> : null}
           <label className="text-sm">
             <span className="mb-1 block font-semibold">Country</span>
             <select name="country" defaultValue={params.country ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3">
@@ -170,6 +206,9 @@ export function CatalogueView({
             </Link>
           ))}
         </div>
+        {path === "/catalogs/virtual_numbers" || params.features ? (
+          <FeatureFilters path={path} params={params} />
+        ) : null}
         {chips.length ? (
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Active filters">
             {chips.map(chip => (

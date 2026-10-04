@@ -86,7 +86,8 @@ describe('DIDWW catalogue', () => {
       ],
     );
     assert.equal(products[0].name, 'United Kingdom local number, London');
-    assert.match(products[0].description, /incoming calls, incoming SMS/);
+    assert.match(products[0].description, /with incoming calls, incoming SMS, SMS from people, SMS codes from apps and services\./);
+    assert.deepEqual(products[0].features, ['calls_in', 'sms_in', 'sms_people', 'app_codes'], 'what the number can do, in BitoCard names');
     assert.deepEqual(products[0].supplierProducts[0].meta, {
       didGroupId: 'grp-london',
       skuId: 'sku-london-0',
@@ -99,14 +100,14 @@ describe('DIDWW catalogue', () => {
     });
     const groupsCall = didww.calls.find(call => call.url.startsWith('/did_groups'));
     assert.match(decodeURIComponent(groupsCall.url), /filter\[needs_registration\]=false/);
-    assert.equal(groupsCall.headers['x-didww-api-version'], '2022-05-10');
+    assert.equal(groupsCall.headers['x-didww-api-version'], '2026-04-16');
   });
 
-  test('newer feature names (voice_in, sms_in) are read too; a fetch says what it found and left out', async () => {
+  test('older feature names (voice, sms) are read too; a fetch says what it found and left out', async () => {
     const { DidwwAdapter } = await import('../dist/suppliers/didww.adapter.js');
     const adapter = new DidwwAdapter({ apiKey: 'didww-key', baseUrl: didww.url, countries: ['GB', 'ZZ'], callbackBase });
     const original = didww.state.groups;
-    didww.state.groups = original.map(group => ({ ...group, attributes: { ...group.attributes, features: group.attributes.features.map(feature => ({ voice: 'voice_in', sms: 'sms_in' })[feature] ?? feature) } }));
+    didww.state.groups = original.map(group => ({ ...group, attributes: { ...group.attributes, features: group.attributes.features.map(feature => ({ voice_in: 'voice', sms_in: 'sms' })[feature] ?? feature) } }));
     try {
       const items = await adapter.catalogue({ category: 'virtual_numbers', country: null });
       assert.deepEqual(items.map(item => item.productKey).sort(), [londonKey, 'virtual_numbers:GB:local:london-voice-sms-2ch']);
@@ -131,6 +132,50 @@ describe('DIDWW catalogue', () => {
       didww.state.groups = original;
       assert.equal((await admin.post('/v1/admin/suppliers/didww/sync')).json.note, null);
     }
+  });
+
+  test('a large catalogue syncs in batches: thousands of numbers, and a second sync writes only what changed', async () => {
+    const original = didww.state.groups;
+    const london = original.find(group => group.id === 'grp-london');
+    const many = Array.from({ length: 1500 }, (_, i) => ({
+      ...london,
+      id: `grp-bulk-${i}`,
+      attributes: { ...london.attributes, area_name: `Area ${i}` },
+      skus: london.skus.map(sku => ({ ...sku, id: `${sku.id}-${i}` })),
+    }));
+    didww.state.groups = [...original, ...many];
+    try {
+      const started = Date.now();
+      const first = await admin.post('/v1/admin/suppliers/didww/sync');
+      assert.equal(first.status, 200, JSON.stringify(first.json));
+      assert.equal(first.json.products_created, 3000, 'two plans per area');
+      const offer = await prisma.supplierProduct.findFirstOrThrow({ where: { supplierCode: 'didww', sku: 'grp-bulk-7:sku-london-0-7' } });
+      await prisma.supplierProduct.update({ where: { id: offer.id }, data: { discountBps: 250, priority: 5 } });
+      const second = await admin.post('/v1/admin/suppliers/didww/sync');
+      assert.deepEqual([second.json.products_created, second.json.offers_updated, second.json.offers_withdrawn], [0, 3002, 0]);
+      const kept = await prisma.supplierProduct.findUniqueOrThrow({ where: { id: offer.id } });
+      assert.deepEqual([kept.discountBps, kept.priority, kept.available], [250, 5, true], 'admin settings are kept');
+      assert.ok(kept.syncedAt > offer.syncedAt, 'seen again');
+      assert.ok(Date.now() - started < 60_000, `two syncs of 3,000 numbers took ${Date.now() - started} ms`);
+    } finally {
+      didww.state.groups = original;
+      await admin.post('/v1/admin/suppliers/didww/sync');
+    }
+    assert.equal(await prisma.supplierProduct.count({ where: { supplierCode: 'didww', available: true } }), 2, 'numbers DIDWW no longer lists are withdrawn');
+  });
+
+  test('the store shows what each number can do and filters by it', async () => {
+    const visitor = (await import('./helpers.mjs')).client(server.base);
+    const all = await visitor.get('/v1/store/products?category=virtual_numbers&limit=60');
+    assert.equal(all.status, 200, JSON.stringify(all.json));
+    const london = all.json.data.find(product => product.key === londonKey);
+    assert.deepEqual(london.features, ['calls_in', 'sms_in', 'sms_people', 'app_codes']);
+    const codes = await visitor.get('/v1/store/products?category=virtual_numbers&features=sms_in,app_codes');
+    assert.ok(codes.json.data.length > 0 && codes.json.data.every(product => product.features.includes('app_codes') && product.features.includes('sms_in')));
+    assert.equal((await visitor.get('/v1/store/products?category=virtual_numbers&features=caller_name')).json.data.length, 0, 'none shows the caller name');
+    const wrong = await visitor.get('/v1/store/products?features=whatsapp');
+    assert.deepEqual([wrong.status, wrong.json.error.param], [400, 'features']);
+    assert.ok(!JSON.stringify(all.json).match(/didww|a2p|p2p/i), 'never the supplier or its names for features');
   });
 
   test('numbers are sold in every market: a Nigerian reseller sees UK numbers, priced in naira, without the supplier', async () => {

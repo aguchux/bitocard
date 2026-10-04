@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronRight, Info } from "lucide-react";
 import { formatFace, type StoreProductDetail } from "@bitocard/api-client/storefront";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
+import { FeatureIcons } from "@/components/store/features";
 import { categoryTheme } from "@/components/store/theme";
 import { storeApi } from "@/lib/api";
 
@@ -77,6 +78,19 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
             {product.brand.company ? ` · ${product.brand.company}` : ""}
           </p>
           {product.description ? <p className="mt-4 text-lg text-slate-700">{product.description}</p> : null}
+          {product.features?.length ? (
+            <section aria-labelledby="features" className="mt-6">
+              <h2 id="features" className="font-display text-lg font-bold">
+                What this {product.category === "virtual_numbers" ? "number" : "product"} can do
+              </h2>
+              <div className="mt-3">
+                <FeatureIcons features={product.features} />
+              </div>
+              {product.features.includes("app_codes") ? (
+                <p className="mt-3 text-sm text-slate-500">Receives SMS codes from apps and services. Some apps do not accept virtual numbers, so check before you rely on one.</p>
+              ) : null}
+            </section>
+          ) : null}
 
           <section aria-labelledby="values-heading" className="mt-6">
             <h2 id="values-heading" className="font-semibold">

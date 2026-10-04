@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
-import { Badge, Button, Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
+import { RefreshCw, Search } from "lucide-react";
+import { Badge, Button, Card, CardHeader, categoryName, EmptyState, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, Input, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type ProductCategory, type Supplier, useCountriesQuery, useSetSupplierMarketMutation, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
 import { healthOf } from "../supplier-health";
 
 type Filter = "live" | "all";
+
+/** Words a supplier is found by: name, code, categories, coverage and notes. */
+const searchText = (supplier: Supplier) => [supplier.name, supplier.code, supplier.coverage, supplier.notes ?? "", ...supplier.categories.map(categoryName)].join(" ").toLowerCase();
 
 /** The supplier's logo, for the admin app (and SHQ where resellers can connect it). Never shown to customers. */
 function SupplierLogo({ supplier, editable }: { supplier: Supplier; editable: boolean }) {
@@ -175,26 +178,44 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
 export default function SuppliersPage() {
   const { data, error, isLoading, refetch } = useSuppliersQuery();
   const [filter, setFilter] = useState<Filter>("live");
-  const suppliers = data?.data.filter(supplier => filter === "all" || supplier.enabled || supplier.status === "mvp_live");
+  const [search, setSearch] = useState("");
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  // A search looks through the whole registry, whichever tab is open.
+  const suppliers = data?.data.filter(supplier => (words.length ? words.every(word => searchText(supplier).includes(word)) : filter === "all" || supplier.enabled || supplier.status === "mvp_live"));
 
   return (
     <AdminShell section="catalog" current="/catalog/suppliers" crumbs={[{ label: "Catalog", href: "/catalog" }, { label: "Suppliers" }]}>
       <PageHeader title="Suppliers" description="Every supplier in the registry, its funding profile, and whether BitoCard uses it. Which suppliers are live is configuration, not code." />
-      <Tabs
-        label="Show"
-        value={filter}
-        onChange={setFilter}
-        items={[
-          { value: "live", label: "In use" },
-          { value: "all", label: "Whole registry", count: data?.data.length },
-        ]}
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 sm:flex-1">
+          <Tabs
+            label="Show"
+            value={filter}
+            onChange={setFilter}
+            items={[
+              { value: "live", label: "In use" },
+              { value: "all", label: "Whole registry", count: data?.data.length },
+            ]}
+          />
+        </div>
+        <label className="relative flex items-center sm:w-80">
+          <span className="sr-only">Search suppliers</span>
+          <Search className="pointer-events-none absolute left-4 size-4 text-subtle" aria-hidden />
+          <Input type="search" placeholder="Search name, category, country…" value={search} onChange={event => setSearch(event.target.value)} className="min-h-11 rounded-2xl pl-11" />
+        </label>
+      </div>
       {error ? (
         <Card>
           <ErrorState message={errorMessage(error)} onRetry={refetch} />
         </Card>
       ) : isLoading || !suppliers ? (
         <Skeleton className="h-64 w-full" />
+      ) : suppliers.length === 0 ? (
+        <Card>
+          <EmptyState title={words.length ? "No supplier matches" : "No suppliers in use yet"} icon={<Search className="size-6" aria-hidden />}>
+            {words.length ? "Try a supplier's name, a category such as eSIMs, or a country." : "Switch suppliers on from the whole registry."}
+          </EmptyState>
+        </Card>
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
           {suppliers.map(supplier => (

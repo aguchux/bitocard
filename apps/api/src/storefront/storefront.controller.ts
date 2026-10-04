@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsHexColor, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsHexColor, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
+import { productFeatureKeys } from '../catalogue/features.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
 import { categoryLabels, navigationGroups } from './layout.js';
 import { StorefrontAdminService } from './storefront-admin.service.js';
@@ -62,6 +63,17 @@ class StoreProductsQueryDto {
   @IsOptional()
   @IsIn(['popular', 'name', 'new'])
   sort?: 'popular' | 'name' | 'new';
+
+  @ApiPropertyOptional({
+    description: `Products that can do all of these, separated by commas: ${productFeatureKeys.join(', ')}. For example virtual numbers that receive SMS and app codes.`,
+    example: 'sms_in,app_codes',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.split(',').map(item => item.trim().toLowerCase()).filter(Boolean) : value))
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsIn(productFeatureKeys, { each: true, message: `features must be from: ${productFeatureKeys.join(', ')}` })
+  features?: string[];
 
   @ApiPropertyOptional({ minimum: 1, maximum: 60, default: 24 })
   @IsOptional()

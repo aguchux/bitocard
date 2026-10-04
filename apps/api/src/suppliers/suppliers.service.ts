@@ -2,12 +2,96 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
+import { Prisma, type Product, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
 import { worldwideCategories } from '../catalogue/pricing.service.js';
 import type { CatalogueItem, CatalogueScope } from './adapter.js';
 import { SupplierAdapters } from './supplier-adapters.js';
 
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
+
+/** Rows per batch when saving a catalogue: well under Postgres's parameter limit, few round trips. */
+const batchSize = 500;
+
+export function chunks<T>(list: T[], size: number) {
+  const out: T[][] = [];
+  for (let at = 0; at < list.length; at += size) out.push(list.slice(at, at + size));
+  return out;
+}
+
+/** JSON with sorted keys, so a stored value (Postgres reorders jsonb keys) compares equal to the same value. */
+const stableJson = (value: unknown): string =>
+  value === null || typeof value !== 'object'
+    ? JSON.stringify(value ?? null)
+    : Array.isArray(value)
+      ? `[${value.map(stableJson).join(',')}]`
+      : `{${Object.keys(value)
+          .sort()
+          .map(key => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`)
+          .join(',')}}`;
+
+/** A product's details from a catalogue item. */
+export function productData(item: CatalogueItem) {
+  return {
+    category: item.category,
+    country: item.country,
+    brand: item.brand,
+    name: item.name,
+    faceCurrency: item.faceCurrency,
+    denominationType: item.denominationType,
+    fixedValues: item.fixedValues,
+    minValueMinor: item.minValue ?? null,
+    maxValueMinor: item.maxValue ?? null,
+    recipientType: item.recipientType,
+    description: item.description ?? null,
+    redeemInstructions: item.redeemInstructions ?? null,
+    logoUrl: item.logoUrl ?? null,
+    features: item.features ?? [],
+  };
+}
+
+function productChanged(product: Product, data: ReturnType<typeof productData>) {
+  return (
+    product.category !== data.category ||
+    product.country !== data.country ||
+    product.brand !== data.brand ||
+    product.name !== data.name ||
+    product.faceCurrency !== data.faceCurrency ||
+    product.denominationType !== data.denominationType ||
+    product.fixedValues.join(',') !== data.fixedValues.join(',') ||
+    product.minValueMinor !== data.minValueMinor ||
+    product.maxValueMinor !== data.maxValueMinor ||
+    product.recipientType !== data.recipientType ||
+    product.description !== data.description ||
+    product.redeemInstructions !== data.redeemInstructions ||
+    product.logoUrl !== data.logoUrl ||
+    product.features.join(',') !== data.features.join(',')
+  );
+}
+
+/** An offer's cost and details from a catalogue item (BitoCard's supplier offers and resellers' own offers alike). */
+export function offerData(item: CatalogueItem, productId: string) {
+  return {
+    productId,
+    costCurrency: item.costCurrency,
+    costRatio: new Prisma.Decimal(item.costRatio),
+    costFeeMinor: item.costFee,
+    meta: (item.meta ?? undefined) as Prisma.InputJsonValue | undefined,
+  };
+}
+
+/** Whether a stored offer differs from a freshly fetched one. */
+export function offerChanged(
+  old: { productId: string; costCurrency: string; costRatio: Prisma.Decimal; costFeeMinor: bigint; meta: Prisma.JsonValue | null },
+  offer: ReturnType<typeof offerData>,
+) {
+  return (
+    old.productId !== offer.productId ||
+    old.costCurrency !== offer.costCurrency ||
+    !old.costRatio.equals(offer.costRatio) ||
+    old.costFeeMinor !== offer.costFeeMinor ||
+    (offer.meta !== undefined && stableJson(old.meta) !== stableJson(offer.meta))
+  );
+}
 
 export type SupplierUpdate = Partial<{
   enabled: boolean;
@@ -153,14 +237,15 @@ export class SuppliersService {
     let created = 0;
     let updated = 0;
     try {
+      const items: CatalogueItem[] = [];
       for (const scope of scopes) {
         for (const item of await adapter.catalogue(scope)) {
           if (seen.has(item.sku)) continue;
           seen.add(item.sku);
-          if (await this.upsert(code, item)) created += 1;
-          else updated += 1;
+          items.push(item);
         }
       }
+      ({ created, updated } = await this.saveOffers(code, items));
     } catch (error) {
       const message = (error as Error).message.slice(0, 500);
       await this.prisma.supplier.update({ where: { code }, data: { lastSyncError: message } });
@@ -185,51 +270,58 @@ export class SuppliersService {
     return results;
   }
 
-  /** Returns true when a new product was created. */
-  private async upsert(supplierCode: string, item: CatalogueItem) {
-    const { product, created } = await this.upsertProduct(item);
-    const offer = {
-      productId: product.id,
-      costCurrency: item.costCurrency,
-      costRatio: new Prisma.Decimal(item.costRatio),
-      costFeeMinor: item.costFee,
-      meta: (item.meta ?? undefined) as Prisma.InputJsonValue | undefined,
-      available: true,
-      syncedAt: new Date(),
-    };
-    await this.prisma.supplierProduct.upsert({
-      where: { supplierCode_sku: { supplierCode, sku: item.sku } },
-      create: { supplierCode, sku: item.sku, ...offer },
-      update: offer,
-    });
-    return created;
+  /**
+   * Saves a supplier's catalogue in batches (a few queries per 500 offers, not several per offer, so catalogues of
+   * thousands, such as DIDWW's numbers, sync well inside the function time limit). Only what changed is written;
+   * offers still listed but unchanged are marked seen in one statement. Admin settings (discount, priority) are kept.
+   */
+  private async saveOffers(supplierCode: string, items: CatalogueItem[]) {
+    const now = new Date();
+    const { ids, created } = await this.upsertProducts(items);
+    for (const chunk of chunks(items, batchSize)) {
+      const existing = await this.prisma.supplierProduct.findMany({ where: { supplierCode, sku: { in: chunk.map(item => item.sku) } } });
+      const bySku = new Map(existing.map(offer => [offer.sku, offer]));
+      const fresh: Prisma.SupplierProductCreateManyInput[] = [];
+      const changed: Prisma.PrismaPromise<unknown>[] = [];
+      const unchanged: string[] = [];
+      for (const item of chunk) {
+        const offer = offerData(item, ids.get(item.productKey)!);
+        const old = bySku.get(item.sku);
+        if (!old) fresh.push({ supplierCode, sku: item.sku, ...offer, available: true, syncedAt: now });
+        else if (offerChanged(old, offer)) changed.push(this.prisma.supplierProduct.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
+        else unchanged.push(old.id);
+      }
+      if (fresh.length) await this.prisma.supplierProduct.createMany({ data: fresh, skipDuplicates: true });
+      if (changed.length) await this.prisma.$transaction(changed);
+      if (unchanged.length) await this.prisma.supplierProduct.updateMany({ where: { id: { in: unchanged } }, data: { available: true, syncedAt: now } });
+    }
+    return { created: created.size, updated: items.length - created.size };
   }
 
   /**
-   * The BitoCard product for a catalogue item (by its product key), created or updated from it. Shared by every
-   * source, so equivalent offers from BitoCard's suppliers and resellers' own accounts are one product.
+   * The BitoCard products for catalogue items (by product key), created or updated from them, in batches. Shared by
+   * every source, so equivalent offers from BitoCard's suppliers and resellers' own accounts are one product. Returns
+   * each key's product ID and the keys that were new.
    */
-  async upsertProduct(item: CatalogueItem) {
-    const productData = {
-      category: item.category,
-      country: item.country,
-      brand: item.brand,
-      name: item.name,
-      faceCurrency: item.faceCurrency,
-      denominationType: item.denominationType,
-      fixedValues: item.fixedValues,
-      minValueMinor: item.minValue ?? null,
-      maxValueMinor: item.maxValue ?? null,
-      recipientType: item.recipientType,
-      description: item.description ?? null,
-      redeemInstructions: item.redeemInstructions ?? null,
-      logoUrl: item.logoUrl ?? null,
-    };
-    const existing = await this.prisma.product.findUnique({ where: { key: item.productKey }, select: { id: true } });
-    const product = existing
-      ? await this.prisma.product.update({ where: { id: existing.id }, data: productData })
-      : await this.prisma.product.create({ data: { key: item.productKey, ...productData } });
-    return { product, created: !existing };
+  async upsertProducts(items: CatalogueItem[]) {
+    const ids = new Map<string, string>();
+    const created = new Set<string>();
+    // The last item with a key decides its product's details, as when items were saved one by one.
+    const byKey = new Map(items.map(item => [item.productKey, item]));
+    for (const keys of chunks([...byKey.keys()], batchSize)) {
+      const existing = await this.prisma.product.findMany({ where: { key: { in: keys } } });
+      const found = new Set(existing.map(product => product.key));
+      const fresh = keys.filter(key => !found.has(key));
+      if (fresh.length) {
+        await this.prisma.product.createMany({ data: fresh.map(key => ({ key, ...productData(byKey.get(key)!) })), skipDuplicates: true });
+        for (const key of fresh) created.add(key);
+        for (const row of await this.prisma.product.findMany({ where: { key: { in: fresh } }, select: { id: true, key: true } })) ids.set(row.key, row.id);
+      }
+      const updates = existing.filter(product => productChanged(product, productData(byKey.get(product.key)!)));
+      if (updates.length) await this.prisma.$transaction(updates.map(product => this.prisma.product.update({ where: { id: product.id }, data: productData(byKey.get(product.key)!) })));
+      for (const product of existing) ids.set(product.key, product.id);
+    }
+    return { ids, created };
   }
 
   // -- Products (admin) ------------------------------------------------------------------------------------------

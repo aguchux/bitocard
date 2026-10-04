@@ -3,9 +3,9 @@ import { worldwideCategories } from '../catalogue/pricing.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { type ConnectionRouting, type LedgerMode, Prisma } from '../generated/prisma/client.js';
-import type { CatalogueScope, SupplierAdapter } from '../suppliers/adapter.js';
+import type { CatalogueItem, CatalogueScope, SupplierAdapter } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
-import { SuppliersService } from '../suppliers/suppliers.service.js';
+import { chunks, offerChanged, offerData, SuppliersService } from '../suppliers/suppliers.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { connectable } from './connectable.js';
 import { ResellerIntegrationsService } from './reseller-integrations.service.js';
@@ -43,23 +43,19 @@ export class OwnSuppliersService {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { countryRef: { include: { categories: true } } } });
     const now = new Date();
     const seen = new Set<string>();
-    const save = (sku: string, productId: string, offer: { costCurrency: string; costRatio: Prisma.Decimal; costFeeMinor: bigint; meta: Prisma.InputJsonValue | undefined }) => {
-      seen.add(sku);
-      const data = { productId, ...offer, available: true, syncedAt: now };
-      return this.prisma.resellerOffer.upsert({
-        where: { connectionId_sku: { connectionId: connection.id, sku } },
-        create: { connectionId: connection.id, resellerId, mode, supplierCode: integrationId, sku, ...data },
-        update: data,
-      });
-    };
-
     try {
       if (mode === 'test') {
         // Simulated: BitoCard's own offers from the same supplier stand in for the reseller's.
         const offers = await this.prisma.supplierProduct.findMany({ where: { supplierCode: integrationId, available: true } });
-        for (const offer of offers) {
-          await save(offer.sku, offer.productId, { costCurrency: offer.costCurrency, costRatio: offer.costRatio, costFeeMinor: offer.costFeeMinor, meta: (offer.meta ?? undefined) as Prisma.InputJsonValue | undefined });
-        }
+        await this.saveOffers(
+          connection,
+          resellerId,
+          mode,
+          integrationId,
+          offers.map(offer => ({ sku: offer.sku, offer: { productId: offer.productId, costCurrency: offer.costCurrency, costRatio: offer.costRatio, costFeeMinor: offer.costFeeMinor, meta: (offer.meta ?? undefined) as Prisma.InputJsonValue | undefined } })),
+          now,
+        );
+        for (const offer of offers) seen.add(offer.sku);
       } else {
         const adapter = await this.adapterFor(resellerId, integrationId);
         if (!adapter) throw notConnected();
@@ -69,18 +65,18 @@ export class OwnSuppliersService {
           const country = worldwideCategories.has(category) ? null : reseller.country;
           scopes.set(`${category}:${country}`, { category, country });
         }
+        const items: CatalogueItem[] = [];
+        const skus = new Set<string>();
         for (const scope of scopes.values()) {
           for (const item of await adapter.catalogue(scope)) {
-            if (seen.has(item.sku)) continue;
-            const { product } = await this.suppliers.upsertProduct(item);
-            await save(item.sku, product.id, {
-              costCurrency: item.costCurrency,
-              costRatio: new Prisma.Decimal(item.costRatio),
-              costFeeMinor: item.costFee,
-              meta: (item.meta ?? undefined) as Prisma.InputJsonValue | undefined,
-            });
+            if (skus.has(item.sku)) continue;
+            skus.add(item.sku);
+            items.push(item);
           }
         }
+        const { ids } = await this.suppliers.upsertProducts(items);
+        await this.saveOffers(connection, resellerId, mode, integrationId, items.map(item => ({ sku: item.sku, offer: offerData(item, ids.get(item.productKey)!) })), now);
+        for (const sku of skus) seen.add(sku);
       }
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -92,6 +88,26 @@ export class OwnSuppliersService {
     const withdrawn = await this.prisma.resellerOffer.updateMany({ where: { connectionId: connection.id, available: true, sku: { notIn: [...seen] } }, data: { available: false } });
     await this.prisma.resellerConnection.update({ where: { id: connection.id }, data: { lastSyncedAt: now, lastSyncError: null } });
     return { object: 'own_catalogue_sync' as const, integration: integrationId, mode, offers: seen.size, withdrawn: withdrawn.count };
+  }
+
+  /** Saves a reseller's own catalogue in batches, like BitoCard's: only what changed is written. */
+  private async saveOffers(connection: { id: string }, resellerId: string, mode: LedgerMode, supplierCode: string, entries: Array<{ sku: string; offer: ReturnType<typeof offerData> }>, now: Date) {
+    for (const chunk of chunks(entries, 500)) {
+      const existing = await this.prisma.resellerOffer.findMany({ where: { connectionId: connection.id, sku: { in: chunk.map(entry => entry.sku) } } });
+      const bySku = new Map(existing.map(offer => [offer.sku, offer]));
+      const fresh: Prisma.ResellerOfferCreateManyInput[] = [];
+      const changed: Prisma.PrismaPromise<unknown>[] = [];
+      const unchanged: string[] = [];
+      for (const { sku, offer } of chunk) {
+        const old = bySku.get(sku);
+        if (!old) fresh.push({ connectionId: connection.id, resellerId, mode, supplierCode, sku, ...offer, available: true, syncedAt: now });
+        else if (offerChanged(old, offer)) changed.push(this.prisma.resellerOffer.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
+        else unchanged.push(old.id);
+      }
+      if (fresh.length) await this.prisma.resellerOffer.createMany({ data: fresh, skipDuplicates: true });
+      if (changed.length) await this.prisma.$transaction(changed);
+      if (unchanged.length) await this.prisma.resellerOffer.updateMany({ where: { id: { in: unchanged } }, data: { available: true, syncedAt: now } });
+    }
   }
 
   /** When to use this supplier: before BitoCard's (`preferred`), only when BitoCard has no offer (`fallback`), or never (`off`). */

@@ -26,6 +26,8 @@ export type Product = {
   recipient_type: RecipientType;
   description: string | null;
   redeem_instructions: string | null;
+  /** What it can do, for example `sms_in` or `app_codes` on a virtual number. */
+  features: string[];
   logo_url: string | null;
   /** Fixed values (up to 20), or the lowest and highest of a range. A quote locks the exact price. */
   pricing: { currency: string; denominations: PricedDenomination[] };

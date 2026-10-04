@@ -37,6 +37,8 @@ export type StoreProductFilter = {
   tag?: string;
   q?: string;
   sort?: 'popular' | 'name' | 'new';
+  /** Products that can do all of these (`src/catalogue/features.ts`). */
+  features?: string[];
   limit?: number;
   offset?: number;
 };
@@ -146,6 +148,8 @@ export class StorefrontService {
       description: product.description,
       /** The admin's image, else the supplier's logo. */
       logo_url: product.imageUrl ?? product.logoUrl,
+      /** What it can do (calls, SMS, app codes on numbers), for icons and filters. */
+      features: product.features,
       brand: this.presentBrand(product.brand, brand),
     };
   }
@@ -203,6 +207,7 @@ export class StorefrontService {
     if (filter.country === 'global') and.push({ category: { in: [...worldwideCategories] } });
     else if (filter.country) and.push({ country: filter.country.toUpperCase() });
     if (filter.brand) and.push({ brand: filter.brand });
+    if (filter.features?.length) and.push({ features: { hasEvery: filter.features } });
     return and.length ? { AND: and } : {};
   }
 

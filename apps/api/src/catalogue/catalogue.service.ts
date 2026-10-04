@@ -28,6 +28,8 @@ export function presentProductBase(product: Product) {
     description: product.description,
     redeem_instructions: product.redeemInstructions,
     logo_url: product.logoUrl,
+    /** What it can do, for example `sms_in` or `app_codes` on a virtual number (see the docs for the list). */
+    features: product.features,
   };
 }
 

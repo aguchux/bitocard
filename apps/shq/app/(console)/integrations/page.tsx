@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { BellRing, Check, Copy, CreditCard, DownloadCloud, Package, Plug, RefreshCw, Unplug } from "lucide-react";
+import { BellRing, Check, Copy, CreditCard, DownloadCloud, Package, Plug, RefreshCw, Search, Unplug } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, ExternalLinks, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
@@ -279,6 +279,10 @@ export default function IntegrationsPage() {
   const [disconnect] = useDisconnectIntegrationMutation();
   const [connecting, setConnecting] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  // Found by name, what it offers, and supplier or payment gateway.
+  const shown = (data?.data ?? []).filter(item => words.every(word => [item.name, item.description, item.kind === "supplier" ? "supplier" : "payment gateway"].join(" ").toLowerCase().includes(word)));
   const current = data?.data.find(item => item.id === connecting) ?? null;
   const toRemove = data?.data.find(item => item.id === removing) ?? null;
   const help = data?.access.reason ? accessHelp[data.access.reason] : null;
@@ -331,8 +335,20 @@ export default function IntegrationsPage() {
             </Card>
           ) : (
             <>
-              <Group title="Suppliers" icon={<Package className="size-5 text-brand-600" aria-hidden />} items={data.data.filter(item => item.kind === "supplier")} render={card} />
-              <Group title="Payment gateways" icon={<CreditCard className="size-5 text-brand-600" aria-hidden />} items={data.data.filter(item => item.kind === "payment_gateway")} render={card} />
+              <label className="relative flex max-w-md items-center">
+                <span className="sr-only">Search integrations</span>
+                <Search className="pointer-events-none absolute left-4 size-4 text-subtle" aria-hidden />
+                <Input type="search" placeholder="Search suppliers and gateways…" value={search} onChange={event => setSearch(event.target.value)} className="min-h-11 rounded-2xl pl-11" />
+              </label>
+              {shown.length === 0 ? (
+                <Card>
+                  <EmptyState title="No integration matches" icon={<Search className="size-6" aria-hidden />}>
+                    Try a name, or what you want to sell, such as gift cards, airtime or numbers.
+                  </EmptyState>
+                </Card>
+              ) : null}
+              <Group title="Suppliers" icon={<Package className="size-5 text-brand-600" aria-hidden />} items={shown.filter(item => item.kind === "supplier")} render={card} />
+              <Group title="Payment gateways" icon={<CreditCard className="size-5 text-brand-600" aria-hidden />} items={shown.filter(item => item.kind === "payment_gateway")} render={card} />
             </>
           )}
         </div>

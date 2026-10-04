@@ -1,9 +1,10 @@
 import type { ProductCategory } from '../generated/prisma/client.js';
+import { type ProductFeature, productFeatureKeys } from '../catalogue/features.js';
 import { providerRequest } from '../payments/provider-error.js';
 import { type CatalogueItem, type CatalogueScope, type FulfilmentRequest, type FulfilmentResult, slug, type SupplierAdapter } from './adapter.js';
 
 /** The DIDWW API version the request and response shapes below follow. */
-export const didwwApiVersion = '2022-05-10';
+export const didwwApiVersion = '2026-04-16';
 
 type Resource<A> = { id: string; type: string; attributes: A; relationships?: Record<string, { data?: { id: string; type: string } | { id: string; type: string }[] | null }> };
 type Document<A, I = unknown> = { data: Resource<A>[]; included?: Resource<I>[]; meta?: { total_records?: number } };
@@ -19,9 +20,35 @@ type DidAttributes = { number: string; expires_at?: string | null; channels_incl
 
 /** Number capabilities BitoCard shows, in DIDWW's names. Fax (t38) is not sold. */
 const capabilities = ['voice', 'voice_out', 'sms', 'sms_out'] as const;
-/** Newer DIDWW API versions name incoming calls and SMS `voice_in` and `sms_in`; read both. */
+/** DIDWW API 2026-04-16 names incoming calls and SMS `voice_in` and `sms_in`; older versions `voice` and `sms`. Read both. */
 const featureAliases: Record<string, (typeof capabilities)[number]> = { voice: 'voice', voice_in: 'voice', voice_out: 'voice_out', sms: 'sms', sms_in: 'sms', sms_out: 'sms_out' };
-const capabilityLabels: Record<(typeof capabilities)[number], string> = { voice: 'incoming calls', voice_out: 'outgoing calls', sms: 'incoming SMS', sms_out: 'outgoing SMS' };
+/**
+ * DIDWW features as BitoCard's product features (`src/catalogue/features.ts`): `a2p` numbers receive SMS sent by apps
+ * and services (verification codes), `p2p` SMS from people, `cnam_out` shows the caller's name. Fax (t38) is not sold.
+ */
+const publicFeatures: Record<string, ProductFeature> = {
+  voice: 'calls_in',
+  voice_in: 'calls_in',
+  voice_out: 'calls_out',
+  sms: 'sms_in',
+  sms_in: 'sms_in',
+  sms_out: 'sms_out',
+  p2p: 'sms_people',
+  a2p: 'app_codes',
+  emergency: 'emergency',
+  cnam_out: 'caller_name',
+};
+/** How each feature reads in a number's description. */
+const describe: Record<ProductFeature, string> = {
+  calls_in: 'incoming calls',
+  calls_out: 'outgoing calls',
+  sms_in: 'incoming SMS',
+  sms_out: 'outgoing SMS',
+  sms_people: 'SMS from people',
+  app_codes: 'SMS codes from apps and services',
+  emergency: 'emergency calls',
+  caller_name: 'caller name display',
+};
 const pageSize = 100;
 
 /** US dollars as a decimal string to cents, rounded up so BitoCard never records less than DIDWW charges. */
@@ -150,6 +177,9 @@ export class DidwwAdapter implements SupplierAdapter {
     const typeName = (related('did_group_type')[0]?.attributes as TypeAttributes | undefined)?.name ?? 'Local';
     const features = this.features(group);
     if (features.length === 0) return [];
+    // Everything the number can do, for the stores' icons and filters (calls and SMS, app codes, emergency, caller name).
+    const named = new Set((group.attributes.features ?? []).map(feature => publicFeatures[feature]).filter(Boolean));
+    const productFeatureList = productFeatureKeys.filter(feature => named.has(feature));
     const skus = related('stock_keeping_units') as Resource<SkuAttributes>[];
     const area = group.attributes.area_name?.trim() || typeName;
     const numberType = slug(typeName);
@@ -158,7 +188,7 @@ export class DidwwAdapter implements SupplierAdapter {
       const monthly = centsUp(sku.attributes.monthly_price);
       const channels = sku.attributes.channels_included_count ?? 0;
       const variant = [slug(area), ...features.map(feature => feature.replace('_', '-')), ...(skus.length > 1 ? [`${channels}ch`] : [])].join('-');
-      const what = features.map(feature => capabilityLabels[feature]).join(', ');
+      const what = productFeatureList.map(feature => describe[feature]).join(', ');
       return {
         sku: `${group.id}:${sku.id}`,
         productKey: `virtual_numbers:${country.iso}:${numberType}:${variant}`,
@@ -171,6 +201,7 @@ export class DidwwAdapter implements SupplierAdapter {
         // Setup plus the first month: what DIDWW charges for the order.
         fixedValues: [setup + monthly],
         recipientType: 'none',
+        features: productFeatureList,
         description: `A ${country.name} number (+${country.prefix} ${group.attributes.prefix}) with ${what}${channels ? `, ${channels} call channels` : ''}. Includes the first month.`,
         costCurrency: 'USD',
         costRatio: '1',
@@ -211,7 +242,7 @@ export class DidwwAdapter implements SupplierAdapter {
           attributes: {
             allow_back_ordering: false,
             callback_url: this.callbackUrl(request.reference),
-            callback_method: 'POST',
+            callback_method: 'post',
             items: [{ type: 'did_order_items', attributes: { sku_id: String(request.meta.skuId), qty: 1, billing_cycles_count: 1 } }],
           },
         },

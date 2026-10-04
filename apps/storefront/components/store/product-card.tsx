@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatFace, type StoreBrand, type StoreProduct } from "@bitocard/api-client/storefront";
 import { BrandImage } from "./brand-image";
+import { FeatureIcons } from "./features";
+import { Flag } from "./flag";
 import { categoryTheme } from "./theme";
 
 export const productHref = (product: Pick<StoreProduct, "key">) => `/p/${encodeURIComponent(product.key)}`;
@@ -42,7 +44,13 @@ export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand
       className={`flex h-full w-full items-center justify-center bg-gradient-to-br p-4 ${brand.color ? "" : theme.card} ${className}`}
       style={brand.color ? { backgroundColor: brand.color } : undefined}
     >
-      {brand.logo_url ? (
+      {product?.category === "virtual_numbers" && !brand.logo_url ? (
+        // A number shows its country's flag, not the initials of its type ("local", "mobile").
+        <span className="flex flex-col items-center gap-2">
+          <Flag code={product.country} className="h-14 w-20 rounded-md shadow-lg sm:h-16 sm:w-24" />
+          <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.55em] font-bold tracking-wide text-[#070f4c] uppercase">{brand.name} number</span>
+        </span>
+      ) : brand.logo_url ? (
         <BrandImage
           src={brand.logo_url}
           frame="flex aspect-square h-[64%] max-h-32 items-center justify-center rounded-[22%] bg-white p-[9%] shadow-md ring-1 ring-black/5"
@@ -71,6 +79,11 @@ export function ProductCard({ product }: { product: StoreProduct }) {
       <div className="flex flex-1 flex-col px-1 pt-3">
         <h3 className="font-display text-lg font-bold leading-snug text-[#070f4c]">{product.name}</h3>
         <p className="mt-0.5 line-clamp-2 text-sm text-slate-500">{product.description ?? `${product.category_label}${product.global ? "" : ` · ${product.country_name}`}`}</p>
+        {product.features?.length ? (
+          <div className="mt-2.5">
+            <FeatureIcons features={product.features} compact />
+          </div>
+        ) : null}
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <p className="text-sm text-slate-500">
             <span className="font-display text-lg font-extrabold text-[#070f4c]">{priceLabel(product)}</span>
@@ -94,6 +107,11 @@ export function ProductRow({ product }: { product: StoreProduct }) {
       <div className="min-w-0 flex-1">
         <h3 className="font-display truncate text-base font-bold text-[#070f4c] sm:text-lg">{product.name}</h3>
         <p className="truncate text-sm text-slate-500">{product.description ?? `${product.category_label} · ${product.country_name}`}</p>
+        {product.features?.length ? (
+          <div className="mt-1.5">
+            <FeatureIcons features={product.features} compact />
+          </div>
+        ) : null}
         <p className="mt-1 font-display text-base font-extrabold text-[#070f4c]">{priceLabel(product)}</p>
       </div>
       <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white">

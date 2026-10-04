@@ -1,4 +1,5 @@
 import type { DenominationType, ProductCategory } from '../generated/prisma/client.js';
+import type { ProductFeature } from '../catalogue/features.js';
 
 /** One product as a supplier offers it, already in BitoCard terms. Amounts are minor units. */
 export type CatalogueItem = {
@@ -19,6 +20,8 @@ export type CatalogueItem = {
   description?: string;
   redeemInstructions?: string;
   logoUrl?: string;
+  /** What the product can do, in BitoCard's names (`src/catalogue/features.ts`). */
+  features?: ProductFeature[];
   costCurrency: string;
   /** Cost per unit of face value in the cost currency, as a decimal string. */
   costRatio: string;

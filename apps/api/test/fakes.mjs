@@ -392,7 +392,8 @@ export async function fakeDidww() {
   const group = (id, attributes, type, skus, meta = {}) => ({ id, attributes: { allow_additional_channels: true, ...attributes }, type, skus, meta: { needs_registration: false, is_available: true, ...meta } });
   const state = {
     groups: [
-      group('grp-london', { prefix: '20', features: ['voice', 'sms', 't38'], is_metered: false, area_name: 'London' }, local, [sku('sku-london-0', '0.0', '1.5', 0), sku('sku-london-2', '0.5', '3.0', 2)]),
+      // DIDWW API 2026-04-16 feature names.
+      group('grp-london', { prefix: '20', features: ['voice_in', 'sms_in', 'p2p', 'a2p', 't38'], is_metered: false, area_name: 'London' }, local, [sku('sku-london-0', '0.0', '1.5', 0), sku('sku-london-2', '0.5', '3.0', 2)]),
       // Regulated, metered and fax-only groups are never sold.
       group('grp-manchester', { prefix: '161', features: ['voice'], is_metered: false, area_name: 'Manchester' }, local, [sku('sku-manchester', '0', '1', 0)], { needs_registration: true }),
       group('grp-freephone', { prefix: '800', features: ['voice'], is_metered: true, area_name: '' }, tollFree, [sku('sku-freephone', '0', '5', 0)]),
