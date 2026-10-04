@@ -294,6 +294,8 @@ describe('delivery', () => {
     assert.equal(pending, 0, 'its pending deliveries stop');
     const message = email.outbox.filter(item => item.to === owner).at(-1);
     assert.match(message.subject, /We stopped sending webhooks/);
+    const [note] = (await browser.get('/v1/notifications')).json.data.filter(item => item.type === 'webhook_endpoint.disabled');
+    assert.deepEqual([note.severity, note.link], ['critical', `/developers/webhooks/${created.id}`]);
     assert.ok(message.text.includes(hook.url));
 
     const calls = hook.state.calls.length;

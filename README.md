@@ -17,12 +17,12 @@ npm-workspaces Turborepo with five Next.js 16 App Router applications, one NestJ
 
 | Package | Purpose |
 | --- | --- |
-| `@bitocard/ui` | `Brand` wordmark, `BrandLockup` (logo with tagline), `ComingSoon` workspace page, `workspace.css`, brand constants, `siteUrl()`, `appUrl()` for cross-app links, and legal entity data (`/legal`) |
+| `@bitocard/ui` | `Brand` wordmark (the "b" mark as its first letter), `BrandLockup` (wordmark with tagline), `ComingSoon` workspace page, `workspace.css`, brand constants, `siteUrl()`, `appUrl()` for cross-app links, and legal entity data (`/legal`) |
 | `@bitocard/next-config` | `createNextConfig()` — Turbopack root, output tracing, security headers, `X-Robots-Tag` for private apps |
 | `@bitocard/eslint-config` | Flat ESLint configs: `/next` (Next core-web-vitals + TypeScript) and `/node` (typescript-eslint, for the API) |
 | `@bitocard/typescript-config` | Base `tsconfig` presets for Next apps and React packages |
 
-Workspace packages ship TypeScript source; Next.js transpiles them automatically, so they have no build step. The logo is served from each app's `public/bitocard-logo.png`.
+Workspace packages ship TypeScript source; Next.js transpiles them automatically, so they have no build step. Logo files are generated from `assets/logo.png` by `python scripts/brand-assets.py` into each app's `public/` folder (`bitocard-mark*.png`, `bitocard-logo*.png`).
 
 ## Development
 

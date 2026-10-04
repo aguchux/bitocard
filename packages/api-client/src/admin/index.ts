@@ -105,7 +105,7 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/orders', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
       providesTags: [{ type: 'Order', id: 'LIST' }],
     }),
-    supplierWebhooks: build.infiniteQuery<List<SupplierWebhook>, { status?: SupplierWebhookStatus; supplier?: string }, string>({
+    supplierWebhooks: build.infiniteQuery<List<SupplierWebhook>, { status?: SupplierWebhookStatus; supplier?: string; connection_id?: string }, string>({
       infiniteQueryOptions: cursorPages,
       query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/supplier-webhooks', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
       providesTags: [{ type: 'Order', id: 'NOTIFICATIONS' }],

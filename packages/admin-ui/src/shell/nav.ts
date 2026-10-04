@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Bell, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'settings';
 
@@ -19,7 +19,14 @@ export type SubNavItem = { label: string; href: string; icon?: LucideIcon; count
 
 /** Each section's menu (the second column). */
 export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> = {
-  home: { title: 'Dashboard', items: [{ label: 'Overview', href: '/', icon: ChartNoAxesColumn }, { label: 'Activity log', href: '/activity', icon: History }] },
+  home: {
+    title: 'Dashboard',
+    items: [
+      { label: 'Overview', href: '/', icon: ChartNoAxesColumn },
+      { label: 'Notifications', href: '/notifications', icon: Bell },
+      { label: 'Activity log', href: '/activity', icon: History },
+    ],
+  },
   orders: {
     title: 'Orders',
     items: [

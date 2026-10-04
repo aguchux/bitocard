@@ -19,6 +19,7 @@ import { EventsService } from '../webhooks/events.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
 import { connectable } from '../reseller-integrations/connectable.js';
 import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { sellerFor } from './seller.js';
 
 /** When to check an unconfirmed order again, after each check. After the last, it joins the exception queue. */
@@ -62,6 +63,7 @@ export class OrdersService {
     private readonly events: EventsService,
     private readonly fees: PlatformFeesService,
     private readonly own: OwnSuppliersService,
+    private readonly inbox: InboxService,
   ) {}
 
   private encryption() {
@@ -346,7 +348,28 @@ export class OrdersService {
         nextCheckAt: new Date(Date.now() + (review ? reviewCheckMs : checkScheduleMs[checks - 1])),
       },
     });
-    if (review && !order.needsReview) this.logger.warn({ orderId: order.id, supplier: order.supplierCode }, 'Order outcome still unclear; added to the exception queue');
+    if (review && !order.needsReview) {
+      this.logger.warn({ orderId: order.id, supplier: order.supplierCode }, 'Order outcome still unclear; added to the exception queue');
+      const product = (await this.prisma.product.findUnique({ where: { id: order.productId }, select: { name: true } }))?.name ?? 'An order';
+      await this.inbox.reseller(order.resellerId, 'order.needs_review', {
+        subject: order.id,
+        title: `${product}: outcome still unclear`,
+        body:
+          order.source === 'own'
+            ? 'Your supplier has not confirmed this order yet. We keep checking; check it in your supplier account too before doing anything else.'
+            : 'The supplier has not confirmed this order yet. BitoCard is looking into it; the amount stays held until it is settled.',
+        link: `/orders/${order.id}`,
+        mode: order.mode,
+      });
+      if (order.mode === 'live') {
+        await this.inbox.admins('admin.order.needs_review', {
+          subject: order.id,
+          title: `${product}: in the exception queue`,
+          body: `${order.source === 'own' ? 'A reseller’s own-supplier order' : 'An order'} is still unconfirmed by ${order.supplierCode} after every scheduled check.`,
+          link: `/orders/${order.id}`,
+        });
+      }
+    }
   }
 
   /** Records the delivery and takes the held money: wholesale as revenue, tax as tax payable, and the supplier cost. */

@@ -16,6 +16,7 @@ import { ProviderError } from '../payments/provider-error.js';
 import type { TransferResult } from '../payments/providers.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { accountNameMatches } from '../identity/providers.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 /** Payouts to a newly added live bank account start after this, so a taken-over account cannot be emptied at once. */
 export const bankAccountCoolingOffMs = 24 * 60 * 60 * 1000;
@@ -81,6 +82,7 @@ export class PayoutsService {
     private readonly providers: PaymentProviders,
     private readonly email: EmailService,
     private readonly events: EventsService,
+    private readonly inbox: InboxService,
   ) {}
 
   private encryption() {
@@ -166,6 +168,13 @@ export class PayoutsService {
       },
     });
     if (mode === 'live') this.notify(resellerId, to => bankAccountAddedEmail(to, bank.name, account.accountNumberLast4));
+    await this.inbox.reseller(resellerId, 'bank_account.added', {
+      subject: account.id,
+      title: 'Payout bank account added',
+      body: `${bank.name} account ending ${account.accountNumberLast4} (${accountName}) can receive withdrawals after the 24-hour wait. If you did not add it, remove it and contact support.`,
+      link: '/wallet/bank-accounts',
+      mode,
+    });
     return presentBankAccount(account);
   }
 
@@ -307,6 +316,27 @@ export class PayoutsService {
     });
     if (changed) this.events.committed();
     const updated = await this.prisma.payout.findUniqueOrThrow({ where: { id: payout.id }, include: { bankAccount: true } });
+    if (changed) {
+      const amount = formatMoney(updated.amountMinor, updated.currency);
+      const paid = updated.status === 'paid';
+      await this.inbox.reseller(updated.resellerId, paid ? 'payout.paid' : 'payout.failed', {
+        subject: updated.id,
+        title: paid ? `${amount} withdrawal paid` : `${amount} withdrawal failed`,
+        body: paid
+          ? `Your withdrawal was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
+          : `Your withdrawal to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your earnings.`,
+        link: '/wallet/payouts',
+        mode: updated.mode,
+      });
+      if (!paid && updated.mode === 'live') {
+        await this.inbox.admins('admin.payout.failed', {
+          subject: updated.id,
+          title: `${amount} withdrawal failed`,
+          body: `A reseller withdrawal failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}.`,
+          link: `/resellers/${updated.resellerId}`,
+        });
+      }
+    }
     if (changed && updated.mode === 'live') {
       const amount = formatMoney(updated.amountMinor, updated.currency);
       this.notify(updated.resellerId, to =>

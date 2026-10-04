@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { Controller, Get, HttpCode, HttpStatus, Injectable, Logger, Param, Post, Query, Req } from '@nestjs/common';
-import { ApiExcludeController } from '@nestjs/swagger';
+import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { waitUntil } from '@vercel/functions';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import type { Request } from 'express';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, SessionOnly } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -13,6 +13,9 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type SupplierWebhook, type SupplierWebhookStatus } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { connectable } from '../reseller-integrations/connectable.js';
+import { ResellerIntegrationsService } from '../reseller-integrations/reseller-integrations.service.js';
 import { didwwNotice, didwwSignatureValid } from '../suppliers/didww.webhooks.js';
 import { reloadlyNotice, reloadlySignatureValid } from '../suppliers/reloadly.webhooks.js';
 import { OrdersService } from './orders.service.js';
@@ -29,7 +32,9 @@ const keepOthersMs = 365 * 24 * 3600_000;
 const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'signature_invalid', 'Webhook signature is missing or wrong.');
 
 /**
- * Supplier notifications (Reloadly and DIDWW). Nothing is lost: each one is verified and stored (encrypted) before it is
+ * Supplier notifications (Reloadly and DIDWW), to BitoCard's own accounts and to resellers' own connections (each live
+ * connection has its own address, checked with that reseller's own secret, and can only name that reseller's own
+ * orders through that connection). Nothing is lost: each one is verified and stored (encrypted) before it is
  * acknowledged; a supplier's retry of the same delivery is stored once. Processing happens after the reply (suppliers
  * allow a few seconds) and never trusts the body: the order it names is re-checked with the supplier, exactly like a
  * scheduled check. Failures are retried on `supplierWebhookRetryMs` by the `supplier-webhooks` job; notifications that
@@ -44,6 +49,8 @@ export class SupplierWebhooksService {
     private readonly integrations: IntegrationsService,
     private readonly orders: OrdersService,
     private readonly audit: AuditService,
+    private readonly connections: ResellerIntegrationsService,
+    private readonly inbox: InboxService,
   ) {}
 
   async receiveReloadly(rawBody: Buffer | undefined, signature: string | undefined, timestamp: string | undefined) {
@@ -57,30 +64,52 @@ export class SupplierWebhooksService {
     return this.store('reloadly', rawBody!, reloadlyNotice(payload));
   }
 
+  /** Reloadly, to a reseller's own connection: signed with the webhook secret they saved on it. */
+  async receiveOwnReloadly(connectionId: string, rawBody: Buffer | undefined, signature: string | undefined, timestamp: string | undefined) {
+    const connection = await this.connections.forNotification(connectionId, 'reloadly');
+    if (!connection || !reloadlySignatureValid(connection.credentials.webhook_secret, rawBody, timestamp, signature)) throw untrusted();
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(rawBody!.toString('utf8'));
+    } catch {
+      // Stored all the same, as for BitoCard's own account.
+    }
+    return this.store('reloadly', rawBody!, reloadlyNotice(payload), connection.id);
+  }
+
   /**
    * DIDWW order callbacks: form fields (`id`, `type`, `status`) signed with the API key over the address DIDWW called,
    * which is our callback base plus the path and query received (the query names our reference).
    */
-  async receiveDidww(pathAndQuery: string, fields: unknown, rawBody: Buffer | undefined, signature: string | undefined) {
+  async receiveDidww(pathAndQuery: string, fields: unknown, rawBody: Buffer | undefined, signature: string | undefined, connectionId?: string) {
     const params: Record<string, string> = {};
     for (const [key, value] of Object.entries(fields && typeof fields === 'object' ? fields : {})) if (typeof value === 'string') params[key] = value;
     const url = `${this.integrations.config.DIDWW_CALLBACK_URL.replace(/\/+$/, '')}${pathAndQuery}`;
-    if (!didwwSignatureValid(this.integrations.config.DIDWW_API_KEY, url, params, signature)) throw untrusted();
+    // A reseller's own connection signs with their own API key.
+    const connection = connectionId ? await this.connections.forNotification(connectionId, 'didww') : null;
+    if (connectionId && !connection) throw untrusted();
+    const apiKey = connection ? connection.credentials.api_key : this.integrations.config.DIDWW_API_KEY;
+    if (!didwwSignatureValid(apiKey, url, params, signature)) throw untrusted();
     const reference = new URL(url).searchParams.get('reference') ?? undefined;
     // The query is part of what is stored (and of the body hash): it is what names the order.
     const stored = Buffer.concat([Buffer.from(`${pathAndQuery}\n`), rawBody ?? Buffer.from(new URLSearchParams(params).toString())]);
-    return this.store('didww', stored, didwwNotice(params, reference));
+    return this.store('didww', stored, didwwNotice(params, reference), connection?.id);
   }
 
-  /** Stores the notification (once per distinct body) and starts processing it after the reply. */
-  private async store(supplierCode: string, rawBody: Buffer, notice: { eventType: string | null; reference: string | null; supplierTransactionId: string | null }) {
-    const bodyHash = createHash('sha256').update(rawBody).digest('hex');
+  /**
+   * Stores the notification (once per distinct body and destination) and starts processing it after the reply. A
+   * connection's notifications hash with its ID, so the same body sent to two accounts is two notifications.
+   */
+  private async store(supplierCode: string, rawBody: Buffer, notice: { eventType: string | null; reference: string | null; supplierTransactionId: string | null }, connectionId?: string) {
+    const hash = createHash('sha256');
+    if (connectionId) hash.update(`connection:${connectionId}\n`);
+    const bodyHash = hash.update(rawBody).digest('hex');
     // Without the encryption key nothing can be stored safely: refuse, so the supplier retries once it is fixed.
     const bodyEncrypted = this.encryption().encrypt(rawBody.toString('utf8'));
     let row: SupplierWebhook;
     try {
       row = await this.prisma.supplierWebhook.create({
-        data: { supplierCode, bodyHash, bodyEncrypted, eventType: notice.eventType?.slice(0, 100), reference: notice.reference?.slice(0, 200), supplierTransactionId: notice.supplierTransactionId?.slice(0, 100) },
+        data: { supplierCode, connectionId: connectionId ?? null, bodyHash, bodyEncrypted, eventType: notice.eventType?.slice(0, 100), reference: notice.reference?.slice(0, 200), supplierTransactionId: notice.supplierTransactionId?.slice(0, 100) },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { received: true, duplicate: true };
@@ -132,7 +161,10 @@ export class SupplierWebhooksService {
       if (!order) {
         // The order may not be visible yet (the supplier answered before our write committed): try again later.
         await this.finish(row, { status: 'unmatched', nextAttemptAt: retryAt, lastError: row.reference ? 'No order has this reference' : 'The notification names no order reference' });
-        if (lastTry) this.logger.warn({ id, supplier: row.supplierCode }, 'Supplier notification matches no order; kept for admins');
+        if (lastTry) {
+          this.logger.warn({ id, supplier: row.supplierCode }, 'Supplier notification matches no order; kept for admins');
+          await this.gaveUp(row, 'matches none of your orders');
+        }
         return 'unmatched';
       }
       const after = order.status === 'processing' && order.mode === 'live' ? await this.orders.attempt(order.id, 'check', { scheduled: false }) : order;
@@ -147,7 +179,10 @@ export class SupplierWebhooksService {
     } catch (error) {
       const status: SupplierWebhookStatus = lastTry ? 'failed' : 'received';
       await this.finish(row, { status, nextAttemptAt: retryAt, lastError: (error as Error).message.slice(0, 500) });
-      if (lastTry) this.logger.error({ err: error, id }, 'Supplier notification kept failing; kept for admins');
+      if (lastTry) {
+        this.logger.error({ err: error, id }, 'Supplier notification kept failing; kept for admins');
+        await this.gaveUp(row, 'could not be processed');
+      }
       return status;
     }
   }
@@ -160,15 +195,40 @@ export class SupplierWebhooksService {
     return this.prisma.supplierWebhook.updateMany({ where: { id: row.id, attempts: row.attempts }, data });
   }
 
-  /** Our order the notification names: by our reference (current or an earlier attempt's), else the supplier's ID. */
+  /** Tells admins (and the reseller, for their own connection) that a notification was given up on. */
+  private async gaveUp(row: SupplierWebhook, why: string) {
+    const name = connectable(row.supplierCode)?.name ?? row.supplierCode;
+    await this.inbox.admins('admin.supplier_notification.failed', {
+      subject: row.id,
+      title: `${name} notification not processed`,
+      body: `A ${name} notification${row.connectionId ? ' to a reseller’s own account' : ''} ${why} after every try. The orders’ own checks continue.`,
+      link: '/orders/notifications',
+    });
+    if (!row.connectionId) return;
+    const connection = await this.prisma.resellerConnection.findUnique({ where: { id: row.connectionId }, select: { resellerId: true } });
+    if (!connection) return;
+    await this.inbox.reseller(connection.resellerId, 'supplier_notification.failed', {
+      subject: row.id,
+      title: `${name} notification not processed`,
+      body: `A notification from your own ${name} account ${why}. Your orders are still checked with ${name} on schedule.`,
+      link: '/integrations',
+      mode: 'live',
+    });
+  }
+
+  /**
+   * Our order the notification names: by our reference (current or an earlier attempt's), else the supplier's ID. A
+   * connection's notification only ever names that connection's own orders; BitoCard's only BitoCard's.
+   */
   private async orderFor(row: SupplierWebhook) {
+    const scope: Prisma.OrderWhereInput = row.connectionId ? { source: 'own', connectionId: row.connectionId } : { source: 'bitocard' };
     if (row.reference) {
-      const current = await this.prisma.order.findUnique({ where: { supplierReference: row.reference } });
+      const current = await this.prisma.order.findFirst({ where: { supplierReference: row.reference, ...scope } });
       if (current) return current.supplierCode === row.supplierCode || (await this.attempted(current.id, row)) ? current : null;
       const earlier = await this.prisma.orderAttempt.findFirst({ where: { reference: row.reference, supplierCode: row.supplierCode }, select: { orderId: true } });
-      if (earlier) return this.prisma.order.findUnique({ where: { id: earlier.orderId } });
+      if (earlier) return this.prisma.order.findFirst({ where: { id: earlier.orderId, ...scope } });
     }
-    if (row.supplierTransactionId) return this.prisma.order.findFirst({ where: { supplierCode: row.supplierCode, supplierTransactionId: row.supplierTransactionId } });
+    if (row.supplierTransactionId) return this.prisma.order.findFirst({ where: { supplierCode: row.supplierCode, supplierTransactionId: row.supplierTransactionId, ...scope } });
     return null;
   }
 
@@ -178,15 +238,32 @@ export class SupplierWebhooksService {
 
   // -- Admin -----------------------------------------------------------------------------------------------------
 
-  async list(filter: { status?: SupplierWebhookStatus; supplier?: string; order_id?: string; limit?: number; starting_after?: string }) {
+  async list(filter: { status?: SupplierWebhookStatus; supplier?: string; order_id?: string; connection_id?: string; limit?: number; starting_after?: string }) {
     const limit = filter.limit ?? 50;
     const rows = await this.prisma.supplierWebhook.findMany({
-      where: { status: filter.status, supplierCode: filter.supplier, orderId: filter.order_id },
+      where: { status: filter.status, supplierCode: filter.supplier, orderId: filter.order_id, connectionId: filter.connection_id },
       orderBy: [{ receivedAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
     });
     return { object: 'list' as const, data: rows.slice(0, limit).map(row => this.present(row)), has_more: rows.length > limit };
+  }
+
+  /** A reseller's view: the notifications their own live connection to this supplier received. */
+  async listForReseller(resellerId: string, integrationId: string, filter: { limit?: number; starting_after?: string }) {
+    const connection = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode: 'live' } } });
+    if (!connection) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such connection.');
+    const page = await this.list({ ...filter, connection_id: connection.id, limit: filter.limit ?? 20 });
+    // The connection and supplier are implied; the rest is theirs to see.
+    return {
+      ...page,
+      data: page.data.map(item => {
+        const { connection_id, supplier, ...rest } = item;
+        void connection_id;
+        void supplier;
+        return rest;
+      }),
+    };
   }
 
   /** Tries an unmatched or failed notification again now (for example after an order was fixed). Audited. */
@@ -207,6 +284,8 @@ export class SupplierWebhooksService {
       object: 'supplier_webhook' as const,
       id: row.id,
       supplier: row.supplierCode,
+      /** A reseller's own connection it was sent to; null for BitoCard's own account. */
+      connection_id: row.connectionId,
       event_type: row.eventType,
       reference: row.reference,
       supplier_transaction_id: row.supplierTransactionId,
@@ -246,12 +325,49 @@ export class SupplierWebhooksController {
   didww(@Req() req: Request & { rawBody?: Buffer }) {
     return this.webhooks.receiveDidww(req.originalUrl, req.body, req.rawBody, req.get('x-didww-signature'));
   }
+
+  /** A reseller's own Reloadly account (the address shown on their connection). */
+  @Post('reloadly/:connection')
+  @HttpCode(HttpStatus.OK)
+  ownReloadly(@Req() req: Request & { rawBody?: Buffer }, @Param('connection') connection: string) {
+    return this.webhooks.receiveOwnReloadly(connection, req.rawBody, req.get('x-reloadly-signature'), req.get('x-reloadly-request-timestamp'));
+  }
+
+  /** A reseller's own DIDWW account (set on each of their orders). */
+  @Post('didww/:connection')
+  @HttpCode(HttpStatus.OK)
+  ownDidww(@Req() req: Request & { rawBody?: Buffer }, @Param('connection') connection: string) {
+    return this.webhooks.receiveDidww(req.originalUrl, req.body, req.rawBody, req.get('x-didww-signature'), connection);
+  }
+}
+
+class ResellerNotificationFilterDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsUUID() starting_after?: string;
+}
+
+/** Resellers: what their own supplier accounts notified, and what became of it. */
+@ApiTags('Integrations')
+@SessionOnly()
+@Controller('integrations')
+export class ResellerSupplierWebhooksController {
+  constructor(private readonly webhooks: SupplierWebhooksService) {}
+
+  @ApiOperation({
+    summary: 'List your supplier’s notifications',
+    description: 'Order updates your own live supplier account sent to its BitoCard address, newest first, and whether each was matched to one of your orders.',
+  })
+  @Get(':id/connection/notifications')
+  list(@CurrentCaller() caller: Caller, @Param('id') id: string, @Query() filter: ResellerNotificationFilterDto) {
+    return this.webhooks.listForReseller(resellerOf(caller), id.trim().toLowerCase(), filter);
+  }
 }
 
 class SupplierWebhookFilterDto {
   @IsOptional() @IsIn(['received', 'processed', 'unmatched', 'failed']) status?: SupplierWebhookStatus;
   @IsOptional() @IsString() @Length(1, 40) supplier?: string;
   @IsOptional() @IsUUID() order_id?: string;
+  @IsOptional() @IsUUID() connection_id?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
   @IsOptional() @IsUUID() starting_after?: string;
 }

@@ -24,6 +24,12 @@ export type ConnectableIntegration = {
   description: string;
   fields: ConnectableField[];
   /**
+   * Suppliers that notify order updates: each live connection gets its own address (`/v1/webhooks/<id>/<connection>`).
+   * `manual`: the reseller enters it in the supplier's dashboard and saves the signature secret (`secretField`);
+   * `automatic`: BitoCard gives it to the supplier on every order. Without it, own orders rely on scheduled checks.
+   */
+  notifications?: { setup: 'manual'; secretField: string } | { setup: 'automatic' };
+  /**
    * A harmless call proving live credentials work (a token, a balance). Throws a ProviderError: `definite` when the
    * provider refused the credentials, otherwise it could not be reached.
    */
@@ -51,6 +57,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       secret('client_secret', 'Client secret'),
       secret('webhook_secret', 'Webhook signature secret', { required: false, help: 'From Reloadly’s Developers > Webhooks, once BitoCard gives you a webhook address.' }),
     ],
+    notifications: { setup: 'manual', secretField: 'webhook_secret' },
     check: async (values, urls) => {
       const token = await providerRequest<{ access_token?: string }>('reloadly', `${urls.RELOADLY_AUTH_URL}/oauth/token`, {
         method: 'POST',
@@ -78,6 +85,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     name: 'DIDWW',
     description: 'Virtual phone numbers from your own DIDWW account.',
     fields: [secret('api_key', 'API key')],
+    notifications: { setup: 'automatic' },
     check: async (values, urls) => {
       await providerRequest('didww', `${urls.DIDWW_API_URL}/balance`, {
         headers: { 'api-key': values.api_key, accept: 'application/vnd.api+json', 'x-didww-api-version': '2022-05-10' },

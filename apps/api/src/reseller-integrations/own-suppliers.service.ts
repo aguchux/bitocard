@@ -6,6 +6,7 @@ import { type ConnectionRouting, type LedgerMode, Prisma } from '../generated/pr
 import type { CatalogueScope, SupplierAdapter } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { SuppliersService } from '../suppliers/suppliers.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { connectable } from './connectable.js';
 import { ResellerIntegrationsService } from './reseller-integrations.service.js';
 
@@ -25,12 +26,13 @@ export class OwnSuppliersService {
     private readonly connections: ResellerIntegrationsService,
     private readonly adapters: SupplierAdapters,
     private readonly suppliers: SuppliersService,
+    private readonly inbox: InboxService,
   ) {}
 
   /** The adapter on an active own connection (live), or null. Only ever for that reseller's own orders. */
   async adapterFor(resellerId: string, integrationId: string): Promise<SupplierAdapter | null> {
-    const credentials = await this.connections.credentials(resellerId, integrationId, 'live');
-    return credentials ? this.adapters.forAccount(integrationId, credentials) : null;
+    const active = await this.connections.active(resellerId, integrationId, 'live');
+    return active ? this.adapters.forAccount(integrationId, active.credentials, active.id) : null;
   }
 
   /** Fetches the reseller's own catalogue and prices onto BitoCard products. Offers no longer listed become unavailable. */
@@ -106,8 +108,17 @@ export class OwnSuppliersService {
       try {
         await this.sync(row.resellerId, 'live', row.integrationId);
         outcome.synced += 1;
-      } catch {
+      } catch (error) {
         outcome.failed += 1;
+        const name = connectable(row.integrationId)?.name ?? row.integrationId;
+        await this.inbox.reseller(row.resellerId, 'connection.sync_failed', {
+          // Once a day at most.
+          subject: `${row.id}:${new Date().toISOString().slice(0, 10)}`,
+          title: `${name} catalogue not refreshed`,
+          body: `${error instanceof ApiError ? error.message : `Your ${name} catalogue could not be fetched.`} Your last synced offers stay in use; check the connection.`,
+          link: '/integrations',
+          mode: 'live',
+        });
       }
     }
     return outcome;

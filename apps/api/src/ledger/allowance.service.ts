@@ -6,6 +6,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { type AccountRef, LedgerService } from './ledger.service.js';
 import { minor } from './mode.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 /** The startup allowance: US$500, granted once. */
 export const startupAllowanceMinor = 50_000n;
@@ -50,6 +51,7 @@ export class AllowanceService {
     private readonly ledger: LedgerService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly inbox: InboxService,
   ) {}
 
   private accounts(resellerId: string): { allowance: AccountRef; promotions: AccountRef } {
@@ -105,6 +107,13 @@ export class AllowanceService {
       throw error;
     }
     await this.audit.record({ actorId, action: 'allowance.granted', targetType: 'reseller', targetId: resellerId, before: null, after: await this.status(resellerId) });
+    await this.inbox.reseller(resellerId, 'startup_allowance.granted', {
+      subject: resellerId,
+      title: 'Startup allowance granted',
+      body: 'You have a US$500 startup allowance towards the wholesale cost of customer-paid orders. It cannot be withdrawn and does not refill.',
+      link: '/wallet',
+      mode: 'live',
+    });
     return true;
   }
 
@@ -128,6 +137,13 @@ export class AllowanceService {
     await this.prisma.$transaction(tx => this.ledger.write(tx, prepared));
     const after = await this.status(resellerId);
     await this.audit.record({ actorId, action: 'allowance.revoked', targetType: 'reseller', targetId: resellerId, before, after: { ...after, reason } });
+    await this.inbox.reseller(resellerId, 'startup_allowance.revoked', {
+      subject: resellerId,
+      title: 'Startup allowance revoked',
+      body: `BitoCard revoked what remained of your startup allowance. Reason: ${reason}`,
+      link: '/wallet',
+      mode: 'live',
+    });
     return after;
   }
 }

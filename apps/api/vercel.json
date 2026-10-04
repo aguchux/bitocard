@@ -55,6 +55,14 @@
     {
       "path": "/v1/cron/supplier-webhooks",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/v1/cron/push",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/v1/cron/notifications-cleanup",
+      "schedule": "50 3 * * *"
     }
   ]
 }

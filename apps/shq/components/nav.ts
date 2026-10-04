@@ -3,6 +3,7 @@ import {
   Banknote,
   BarChart3,
   Bell,
+  BellRing,
   Building,
   Code2,
   CreditCard,
@@ -45,7 +46,13 @@ export const sections: ShqNavItem[] = [
 
 /** Each section's menu (the second column). A new SHQ page is a folder in `app/(console)` plus its entry here. */
 export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }> = {
-  home: { title: "Home", items: [{ label: "Overview", href: "/", icon: BarChart3 }] },
+  home: {
+    title: "Home",
+    items: [
+      { label: "Overview", href: "/", icon: BarChart3 },
+      { label: "Notifications", href: "/notifications", icon: Bell },
+    ],
+  },
   orders: { title: "Orders", items: [{ label: "All orders", href: "/orders", icon: ListOrdered }, { label: "New order", href: "/orders/new", icon: Sparkles }] },
   catalogue: {
     title: "Catalogue",
@@ -83,6 +90,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Identity check", href: "/settings/verification", icon: ShieldCheck },
       { label: "Plan", href: "/settings/plan", icon: Sparkles },
       { label: "Preferences", href: "/settings/preferences", icon: Bell },
+      { label: "Notifications", href: "/settings/notifications", icon: BellRing },
       { label: "Your profile", href: "/settings/profile", icon: UserCog },
     ],
   },

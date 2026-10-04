@@ -111,6 +111,7 @@ describe('cancelling and renewing', () => {
     const { EmailService } = await import('../dist/notifications/email.service.js');
     const outbox = server.app.get(EmailService).outbox;
     assert.match(outbox.findLast(m => m.to === email).subject, /could not renew your Premium plan/);
+    assert.ok((await browser.get('/v1/notifications')).json.data.some(item => item.type === 'plan.renewal_failed' && item.link === '/settings/plan'));
 
     await billing.renewDue(new Date(due.getTime() + 2 * 86_400_000));
     assert.equal((await browser.get('/v1/subscription')).json.plan.code, 'premium', 'still inside the grace period');

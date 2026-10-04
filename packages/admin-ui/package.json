@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./shell": "./src/shell/index.ts",
     "./format": "./src/format.ts",
+    "./push-worker": "./src/push-worker.ts",
     "./styles.css": "./src/styles.css"
   },
   "scripts": {

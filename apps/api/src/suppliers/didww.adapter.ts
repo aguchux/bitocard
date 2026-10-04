@@ -32,6 +32,11 @@ export type DidwwSettings = {
   countries: string[];
   /** BitoCard's public API address, used for DIDWW's order callbacks (`/v1/webhooks/didww`). */
   callbackBase: string;
+  /**
+   * A reseller's own DIDWW account: its callbacks go to that connection's own address
+   * (`/v1/webhooks/didww/<connection>`), where they are checked with the reseller's own API key.
+   */
+  connectionId?: string;
 };
 
 /**
@@ -148,7 +153,8 @@ export class DidwwAdapter implements SupplierAdapter {
 
   /** The callback address for one order: it names our reference, which is how a lost order is found again. */
   callbackUrl(reference: string) {
-    return `${this.settings.callbackBase.replace(/\/+$/, '')}/v1/webhooks/didww?reference=${encodeURIComponent(reference)}`;
+    const path = this.settings.connectionId ? `/v1/webhooks/didww/${this.settings.connectionId}` : '/v1/webhooks/didww';
+    return `${this.settings.callbackBase.replace(/\/+$/, '')}${path}?reference=${encodeURIComponent(reference)}`;
   }
 
   async placeOrder(request: FulfilmentRequest): Promise<FulfilmentResult> {

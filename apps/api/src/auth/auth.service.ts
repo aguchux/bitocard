@@ -15,6 +15,7 @@ import { presentMembership, presentUser } from './presenters.js';
 import { SessionsService } from './sessions.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
 import type { CreateResellerAccountDto, SignUpDto } from './auth.dto.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 
@@ -53,6 +54,7 @@ export class AuthService {
     private readonly team: TeamService,
     private readonly countries: CountriesService,
     private readonly signupVerification: SignupVerificationService,
+    private readonly inbox: InboxService,
   ) {}
 
   async signUp(input: SignUpDto, req: Request, res: Response) {
@@ -62,6 +64,7 @@ export class AuthService {
     const passwordHash = await this.passwords.hash(input.password);
 
     let user: User;
+    let openedReseller: { id: string; name: string; country: string | null } | null = null;
     try {
       user = await this.prisma.$transaction(async tx => {
         if (invitation) {
@@ -78,6 +81,7 @@ export class AuthService {
         });
         const reseller = await tx.reseller.create({ data: { name: input.business_name ?? input.name, country: input.country } });
         await tx.resellerMember.create({ data: { resellerId: reseller.id, userId: created.id, role: 'owner' } });
+        openedReseller = reseller;
         return created;
       });
     } catch (error) {
@@ -87,6 +91,15 @@ export class AuthService {
       throw error;
     }
 
+    if (invitation) {
+      await this.inbox.reseller(invitation.resellerId, 'team.member_joined', {
+        subject: `${invitation.resellerId}:${user.id}`,
+        title: `${user.name} joined your team`,
+        body: `${user.name} (${user.email}) accepted your invitation as ${invitation.role}.`,
+        link: '/team',
+      });
+    }
+    if (openedReseller) await this.newReseller(openedReseller);
     // A delivery problem must not lose the new account: the person can ask for another code.
     if (!user.emailVerifiedAt) await this.sendVerification(user).catch(error => this.logger.error({ err: error }, 'Could not send the sign-up confirmation code'));
     await this.sessions.create(user.id, 'reseller', req, res);
@@ -100,7 +113,7 @@ export class AuthService {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_unverified', 'Confirm your email before opening a reseller account.');
     }
     await this.countries.assertSignupOpen(input.country);
-    await this.prisma.$transaction(async tx => {
+    const opened = await this.prisma.$transaction(async tx => {
       // Locks the person's row, so two requests at once cannot both open an account.
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
       if (await tx.resellerMember.findFirst({ where: { userId, role: 'owner' } })) {
@@ -108,8 +121,20 @@ export class AuthService {
       }
       const reseller = await tx.reseller.create({ data: { name: input.business_name, country: input.country } });
       await tx.resellerMember.create({ data: { resellerId: reseller.id, userId, role: 'owner' } });
+      return reseller;
     });
+    await this.newReseller(opened);
     return this.describe(userId);
+  }
+
+  /** Tells operations and support a reseller account was opened. */
+  private newReseller(reseller: { id: string; name: string; country: string | null }) {
+    return this.inbox.admins('admin.reseller.signed_up', {
+      subject: reseller.id,
+      title: `New reseller: ${reseller.name}`,
+      body: `${reseller.name}${reseller.country ? ` (${reseller.country})` : ''} opened a reseller account. It goes live after the identity check.`,
+      link: `/resellers/${reseller.id}`,
+    });
   }
 
   async signIn(identifier: string, password: string, req: Request, res: Response) {
@@ -240,6 +265,12 @@ export class AuthService {
     await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await this.passwords.hash(next) } });
     await this.prisma.session.updateMany({ where: { userId, revokedAt: null, id: { not: sessionId } }, data: { revokedAt: new Date() } });
     await this.email.send(passwordChangedEmail(user.email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the password changed notice'));
+    await this.inbox.person(userId, 'security.password_changed', {
+      subject: String(Date.now()),
+      title: 'Your password was changed',
+      body: 'Your other sessions were signed out. If this was not you, reset your password and contact support@bitocard.com.',
+      link: '/settings/profile',
+    });
   }
 
   /** Step 1 of changing the sign-in email: the current password, then a code sent to the new address. */
@@ -269,6 +300,12 @@ export class AuthService {
       throw error;
     }
     await this.email.send(emailChangedEmail(before.email, email)).catch((error: unknown) => this.logger.error({ err: error }, 'Could not send the email changed notice'));
+    await this.inbox.person(userId, 'security.email_changed', {
+      subject: String(Date.now()),
+      title: 'Your sign-in email was changed',
+      body: `You now sign in with ${email} instead of ${before.email}. If this was not you, contact support@bitocard.com.`,
+      link: '/settings/profile',
+    });
     return this.describe(userId);
   }
 

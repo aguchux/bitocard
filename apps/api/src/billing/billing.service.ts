@@ -7,6 +7,7 @@ import { WalletService } from '../ledger/wallet.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { formatMoney, planEndedEmail, planRenewalFailedEmail } from '../notifications/templates.js';
 import { presentPlan } from '../plans/plans.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 /** Days a Premium plan stays on after a failed renewal before it drops to Standard. */
 export const renewalGraceDays = 7;
@@ -31,6 +32,7 @@ export class BillingService {
     private readonly wallets: WalletService,
     private readonly fx: FxService,
     private readonly email: EmailService,
+    private readonly inbox: InboxService,
   ) {}
 
   async subscription(resellerId: string) {
@@ -108,6 +110,13 @@ export class BillingService {
           await this.prisma.reseller.update({ where: { id: reseller.id }, data: { planPastDueSince: now } });
           const price = `US$${(reseller.plan.priceCents / 100).toFixed(2)}`;
           await this.notify(reseller.id, to => planRenewalFailedEmail(to, reseller.plan.name, price, renewalGraceDays));
+          await this.inbox.reseller(reseller.id, 'plan.renewal_failed', {
+            subject: `${reseller.id}:${now.toISOString().slice(0, 10)}`,
+            title: `${reseller.plan.name} renewal failed`,
+            body: `Your wallet could not pay ${price} for ${reseller.plan.name}. Top up within ${renewalGraceDays} days to keep it.`,
+            link: '/settings/plan',
+            mode: 'live',
+          });
         }
         outcome.past_due += 1;
       }
@@ -121,6 +130,13 @@ export class BillingService {
       data: { planCode: 'standard', planRenewsAt: null, planCancelAtPeriodEnd: false, planPastDueSince: null },
     });
     await this.notify(resellerId, to => planEndedEmail(to, planName));
+    await this.inbox.reseller(resellerId, 'plan.ended', {
+      subject: `${resellerId}:${Date.now()}`,
+      title: `${planName} ended`,
+      body: `Your ${planName} plan was not paid and has ended; you are on the Standard plan now.`,
+      link: '/settings/plan',
+      mode: 'live',
+    });
   }
 
   private async notify(resellerId: string, build: (to: string) => Parameters<EmailService['send']>[0]) {

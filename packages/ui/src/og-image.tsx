@@ -27,37 +27,42 @@ async function loadFonts(): Promise<OgFont[] | undefined> {
   }
 }
 
-async function loadLogo() {
-  const logo = await readFile(join(process.cwd(), "public/bitocard-logo.png"));
-  return `data:image/png;base64,${logo.toString("base64")}`;
+/** The "b" mark (navy, or `light` for dark backgrounds) from the app's public/ folder. */
+async function loadMark(light = false) {
+  const mark = await readFile(join(process.cwd(), `public/bitocard-mark${light ? "-light" : ""}.png`));
+  return `data:image/png;base64,${mark.toString("base64")}`;
 }
 
-/** Cropped logo mark, matching the .brand-icon crop used on the sites. */
-function LogoMark({ src, size }: { src: string; size: number }) {
-  const scaled = Math.round(size * 1.42);
-  const offset = Math.round(size * .21);
+/** The mark's width over its height (bitocard-mark.png is 380x512). */
+const markRatio = 380 / 512;
+
+/**
+ * The wordmark as on the sites: the "b" mark as the first letter (ascender height, sitting on the baseline), then
+ * "ito" and the accent-coloured "Card". With Inter at line-height 1 the baseline sits about .14em above the box's foot.
+ */
+function Wordmark({ mark, size, color, accent }: { mark: string; size: number; color: string; accent: string }) {
+  const height = Math.round(size * .74);
   return (
-    <div style={{ display: "flex", width: size, height: size, overflow: "hidden", position: "relative" }}>
+    <div style={{ display: "flex", alignItems: "flex-end", fontSize: size, fontWeight: 800, letterSpacing: -size / 30, lineHeight: 1, color }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain img elements */}
-      <img src={src} alt="" width={scaled} height={scaled} style={{ position: "absolute", left: -offset, top: -offset }} />
+      <img src={mark} alt="" width={Math.round(height * markRatio)} height={height} style={{ marginBottom: Math.round(size * .14), marginRight: Math.round(size * .02) }} />
+      <span>ito</span>
+      <span style={{ color: accent }}>Card</span>
     </div>
   );
 }
 
 /** Light 1200x630 social preview (storefront). */
 export async function brandOgImage({ eyebrow, title, accent, subtitle }: { eyebrow: string; title: string; accent: string; subtitle: string }) {
-  const [logoSrc, fonts] = await Promise.all([loadLogo(), loadFonts()]);
+  const [mark, fonts] = await Promise.all([loadMark(), loadFonts()]);
 
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", position: "relative", overflow: "hidden", background: "#fcfdff", color: "#070f4c", fontFamily: "Inter, sans-serif" }}>
         <div style={{ position: "absolute", right: -160, top: 150, width: 720, height: 560, borderRadius: 400, background: "linear-gradient(110deg, #ffeaf6, #ffc4e5)", transform: "rotate(-25deg)" }} />
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "64px 72px", width: "100%" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <LogoMark src={logoSrc} size={84} />
-            <div style={{ display: "flex", fontSize: 60, fontWeight: 800, letterSpacing: -2 }}>
-              <span>Bito</span><span style={{ color: "#ff2382" }}>Card</span>
-            </div>
+          <div style={{ display: "flex" }}>
+            <Wordmark mark={mark} size={64} color="#070f4c" accent="#ff2382" />
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignSelf: "flex-start", padding: "10px 22px", borderRadius: 30, background: "#fcecf8", fontSize: 20, fontWeight: 800, letterSpacing: 4, textTransform: "uppercase" }}>{eyebrow}</div>
@@ -79,7 +84,7 @@ export async function brandOgImage({ eyebrow, title, accent, subtitle }: { eyebr
 export async function bannerOgImage({ tagline, crumbs, eyebrow, title, accent, subtitle, chips = [] }: {
   tagline: string; crumbs: string[]; eyebrow: string; title: string; accent?: string; subtitle: string; chips?: string[];
 }) {
-  const [logoSrc, fonts] = await Promise.all([loadLogo(), loadFonts()]);
+  const [mark, fonts] = await Promise.all([loadMark(true), loadFonts()]);
   const stacked = Boolean(accent) && title.length + (accent?.length ?? 0) > 26;
 
   return new ImageResponse(
@@ -95,16 +100,9 @@ export async function bannerOgImage({ tagline, crumbs, eyebrow, title, accent, s
       }}>
 
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: "100%", padding: "56px 72px 60px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 76, height: 76, borderRadius: 20, background: "white" }}>
-              <LogoMark src={logoSrc} size={58} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", fontSize: 44, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1 }}>
-                <span>Bito</span><span style={{ color: "#ffb3d6" }}>Card</span>
-              </div>
-              <div style={{ display: "flex", marginTop: 6, fontSize: 20, fontWeight: 600, color: "#c9d1ee" }}>{tagline}</div>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Wordmark mark={mark} size={48} color="white" accent="#ffb3d6" />
+            <div style={{ display: "flex", marginTop: 8, fontSize: 20, fontWeight: 600, color: "#c9d1ee" }}>{tagline}</div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column" }}>

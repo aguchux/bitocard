@@ -47,6 +47,9 @@ const integrationKeyList = [
   'TERMII_API_KEY',
   'TERMII_API_URL',
   'TERMII_SENDER_ID',
+  'WEB_PUSH_PUBLIC_KEY',
+  'WEB_PUSH_PRIVATE_KEY',
+  'WEB_PUSH_SUBJECT',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'GOOGLE_REDIRECT_URI',
@@ -121,6 +124,17 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       secret('TERMII_API_KEY', 'API key'),
       field('TERMII_API_URL', 'API address', { kind: 'url', help: 'Account-specific; shown in the Termii dashboard.' }),
       field('TERMII_SENDER_ID', 'Sender ID'),
+    ],
+  },
+  {
+    id: 'web_push',
+    name: 'Browser push',
+    description:
+      'Push notifications to the browsers people turn them on in (SHQ and the admin app). Switched off until both keys are set; generate a pair with npm run push:keys -w @bitocard/api. Changing the keys stops pushes to every registered browser until it is turned on again.',
+    fields: [
+      field('WEB_PUSH_PUBLIC_KEY', 'Public key (VAPID)', { required: true, help: 'The browser uses it to subscribe.' }),
+      secret('WEB_PUSH_PRIVATE_KEY', 'Private key (VAPID)'),
+      field('WEB_PUSH_SUBJECT', 'Contact', { help: 'A mailto: or https: address push services can contact. Default: mailto:support@bitocard.com' }),
     ],
   },
   {

@@ -3,3 +3,5 @@ export { AccountMenu, type AccountMenuProps, ConsoleShell, type ConsoleShellProp
 export { menus, sections, type NavItem, type SectionKey, type SubNavItem } from './nav';
 export { AdminGate, AdminProviders, can, goToSignIn, AppLink, type AppLinkProps, LinkProvider, ModeProvider, useAdmin, useMode } from './session';
 export { AppProviders } from './app-providers';
+export { NotificationBell, NotificationsInbox, unreadPollMs } from './notifications';
+export { PushSettings, pushSupported, usePushSync } from './push';

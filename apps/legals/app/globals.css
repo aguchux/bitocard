@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "@bitocard/ui/styles/interactive.css";
 
-/* Brand tokens, .wordmark and .brand-icon come from @bitocard/ui/styles/workspace.css; the lockup from brand-lockup.css. */
+/* Brand tokens, .wordmark and the wordmark's "b" mark come from @bitocard/ui/styles/workspace.css; the lockup from brand-lockup.css. */
 
 /* Header with the main menu (Home, Documents dropdown, Contact), shared by every page. */
 .site-header { position: relative; z-index: 20; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }

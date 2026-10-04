@@ -7,6 +7,7 @@ import { LedgerService, type PreparedEntry } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { formatMoney } from '../notifications/templates.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 /** Billionths of a minor unit per minor unit. Rates are parts per billion, so base x rate is the fee in billionths. */
 export const nanoPerMinor = 1_000_000_000n;
@@ -86,6 +87,7 @@ export class PlatformFeesService {
     private readonly ledger: LedgerService,
     private readonly wallets: WalletService,
     private readonly audit: AuditService,
+    private readonly inbox: InboxService,
   ) {}
 
   /** The rule for a transaction: the most specific match, or none (no fee). */
@@ -270,6 +272,15 @@ export class PlatformFeesService {
       return tx.feeCharge.findUniqueOrThrow({ where: { id: charge.id } });
     });
     if (actorId) await this.audit.record({ actorId, action: 'fee.refunded', targetType: 'fee_charge', targetId: charge.id, before: { status: charge.status }, after: { status: 'refunded', amount: amount.toString(), reason } });
+    if (refunded.status === 'refunded' && amount > 0n) {
+      await this.inbox.reseller(charge.resellerId, 'fee.refunded', {
+        subject: charge.id,
+        title: `${formatMoney(amount, charge.currency)} BitoCard fee refunded`,
+        body: `BitoCard refunded its fee to your wallet. Reason: ${reason}`,
+        link: '/wallet/fees',
+        mode: charge.mode,
+      });
+    }
     return refunded;
   }
 

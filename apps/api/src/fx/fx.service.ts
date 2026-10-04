@@ -8,6 +8,7 @@ import { EmailService } from '../notifications/email.service.js';
 import { conversionsPausedEmail } from '../notifications/templates.js';
 import { PaymentProviders } from '../payments/payment-providers.js';
 import { providerRequest } from '../payments/provider-error.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;
@@ -48,6 +49,7 @@ export class FxService {
     private readonly providers: PaymentProviders,
     private readonly email: EmailService,
     private readonly audit: AuditService,
+    private readonly inbox: InboxService,
   ) {}
 
   /** Fetches the latest rates from every configured source, then checks them against each other. */
@@ -124,6 +126,12 @@ export class FxService {
     const after = await this.prisma.currencySetting.update({ where: { currency }, data: { paused: true, pausedReason: reason } });
     await this.audit.record({ actorId: null, action: 'currency.paused', targetType: 'currency', targetId: currency, before, after });
     this.logger.error({ currency, reason }, 'Conversions paused');
+    await this.inbox.admins('admin.fx.paused', {
+      subject: `${currency}:${Date.now()}`,
+      title: `${currency} conversions paused`,
+      body: `${reason} Conversions in ${currency} stay paused until a finance admin resumes them.`,
+      link: '/settings/markets',
+    });
     await this.email.send(conversionsPausedEmail(this.config.ALERT_EMAIL, currency, reason)).catch(error => this.logger.error({ err: error }, 'Could not send the alert'));
   }
 

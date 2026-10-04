@@ -6,6 +6,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { Invitation, ResellerRole } from '../generated/prisma/client.js';
 import { EmailService } from '../notifications/email.service.js';
 import { invitationEmail } from '../notifications/templates.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 export const staffRoles = ['admin', 'developer', 'finance', 'support'] as const;
 const invitationLifetimeMs = 7 * 24 * 60 * 60 * 1000;
@@ -37,6 +38,7 @@ export class TeamService {
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly integrations: IntegrationsService,
+    private readonly inbox: InboxService,
   ) {}
 
   async team(resellerId: string) {
@@ -107,7 +109,18 @@ export class TeamService {
       // Following the emailed link proves the address.
       this.prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: user.emailVerifiedAt ?? new Date() } }),
     ]);
+    await this.joined(invitation.resellerId, user, invitation.role);
     return { object: 'membership_created' as const, reseller_id: invitation.resellerId, role: invitation.role };
+  }
+
+  /** Tells the owner and admins someone joined (by invitation, signed up or signed in). */
+  async joined(resellerId: string, user: { id: string; name: string; email: string }, role: ResellerRole) {
+    await this.inbox.reseller(resellerId, 'team.member_joined', {
+      subject: `${resellerId}:${user.id}`,
+      title: `${user.name} joined your team`,
+      body: `${user.name} (${user.email}) accepted your invitation as ${role}.`,
+      link: '/team',
+    });
   }
 
   async changeRole(resellerId: string, userId: string, role: ResellerRole) {

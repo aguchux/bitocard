@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { categoryName, CodeInput, DataTable, formatBps, formatMoney, formatRelative, LineChart, percentChange, StatusBadge, Trend } from '../src';
 import { useState } from 'react';
-import { AdminGate, AdminProviders, AdminShell, can, useAdmin } from '../src/shell';
+import { AdminGate, AdminProviders, AdminShell, can, NotificationBell, NotificationsInbox, PushSettings, useAdmin } from '../src/shell';
+import { pushServiceWorker } from '../src/push-worker';
 
 afterEach(cleanup);
 
@@ -186,5 +187,146 @@ describe('code input', () => {
     render(<Harness onComplete={onComplete} />);
     fireEvent.change(boxes()[0], { target: { value: '246810' } });
     expect(boxes().map(box => box.value).join('')).toBe('246810');
+  });
+});
+
+describe('notifications', () => {
+  const item = (id: string, extra: Record<string, unknown> = {}) => ({
+    object: 'notification',
+    id,
+    type: 'admin.order.needs_review',
+    severity: 'warning',
+    title: `Order ${id} unclear`,
+    body: 'Still unconfirmed after every check.',
+    link: `/orders/${id}`,
+    mode: null,
+    read: false,
+    read_at: null,
+    created_at: new Date().toISOString(),
+    ...extra,
+  });
+  let calls: Array<{ method: string; url: string }>;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_API_URL = 'http://api.test';
+    calls = [];
+    vi.stubGlobal('fetch', async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      calls.push({ method: request.method, url: `${url.pathname}${url.search}` });
+      if (url.pathname.endsWith('/unread-count')) return Response.json({ object: 'unread_count', count: 2 });
+      if (url.pathname.endsWith('/read-all')) return Response.json({ object: 'notifications_read', updated: 2 });
+      if (url.pathname.endsWith('/read')) return Response.json(item('n1', { read: true }));
+      if (url.searchParams.get('unread') === 'true') return Response.json({ object: 'list', data: [], has_more: false, unread_count: 0 });
+      return Response.json({ object: 'list', data: [item('n1'), item('n2', { severity: 'critical', mode: 'test', read: true, link: null })], has_more: false, unread_count: 2 });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  test('the bell shows the unread count and the latest notifications; opening one marks it read', async () => {
+    render(
+      <AdminProviders>
+        <NotificationBell realm="admin" />
+      </AdminProviders>,
+    );
+    const bell = await screen.findByRole('button', { name: 'Notifications, 2 unread' });
+    expect(calls[0].url).toBe('/v1/admin/notifications/unread-count');
+    fireEvent.click(bell);
+    const menu = await screen.findByRole('dialog', { name: 'Notifications' });
+    expect(await within(menu).findByText('Order n1 unclear')).toBeTruthy();
+    expect(within(menu).getByText('Sandbox')).toBeTruthy();
+    expect(within(menu).getByLabelText('Urgent')).toBeTruthy();
+    expect(within(menu).getAllByLabelText('Unread')).toHaveLength(1);
+    expect(within(menu).getByText('See all notifications').closest('a')!.getAttribute('href')).toBe('/notifications');
+    fireEvent.click(within(menu).getByText('Order n1 unclear'));
+    await waitFor(() => expect(calls.some(call => call.method === 'POST' && call.url === '/v1/admin/notifications/n1/read')).toBe(true));
+    expect(screen.queryByRole('dialog', { name: 'Notifications' })).toBeNull();
+  });
+
+  test('the inbox lists everything, filters unread and marks all read', async () => {
+    render(
+      <AdminProviders>
+        <NotificationsInbox realm="reseller" />
+      </AdminProviders>,
+    );
+    expect(await screen.findByText('Order n2 unclear')).toBeTruthy();
+    expect(calls.some(call => call.url.startsWith('/v1/notifications?'))).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
+    await waitFor(() => expect(calls.some(call => call.method === 'POST' && call.url === '/v1/notifications/read-all')).toBe(true));
+    fireEvent.click(screen.getByRole('tab', { name: /Unread/ }));
+    expect(await screen.findByText('No unread notifications')).toBeTruthy();
+  });
+});
+
+describe('push', () => {
+  let calls: Array<{ method: string; url: string; body: string }>;
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_API_URL = 'http://api.test';
+    calls = [];
+    vi.stubGlobal('fetch', async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      calls.push({ method: request.method, url: url.pathname, body: request.method === 'GET' ? '' : await request.clone().text() });
+      if (url.pathname.endsWith('/push-settings')) return Response.json({ object: 'push_settings', enabled: true, public_key: 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U' });
+      if (url.pathname.endsWith('/devices') && request.method === 'GET') {
+        return Response.json({ object: 'list', data: [{ object: 'device', id: 'd1', channel: 'web_push', label: 'Chrome on Windows', current: false, last_pushed_at: null, last_seen_at: new Date().toISOString(), created_at: new Date().toISOString() }] });
+      }
+      if (url.pathname.endsWith('/test')) return Response.json({ object: 'push_test', sent: false, error: 'HTTP 410' });
+      if (request.method === 'DELETE') return new Response(null, { status: 204 });
+      if (url.pathname.endsWith('/notification-preferences')) {
+        return Response.json({
+          object: 'list',
+          data: [
+            { object: 'notification_preference', type: 'top_up.credited', label: 'Wallet topped up', severity: 'success', push: false, default: false, locked: false },
+            { object: 'notification_preference', type: 'payout.failed', label: 'Withdrawal failed', severity: 'critical', push: true, default: true, locked: true },
+          ],
+        });
+      }
+      return Response.json({ object: 'notification_preference', type: 'top_up.credited', label: 'Wallet topped up', severity: 'success', push: true, default: false, locked: false });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  test('settings list devices and preferences; urgent ones cannot be turned off; devices can be tested and removed', async () => {
+    render(
+      <AdminProviders>
+        <PushSettings realm="reseller" userId="u1" />
+      </AdminProviders>,
+    );
+    expect(await screen.findByText('Chrome on Windows')).toBeTruthy();
+    // jsdom has no service workers, like a browser without push support.
+    expect(screen.getByText(/This browser cannot receive push notifications/)).toBeTruthy();
+    const locked = await screen.findByRole('switch', { name: 'Push “Withdrawal failed”' });
+    expect((locked as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('switch', { name: 'Push “Wallet topped up”' }));
+    await waitFor(() => expect(calls.some(call => call.method === 'PUT' && call.url === '/v1/notification-preferences/top_up.credited' && call.body === '{"push":true}')).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Test' }));
+    expect(await screen.findByText('The test push was not accepted (HTTP 410).')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Chrome on Windows' }));
+    await waitFor(() => expect(calls.some(call => call.method === 'DELETE' && call.url === '/v1/devices/d1')).toBe(true));
+  });
+
+  test('the service worker shows each push and opens its page in the right account and mode', async () => {
+    const listeners: Record<string, (event: unknown) => void> = {};
+    const shown: Array<{ title: string; options: { body: string; tag: string; requireInteraction: boolean; data: { url: string } } }> = [];
+    const opened: string[] = [];
+    const scope = {
+      location: { origin: 'https://shq.bitocard.com' },
+      addEventListener: (name: string, listener: (event: unknown) => void) => (listeners[name] = listener),
+      skipWaiting: () => undefined,
+      registration: { showNotification: async (title: string, options: never) => void shown.push({ title, options }) },
+      clients: { claim: async () => undefined, matchAll: async () => [], openWindow: async (url: string) => void opened.push(url) },
+    };
+    new Function('self', pushServiceWorker)(scope);
+    const waits: Array<Promise<unknown>> = [];
+    const push = (data: unknown) => listeners.push({ data: { json: () => data }, waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    push({ id: 'n1', title: 'Withdrawal failed', body: 'Back in your earnings.', severity: 'critical', link: '/wallet/payouts', mode: 'test', account: 'r1' });
+    push({ id: 'n2', title: 'Evil', body: '', severity: 'info', link: 'https://evil.example/x', mode: null, account: null });
+    await Promise.all(waits);
+    expect(shown[0]).toMatchObject({ title: 'Withdrawal failed', options: { body: 'Back in your earnings.', tag: 'n1', requireInteraction: true, data: { url: 'https://shq.bitocard.com/wallet/payouts?account=r1&mode=test' } } });
+    expect(shown[1].options.data.url).toBe('https://shq.bitocard.com/notifications');
+    listeners.notificationclick({ notification: { close: () => undefined, data: shown[0].options.data }, waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    await Promise.all(waits);
+    expect(opened).toEqual(['https://shq.bitocard.com/wallet/payouts?account=r1&mode=test']);
   });
 });

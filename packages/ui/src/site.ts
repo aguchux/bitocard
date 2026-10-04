@@ -2,7 +2,12 @@ export const brand = {
   name: "BitoCard",
   owner: "Golojan Ltd",
   credit: "A Golojan Ltd venture",
+  /** The square logo (favicons, app icons, push): the "b" mark with room around it. */
   logo: "/bitocard-logo.png",
+  /** The "b" mark, tightly cropped: the first letter of the wordmark. `-light` versions are for navy backgrounds. */
+  mark: "/bitocard-mark.png",
+  logoLight: "/bitocard-logo-light.png",
+  markLight: "/bitocard-mark-light.png",
 } as const;
 
 const apps = {

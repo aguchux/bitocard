@@ -2,9 +2,9 @@
 // Money is stored in integer minor units; balances are always derived from ledger entries (added in M4).
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "esm"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
   importFileExtension = "js"
 }
 
@@ -75,12 +75,15 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  oauthAccounts     OAuthAccount[]
-  sessions          Session[]
-  verificationCodes VerificationCode[]
-  totp              TotpCredential?
-  memberships       ResellerMember[]
-  apiKeysCreated    ApiKey[]
+  oauthAccounts           OAuthAccount[]
+  sessions                Session[]
+  verificationCodes       VerificationCode[]
+  totp                    TotpCredential?
+  memberships             ResellerMember[]
+  apiKeysCreated          ApiKey[]
+  notifications           Notification[]
+  devices                 Device[]
+  notificationPreferences NotificationPreference[]
 
   @@unique([realm, email])
   @@unique([realm, phone])
@@ -104,16 +107,16 @@ model OAuthAccount {
 /// A Google sign-in in progress (10 minutes). The browser holds the state token in a cookie; this holds the PKCE verifier.
 model OAuthState {
   /// SHA-256 of the state token.
-  id           String   @id @db.Char(64)
-  codeVerifier String   @map("code_verifier")
+  id           String      @id @db.Char(64)
+  codeVerifier String      @map("code_verifier")
   nonce        String
-  returnTo     String   @map("return_to")
+  returnTo     String      @map("return_to")
   /// Set when a signed-in person is linking Google to their existing account.
   linkUserId   String?     @map("link_user_id") @db.Uuid
   /// Only `signup` creates an account; `signin` with an unknown Google account fails.
   intent       OAuthIntent @default(signin)
-  expiresAt    DateTime @map("expires_at")
-  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime    @map("expires_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
 
   @@map("oauth_states")
 }
@@ -227,38 +230,38 @@ enum FeeChargeStatus {
 
 /// One platform fee: its rule, base and exact amount, what was held and charged, and the carried fraction before and after.
 model FeeCharge {
-  id              String          @id @default(uuid()) @db.Uuid
-  resellerId      String          @map("reseller_id") @db.Uuid
+  id              String           @id @default(uuid()) @db.Uuid
+  resellerId      String           @map("reseller_id") @db.Uuid
   mode            LedgerMode
-  currency        String          @db.Char(3)
+  currency        String           @db.Char(3)
   kind            FeeKind
   /// What the fee is on: `order` or `payment`, and its id.
-  sourceType      String          @map("source_type")
-  sourceId        String          @map("source_id")
+  sourceType      String           @map("source_type")
+  sourceId        String           @map("source_id")
   /// `fee:<source type>:<source id>`: one fee per transaction.
-  reference       String          @unique
+  reference       String           @unique
   category        ProductCategory?
   /// The reseller's country and plan when charged, for reports.
-  countryCode     String?         @map("country_code") @db.Char(2)
-  planCode        String?         @map("plan_code")
-  ruleId          String?         @map("rule_id") @db.Uuid
-  ratePpb         Int             @map("rate_ppb")
-  baseMinor       BigInt          @map("base_minor")
-  minFeeMinor     BigInt?         @map("min_fee_minor")
+  countryCode     String?          @map("country_code") @db.Char(2)
+  planCode        String?          @map("plan_code")
+  ruleId          String?          @map("rule_id") @db.Uuid
+  ratePpb         Int              @map("rate_ppb")
+  baseMinor       BigInt           @map("base_minor")
+  minFeeMinor     BigInt?          @map("min_fee_minor")
   /// The exact fee in billionths of a minor unit (base x rate in parts per billion).
-  exactNano       BigInt          @map("exact_nano")
-  heldMinor       BigInt          @map("held_minor")
-  holdId          String?         @map("hold_id") @db.Uuid
-  status          FeeChargeStatus @default(held)
-  chargedMinor    BigInt?         @map("charged_minor")
-  carryBeforeNano BigInt?         @map("carry_before_nano")
-  carryAfterNano  BigInt?         @map("carry_after_nano")
+  exactNano       BigInt           @map("exact_nano")
+  heldMinor       BigInt           @map("held_minor")
+  holdId          String?          @map("hold_id") @db.Uuid
+  status          FeeChargeStatus  @default(held)
+  chargedMinor    BigInt?          @map("charged_minor")
+  carryBeforeNano BigInt?          @map("carry_before_nano")
+  carryAfterNano  BigInt?          @map("carry_after_nano")
   /// What a minimum fee added beyond the exact fee and carry (billionths), so reconciliation still adds up.
-  extraNano       BigInt?         @map("extra_nano")
-  refundReason    String?         @map("refund_reason")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  settledAt       DateTime?       @map("settled_at")
-  reseller        Reseller        @relation(fields: [resellerId], references: [id])
+  extraNano       BigInt?          @map("extra_nano")
+  refundReason    String?          @map("refund_reason")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  settledAt       DateTime?        @map("settled_at")
+  reseller        Reseller         @relation(fields: [resellerId], references: [id])
 
   @@index([resellerId, mode, createdAt])
   @@index([status, createdAt])
@@ -339,31 +342,31 @@ enum ConnectionStatus {
 
 /// A reseller's own account with a supplier or payment gateway, per mode. Credentials are encrypted, never returned.
 model ResellerConnection {
-  id                   String           @id @default(uuid()) @db.Uuid
-  resellerId           String           @map("reseller_id") @db.Uuid
-  integrationId        String           @map("integration_id")
+  id                   String            @id @default(uuid()) @db.Uuid
+  resellerId           String            @map("reseller_id") @db.Uuid
+  integrationId        String            @map("integration_id")
   mode                 LedgerMode
   status               ConnectionStatus
   /// Every credential as encrypted JSON; erased on disconnection or rejection.
-  credentialsEncrypted String?          @map("credentials_encrypted")
+  credentialsEncrypted String?           @map("credentials_encrypted")
   /// Non-secret values (shown back), and the last four characters of secrets.
-  publicValues         Json             @default("{}") @map("public_values")
-  hints                Json             @default("{}")
-  lastCheckedAt        DateTime?        @map("last_checked_at")
-  lastCheckOk          Boolean?         @map("last_check_ok")
-  lastCheckMessage     String?          @map("last_check_message")
+  publicValues         Json              @default("{}") @map("public_values")
+  hints                Json              @default("{}")
+  lastCheckedAt        DateTime?         @map("last_checked_at")
+  lastCheckOk          Boolean?          @map("last_check_ok")
+  lastCheckMessage     String?           @map("last_check_message")
   /// Why an admin rejected or suspended it (shown to the reseller).
-  decisionNote         String?          @map("decision_note")
-  decidedById          String?          @map("decided_by_id") @db.Uuid
-  decidedAt            DateTime?        @map("decided_at")
-  connectedById        String?          @map("connected_by_id") @db.Uuid
+  decisionNote         String?           @map("decision_note")
+  decidedById          String?           @map("decided_by_id") @db.Uuid
+  decidedAt            DateTime?         @map("decided_at")
+  connectedById        String?           @map("connected_by_id") @db.Uuid
   /// Suppliers: when to use this account's offers instead of BitoCard's.
   routing              ConnectionRouting @default(preferred)
-  lastSyncedAt         DateTime?        @map("last_synced_at")
-  lastSyncError        String?          @map("last_sync_error")
-  createdAt            DateTime         @default(now()) @map("created_at")
-  updatedAt            DateTime         @updatedAt @map("updated_at")
-  reseller             Reseller         @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  lastSyncedAt         DateTime?         @map("last_synced_at")
+  lastSyncError        String?           @map("last_sync_error")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  reseller             Reseller          @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   offers               ResellerOffer[]
 
   @@unique([resellerId, integrationId, mode])
@@ -394,35 +397,35 @@ enum ResellerStatus {
 
 /// A reseller business. Stores, wallets and countries attach to it in later milestones.
 model Reseller {
-  id                    String            @id @default(uuid()) @db.Uuid
+  id                    String                 @id @default(uuid()) @db.Uuid
   name                  String
   /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
-  country               String?           @db.Char(2)
-  status                ResellerStatus    @default(pending)
+  country               String?                @db.Char(2)
+  status                ResellerStatus         @default(pending)
   /// When the business owner passed the identity check (Didit); required before going live.
-  verifiedAt            DateTime?         @map("verified_at")
+  verifiedAt            DateTime?              @map("verified_at")
   /// The owner's name as verified, for matching payout bank accounts.
-  verifiedName          String?           @map("verified_name")
+  verifiedName          String?                @map("verified_name")
   /// The owner's BVN was checked with Flutterwave and its name matched the verified owner (Nigeria; reserved accounts).
-  bvnVerifiedAt         DateTime?         @map("bvn_verified_at")
+  bvnVerifiedAt         DateTime?              @map("bvn_verified_at")
   /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
-  planCode              String            @default("standard") @map("plan_code")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
+  planCode              String                 @default("standard") @map("plan_code")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
   members               ResellerMember[]
   invitations           Invitation[]
   apiKeys               ApiKey[]
-  countryRef            Country?          @relation(fields: [country], references: [code])
-  plan                  Plan              @relation(fields: [planCode], references: [code])
+  countryRef            Country?               @relation(fields: [country], references: [code])
+  plan                  Plan                   @relation(fields: [planCode], references: [code])
   stores                Store[]
   options               ResellerOption[]
   switches              FeatureSwitch[]
   /// Premium billing (M4): when the next monthly charge is due. Null means not billed (Standard, or a plan set by an admin).
-  planRenewsAt          DateTime?         @map("plan_renews_at")
+  planRenewsAt          DateTime?              @map("plan_renews_at")
   /// Switch to Standard at the next renewal instead of charging.
-  planCancelAtPeriodEnd Boolean           @default(false) @map("plan_cancel_at_period_end")
+  planCancelAtPeriodEnd Boolean                @default(false) @map("plan_cancel_at_period_end")
   /// Set when a renewal charge failed; the plan drops to Standard after the grace period.
-  planPastDueSince      DateTime?         @map("plan_past_due_since")
+  planPastDueSince      DateTime?              @map("plan_past_due_since")
   ledgerAccounts        LedgerAccount[]
   holds                 Hold[]
   earningsLots          EarningsLot[]
@@ -627,19 +630,21 @@ enum StoreStatus {
 
 /// A reseller's hosted storefront on <subdomain>.bitocard.com.
 model Store {
-  id           String      @id @default(uuid()) @db.Uuid
-  resellerId   String      @map("reseller_id") @db.Uuid
-  name         String
+  id            String         @id @default(uuid()) @db.Uuid
+  resellerId    String         @map("reseller_id") @db.Uuid
+  name          String
   /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.
-  subdomain    String      @unique
-  status       StoreStatus @default(draft)
-  logoUrl      String?     @map("logo_url")
-  primaryColor String      @default("#070f4c") @map("primary_color")
-  accentColor  String      @default("#ff2382") @map("accent_color")
-  publishedAt  DateTime?   @map("published_at")
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
-  reseller     Reseller    @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  subdomain     String         @unique
+  status        StoreStatus    @default(draft)
+  logoUrl       String?        @map("logo_url")
+  primaryColor  String         @default("#070f4c") @map("primary_color")
+  accentColor   String         @default("#ff2382") @map("accent_color")
+  publishedAt   DateTime?      @map("published_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  reseller      Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+  devices       Device[]
 
   @@index([resellerId])
   @@map("stores")
@@ -1401,37 +1406,37 @@ enum VerificationStatus {
 
 /// One identity check. Keeps only the outcome and the verified name: never document images, ID numbers or the BVN.
 model IdentityVerification {
-  id                String               @id @default(uuid()) @db.Uuid
+  id                String              @id @default(uuid()) @db.Uuid
   subject           VerificationSubject
-  resellerId        String               @map("reseller_id") @db.Uuid
+  resellerId        String              @map("reseller_id") @db.Uuid
   mode              LedgerMode
   /// The reseller's own reference for the customer (customer checks only).
-  customerReference String?              @map("customer_reference")
+  customerReference String?             @map("customer_reference")
   method            VerificationMethod
   /// didit, flutterwave or sandbox.
   provider          String
   /// The provider's session or consent reference.
-  providerReference String               @map("provider_reference")
-  status            VerificationStatus   @default(in_progress)
+  providerReference String              @map("provider_reference")
+  status            VerificationStatus  @default(in_progress)
   /// Where the person completes the check (provider-hosted).
   url               String?
-  country           String               @db.Char(2)
+  country           String              @db.Char(2)
   /// When the person agreed to the check (biometric and BVN data need explicit consent).
-  consentAt         DateTime             @map("consent_at")
-  expectedName      String?              @map("expected_name")
+  consentAt         DateTime            @map("consent_at")
+  expectedName      String?             @map("expected_name")
   /// A reseller owner's BVN, encrypted, kept only until their reserved accounts are opened (the bank needs it), then erased;
   /// erased at once if the check fails or expires.
-  secretEncrypted   String?              @map("secret_encrypted")
-  verifiedName      String?              @map("verified_name")
-  documentCountry   String?              @map("document_country") @db.Char(2)
+  secretEncrypted   String?             @map("secret_encrypted")
+  verifiedName      String?             @map("verified_name")
+  documentCountry   String?             @map("document_country") @db.Char(2)
   /// Why it was declined or sent for review (shown to admins; a short code to resellers).
   reason            String?
-  requestedById     String?              @map("requested_by_id") @db.Uuid
-  decidedById       String?              @map("decided_by_id") @db.Uuid
-  decidedAt         DateTime?            @map("decided_at")
-  lastCheckedAt     DateTime?            @map("last_checked_at")
-  createdAt         DateTime             @default(now()) @map("created_at")
-  reseller          Reseller             @relation(fields: [resellerId], references: [id])
+  requestedById     String?             @map("requested_by_id") @db.Uuid
+  decidedById       String?             @map("decided_by_id") @db.Uuid
+  decidedAt         DateTime?           @map("decided_at")
+  lastCheckedAt     DateTime?           @map("last_checked_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  reseller          Reseller            @relation(fields: [resellerId], references: [id])
 
   @@unique([provider, providerReference])
   @@index([resellerId, subject, mode, customerReference, createdAt])
@@ -1466,26 +1471,170 @@ enum SupplierWebhookStatus {
 /// Every notification a supplier sends (Reloadly first), stored before it is acknowledged so none is lost. The body is
 /// never trusted: it only says which order to re-check with the supplier. Retries of the same delivery are stored once.
 model SupplierWebhook {
-  id            String                @id @default(uuid()) @db.Uuid
-  supplierCode  String                @map("supplier_code")
-  eventType     String?               @map("event_type")
+  id                    String                @id @default(uuid()) @db.Uuid
+  supplierCode          String                @map("supplier_code")
+  eventType             String?               @map("event_type")
   /// SHA-256 of the raw body: a supplier's retry of the same delivery is recognised and stored once.
-  bodyHash      String                @map("body_hash")
+  bodyHash              String                @map("body_hash")
   /// The raw body, encrypted with ENCRYPTION_KEY (it may carry customer details); never returned by the API.
-  bodyEncrypted String                @map("body_encrypted")
+  bodyEncrypted         String                @map("body_encrypted")
   /// Our order reference the notification names (Reloadly's customIdentifier), and the supplier's transaction ID.
-  reference     String?
-  supplierTransactionId String?       @map("supplier_transaction_id")
-  orderId       String?               @map("order_id") @db.Uuid
-  status        SupplierWebhookStatus @default(received)
-  attempts      Int                   @default(0)
-  lastError     String?               @map("last_error")
-  nextAttemptAt DateTime              @default(now()) @map("next_attempt_at")
-  receivedAt    DateTime              @default(now()) @map("received_at")
-  processedAt   DateTime?             @map("processed_at")
+  reference             String?
+  supplierTransactionId String?               @map("supplier_transaction_id")
+  /// Set when it came to a reseller's own connection's address (signed with their own secret): it can only name
+  /// that reseller's own orders. Null for BitoCard's own supplier accounts.
+  connectionId          String?               @map("connection_id") @db.Uuid
+  orderId               String?               @map("order_id") @db.Uuid
+  status                SupplierWebhookStatus @default(received)
+  attempts              Int                   @default(0)
+  lastError             String?               @map("last_error")
+  nextAttemptAt         DateTime              @default(now()) @map("next_attempt_at")
+  receivedAt            DateTime              @default(now()) @map("received_at")
+  processedAt           DateTime?             @map("processed_at")
 
   @@unique([supplierCode, bodyHash])
   @@index([status, nextAttemptAt])
   @@index([orderId])
+  @@index([connectionId, receivedAt])
   @@map("supplier_webhooks")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications inbox (every role, both realms)
+// ---------------------------------------------------------------------------
+
+enum NotificationSeverity {
+  info
+  success
+  warning
+  critical
+}
+
+/// Who a notification, device or push preference belongs to. Admins and reseller staff are users; customers are
+/// hosted-storefront customers (accounts scoped to one store and owned by its reseller, built with hosted checkout).
+enum NotificationAudience {
+  admin
+  reseller
+  customer
+}
+
+/// One in-app notification for one recipient (fanned out to everyone whose role should see it when it is created, so
+/// read state is per recipient). Exactly one of `userId` (admins and reseller staff) or `customerId` (storefront
+/// customers, with their store) is set, checked by the database. Reseller notifications name their reseller account;
+/// personal ones (security notices) and admin ones do not. Kept 90 days.
+model Notification {
+  id         String               @id @default(uuid()) @db.Uuid
+  audience   NotificationAudience
+  userId     String?              @map("user_id") @db.Uuid
+  /// A storefront customer. Its foreign key is added with the customers table.
+  customerId String?              @map("customer_id") @db.Uuid
+  resellerId String?              @map("reseller_id") @db.Uuid
+  /// Customers: the store whose name, address and brand the notification uses.
+  storeId    String?              @map("store_id") @db.Uuid
+  /// From `notificationTypes` (src/notifications/inbox.ts).
+  type       String
+  severity   NotificationSeverity @default(info)
+  title      String
+  body       String
+  /// A path in the recipient's app (SHQ, admin, or the customer's store), for example `/orders/<id>`.
+  link       String?
+  /// Sandbox notifications are labelled; null when the mode does not apply.
+  mode       LedgerMode?
+  /// The same thing is notified to a recipient once (jobs may run twice): `<type>:<subject id>`.
+  dedupeKey  String               @map("dedupe_key")
+  readAt     DateTime?            @map("read_at")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  user       User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store      Store?               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  pushes     PushDelivery[]
+
+  @@unique([userId, dedupeKey])
+  @@unique([customerId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Device push (Web Push to signed-in browsers)
+// ---------------------------------------------------------------------------
+
+enum DeviceChannel {
+  /// A browser's Web Push subscription (VAPID, RFC 8030/8291). Native app channels can be added later.
+  web_push
+}
+
+/// One signed-in browser or device that receives push notifications, with its own ID. Belongs to a user (admins,
+/// reseller staff) or a storefront customer (on that store's address), exactly one, checked by the database. Tied to
+/// the session that registered it: once that session ends (sign-out, expiry, password change), the device is dropped
+/// at the next push.
+model Device {
+  id            String               @id @default(uuid()) @db.Uuid
+  audience      NotificationAudience
+  userId        String?              @map("user_id") @db.Uuid
+  customerId    String?              @map("customer_id") @db.Uuid
+  /// Customers: the store whose address the browser subscribed on.
+  storeId       String?              @map("store_id") @db.Uuid
+  /// The staff session (`sessions`) or, for customers, their storefront session.
+  sessionId     String               @map("session_id") @db.Uuid
+  channel       DeviceChannel        @default(web_push)
+  /// The push service address (unique per browser subscription).
+  endpoint      String               @unique
+  /// The subscription's p256dh and auth keys, encrypted with ENCRYPTION_KEY.
+  keysEncrypted String               @map("keys_encrypted")
+  /// For people to recognise it, for example "Chrome on Windows".
+  label         String
+  failures      Int                  @default(0)
+  lastPushedAt  DateTime?            @map("last_pushed_at")
+  lastSeenAt    DateTime             @default(now()) @map("last_seen_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  user          User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store         Store?               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  pushes        PushDelivery[]
+
+  @@index([userId])
+  @@index([customerId])
+  @@map("devices")
+}
+
+enum PushDeliveryStatus {
+  pending
+  sent
+  failed
+}
+
+/// One notification pushed to one device: at most once (unique), retried briefly, then given up (push is ephemeral).
+model PushDelivery {
+  id             String             @id @default(uuid()) @db.Uuid
+  notificationId String             @map("notification_id") @db.Uuid
+  deviceId       String             @map("device_id") @db.Uuid
+  status         PushDeliveryStatus @default(pending)
+  attempts       Int                @default(0)
+  nextAttemptAt  DateTime           @default(now()) @map("next_attempt_at")
+  lastError      String?            @map("last_error")
+  sentAt         DateTime?          @map("sent_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  notification   Notification       @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  device         Device             @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, deviceId])
+  @@index([status, nextAttemptAt])
+  @@map("push_deliveries")
+}
+
+/// A recipient's choice to push (or not) one notification type to their devices (a user or a customer, exactly one).
+/// Without a row, the type's default applies. Urgent and security types are always pushed.
+model NotificationPreference {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  customerId String?  @map("customer_id") @db.Uuid
+  type       String
+  push       Boolean
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@unique([customerId, type])
+  @@map("notification_preferences")
 }

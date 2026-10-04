@@ -12,7 +12,7 @@ import {
   useVerifySignupEmailMutation,
 } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
-import { Button, CodeInput, cn, errorMessage, Notice, Select, Skeleton } from "@bitocard/admin-ui";
+import { Button, CodeInput, cn, errorMessage, Notice, Select, Skeleton, Wordmark } from "@bitocard/admin-ui";
 import { continueWithGoogle, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
 type Step = "details" | "verify" | "business" | "password";
@@ -180,10 +180,8 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8 flex items-center gap-3 lg:hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
-        <img src="/bitocard-logo.png" alt="" className="size-10 rounded-xl" />
-        <span className="text-lg font-extrabold tracking-tight text-ink">BitoCard SHQ</span>
+      <div className="mb-8 flex items-center lg:hidden">
+        <Wordmark suffix="SHQ" className="text-3xl" />
       </div>
       <h2 className="text-3xl font-extrabold tracking-tight text-ink">{invitation ? "Join your team" : "Create your reseller account"}</h2>
       <p className="mt-2 text-sm text-muted">

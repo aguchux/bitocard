@@ -27,8 +27,29 @@ export type ResellerConnection = {
   /** Why BitoCard rejected or suspended it. */
   decision_note: string | null;
   last_check: { checked_at: string; ok: boolean | null; message: string | null } | null;
+  /**
+   * Live suppliers that send order updates: this connection's own address. `manual`: enter it in the supplier's
+   * dashboard and save the signature secret (`ready` once saved); `automatic`: BitoCard gives it on every order.
+   */
+  notifications: { url: string; setup: 'manual' | 'automatic'; ready: boolean } | null;
   created_at: string;
   updated_at: string;
+};
+
+/** An order update your own supplier account sent, and what became of it. */
+export type SupplierNotification = {
+  object: 'supplier_webhook';
+  id: string;
+  event_type: string | null;
+  reference: string | null;
+  supplier_transaction_id: string | null;
+  order_id: string | null;
+  status: 'received' | 'processed' | 'unmatched' | 'failed';
+  attempts: number;
+  last_error: string | null;
+  next_attempt_at: string | null;
+  received_at: string;
+  processed_at: string | null;
 };
 
 export type ResellerIntegration = {
@@ -68,6 +89,12 @@ export const resellerIntegrationsApi = bitocardApi.injectEndpoints({
       query: ({ id, routing }) => ({ url: `/v1/integrations/${id}/connection/routing`, method: 'PUT', body: { routing } }),
       invalidatesTags: ['ResellerIntegration', 'Catalogue'],
     }),
+    /** What your own live supplier account notified (newest first). */
+    integrationNotifications: build.infiniteQuery<{ object: 'list'; data: SupplierNotification[]; has_more: boolean }, string, string>({
+      infiniteQueryOptions: { initialPageParam: '', getNextPageParam: last => (last.has_more ? last.data.at(-1)?.id : undefined) },
+      query: ({ queryArg: id, pageParam }) => ({ url: `/v1/integrations/${id}/connection/notifications`, params: pageParam ? { starting_after: pageParam } : {} }),
+      providesTags: ['SupplierNotification'],
+    }),
     disconnectIntegration: build.mutation<void, string>({
       query: id => ({ url: `/v1/integrations/${id}/connection`, method: 'DELETE' }),
       invalidatesTags: ['ResellerIntegration'],
@@ -76,6 +103,7 @@ export const resellerIntegrationsApi = bitocardApi.injectEndpoints({
 });
 
 export const {
+  useIntegrationNotificationsInfiniteQuery,
   useResellerIntegrationsQuery,
   useConnectIntegrationMutation,
   useCheckIntegrationMutation,

@@ -16,6 +16,8 @@ import { SupplierWebhooksService } from '../orders/supplier-webhooks.js';
 import { WebhookDeliveryService } from '../webhooks/delivery.service.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { PushService } from '../notifications/push.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -40,6 +42,8 @@ export class CronController {
     identity: IdentityService,
     supplierWebhooks: SupplierWebhooksService,
     ownSuppliers: OwnSuppliersService,
+    inbox: InboxService,
+    push: PushService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -62,6 +66,10 @@ export class CronController {
       'supplier-webhooks': () => supplierWebhooks.processDue(),
       /** Daily: delete events older than 30 days and expired rotated secrets. */
       'webhooks-cleanup': () => webhooks.purge(),
+      /** Every 5 minutes: retry push notifications that are due (pushes start right after each notification). */
+      push: () => push.runDue(),
+      /** Daily: delete in-app notifications older than 90 days (and their pushes). */
+      'notifications-cleanup': () => inbox.purge(),
     };
   }
 

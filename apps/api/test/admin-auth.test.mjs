@@ -181,3 +181,36 @@ describe('admin:create script', () => {
     assert.equal(signin.status, 200);
   });
 });
+
+describe('one email, separate accounts', () => {
+  test('an admin’s email can also sign up to SHQ: a separate reseller account that never changes the admin', async () => {
+    const { lastEmailCode } = await import('./helpers.mjs');
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    const email = await createAdmin();
+    const admin = await firstSignIn(email);
+
+    const reseller = client(server.base);
+    const resellerPassword = 'a different reseller passphrase';
+    const signup = await reseller.post('/v1/auth/signup', { name: 'Same Person', email, password: resellerPassword, country: 'NG', business_name: 'Side Business' });
+    assert.equal(signup.status, 201, JSON.stringify(signup.json));
+    const users = await prisma.user.findMany({ where: { email }, orderBy: { realm: 'asc' } });
+    assert.deepEqual(users.map(user => [user.realm, user.adminRoles]), [['reseller', []], ['admin', ['operations']]]);
+    assert.notEqual(users[0].id, users[1].id);
+
+    // Each password opens only its own account; neither session reaches the other app.
+    assert.equal((await client(server.base).post('/v1/auth/signin', { identifier: email, password })).status, 401);
+    assert.equal((await client(server.base).post('/v1/admin/auth/signin', { email, password: resellerPassword })).status, 401);
+    assert.equal((await reseller.get('/v1/admin/auth/session')).status, 401);
+    assert.equal((await admin.browser.get('/v1/auth/session')).status, 401);
+
+    // Resetting the reseller password changes nothing for the admin.
+    await client(server.base).post('/v1/auth/password/forgot', { email });
+    const reset = await client(server.base).post('/v1/auth/password/reset', { email, code: await lastEmailCode(server.app, email), password: 'yet another reseller passphrase' });
+    assert.equal(reset.status, 200, JSON.stringify(reset.json));
+    assert.equal((await admin.browser.get('/v1/admin/auth/session')).status, 200, 'the admin stays signed in');
+    const again = await client(server.base).post('/v1/admin/auth/signin', { email, password });
+    assert.equal(again.status, 200, 'the admin password still works');
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: users[1].id } });
+    assert.deepEqual([after.passwordHash, after.adminRoles, after.email], [users[1].passwordHash, ['operations'], email]);
+  });
+});

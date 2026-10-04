@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeftRight, FlaskConical } from "lucide-react";
 import { cn, humanise } from "@bitocard/admin-ui";
-import { AccountMenu, ConsoleShell, type Crumb } from "@bitocard/admin-ui/shell";
+import { AccountMenu, ConsoleShell, type Crumb, NotificationBell } from "@bitocard/admin-ui/shell";
 import { menus, sections, type ShqSection } from "./nav";
 import { useReseller, useSignOut } from "./reseller";
 
@@ -62,6 +62,10 @@ function SandboxBanner() {
   );
 }
 
+function ShqBell() {
+  return <NotificationBell realm="reseller" userId={useReseller().user.id} />;
+}
+
 /** The layout of every SHQ page: rail, section menu, breadcrumbs, live/sandbox switch and account menu. */
 export function ShqShell({ section, current, crumbs, actions, children }: { section: ShqSection; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   return (
@@ -78,6 +82,7 @@ export function ShqShell({ section, current, crumbs, actions, children }: { sect
           <ModeSwitch />
         </>
       }
+      notifications={<ShqBell />}
       account={<ShqAccountMenu />}
       banner={<SandboxBanner />}
     >

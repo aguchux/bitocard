@@ -12,6 +12,8 @@ import { WalletService } from '../ledger/wallet.service.js';
 import { PaymentProviders } from './payment-providers.js';
 import { ProviderError } from './provider-error.js';
 import { EventsService } from '../webhooks/events.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { formatMoney } from '../notifications/templates.js';
 import type { ChargeResult } from './providers.js';
 
 const day = 24 * 60 * 60 * 1000;
@@ -77,7 +79,19 @@ export class PaymentsService {
     private readonly providers: PaymentProviders,
     private readonly events: EventsService,
     private readonly settings: SettingsService,
+    private readonly inbox: InboxService,
   ) {}
+
+  /** Tells the owner and finance that money reached the wallet. */
+  private toppedUp(payment: { id: string; resellerId: string; mode: LedgerMode; amountMinor: bigint; currency: string }, how: string) {
+    return this.inbox.reseller(payment.resellerId, 'top_up.credited', {
+      subject: payment.id,
+      title: `${formatMoney(payment.amountMinor, payment.currency)} added to your wallet`,
+      body: `Your ${how} has been confirmed and added to your wallet.`,
+      link: '/wallet',
+      mode: payment.mode,
+    });
+  }
 
   /** Who the provider should treat as the payer: the signed-in person, or the business owner for API keys. */
   async contactFor(resellerId: string, userId: string | null) {
@@ -232,7 +246,10 @@ export class PaymentsService {
         }
         return claimed.count === 1;
       });
-      if (credited) this.events.committed();
+      if (credited) {
+        this.events.committed();
+        await this.toppedUp(payment, 'top-up');
+      }
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         this.logger.error({ paymentId: payment.id, providerTransactionId: result.providerTransactionId }, 'Provider transaction already credited elsewhere; needs review');
@@ -374,6 +391,7 @@ export class PaymentsService {
         await this.recordEvent(tx, 'top_up.succeeded', id);
       });
       this.events.committed();
+      await this.toppedUp({ id, ...base, mode: account.mode }, 'bank transfer');
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { credited: false, reason: 'duplicate' };
       throw error;

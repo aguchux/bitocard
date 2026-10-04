@@ -47,7 +47,16 @@ export default function SupplierNotificationsPage() {
           empty={filter === "attention" ? "Nothing needs attention: every notification matched an order." : "No notifications."}
           columns={[
             { key: "received", header: "Received", cell: row => <span title={formatDateTime(row.received_at)}>{formatRelative(row.received_at)}</span> },
-            { key: "supplier", header: "Supplier", cell: row => <span className="font-medium">{row.supplier}</span> },
+            {
+              key: "supplier",
+              header: "Supplier",
+              cell: row => (
+                <div className="space-y-0.5">
+                  <span className="font-medium">{row.supplier}</span>
+                  {row.connection_id ? <p className="text-xs text-muted">Reseller’s own account</p> : null}
+                </div>
+              ),
+            },
             { key: "event", header: "Event", cell: row => <span className="font-mono text-xs">{row.event_type ?? "—"}</span>, hideOnMobile: true },
             {
               key: "order",

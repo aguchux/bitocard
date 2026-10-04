@@ -16,7 +16,8 @@
     "db:studio": "prisma studio",
     "test:docker": "node --env-file=test/docker.env --test --test-concurrency=1 \"test/*.test.mjs\"",
     "smoke": "node scripts/smoke.mjs",
-    "admin:create": "node scripts/create-admin.mjs"
+    "admin:create": "node scripts/create-admin.mjs",
+    "push:keys": "node scripts/push-keys.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.1",
@@ -40,6 +41,7 @@
     "pino-http": "^11.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -50,6 +52,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22",
     "@types/pg": "^8.23.1",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9",
     "pg": "^8.23.1",
     "pglite-prisma-adapter": "^0.7.2",

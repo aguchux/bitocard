@@ -35,7 +35,7 @@ describe('integration settings', () => {
     assert.equal(status, 200);
     assert.deepEqual(
       json.data.filter(item => item.section === 'platform').map(item => item.id),
-      ['general', 'email', 'sms', 'google', 'flutterwave', 'monnify', 'exchange_rates', 'didit'],
+      ['general', 'email', 'sms', 'web_push', 'google', 'flutterwave', 'monnify', 'exchange_rates', 'didit'],
     );
     // Every supplier in the registry has a group (Flutterwave virtual cards use the Flutterwave keys).
     const registry = await prisma.supplier.findMany({ select: { code: true } });

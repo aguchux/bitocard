@@ -6,6 +6,7 @@ import { useAdminSignOutMutation } from '@bitocard/api-client/admin';
 import { cn, humanise } from '../format';
 import { AccountMenu, ConsoleShell, type Crumb } from './console-shell';
 import { menus, sections, type SectionKey } from './nav';
+import { NotificationBell } from './notifications';
 import { useAdmin, useMode } from './session';
 
 export type { Crumb };
@@ -29,6 +30,10 @@ function AdminAccountMenu() {
   );
 }
 
+function AdminBell() {
+  return <NotificationBell realm="admin" userId={useAdmin().id} />;
+}
+
 /** Live or sandbox figures. Shown where a page has mode-dependent data. */
 export function ModeSwitch() {
   const { mode, setMode } = useMode();
@@ -48,7 +53,7 @@ export function ModeSwitch() {
 /** The layout of every admin page (see ConsoleShell). */
 export function AdminShell({ section, current, crumbs, actions, children }: { section: SectionKey; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   return (
-    <ConsoleShell brand="BitoCard" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} account={<AdminAccountMenu />}>
+    <ConsoleShell brand="BitoCard" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
       {children}
     </ConsoleShell>
   );

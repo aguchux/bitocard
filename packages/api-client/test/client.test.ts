@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { adminApi, percentToPpb } from '../src/admin';
 import { resellerSessionApi } from '../src/reseller';
-import { makeStore, setRequestContext, toApiError } from '../src';
+import { makeStore, notificationsApi, pushApi, setRequestContext, toApiError } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
 
@@ -111,6 +111,45 @@ describe('integrations', () => {
     expect(put.headers.get('idempotency-key')).toBeNull();
     expect(JSON.parse(put.body!)).toEqual({ values: { RESEND_API_KEY: 're_key', EMAIL_FROM: null }, code: '123456' });
     list.unsubscribe();
+  });
+});
+
+describe('notifications', () => {
+  test('each app reads its own inbox; marking read refetches the count', async () => {
+    const store = makeStore();
+    reply = call => (call.url.includes('unread-count') ? Response.json({ object: 'unread_count', count: 1 }) : Response.json({ object: 'list', data: [], has_more: false, unread_count: 1 }));
+    await store.dispatch(notificationsApi.endpoints.unreadNotifications.initiate('admin'));
+    await store.dispatch(notificationsApi.endpoints.unreadNotifications.initiate('reseller'));
+    await store.dispatch(notificationsApi.endpoints.notifications.initiate({ realm: 'reseller', unread: true, limit: 5 }));
+    await store.dispatch(notificationsApi.endpoints.notifications.initiate({ realm: 'admin', unread: false }));
+    expect(calls.map(call => call.url)).toEqual([
+      'http://api.test/v1/admin/notifications/unread-count',
+      'http://api.test/v1/notifications/unread-count',
+      'http://api.test/v1/notifications?unread=true&limit=5',
+      'http://api.test/v1/admin/notifications',
+    ]);
+    calls = [];
+    await store.dispatch(notificationsApi.endpoints.markNotificationRead.initiate({ realm: 'admin', id: 'n1' }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(calls[0]).toMatchObject({ method: 'POST', url: 'http://api.test/v1/admin/notifications/n1/read' });
+    expect(calls.some(call => call.url === 'http://api.test/v1/admin/notifications/unread-count')).toBe(true);
+  });
+});
+
+describe('push', () => {
+  test('devices and preferences go to each app’s own endpoints', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ object: 'list', data: [] });
+    await store.dispatch(pushApi.endpoints.pushDevices.initiate('admin'));
+    await store.dispatch(pushApi.endpoints.registerPushDevice.initiate({ realm: 'reseller', subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/x', keys: { p256dh: 'p', auth: 'a' } } }));
+    await store.dispatch(pushApi.endpoints.setNotificationPreference.initiate({ realm: 'reseller', type: 'top_up.credited', push: true }));
+    // Registering refetches the device list in between, so only these calls are checked.
+    expect(calls.filter(call => !(call.method === 'GET' && call !== calls[0])).map(call => [call.method, call.url, call.body])).toEqual([
+      ['GET', 'http://api.test/v1/admin/devices', null],
+      ['POST', 'http://api.test/v1/devices', '{"endpoint":"https://fcm.googleapis.com/fcm/send/x","keys":{"p256dh":"p","auth":"a"}}'],
+      ['PUT', 'http://api.test/v1/notification-preferences/top_up.credited', '{"push":true}'],
+    ]);
+    expect(calls.find(call => call.method === 'POST')!.headers.get('idempotency-key')).toBeTruthy();
   });
 });
 

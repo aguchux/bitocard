@@ -138,6 +138,9 @@ describe('reseller identity checks', () => {
 
     const queue = (await admin.get(`/v1/admin/verifications?status=in_review&reseller_id=${resellerId}`)).json.data;
     assert.equal(queue.length, 1);
+    const notes = (await browser.get('/v1/notifications')).json.data.map(item => item.title);
+    assert.ok(notes.includes('Your identity check is being reviewed') && notes.includes('Your identity check was declined'));
+    assert.ok((await admin.get('/v1/admin/notifications?limit=100')).json.data.some(item => item.type === 'admin.verification.review'));
     assert.equal(queue[0].provider_reference, second);
     const support = await adminClient(server, ['support']);
     assert.equal((await support.post(`/v1/admin/verifications/${queue[0].id}/decide`, { decision: 'approved', reason: 'Checked by hand' })).status, 403);

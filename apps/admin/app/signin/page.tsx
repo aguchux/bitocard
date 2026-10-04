@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Database, ShieldCheck, Users } from "lucide-react";
 import { SignIn } from "./sign-in";
+import { Wordmark } from "@bitocard/admin-ui";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -27,10 +28,8 @@ export default function SignInPage() {
           <div className="absolute right-[-15%] bottom-[22%] h-[30%] w-[80%] rotate-[-18deg] rounded-[50%] border-t-2 border-brand-500/60 blur-[1px]" />
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bitocard-logo-light.png" alt="" className="size-10" />
-          <span className="text-lg font-extrabold tracking-[0.25em]">BITOCARD</span>
+        <div className="flex items-center">
+          <Wordmark tone="light" className="text-3xl" />
         </div>
 
         <div className="my-auto max-w-md py-8">

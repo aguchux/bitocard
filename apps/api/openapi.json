@@ -1,6 +1,260 @@
 {
   "openapi": "3.1.0",
   "paths": {
+    "/v1/notifications": {
+      "get": {
+        "description": "Newest first, with your unread count.",
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "unread",
+            "required": false,
+            "in": "query",
+            "description": "Only unread notifications.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "The last notification ID of the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your notifications",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unread",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Count your unread notifications",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notifications/read-all": {
+      "post": {
+        "operationId": "NotificationsController_readAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Mark every notification read",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "NotificationsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Mark a notification read",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/devices/push-settings": {
+      "get": {
+        "description": "Whether push is switched on, and the public key a browser subscribes with.",
+        "operationId": "DevicesController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get the push key",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/devices": {
+      "get": {
+        "operationId": "DevicesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your devices",
+        "tags": [
+          "Notifications"
+        ]
+      },
+      "post": {
+        "description": "Send the browser’s push subscription. Registering the same browser again updates it.",
+        "operationId": "DevicesController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Register this browser for push",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/devices/{id}/test": {
+      "post": {
+        "operationId": "DevicesController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Send a test push to a device",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/devices/{id}": {
+      "delete": {
+        "description": "It gets no more pushes.",
+        "operationId": "DevicesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Remove a device",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notification-preferences": {
+      "get": {
+        "description": "Every notification you can get, and whether it is pushed. `locked` ones are always pushed.",
+        "operationId": "DevicesController_preferences",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your push preferences",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notification-preferences/{type}": {
+      "put": {
+        "operationId": "DevicesController_setPreference",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Choose whether a notification is pushed",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
     "/v1/countries": {
       "get": {
         "description": "Each with its currency and the product categories sold there.",
@@ -3487,6 +3741,31 @@
           "Orders"
         ]
       }
+    },
+    "/v1/integrations/{id}/connection/notifications": {
+      "get": {
+        "description": "Order updates your own live supplier account sent to its BitoCard address, newest first, and whether each was matched to one of your orders.",
+        "operationId": "ResellerSupplierWebhooksController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List your supplier’s notifications",
+        "tags": [
+          "Integrations"
+        ]
+      }
     }
   },
   "info": {
@@ -3511,6 +3790,55 @@
       }
     },
     "schemas": {
+      "PushKeysDto": {
+        "type": "object",
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "description": "The subscription’s P-256 public key (base64url), from `PushSubscription.toJSON().keys`."
+          },
+          "auth": {
+            "type": "string",
+            "description": "The subscription’s auth secret (base64url)."
+          }
+        },
+        "required": [
+          "p256dh",
+          "auth"
+        ]
+      },
+      "RegisterDeviceDto": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "The push service address, from `PushSubscription.endpoint`."
+          },
+          "keys": {
+            "$ref": "#/components/schemas/PushKeysDto"
+          },
+          "label": {
+            "type": "string",
+            "description": "How the device is shown; defaults to the browser and system, for example \"Chrome on Windows\"."
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ]
+      },
+      "PreferenceDto": {
+        "type": "object",
+        "properties": {
+          "push": {
+            "type": "boolean",
+            "description": "Push this notification type to your devices."
+          }
+        },
+        "required": [
+          "push"
+        ]
+      },
       "OptionValueDto": {
         "type": "object",
         "properties": {

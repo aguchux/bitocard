@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { ConnectionStatus, IntegrationApproval, LedgerMode, ResellerConnection } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { EmailService } from '../notifications/email.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { connectionEmail } from '../notifications/templates.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -44,6 +45,7 @@ export class ResellerIntegrationsService {
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
     private readonly email: EmailService,
+    private readonly inbox: InboxService,
   ) {}
 
   /** Whether the reseller may connect their own integrations in this mode. */
@@ -76,7 +78,7 @@ export class ResellerIntegrationsService {
       })
       .map(item => {
         const offer = offers.find(row => row.integrationId === item.id);
-        return presentIntegration(item, offer?.approval ?? 'review', connections.find(row => row.integrationId === item.id) ?? null);
+        return presentIntegration(item, offer?.approval ?? 'review', connections.find(row => row.integrationId === item.id) ?? null, this.apiBase);
       });
     return { object: 'list' as const, access, data };
   }
@@ -130,7 +132,15 @@ export class ResellerIntegrationsService {
       after: auditView(connection),
     });
     if (mode === 'live') await this.notify(resellerId, integration.name, status === 'pending_review' ? 'pending' : 'connected');
-    return presentIntegration(integration, offer.approval, connection);
+    if (status === 'pending_review' && existing?.status !== 'pending_review') {
+      await this.inbox.admins('admin.connection.review', {
+        subject: `${connection.id}:${connection.updatedAt.getTime()}`,
+        title: `${integration.name} connection to review`,
+        body: `${reseller.name} connected their own ${integration.name} account. Review it before it can be used.`,
+        link: '/resellers/connections',
+      });
+    }
+    return presentIntegration(integration, offer.approval, connection, this.apiBase);
   }
 
   /** Runs the check again (live); the sandbox has nothing to check. */
@@ -150,7 +160,7 @@ export class ResellerIntegrationsService {
     }
     const updated = await this.prisma.resellerConnection.update({ where: { id: connection.id }, data: { lastCheckedAt: new Date(), lastCheckOk: ok, lastCheckMessage: message } });
     const offer = await this.prisma.integrationOffer.findUnique({ where: { integrationId } });
-    return presentIntegration(integration, offer?.approval ?? 'review', updated);
+    return presentIntegration(integration, offer?.approval ?? 'review', updated, this.apiBase);
   }
 
   /** Erases the credentials. A suspended connection stays suspended (with nothing stored) until reinstated. */
@@ -171,9 +181,25 @@ export class ResellerIntegrationsService {
    * Never returned by the API.
    */
   async credentials(resellerId: string, integrationId: string, mode: LedgerMode) {
+    return (await this.active(resellerId, integrationId, mode))?.credentials ?? null;
+  }
+
+  /** An active connection's ID and decrypted credentials, or null. */
+  async active(resellerId: string, integrationId: string, mode: LedgerMode) {
     const connection = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode } } });
     if (connection?.status !== 'active' || !connection.credentialsEncrypted) return null;
-    return JSON.parse(this.encryption().decrypt(connection.credentialsEncrypted)) as Record<string, string>;
+    return { id: connection.id, credentials: JSON.parse(this.encryption().decrypt(connection.credentialsEncrypted)) as Record<string, string> };
+  }
+
+  /**
+   * A live supplier connection's saved credentials, whatever its status, to check a notification sent to its own
+   * address (only its signature is checked with them; processing still needs the connection active). Null when it does
+   * not exist or holds nothing.
+   */
+  async forNotification(connectionId: string, integrationId: string) {
+    const connection = /^[0-9a-f-]{36}$/i.test(connectionId) ? await this.prisma.resellerConnection.findUnique({ where: { id: connectionId } }) : null;
+    if (!connection || connection.mode !== 'live' || connection.integrationId !== integrationId || !connection.credentialsEncrypted) return null;
+    return { id: connection.id, resellerId: connection.resellerId, credentials: JSON.parse(this.encryption().decrypt(connection.credentialsEncrypted)) as Record<string, string> };
   }
 
   // ---- Admin
@@ -259,10 +285,28 @@ export class ResellerIntegrationsService {
     const name = connectable(connection.integrationId)?.name ?? connection.integrationId;
     const event = decision === 'approve' || decision === 'reinstate' ? 'approved' : decision === 'reject' ? 'rejected' : 'suspended';
     await this.notify(connection.resellerId, name, event, reason);
+    const outcomes = {
+      approve: { type: 'connection.approved', title: `${name} connection approved`, body: `Your own ${name} account is approved and ready to use.` },
+      reinstate: { type: 'connection.reinstated', title: `${name} connection reinstated`, body: `BitoCard reinstated your own ${name} account; it is in use again.` },
+      reject: { type: 'connection.rejected', title: `${name} connection rejected`, body: `BitoCard rejected your own ${name} account and erased its credentials. Reason: ${reason?.trim()}` },
+      suspend: { type: 'connection.suspended', title: `${name} connection suspended`, body: `BitoCard suspended your own ${name} account; orders use BitoCard's suppliers meanwhile. Reason: ${reason?.trim()}` },
+    } as const;
+    await this.inbox.reseller(connection.resellerId, outcomes[decision].type, {
+      subject: `${id}:${updated.decidedAt?.getTime()}`,
+      title: outcomes[decision].title,
+      body: outcomes[decision].body,
+      link: '/integrations',
+      mode: connection.mode,
+    });
     return { ...presentAdminConnection(updated), reseller: { id: connection.reseller.id, name: connection.reseller.name, country: connection.reseller.country } };
   }
 
   // ---- Helpers
+
+  /** BitoCard's public API address, where suppliers send notifications. */
+  private get apiBase() {
+    return this.integrations.config.DIDWW_CALLBACK_URL;
+  }
 
   private async runCheck(integration: ConnectableIntegration, values: Record<string, string>) {
     try {
@@ -323,7 +367,7 @@ function prepare(integration: ConnectableIntegration, submitted: Record<string, 
 }
 
 /** What the reseller sees: never a secret, only its last four characters. */
-function presentIntegration(integration: ConnectableIntegration, approval: IntegrationApproval, connection: ResellerConnection | null) {
+function presentIntegration(integration: ConnectableIntegration, approval: IntegrationApproval, connection: ResellerConnection | null, apiBase: string) {
   const publicValues = (connection?.publicValues ?? {}) as Record<string, string>;
   const hints = (connection?.hints ?? {}) as Record<string, string>;
   return {
@@ -342,7 +386,21 @@ function presentIntegration(integration: ConnectableIntegration, approval: Integ
       value: item.secret ? null : (publicValues[item.key] ?? null),
       hint: item.secret ? (hints[item.key] ?? null) : null,
     })),
-    connection: connection && connection.status !== 'disconnected' ? presentConnection(connection) : null,
+    connection: connection && connection.status !== 'disconnected' ? { ...presentConnection(connection), notifications: notificationSetup(integration, connection, apiBase) } : null,
+  };
+}
+
+/**
+ * Where the supplier sends this live connection's order updates, and whether they can be accepted yet (a manual setup
+ * needs the signature secret saved). Null in the sandbox and for suppliers without notifications.
+ */
+function notificationSetup(integration: ConnectableIntegration, connection: ResellerConnection, apiBase: string) {
+  if (!integration.notifications || connection.mode !== 'live') return null;
+  const hints = (connection.hints ?? {}) as Record<string, string>;
+  return {
+    url: `${apiBase.replace(/\/+$/, '')}/v1/webhooks/${integration.id}/${connection.id}`,
+    setup: integration.notifications.setup,
+    ready: integration.notifications.setup === 'automatic' || Boolean(hints[integration.notifications.secretField]),
   };
 }
 

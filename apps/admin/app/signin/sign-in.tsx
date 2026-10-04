@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
-import { Button, cn, CodeInput, Field, Input, Notice } from "@bitocard/admin-ui";
+import { Button, cn, CodeInput, Field, Input, Notice, Wordmark } from "@bitocard/admin-ui";
 import { useAdminMfaSetupMutation, useAdminMfaVerifyMutation, useAdminSessionQuery, useAdminSignInMutation, type MfaSetup } from "@bitocard/api-client/admin";
 import type { ApiError } from "@bitocard/api-client";
 
@@ -90,10 +90,8 @@ export function SignIn() {
 
   return (
     <div className="w-full max-w-md space-y-6">
-      <div className="flex items-center justify-center gap-3 lg:hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/bitocard-logo.png" alt="" className="size-10 rounded-xl" />
-        <span className="text-xl font-extrabold tracking-[0.2em]">BITOCARD</span>
+      <div className="flex items-center justify-center lg:hidden">
+        <Wordmark className="text-3xl" />
       </div>
 
       {step.kind === "password" ? (

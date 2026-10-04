@@ -402,6 +402,8 @@ export async function fakeDidww() {
     dids: [],
     orderReply: 'Completed',
     next: 1000,
+    /** API keys the fake accepts: BitoCard's, plus any a test adds for a reseller's own account. */
+    keys: ['didww-key'],
   };
   const resource = order => ({ id: order.id, type: 'orders', attributes: { status: order.status, reference: order.reference, amount: order.amount, callback_url: order.callback_url, callback_method: order.callback_method, created_at: order.created_at } });
   const complete = id => {
@@ -413,8 +415,9 @@ export async function fakeDidww() {
   const service = await fakeService(({ method, url, headers, body }) => {
     const [path, search = ''] = url.split('?');
     const query = new URLSearchParams(search);
-    if (headers['api-key'] !== 'didww-key') return { status: 401, body: { errors: [{ title: 'Unauthorized', detail: 'Invalid API key' }] } };
+    if (!state.keys.includes(headers['api-key'])) return { status: 401, body: { errors: [{ title: 'Unauthorized', detail: 'Invalid API key' }] } };
     if (state.fail && path.startsWith(state.fail)) return { status: 500, body: { errors: [{ title: 'Simulated outage' }] } };
+    if (method === 'GET' && path === '/balance') return { body: { data: { id: 'balance', type: 'balances', attributes: { total_balance: '100.0' } } } };
     if (method === 'GET' && path === '/countries') return { body: { data: query.get('filter[iso]') === 'GB' ? [country] : [] } };
     if (method === 'GET' && path === '/did_groups') {
       const groups = state.groups.filter(

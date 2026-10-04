@@ -273,6 +273,8 @@ export type SupplierWebhook = {
   object: 'supplier_webhook';
   id: string;
   supplier: string;
+  /** A reseller's own connection it was sent to; null for BitoCard's own account. */
+  connection_id: string | null;
   event_type: string | null;
   reference: string | null;
   supplier_transaction_id: string | null;

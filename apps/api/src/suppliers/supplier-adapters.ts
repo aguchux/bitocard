@@ -38,13 +38,13 @@ export class SupplierAdapters {
   /**
    * An adapter on a reseller's own supplier account (their credentials, BitoCard's live addresses), for that
    * reseller's own orders only. Null for a supplier that cannot be connected this way. Live only: the sandbox never
-   * calls suppliers.
+   * calls suppliers. The connection names the account's own notification address (DIDWW callbacks).
    */
-  forAccount(code: string, credentials: Record<string, string>): SupplierAdapter | null {
+  forAccount(code: string, credentials: Record<string, string>, connectionId?: string): SupplierAdapter | null {
     const config = this.integrations.config;
     if (code === 'reloadly') return reloadly({ ...config, RELOADLY_SANDBOX: false }, { clientId: credentials.client_id, clientSecret: credentials.client_secret });
     if (code === 'vtpass') return new VtpassAdapter({ apiKey: credentials.api_key, publicKey: credentials.public_key, secretKey: credentials.secret_key }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE);
-    if (code === 'didww') return new DidwwAdapter({ apiKey: credentials.api_key, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL });
+    if (code === 'didww') return new DidwwAdapter({ apiKey: credentials.api_key, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL, connectionId });
     return null;
   }
 

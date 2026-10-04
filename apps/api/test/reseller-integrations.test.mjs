@@ -198,12 +198,16 @@ describe('review', () => {
     const item = queue.json.data.find(row => row.reseller.id === resellerId);
     assert.deepEqual([item.integration.name, item.public_values.contract_code], ['Monnify', '123456']);
     assert.ok(!JSON.stringify(queue.json).includes('monnify-secret'));
+    const toReview = (await admin.get('/v1/admin/notifications')).json.data.find(row => row.type === 'admin.connection.review' && row.title === 'Monnify connection to review');
+    assert.equal(toReview?.link, '/resellers/connections');
 
     const noReason = await admin.post(`/v1/admin/connections/${item.id}/decide`, { decision: 'reject' });
     assert.equal(noReason.json.error.code, 'parameter_missing');
     const approved = await admin.post(`/v1/admin/connections/${item.id}/decide`, { decision: 'approve' });
     assert.equal(approved.json.status, 'active');
     assert.ok(outbox.some(message => message.to === email && /approved/.test(message.subject)));
+    const notified = (await browser.get('/v1/notifications')).json.data.find(row => row.type === 'connection.approved');
+    assert.deepEqual([notified?.title, notified?.severity], ['Monnify connection approved', 'success']);
     assert.equal((await admin.post(`/v1/admin/connections/${item.id}/decide`, { decision: 'approve' })).json.error.code, 'connection_state_changed');
 
     // The same credentials stay active; different ones go back for review.

@@ -12,8 +12,8 @@ function Rail({ brand, sections, active, onNavigate }: { brand: string; sections
   return (
     <nav aria-label="Main" className="flex h-full flex-col items-stretch gap-1 bg-navy-900 px-2 py-4 text-white">
       <AppLink href="/" className="mb-4 flex flex-col items-center gap-1 px-1 py-1 text-center" onClick={onNavigate}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- the light logo for the navy rail, from the app's public folder (bitocard-logo-light.png) */}
-        <img src="/bitocard-logo-light.png" alt="" className="size-9" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- the light "b" mark for the navy rail, from the app's public folder */}
+        <img src="/bitocard-mark-light.png" alt="" className="h-9 w-auto" />
         <span className="text-sm font-extrabold tracking-tight">{brand}</span>
       </AppLink>
       {sections.map(section => {
@@ -144,6 +144,8 @@ export type ConsoleShellProps<K extends string> = {
   actions?: ReactNode;
   /** The account menu (top right). */
   account: ReactNode;
+  /** The notifications bell, beside the account menu. */
+  notifications?: ReactNode;
   /** Shown above every page, for example a sandbox notice. */
   banner?: ReactNode;
   children: ReactNode;
@@ -153,7 +155,7 @@ export type ConsoleShellProps<K extends string> = {
  * The layout of the admin app and SHQ: navy rail, section menu, breadcrumbs and account menu. On phones the rail and
  * section menu move into a drawer.
  */
-export function ConsoleShell<K extends string>({ brand, sections, menus, section, current, crumbs, actions, account, banner, children }: ConsoleShellProps<K>) {
+export function ConsoleShell<K extends string>({ brand, sections, menus, section, current, crumbs, actions, account, notifications, banner, children }: ConsoleShellProps<K>) {
   const [drawer, setDrawer] = useState(false);
   const { title: sectionTitle, items: subnav } = menus[section];
   useEffect(() => {
@@ -216,6 +218,7 @@ export function ConsoleShell<K extends string>({ brand, sections, menus, section
             </ol>
           </nav>
           {actions}
+          {notifications}
           {account}
         </header>
         {banner}

@@ -39,6 +39,12 @@ export const configSchema = z.object({
   TERMII_API_URL: z.string().url().default('https://api.ng.termii.com'),
   TERMII_SENDER_ID: z.string().default('BitoCard'),
 
+  // Browser push notifications (Web Push, VAPID). Without both keys, push is switched off and only the in-app inbox
+  // is used. Generate a key pair with `npm run push:keys -w @bitocard/api`.
+  WEB_PUSH_PUBLIC_KEY: z.string().optional(),
+  WEB_PUSH_PRIVATE_KEY: z.string().optional(),
+  WEB_PUSH_SUBJECT: z.string().default('mailto:support@bitocard.com'),
+
   // Sign in with Google (resellers only). Unset client ID means Google sign-in is switched off.
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

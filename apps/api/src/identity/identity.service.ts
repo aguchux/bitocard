@@ -16,6 +16,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { DiditProvider } from './didit.provider.js';
 import { type CheckResult, namesMatch } from './providers.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 /** Statuses a provider (or an admin, for in_review) can still change. */
 const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];
@@ -108,6 +109,7 @@ export class IdentityService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly allowance: AllowanceService,
+    private readonly inbox: InboxService,
   ) {
     this.diditClient = integrations.derive(config =>
       config.DIDIT_API_KEY && config.DIDIT_WORKFLOW_ID ? new DiditProvider(config.DIDIT_API_KEY, config.DIDIT_WORKFLOW_ID, config.DIDIT_API_URL, config.DIDIT_WEBHOOK_SECRET) : null,
@@ -405,6 +407,32 @@ export class IdentityService {
     if (ownerDocument && status === 'approved') await this.allowance.grantIfEligible(record.resellerId).catch(error => this.logger.error({ err: error }, 'Could not grant the startup allowance'));
     if (actorId !== null || record.subject === 'reseller') {
       await this.audit.record({ actorId, action: `verification.${status}`, targetType: 'reseller', targetId: record.resellerId, before: { verification_id: record.id, status: record.status }, after: { status, reason } });
+    }
+    if (record.subject === 'reseller') {
+      const what = ownerBvn ? 'BVN check' : 'identity check';
+      const outcomes: Record<string, { title: string; body: string }> = {
+        approved: { title: `Your ${what} was approved`, body: ownerBvn ? 'You can open your reserved bank accounts now.' : autoApprove ? 'Your account is live.' : 'BitoCard will activate your account shortly.' },
+        declined: { title: `Your ${what} was declined`, body: reason === 'name_mismatch' ? 'The name on the record did not match your verified name.' : 'Start a new check from the verification page.' },
+        in_review: { title: `Your ${what} is being reviewed`, body: 'BitoCard is reviewing it; we will tell you the outcome.' },
+        expired: { title: `Your ${what} expired`, body: 'It was not finished in time. Start a new one when you are ready.' },
+      };
+      const outcome = outcomes[status];
+      if (outcome) {
+        await this.inbox.reseller(record.resellerId, 'verification.updated', {
+          subject: `${record.id}:${status}`,
+          ...outcome,
+          link: ownerBvn ? '/wallet/reserved-accounts' : '/verification',
+          mode: record.mode,
+        });
+      }
+    }
+    if (status === 'in_review' && record.mode === 'live') {
+      await this.inbox.admins('admin.verification.review', {
+        subject: record.id,
+        title: `${record.subject === 'reseller' ? 'Reseller' : 'Customer'} identity check to review`,
+        body: 'The provider could not decide this check on its own. Review it.',
+        link: '/verifications',
+      });
     }
     if (ownerDocument && (status === 'approved' || status === 'declined')) {
       const owner = await this.prisma.resellerMember.findFirst({ where: { resellerId: record.resellerId, role: 'owner' }, include: { user: true } });

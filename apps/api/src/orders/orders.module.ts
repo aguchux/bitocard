@@ -4,11 +4,11 @@ import { FeesModule } from '../fees/fees.module.js';
 import { ResellerIntegrationsModule } from '../reseller-integrations/reseller-integrations.module.js';
 import { AdminOrdersController, OrdersController } from './orders.controller.js';
 import { OrdersService } from './orders.service.js';
-import { AdminSupplierWebhooksController, SupplierWebhooksController, SupplierWebhooksService } from './supplier-webhooks.js';
+import { AdminSupplierWebhooksController, ResellerSupplierWebhooksController, SupplierWebhooksController, SupplierWebhooksService } from './supplier-webhooks.js';
 
 @Module({
   imports: [CatalogueModule, FeesModule, ResellerIntegrationsModule],
-  controllers: [OrdersController, AdminOrdersController, SupplierWebhooksController, AdminSupplierWebhooksController],
+  controllers: [OrdersController, AdminOrdersController, SupplierWebhooksController, AdminSupplierWebhooksController, ResellerSupplierWebhooksController],
   providers: [OrdersService, SupplierWebhooksService],
   exports: [OrdersService, SupplierWebhooksService],
 })

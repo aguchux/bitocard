@@ -73,6 +73,9 @@ describe('sandbox top-ups', () => {
     const paid = await browser.post(`/v1/wallet/top-ups/${created.json.id}/simulate`, { outcome: 'succeeded' }, sandbox);
     assert.deepEqual([paid.status, paid.json.status, paid.json.checkout_url], [200, 'succeeded', null]);
     await browser.post(`/v1/wallet/top-ups/${created.json.id}/simulate`, { outcome: 'succeeded' }, sandbox);
+    // The owner (and finance staff) are told once, labelled as sandbox.
+    const credited = (await browser.get('/v1/notifications')).json.data.filter(item => item.type === 'top_up.credited');
+    assert.deepEqual(credited.map(item => [item.title, item.mode, item.link]), [['NGN 5,000.00 added to your wallet', 'test', '/wallet']]);
     await browser.post(`/v1/wallet/top-ups/${created.json.id}/simulate`, { outcome: 'failed' }, sandbox);
 
     assert.equal((await browser.get('/v1/wallet', sandbox)).json.available, 500_000);

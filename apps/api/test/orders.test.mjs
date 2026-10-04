@@ -233,6 +233,9 @@ describe('live orders', () => {
     }
     const queue = (await admin.get('/v1/admin/orders?needs_review=true')).json.data;
     assert.ok(queue.some(o => o.id === order.id));
+    // The reseller's owner and support staff, and BitoCard operations and support, are told once.
+    assert.equal((await browser.get('/v1/notifications')).json.data.filter(item => item.type === 'order.needs_review' && item.link === `/orders/${order.id}`).length, 1);
+    assert.equal((await admin.get('/v1/admin/notifications?limit=100')).json.data.filter(item => item.type === 'admin.order.needs_review' && item.link === `/orders/${order.id}`).length, 1);
     assert.equal((await browser.get(`/v1/orders/${order.id}`)).json.status, 'processing', 'resellers see processing, not internal review');
 
     const support = await adminClient(server, ['support']);

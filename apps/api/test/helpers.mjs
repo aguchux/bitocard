@@ -140,9 +140,12 @@ export function client(base, { origin = appOrigin, autoIdempotency = false } = {
 export async function fakeService(handler) {
   const calls = [];
   const server = createServer(async (req, res) => {
-    let body = '';
-    for await (const chunk of req) body += chunk;
-    const call = { method: req.method, url: req.url, headers: req.headers, body: body ? safeJson(body) : null };
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const raw = Buffer.concat(chunks);
+    const body = raw.toString('utf8');
+    // `raw` keeps binary bodies (encrypted pushes) intact.
+    const call = { method: req.method, url: req.url, headers: req.headers, body: body ? safeJson(body) : null, raw };
     calls.push(call);
     const reply = await handler(call);
     res.writeHead(reply.status ?? 200, reply.headers ?? { 'content-type': 'application/json' });

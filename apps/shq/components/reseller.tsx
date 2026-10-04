@@ -213,6 +213,18 @@ export function ResellerGate({ children }: { children: ReactNode }) {
   }, [unauthenticated]);
 
   useEffect(() => {
+    // A link from a push notification names its account and mode: remember them, then tidy the address.
+    const params = new URLSearchParams(window.location.search);
+    const linked = params.get("account");
+    if (linked) write(resellerKey, linked);
+    const linkedMode = params.get("mode");
+    if (linkedMode === "test" || linkedMode === "live") write(modeKey, linkedMode);
+    if (linked || params.has("mode")) {
+      params.delete("account");
+      params.delete("mode");
+      const search = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+    }
     // Read the stored choices once mounted (never during render, so server and client markup match).
     const mode: Mode = read(modeKey) === "test" ? "test" : "live";
     setRequestContext({ mode });

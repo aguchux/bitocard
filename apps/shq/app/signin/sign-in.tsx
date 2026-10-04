@@ -6,7 +6,7 @@ import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { apiBaseUrl } from "@bitocard/api-client";
 import { useSessionQuery, useSignInMutation } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
-import { Button, cn, errorMessage, Input, Notice } from "@bitocard/admin-ui";
+import { Button, cn, errorMessage, Input, Notice, Wordmark } from "@bitocard/admin-ui";
 
 /** Only same-site paths, so a crafted link cannot send a reseller elsewhere after sign-in. */
 export function safeNext(value: string | null) {
@@ -83,10 +83,8 @@ export function SignIn() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="mb-8 flex items-center gap-3 lg:hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
-        <img src="/bitocard-logo.png" alt="" className="size-10 rounded-xl" />
-        <span className="text-lg font-extrabold tracking-tight text-ink">BitoCard SHQ</span>
+      <div className="mb-8 flex items-center lg:hidden">
+        <Wordmark suffix="SHQ" className="text-3xl" />
       </div>
       <h2 className="text-3xl font-extrabold tracking-tight text-ink">Sign in</h2>
       <p className="mt-2 text-sm text-muted">Welcome back. Sign in to run your store, orders and wallet.</p>

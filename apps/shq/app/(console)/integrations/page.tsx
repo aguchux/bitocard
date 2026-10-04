@@ -1,8 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
-import { CreditCard, DownloadCloud, Package, Plug, RefreshCw, Unplug } from "lucide-react";
-import { ActionDialog, Button, Card, CardHeader, EmptyState, ErrorState, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { BellRing, Check, Copy, CreditCard, DownloadCloud, Package, Plug, RefreshCw, Unplug } from "lucide-react";
+import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   type IntegrationAccessReason,
@@ -10,6 +10,7 @@ import {
   useCheckIntegrationMutation,
   useConnectIntegrationMutation,
   useDisconnectIntegrationMutation,
+  useIntegrationNotificationsInfiniteQuery,
   useResellerIntegrationsQuery,
   useSetIntegrationRoutingMutation,
   useSyncIntegrationMutation,
@@ -74,6 +75,95 @@ const routingLabels = {
   off: "Don’t use for orders",
 } as const;
 
+const notificationStatus = { received: "Checking", processed: "Matched", unmatched: "No matching order", failed: "Not processed" } as const;
+
+/** What the supplier sent to this connection's address, newest first. */
+function NotificationsDialog({ integration, onClose }: { integration: ResellerIntegration; onClose: () => void }) {
+  const query = useIntegrationNotificationsInfiniteQuery(integration.id);
+  const items = query.data?.pages.flatMap(page => page.data) ?? [];
+  return (
+    <Dialog open onClose={onClose} title={`${integration.name} order updates`} description="Each update makes BitoCard check that order with your account; nothing in it is trusted on its own.">
+      {query.error ? (
+        <ErrorState message={errorMessage(query.error)} onRetry={query.refetch} />
+      ) : query.isLoading ? (
+        <Skeleton className="h-24" />
+      ) : items.length === 0 ? (
+        <p className="text-sm text-muted">No updates received yet.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {items.map(item => (
+            <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
+              <div className="min-w-0 space-y-0.5">
+                <p className="font-mono text-xs text-ink">{item.event_type ?? "update"}</p>
+                {item.order_id ? (
+                  <AppLink href={`/orders/${item.order_id}`} className="font-semibold text-brand-600 hover:underline">
+                    View order
+                  </AppLink>
+                ) : (
+                  <p className="font-mono text-xs text-muted break-all">{item.reference ?? "no reference"}</p>
+                )}
+                <p className="text-xs text-subtle" title={formatDateTime(item.received_at)}>
+                  {formatRelative(item.received_at)}
+                </p>
+              </div>
+              <StatusBadge status={item.status === "received" ? "pending" : item.status === "unmatched" ? "expired" : item.status} label={notificationStatus[item.status]} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <LoadMore hasMore={query.hasNextPage} loading={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} />
+    </Dialog>
+  );
+}
+
+/** Where your supplier sends order updates for this connection, so your orders settle without waiting for checks. */
+function OrderUpdates({ integration }: { integration: ResellerIntegration }) {
+  const setup = integration.connection!.notifications!;
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-2 rounded-lg bg-canvas p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+          <BellRing className="size-4" aria-hidden />
+          Order updates
+        </p>
+        {setup.ready ? <Badge tone="green">Ready</Badge> : <Badge tone="amber">Secret not saved</Badge>}
+      </div>
+      {setup.setup === "manual" ? (
+        <>
+          <p className="text-xs text-muted">{`Add this address in your ${integration.name} dashboard’s webhook settings, then save the signature secret it gives you (Update credentials). Until then your orders settle on our scheduled checks.`}</p>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md border border-line bg-white px-2 py-1.5 text-xs" title={setup.url}>
+              {setup.url}
+            </code>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Copy the address"
+              icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+              onClick={() => {
+                void navigator.clipboard?.writeText(setup.url).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                });
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-muted">{`BitoCard gives ${integration.name} this connection’s own address with every order; there is nothing to set up.`}</p>
+      )}
+      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+        Recent updates
+      </Button>
+      {open ? <NotificationsDialog integration={integration} onClose={() => setOpen(false)} /> : null}
+    </div>
+  );
+}
+
 /** A connected supplier: its catalogue (your products and prices) and when your orders use it. */
 function SupplierControls({ integration, manage }: { integration: ResellerIntegration; manage: boolean }) {
   const connection = integration.connection!;
@@ -131,6 +221,7 @@ function IntegrationCard({ integration, manage, onConnect, onDisconnect }: { int
           <p className="text-sm text-muted">{integration.approval === "review" ? "Live connections are reviewed by BitoCard before use." : "Live connections are active as soon as the credentials check out."}</p>
         )}
         {integration.kind === "supplier" && connection?.status === "active" ? <SupplierControls integration={integration} manage={manage} /> : null}
+        {integration.kind === "supplier" && connection?.notifications && status !== "rejected" ? <OrderUpdates integration={integration} /> : null}
         {connection?.decision_note ? <Notice tone={status === "suspended" || status === "rejected" ? "red" : "grey"}>{connection.decision_note}</Notice> : null}
         {connection?.last_check ? (
           <p className={connection.last_check.ok === false ? "text-xs text-red-700" : "text-xs text-muted"}>

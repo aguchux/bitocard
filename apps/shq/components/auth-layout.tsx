@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Code2, Store, Wallet } from "lucide-react";
+import { Wordmark } from "@bitocard/admin-ui";
 
 const features = [
   { icon: Store, label: "Your branded store" },
@@ -23,10 +24,8 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           <div className="absolute -right-1/4 bottom-[-10%] h-[65%] w-[110%] rotate-[-12deg] rounded-[50%] bg-[radial-gradient(closest-side,#7c3aed_0%,#3b2bd6_40%,transparent_75%)] opacity-60 blur-2xl" />
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
-          <img src="/bitocard-logo-light.png" alt="" className="size-10" />
-          <span className="text-lg font-extrabold tracking-[0.25em]">BITOCARD</span>
+        <div className="flex items-center">
+          <Wordmark tone="light" className="text-3xl" />
         </div>
 
         <div className="my-auto max-w-md py-8">

@@ -12,6 +12,7 @@ import { webhookEndpointDisabledEmail } from '../notifications/templates.js';
 import { BlockedDestinationError, isBlockedAddress, safeLookup } from './destinations.js';
 import { EndpointBusyError, type EndpointMessage, WebhookQueue } from './queue.js';
 import { signatureHeader, signatureValue } from './signing.js';
+import { InboxService } from '../notifications/inbox.service.js';
 
 /** Seconds to wait after each failed attempt: 1 min, 5 min, 30 min, 2 h, 6 h, then every 12 h. */
 export const retryScheduleSeconds = [60, 300, 1800, 7200, 21_600];
@@ -54,6 +55,7 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     private readonly queue: WebhookQueue,
+    private readonly inbox: InboxService,
   ) {}
 
   private encryption() {
@@ -274,6 +276,13 @@ export class WebhookDeliveryService implements OnModuleDestroy {
       data: { status: 'failed', nextAttemptAt: null, lastError: 'endpoint_disabled' },
     });
     this.logger.warn({ endpointId: endpoint.id, resellerId: endpoint.resellerId }, 'Webhook endpoint disabled after 3 days of failures');
+    await this.inbox.reseller(endpoint.resellerId, 'webhook_endpoint.disabled', {
+      subject: `${endpoint.id}:${Date.now()}`,
+      title: 'Webhook endpoint disabled',
+      body: `${endpoint.url} failed for 3 days, so it was disabled. Fix it, enable it again, then catch up with GET /v1/events.`,
+      link: `/developers/webhooks/${endpoint.id}`,
+      mode: endpoint.mode,
+    });
     const owner = await this.prisma.resellerMember.findFirst({ where: { resellerId: endpoint.resellerId, role: 'owner' }, include: { user: true } });
     if (owner) {
       await this.email

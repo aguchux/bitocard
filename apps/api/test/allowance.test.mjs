@@ -47,6 +47,7 @@ describe('startup allowance', () => {
       ['USD', 50_000, 50_000, 'active'],
     );
     assert.equal(wallet.available, 0, 'the allowance is not money the reseller can spend or withdraw');
+    assert.ok((await browser.get('/v1/notifications')).json.data.some(item => item.type === 'startup_allowance.granted'));
     assert.equal((await browser.get('/v1/wallet', { 'bitocard-mode': 'test' })).json.startup_allowance, null, 'live only');
 
     const [entry] = (await browser.get('/v1/wallet/transactions')).json.data;

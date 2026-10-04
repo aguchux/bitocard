@@ -90,6 +90,8 @@ describe('sandbox payouts', () => {
 
     assert.equal((await browser.post(`/v1/payouts/${payout.json.id}/simulate`, { outcome: 'paid' }, sandbox)).json.status, 'paid');
     assert.equal((await browser.post(`/v1/payouts/${payout.json.id}/simulate`, { outcome: 'failed' }, sandbox)).json.status, 'paid', 'final');
+    const notes = (await browser.get('/v1/notifications')).json.data.map(item => item.type);
+    assert.deepEqual(notes.filter(type => type.startsWith('payout') || type === 'bank_account.added'), ['payout.paid', 'bank_account.added']);
     wallet = (await browser.get('/v1/wallet', sandbox)).json;
     assert.deepEqual([wallet.earnings.withdrawable, wallet.payouts_in_progress], [3_000_000, 0]);
     assert.equal((await browser.get('/v1/payouts', sandbox)).json.data[0].status, 'paid');
@@ -112,6 +114,9 @@ describe('sandbox payouts', () => {
     const payout = (await browser.post('/v1/payouts', { amount: 2_000_000, bank_account_id: account.id }, sandbox)).json;
     const failed = await browser.post(`/v1/payouts/${payout.id}/simulate`, { outcome: 'failed' }, sandbox);
     assert.deepEqual([failed.json.status, failed.json.failure_reason], ['failed', 'Simulated failure.']);
+    const [note] = (await browser.get('/v1/notifications')).json.data.filter(item => item.type === 'payout.failed');
+    assert.deepEqual([note.severity, note.mode], ['critical', 'test']);
+    assert.match(note.body, /Simulated failure\. The money is back in your earnings/);
     const wallet = (await browser.get('/v1/wallet', sandbox)).json;
     assert.deepEqual([wallet.earnings.withdrawable, wallet.payouts_in_progress], [5_000_000, 0]);
   });
