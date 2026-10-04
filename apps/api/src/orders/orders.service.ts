@@ -16,6 +16,9 @@ import { ProviderError } from '../payments/provider-error.js';
 import type { Delivery, FulfilmentRequest, FulfilmentResult } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { EventsService } from '../webhooks/events.service.js';
+import { PlatformFeesService } from '../fees/platform-fees.service.js';
+import { connectable } from '../reseller-integrations/connectable.js';
+import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
 import { sellerFor } from './seller.js';
 
 /** When to check an unconfirmed order again, after each check. After the last, it joins the exception queue. */
@@ -57,6 +60,8 @@ export class OrdersService {
     private readonly adapters: SupplierAdapters,
     private readonly audit: AuditService,
     private readonly events: EventsService,
+    private readonly fees: PlatformFeesService,
+    private readonly own: OwnSuppliersService,
   ) {}
 
   private encryption() {
@@ -69,6 +74,7 @@ export class OrdersService {
   /** Deliveries (codes, PINs, tokens) are included only when `withSecrets` is set: the single-order view. */
   present(order: OrderWithProduct & { deliveries?: OrderDelivery[] }, withSecrets = false) {
     const encryption = withSecrets && order.deliveries?.length ? this.encryption() : null;
+    const own = order.source === 'own';
     return {
       object: 'order' as const,
       id: order.id,
@@ -82,12 +88,18 @@ export class OrdersService {
       currency: order.currency,
       wholesale: minor(order.wholesaleMinor),
       tax: minor(order.taxMinor),
-      /** Taken from the wallet: wholesale plus tax (BitoCard is the seller of record and pays the tax). */
-      charged: minor(order.wholesaleMinor + order.taxMinor),
+      /**
+       * Taken from the wallet: wholesale plus tax (BitoCard is the seller of record and pays the tax); for your own
+       * supplier, only BitoCard's fee (the most it can be while processing, then what was charged).
+       */
+      charged: minor(own ? (order.feeMinor ?? 0n) : order.wholesaleMinor + order.taxMinor),
       price: minor(order.priceMinor),
       reseller_profit: minor(order.resellerProfitMinor),
       recipient: order.recipient as RecipientRecord | null,
       customer_reference: order.customerReference,
+      /** `own`: fulfilled through your own supplier account (you are the seller); `bitocard` otherwise. */
+      source: order.source as 'bitocard' | 'own',
+      integration: own ? { id: order.supplierCode, name: connectable(order.supplierCode)?.name ?? order.supplierCode } : null,
       ...(withSecrets
         ? {
             deliveries: (order.deliveries ?? []).map(d => ({
@@ -131,8 +143,26 @@ export class OrdersService {
     }
 
     const id = randomUUID();
-    const total = quote.wholesaleMinor + quote.taxMinor;
-    const hold = await this.wallets.hold({ resellerId, mode, amount: total, reference: `order:${id}`, description: `Order: ${quote.product.name}` });
+    const own = quote.source === 'own';
+    let hold: { id: string } | null = null;
+    let fee: { id: string; heldMinor: bigint } | null = null;
+    if (own) {
+      // The reseller's own supplier: BitoCard holds only its fee, at the rate the quote locked.
+      const connection = quote.connectionId ? await this.prisma.resellerConnection.findUnique({ where: { id: quote.connectionId } }) : null;
+      if (connection?.status !== 'active') throw conflict('integration_unavailable', 'Your supplier account is no longer connected. Create a new quote.');
+      fee = await this.fees.hold({
+        resellerId,
+        mode,
+        kind: 'supplier_order',
+        category: quote.product.category,
+        baseMinor: quote.feeBaseMinor ?? 0n,
+        source: { type: 'order', id },
+        description: `Order: ${quote.product.name}`,
+        locked: { ruleId: quote.feeRuleId, ratePpb: quote.feeRatePpb ?? 0, minFeeMinor: quote.feeMinMinor },
+      });
+    } else {
+      hold = await this.wallets.hold({ resellerId, mode, amount: quote.wholesaleMinor + quote.taxMinor, reference: `order:${id}`, description: `Order: ${quote.product.name}` });
+    }
     try {
       await this.prisma.$transaction(async tx => {
         const claimed = await tx.quote.updateMany({ where: { id: quote.id, status: 'open', expiresAt: { gt: new Date() } }, data: { status: 'used' } });
@@ -154,7 +184,11 @@ export class OrdersService {
             resellerProfitMinor: quote.resellerProfitMinor,
             recipient: quote.recipient ?? undefined,
             customerReference: quote.customerReference,
-            holdId: hold.id,
+            holdId: hold?.id ?? null,
+            source: quote.source,
+            connectionId: quote.connectionId,
+            feeChargeId: fee?.id ?? null,
+            feeMinor: fee?.heldMinor ?? null,
             supplierCode: quote.supplierCode,
             supplierProductId: quote.supplierProductId,
             supplierCostMinor: quote.supplierCostMinor,
@@ -167,7 +201,8 @@ export class OrdersService {
         });
       });
     } catch (error) {
-      await this.wallets.releaseHold(hold.id, 'Order not placed: funds released');
+      if (hold) await this.wallets.releaseHold(hold.id, 'Order not placed: funds released');
+      if (fee) await this.fees.release(fee.id);
       throw error;
     }
     const order = await this.attempt(id, 'place');
@@ -196,6 +231,7 @@ export class OrdersService {
   async receipt(resellerId: string, mode: LedgerMode, id: string) {
     const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode }, include: { product: true, reseller: { include: { stores: true } } } });
     if (!order) throw notFound();
+    if (order.source === 'own') throw conflict('receipt_unavailable', 'You are the seller of orders through your own supplier, so BitoCard does not issue their receipts.');
     if (order.status !== 'completed' || order.receiptNumber === null) throw conflict('receipt_unavailable', 'Receipts are issued for completed orders.');
     const seller = sellerFor(order.reseller.country ?? 'NG');
     const taxBreakdown = order.taxMinor > 0n ? ((await this.prisma.quote.findUnique({ where: { id: order.quoteId } })) ?? null) : null;
@@ -229,7 +265,10 @@ export class OrdersService {
   // -- Fulfilment ------------------------------------------------------------------------------------------------
 
   private async request(order: OrderWithProduct): Promise<FulfilmentRequest> {
-    const offer = await this.prisma.supplierProduct.findUniqueOrThrow({ where: { id: order.supplierProductId } });
+    const offer =
+      order.source === 'own'
+        ? await this.prisma.resellerOffer.findUniqueOrThrow({ where: { id: order.supplierProductId } })
+        : await this.prisma.supplierProduct.findUniqueOrThrow({ where: { id: order.supplierProductId } });
     return {
       reference: order.supplierReference,
       sku: offer.sku,
@@ -261,9 +300,11 @@ export class OrdersService {
     if (order.mode === 'test') {
       result = this.sandboxResult(order);
     } else {
-      const adapter = this.adapters.get(order.supplierCode);
+      // The reseller's own orders go through their own account, and only theirs.
+      const adapter = order.source === 'own' ? await this.own.adapterFor(order.resellerId, order.supplierCode) : this.adapters.get(order.supplierCode);
       const request = await this.request(order);
       try {
+        if (!adapter) throw new ProviderError(order.supplierCode, 'your supplier account is no longer connected', action === 'place');
         if (action === 'place') {
           if (!adapter.placeOrder) throw new ProviderError(order.supplierCode, 'ordering not supported', true);
           result = await adapter.placeOrder(request);
@@ -313,7 +354,7 @@ export class OrdersService {
     const deliveries = result.deliveries ?? [];
     const encryption = deliveries.some(d => d.code || d.pin) ? this.encryption() : null;
     const claimed = await this.prisma.$transaction(async tx => {
-      const [{ nextval }] = await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('order_receipt_number_seq')`;
+      const [{ nextval }] = order.source === 'own' ? [{ nextval: null }] : await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('order_receipt_number_seq')`;
       const updated = await tx.order.updateMany({
         where: { id: order.id, status: 'processing' },
         data: {
@@ -321,7 +362,7 @@ export class OrdersService {
           needsReview: false,
           nextCheckAt: null,
           completedAt: new Date(),
-          receiptNumber: Number(nextval),
+          receiptNumber: nextval === null ? null : Number(nextval),
           supplierTransactionId: result.supplierTransactionId ?? order.supplierTransactionId,
         },
       });
@@ -350,6 +391,14 @@ export class OrdersService {
   /** Ledger entries for a completed order. Idempotent, so the scheduled job can repair an interrupted completion. */
   private async settle(orderId: string) {
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { product: true } });
+    if (order.source === 'own') {
+      // BitoCard paid no supplier: it charges its fee, exactly, and nothing else.
+      if (order.feeChargeId) {
+        const fee = await this.fees.settle(order.feeChargeId);
+        await this.prisma.order.update({ where: { id: order.id }, data: { feeMinor: fee.chargedMinor ?? 0n } });
+      }
+      return;
+    }
     if (order.holdId) {
       await this.wallets.captureHold(order.holdId, `Order delivered: ${order.product.name}`, [{ kind: 'tax_payable', amount: order.taxMinor }]);
     }
@@ -371,6 +420,10 @@ export class OrdersService {
 
   /** A confirmed failure: try another supplier that can still honour the quote, or fail the order and release the hold. */
   private async failOrFallBack(order: OrderWithProduct, detail?: string) {
+    if (order.source === 'own') {
+      await this.fail(order.id, 'Your supplier could not fulfil the order. BitoCard\'s fee hold has been returned to your wallet.', detail);
+      return;
+    }
     const failed = await this.prisma.orderAttempt.findMany({ where: { orderId: order.id, outcome: 'failed' }, select: { supplierCode: true } });
     const exclude = new Set(failed.map(attempt => attempt.supplierCode));
     try {
@@ -417,6 +470,10 @@ export class OrdersService {
     this.events.committed();
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     if (order.holdId) await this.wallets.releaseHold(order.holdId, 'Order failed: funds released');
+    if (order.feeChargeId) {
+      await this.fees.release(order.feeChargeId);
+      await this.prisma.order.update({ where: { id: orderId }, data: { feeMinor: 0n } });
+    }
     this.logger.log({ orderId, detail }, 'Order failed');
   }
 
@@ -441,6 +498,12 @@ export class OrdersService {
     const unsettled = await this.prisma.order.findMany({ where: { status: 'completed', holdId: { not: null } }, select: { id: true, holdId: true }, take: 200, orderBy: { completedAt: 'desc' } });
     const holds = await this.prisma.hold.findMany({ where: { id: { in: unsettled.map(o => o.holdId!) }, status: 'held' }, select: { id: true } });
     for (const order of unsettled.filter(o => holds.some(h => h.id === o.holdId))) {
+      await this.settle(order.id);
+      outcome.repaired += 1;
+    }
+    const ownUnsettled = await this.prisma.order.findMany({ where: { status: 'completed', source: 'own', feeChargeId: { not: null } }, select: { id: true, feeChargeId: true }, take: 200, orderBy: { completedAt: 'desc' } });
+    const heldFees = await this.prisma.feeCharge.findMany({ where: { id: { in: ownUnsettled.map(o => o.feeChargeId!) }, status: 'held' }, select: { id: true } });
+    for (const order of ownUnsettled.filter(o => heldFees.some(f => f.id === o.feeChargeId))) {
       await this.settle(order.id);
       outcome.repaired += 1;
     }
@@ -469,7 +532,13 @@ export class OrdersService {
   async adminGet(id: string) {
     const order = await this.prisma.order.findUnique({ where: { id }, include: { product: true, attempts: { orderBy: { createdAt: 'asc' } } } });
     if (!order) throw notFound();
-    const references = [`order_cost:${id}`, `order_refund:${id}`, ...(order.holdId ? [`hold:${order.holdId}`, `hold_capture:${order.holdId}`, `hold_release:${order.holdId}`] : [])];
+    const fee = order.feeChargeId ? await this.prisma.feeCharge.findUnique({ where: { id: order.feeChargeId } }) : null;
+    const references = [
+      `order_cost:${id}`,
+      `order_refund:${id}`,
+      ...(order.holdId ? [`hold:${order.holdId}`, `hold_capture:${order.holdId}`, `hold_release:${order.holdId}`] : []),
+      ...(fee ? [fee.reference, `fee:refund:${fee.id}`, ...(fee.holdId ? [`hold:${fee.holdId}`, `hold_release:${fee.holdId}`] : [])] : []),
+    ];
     const entries = await this.prisma.journalEntry.findMany({ where: { reference: { in: references } }, include: { postings: { include: { account: true } } }, orderBy: { createdAt: 'asc' } });
     const notifications = await this.prisma.supplierWebhook.findMany({ where: { orderId: id }, orderBy: { receivedAt: 'asc' } });
     return {
@@ -514,6 +583,20 @@ export class OrdersService {
     return this.adminGet(id);
   }
 
+  /** An own-supplier order: BitoCard took only its fee, so that is what it gives back. The reseller deals with their supplier. */
+  private async refundOwn(actorId: string | null, order: OrderWithProduct, reason: string) {
+    if (order.feeChargeId) await this.fees.refund(order.feeChargeId, actorId, reason);
+    const refunded = await this.prisma.$transaction(async tx => {
+      const claimed = await tx.order.updateMany({ where: { id: order.id, status: 'completed' }, data: { status: 'refunded', feeMinor: 0n } });
+      if (claimed.count === 1) await this.recordEvent(tx, 'order.refunded', order.id);
+      return claimed.count === 1;
+    });
+    if (!refunded) throw conflict('order_not_refundable', 'Only completed orders can be refunded.');
+    this.events.committed();
+    await this.audit.record({ actorId, action: 'order.refunded', targetType: 'order', targetId: order.id, before: order, after: { status: 'refunded', reason, fee_only: true } });
+    return this.adminGet(order.id);
+  }
+
   /**
    * Refunds a completed order to the reseller wallet (as topped-up funds). If the supplier refunded BitoCard too,
    * the supplier cost is reversed as well.
@@ -522,6 +605,7 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id }, include: { product: true } });
     if (!order) throw notFound();
     if (order.status !== 'completed') throw conflict('order_not_refundable', 'Only completed orders can be refunded.');
+    if (order.source === 'own') return this.refundOwn(actorId, order, input.reason);
     const total = order.wholesaleMinor + order.taxMinor;
     const entry = await this.ledger.prepare({
       mode: order.mode,

@@ -145,6 +145,25 @@ export function planRenewalFailedEmail(to: string, plan: string, amount: string,
   };
 }
 
+/** A reseller's own integration changed: connected, waiting for review, approved, rejected, suspended or disconnected. */
+export function connectionEmail(
+  to: string,
+  integration: string,
+  event: 'connected' | 'pending' | 'approved' | 'rejected' | 'suspended' | 'disconnected',
+  note?: string,
+): EmailMessage {
+  const copy = {
+    connected: [`Your ${integration} account is connected`, `Your own ${integration} account is now connected to BitoCard.`],
+    pending: [`Your ${integration} account is waiting for review`, `Your own ${integration} account is connected. BitoCard reviews it before you can use it live; we will email you when it is done.`],
+    approved: [`Your ${integration} account is approved`, `Your own ${integration} account is approved and active on BitoCard.`],
+    rejected: [`Your ${integration} account was not approved`, `BitoCard did not approve your own ${integration} account, and its credentials were erased.`],
+    suspended: [`Your ${integration} account is suspended`, `BitoCard suspended your own ${integration} account on BitoCard. Contact support to have it reinstated.`],
+    disconnected: [`Your ${integration} account was disconnected`, `Your own ${integration} account was disconnected from BitoCard and its credentials were erased.`],
+  }[event];
+  const paragraphs = [copy[1], ...(note ? [`Reason: ${note}`] : []), 'If you did not expect this, contact BitoCard support and change the credentials with the provider.'];
+  return { to, subject: copy[0], ...layout(copy[0], paragraphs) };
+}
+
 export function planEndedEmail(to: string, plan: string): EmailMessage {
   return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Standard plan. You can upgrade again at any time.']) };
 }

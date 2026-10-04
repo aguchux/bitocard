@@ -6,7 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 
-export const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling'] as const;
+export const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations'] as const;
 
 export function presentPlan(plan: Plan) {
   return { object: 'plan' as const, code: plan.code, name: plan.name, price: { amount: plan.priceCents, currency: 'USD', interval: 'month' }, features: plan.features };

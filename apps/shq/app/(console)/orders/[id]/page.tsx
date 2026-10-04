@@ -291,13 +291,22 @@ export default function OrderPage() {
             <Card>
               <CardHeader title="Money" description={order.currency} />
               <dl className="space-y-2 p-5 text-sm sm:p-6">
-                {[
-                  ["Customer price", money(order.price)],
-                  ["Wholesale", money(order.wholesale)],
-                  ["Tax", money(order.tax)],
-                  ["Charged to your wallet", money(order.charged)],
-                  ["Your profit", money(order.reseller_profit)],
-                ].map(([label, value]) => (
+                {(order.source === "own"
+                  ? [
+                      ["Fulfilled by", `Your ${order.integration?.name ?? "supplier"} account`],
+                      ["Customer price", money(order.price)],
+                      ["Your cost and BitoCard’s fee", money(order.wholesale)],
+                      ["BitoCard fee from your wallet", money(order.charged)],
+                      ["Your profit", money(order.reseller_profit)],
+                    ]
+                  : [
+                      ["Customer price", money(order.price)],
+                      ["Wholesale", money(order.wholesale)],
+                      ["Tax", money(order.tax)],
+                      ["Charged to your wallet", money(order.charged)],
+                      ["Your profit", money(order.reseller_profit)],
+                    ]
+                ).map(([label, value]) => (
                   <div key={label} className="flex justify-between gap-3">
                     <dt className="text-muted">{label}</dt>
                     <dd className="text-right font-semibold">{value}</dd>

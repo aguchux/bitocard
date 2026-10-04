@@ -172,6 +172,29 @@ export class SuppliersService {
 
   /** Returns true when a new product was created. */
   private async upsert(supplierCode: string, item: CatalogueItem) {
+    const { product, created } = await this.upsertProduct(item);
+    const offer = {
+      productId: product.id,
+      costCurrency: item.costCurrency,
+      costRatio: new Prisma.Decimal(item.costRatio),
+      costFeeMinor: item.costFee,
+      meta: (item.meta ?? undefined) as Prisma.InputJsonValue | undefined,
+      available: true,
+      syncedAt: new Date(),
+    };
+    await this.prisma.supplierProduct.upsert({
+      where: { supplierCode_sku: { supplierCode, sku: item.sku } },
+      create: { supplierCode, sku: item.sku, ...offer },
+      update: offer,
+    });
+    return created;
+  }
+
+  /**
+   * The BitoCard product for a catalogue item (by its product key), created or updated from it. Shared by every
+   * source, so equivalent offers from BitoCard's suppliers and resellers' own accounts are one product.
+   */
+  async upsertProduct(item: CatalogueItem) {
     const productData = {
       category: item.category,
       country: item.country,
@@ -191,21 +214,7 @@ export class SuppliersService {
     const product = existing
       ? await this.prisma.product.update({ where: { id: existing.id }, data: productData })
       : await this.prisma.product.create({ data: { key: item.productKey, ...productData } });
-    const offer = {
-      productId: product.id,
-      costCurrency: item.costCurrency,
-      costRatio: new Prisma.Decimal(item.costRatio),
-      costFeeMinor: item.costFee,
-      meta: (item.meta ?? undefined) as Prisma.InputJsonValue | undefined,
-      available: true,
-      syncedAt: new Date(),
-    };
-    await this.prisma.supplierProduct.upsert({
-      where: { supplierCode_sku: { supplierCode, sku: item.sku } },
-      create: { supplierCode, sku: item.sku, ...offer },
-      update: offer,
-    });
-    return !existing;
+    return { product, created: !existing };
   }
 
   // -- Products (admin) ------------------------------------------------------------------------------------------

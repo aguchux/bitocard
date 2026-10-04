@@ -31,6 +31,7 @@ const statusTones: Record<string, Tone> = {
   pending: 'amber',
   in_review: 'amber',
   needs_review: 'amber',
+  pending_review: 'amber',
   degraded: 'amber',
   incomplete: 'amber',
   unmatched: 'amber',
@@ -39,10 +40,12 @@ const statusTones: Record<string, Tone> = {
   expired: 'grey',
   disabled: 'grey',
   not_connected: 'grey',
+  disconnected: 'grey',
   refunded: 'pink',
   failed: 'red',
   declined: 'red',
   suspended: 'red',
+  rejected: 'red',
 };
 
 export function Badge({ tone = 'grey', children, dot = true, className }: { tone?: Tone; children: ReactNode; dot?: boolean; className?: string }) {

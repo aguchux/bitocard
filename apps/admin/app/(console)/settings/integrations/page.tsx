@@ -5,6 +5,7 @@ import { Check, Copy, KeyRound, Pencil } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type Integration, type IntegrationField, type IntegrationSource, useIntegrationsQuery, useUpdateIntegrationMutation } from "@bitocard/api-client/admin";
+import { ResellerAvailability } from "@/components/reseller-availability";
 
 const sourceLabels: Record<IntegrationSource, string> = { admin: "Set here", environment: "From .env", default: "Default", unset: "Not set" };
 const statusLabels: Record<Integration["status"], string> = { connected: "Connected", incomplete: "Incomplete", not_connected: "Not connected" };
@@ -195,7 +196,7 @@ export default function IntegrationsPage() {
   const allowed = can(admin);
   const { data, error, isLoading, refetch } = useIntegrationsQuery(undefined, { skip: !allowed });
   const [editing, setEditing] = useState<string | null>(null);
-  const [section, setSection] = useState<Integration["section"]>("platform");
+  const [section, setSection] = useState<Integration["section"] | "resellers">("platform");
   const shown = data?.data.filter(item => item.section === section) ?? [];
   const current = data?.data.find(item => item.id === editing) ?? null;
   const connected = data?.data.filter(item => item.status === "connected" && item.adapter_ready).length ?? 0;
@@ -236,13 +237,18 @@ export default function IntegrationsPage() {
             items={[
               { value: "platform", label: "Platform", count: data.data.filter(item => item.section === "platform").length },
               { value: "suppliers", label: "Suppliers", count: data.data.filter(item => item.section === "suppliers").length },
+              { value: "resellers", label: "Resellers' own" },
             ]}
           />
-          <div className="grid gap-4 lg:grid-cols-2">
-            {shown.map(integration => (
-              <IntegrationCard key={integration.id} integration={integration} editable={allowed} onEdit={() => setEditing(integration.id)} />
-            ))}
-          </div>
+          {section === "resellers" ? (
+            <ResellerAvailability editable={allowed} />
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {shown.map(integration => (
+                <IntegrationCard key={integration.id} integration={integration} editable={allowed} onEdit={() => setEditing(integration.id)} />
+              ))}
+            </div>
+          )}
         </>
       )}
       {current ? <EditDialog key={current.id} integration={current} onClose={() => setEditing(null)} /> : null}

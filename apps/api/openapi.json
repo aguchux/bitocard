@@ -2903,6 +2903,353 @@
         ]
       }
     },
+    "/v1/integrations/{id}/connection/sync": {
+      "post": {
+        "description": "Fetches your own supplier’s products and your prices with your credentials (simulated in the sandbox). Also runs daily.",
+        "operationId": "ResellerIntegrationsController_sync",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Sync your supplier catalogue",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/integrations/{id}/connection/routing": {
+      "put": {
+        "description": "Before BitoCard’s suppliers, only when BitoCard has no offer, or never.",
+        "operationId": "ResellerIntegrationsController_routing",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Choose when your supplier is used",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/integrations": {
+      "get": {
+        "description": "Integrations offered in your country, each with its fields and your connection in this mode, plus whether your account may connect them (`access`).",
+        "operationId": "ResellerIntegrationsController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List the integrations you can connect",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/integrations/{id}/connection": {
+      "put": {
+        "description": "Saves (or replaces) your credentials, encrypted; they are never returned. Live credentials are checked with the provider first; live connections may wait for BitoCard to review them.",
+        "operationId": "ResellerIntegrationsController_connect",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Connect your own account",
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "delete": {
+        "description": "Erases the saved credentials.",
+        "operationId": "ResellerIntegrationsController_disconnect",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Disconnect your account",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/integrations/{id}/connection/check": {
+      "post": {
+        "description": "Live: asks the provider whether the saved credentials still work.",
+        "operationId": "ResellerIntegrationsController_check",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Check a connection again",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/v1/wallet/fees": {
+      "get": {
+        "description": "Fees on orders through your own suppliers and payments through your own gateway, newest first: the rate, the base, the exact fee (billionths of a minor unit), what was held and charged, and the fraction carried to your next transaction.",
+        "operationId": "FeesController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Only this UTC month, `YYYY-MM`.",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List BitoCard fees",
+        "tags": [
+          "Wallet"
+        ]
+      }
+    },
+    "/v1/wallet/fees/statement": {
+      "get": {
+        "description": "Fees charged and refunded by kind, and your subscription charges, for a UTC month.",
+        "operationId": "FeesController_statement",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "UTC month, `YYYY-MM`; defaults to this month.",
+            "schema": {
+              "example": "2026-10",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your monthly fee statement",
+        "tags": [
+          "Wallet"
+        ]
+      }
+    },
+    "/v1/wallet/fee-rates": {
+      "get": {
+        "description": "Per fee kind and product category, for your country and plan, in parts per billion and as a percentage.",
+        "operationId": "FeesController_rates",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The fee rates that apply to you",
+        "tags": [
+          "Wallet"
+        ]
+      }
+    },
     "/v1/orders": {
       "post": {
         "description": "Uses an open quote. Wholesale cost plus tax is held from your wallet and taken only when the order completes; a failed order releases it. `processing` means the supplier has not confirmed yet: check again, or wait for the webhook. Gift card codes, PINs and electricity tokens appear only on this order, never in lists or webhooks.",
@@ -3984,6 +4331,39 @@
           "outcome"
         ]
       },
+      "RoutingDto": {
+        "type": "object",
+        "properties": {
+          "routing": {
+            "type": "string",
+            "enum": [
+              "preferred",
+              "fallback",
+              "off"
+            ],
+            "description": "`preferred`: used before BitoCard’s suppliers; `fallback`: only when BitoCard has no offer; `off`: never."
+          }
+        },
+        "required": [
+          "routing"
+        ]
+      },
+      "ConnectDto": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "description": "The integration's credentials by field key (see `fields`). Secrets left blank keep the saved ones.",
+            "example": {
+              "client_id": "abc123",
+              "client_secret": "s3cr3t"
+            }
+          }
+        },
+        "required": [
+          "values"
+        ]
+      },
       "CreateOrderDto": {
         "type": "object",
         "properties": {
@@ -4041,6 +4421,8 @@
           "reseller_profit",
           "recipient",
           "customer_reference",
+          "source",
+          "integration",
           "failure_reason",
           "receipt_number",
           "created_at",
@@ -4156,6 +4538,35 @@
               "null"
             ],
             "description": "Your own reference for the customer, as given on the quote."
+          },
+          "source": {
+            "type": "string",
+            "description": "`bitocard`, or `own`: fulfilled through your own supplier account (you are the seller; `charged` is only BitoCard’s fee).",
+            "enum": [
+              "bitocard",
+              "own"
+            ]
+          },
+          "integration": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "For `own` orders: your supplier account that fulfilled it.",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Integration ID, for example `reloadly`."
+              },
+              "name": {
+                "type": "string",
+                "description": "Integration name."
+              }
+            }
           },
           "failure_reason": {
             "type": [
@@ -5081,6 +5492,8 @@
                       "phone": "+2348031234567"
                     },
                     "customer_reference": "cust-1042",
+                    "source": "bitocard",
+                    "integration": null,
                     "failure_reason": null,
                     "receipt_number": "BC-000123",
                     "created_at": "2026-10-06T09:15:02.114Z",
@@ -5188,6 +5601,8 @@
                       "phone": "+2348031234567"
                     },
                     "customer_reference": "cust-1042",
+                    "source": "bitocard",
+                    "integration": null,
                     "failure_reason": "The order could not be fulfilled. The amount held has been returned to your wallet.",
                     "receipt_number": null,
                     "created_at": "2026-10-06T09:15:02.114Z",
@@ -5295,6 +5710,8 @@
                       "phone": "+2348031234567"
                     },
                     "customer_reference": "cust-1042",
+                    "source": "bitocard",
+                    "integration": null,
                     "failure_reason": null,
                     "receipt_number": "BC-000123",
                     "created_at": "2026-10-06T09:15:02.114Z",

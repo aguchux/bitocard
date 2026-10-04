@@ -65,6 +65,8 @@ export const tagTypes = [
   'Activity',
   'Plan',
   'Integration',
+  'IntegrationOffer',
+  'Connection',
   // Reseller (SHQ)
   'Account',
   'Wallet',
@@ -82,6 +84,9 @@ export const tagTypes = [
   'Catalogue',
   'Settings',
   'IdentityCheck',
+  'ResellerIntegration',
+  'Fee',
+  'FeeRule',
 ] as const;
 
 /** The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache. */

@@ -169,8 +169,16 @@ function QuoteCard({ quote, product, onPlaced, onRequote, requoting }: { quote: 
             ...recipient.map(([key, value]) => [humanise(key), key === "transaction_type" ? humanise(String(value)) : String(value)]),
             ["Customer pays", money(quote.price)],
             ...(quote.tax ? [[`${quote.tax.name} (${quote.tax.rate_percent}%)`, money(quote.tax.amount)]] : []),
-            ["Wholesale", money(quote.wholesale)],
-            ["Taken from your wallet", money(quote.wholesale + (quote.tax?.amount ?? 0))],
+            ...(quote.source === "own" && quote.bitocard_fee
+              ? [
+                  ["Fulfilled by", `Your ${quote.integration?.name ?? "supplier"} account`],
+                  ["Your cost and BitoCard’s fee", money(quote.wholesale)],
+                  [`BitoCard fee (${quote.bitocard_fee.rate_percent}%) from your wallet`, `up to ${money(quote.bitocard_fee.max)}`],
+                ]
+              : [
+                  ["Wholesale", money(quote.wholesale)],
+                  ["Taken from your wallet", money(quote.wholesale + (quote.tax?.amount ?? 0))],
+                ]),
             ["Your profit", money(quote.reseller_profit)],
           ].map(([label, value]) => (
             <div key={label} className="flex justify-between gap-3">
@@ -201,7 +209,7 @@ function QuoteCard({ quote, product, onPlaced, onRequote, requoting }: { quote: 
               </Field>
             ) : null}
             <Button className="w-full sm:w-auto" icon={<ShoppingCart className="size-4" aria-hidden />} loading={placeState.isLoading} onClick={submit}>
-              {`Place order · ${money(quote.wholesale + (quote.tax?.amount ?? 0))} from wallet`}
+              {quote.source === "own" && quote.bitocard_fee ? `Place order · fee up to ${money(quote.bitocard_fee.max)}` : `Place order · ${money(quote.wholesale + (quote.tax?.amount ?? 0))} from wallet`}
             </Button>
             <p className="text-xs text-muted">The amount is held from your wallet and taken only when the order completes.</p>
           </div>

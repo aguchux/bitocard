@@ -27,6 +27,8 @@ import { IdentityModule } from './identity/identity.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { IntegrationsAdminModule } from './integrations/integrations.admin.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
+import { ResellerIntegrationsModule } from './reseller-integrations/reseller-integrations.module.js';
+import { FeesModule } from './fees/fees.module.js';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter.js';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor.js';
 import { RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
@@ -78,6 +80,8 @@ export class AppModule {
         IdentityModule,
         AdminModule,
         IntegrationsAdminModule,
+        ResellerIntegrationsModule,
+        FeesModule,
         OrdersModule,
         CronModule,
         ...(options.extraModules ?? []),

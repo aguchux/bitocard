@@ -232,3 +232,5 @@ export const {
   useIntegrationsQuery,
   useUpdateIntegrationMutation,
 } = adminApi;
+export * from './reseller-integrations';
+export * from './fees';

@@ -15,6 +15,7 @@ import { OrdersService } from '../orders/orders.service.js';
 import { SupplierWebhooksService } from '../orders/supplier-webhooks.js';
 import { WebhookDeliveryService } from '../webhooks/delivery.service.js';
 import { IdentityService } from '../identity/identity.service.js';
+import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -38,6 +39,7 @@ export class CronController {
     webhooks: WebhookDeliveryService,
     identity: IdentityService,
     supplierWebhooks: SupplierWebhooksService,
+    ownSuppliers: OwnSuppliersService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -50,8 +52,8 @@ export class CronController {
       plans: () => billing.renewDue(),
       /** Every 2 minutes: check orders the suppliers have not confirmed, and repair interrupted completions. */
       orders: () => orders.checkDue(),
-      /** Daily: refresh supplier catalogues and costs. */
-      catalogue: () => suppliers.syncAll(),
+      /** Daily: refresh supplier catalogues and costs, BitoCard's and resellers' own. */
+      catalogue: async () => ({ suppliers: await suppliers.syncAll(), own: await ownSuppliers.syncAll() }),
       /** Every minute: send the outbox and due webhook retries (runs also start right after each change). */
       webhooks: () => webhooks.run(),
       /** Every 30 minutes: re-read identity checks the providers have not reported, and close abandoned ones. */

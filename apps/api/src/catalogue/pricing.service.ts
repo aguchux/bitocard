@@ -3,17 +3,21 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { FxService } from '../fx/fx.service.js';
 import {
+  type ConnectionRouting,
   type Country,
   type CountryCategory,
+  type FeeRule,
   type LedgerMode,
   Prisma,
   type PricingRule,
   type Product,
   type ProductCategory,
   type ResellerMarkup,
+  type ResellerOffer,
   type Supplier,
   type SupplierProduct,
 } from '../generated/prisma/client.js';
+import { exactFeeNano, maxFeeMinor, pickFeeRule } from '../fees/platform-fees.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 
@@ -26,6 +30,10 @@ export const faceValueCategories = new Set<ProductCategory>(['airtime', 'data', 
 export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'esim', 'software', 'virtual_numbers']);
 
 export type Offer = SupplierProduct & { supplier: Supplier };
+/** An offer from the reseller's own supplier account, with when the reseller wants it used. */
+export type OwnOffer = ResellerOffer & { connection: { routing: ConnectionRouting } };
+/** What a priced offer needs, whichever source it came from. */
+export type PricedOffer = Pick<SupplierProduct, 'id' | 'supplierCode' | 'costCurrency' | 'meta'>;
 export type ProductWithOffers = Product & { supplierProducts: Offer[] };
 
 /** Everything needed to price products for one reseller, loaded once per request. */
@@ -42,11 +50,22 @@ export type PricingContext = {
   /** supplierCode:category pairs switched on in the reseller market. */
   markets: Set<string>;
   rates: Map<string, { pay: Decimal; receive: Decimal }>;
+  planCode: string;
+  /** BitoCard's fee rules for own-supplier orders. */
+  feeRules: FeeRule[];
+  /** The reseller's own offers by product (active connections in this mode, not switched off). */
+  own: Map<string, OwnOffer[]>;
 };
 
 /** One unit priced through one supplier offer. All amounts are minor units of the reseller currency unless noted. */
 export type Priced = {
-  offer: Offer;
+  offer: PricedOffer;
+  /** `own`: the reseller's own supplier account; BitoCard's fee replaces its margin and is all it charges. */
+  source: 'bitocard' | 'own';
+  connectionId?: string;
+  routing?: ConnectionRouting;
+  /** Own supplier, per unit: the fee rule and rate, and the base the fee is on (cost, or face value for face-value products). */
+  fee?: { ruleId: string | null; ratePpb: number; baseMinor: bigint; minFeeMinor: bigint | null };
   /** In the supplier currency. */
   supplierCost: bigint;
   /** Reseller currency per unit of supplier currency (null when they are the same). */
@@ -86,6 +105,12 @@ export class PricingService {
     }
     const options = await this.settings.effectiveOptions(resellerId);
     const markets = await this.prisma.supplierMarket.findMany({ where: { countryCode: reseller.countryRef.code, enabled: true } });
+    const own = await this.prisma.resellerOffer.findMany({
+      where: { resellerId, mode, available: true, connection: { status: 'active', routing: { not: 'off' } } },
+      include: { connection: { select: { routing: true } } },
+    });
+    const ownByProduct = new Map<string, OwnOffer[]>();
+    for (const offer of own) ownByProduct.set(offer.productId, [...(ownByProduct.get(offer.productId) ?? []), offer]);
     return {
       resellerId,
       mode,
@@ -98,6 +123,9 @@ export class PricingService {
       rules: await this.prisma.pricingRule.findMany(),
       markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
       rates: new Map(),
+      planCode: reseller.planCode,
+      feeRules: await this.prisma.feeRule.findMany({ where: { kind: 'supplier_order' } }),
+      own: ownByProduct,
     };
   }
 
@@ -167,19 +195,19 @@ export class PricingService {
     const rule = this.rule(ctx, product);
     const markup = this.markupBps(ctx, product);
     const faceValueProduct = product.faceCurrency === ctx.currency && faceValueCategories.has(product.category);
-    let best: Priced | null = null;
+    let best: (Priced & { offer: Offer }) | null = null;
     for (const offer of this.eligibleOffers(ctx, product, exclude)) {
       const discounted = new Decimal(faceValue.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
       const supplierCost = BigInt(discounted.toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
       const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
-      let priced: Priced;
+      let priced: Priced & { offer: Offer };
       if (faceValueProduct && ctx.earning === 'discount') {
-        priced = { offer, supplierCost, fxRate: rate, cost, wholesale: faceValue - mulBps(faceValue, rule.resellerDiscountBps) / 10_000n, price: faceValue, basis: 'discount' };
+        priced = { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, wholesale: faceValue - mulBps(faceValue, rule.resellerDiscountBps) / 10_000n, price: faceValue, basis: 'discount' };
       } else if (faceValueProduct) {
-        priced = { offer, supplierCost, fxRate: rate, cost, wholesale: faceValue, price: addBps(faceValue, markup), basis: 'markup' };
+        priced = { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, wholesale: faceValue, price: addBps(faceValue, markup), basis: 'markup' };
       } else {
         const wholesale = addBps(cost, rule.marginBps);
-        priced = { offer, supplierCost, fxRate: rate, cost, wholesale, price: addBps(wholesale, markup), basis: 'cost' };
+        priced = { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, wholesale, price: addBps(wholesale, markup), basis: 'cost' };
       }
       // BitoCard never sells below its own cost.
       if (priced.wholesale < cost) continue;
@@ -187,6 +215,59 @@ export class PricingService {
     }
     if (!best) throw unavailable('product_unavailable', 'This product is not available right now.');
     return best;
+  }
+
+  /**
+   * Prices one unit through the reseller's own supplier account, or null if they have no usable offer. Their cost
+   * plus BitoCard's fee (the most it can be) is the wholesale price; BitoCard's margin does not apply. Face-value
+   * products keep their face-value price; offers that would sell below cost plus fee are skipped.
+   */
+  async priceOwn(ctx: PricingContext, product: Product, faceValue: bigint): Promise<Priced | null> {
+    const markup = this.markupBps(ctx, product);
+    const faceValueProduct = product.faceCurrency === ctx.currency && faceValueCategories.has(product.category);
+    const rule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category, planCode: ctx.planCode });
+    let best: Priced | null = null;
+    for (const offer of ctx.own.get(product.id) ?? []) {
+      const supplierCost = BigInt(new Decimal(faceValue.toString()).mul(offer.costRatio).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
+      const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
+      const base = faceValueProduct ? faceValue : cost;
+      const fee = maxFeeMinor(exactFeeNano(base, rule?.ratePpb ?? 0), rule?.minFeeMinor ?? null);
+      const wholesale = cost + fee;
+      const price = faceValueProduct ? (ctx.earning === 'discount' ? faceValue : addBps(faceValue, markup)) : addBps(wholesale, markup);
+      if (price < wholesale) continue;
+      const priced: Priced = {
+        offer,
+        source: 'own',
+        connectionId: offer.connectionId,
+        routing: offer.connection.routing,
+        fee: { ruleId: rule?.id ?? null, ratePpb: rule?.ratePpb ?? 0, baseMinor: base, minFeeMinor: rule?.minFeeMinor ?? null },
+        supplierCost,
+        fxRate: rate,
+        cost,
+        wholesale,
+        price,
+        basis: faceValueProduct ? (ctx.earning === 'discount' ? 'discount' : 'markup') : 'cost',
+      };
+      // Preferred accounts first, then the cheapest.
+      const rank = (item: Priced) => (item.routing === 'preferred' ? 0 : 1);
+      if (!best || rank(priced) < rank(best) || (rank(priced) === rank(best) && cost < best.cost)) best = priced;
+    }
+    return best;
+  }
+
+  /**
+   * The source for a sale: the reseller's own supplier when they prefer it (or BitoCard has no offer), otherwise
+   * BitoCard's cheapest offer.
+   */
+  async choose(ctx: PricingContext, product: ProductWithOffers, faceValue: bigint): Promise<Priced> {
+    const own = await this.priceOwn(ctx, product, faceValue);
+    if (own?.routing === 'preferred') return own;
+    try {
+      return await this.price(ctx, product, faceValue);
+    } catch (error) {
+      if (own && error instanceof ApiError && error.code === 'product_unavailable') return own;
+      throw error;
+    }
   }
 
   // -- Reseller markups ------------------------------------------------------------------------------------------

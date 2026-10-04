@@ -17,7 +17,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "check": "turbo run lint typecheck && turbo run build test",
+    "check": "turbo run lint typecheck && turbo run build && turbo run test",
     "dev:storefront": "turbo run dev --filter=@bitocard/storefront",
     "dev:api": "turbo run dev --filter=@bitocard/api",
     "dev:docs": "turbo run dev --filter=@bitocard/docs",

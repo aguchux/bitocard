@@ -1,4 +1,4 @@
-import { AlertTriangle, BellRing, PlugZap, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'settings';
 
@@ -37,7 +37,14 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Pricing rules', href: '/catalog/pricing', icon: BadgePercent },
     ],
   },
-  resellers: { title: 'Resellers', items: [{ label: 'All resellers', href: '/resellers', icon: Building2 }, { label: 'Identity checks', href: '/verifications', icon: ShieldCheck }] },
+  resellers: {
+    title: 'Resellers',
+    items: [
+      { label: 'All resellers', href: '/resellers', icon: Building2 },
+      { label: 'Identity checks', href: '/verifications', icon: ShieldCheck },
+      { label: 'Own integrations', href: '/resellers/connections', icon: Plug },
+    ],
+  },
   verifications: {
     title: 'Identity',
     items: [
@@ -52,6 +59,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Feature switches', href: '/settings', icon: ToggleRight },
       { label: 'Markets', href: '/settings/markets', icon: Globe2 },
       { label: 'Integrations', href: '/settings/integrations', icon: PlugZap },
+      { label: 'Platform fees', href: '/settings/fees', icon: Percent },
     ],
   },
 };

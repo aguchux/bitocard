@@ -45,7 +45,7 @@ export class CatalogueService {
     for (const value of values) {
       if (value <= 0n) continue;
       try {
-        const priced = await this.pricing.price(ctx, product, value);
+        const priced = await this.pricing.choose(ctx, product, value);
         denominations.push({ face_value: minor(value), wholesale: minor(priced.wholesale), price: minor(priced.price) });
       } catch (error) {
         if (error instanceof ApiError && error.code === 'product_unavailable') continue;
@@ -73,8 +73,11 @@ export class CatalogueService {
         category: filter.category ? { in: categories.includes(filter.category) ? [filter.category] : [] } : { in: categories },
         country: filter.country?.toUpperCase(),
         ...(ctx.international ? {} : { OR: [{ country: ctx.country.code }, { category: { in: [...worldwideCategories] } }] }),
-        ...(filter.q ? { AND: [{ OR: [{ name: { contains: filter.q, mode: 'insensitive' as const } }, { brand: { contains: filter.q.toLowerCase() } }] }] } : {}),
-        supplierProducts: { some: { available: true } },
+        AND: [
+          // BitoCard's offers, or the reseller's own.
+          { OR: [{ supplierProducts: { some: { available: true } } }, { id: { in: [...ctx.own.keys()] } }] },
+          ...(filter.q ? [{ OR: [{ name: { contains: filter.q, mode: 'insensitive' as const } }, { brand: { contains: filter.q.toLowerCase() } }] }] : []),
+        ],
       },
       include: offersInclude,
       orderBy: { key: 'asc' },

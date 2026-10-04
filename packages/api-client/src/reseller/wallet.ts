@@ -45,6 +45,8 @@ export type WalletTransactionType =
   | 'plan_charge'
   | 'allowance_granted'
   | 'allowance_revoked'
+  | 'platform_fee'
+  | 'platform_fee_refund'
   | (string & {});
 
 /** The $500 startup allowance (US cents). Restricted: pays only the wholesale cost of customer-paid orders, never cash. */
@@ -71,6 +73,8 @@ export type WalletTransaction = {
   earnings_on_hold_change: number;
   /** Change to the startup allowance (US cents); never part of `amount`. */
   allowance_change: number;
+  /** BitoCard fee entries (and the fee hold returned before them): the fee and what it was on. */
+  fee: { id: string; source: { type: string; id: string | null } | null } | null;
   created_at: string;
 };
 

@@ -1,7 +1,7 @@
 import {
+  BadgePercent,
   Banknote,
   BarChart3,
-  BadgePercent,
   Bell,
   Building,
   Code2,
@@ -12,19 +12,21 @@ import {
   Landmark,
   ListOrdered,
   Package,
+  Percent,
+  Plug,
   ReceiptText,
   Settings,
   ShieldCheck,
   Sparkles,
   Store,
+  type LucideIcon,
   UserCog,
   Users,
   Wallet,
   Webhook,
-  type LucideIcon,
 } from "lucide-react";
 
-export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "store" | "developers" | "team" | "settings";
+export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "store" | "integrations" | "developers" | "team" | "settings";
 export type ShqNavItem = { key: ShqSection; label: string; href: string; icon: LucideIcon };
 export type ShqSubNavItem = { label: string; href: string; icon?: LucideIcon };
 
@@ -35,6 +37,7 @@ export const sections: ShqNavItem[] = [
   { key: "catalogue", label: "Catalogue", href: "/catalogue", icon: Package },
   { key: "wallet", label: "Wallet", href: "/wallet", icon: Wallet },
   { key: "store", label: "Store", href: "/store", icon: Store },
+  { key: "integrations", label: "Integrations", href: "/integrations", icon: Plug },
   { key: "developers", label: "Developers", href: "/developers", icon: Code2 },
   { key: "team", label: "Team", href: "/team", icon: Users },
   { key: "settings", label: "Settings", href: "/settings", icon: Settings },
@@ -59,9 +62,11 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Bank transfer accounts", href: "/wallet/reserved-accounts", icon: Landmark },
       { label: "Withdrawals", href: "/wallet/payouts", icon: Banknote },
       { label: "Payout bank accounts", href: "/wallet/bank-accounts", icon: Building },
+      { label: "BitoCard fees", href: "/wallet/fees", icon: Percent },
     ],
   },
   store: { title: "Store", items: [{ label: "Your store", href: "/store", icon: Store }] },
+  integrations: { title: "Integrations", items: [{ label: "Your integrations", href: "/integrations", icon: Plug }] },
   developers: {
     title: "Developers",
     items: [

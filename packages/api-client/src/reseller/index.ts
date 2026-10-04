@@ -9,3 +9,5 @@ export * from './developers';
 export * from './store';
 export * from './team';
 export * from './identity';
+export * from './integrations';
+export * from './fees';

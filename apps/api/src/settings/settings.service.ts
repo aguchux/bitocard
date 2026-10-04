@@ -23,6 +23,10 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: 'Live reserved bank accounts (top-ups by bank transfer), on top of the country offering them. In Nigeria the owner also needs a verified BVN.',
   },
+  own_integrations: {
+    scopes: ['global', 'country', 'reseller'],
+    description: "Resellers connect their own supplier and payment gateway accounts (on plans with own integrations, for integrations offered in their country).",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

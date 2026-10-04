@@ -187,6 +187,190 @@ model SignupVerification {
   @@map("signup_verifications")
 }
 
+/// What a platform fee is charged on.
+enum FeeKind {
+  /// Orders fulfilled through the reseller's own supplier.
+  supplier_order
+  /// Payments taken through the reseller's own payment gateway.
+  gateway_payment
+}
+
+/// An admin's fee rate. The most specific rule for a transaction wins (country, then category, then plan); none: no fee.
+model FeeRule {
+  id          String           @id @default(uuid()) @db.Uuid
+  kind        FeeKind
+  countryCode String?          @map("country_code") @db.Char(2)
+  category    ProductCategory?
+  planCode    String?          @map("plan_code")
+  /// `kind:country:category:plan` with `*` for any, so a scope has one rule.
+  scopeKey    String           @unique @map("scope_key")
+  /// Parts per billion of the base: 1 = 0.0000001%, 100,000,000 = 10%.
+  ratePpb     Int              @map("rate_ppb")
+  /// Optional minimum per transaction, in the country's currency (needs a country).
+  minFeeMinor BigInt?          @map("min_fee_minor")
+  updatedById String?          @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@map("fee_rules")
+}
+
+enum FeeChargeStatus {
+  /// The most the fee can be is held from the wallet.
+  held
+  /// Charged (possibly nothing this time, the fraction carried).
+  charged
+  /// The transaction failed: the hold was returned and nothing charged.
+  released
+  /// Charged, then given back.
+  refunded
+}
+
+/// One platform fee: its rule, base and exact amount, what was held and charged, and the carried fraction before and after.
+model FeeCharge {
+  id              String          @id @default(uuid()) @db.Uuid
+  resellerId      String          @map("reseller_id") @db.Uuid
+  mode            LedgerMode
+  currency        String          @db.Char(3)
+  kind            FeeKind
+  /// What the fee is on: `order` or `payment`, and its id.
+  sourceType      String          @map("source_type")
+  sourceId        String          @map("source_id")
+  /// `fee:<source type>:<source id>`: one fee per transaction.
+  reference       String          @unique
+  category        ProductCategory?
+  /// The reseller's country and plan when charged, for reports.
+  countryCode     String?         @map("country_code") @db.Char(2)
+  planCode        String?         @map("plan_code")
+  ruleId          String?         @map("rule_id") @db.Uuid
+  ratePpb         Int             @map("rate_ppb")
+  baseMinor       BigInt          @map("base_minor")
+  minFeeMinor     BigInt?         @map("min_fee_minor")
+  /// The exact fee in billionths of a minor unit (base x rate in parts per billion).
+  exactNano       BigInt          @map("exact_nano")
+  heldMinor       BigInt          @map("held_minor")
+  holdId          String?         @map("hold_id") @db.Uuid
+  status          FeeChargeStatus @default(held)
+  chargedMinor    BigInt?         @map("charged_minor")
+  carryBeforeNano BigInt?         @map("carry_before_nano")
+  carryAfterNano  BigInt?         @map("carry_after_nano")
+  /// What a minimum fee added beyond the exact fee and carry (billionths), so reconciliation still adds up.
+  extraNano       BigInt?         @map("extra_nano")
+  refundReason    String?         @map("refund_reason")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  settledAt       DateTime?       @map("settled_at")
+  reseller        Reseller        @relation(fields: [resellerId], references: [id])
+
+  @@index([resellerId, mode, createdAt])
+  @@index([status, createdAt])
+  @@map("fee_charges")
+}
+
+/// The fraction of a minor unit each reseller has accrued but not yet been charged (billionths, always below one unit).
+model FeeCarry {
+  resellerId String     @map("reseller_id") @db.Uuid
+  mode       LedgerMode
+  currency   String     @db.Char(3)
+  carryNano  BigInt     @default(0) @map("carry_nano")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@id([resellerId, mode, currency])
+  @@map("fee_carries")
+}
+
+enum IntegrationApproval {
+  automatic
+  review
+}
+
+/// Which integrations resellers may connect their own accounts to, and where. No row: not offered.
+model IntegrationOffer {
+  /// The connectable integration's id (`src/reseller-integrations/connectable.ts`).
+  integrationId String              @id @map("integration_id")
+  /// Offered to resellers in every country.
+  global        Boolean             @default(false)
+  /// Offered to resellers in these countries (when not global).
+  countries     String[]            @default([])
+  /// Live connections start active, or wait for an admin's review.
+  approval      IntegrationApproval @default(review)
+  updatedById   String?             @map("updated_by_id") @db.Uuid
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  @@map("integration_offers")
+}
+
+/// When a reseller's own supplier is used: before BitoCard's suppliers, only when BitoCard has no offer, or never.
+enum ConnectionRouting {
+  preferred
+  fallback
+  off
+}
+
+/// An offer from a reseller's own supplier account, priced at their own cost. Only ever used for that reseller.
+model ResellerOffer {
+  id           String             @id @default(uuid()) @db.Uuid
+  connectionId String             @map("connection_id") @db.Uuid
+  resellerId   String             @map("reseller_id") @db.Uuid
+  mode         LedgerMode
+  /// The integration (supplier) code, for example `reloadly`.
+  supplierCode String             @map("supplier_code")
+  productId    String             @map("product_id") @db.Uuid
+  sku          String
+  costCurrency String             @map("cost_currency") @db.Char(3)
+  costRatio    Decimal            @map("cost_ratio") @db.Decimal(24, 10)
+  costFeeMinor BigInt             @default(0) @map("cost_fee_minor")
+  meta         Json?
+  available    Boolean            @default(true)
+  syncedAt     DateTime           @map("synced_at")
+  connection   ResellerConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  product      Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, sku])
+  @@index([resellerId, mode, productId])
+  @@map("reseller_offers")
+}
+
+enum ConnectionStatus {
+  pending_review
+  active
+  rejected
+  suspended
+  disconnected
+}
+
+/// A reseller's own account with a supplier or payment gateway, per mode. Credentials are encrypted, never returned.
+model ResellerConnection {
+  id                   String           @id @default(uuid()) @db.Uuid
+  resellerId           String           @map("reseller_id") @db.Uuid
+  integrationId        String           @map("integration_id")
+  mode                 LedgerMode
+  status               ConnectionStatus
+  /// Every credential as encrypted JSON; erased on disconnection or rejection.
+  credentialsEncrypted String?          @map("credentials_encrypted")
+  /// Non-secret values (shown back), and the last four characters of secrets.
+  publicValues         Json             @default("{}") @map("public_values")
+  hints                Json             @default("{}")
+  lastCheckedAt        DateTime?        @map("last_checked_at")
+  lastCheckOk          Boolean?         @map("last_check_ok")
+  lastCheckMessage     String?          @map("last_check_message")
+  /// Why an admin rejected or suspended it (shown to the reseller).
+  decisionNote         String?          @map("decision_note")
+  decidedById          String?          @map("decided_by_id") @db.Uuid
+  decidedAt            DateTime?        @map("decided_at")
+  connectedById        String?          @map("connected_by_id") @db.Uuid
+  /// Suppliers: when to use this account's offers instead of BitoCard's.
+  routing              ConnectionRouting @default(preferred)
+  lastSyncedAt         DateTime?        @map("last_synced_at")
+  lastSyncError        String?          @map("last_sync_error")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  reseller             Reseller         @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  offers               ResellerOffer[]
+
+  @@unique([resellerId, integrationId, mode])
+  @@index([status])
+  @@map("reseller_connections")
+}
+
 /// Admin authenticator-app secret, encrypted at rest. Admins cannot use the admin app until it is confirmed.
 model TotpCredential {
   userId             String    @id @map("user_id") @db.Uuid
@@ -250,6 +434,8 @@ model Reseller {
   quotes                Quote[]
   orders                Order[]
   events                Event[]
+  connections           ResellerConnection[]
+  feeCharges            FeeCharge[]
   webhookEndpoints      WebhookEndpoint[]
   verifications         IdentityVerification[]
 
@@ -507,6 +693,8 @@ enum AccountKind {
   /// Fees payment providers charge BitoCard (an expense).
   processing_fees
   platform_revenue
+  /// BitoCard's fees on resellers' own-integration transactions (revenue, kept apart from platform_revenue).
+  platform_fees
   tax_payable
   /// Counterpart of manual admin adjustments.
   adjustments
@@ -860,6 +1048,7 @@ model Product {
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
   supplierProducts   SupplierProduct[]
+  resellerOffers     ResellerOffer[]
   quotes             Quote[]
   orders             Order[]
 
@@ -959,6 +1148,15 @@ model Quote {
   /// Phone, smartcard or meter number, and what the supplier returned when validating it.
   recipient           Json?
   customerReference   String?     @map("customer_reference")
+  /// `bitocard`, or `own`: the reseller's own supplier (supplierProductId is then a reseller offer).
+  source              String      @default("bitocard")
+  connectionId        String?     @map("connection_id") @db.Uuid
+  /// Own supplier: BitoCard's fee, locked with the price (rule, rate, base, minimum, and the most it can be).
+  feeRuleId           String?     @map("fee_rule_id") @db.Uuid
+  feeRatePpb          Int?        @map("fee_rate_ppb")
+  feeBaseMinor        BigInt?     @map("fee_base_minor")
+  feeMinMinor         BigInt?     @map("fee_min_minor")
+  feeMaxMinor         BigInt?     @map("fee_max_minor")
   status              QuoteStatus @default(open)
   expiresAt           DateTime    @map("expires_at")
   createdAt           DateTime    @default(now()) @map("created_at")
@@ -1012,6 +1210,12 @@ model Order {
   /// Our reference for the current attempt, sent to the supplier so a status check can find it.
   supplierReference     String          @unique @map("supplier_reference")
   supplierTransactionId String?         @map("supplier_transaction_id")
+  /// `bitocard`, or `own`: fulfilled through the reseller's own supplier account (BitoCard charges only its fee).
+  source                String          @default("bitocard")
+  connectionId          String?         @map("connection_id") @db.Uuid
+  feeChargeId           String?         @map("fee_charge_id") @db.Uuid
+  /// Own supplier: BitoCard's fee taken from the wallet: the most it can be while processing, then what was charged.
+  feeMinor              BigInt?         @map("fee_minor")
   /// Sandbox only: the outcome to simulate.
   simulate              String?
   checks                Int             @default(0)

@@ -32,6 +32,9 @@ export type Order = {
   /** What the customer pays, tax included. */
   price: number;
   reseller_profit: number;
+  /** `own`: fulfilled through your own supplier account (you are the seller; `charged` is only BitoCard's fee). */
+  source: 'bitocard' | 'own';
+  integration: { id: string; name: string } | null;
   recipient: QuoteRecipient | null;
   customer_reference: string | null;
   failure_reason: string | null;

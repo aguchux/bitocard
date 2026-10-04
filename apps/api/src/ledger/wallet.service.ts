@@ -33,8 +33,15 @@ export function presentEntry(entry: EntryWithPostings, resellerId: string) {
     earnings_on_hold_change: minor(change(kind => kind === 'reseller_earnings_held')),
     /** Change to the startup allowance (US dollars, cents); never part of `amount`. */
     allowance_change: minor(change(kind => kind === 'reseller_allowance')),
+    /** For BitoCard fees (`platform_fee`, `platform_fee_refund`, and the hold returned before a fee): the fee and what it was on. */
+    fee: feeLink(entry),
     created_at: entry.createdAt.toISOString(),
   };
+}
+
+function feeLink(entry: JournalEntry) {
+  const meta = (entry.metadata ?? {}) as { fee_charge_id?: string; source_type?: string; source_id?: string };
+  return meta.fee_charge_id ? { id: meta.fee_charge_id, source: meta.source_type ? { type: meta.source_type, id: meta.source_id ?? null } : null } : null;
 }
 
 /** A reseller's wallet: what they can spend, what is held for orders, and their earnings. One per mode, in their country's currency. */

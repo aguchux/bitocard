@@ -8,7 +8,10 @@ import type { RecipientCheck } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { TaxService } from '../tax/tax.service.js';
 import { offersInclude } from './catalogue.service.js';
-import { type Offer, PricingService } from './pricing.service.js';
+import { exactFeeNano, maxFeeMinor } from '../fees/platform-fees.service.js';
+import { connectable } from '../reseller-integrations/connectable.js';
+import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
+import { type PricedOffer, PricingService } from './pricing.service.js';
 
 /** How long a quote price is held. */
 export const quoteLifetimeMs = 10 * 60 * 1000;
@@ -25,6 +28,9 @@ export type QuoteInput = {
 };
 
 type RecipientRecord = { phone?: string; account_number?: string; account_name?: string; [detail: string]: string | undefined };
+
+/** A rate in parts per billion as a percentage string (exact). */
+const percent = (ratePpb: number) => (ratePpb / 10_000_000).toFixed(7).replace(/\.?0+$/, '');
 
 const invalid = (message: string, param: string, code = 'parameter_invalid') => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 
@@ -48,6 +54,11 @@ export function presentQuote(quote: Quote & { product: Product }, now = new Date
     price: minor(quote.priceMinor),
     tax: quote.taxName ? { name: quote.taxName, rate_percent: (quote.taxRateBps ?? 0) / 100, amount: minor(quote.taxMinor) } : null,
     reseller_profit: minor(quote.resellerProfitMinor),
+    /** `own`: fulfilled through your own supplier account; BitoCard charges only its fee. */
+    source: quote.source as 'bitocard' | 'own',
+    integration: quote.source === 'own' ? { id: quote.supplierCode, name: connectable(quote.supplierCode)?.name ?? quote.supplierCode } : null,
+    /** Own supplier: BitoCard's fee, at most this, taken from your wallet (fractions are carried, never rounded up). */
+    bitocard_fee: quote.source === 'own' ? { rate_percent: percent(quote.feeRatePpb ?? 0), max: minor(quote.feeMaxMinor ?? 0n) } : null,
     recipient,
     customer_reference: quote.customerReference,
     expires_at: quote.expiresAt.toISOString(),
@@ -68,6 +79,7 @@ export class QuotesService {
     private readonly pricing: PricingService,
     private readonly adapters: SupplierAdapters,
     private readonly tax: TaxService,
+    private readonly own: OwnSuppliersService,
   ) {}
 
   async create(resellerId: string, mode: LedgerMode, input: QuoteInput) {
@@ -93,15 +105,20 @@ export class QuotesService {
     }
     if (product.category === 'pay_tv') recipient.transaction_type = input.recipient?.transaction_type ?? 'change';
 
-    const priced = await this.pricing.price(ctx, product, face);
-    if (recipient.account_number) Object.assign(recipient, await this.checkAccount(mode, product, priced.offer, recipient.account_number));
+    const priced = await this.pricing.choose(ctx, product, face);
+    const own = priced.source === 'own' && priced.fee ? priced.fee : null;
+    if (recipient.account_number) Object.assign(recipient, await this.checkAccount(mode, product, priced.offer, recipient.account_number, resellerId, Boolean(own)));
 
     const net = priced.price * BigInt(quantity);
-    const wholesale = priced.wholesale * BigInt(quantity);
+    // Own supplier: the fee is on the whole order (rounded once), so the wholesale price is cost plus that fee.
+    const feeBase = own ? own.baseMinor * BigInt(quantity) : null;
+    const feeMax = own && feeBase !== null ? maxFeeMinor(exactFeeNano(feeBase, own.ratePpb), own.minFeeMinor) : null;
+    const wholesale = own && feeMax !== null ? priced.cost * BigInt(quantity) + feeMax : priced.wholesale * BigInt(quantity);
     let price = net;
     let taxAmount = 0n;
     let tax: { name: string; rateBps: number } | null = null;
-    if (ctx.country.categories.some(c => c.category === product.category && c.taxable)) {
+    // The reseller is the seller of record for sales through their own supplier: BitoCard adds no tax.
+    if (!own && ctx.country.categories.some(c => c.category === product.category && c.taxable)) {
       const breakdown = await this.tax.calculate(ctx.country.code, net, mode);
       price = breakdown.gross;
       taxAmount = breakdown.tax;
@@ -134,6 +151,13 @@ export class QuotesService {
         fxRate: priced.fxRate,
         recipient: Object.keys(recipient).length ? (recipient as Prisma.InputJsonValue) : Prisma.JsonNull,
         customerReference: input.customer_reference ?? null,
+        source: priced.source,
+        connectionId: priced.connectionId ?? null,
+        feeRuleId: own?.ruleId ?? null,
+        feeRatePpb: own?.ratePpb ?? null,
+        feeBaseMinor: feeBase,
+        feeMinMinor: own?.minFeeMinor ?? null,
+        feeMaxMinor: feeMax,
         expiresAt: new Date(Date.now() + quoteLifetimeMs),
       },
       include: { product: true },
@@ -158,7 +182,7 @@ export class QuotesService {
   }
 
   /** Validates a smartcard or meter number with the routed supplier (simulated in the sandbox). */
-  private async checkAccount(mode: LedgerMode, product: Product, offer: Offer, accountNumber: string) {
+  private async checkAccount(mode: LedgerMode, product: Product, offer: PricedOffer, accountNumber: string, resellerId: string, own: boolean) {
     let check: RecipientCheck;
     if (mode === 'test') {
       check =
@@ -166,8 +190,9 @@ export class QuotesService {
           ? { valid: false, reason: 'The number was not recognised.' }
           : { valid: true, accountName: 'SANDBOX CUSTOMER', details: product.recipientType === 'smartcard' ? { current_package: product.name } : {} };
     } else {
-      const adapter = this.adapters.get(offer.supplierCode);
-      if (!adapter.validateRecipient) {
+      // The reseller's own account checks numbers for their own orders.
+      const adapter = own ? await this.own.adapterFor(resellerId, offer.supplierCode) : this.adapters.get(offer.supplierCode);
+      if (!adapter?.validateRecipient) {
         check = { valid: true, accountName: '', details: {} };
       } else {
         try {

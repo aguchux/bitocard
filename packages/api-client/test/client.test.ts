@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { adminApi } from '../src/admin';
+import { adminApi, percentToPpb } from '../src/admin';
 import { resellerSessionApi } from '../src/reseller';
 import { makeStore, setRequestContext, toApiError } from '../src';
 
@@ -111,5 +111,19 @@ describe('integrations', () => {
     expect(put.headers.get('idempotency-key')).toBeNull();
     expect(JSON.parse(put.body!)).toEqual({ values: { RESEND_API_KEY: 're_key', EMAIL_FROM: null }, code: '123456' });
     list.unsubscribe();
+  });
+});
+
+describe('percentToPpb', () => {
+  test('turns a percentage into parts per billion exactly', () => {
+    expect(percentToPpb('0.01')).toBe(100_000);
+    expect(percentToPpb('0.0000001')).toBe(1);
+    expect(percentToPpb('10')).toBe(100_000_000);
+    expect(percentToPpb('2.55')).toBe(25_500_000);
+    expect(percentToPpb('0')).toBe(0);
+  });
+
+  test('refuses anything outside 0% to 10% or finer than 0.0000001%', () => {
+    for (const text of ['10.0000001', '11', '0.00000001', '-1', 'abc', '', '1e-3']) expect(percentToPpb(text)).toBeNull();
   });
 });

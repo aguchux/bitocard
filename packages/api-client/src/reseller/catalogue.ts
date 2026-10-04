@@ -58,6 +58,11 @@ export type Quote = {
   price: number;
   tax: TaxLine | null;
   reseller_profit: number;
+  /** `own`: fulfilled through your own supplier account; BitoCard charges only its fee. */
+  source: 'bitocard' | 'own';
+  integration: { id: string; name: string } | null;
+  /** Own supplier: BitoCard's fee, at most `max` (fractions are carried, never rounded up). */
+  bitocard_fee: { rate_percent: string; max: number } | null;
   recipient: QuoteRecipient | null;
   customer_reference: string | null;
   expires_at: string;
