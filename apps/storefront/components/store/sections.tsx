@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check, CreditCard, Gift, Globe2, Signal, Smartphone } from "lucide-react";
 import type { ResolvedSection, StoreBrand, StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/storefront";
@@ -38,10 +39,9 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
       aria-labelledby={`hero-${section.id}`}
       className={`relative isolate bg-[#050a33] text-white ${bleed ? "ml-[calc(50%-50vw)] w-screen overflow-x-clip" : "overflow-x-clip rounded-3xl"}`}
     >
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_78%_40%,rgba(59,130,246,.38),transparent_42%),radial-gradient(ellipse_at_95%_10%,rgba(255,35,130,.28),transparent_40%),linear-gradient(110deg,#040828,#070f4c_55%,#0d1366)]"
-      />
+      {/* The banner: a lit globe with orbits on the right, darkened behind the text so it stays readable. */}
+      <Image src="/hero/globe.webp" alt="" aria-hidden="true" fill priority sizes="100vw" className="-z-20 object-cover object-[72%_center] lg:object-right" />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,10,51,.92),rgba(5,10,51,.7)_45%,rgba(5,10,51,.1)_75%)] lg:bg-[linear-gradient(90deg,rgba(5,10,51,.75),rgba(5,10,51,.35)_45%,transparent_65%)]" />
       <div className={`grid items-center gap-8 lg:grid-cols-12 ${bleed ? "mx-auto max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8 lg:py-12" : "px-5 py-10 sm:px-10 lg:px-14 lg:py-14"}`}>
         <div className="relative z-10 lg:col-span-7">
           <h1 id={`hero-${section.id}`} className="font-display text-4xl leading-[1.02] font-extrabold tracking-tight sm:text-6xl xl:text-7xl">
@@ -81,29 +81,10 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
   );
 }
 
-/** The globe with orbits and floating brand cards (the featured brands); decoration only. */
+/** Floating brand cards (the featured brands) over the banner's globe; decoration only. */
 function HeroArt({ featured }: { featured: StoreBrand[] }) {
   return (
     <div aria-hidden="true" className="relative hidden h-[22rem] lg:col-span-5 lg:block xl:h-[24rem]">
-      {/* The globe: a lit sphere with a dotted surface. */}
-      <div className="absolute top-1/2 left-1/2 size-[21rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_38%_32%,rgba(96,165,250,.75),rgba(37,99,235,.35)_45%,rgba(5,10,51,.2)_72%)] shadow-[0_0_120px_rgba(59,130,246,.45)] xl:size-[23rem]" />
-      <div className="absolute top-1/2 left-1/2 size-[21rem] -translate-x-1/2 -translate-y-1/2 rounded-full [background-image:radial-gradient(rgba(191,219,254,.55)_1.1px,transparent_1.3px)] [background-size:9px_9px] [mask-image:radial-gradient(circle,black_55%,transparent_72%)] opacity-70 xl:size-[23rem]" />
-      {/* Orbits with glowing points. */}
-      <svg viewBox="0 0 500 380" className="absolute inset-0 h-full w-full" fill="none">
-        <ellipse cx="250" cy="190" rx="240" ry="92" transform="rotate(-18 250 190)" stroke="rgba(255,35,130,.55)" strokeWidth="1.4" />
-        <ellipse cx="250" cy="190" rx="225" ry="120" transform="rotate(14 250 190)" stroke="rgba(147,197,253,.4)" strokeWidth="1.2" />
-        <ellipse cx="250" cy="190" rx="170" ry="178" stroke="rgba(255,255,255,.12)" strokeWidth="1" />
-        {[
-          [32, 250],
-          [470, 120],
-          [120, 70],
-          [400, 330],
-          [255, 14],
-          [470, 270],
-        ].map(([cx, cy]) => (
-          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill="#ff5ca8" className="drop-shadow-[0_0_6px_#ff2382]" />
-        ))}
-      </svg>
       {featured.map((brand, index) => (
         <FloatingTile key={brand.slug} brand={brand} index={index} />
       ))}

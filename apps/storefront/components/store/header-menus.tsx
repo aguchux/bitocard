@@ -34,7 +34,7 @@ function NavGroup({ group }: { group: StoreNavigationGroup }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className="flex min-h-11 items-center gap-1 rounded-lg px-3 text-[15px] font-medium text-[#070f4c] hover:bg-slate-50"
+        className="flex min-h-11 items-center gap-1 rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-[#070f4c] hover:bg-slate-50"
       >
         {group.label}
         <ChevronDown className={`size-4 transition ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -46,7 +46,11 @@ function NavGroup({ group }: { group: StoreNavigationGroup }) {
               <li key={category.category}>
                 <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
                   {category.label}
-                  <span className="text-xs font-normal text-slate-500">{category.products}</span>
+                  {category.on_sale ? (
+                    <span className="text-xs font-normal text-slate-500">{category.products}</span>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
+                  )}
                 </Link>
               </li>
             ))}
@@ -76,7 +80,7 @@ function NavGroup({ group }: { group: StoreNavigationGroup }) {
 
 export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
   return (
-    <nav aria-label="Categories" className="hidden items-center gap-1 xl:flex">
+    <nav aria-label="Categories" className="hidden items-center gap-0.5 xl:flex">
       {groups.map(group => (
         <NavGroup key={group.key} group={group} />
       ))}

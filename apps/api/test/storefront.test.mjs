@@ -75,14 +75,23 @@ describe('the public catalogue', () => {
     await prisma.product.update({ where: { key }, data: { active: true } });
   });
 
-  test('categories, brands, the menu and countries list only what is on sale', async () => {
+  test('categories and brands list only what is on sale; the menu lists every group; countries every market', async () => {
     const categories = (await visitor.get('/v1/store/categories')).json.data;
     assert.ok(categories.some(item => item.category === 'airtime' && item.label === 'Airtime' && item.group === 'mobile' && item.products >= 2));
-    assert.ok(categories.every(item => item.products > 0));
+    assert.ok(categories.every(item => item.products > 0 && item.on_sale));
     const navigation = (await visitor.get('/v1/store/navigation')).json;
+    assert.deepEqual(
+      navigation.groups.map(group => group.key),
+      ['gift-cards', 'mobile', 'bills', 'esims', 'software', 'virtual-cards'],
+      'the menus never come and go',
+    );
     const mobile = navigation.groups.find(group => group.key === 'mobile');
-    assert.ok(mobile.brands.length > 0);
+    assert.ok(mobile.on_sale && mobile.brands.length > 0);
+    const cards = navigation.groups.find(group => group.key === 'virtual-cards');
+    assert.deepEqual([cards.on_sale, cards.brands, cards.categories.map(item => [item.category, item.on_sale, item.products])], [false, [], [['virtual_cards', false, 0]]], 'not open yet: listed, marked, empty');
     assert.ok(navigation.countries.some(item => item.code === 'NG' && item.name === 'Nigeria'));
+    const markets = await prisma.country.findMany();
+    for (const market of markets) assert.ok(navigation.countries.some(item => item.code === market.code && item.name === market.name), `market ${market.code} is in the picker, with or without products`);
     noSuppliers(navigation);
   });
 });

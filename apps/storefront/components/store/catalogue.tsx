@@ -61,6 +61,11 @@ export function CatalogueView({
   result: Awaited<ReturnType<typeof loadCatalogue>>["result"];
 }) {
   const products = result.ok ? result.data.data : [];
+  // A category or menu group with nothing open yet says so, instead of "nothing matches".
+  const slug = path.replace(/^\/catalogs\/?/, "");
+  const every = groups.flatMap(group => group.categories);
+  const scope = !slug ? every : (groups.find(group => group.key === slug)?.categories ?? every.filter(category => category.category === slug));
+  const comingSoon = path.startsWith("/catalogs") && products.length === 0 && !scope.some(category => category.on_sale);
   const total = result.ok ? (result.data.total ?? products.length) : 0;
   const chips = [
     params.country ? { label: params.country === "global" ? "Usable anywhere" : (countries.find(item => item.code.toLowerCase() === params.country)?.name ?? params.country.toUpperCase()), change: { country: undefined } } : null,
@@ -87,7 +92,7 @@ export function CatalogueView({
                       className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-700 hover:bg-slate-50"}`}
                     >
                       {category.label}
-                      <span className="text-xs text-slate-500">{category.products}</span>
+                      <span className="text-xs text-slate-500">{category.on_sale ? category.products : "Soon"}</span>
                     </Link>
                   </li>
                 ))}
@@ -158,7 +163,9 @@ export function CatalogueView({
             ))}
           </ul>
         ) : result.ok ? (
-          <p className="mt-6 rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">Nothing matches these filters yet.</p>
+          <p className="mt-6 rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
+            {comingSoon ? `${title} are coming soon to BitoCard. Check back shortly.` : "Nothing matches these filters yet."}
+          </p>
         ) : null}
         {result.ok && (page > 1 || result.data.has_more) ? (
           <nav aria-label="Pages" className="mt-8 flex items-center justify-between">

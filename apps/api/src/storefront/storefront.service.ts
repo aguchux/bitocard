@@ -268,21 +268,28 @@ export class StorefrontService {
     };
   }
 
+  /** Categories on sale (enabled somewhere, with products available). */
   async categories() {
+    return (await this.everyCategory()).filter(item => item.on_sale);
+  }
+
+  /** Every category with its products on sale (none for categories not open yet), for the menu. */
+  private async everyCategory() {
     const { where, categories } = await this.availability();
     const [counts, presentation] = await Promise.all([this.prisma.product.groupBy({ by: ['category'], where, _count: { _all: true } }), this.prisma.categoryPresentation.findMany()]);
-    return (Object.keys(categoryLabels) as ProductCategory[])
-      .filter(category => categories.has(category))
-      .map(category => ({
+    return (Object.keys(categoryLabels) as ProductCategory[]).map(category => {
+      const products = counts.find(row => row.category === category)?._count._all ?? 0;
+      return {
         object: 'store_category' as const,
         category,
         label: categoryLabels[category],
         group: navigationGroups.find(group => group.categories.includes(category))?.key ?? null,
         icon_url: presentation.find(row => row.category === category)?.iconUrl ?? null,
         image_url: presentation.find(row => row.category === category)?.imageUrl ?? null,
-        products: counts.find(row => row.category === category)?._count._all ?? 0,
-      }))
-      .filter(item => item.products > 0);
+        products,
+        on_sale: categories.has(category) && products > 0,
+      };
+    });
   }
 
   async brands(filter: { tag?: string; limit?: number; category?: ProductCategory[] } = {}) {
@@ -305,10 +312,22 @@ export class StorefrontService {
   }
 
   /** Countries with products on sale, for the country picker. */
+  /**
+   * The countries for the country picker: every market BitoCard has set up (Settings > Markets), with the products on
+   * sale there (none yet is fine), plus any other country with products on sale.
+   */
   async countries() {
     const { where } = await this.availability();
-    const grouped = await this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } });
-    return grouped.map(row => ({ code: row.country, name: countryName(row.country), products: row._count._all })).sort((a, b) => a.name.localeCompare(b.name));
+    const [grouped, markets] = await Promise.all([
+      this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } }),
+      this.prisma.country.findMany({ select: { code: true, name: true } }),
+    ]);
+    const counts = new Map(grouped.map(row => [row.country, row._count._all]));
+    const codes = new Set([...markets.map(row => row.code), ...counts.keys()]);
+    return [...codes]
+      .filter(code => /^[A-Z]{2}$/.test(code))
+      .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   // -- Search ----------------------------------------------------------------------------------------------------
@@ -417,17 +436,23 @@ export class StorefrontService {
 
   // -- The home page ---------------------------------------------------------------------------------------------
 
-  /** The menu: category groups on sale, each with its top brands. */
+  /**
+   * The menu: every category group, always in the same order, so the store's menus never come and go. Each lists its
+   * categories with the products on sale (`on_sale: false` for those not open yet) and its top brands.
+   */
   async navigation() {
-    const categories = await this.categories();
-    const groups = navigationGroups.filter(group => categories.some(item => group.categories.includes(item.category)));
+    const categories = await this.everyCategory();
     return Promise.all(
-      groups.map(async group => ({
-        key: group.key,
-        label: group.label,
-        categories: categories.filter(item => group.categories.includes(item.category)),
-        brands: await this.brands({ category: group.categories, limit: 8 }),
-      })),
+      navigationGroups.map(async group => {
+        const own = categories.filter(item => group.categories.includes(item.category));
+        return {
+          key: group.key,
+          label: group.label,
+          on_sale: own.some(item => item.on_sale),
+          categories: own,
+          brands: own.some(item => item.on_sale) ? await this.brands({ category: group.categories, limit: 8 }) : [],
+        };
+      }),
     );
   }
 
@@ -437,8 +462,11 @@ export class StorefrontService {
     return Promise.all(
       visible.map(async item => {
         switch (item.type) {
-          case 'hero':
-            return { ...item, data: { featured: await this.brands({ limit: 6 }) } };
+          case 'hero': {
+            // Brands with a logo first, so the floating cards show logos rather than initials.
+            const brands = await this.brands({ limit: 24 });
+            return { ...item, data: { featured: [...brands.filter(brand => brand.logo_url), ...brands.filter(brand => !brand.logo_url)].slice(0, 6) } };
+          }
           case 'product_rail': {
             let products;
             if (item.source === 'manual') {
