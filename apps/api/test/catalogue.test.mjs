@@ -103,6 +103,13 @@ describe('supplier registry and sync', () => {
     } finally {
       reloadly.state.fail = undefined;
     }
+    // A refused sign-in says which Reloadly API refused it, and what to check.
+    const { ReloadlyAdapter } = await import('../dist/suppliers/reloadly.adapter.js');
+    const urls = { auth: reloadly.env.RELOADLY_AUTH_URL, giftcards: reloadly.env.RELOADLY_GIFTCARDS_URL, topups: reloadly.env.RELOADLY_TOPUPS_URL };
+    await assert.rejects(new ReloadlyAdapter({ clientId: 'wrong', clientSecret: 'wrong' }, urls).catalogue({ category: 'gift_cards' }), error => {
+      assert.match(error.message, /^reloadly: sign-in to the gift cards API refused \(HTTP 401\): Invalid credentials\. Check the client ID and secret, that the sandbox setting matches them/);
+      return true;
+    });
     assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
     assert.equal((await admin.get('/v1/admin/suppliers/reloadly')).json.last_sync_error, null);
   });

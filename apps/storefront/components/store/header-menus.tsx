@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Menu, Store, X } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 
@@ -88,7 +89,10 @@ export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
   );
 }
 
-/** Phones and tablets: the menu in a drawer. */
+/**
+ * Phones and tablets: the menu in a drawer, rendered into <body>: the sticky header's backdrop blur makes the header
+ * the containing block of fixed elements inside it, which clipped the drawer to the header's height.
+ */
 export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -106,43 +110,49 @@ export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
       <button type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
         <Menu className="size-6" aria-hidden="true" />
       </button>
-      {open ? (
-        <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Menu">
-          <button type="button" aria-label="Close menu" className="flex-1 bg-[#070f4c]/50" onClick={() => setOpen(false)} />
-          <div className="flex w-[min(22rem,88vw)] flex-col overflow-y-auto bg-white p-5 shadow-2xl">
-            <div className="flex justify-end">
-              <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
-                <X className="size-6" aria-hidden="true" />
-              </button>
-            </div>
-            <nav aria-label="Categories" className="mt-2 space-y-4">
-              {groups.map(group => (
-                <div key={group.key}>
-                  <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display block text-lg font-bold text-[#070f4c]">
-                    {group.label}
-                  </Link>
-                  <ul className="mt-1">
-                    {group.categories.map(category => (
-                      <li key={category.category}>
-                        <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center text-slate-600">
-                          {category.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+      {open
+        ? createPortal(
+            <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Menu">
+              <button type="button" aria-label="Close menu" className="flex-1 bg-[#070f4c]/50" onClick={() => setOpen(false)} />
+              <div className="flex w-[min(22rem,88vw)] flex-col overflow-y-auto bg-white p-5 shadow-2xl">
+                <div className="flex justify-end">
+                  <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
+                    <X className="size-6" aria-hidden="true" />
+                  </button>
                 </div>
-              ))}
-            </nav>
-            <Link href="/signin" onClick={() => setOpen(false)} className="mt-6 flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]">
-              Sign in
-            </Link>
-            <Link href="/resellers" onClick={() => setOpen(false)} className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
-              <Store className="size-5" aria-hidden="true" />
-              Open a reseller store
-            </Link>
-          </div>
-        </div>
-      ) : null}
+                <nav aria-label="Categories" className="mt-2 space-y-4">
+                  {groups.map(group => (
+                    <div key={group.key}>
+                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display block text-lg font-bold text-[#070f4c]">
+                        {group.label}
+                      </Link>
+                      {group.categories.length > 1 || !group.on_sale ? (
+                        <ul className="mt-1">
+                          {group.categories.map(category => (
+                            <li key={category.category}>
+                              <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center justify-between gap-3 text-slate-600">
+                                {category.label}
+                                {category.on_sale ? null : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ))}
+                </nav>
+                <Link href="/signin" onClick={() => setOpen(false)} className="mt-6 flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]">
+                  Sign in
+                </Link>
+                <Link href="/resellers" onClick={() => setOpen(false)} className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
+                  <Store className="size-5" aria-hidden="true" />
+                  Open a reseller store
+                </Link>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

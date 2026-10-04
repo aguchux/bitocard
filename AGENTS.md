@@ -294,6 +294,7 @@ BitoCard is API-first. Every capability is built as a public, versioned API befo
 
 - The API runs on **Vercel Functions** (its own Vercel project, `apps/api`), with Vercel Queues, Workflow and Cron for background work, alongside the frontends.
 - Before building each vendor adapter, confirm whether the vendor requires calls from allowlisted IP addresses. If any do, enable Vercel Static IPs for the API project; if the plan cannot provide them, that is the trigger to reconsider hosting (for example DigitalOcean).
+- **No Cloudflare proxy in front of Vercel.** `api.bitocard.com` is proxied through Cloudflare (orange cloud) as of October 2026; set its DNS record to DNS only (grey cloud), as Vercel advises. While proxied, Cloudflare replaces the API's 502 and 504 replies (supplier, payment, email, storage failures) with its own error page, which has no CORS headers, so the admin app and SHQ show "Could not reach BitoCard" instead of the API's message.
 - Keep the API portable: standard NestJS, no Vercel-specific code in business logic, queues behind an interface, Postgres through Prisma. Moving hosts must be a deployment change, not a rewrite.
 
 ### Outbound webhooks to resellers

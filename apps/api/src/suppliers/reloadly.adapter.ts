@@ -84,6 +84,13 @@ export class ReloadlyAdapter implements SupplierAdapter {
     const res = await providerRequest<{ access_token: string; expires_in: number }>(this.code, `${this.urls.auth}/oauth/token`, {
       method: 'POST',
       body: { client_id: this.credentials.clientId, client_secret: this.credentials.clientSecret, grant_type: 'client_credentials', audience },
+    }).catch((error: unknown) => {
+      // Say which API refused the sign-in and why, for the supplier record (Reloadly only answers "Access Denied").
+      if (!(error instanceof ProviderError)) throw error;
+      const api = audience === this.urls.giftcards ? 'gift cards' : 'top-ups';
+      const reason = error.message.replace(/^reloadly: /, '');
+      const hint = error.status === 401 || error.status === 403 ? ' Check the client ID and secret, that the sandbox setting matches them (test or live keys), and that this API is enabled on the Reloadly account.' : '';
+      throw new ProviderError(this.code, `sign-in to the ${api} API refused (HTTP ${error.status ?? 'no answer'}): ${reason}.${hint}`, error.definite, error.status);
     });
     this.tokens.set(audience, { value: res.access_token, expiresAt: Date.now() + res.expires_in * 1000 });
     return res.access_token;
