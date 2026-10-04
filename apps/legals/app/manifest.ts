@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { manifestIcons } from "@bitocard/ui/site";
 import { siteName } from "@/components/seo";
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -10,10 +11,6 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "browser",
     background_color: "#fcfdff",
     theme_color: "#fcfdff",
-    icons: [
-      { src: "/icon", sizes: "32x32", type: "image/png" },
-      { src: "/apple-icon", sizes: "180x180", type: "image/png" },
-      { src: "/bitocard-logo.png", sizes: "1024x1024", type: "image/png", purpose: "any" },
-    ],
+    icons: [...manifestIcons],
   };
 }

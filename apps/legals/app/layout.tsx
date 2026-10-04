@@ -9,7 +9,7 @@ import "./landing.css";
 const title = "BitoCard Legals & Compliance – privacy, terms and cookies";
 const description = "BitoCard's privacy notice, terms of use, cookie notice and company information for resellers and customers in Europe, the Americas, Africa and Asia.";
 
-// Favicons come from app/icon.tsx and app/apple-icon.tsx; banner images from app/og/[image]/route.tsx.
+// Favicons are app/favicon.ico, icon.svg, icon1.png and apple-icon.png (scripts/brand-assets.py); banner images from app/og/[image]/route.tsx.
 export const metadata: Metadata = {
   metadataBase: siteUrl(3005),
   title: { default: title, template: `%s | ${siteName}` },

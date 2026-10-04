@@ -3,18 +3,17 @@ import { brand, siteUrl } from "@bitocard/ui/site";
 import "@bitocard/ui/styles/brand-lockup.css";
 import "./globals.css";
 
-const title = "BitoCard – Launch your own gift card, airtime & data store";
-const description = "Build your own branded store for digital gift cards, mobile airtime and data. Choose your products, set your prices and grow your reseller business with BitoCard.";
+const title = "BitoCard – Gift cards, airtime, data, bills and more";
+const description = "Shop digital gift cards, top up mobile airtime and data, pay bills and TV, and explore eSIMs and software, delivered digitally. Or open your own reseller store.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl(3000),
   title: { default: title, template: "%s | BitoCard" },
   description,
   applicationName: brand.name,
-  keywords: ["gift card reseller", "digital gift card store", "airtime reseller", "data bundle reseller", "white-label storefront", "reseller platform", "BitoCard"],
-  category: "business",
+  keywords: ["gift cards", "buy gift cards online", "airtime top up", "mobile data", "pay bills online", "eSIM", "digital store", "gift card reseller", "BitoCard"],
+  category: "shopping",
   alternates: { canonical: "/" },
-  icons: { icon: brand.logo, apple: brand.logo },
   openGraph: { type: "website", url: "/", siteName: brand.name, title, description, locale: "en_GB" },
   twitter: { card: "summary_large_image", title, description },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },

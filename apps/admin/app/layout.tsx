@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { AppProviders } from "@bitocard/admin-ui/shell";
-import { brand, siteUrl } from "@bitocard/ui/site";
+import { siteUrl } from "@bitocard/ui/site";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -10,7 +10,6 @@ export const metadata: Metadata = {
   metadataBase: siteUrl(3003),
   title: { default: "BitoCard Admin", template: "%s | BitoCard Admin" },
   description: "BitoCard platform administration.",
-  icons: { icon: brand.logo },
   robots: { index: false, follow: false },
 };
 

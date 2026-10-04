@@ -33,21 +33,23 @@ async function loadMark(light = false) {
   return `data:image/png;base64,${mark.toString("base64")}`;
 }
 
-/** The mark's width over its height (bitocard-mark.png is 380x512). */
-const markRatio = 380 / 512;
+/** A PNG's width over its height, from its header (the mark's proportions follow the artwork). */
+export function pngRatio(dataUri: string) {
+  const bytes = Buffer.from(dataUri.slice(dataUri.indexOf(",") + 1), "base64");
+  return bytes.readUInt32BE(16) / bytes.readUInt32BE(20);
+}
 
-/**
- * The wordmark as on the sites: the "b" mark as the first letter (ascender height, sitting on the baseline), then
- * "ito" and the accent-coloured "Card". With Inter at line-height 1 the baseline sits about .14em above the box's foot.
- */
+/** The logo as on the sites: the "b" mark on the left, then "Bito" and the accent-coloured "card". */
 function Wordmark({ mark, size, color, accent }: { mark: string; size: number; color: string; accent: string }) {
-  const height = Math.round(size * .74);
+  const height = Math.round(size * 1.15);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", fontSize: size, fontWeight: 800, letterSpacing: -size / 30, lineHeight: 1, color }}>
+    <div style={{ display: "flex", alignItems: "center", gap: Math.round(size * .3), fontSize: size, fontWeight: 800, letterSpacing: -size / 30, lineHeight: 1, color }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain img elements */}
-      <img src={mark} alt="" width={Math.round(height * markRatio)} height={height} style={{ marginBottom: Math.round(size * .14), marginRight: Math.round(size * .02) }} />
-      <span>ito</span>
-      <span style={{ color: accent }}>Card</span>
+      <img src={mark} alt="" width={Math.round(height * pngRatio(mark))} height={height} />
+      <div style={{ display: "flex" }}>
+        <span>Bito</span>
+        <span style={{ color: accent }}>card</span>
+      </div>
     </div>
   );
 }

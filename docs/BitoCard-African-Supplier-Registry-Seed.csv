@@ -1,0 +1,33 @@
+provider_code,capability_categories,country_coverage_claim_or_model,api_evidence_status,official_source,qualification_stage
+reloadly,airtime_data_giftcards_bills,Multi-country; live product/country feed required,Documented API; qualify reseller own-account access,https://developers.reloadly.com/,Priority qualification
+dtone,airtime_data_esim_bills_giftcards_gaming,160+ countries claimed; feed required,Documented API; qualify African account/resale terms,https://developers.dtone.com/reference/overview,Priority qualification
+prestmit,giftcards_buy_sell,NGN/GHS payout flows documented; coverage to confirm,Documented product API; access/market qualification,https://documentation.prestmit.io/docs/getting-started,API documented; qualification required
+cardtonic,giftcards_buy_sell,Country coverage to confirm,Product API documented; production access gated/waitlist,https://cardtonic.com/developer,API documented; qualification required
+vtpass,airtime_data_tv_electricity_bills,Nigeria,Documented API with sandbox/live onboarding,https://vtpass.com/documentation/,Nigeria pilot
+interswitch_quickteller,bills_digital_services,Nigeria target; API/catalogue access to confirm,Partner API qualification,https://developer.interswitchgroup.com/,Qualify
+korba_xchange,airtime_data_bills_tv,Ghana,Documented API and sandbox,https://xchange.korba365.com/docs/,Ghana priority
+techlink_gh,airtime_data_bills_tv_education,Ghana,Documented REST API,https://business.techlinkgh.com/techlinkgh-api,Ghana backup
+king_flexy_gh,airtime_data_bills_tv,Ghana,Documented developer API/catalogue,https://kingflexygh.com/developers,Ghana backup
+expresspay_gh,bills_airtime_data_payments,Ghana; fulfilment endpoint entitlement to confirm,Documented business API and bill-payment service,https://expresspaygh.com/developers/docs/bill-payments/payment,Ghana candidate
+ipay_africa,airtime_bills_tv,Kenya; current biller list to confirm,Documented billing API,https://dev.ipayafrica.com/billing.html,Kenya qualify
+elipa,airtime_bills_payouts,Country-specific API sections; KE/UG/MW/ZM leads,Documented APIs; live catalogue per market required,https://elipa.global/dev/,Regional candidate
+tupay,bills_tv,Kenya bill API lead; exact coverage to confirm,Documented bill API,https://docs.tupay.app/bills/order/,Kenya backup
+cellulant_tingg,payments_payouts; bill supplier capability separate,Payment methods across multiple African markets incl listed Anglophone markets,Documented API; do not infer bill supply from checkout coverage,https://docs.tingg.africa/,Payment adapter / qualify bill APIs
+africas_talking,sms_ussd_voice_airtime_data,Service-by-service in KE UG TZ RW MW ZM NG GH ZA,Documented API; country/service matrix published,https://help.africastalking.com/en/articles/2727792-which-countries-are-africa-s-talking-products-in,Regional candidate
+airalo_partners,travel_esim,200+ destination countries claimed; destination feed required,Documented partner API,https://developers.partners.airalo.com/,eSIM candidate
+esim_go,travel_esim,190+ destination countries claimed; destination feed required,Documented API; check min funding and resale rights,https://docs.esim-go.com/,eSIM candidate
+esim_access,travel_esim,Global candidate; destination feed/access to confirm,Documented reseller provisioning API; partner access/market qualification,https://docs.esimaccess.com/,Partner-gated API
+esimerge,travel_esim,Global candidate; destination feed/access to confirm,Documented REST provisioning API; partner access/market qualification,https://esimerge.com/,Partner-gated API
+nexway_connect,software_games_digital_licences,Territory and SKU eligibility partner-gated,Documented API; partner agreement required,https://apidoc.nexway.store/,Software pilot candidate
+ingram_micro,software_cloud_licences,Country catalogues partner-gated,Partner/marketplace/API qualification,https://www.ingrammicro.com/,Later candidate
+td_synnex,software_cloud_licences,Country catalogues partner-gated,Partner/marketplace/API qualification,https://developer.tdsynnex.com/,Later candidate
+pax8,business_software_subscriptions,African territory eligibility to confirm,Partner onboarding and API qualification,https://devx.pax8.com/docs/introduction,Later candidate
+also_cloud,business_software_subscriptions,Mainly Europe; Africa eligibility to confirm,Partner onboarding and API qualification,https://www.also.com/ec/cms5/en_6000/6000/also-cloud-marketplace/index.jsp,Low-priority candidate
+didww,virtual_numbers_sip_sms,Selected African number markets; inventory API authoritative,"Documented REST API, live DID discovery",https://doc.didww.com/api3/2026-04-16/coverage-resources/countries/index.html,Telecom candidate
+telnyx,virtual_numbers_voice_sms,Selected African markets; requirements/inventory vary,Documented international coverage and APIs,https://support.telnyx.com/en/articles/1424680-international-coverage,Telecom candidate
+twilio,virtual_numbers_voice_sms,Country/number-type inventory varies,Documented Phone Numbers API,https://www.twilio.com/docs/phone-numbers/api,Telecom candidate
+vonage,virtual_numbers_voice_sms,Country inventory and resale model to confirm,Partner/API qualification,https://developer.vonage.com/en/api/numbers,Telecom candidate
+plivo,virtual_numbers_voice_sms,Country inventory and resale model to confirm,Partner/API qualification,https://www.plivo.com/docs/numbers/phone-numbers,Telecom candidate
+flutterwave_cards,virtual_payment_cards,Nigeria pilot lead; programme geography to confirm,Regulated issuer/programme access required,https://developer.flutterwave.com/v2.0/reference/create-a-virtual-card,Compliance/partner gate
+maplerad,virtual_payment_cards,Nigeria lead; programme geography to confirm,Regulated issuer/programme access required,https://maplerad.dev/docs/issuing,Compliance/partner gate
+onafriq,virtual_payment_cards,Pan-African lead; specific card programme markets to confirm,Regulated programme/API qualification,https://developers.onafriq.com/docs/card-issuance/o4s4drespbv5l-overview,Compliance/partner gate

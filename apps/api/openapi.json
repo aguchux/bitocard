@@ -3504,6 +3504,296 @@
         ]
       }
     },
+    "/v1/store/home": {
+      "get": {
+        "description": "The published layout with every section filled in, the menu and the countries on sale. Not found until published.",
+        "operationId": "StorefrontController_home",
+        "parameters": [
+          {
+            "name": "preview",
+            "required": false,
+            "in": "query",
+            "description": "A preview link token from the Storefront Manager: shows the draft.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get the home page",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
+    "/v1/store/products": {
+      "get": {
+        "description": "Filter by category, menu group, country, brand, tag or words; sorted by popularity, name or newest.",
+        "operationId": "StorefrontController_products",
+        "parameters": [
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gift_cards",
+                "airtime",
+                "data",
+                "bills",
+                "pay_tv",
+                "esim",
+                "software",
+                "virtual_numbers",
+                "virtual_cards"
+              ]
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "description": "A menu group, for example mobile (airtime, data and numbers).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "gift-cards",
+                "mobile",
+                "bills",
+                "esims",
+                "software",
+                "virtual-cards"
+              ]
+            }
+          },
+          {
+            "name": "country",
+            "required": false,
+            "in": "query",
+            "description": "ISO country code, or `global` for products usable anywhere.",
+            "schema": {
+              "example": "US",
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "amazon-us",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "description": "Brand tag, for example gaming.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Words to match in names, brands and the companies behind them.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "popular",
+              "type": "string",
+              "enum": [
+                "popular",
+                "name",
+                "new"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 60,
+              "default": 24,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List products",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
+    "/v1/store/products/{key}": {
+      "get": {
+        "description": "Its face values, how it is delivered, and related products.",
+        "operationId": "StorefrontController_product",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a product",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
+    "/v1/store/search": {
+      "get": {
+        "description": "Products, brands and the companies behind them, categories and countries, best matches first.",
+        "operationId": "StorefrontController_search",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "What to look for: a brand, a company, a product, a category or a country.",
+            "schema": {
+              "example": "playstation",
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "US",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Search everything",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
+    "/v1/store/categories": {
+      "get": {
+        "operationId": "StorefrontController_categories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List categories on sale",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
+    "/v1/store/brands": {
+      "get": {
+        "operationId": "StorefrontController_brands",
+        "parameters": [
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "description": "Only brands with this tag, for example gaming.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 60,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List brands on sale",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
+    "/v1/store/navigation": {
+      "get": {
+        "description": "Category groups on sale with their top brands, and the countries with products.",
+        "operationId": "StorefrontController_navigation",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get the menu",
+        "tags": [
+          "Storefront"
+        ]
+      }
+    },
     "/v1/orders": {
       "post": {
         "description": "Uses an open quote. Wholesale cost plus tax is held from your wallet and taken only when the order completes; a failed order releases it. `processing` means the supplier has not confirmed yet: check again, or wait for the webhook. Gift card codes, PINs and electricity tokens appear only on this order, never in lists or webhooks.",

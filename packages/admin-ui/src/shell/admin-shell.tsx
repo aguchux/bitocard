@@ -53,7 +53,7 @@ export function ModeSwitch() {
 /** The layout of every admin page (see ConsoleShell). */
 export function AdminShell({ section, current, crumbs, actions, children }: { section: SectionKey; current: string; crumbs: Crumb[]; actions?: ReactNode; children: ReactNode }) {
   return (
-    <ConsoleShell brand="BitoCard" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
+    <ConsoleShell brand="Bitocard" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
       {children}
     </ConsoleShell>
   );

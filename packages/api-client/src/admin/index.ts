@@ -234,3 +234,4 @@ export const {
 } = adminApi;
 export * from './reseller-integrations';
 export * from './fees';
+export * from './storefront';

@@ -79,10 +79,11 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 4 | VTpass | Pay-TV, bills | Nigeria | **MVP live** |
 | 5 | Interswitch / Quickteller | Pay-TV, bills | Nigeria | MVP qualify (second Nigerian source) |
 | 6 | Korba Xchange | Electricity (ECG), Ghana Water, DStv, GOtv, StarTimes | Ghana | **MVP qualify first** (API integration) |
-| 7 | Hubtel | Electricity (ECG prepaid/postpaid), Ghana Water, TV | Ghana | **MVP qualify** in parallel (supplier onboarding) |
+| 7 | Hubtel | Electricity (ECG prepaid/postpaid), Ghana Water, TV | Ghana | **On hold**: the October 2026 research found merchant payment APIs but no API for supplying bills; kept in the registry, not qualified until one is shown |
 | 8 | Techlink GH | Electricity (ECG), Ghana Water, TV | Ghana | Backup |
 | 9 | KiNG FLEXY GH | Electricity (ECG), Ghana Water, DStv, GOtv, StarTimes | Ghana | Backup |
-| 10 | iPay Africa / eLipa | KPLC prepaid/postpaid, DStv, GOtv, Nairobi Water | Kenya | MVP qualify if Reloadly lacks KPLC or TV (docs dated; confirm live) |
+| 10 | iPay Africa | KPLC prepaid/postpaid, DStv, GOtv, Nairobi Water, airtime | Kenya | MVP qualify if Reloadly lacks KPLC or TV (docs dated; confirm live) |
+| 10b | eLipa | Bills, airtime, payouts | Kenya; Uganda, Malawi and Zambia leads | MVP qualify with iPay; regional lead (split from "iPay Africa / eLipa") |
 | 11 | Tupay | DStv, GOtv, Zuku, StarTimes | Kenya | Backup TV provider (no KPLC published) |
 | 12 | Cellulant / Tingg | Bills, pay-TV | Pan-African | Later (expansion) |
 | 13 | eSIM Access | eSIM | Global | Pilot (first) |
@@ -103,6 +104,8 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 28 | Flutterwave (cards) | Virtual payment cards | Nigeria pilot | Later (phase 4) |
 | 29 | Maplerad | Virtual payment cards | Nigeria | Later (alternative) |
 | 30 | Onafriq | Virtual payment cards | Pan-African | Later (expansion) |
+| 31 | DT One | Airtime, data, eSIM, bills, gift cards, gaming PINs | 160+ countries claimed; the live feed decides | **Qualify** (broad pan-African alternative to Reloadly) |
+| 32 | expressPay | Bills, airtime, data | Ghana | Qualify (confirm fulfilment, not only collections) |
 
 **Platform vendors** (also behind adapters)
 
@@ -119,8 +122,155 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 **Pilot sourcing paths**
 
 - **Nigeria:** Reloadly (gift cards, airtime, data) and VTpass (pay-TV, bills), with Quickteller as the second source.
-- **Ghana:** qualify Korba Xchange first for API integration and approach Hubtel in parallel; Techlink GH and KiNG FLEXY GH are backups. Confirm which ECG meter types (prepaid, postpaid) each enables.
+- **Ghana:** qualify Korba Xchange first for API integration; Techlink GH, KiNG FLEXY GH and expressPay are backups (Hubtel on hold, see above). Confirm which ECG meter types (prepaid, postpaid) each enables.
 - **Kenya:** query Reloadly's live catalogue for KPLC (prepaid and postpaid) and TV billers first. If either is missing, ask iPay/eLipa to confirm current KPLC and TV availability; add Tupay if a separate TV provider is needed.
+
+### Supplier registry and directory (planned, M13c; Open until approved)
+
+Source research: `docs/BitoCard-African-Supplier-Registry-Research.md` (4 October 2026) and its seed, `docs/BitoCard-African-Supplier-Registry-Seed.csv` (32 suppliers, 21 English-speaking African markets). The research is a baseline, not proof of live inventory or resale permission.
+
+**What it is.** One registry of every supplier, searchable by admins and, in a reseller-safe form, by resellers. Each supplier can be used through two independent **channels**:
+
+1. **BitoCard's own supply (`bitocard`).** BitoCard holds the account and uses it for its parent store (bitocard.com) and to resupply resellers. The rules are unchanged: suppliers stay invisible to resellers and customers, and routing is by net margin.
+2. **Resellers' own accounts (`own`).** A reseller signs up with a supplier in their country themselves, without BitoCard, and connects their credentials in SHQ (M13b). The reseller is the seller of record for those sales.
+
+A supplier can be on either channel, both or neither. Each channel is enabled per country, so one supplier can serve many countries.
+
+**Rules**
+
+- **API provisioning is the inclusion test.** A supplier is listed as a product supplier only when official docs or provider materials show it can discover products or fulfil orders by API, for the product in question.
+  - A checkout or collections API alone does not qualify.
+  - So Tingg's payment coverage is not bill-supply coverage, and Hubtel is on hold for this reason.
+- **Three countries, never merged:**
+  1. **Account market:** where a business can contract with the supplier and hold credentials. This decides which resellers may connect it.
+  2. **Fulfilment market:** where the recipient, meter or account is.
+  3. **Country of use:** where the item works (gift-card region, eSIM destination, licence territory, number country).
+- **Coverage is per country and category,** and each entry has its own status:
+  - `claimed`: published by the supplier;
+  - `confirmed`: returned by an authenticated catalogue;
+  - `stale`: the last feed failed (never read as "no coverage");
+  - `unavailable`.
+- **Technical readiness and commercial access are tracked separately.** Each supplier has:
+  - an API status: `documented`, `partner_gated`, `waitlist` or `none`;
+  - a qualification stage: `candidate`, `qualifying`, `approved`, `live`, `on_hold` or `rejected`;
+  - an adapter status: `stub` or `built`.
+
+  Only a supplier with a built adapter can be connected or routed to.
+- **Every claim has evidence:**
+  - its source: official docs, provider API, contract, sales confirmation or test order;
+  - the URL or document;
+  - who recorded it and when;
+  - a review date (the registry flags entries past it).
+- **Suppliers BitoCard uses stay hidden from resellers.** The SHQ directory lists only suppliers a reseller can sign up with and connect themselves. It never shows whether BitoCard uses a supplier, or BitoCard's terms, costs, routing or evidence.
+
+**Access rules: by country and by reseller, for each channel**
+
+Rules resolve like feature switches: **reseller, then country, then global**. At the same level a block beats an allow, and with no rule the supplier is off. A rule can be narrowed to one category, for example DT One allowed for airtime only in Kenya.
+
+- **`bitocard` channel:**
+  - Admins enable a supplier per country and category (today's `supplier_markets`). It then supplies the parent store and resupplies resellers in that country.
+  - Admins can also block or allow it for one reseller. A blocked supplier is never routed to for that reseller's orders. The products stay on sale wherever another supplier covers them.
+- **`own` channel:**
+  - Admins offer a supplier globally or in chosen countries (today's `integration_offers`, extended with a category).
+  - Admins can also allow or block it for one reseller: for example, a pilot with one reseller before opening a country, or a block after abuse.
+  - The M13b gates still apply unchanged: the `own_integrations` switch, the plan feature, a verified account and the connection's approval.
+  - Blocking a reseller who is already connected suspends their connection, with the reason shown, exactly as when operations suspend one.
+- Every rule change is audited. The supplier's page shows each change with who made it and why.
+
+**Search**
+
+- **Admins:** Suppliers in the admin app, `GET /v1/admin/suppliers?q=&country=&category=&channel=&stage=&api_status=&adapter=`.
+  - Search by name, code, alias (the seed's provider codes), category, capability, country and notes.
+  - Filter by stage, channel, API status, adapter status, and evidence past its review date.
+  - A supplier's page shows:
+    - countries and evidence;
+    - funding profile;
+    - channel rules (country and reseller);
+    - connected resellers;
+    - adapter state.
+  - A **country view** lists every supplier and category covering a country, by status, so gaps are visible at a glance (for example "Malawi: no bills supplier confirmed").
+- **Resellers:** SHQ Integrations > Directory, `GET /v1/integrations/directory?q=&category=&country=`.
+  - Sessions only, and outside the public OpenAPI document like the rest of `/v1/integrations`.
+  - Lists suppliers whose account market includes the reseller's business country, searchable by name, category and what they sell.
+  - Each card shows:
+    - the supplier's public name and categories;
+    - the countries it covers;
+    - links to sign up with the supplier and to its docs, from the registry;
+    - the credentials it will ask for;
+    - its state for this reseller.
+  - The states are:
+    - **Connect:** offered and connectable;
+    - **Connected;**
+    - **Coming soon:** in the registry, but the adapter is not built or the supplier is not offered yet;
+    - **Not available on your plan or account:** with the gate that applies.
+  - Not listed: suppliers blocked for this reseller, rejected or on hold.
+  - **Request** on a Coming soon supplier records the reseller's interest (once per reseller and supplier). Admins use these requests to prioritise adapters and offers.
+
+**Data (proposed)**
+
+- `suppliers` gains:
+  - `aliases`;
+  - a kind: `product_supplier`, `payment_gateway` or `communications`;
+  - a public name;
+  - website, docs and sign-up URLs;
+  - API status;
+  - qualification stage, replacing today's `SupplierStatus` (existing values mapped across);
+  - adapter status;
+  - a review date.
+- `supplier_capabilities`: supplier, category, direction (`buy`, `sell`, `issue`, `pay_bill`, `payout`), and whether sandbox and live are supported.
+- `supplier_coverage`: supplier, country, category, the three country roles, status, source and evidence, and when it was checked.
+- `supplier_access_rules`: supplier, channel, scope (global, country or reseller), an optional category, `allow` or `block`, and the reason, who and when.
+  - Today's `supplier_markets` and `integration_offers` become the country and global rules: migrated, then retired.
+- `supplier_requests`: resellers' interest in a supplier.
+- The 21 research markets are added to `countries`, closed for sign-up. Coverage can then name them without opening them.
+
+**Seeding**
+
+- A migration seeds the registry from the CSV, keyed by today's codes so adapters, connections and orders keep working.
+- The CSV's codes become aliases:
+  - `interswitch_quickteller` → `quickteller`
+  - `korba_xchange` → `korba`
+  - `king_flexy_gh` → `kingflexy_gh`
+  - `cellulant_tingg` → `cellulant`
+  - `airalo_partners` → `airalo`
+  - `nexway_connect` → `nexway`
+  - `also_cloud` → `also`
+- Two new suppliers, `dtone` and `expresspay_gh`, each get a stub adapter and a credential group.
+- `ipay_elipa` splits into `ipay_africa` and `elipa`, and its settings move with it.
+- Coverage starts as `claimed`, with the research's source URLs.
+- Re-seeding never overwrites admin edits.
+
+**Catalogue discovery**
+
+- For suppliers with a built adapter and credentials, the nightly `catalogue` job marks coverage `confirmed` from the authenticated feed, per country and category, recording the response hash and time.
+- A failed feed marks coverage `stale`, never `unavailable`.
+- Changes go to a review list for admins.
+- Volatile items (eSIM packages, number stock) are still rechecked when quoting, as now.
+
+**Phases**
+
+1. **R1, registry and admin search:**
+   - the data model, the CSV seed and aliases;
+   - admin search, the supplier page and the country view;
+   - stub adapters for DT One and expressPay, and the iPay/eLipa split.
+2. **R2, access rules:**
+   - channel rules per country and reseller;
+   - wired into routing (`bitocard` channel) and the M13b gates (`own` channel);
+   - suspension on block, and auditing.
+3. **R3, SHQ directory:**
+   - reseller search with each supplier's state;
+   - sign-up and docs links;
+   - interest requests and the admin list of them.
+4. **R4, evidence and discovery:**
+   - coverage confirmed from live feeds;
+   - stale handling and review dates;
+   - the review list for changes.
+5. **Adapters follow qualification.** The next adapters to build are chosen from the pilot sourcing paths and reseller demand, starting with DT One, Korba and iPay/eLipa. Each is checked against the research's qualification checklist.
+
+**Before R3 goes live:**
+
+- reseller terms stating that resellers contract with suppliers themselves and BitoCard makes no promise about those suppliers;
+- a legal check on naming third-party suppliers in SHQ and linking to their sign-up pages.
 
 ### Pricing (Decided, starting values admins can change)
 
@@ -185,6 +335,15 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 Questions to ask each supplier are listed per category in `AGENTS.md`.
 
 ## 5. Reseller storefronts and onboarding
+
+### BitoCard's own store, bitocard.com (Decided)
+
+- bitocard.com is BitoCard's in-house marketplace for retail customers, not a reseller clone: gift cards, mobile airtime and data, bills and pay-TV, eSIMs, software and virtual cards as each is enabled.
+- Admins lay out its home page in the Storefront Manager (admin app): sections on a 12-column desktop grid (6 on tablets, one column on phones), dragged into place and sized per screen. The sections are a hero with search and category shortcuts; product rails (trending, top selling, new, featured, a category, a brand or hand-picked); category and brand grids; promo cards; and a trust bar. Every publish is a version that can be restored; previews show the draft before it goes live.
+- Search covers everything on sale: brands and the companies behind them, products, categories (including the words people use, such as "top up" or "electricity") and countries. It never shows BitoCard's own suppliers.
+- Brands are presented with their name, company, logo, card art, colour, tags and search aliases, set by admins.
+- Until checkout exists (M10b) the store shows face values only, and nothing can be bought. Until a home page is published, bitocard.com shows the reseller landing page.
+- The reseller landing page is bitocard.com/resellers: what BitoCard offers resellers, with Register leading to SHQ sign-up. "Open a reseller store" throughout the store leads there first.
 
 - Hosted storefront per reseller: its own tenant with branding, products, customer-facing prices, customers, orders and reports. **Decided**
 - Resellers choose products, set retail prices, and see their profit, never supplier costs. **Decided**
@@ -359,10 +518,10 @@ Phase 1, foundation and own-brand pilot:
 | M7 | Webhooks: outbox, delivery, retries, events API | **Done** (Vercel Queues transport; needs Vercel Pro for the 5-minute backstop job) |
 | M8 | Identity checks: Didit, BVN, bank validation, gating | **Done** (needs Didit API key, workflow and webhook secret, and Flutterwave BVN access; privacy notice update before live) |
 | M9 | Admin app | **Done** (needs the `bitocard-admin` Vercel project on admin.bitocard.com with `NEXT_PUBLIC_API_URL`, and the API's `ALLOWED_ORIGINS` to include it) |
-| M10 | Own-brand storefront: BitoCard's parent store on the main site (`bitocard.com`, catalogue at `/catalogs`) for retail customers | Next |
+| M10 | Own-brand storefront: BitoCard's parent store on the main site (`bitocard.com`, catalogue at `/catalogs`) for retail customers | **M10a built**: public catalogue API, search, trending and top selling, brand presentation, the Storefront Manager (drag-and-drop home page grid, versions, previews, publishing), the store's home, catalogue, search and product pages, and the reseller landing page at `/resellers`. **Next, M10b**: customer accounts and sign-in, checkout and payment, order delivery and customer notifications |
 | M11 | Pilot launch: Nigeria, then Ghana and Kenya | |
 
-Phase 2, reseller launch: M12 docs app, M13 SHQ reseller dashboard (**in progress**: sign-in, overview, orders, catalogue and pricing, wallet and withdrawals, store, developers, team and settings built; needs the `bitocard-shq` Vercel project on shq.bitocard.com), M13b reseller's own integrations (suppliers and payment gateways, admin-gated per integration and country, fees from the wallet; **phase 1 built**: availability per country, gates, encrypted and checked connections, admin review, SHQ Integrations; **phase 2 built**: fee rules in parts per billion, exact fees with the carry, wallet holds, `platform_fees` ledger, statements, reports and reconciliation; **phase 3 built**: own catalogues synced with the reseller's credentials, routing, quotes and orders charging only the fee, sandbox simulation; **built**: per-connection supplier notifications (Reloadly and DIDWW), in-app notifications for every role in SHQ and the admin app, and browser push to each person's registered devices; next: phase 4 own payment gateways), M14 domains, M15 promotions, M16 reseller launch. Phase 3 onwards: gift-card selling, more bills countries, Microsoft licences, virtual numbers, virtual cards.
+Phase 2, reseller launch: M12 docs app, M13 SHQ reseller dashboard (**in progress**: sign-in, overview, orders, catalogue and pricing, wallet and withdrawals, store, developers, team and settings built; needs the `bitocard-shq` Vercel project on shq.bitocard.com), M13b reseller's own integrations (suppliers and payment gateways, admin-gated per integration and country, fees from the wallet; **phase 1 built**: availability per country, gates, encrypted and checked connections, admin review, SHQ Integrations; **phase 2 built**: fee rules in parts per billion, exact fees with the carry, wallet holds, `platform_fees` ledger, statements, reports and reconciliation; **phase 3 built**: own catalogues synced with the reseller's credentials, routing, quotes and orders charging only the fee, sandbox simulation; **built**: per-connection supplier notifications (Reloadly and DIDWW), in-app notifications for every role in SHQ and the admin app, and browser push to each person's registered devices; next: phase 4 own payment gateways), M13c supplier registry and directory (planned: one searchable registry for admins and resellers, coverage per country, channel rules per country and reseller; see section 4), M14 domains, M15 promotions, M16 reseller launch. Phase 3 onwards: gift-card selling, more bills countries, Microsoft licences, virtual numbers, virtual cards.
 
 ## 12. MVP acceptance criteria
 
@@ -379,7 +538,9 @@ Phase 2, reseller launch: M12 docs app, M13 SHQ reseller dashboard (**in progres
 
 ## Open decisions
 
-None. Every product decision for the MVP is made.
+None for the MVP.
+
+Supplier registry (M13c): approve the proposed data model and the Hubtel hold before R1; before R3, legal check on naming and linking third-party suppliers in SHQ.
 
 Confirm with advisers: startup allowance expiry and accounting treatment (accountant); tax registrations per country as seller of record (tax adviser); data protection roles now that BitoCard is the seller (lawyers).
 

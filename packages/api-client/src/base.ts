@@ -92,6 +92,9 @@ export const tagTypes = [
   'SupplierNotification',
   'Device',
   'NotificationPreference',
+  // Storefront Manager (admin)
+  'Storefront',
+  'Brand',
 ] as const;
 
 /** The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache. */

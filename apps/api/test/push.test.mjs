@@ -152,7 +152,7 @@ describe('pushing', () => {
     const [push] = await pushes(financeDevice.sub);
     assert.deepEqual(
       { ...push.payload, id: undefined },
-      { id: undefined, type: 'payout.failed', title: 'Title payout-9', body: 'Body payout-9', severity: 'critical', link: '/wallet/payouts', mode: 'test', account: owner.resellerId, icon: '/bitocard-logo.png' },
+      { id: undefined, type: 'payout.failed', title: 'Title payout-9', body: 'Body payout-9', severity: 'critical', link: '/wallet/payouts', mode: 'test', account: owner.resellerId, icon: '/icon-192.png' },
     );
     assert.equal(push.headers['content-encoding'], 'aes128gcm');
     assert.equal(push.headers.urgency, 'high');
@@ -167,7 +167,8 @@ describe('pushing', () => {
     assert.equal(verify('sha256', Buffer.from(`${header}.${claims}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url')), true);
     const decoded = JSON.parse(Buffer.from(claims, 'base64url').toString());
     assert.deepEqual([decoded.aud, decoded.sub], [pushService.url, 'mailto:ops@bitocard.com']);
-    assert.equal((await prisma.pushDelivery.count({ where: { deviceId: financeDevice.device.id, status: 'sent' } })), 1);
+    // The push arrives a moment before its delivery is recorded as sent.
+    await until(async () => (await prisma.pushDelivery.count({ where: { deviceId: financeDevice.device.id, status: 'sent' } })) === 1, 'the delivery to be recorded');
   });
 
   test('preferences: quieter notifications are off until chosen; urgent and security ones cannot be turned off', async () => {
@@ -227,8 +228,9 @@ describe('pushing', () => {
     await inbox.reseller(owner.resellerId, 'payout.failed', content('retry-1'));
     await until(async () => (await prisma.device.count({ where: { id: gone.device.id } })) === 0, 'the gone device to be dropped');
     const delivery = () => prisma.pushDelivery.findFirstOrThrow({ where: { deviceId: busy.device.id } });
-    await until(async () => (await delivery()).attempts === 1, 'the first try');
-    assert.deepEqual([(await delivery()).status, (await delivery()).lastError], ['pending', 'HTTP 503']);
+    // The attempt is counted when it is claimed, before the push service answers: wait for the recorded answer.
+    await until(async () => (await delivery()).lastError === 'HTTP 503', 'the first try');
+    assert.deepEqual([(await delivery()).status, (await delivery()).attempts], ['pending', 1]);
 
     const runJob = () => fetch(`${server.base}/v1/cron/push`, { headers: { authorization: 'Bearer cron-secret' } }).then(res => res.json());
     const makeDue = async () => prisma.pushDelivery.updateMany({ where: { deviceId: busy.device.id }, data: { nextAttemptAt: new Date(Date.now() - 1000) } });
@@ -240,7 +242,7 @@ describe('pushing', () => {
     replies.set(busy.sub.path, 500);
     await inbox.reseller(owner.resellerId, 'payout.failed', content('retry-2'));
     const second = async () => prisma.pushDelivery.findFirstOrThrow({ where: { deviceId: busy.device.id, notification: { title: 'Title retry-2' } } });
-    await until(async () => (await second()).attempts === 1, 'the first try');
+    await until(async () => (await second()).lastError === 'HTTP 500', 'the first try');
     for (let i = 0; i < 5; i += 1) {
       await makeDue();
       await runJob();

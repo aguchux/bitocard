@@ -10,26 +10,29 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@bitocard/next-config": "*",
-    "@bitocard/ui": "*",
-    "next": "16.3.6",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
     "@bitocard/admin-ui": "*",
     "@bitocard/api-client": "*",
+    "@bitocard/next-config": "*",
+    "@bitocard/ui": "*",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "lucide-react": "^1.50.0",
-    "qrcode": "^1.5.4"
+    "next": "16.3.6",
+    "qrcode": "^1.5.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@bitocard/eslint-config": "*",
     "@bitocard/typescript-config": "*",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "@types/qrcode": "^1.5.5"
+    "typescript": "^5"
   }
 }

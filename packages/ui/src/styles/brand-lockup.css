@@ -1,13 +1,16 @@
 /*
- * Header lockup: the "BitoCard" wordmark (the "b" mark as its first letter) with the tagline directly beneath.
+ * Header lockup: the "b" mark flush left spanning both lines, the name "Bitocard" with the tagline directly beneath.
  * Set --wordmark on .brand-lockup to scale it (default 28px).
  * Selectors use `.wordmark.brand-lockup` so an app's own `.wordmark` rules cannot override the grid,
  * whatever order the stylesheets load in.
  */
-.wordmark.brand-lockup { font-size: var(--wordmark, 28px); display: grid; grid-template-columns: auto; justify-content: start; justify-items: start; row-gap: .14em; line-height: 1; text-decoration: none; }
-.wordmark.brand-lockup .tagline { color: #414f77; font-size: max(13px, .36em); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
-/* The "b" mark is the first letter of the wordmark: as tall as an ascender, sitting on the baseline. */
-.brand-name { display: inline-flex; align-items: baseline; white-space: nowrap; }
-.brand-b { display: inline-block; height: .74em; margin-right: .02em; }
-.brand-b img { display: block; width: auto; height: 100%; }
+.wordmark.brand-lockup { font-size: var(--wordmark, 28px); display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: .3em; row-gap: .08em; line-height: 1; text-decoration: none; }
+.wordmark.brand-lockup .brand-icon { grid-row: 1 / span 2; height: 1.6em; }
+.wordmark.brand-lockup .brand-name { grid-column: 2; align-self: end; }
+.wordmark.brand-lockup .tagline { grid-column: 2; align-self: start; color: #414f77; font-size: max(13px, .36em); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
+/* The logo outside the lockup: the "b" mark on the left, a little taller than the name beside it. */
+.brand-icon { display: block; flex: none; height: 1.15em; }
+.brand-icon img { display: block; width: auto; height: 100%; }
+.brand-name { white-space: nowrap; }
+.brand-name .brand-accent { color: var(--pink, #ff2382); }
 

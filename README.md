@@ -17,7 +17,7 @@ npm-workspaces Turborepo with five Next.js 16 App Router applications, one NestJ
 
 | Package | Purpose |
 | --- | --- |
-| `@bitocard/ui` | `Brand` wordmark (the "b" mark as its first letter), `BrandLockup` (wordmark with tagline), `ComingSoon` workspace page, `workspace.css`, brand constants, `siteUrl()`, `appUrl()` for cross-app links, and legal entity data (`/legal`) |
+| `@bitocard/ui` | `Brand` logo (the "b" mark beside "Bitocard"), `BrandLockup` (logo with tagline), `ComingSoon` workspace page, `workspace.css`, brand constants, `siteUrl()`, `appUrl()` for cross-app links, and legal entity data (`/legal`) |
 | `@bitocard/next-config` | `createNextConfig()` — Turbopack root, output tracing, security headers, `X-Robots-Tag` for private apps |
 | `@bitocard/eslint-config` | Flat ESLint configs: `/next` (Next core-web-vitals + TypeScript) and `/node` (typescript-eslint, for the API) |
 | `@bitocard/typescript-config` | Base `tsconfig` presets for Next apps and React packages |

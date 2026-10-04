@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { brand, siteUrl } from "@bitocard/ui/site";
+import { siteUrl } from "@bitocard/ui/site";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -10,7 +10,6 @@ export const metadata: Metadata = {
   metadataBase: siteUrl(3004),
   title: { default: "BitoCard SHQ", template: "%s | BitoCard SHQ" },
   description: "Seller Head Quarters: run your BitoCard reseller business.",
-  icons: { icon: brand.logo },
   robots: { index: false, follow: false },
 };
 

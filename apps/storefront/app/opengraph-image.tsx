@@ -1,9 +1,9 @@
 import { brandOgImage, ogImageSize } from "@bitocard/ui/og-image";
 
-export const alt = "BitoCard – your digital store for gift cards, airtime and data";
+export const alt = "BitoCard – gift cards, airtime, data, bills and more";
 export const size = ogImageSize;
 export const contentType = "image/png";
 
 export default function OpenGraphImage() {
-  return brandOgImage({ eyebrow: "For resellers", title: "Your digital store.", accent: "Ready in minutes.", subtitle: "Gift cards · Airtime · Data — under your own brand" });
+  return brandOgImage({ eyebrow: "Digital marketplace", title: "One marketplace.", accent: "More ways to pay.", subtitle: "Gift cards · Airtime · Data · Bills · eSIMs · Software" });
 }

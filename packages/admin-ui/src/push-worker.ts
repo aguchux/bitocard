@@ -35,8 +35,8 @@ self.addEventListener('push', function (event) {
       body: data.body || '',
       tag: data.id || undefined,
       // The API sends the icon: BitoCard's for staff, the store's logo (or none) for customers.
-      icon: data.icon === undefined ? '/bitocard-logo.png' : data.icon || undefined,
-      badge: data.icon === undefined ? '/bitocard-logo.png' : data.icon || undefined,
+      icon: data.icon === undefined ? '/icon-192.png' : data.icon || undefined,
+      badge: data.icon === undefined ? '/icon-192.png' : data.icon || undefined,
       requireInteraction: data.severity === 'critical',
       data: { url: target(data) },
     }),

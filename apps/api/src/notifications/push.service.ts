@@ -337,9 +337,9 @@ export class PushService {
     return Boolean(session && !session.revokedAt && session.expiresAt > now && session.userId === device.userId);
   }
 
-  /** The notification icon: BitoCard's for staff; for customers their store's logo (never BitoCard's brand), if any. */
+  /** The notification icon: Bitocard's app icon (public/icon-192.png) for staff; for customers their store's logo (never BitoCard's brand), if any. */
   private async iconFor(storeId: string | null) {
-    if (!storeId) return '/bitocard-logo.png';
+    if (!storeId) return '/icon-192.png';
     return (await this.prisma.store.findUnique({ where: { id: storeId }, select: { logoUrl: true } }))?.logoUrl ?? null;
   }
 

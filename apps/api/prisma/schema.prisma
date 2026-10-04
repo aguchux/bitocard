@@ -1238,6 +1238,7 @@ model Order {
 
   @@index([resellerId, createdAt])
   @@index([status, nextCheckAt])
+  @@index([productId, completedAt])
   @@map("orders")
 }
 
@@ -1637,4 +1638,69 @@ model NotificationPreference {
   @@unique([userId, type])
   @@unique([customerId, type])
   @@map("notification_preferences")
+}
+
+// ---------------------------------------------------------------------------
+// BitoCard's own storefront (bitocard.com): brands and the admin-managed home page layout
+// ---------------------------------------------------------------------------
+
+/// How a brand is presented on the storefront and found by search. `slug` is the brand as products name it
+/// (`Product.brand`, for example "amazon-us" or "mtn"); without a row, the storefront shows the products' own name.
+/// Never names BitoCard's suppliers.
+model Brand {
+  slug        String   @id
+  /// Shown to customers, for example "Amazon".
+  name        String
+  /// The company behind it when it differs, for example "Apple Inc." or "MultiChoice"; searchable.
+  company     String?
+  description String?
+  /// Square logo, and the card art used on product cards (HTTPS addresses).
+  logoUrl     String?  @map("logo_url")
+  imageUrl    String?  @map("image_url")
+  /// Card background when there is no art, for example "#0b0b0f".
+  color       String?
+  /// Storefront filters, for example gaming, entertainment, shopping, travel.
+  tags        String[] @default([])
+  /// Other names people search for, for example "psn", "playstation network".
+  aliases     String[] @default([])
+  /// Shown first where the storefront lists brands, and used when there are no sales yet to rank.
+  featured    Boolean  @default(false)
+  /// Lower comes first among featured brands.
+  sortOrder   Int      @default(100) @map("sort_order")
+  /// Hidden from the storefront (its products too) while false.
+  visible     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("brands")
+}
+
+/// A storefront page laid out by admins (the home page first): a draft they edit and the published version visitors
+/// see. Sections are validated JSON (`src/storefront/layout.ts`). Unpublished means the site shows its coming-soon page.
+model StorefrontPage {
+  key           String                  @id
+  draft         Json
+  published     Json?
+  /// The published version number; each publish adds a version row.
+  version       Int                     @default(0)
+  publishedAt   DateTime?               @map("published_at")
+  publishedById String?                 @map("published_by_id") @db.Uuid
+  updatedById   String?                 @map("updated_by_id") @db.Uuid
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  versions      StorefrontPageVersion[]
+
+  @@map("storefront_pages")
+}
+
+/// Every published version of a storefront page, so an earlier one can be restored.
+model StorefrontPageVersion {
+  pageKey       String         @map("page_key")
+  version       Int
+  sections      Json
+  publishedAt   DateTime       @default(now()) @map("published_at")
+  publishedById String?        @map("published_by_id") @db.Uuid
+  page          StorefrontPage @relation(fields: [pageKey], references: [key], onDelete: Cascade)
+
+  @@id([pageKey, version])
+  @@map("storefront_page_versions")
 }

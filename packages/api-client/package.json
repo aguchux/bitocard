@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./admin": "./src/admin/index.ts",
-    "./reseller": "./src/reseller/index.ts"
+    "./reseller": "./src/reseller/index.ts",
+    "./storefront": "./src/storefront.ts"
   },
   "scripts": {
     "lint": "eslint .",

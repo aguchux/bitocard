@@ -1,0 +1,92 @@
+/* The reseller landing page (bitocard.com/resellers), scoped to .site-shell so it never styles the store. */
+.site-shell { position: relative; isolation: isolate; overflow: clip; min-height: 100svh; display: flex; flex-direction: column; padding: 24px 22px; background: radial-gradient(ellipse at 5% 100%, #edf4ff 0, transparent 36%); }
+.site-shell::before { content: ""; position: absolute; z-index: -1; width: 780px; height: 590px; top: 29%; right: -200px; border-radius: 55% 40% 48% 50%; transform: rotate(-25deg); background: linear-gradient(110deg, #ffeaf6, #ffc4e5); }
+.site-shell::after { content: ""; position: absolute; z-index: -1; width: 900px; height: 420px; bottom: -320px; left: -120px; background: #f3f7ff; border-radius: 50%; transform: rotate(20deg); }
+.site-shell .site-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.site-shell .wordmark:not(.brand-lockup) { font-size: 34px; font-weight: 800; letter-spacing: -1.8px; line-height: 1; text-decoration: none; }
+.site-shell .wordmark:not(.brand-lockup) { display: inline-flex; align-items: center; gap: .24em; }
+.site-shell .wordmark.brand-lockup { font-weight: 800; letter-spacing: -1.8px; }
+.site-shell .wordmark .brand-name { color: var(--navy); }
+.site-shell .wordmark .brand-accent, .site-shell h1 span, .site-shell .phone h2 span { color: var(--pink); }
+.site-shell .site-header nav { display: flex; gap: 12px; flex-wrap: wrap; }
+.site-shell main { flex: 1; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; align-items: center; padding: 44px 0 25px; }
+.site-shell .hero-copy { min-width: 0; }
+.site-shell .status { display: inline-block; margin: 0 0 24px; padding: 9px 20px; border-radius: 30px; background: #fcecf8; text-transform: uppercase; letter-spacing: 4px; font-size: 12px; font-weight: 700; }
+.site-shell h1 { margin: 0; font-size: clamp(36px, 8.5vw, 62px); font-weight: 800; line-height: 1.09; letter-spacing: -2px; }
+.site-shell .lead { color: #414f77; font-size: 19px; line-height: 1.5; max-width: 710px; margin: 26px 0 0; }
+.site-shell .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 27px; }
+.site-shell .button { display: inline-flex; justify-content: center; align-items: center; gap: 22px; min-height: 52px; border: 1.5px solid var(--navy); border-radius: 15px; padding: 14px 20px; background: transparent; color: var(--navy); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s, box-shadow .15s; }
+.site-shell .button-primary { color: white; background: var(--pink); border-color: var(--pink); }
+.site-shell .button-primary span { font-size: 27px; line-height: 1; }
+.site-shell .button:hover { background: #edf1fc; }
+.site-shell .button-primary:hover { background: #e8116d; box-shadow: 0 8px 24px #ff238225; }
+.site-shell .button-nav { min-height: 44px; border: 0; padding: 8px; border-radius: 6px; font-size: 15px; font-weight: 400; }
+.site-shell .setup-note { max-width: 490px; margin-top: 20px; font-size: 12px; color: #647295; line-height: 1.5; }
+.site-shell .phone-stage { position: relative; margin: 0; justify-self: center; width: min(100%, 340px); container-type: inline-size; }
+.site-shell .phone { padding: 2.941cqw; border-radius: 15.588cqw; background: linear-gradient(100deg, #71849e, #081120 5%, #000 94%, #8c9eb6); border: 0.588cqw solid #9cabc2; box-shadow: 0 0 0 0.294cqw #283c58, inset 0 0 0 0.882cqw #263247, 0 7.647cqw 10.294cqw #0b184b30; }
+.site-shell .phone-screen { position: relative; border-radius: 12.059cqw; overflow: hidden; background: #fff; }
+.site-shell .phone-status { display: flex; justify-content: space-between; padding: 3.529cqw 7.059cqw 5cqw; font-size: 3.235cqw; font-weight: 700; color: #101018; }
+.site-shell .phone-notch { position: absolute; height: 6.765cqw; width: 49%; left: 25.5%; top: 0; border-radius: 0 0 5.294cqw 5.294cqw; background: #03060d; }
+.site-shell .phone-notch::after { content: ""; position: absolute; width: 11.765cqw; height: 1.176cqw; border-radius: 1.176cqw; background: #151c2a; top: 2.353cqw; left: calc(50% - 5.882cqw); }
+.site-shell .phone-content { padding: 2.353cqw 6.176cqw 4.706cqw; }
+.site-shell .store-header { display: flex; align-items: center; justify-content: space-between; margin: 2.647cqw 0 9.412cqw; }
+.site-shell .store-header .wordmark { font-size: 7.353cqw; letter-spacing: -0.324cqw; }
+.site-shell .menu-lines { width: 5.882cqw; height: 4.412cqw; border-top: 0.588cqw solid; border-bottom: 0.588cqw solid; position: relative; }
+.site-shell .menu-lines::after { content: ""; position: absolute; top: 1.471cqw; width: 5.882cqw; border-top: 0.588cqw solid; }
+.site-shell .phone h2 { font-size: 8.529cqw; line-height: 1.12; letter-spacing: -0.353cqw; font-weight: 750; margin: 0 0 6.471cqw; }
+.site-shell .mock-search { display: flex; align-items: center; gap: 3.529cqw; padding: 3.529cqw 4.118cqw; border: 0.294cqw solid #dce1ef; border-radius: 3.824cqw; color: #8c9ac1; font-size: 3.529cqw; }
+.site-shell .mock-search svg { width: 4.706cqw; height: 4.706cqw; }
+.site-shell .products { display: grid; gap: 3.529cqw; margin-top: 6.471cqw; }
+.site-shell .product { display: flex; align-items: center; gap: 4.118cqw; border-radius: 4.412cqw; padding: 3.824cqw; }
+.site-shell .product-pink { background: #ffedf8; --accent: #ff2382; --tile: #ffe0f1; }
+.site-shell .product-blue { background: #eaf4ff; --accent: #2477ff; --tile: #d7eaff; }
+.site-shell .product-green { background: #e7f9f5; --accent: #00a575; --tile: #d1f2e9; }
+.site-shell .product-icon { display: grid; place-items: center; flex-shrink: 0; width: 17.059cqw; height: 17.647cqw; border-radius: 4.118cqw; color: var(--accent); background: var(--tile); }
+.site-shell .product-icon svg { width: 10.294cqw; height: 10.294cqw; stroke-width: 2.5; }
+.site-shell .product h3 { font-size: 4.706cqw; font-weight: 700; margin-bottom: 1.765cqw; }
+.site-shell .product p { font-size: 2.941cqw; color: #6478a5; }
+.site-shell .product-arrow { display: grid; place-items: center; margin-left: auto; min-width: 7.941cqw; height: 8.824cqw; border-radius: 50%; color: var(--accent); background: var(--tile); font-size: 7.353cqw; }
+.site-shell .store-tabs { display: flex; justify-content: space-around; padding: 3.529cqw 2.941cqw 2.941cqw; border-top: 0.294cqw solid #eef0f6; color: #6478a5; font-size: 2.941cqw; }
+.site-shell .store-tabs span { position: relative; display: grid; justify-items: center; gap: 1.471cqw; }
+.site-shell .store-tabs svg { width: 5.588cqw; height: 5.588cqw; }
+.site-shell .store-tabs .active { color: var(--pink); }
+.site-shell .store-tabs .active::after { position: absolute; content: ""; bottom: -2.941cqw; height: 0.588cqw; width: 9.412cqw; background: var(--pink); }
+.site-shell .home-indicator { width: 34%; height: 1.176cqw; border-radius: 1.176cqw; background: #a2a7b6; margin: 2.353cqw auto; }
+.site-shell figcaption { text-align: center; margin-top: 15px; color: #657399; font-size: 10px; }
+.site-shell footer { display: flex; justify-content: center; align-items: center; gap: 16px; color: #8090b7; font-size: 13px; padding-top: 10px; }
+.site-shell footer::before, .site-shell footer::after { content: ""; width: 42px; height: 1px; background: #d3ddf3; }
+/* Home footer: credit and legal links stacked on mobile (comfortable tap targets), one row on desktop. */
+.site-shell .home-footer { flex-direction: column; gap: 4px; }
+.site-shell .home-footer::before, .site-shell .home-footer::after { display: none; }
+.site-shell .home-footer nav { display: flex; flex-wrap: wrap; justify-content: center; column-gap: 18px; }
+.site-shell .home-footer a { display: inline-flex; align-items: center; min-height: 44px; color: #647295; text-decoration: none; }
+.site-shell .home-footer a:hover { color: var(--navy); text-decoration: underline; }
+.site-shell dialog { margin: auto; width: min(540px, calc(100% - 32px)); max-height: calc(100svh - 48px); overflow-y: auto; border: 1px solid #e3e7f2; border-radius: 22px; padding: 32px; color: var(--navy); background: white; box-shadow: 0 24px 80px #070f4c33; }
+.site-shell dialog::backdrop { background: #070f4c77; backdrop-filter: blur(5px); }
+.site-shell dialog h2 { font-size: 28px; font-weight: 700; }
+.site-shell .dialog-copy { color: #414f77; line-height: 1.7; }
+.site-shell .dialog-copy p, .site-shell .dialog-copy ol { margin: 18px 0; }
+.site-shell .dialog-copy ol { padding-left: 22px; list-style: decimal; }
+.site-shell .dialog-copy li { margin-bottom: 12px; }
+
+/* Mobile is the default; enhance the layout when two columns have room. */
+@media (min-width: 800px) {
+  .site-shell { padding: clamp(20px, 3svh, 34px) max(5vw, calc((100vw - 1340px) / 2)) 18px; }
+  .site-shell .site-header { flex-wrap: nowrap; }
+  .site-shell .brand-lockup { --wordmark: clamp(28px, 2.6vw, 38px); }
+  .site-shell .site-header nav { gap: 24px; }
+  .site-shell .button-nav { font-size: 17px; }
+  .site-shell main { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: clamp(24px, 3vw, 48px); padding: clamp(4px, 1svh, 20px) 0; }
+  .site-shell h1 { font-size: clamp(38px, min(5.3vw, 8svh), 80px); letter-spacing: -.045em; }
+  .site-shell .lead { font-size: clamp(18px, min(2.05vw, 3.2svh), 29px); margin-top: clamp(18px, 3svh, 26px); }
+  .site-shell .status { margin-bottom: clamp(18px, 3svh, 30px); font-size: 14px; }
+  .site-shell .actions { margin-top: clamp(22px, 4svh, 36px); gap: 18px; }
+  .site-shell .button { padding: 14px 24px; font-size: 17px; }
+  .site-shell .button-nav { padding: 8px; }
+  .site-shell .phone-stage { width: min(100%, 380px, max(220px, calc((100svh - 175px) * .46))); }
+  .site-shell::before { top: 25%; bottom: auto; }
+  .site-shell .home-footer { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+  .site-shell .home-footer::before, .site-shell .home-footer::after { display: block; }
+  .site-shell .home-footer a { min-height: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .site-shell .button { transition: none; } }

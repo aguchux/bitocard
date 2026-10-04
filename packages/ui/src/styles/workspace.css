@@ -5,10 +5,10 @@ body { margin: 0; background: var(--background); color: var(--navy); }
 
 .wordmark { display: inline-flex; align-items: center; gap: .24em; font-size: 30px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
 .brand-accent { color: var(--pink); }
-/* The "b" mark is the first letter of the wordmark: as tall as an ascender, sitting on the baseline. */
-.brand-name { display: inline-flex; align-items: baseline; white-space: nowrap; }
-.brand-b { display: inline-block; height: .74em; margin-right: .02em; }
-.brand-b img { display: block; width: auto; height: 100%; }
+/* The logo: the "b" mark on the left, a little taller than the name beside it. */
+.brand-icon { display: block; flex: none; height: 1.15em; }
+.brand-icon img { display: block; width: auto; height: 100%; }
+.brand-name { white-space: nowrap; }
 
 .workspace { max-width: 960px; min-height: 100svh; margin: auto; padding: 24px; display: flex; flex-direction: column; align-items: flex-start; }
 .workspace .badge { background: #ffedf8; color: #a00b4a; border-radius: 30px; padding: 8px 16px; margin: 48px 0 20px; font-size: 13px; }
