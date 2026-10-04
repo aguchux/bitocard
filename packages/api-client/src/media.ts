@@ -9,6 +9,8 @@ export type MediaRealm = 'admin' | 'reseller';
 export type MediaPurpose =
   | 'brand_logo'
   | 'brand_card'
+  | 'registry_logo'
+  | 'registry_card'
   | 'product_image'
   | 'supplier_logo'
   | 'category_icon'

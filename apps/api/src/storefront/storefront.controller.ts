@@ -207,6 +207,11 @@ class BrandDto {
   @IsOptional() @IsBoolean() visible?: boolean;
 }
 
+class RegistryAssetsDto {
+  @IsOptional() @IsString() @Matches(httpsUrl, { message: 'logo_url must be an https:// address' }) @MaxLength(1000) logo_url?: string | null;
+  @IsOptional() @IsString() @Matches(httpsUrl, { message: 'card_url must be an https:// address' }) @MaxLength(1000) card_url?: string | null;
+}
+
 class CategoryPresentationDto {
   @IsOptional() @IsString() @Matches(httpsUrl, { message: 'icon_url must be an https:// address' }) @MaxLength(1000) icon_url?: string | null;
   @IsOptional() @IsString() @Matches(httpsUrl, { message: 'image_url must be an https:// address' }) @MaxLength(1000) image_url?: string | null;
@@ -276,6 +281,18 @@ export class AdminStorefrontController {
   @Put('brands/:slug')
   saveBrand(@CurrentCaller() caller: Caller, @Param('slug') slug: string, @Body() body: BrandDto) {
     return this.admin.saveBrand(adminId(caller), slug.trim().toLowerCase(), body);
+  }
+
+  @AdminRoles('operations', 'support')
+  @Get('registry')
+  registry() {
+    return this.admin.registry();
+  }
+
+  @AdminRoles('operations')
+  @Put('registry/:slug')
+  saveRegistry(@CurrentCaller() caller: Caller, @Param('slug') slug: string, @Body() body: RegistryAssetsDto) {
+    return this.admin.saveRegistryAssets(adminId(caller), slug.trim().toLowerCase(), body);
   }
 
   @AdminRoles('operations', 'support')

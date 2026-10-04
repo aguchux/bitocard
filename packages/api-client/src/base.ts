@@ -96,6 +96,7 @@ export const tagTypes = [
   'Storefront',
   'Brand',
   'Media',
+  'BrandRegistry',
   'Email',
   'Category',
 ] as const;

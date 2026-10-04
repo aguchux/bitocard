@@ -1,0 +1,11 @@
+<ns0:svg xmlns:ns0="http://www.w3.org/2000/svg" xmlns:ns1="http://www.w3.org/1999/xlink" width="500" height="500" viewBox="0 0 500 500" role="img" aria-labelledby="title desc"><ns0:title id="title">Reloadly</ns0:title><ns0:desc id="desc">Vector logo sourced online from https://cdn.reloadly.com/assets/images/logo.svg. See SOURCES.csv for source and rights note.</ns0:desc><ns0:svg x="30.0000" y="186.1290" width="440.0000" height="127.7419" viewBox="0 0 124 36" preserveAspectRatio="xMidYMid meet" fill="none"><ns0:rect width="35" height="36" fill="url(#pattern0_19658_609)" />
+<ns0:rect x="35" y="3" width="89" height="30" fill="url(#pattern1_19658_609)" />
+<ns0:defs>
+<ns0:pattern id="pattern0_19658_609" patternContentUnits="objectBoundingBox" width="1" height="1">
+<ns0:use ns1:href="#image0_19658_609" transform="matrix(0.00608622 0 0 0.00591716 -0.00879121 0)" />
+</ns0:pattern>
+<ns0:pattern id="pattern1_19658_609" patternContentUnits="objectBoundingBox" width="1" height="1">
+<ns0:use ns1:href="#image1_19658_609" transform="matrix(0.00239346 0 0 0.00710059 -0.396716 -0.1)" />
+</ns0:pattern>
+</ns0:defs>
+</ns0:svg></ns0:svg>

@@ -47,3 +47,6 @@ next-env.d.ts
 # generated Prisma client
 apps/api/src/generated/
 !.env.example
+
+# source archives (the unpacked folders are committed)
+assets/*.zip

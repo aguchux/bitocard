@@ -11,6 +11,8 @@ const sizeLabel = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / (1024 *
 const purposeLabels: Record<MediaPurpose, string> = {
   brand_logo: "Brand logos",
   brand_card: "Gift card and brand images",
+  registry_logo: "Brand registry logos",
+  registry_card: "Brand registry card images",
   product_image: "Product images",
   supplier_logo: "Supplier logos",
   category_icon: "Category icons",

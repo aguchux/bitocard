@@ -59,6 +59,8 @@ export const configSchema = z.object({
 
   /** Where links in emails point (the reseller dashboard). */
   DASHBOARD_URL: z.string().url().default('https://shq.bitocard.com'),
+  /** BitoCard's store (bitocard.com); bundled brand icons are served from it at /brand-icons/<slug>.svg. */
+  STOREFRONT_URL: z.string().url().default('https://bitocard.com'),
 
   // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),

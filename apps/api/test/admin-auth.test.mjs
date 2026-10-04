@@ -182,6 +182,51 @@ describe('admin:create script', () => {
   });
 });
 
+describe('resetting an admin password', () => {
+  test('a new password works, the old one does not, the lockout is cleared and sessions end', async () => {
+    const email = await createAdmin();
+    const { browser } = await firstSignIn(email);
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    await prisma.user.updateMany({ where: { realm: 'admin', email }, data: { failedSignIns: 0, lockedUntil: new Date(Date.now() + 15 * 60_000) } });
+
+    await admins.resetPassword(email, 'a fresh admin passphrase');
+    assert.equal((await browser.get('/v1/admin/auth/session')).status, 401, 'signed out everywhere');
+    const user = await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email } });
+    assert.deepEqual([user.lockedUntil, user.failedSignIns], [null, 0]);
+    assert.equal((await client(server.base).post('/v1/admin/auth/signin', { email, password })).status, 401, 'the old password no longer works');
+    const fresh = await client(server.base).post('/v1/admin/auth/signin', { email, password: 'a fresh admin passphrase' });
+    assert.deepEqual([fresh.status, fresh.json.mfa_setup_required], [200, false], 'the authenticator is kept');
+  });
+
+  test('with resetAuthenticator the admin sets the authenticator up again; reseller accounts are never touched', async () => {
+    const email = await createAdmin();
+    await firstSignIn(email);
+    await assert.rejects(admins.resetPassword('nobody@bitocard.com', 'a fresh admin passphrase'), /No admin account/);
+    await assert.rejects(admins.resetPassword(email, 'short'), /./, 'the password rules still apply');
+    await admins.resetPassword(email.toUpperCase(), 'another fresh passphrase', { resetAuthenticator: true });
+    const signin = await client(server.base).post('/v1/admin/auth/signin', { email, password: 'another fresh passphrase' });
+    assert.deepEqual([signin.status, signin.json.mfa_setup_required], [200, true]);
+  });
+});
+
+describe('admin:reset-password script', () => {
+  test('prints a one-time password that signs in, and audits the reset', { skip: !dockerUrl && 'needs the Docker database' }, async () => {
+    const email = `reset-${Date.now()}@bitocard.com`;
+    const env = { ...process.env, DATABASE_URL: dockerUrl, PASSWORD_BREACH_CHECK: 'off' };
+    const cwd = new URL('..', import.meta.url);
+    await promisify(execFile)(process.execPath, ['scripts/create-admin.mjs', '--email', email, '--name', 'Reset Admin', '--roles', 'support'], { cwd, env });
+    const { stdout } = await promisify(execFile)(process.execPath, ['scripts/reset-admin-password.mjs', '--email', email, '--reset-authenticator'], { cwd, env });
+    assert.match(stdout, /and their authenticator/);
+    const temporary = /Temporary password \(shown once\): (\S+)/.exec(stdout)?.[1];
+    assert.ok(temporary, stdout);
+    const signin = await client(server.base).post('/v1/admin/auth/signin', { email, password: temporary });
+    assert.equal(signin.status, 200);
+    const missing = await promisify(execFile)(process.execPath, ['scripts/reset-admin-password.mjs', '--email', 'nobody-at-all@bitocard.com'], { cwd, env }).catch(error => error);
+    assert.equal(missing.code, 1);
+    assert.match(missing.stderr, /No admin account/);
+  });
+});
+
 describe('one email, separate accounts', () => {
   test('an admin’s email can also sign up to SHQ: a separate reseller account that never changes the admin', async () => {
     const { lastEmailCode } = await import('./helpers.mjs');

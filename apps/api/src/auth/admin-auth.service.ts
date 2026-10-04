@@ -53,6 +53,28 @@ export class AdminAuthService {
     });
   }
 
+  /**
+   * Gives an admin a new password (the `admin:reset-password` script; admins have no self-service reset): clears any
+   * lockout, signs out every admin session they have, and with `resetAuthenticator` removes their authenticator so
+   * they set it up again at their next sign-in. Admin accounts only; a reseller account with the same email is
+   * untouched.
+   */
+  async resetPassword(emailInput: string, password: string, options: { resetAuthenticator?: boolean } = {}) {
+    const email = emailInput.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'admin', email } } });
+    if (!user) throw new Error(`No admin account for ${email}.`);
+    // The request DTOs check the length elsewhere; this path has no DTO.
+    if (password.length < 10 || password.length > 128) throw new Error('Passwords are 10 to 128 characters.');
+    await this.passwords.assertAcceptable(password);
+    const passwordHash = await this.passwords.hash(password);
+    await this.prisma.$transaction(async tx => {
+      await tx.user.update({ where: { id: user.id }, data: { passwordHash, failedSignIns: 0, lockedUntil: null } });
+      await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      if (options.resetAuthenticator) await tx.totpCredential.deleteMany({ where: { userId: user.id } });
+    });
+    return user;
+  }
+
   /** Step 1: password. Returns a short-lived challenge to complete with an authenticator code. */
   async signIn(emailInput: string, password: string) {
     const email = emailInput.trim().toLowerCase();

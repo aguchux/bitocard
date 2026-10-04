@@ -1786,3 +1786,18 @@ model UserEmail {
   @@index([userId])
   @@map("user_emails")
 }
+
+/**
+ * Logos and card art an admin uploaded for a brand registry entry (Storefront > Brand registry), keyed by the entry's
+ * slug, so one upload covers every product brand slug the entry lists. Between a brand's own settings and the
+ * registry file's defaults.
+ */
+model BrandAsset {
+  slug        String   @id
+  logoUrl     String?  @map("logo_url")
+  cardUrl     String?  @map("card_url")
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("brand_assets")
+}

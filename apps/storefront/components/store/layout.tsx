@@ -4,9 +4,11 @@ import type { StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/st
 import { Brand } from "@bitocard/ui/brand";
 import { legalDocuments } from "@bitocard/ui/legal";
 import { appUrl, brand } from "@bitocard/ui/site";
+import { CountryPicker } from "./country-picker";
+import { CurrencyMenu } from "./currency-menu";
 import { DesktopNav, MobileMenu } from "./header-menus";
 
-/** The store header: wordmark, the category menus, and the reseller call to action. */
+/** The store header: wordmark, the category menus, then currency, sign in and the reseller call to action. */
 export function StoreHeader({ groups }: { groups: StoreNavigationGroup[] }) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
@@ -15,9 +17,15 @@ export function StoreHeader({ groups }: { groups: StoreNavigationGroup[] }) {
           <Brand />
         </Link>
         <DesktopNav groups={groups} />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50 md:hidden">
             <Search className="size-5" aria-hidden="true" />
+          </Link>
+          <div className="hidden lg:block">
+            <CurrencyMenu />
+          </div>
+          <Link href="/signin" className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold text-[#070f4c] hover:border-slate-300 lg:inline-flex">
+            Sign in
           </Link>
           <Link
             href="/resellers"
@@ -33,30 +41,22 @@ export function StoreHeader({ groups }: { groups: StoreNavigationGroup[] }) {
   );
 }
 
-/** Search with a country picker; a plain form, so it works before any script loads. */
+/**
+ * Search with a country picker (with flags), in one white bar with the search button inside it. A plain form, so it
+ * works before any script loads.
+ */
 export function SearchForm({ countries, q = "", country = "", size = "lg" }: { countries: StoreCountry[]; q?: string; country?: string; size?: "lg" | "md" }) {
-  const tall = size === "lg" ? "min-h-16" : "min-h-13";
+  const tall = size === "lg" ? "min-h-16" : "min-h-14";
   return (
-    <form action="/search" method="get" role="search" className={`flex w-full flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-0 sm:rounded-2xl sm:bg-white sm:shadow-lg sm:ring-1 sm:ring-slate-200`}>
-      <label className={`flex flex-1 items-center gap-3 rounded-2xl bg-white px-4 shadow-lg ring-1 ring-slate-200 sm:rounded-r-none sm:shadow-none sm:ring-0 ${tall}`}>
-        <Search className="size-5 shrink-0 text-slate-500" aria-hidden="true" />
+    <form action="/search" method="get" role="search" className={`flex w-full flex-col gap-2 rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200 sm:flex-row sm:items-stretch sm:gap-0 ${tall}`}>
+      <label className="flex min-h-12 flex-1 items-center gap-3 px-3 sm:px-4">
+        <Search className="size-5 shrink-0 text-[#070f4c]" aria-hidden="true" />
         <span className="sr-only">Search</span>
-        <input name="q" type="search" defaultValue={q} placeholder="Find a product, brand or service" className="w-full bg-transparent text-base text-[#070f4c] outline-none placeholder:text-slate-400" />
+        <input name="q" type="search" defaultValue={q} placeholder="Find a product, brand or service" className="w-full min-w-0 bg-transparent text-base text-[#070f4c] outline-none placeholder:text-slate-400 sm:text-[17px]" />
       </label>
-      <div className="flex gap-2 sm:gap-0">
-        <label className={`flex flex-1 items-center rounded-2xl bg-white px-3 shadow-lg ring-1 ring-slate-200 sm:rounded-none sm:border-l sm:border-slate-200 sm:shadow-none sm:ring-0 ${tall}`}>
-          <span className="sr-only">Country</span>
-          <select name="country" defaultValue={country} className="w-full bg-transparent text-sm font-medium text-[#070f4c] outline-none sm:w-44">
-            <option value="">All countries</option>
-            <option value="global">Usable anywhere</option>
-            {countries.map(item => (
-              <option key={item.code} value={item.code}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" aria-label="Search" className={`grid w-16 shrink-0 place-items-center rounded-2xl bg-[#ff2382] text-white hover:bg-[#e8116d] sm:rounded-l-none sm:w-20 ${tall}`}>
+      <div className="flex items-stretch gap-1.5 border-t border-slate-100 pt-1.5 sm:border-t-0 sm:pt-0">
+        <CountryPicker countries={countries} value={country} className="min-h-12 flex-1 sm:w-52 sm:flex-none sm:border-l sm:border-slate-200" />
+        <button type="submit" aria-label="Search" className="grid min-h-12 w-16 shrink-0 place-items-center rounded-xl bg-[#ff2382] text-white hover:bg-[#e8116d] sm:w-20">
           <Search className="size-6" aria-hidden="true" />
         </button>
       </div>

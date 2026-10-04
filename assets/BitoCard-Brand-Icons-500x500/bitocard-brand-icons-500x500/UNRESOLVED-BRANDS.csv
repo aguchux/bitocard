@@ -1,0 +1,20 @@
+﻿brand,expected_svg,status,note
+Nintendo eShop,svg/gift-cards/nintendo.svg,No suitable online artwork located; no generated fallback included,"A related official-site image/page was found, but it did not identify the requested standalone logo; omitted instead of packaging an ambiguous mark."
+9mobile,svg/african-telecoms/9mobile.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+AT Ghana (AirtelTigo),svg/african-telecoms/atghana.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Vodacom,svg/african-telecoms/vodacom.svg,No suitable online artwork located; no generated fallback included,HTTPError: HTTP Error 404: Not Found
+Yas (Tigo),svg/african-telecoms/yas.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Halotel,svg/african-telecoms/halotel.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+TNM,svg/african-telecoms/tnm.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Botswana Telecommunications (BTC),svg/african-telecoms/btc.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+MTC Namibia,svg/african-telecoms/mtc.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+TN Mobile,svg/african-telecoms/tnmobile.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Ethio Telecom,svg/african-telecoms/ethiotelecom.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Zain,svg/african-telecoms/zain.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Quickteller,svg/suppliers/quickteller.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Cellulant / Tingg,svg/suppliers/tingg.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+eSimerge,svg/suppliers/esimerge.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Swiftnet,svg/suppliers/swiftnet.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+M-Pesa,svg/payment-networks/mpesa.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.
+Airtel Money,svg/payment-networks/airtelmoney.svg,No suitable online artwork located; no generated fallback included,"A related official-site image/page was found, but it did not identify the requested standalone logo; omitted instead of packaging an ambiguous mark."
+MTN MoMo,svg/payment-networks/mtnmomo.svg,No suitable online artwork located; no generated fallback included,Could not identify a matching official or reusable logo asset; no generated replacement included.

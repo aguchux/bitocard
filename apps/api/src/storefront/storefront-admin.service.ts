@@ -2,7 +2,9 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
 import { Prisma, type ProductCategory, type StorefrontPage } from '../generated/prisma/client.js';
+import { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryIconUrl } from './brand-registry.js';
 import { categoryLabels, defaultHome, sections as sectionsSchema } from './layout.js';
 import { StorefrontService } from './storefront.service.js';
 
@@ -39,6 +41,7 @@ export class StorefrontAdminService {
     private readonly prisma: PrismaService,
     private readonly storefront: StorefrontService,
     private readonly audit: AuditService,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   /** The home page, created with the default layout as its first draft. */
@@ -131,6 +134,7 @@ export class StorefrontAdminService {
 
   /** Every brand products name (with how many products and which categories), and its presentation if set. */
   async brands() {
+    await this.storefront.refreshBrandAssets();
     const [grouped, rows] = await Promise.all([
       this.prisma.product.groupBy({ by: ['brand', 'category'], _count: { _all: true } }),
       this.prisma.brand.findMany(),
@@ -145,7 +149,9 @@ export class StorefrontAdminService {
           return {
             ...this.storefront.presentBrand(slug, row),
             object: 'admin_brand' as const,
-            aliases: row?.aliases ?? [],
+            aliases: row ? row.aliases : (registryBrand(slug)?.aliases ?? []),
+            /** Known to the brand registry, which supplies its defaults until it is set up. */
+            in_registry: registryBrand(slug) !== null,
             featured: row?.featured ?? false,
             sort_order: row?.sortOrder ?? 100,
             visible: row?.visible ?? true,
@@ -177,6 +183,61 @@ export class StorefrontAdminService {
     const row = await this.prisma.brand.upsert({ where: { slug }, create: { slug, ...data }, update: data });
     await this.audit.record({ actorId, action: before ? 'brand.updated' : 'brand.created', targetType: 'brand', targetId: slug, before, after: row });
     return (await this.brands()).data.find(item => item.slug === slug)!;
+  }
+
+  // -- Brand registry -------------------------------------------------------------------------------------------
+
+  /**
+   * Every brand registry entry (`brand-registry.json`) with its logo and card art: an admin upload (Storefront > Brand
+   * registry) if there is one, else the file's own, else the bundled icon, else none (initials show). Product counts cover every slug it lists.
+   */
+  async registry() {
+    const [assets, grouped] = await Promise.all([this.prisma.brandAsset.findMany(), this.prisma.product.groupBy({ by: ['brand'], _count: { _all: true } })]);
+    const config = this.integrations.config;
+    const counts = new Map(grouped.map(row => [row.brand, row._count._all]));
+    return {
+      object: 'list' as const,
+      data: brandRegistry.map(entry => {
+        const asset = assets.find(row => row.slug === entry.slug);
+        const fileLogo = registryAssetUrl(entry.logo, config);
+        const bundled = registryIconUrl(entry, config);
+        const fileCard = registryAssetUrl(entry.card, config);
+        const slugs = [...new Set([entry.slug, ...entry.slugs])];
+        return {
+          object: 'brand_registry_entry' as const,
+          slug: entry.slug,
+          name: entry.name,
+          company: entry.company ?? null,
+          slugs,
+          color: entry.color,
+          initials: brandInitials(entry.name, entry.initials),
+          aliases: entry.aliases,
+          tags: entry.tags,
+          logo_url: asset?.logoUrl ?? fileLogo ?? bundled,
+          logo_source: asset?.logoUrl ? ('upload' as const) : fileLogo ? ('file' as const) : bundled ? ('bundled' as const) : null,
+          card_url: asset?.cardUrl ?? fileCard,
+          card_source: asset?.cardUrl ? ('upload' as const) : fileCard ? ('file' as const) : null,
+          products: slugs.reduce((sum, slug) => sum + (counts.get(slug) ?? 0), 0),
+          updated_at: asset?.updatedAt.toISOString() ?? null,
+        };
+      }),
+    };
+  }
+
+  /** Sets (or clears, with null) a registry entry's uploaded logo or card art. Audited. */
+  async saveRegistryAssets(actorId: string | null, slug: string, input: { logo_url?: string | null; card_url?: string | null }) {
+    const entry = registryBrand(slug);
+    if (!entry || entry.slug !== slug) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such brand in the registry.');
+    const data = {
+      ...(input.logo_url !== undefined ? { logoUrl: input.logo_url?.trim() || null } : {}),
+      ...(input.card_url !== undefined ? { cardUrl: input.card_url?.trim() || null } : {}),
+      updatedById: actorId,
+    };
+    const before = await this.prisma.brandAsset.findUnique({ where: { slug } });
+    const after = await this.prisma.brandAsset.upsert({ where: { slug }, create: { slug, ...data }, update: data });
+    await this.audit.record({ actorId, action: 'brand_registry.assets_updated', targetType: 'brand_registry', targetId: slug, before, after });
+    await this.storefront.refreshBrandAssets(true);
+    return (await this.registry()).data.find(item => item.slug === slug)!;
   }
 
   // -- Categories ------------------------------------------------------------------------------------------------

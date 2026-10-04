@@ -228,6 +228,19 @@ describe('signed uploads', () => {
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'media.deleted', targetId: created.json.id } }));
   });
 
+  test('brand registry logos are PNG or SVG, uploaded for any registry entry, even one with no products yet', async () => {
+    const logo = await upload(admin, '/v1/admin/media', { purpose: 'registry_logo', target_id: 'dstv' }, png(200, 200));
+    assert.equal(logo.completed.status, 200, JSON.stringify(logo.completed.json));
+    assert.equal(logo.created.json.folder, 'test/platform/brands/dstv/logos');
+    const saved = await admin.put('/v1/admin/storefront/registry/dstv', { logo_url: logo.completed.json.url });
+    assert.equal(saved.json.logo_source, 'upload');
+    assert.deepEqual((await admin.get(`/v1/admin/media?purpose=registry_logo`)).json.data.find(item => item.id === logo.created.json.id).in_use, ['registry:dstv:logo']);
+    const webp = await admin.post('/v1/admin/media/uploads', { purpose: 'registry_logo', target_id: 'dstv', filename: 'x.webp', content_type: 'image/webp', size: 64 });
+    assert.equal(webp.json.error.code, 'unsupported_file_type');
+    const unknown = await admin.post('/v1/admin/media/uploads', { purpose: 'registry_logo', target_id: 'not-in-registry', filename: 'x.png', content_type: 'image/png', size: 64 });
+    assert.equal(unknown.status, 404);
+  });
+
   test('requests are checked: purpose, type, size and the target must exist', async () => {
     const request = body => admin.post('/v1/admin/media/uploads', { filename: 'x.png', content_type: 'image/png', size: 100, ...body });
     const cases = [

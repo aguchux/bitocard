@@ -26,14 +26,38 @@ export type AdminBrand = {
   logo_url: string | null;
   image_url: string | null;
   color: string | null;
+  initials: string;
   tags: string[];
   aliases: string[];
+  /** Known to the brand registry, which supplies its defaults until it is set up. */
+  in_registry: boolean;
   featured: boolean;
   sort_order: number;
   visible: boolean;
   configured: boolean;
   products: number;
   categories: ProductCategory[];
+};
+
+/** A brand registry entry (brand-registry.json) with its logo and card art: an admin upload, the file's own, or none. */
+export type BrandRegistryEntry = {
+  object: 'brand_registry_entry';
+  slug: string;
+  name: string;
+  company: string | null;
+  /** Every product brand slug the entry covers. */
+  slugs: string[];
+  color: string;
+  initials: string;
+  aliases: string[];
+  tags: string[];
+  logo_url: string | null;
+  /** upload (Brand registry page), file (the registry's logo), bundled (the icon pack, on the store), or none. */
+  logo_source: 'upload' | 'file' | 'bundled' | null;
+  card_url: string | null;
+  card_source: 'upload' | 'file' | null;
+  products: number;
+  updated_at: string | null;
 };
 
 /** A category's icon and image on storefronts (labels are fixed). */
@@ -75,6 +99,11 @@ export const adminStorefrontApi = bitocardApi.injectEndpoints({
       query: ({ slug, brand }) => ({ url: `/v1/admin/storefront/brands/${encodeURIComponent(slug)}`, method: 'PUT', body: brand }),
       invalidatesTags: ['Brand', 'Media', 'Activity'],
     }),
+    brandRegistry: build.query<List<BrandRegistryEntry>, void>({ query: () => '/v1/admin/storefront/registry', providesTags: ['BrandRegistry'] }),
+    saveBrandRegistry: build.mutation<BrandRegistryEntry, { slug: string; logo_url?: string | null; card_url?: string | null }>({
+      query: ({ slug, ...body }) => ({ url: `/v1/admin/storefront/registry/${encodeURIComponent(slug)}`, method: 'PUT', body }),
+      invalidatesTags: ['BrandRegistry', 'Brand', 'Media', 'Activity'],
+    }),
     storefrontCategories: build.query<List<AdminCategory>, void>({ query: () => '/v1/admin/storefront/categories', providesTags: ['Category'] }),
     saveStorefrontCategory: build.mutation<AdminCategory, { category: ProductCategory; icon_url: string | null; image_url: string | null }>({
       query: ({ category, ...body }) => ({ url: `/v1/admin/storefront/categories/${category}`, method: 'PUT', body }),
@@ -94,5 +123,7 @@ export const {
   useStorefrontBrandsQuery,
   useSaveStorefrontBrandMutation,
   useStorefrontCategoriesQuery,
+  useBrandRegistryQuery,
+  useSaveBrandRegistryMutation,
   useSaveStorefrontCategoryMutation,
 } = adminStorefrontApi;

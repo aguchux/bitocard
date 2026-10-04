@@ -3,7 +3,7 @@
  * (`SPACES_ROOT`): platform files under `platform/`, each reseller's under `resellers/<reseller id>/`, so a bucket is
  * easy to browse and a reseller's files are never mixed with BitoCard's or another reseller's.
  */
-export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category';
+export type MediaTarget = 'brand' | 'product' | 'supplier' | 'category' | 'registry';
 
 export type MediaPurpose = {
   label: string;
@@ -33,6 +33,8 @@ export const segment = (value: string) =>
 
 const purposeTable = {
   brand_logo: { label: 'Brand logo', realm: 'admin', target: 'brand', folder: slug => `platform/brands/${segment(slug!)}/logos`, maxBytes: 1 * MB, types: withSvg },
+  registry_logo: { label: 'Brand registry logo', realm: 'admin', target: 'registry', folder: slug => `platform/brands/${segment(slug!)}/logos`, maxBytes: 1 * MB, types: ['image/png', 'image/svg+xml'] },
+  registry_card: { label: 'Brand registry card image', realm: 'admin', target: 'registry', folder: slug => `platform/brands/${segment(slug!)}/cards`, maxBytes: 5 * MB, types: rasterTypes },
   brand_card: { label: 'Gift card or brand card image', realm: 'admin', target: 'brand', folder: slug => `platform/brands/${segment(slug!)}/cards`, maxBytes: 5 * MB, types: rasterTypes },
   product_image: {
     label: 'Product image',

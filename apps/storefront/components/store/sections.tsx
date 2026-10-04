@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, Gift, Globe2, Signal } from "lucide-react";
+import { ArrowRight, Check, CreditCard, Gift, Globe2, Signal, Smartphone } from "lucide-react";
 import type { ResolvedSection, StoreBrand, StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { brand as site } from "@bitocard/ui/site";
 import { BrandArt, ProductCard, ProductRow } from "./product-card";
@@ -31,14 +31,20 @@ function Heading({ title, subtitle, href, children }: { title: string; subtitle?
   );
 }
 
-function Hero({ section, groups, countries }: { section: Extract<ResolvedSection, { type: "hero" }>; groups: StoreNavigationGroup[]; countries: StoreCountry[] }) {
-  const featured = section.data.featured.slice(0, 5);
+function Hero({ section, groups, countries, bleed = false }: { section: Extract<ResolvedSection, { type: "hero" }>; groups: StoreNavigationGroup[]; countries: StoreCountry[]; bleed?: boolean }) {
+  const featured = section.data.featured.slice(0, 4);
   return (
-    <section aria-labelledby={`hero-${section.id}`} className="relative isolate overflow-hidden rounded-3xl bg-[#060b3a] px-5 py-10 text-white sm:px-10 lg:px-14 lg:py-14">
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_80%_20%,rgba(255,35,130,.35),transparent_45%),radial-gradient(ellipse_at_10%_110%,rgba(36,119,255,.35),transparent_45%),linear-gradient(120deg,#060b3a,#0d1366_60%,#1a0f5c)]" />
-      <div className="grid items-center gap-10 lg:grid-cols-12">
-        <div className="lg:col-span-7">
-          <h1 id={`hero-${section.id}`} className="font-display text-4xl leading-[1.04] font-extrabold tracking-tight sm:text-5xl xl:text-6xl">
+    <section
+      aria-labelledby={`hero-${section.id}`}
+      className={`relative isolate bg-[#050a33] text-white ${bleed ? "ml-[calc(50%-50vw)] w-screen overflow-x-clip" : "overflow-x-clip rounded-3xl"}`}
+    >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_78%_40%,rgba(59,130,246,.38),transparent_42%),radial-gradient(ellipse_at_95%_10%,rgba(255,35,130,.28),transparent_40%),linear-gradient(110deg,#040828,#070f4c_55%,#0d1366)]"
+      />
+      <div className={`grid items-center gap-8 lg:grid-cols-12 ${bleed ? "mx-auto max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8 lg:py-12" : "px-5 py-10 sm:px-10 lg:px-14 lg:py-14"}`}>
+        <div className="relative z-10 lg:col-span-7">
+          <h1 id={`hero-${section.id}`} className="font-display text-4xl leading-[1.02] font-extrabold tracking-tight sm:text-6xl xl:text-7xl">
             {section.title}
             {section.accent ? (
               <>
@@ -53,13 +59,13 @@ function Hero({ section, groups, countries }: { section: Extract<ResolvedSection
               <SearchForm countries={countries} />
             </div>
           ) : null}
-          {section.categoryChips ? (
+          {section.categoryChips && groups.length ? (
             <ul className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {groups.map(group => {
                 const Icon = groupIcon[group.key] ?? Gift;
                 return (
                   <li key={group.key}>
-                    <Link href={groupHref(group)} className="flex min-h-12 items-center gap-2 rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:bg-white/10">
+                    <Link href={groupHref(group)} className="flex min-h-12 items-center gap-2 rounded-full border border-white/25 bg-white/5 px-4 text-sm font-semibold text-white backdrop-blur hover:bg-white/10">
                       <Icon className={`size-5 ${groupInk[group.key] ?? "text-pink-400"}`} aria-hidden="true" />
                       {group.label}
                     </Link>
@@ -69,23 +75,66 @@ function Hero({ section, groups, countries }: { section: Extract<ResolvedSection
             </ul>
           ) : null}
         </div>
-        <div aria-hidden="true" className="relative hidden h-80 lg:col-span-5 lg:block">
-          <div className="absolute inset-6 rounded-full bg-[radial-gradient(circle_at_40%_40%,rgba(59,130,246,.55),rgba(6,11,58,.1)_65%)] shadow-[0_0_120px_rgba(59,130,246,.35)]" />
-          <div className="absolute inset-6 rounded-full border border-white/10 [background-image:radial-gradient(rgba(255,255,255,.35)_1px,transparent_1px)] [background-size:10px_10px] opacity-40" />
-          {featured.map((brand, index) => (
-            <FloatingTile key={brand.slug} brand={brand} index={index} />
-          ))}
-          <Globe2 className="absolute top-1/2 left-1/2 size-14 -translate-x-1/2 -translate-y-1/2 text-white/30" />
-        </div>
+        <HeroArt featured={featured} />
       </div>
     </section>
   );
 }
 
-const tilePositions = ["left-[8%] top-[8%] -rotate-6", "right-[4%] top-[2%] rotate-6", "left-[22%] bottom-[6%] rotate-3", "right-[10%] bottom-[14%] -rotate-3", "left-[46%] top-[34%] rotate-2"];
+/** The globe with orbits and floating brand cards (the featured brands); decoration only. */
+function HeroArt({ featured }: { featured: StoreBrand[] }) {
+  return (
+    <div aria-hidden="true" className="relative hidden h-[22rem] lg:col-span-5 lg:block xl:h-[24rem]">
+      {/* The globe: a lit sphere with a dotted surface. */}
+      <div className="absolute top-1/2 left-1/2 size-[21rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_38%_32%,rgba(96,165,250,.75),rgba(37,99,235,.35)_45%,rgba(5,10,51,.2)_72%)] shadow-[0_0_120px_rgba(59,130,246,.45)] xl:size-[23rem]" />
+      <div className="absolute top-1/2 left-1/2 size-[21rem] -translate-x-1/2 -translate-y-1/2 rounded-full [background-image:radial-gradient(rgba(191,219,254,.55)_1.1px,transparent_1.3px)] [background-size:9px_9px] [mask-image:radial-gradient(circle,black_55%,transparent_72%)] opacity-70 xl:size-[23rem]" />
+      {/* Orbits with glowing points. */}
+      <svg viewBox="0 0 500 380" className="absolute inset-0 h-full w-full" fill="none">
+        <ellipse cx="250" cy="190" rx="240" ry="92" transform="rotate(-18 250 190)" stroke="rgba(255,35,130,.55)" strokeWidth="1.4" />
+        <ellipse cx="250" cy="190" rx="225" ry="120" transform="rotate(14 250 190)" stroke="rgba(147,197,253,.4)" strokeWidth="1.2" />
+        <ellipse cx="250" cy="190" rx="170" ry="178" stroke="rgba(255,255,255,.12)" strokeWidth="1" />
+        {[
+          [32, 250],
+          [470, 120],
+          [120, 70],
+          [400, 330],
+          [255, 14],
+          [470, 270],
+        ].map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill="#ff5ca8" className="drop-shadow-[0_0_6px_#ff2382]" />
+        ))}
+      </svg>
+      {featured.map((brand, index) => (
+        <FloatingTile key={brand.slug} brand={brand} index={index} />
+      ))}
+      {/* Small category badges around the globe. */}
+      <span className="absolute top-[30%] left-[2%] grid size-12 -rotate-12 place-items-center rounded-xl bg-[#2477ff] shadow-xl ring-1 ring-white/30">
+        <Smartphone className="size-6 text-white" />
+      </span>
+      <span className="absolute top-[4%] right-[2%] grid size-14 rotate-12 place-items-center rounded-2xl bg-[#ff2382] shadow-xl ring-1 ring-white/30">
+        <Gift className="size-7 text-white" />
+      </span>
+      <span className="absolute right-[0%] bottom-[8%] grid size-12 rotate-12 place-items-center rounded-xl bg-[#2477ff] shadow-xl ring-1 ring-white/30">
+        <CreditCard className="size-6 text-white" />
+      </span>
+      <span className="absolute top-[58%] left-[6%] size-9 rotate-12 rounded-lg bg-[#ff5ca8] shadow-xl" />
+    </div>
+  );
+}
+
+const tilePositions = [
+  "left-[10%] top-[10%] w-40 h-28 -rotate-6",
+  "right-[6%] top-[6%] w-44 h-28 rotate-6",
+  "left-[24%] bottom-[5%] w-40 h-28 rotate-6",
+  "right-[2%] bottom-[16%] w-40 h-28 -rotate-6",
+];
 
 function FloatingTile({ brand, index }: { brand: StoreBrand; index: number }) {
-  return <div className={`absolute h-24 w-40 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/20 ${tilePositions[index]}`}><BrandArt brand={brand} className="text-lg" /></div>;
+  return (
+    <div className={`absolute overflow-hidden rounded-2xl shadow-[0_20px_45px_rgba(0,0,0,.45)] ring-1 ring-white/25 ${tilePositions[index]}`}>
+      <BrandArt brand={brand} className="text-lg" />
+    </div>
+  );
 }
 
 function ProductRail({ section }: { section: Extract<ResolvedSection, { type: "product_rail" }> }) {
@@ -297,9 +346,19 @@ function TrustBar({ section }: { section: Extract<ResolvedSection, { type: "trus
 
 /** The home page: each section on the grid (12 columns on desktop, 6 on tablets, one on phones), densely packed. */
 export function HomeSections({ sections, groups, countries }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[] }) {
+  // A full-width hero at the top runs edge to edge under the header (full bleed); the rest sit in the grid.
+  const [first, ...others] = sections;
+  const bleed = first?.type === "hero" && first.span.lg === 12 ? first : null;
+  const grid = bleed ? others : sections;
   return (
+    <>
+      {bleed ? (
+        <div className="relative z-20 -mt-6 mb-6 lg:mb-7">
+          <Hero section={bleed} groups={groups} countries={countries} bleed />
+        </div>
+      ) : null}
     <div className="grid grid-flow-row-dense grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12 lg:gap-7">
-      {sections.map(section => (
+      {grid.map(section => (
         <div key={section.id} className={`min-w-0 ${mdSpan[section.span.md]} ${lgSpan[section.span.lg]} ${section.span.rows === 2 ? "md:row-span-2" : ""}`}>
           {section.type === "hero" ? <Hero section={section} groups={groups} countries={countries} /> : null}
           {section.type === "product_rail" ? <ProductRail section={section} /> : null}
@@ -310,5 +369,6 @@ export function HomeSections({ sections, groups, countries }: { sections: Resolv
         </div>
       ))}
     </div>
+    </>
   );
 }

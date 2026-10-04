@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   const { groups } = await storeNavigation();
   return (
-    <div className={`${inter.variable} store min-h-svh bg-[#fcfdff] font-[family-name:var(--font-inter)] text-[#070f4c]`}>
+    <div className={`${inter.variable} store min-h-svh overflow-x-clip bg-[#fcfdff] font-[family-name:var(--font-inter)] text-[#070f4c]`}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>

@@ -40,6 +40,7 @@ export type IntegrationGroup = {
 const integrationKeyList = [
   'DASHBOARD_URL',
   'PAYMENT_RETURN_URL',
+  'STOREFRONT_URL',
   'ALERT_EMAIL',
   'EMAIL_FROM',
   'RESEND_API_KEY',
@@ -109,6 +110,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     description: 'Where emails and payment pages send people back to, and where operational alerts go.',
     fields: [
       field('DASHBOARD_URL', 'Reseller dashboard address', { kind: 'url', help: 'Links in emails point here.' }),
+      field('STOREFRONT_URL', 'Store address', { kind: 'url', help: 'BitoCard\'s store. Bundled brand logos are served from it (/brand-icons/). Default: https://bitocard.com' }),
       field('PAYMENT_RETURN_URL', 'Payment return address', { kind: 'url', help: 'Where a payment page returns the payer when the caller gives none.' }),
       field('ALERT_EMAIL', 'Alerts email', { kind: 'email', help: 'Operational alerts, for example conversions paused.' }),
     ],

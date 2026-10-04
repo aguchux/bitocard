@@ -129,7 +129,10 @@ export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                 </div>
               ))}
             </nav>
-            <Link href="/resellers" onClick={() => setOpen(false)} className="mt-6 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
+            <Link href="/signin" onClick={() => setOpen(false)} className="mt-6 flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]">
+              Sign in
+            </Link>
+            <Link href="/resellers" onClick={() => setOpen(false)} className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
               <Store className="size-5" aria-hidden="true" />
               Open a reseller store
             </Link>

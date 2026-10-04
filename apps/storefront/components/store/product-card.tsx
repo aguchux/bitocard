@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatFace, type StoreBrand, type StoreProduct } from "@bitocard/api-client/storefront";
+import { BrandImage } from "./brand-image";
 import { categoryTheme } from "./theme";
 
 export const productHref = (product: Pick<StoreProduct, "key">) => `/p/${encodeURIComponent(product.key)}`;
@@ -12,28 +13,49 @@ export function priceLabel(product: StoreProduct) {
   return product.to > product.from ? `From ${from}` : from;
 }
 
-/** The brand's card art, or its colour (or the category's) with its logo or name. */
+/** Dark text on light brand colours (MTN yellow), white on dark ones. */
+function inkOn(color: string | null) {
+  const hex = color?.match(/^#([0-9a-f]{6})$/i)?.[1];
+  if (!hex) return "#ffffff";
+  const [r, g, b] = [0, 2, 4].map(at => parseInt(hex.slice(at, at + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 ? "#070f4c" : "#ffffff";
+}
+
+/** The brand's initials, when it has no logo (or its logo fails to load). */
+function Initials({ brand }: { brand: StoreBrand }) {
+  return (
+    <span className="font-display text-center text-[2.2em] leading-none font-extrabold tracking-tight drop-shadow-sm" style={{ color: inkOn(brand.color) }} aria-label={brand.name}>
+      {brand.initials ?? brand.name.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+/**
+ * The brand's card art; else its colour (or the category's) with its logo on a white tile (so a logo in the brand's
+ * own colour still shows); else with its initials. Logos and art come from the brand's settings, the brand registry
+ * or its bundled icons; a failed image falls back the same way.
+ */
 export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand; product?: StoreProduct; className?: string }) {
   const theme = product ? categoryTheme[product.category] : categoryTheme.gift_cards;
-  if (brand.image_url) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- brand art is an admin-set https address on any host
-      <img src={brand.image_url} alt="" className={`h-full w-full object-cover ${className}`} loading="lazy" />
-    );
-  }
-  return (
+  const plate = (
     <div
       className={`flex h-full w-full items-center justify-center bg-gradient-to-br p-4 ${brand.color ? "" : theme.card} ${className}`}
       style={brand.color ? { backgroundColor: brand.color } : undefined}
     >
       {brand.logo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element -- brand logos are admin-set https addresses on any host
-        <img src={brand.logo_url} alt="" className="max-h-[60%] max-w-[70%] object-contain" loading="lazy" />
+        <BrandImage
+          src={brand.logo_url}
+          frame="flex aspect-square h-[64%] max-h-32 items-center justify-center rounded-[22%] bg-white p-[9%] shadow-md ring-1 ring-black/5"
+          className="h-full w-full object-contain"
+          fallback={<Initials brand={brand} />}
+        />
       ) : (
-        <span className="text-center text-2xl font-extrabold tracking-tight text-white drop-shadow-sm">{brand.name}</span>
+        <Initials brand={brand} />
       )}
     </div>
   );
+  if (brand.image_url) return <BrandImage src={brand.image_url} className={`h-full w-full object-cover ${className}`} fallback={plate} />;
+  return plate;
 }
 
 /** A product in a rail or a grid: art, name, what it is, and its face value. */

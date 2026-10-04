@@ -23,7 +23,7 @@ function Swatch({ brand }: { brand: AdminBrand }) {
   }
   return (
     <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg text-sm font-bold text-white" style={{ background: brand.color ?? "#94a3b8" }}>
-      {brand.name.slice(0, 1).toUpperCase()}
+      {brand.initials}
     </span>
   );
 }
@@ -193,14 +193,19 @@ export default function StorefrontBrandsPage() {
     },
     { key: "featured", header: "Featured", cell: brand => (brand.featured ? <Badge tone="pink">Featured</Badge> : <span className="text-muted">No</span>) },
     { key: "visible", header: "Shown", cell: brand => <StatusBadge status={brand.visible ? "active" : "disabled"} label={brand.visible ? "Shown" : "Hidden"} /> },
-    { key: "configured", header: "Set up", hideOnMobile: true, cell: brand => (brand.configured ? <Badge tone="green">Configured</Badge> : <Badge tone="amber">Defaults</Badge>) },
+    {
+      key: "configured",
+      header: "Set up",
+      hideOnMobile: true,
+      cell: brand => (brand.configured ? <Badge tone="green">Configured</Badge> : brand.in_registry ? <Badge tone="blue">Brand registry</Badge> : <Badge tone="amber">Defaults</Badge>),
+    },
   ];
 
   return (
     <AdminShell section="storefront" current="/storefront/brands" crumbs={[{ label: "Storefront", href: "/storefront" }, { label: "Brands" }]}>
       <PageHeader
         title="Brands"
-        description="Brands are how products appear on bitocard.com: their name, logo, colour, tags and order. Visitors only ever see the brand, never BitoCard's suppliers. Brands come from the catalogue; until one is set up it uses defaults."
+        description="Brands are how products appear on bitocard.com: their name, logo, colour, tags and order. Visitors only ever see the brand, never BitoCard's suppliers. Brands come from the catalogue; until one is set up here it uses the Brand registry's defaults (logos are managed there), else its initials."
       />
       <label className="relative flex max-w-md items-center">
         <span className="sr-only">Search brands</span>

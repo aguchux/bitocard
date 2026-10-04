@@ -27,6 +27,8 @@ export type StoreBrand = {
   logo_url: string | null;
   image_url: string | null;
   color: string | null;
+  /** Up to three letters to show when there is no logo (MTN, GP, AM). */
+  initials: string;
   tags: string[];
   /** In brand lists: how many products, and whether featured. */
   products?: number;

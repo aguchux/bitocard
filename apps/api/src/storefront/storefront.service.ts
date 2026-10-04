@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Brand, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
+import { brandInitials, registryAssetUrl, registryBrand, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
 import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
 
 const homeKey = 'home';
@@ -61,6 +62,7 @@ export class StorefrontService {
    * supplier, in a category on sale in the product's country (worldwide categories: on sale anywhere).
    */
   async availability(): Promise<Availability> {
+    await this.refreshBrandAssets();
     const [enabled, hidden] = await Promise.all([
       this.prisma.countryCategory.findMany({ where: { enabled: true }, select: { countryCode: true, category: true } }),
       this.prisma.brand.findMany({ where: { visible: false }, select: { slug: true } }),
@@ -83,18 +85,40 @@ export class StorefrontService {
     return new Map(rows.map(row => [row.slug, row]));
   }
 
+  /**
+   * A brand as the stores show it: the admin's settings when the brand is set up (`brands`), otherwise the brand
+   * registry's defaults (`brand-registry.json`), otherwise a name from the slug. The logo falls back from the brand's own
+   * to the registry upload, the registry file's logo, then the bundled icon. `initials` is what to show when there is
+   * no logo.
+   */
   presentBrand(slug: string, row?: Brand | null) {
+    const registry = registryBrand(slug);
+    const uploaded = registry ? this.brandAssets.get(registry.slug) : undefined;
+    const config = this.integrations.config;
+    const name = row?.name ?? (registry?.slug === slug ? registry.name : brandNameFromSlug(slug));
     return {
       object: 'store_brand' as const,
       slug,
-      name: row?.name ?? brandNameFromSlug(slug),
-      company: row?.company ?? null,
+      name,
+      company: row?.company ?? registry?.company ?? null,
       description: row?.description ?? null,
-      logo_url: row?.logoUrl ?? null,
-      image_url: row?.imageUrl ?? null,
-      color: row?.color ?? null,
-      tags: row?.tags ?? [],
+      logo_url: row?.logoUrl ?? uploaded?.logoUrl ?? registryAssetUrl(registry?.logo ?? null, config) ?? registryIconUrl(registry, config),
+      image_url: row?.imageUrl ?? uploaded?.cardUrl ?? registryAssetUrl(registry?.card ?? null, config),
+      color: row?.color ?? registry?.color ?? null,
+      initials: brandInitials(name, registry && name === registry.name ? registry.initials : undefined),
+      tags: row?.tags.length ? row.tags : (registry?.tags ?? []),
     };
+  }
+
+  /** Logos and card art uploaded for registry entries (Storefront > Brand registry), kept for 30 seconds. */
+  private brandAssets = new Map<string, { logoUrl: string | null; cardUrl: string | null }>();
+  private brandAssetsAt = 0;
+
+  async refreshBrandAssets(force = false) {
+    if (!force && Date.now() - this.brandAssetsAt < 30_000) return;
+    const rows = await this.prisma.brandAsset.findMany();
+    this.brandAssets = new Map(rows.map(row => [row.slug, { logoUrl: row.logoUrl, cardUrl: row.cardUrl }]));
+    this.brandAssetsAt = Date.now();
   }
 
   /** A product as the storefront lists it: face values only (the customer's price is quoted at checkout). */
@@ -316,7 +340,8 @@ export class StorefrontService {
       },
       select: { slug: true },
     });
-    return rows.map(row => row.slug);
+    // Plus brands the registry knows by name, company or search word (PSN for PlayStation, robux for Roblox).
+    return [...new Set([...rows.map(row => row.slug), ...registrySlugsMatching(phrase, words)])];
   }
 
   /** Products matching a query: every word in the name or brand, or a matching brand (name, company, alias). */
@@ -358,7 +383,8 @@ export class StorefrontService {
     const score = (product: Product) => {
       const name = product.name.toLowerCase();
       const brand = brands.get(product.brand);
-      const brandText = `${product.brand} ${brand?.name ?? ''} ${brand?.company ?? ''} ${(brand?.aliases ?? []).join(' ')}`.toLowerCase();
+      const registry = registryBrand(product.brand);
+      const brandText = `${product.brand} ${brand?.name ?? registry?.name ?? ''} ${brand?.company ?? registry?.company ?? ''} ${[...(brand?.aliases ?? []), ...(registry?.aliases ?? [])].join(' ')}`.toLowerCase();
       let value = 0;
       if (name.startsWith(phrase)) value += 50;
       if (brandText.includes(phrase)) value += 30;

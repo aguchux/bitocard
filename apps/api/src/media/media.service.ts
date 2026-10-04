@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { productCategories } from '../countries/countries.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { registryBrand } from '../storefront/brand-registry.js';
 import type { MediaAsset, Prisma, ProductCategory } from '../generated/prisma/client.js';
 import { inspectImage, sniffBytes } from './images.js';
 import { extensions, type MediaPurposeKey, mediaPurposeKeys, mediaPurposes, purposesFor } from './purposes.js';
@@ -83,9 +84,11 @@ export class MediaService {
           ? (await this.prisma.product.count({ where: { key: value } })) > 0
           : kind === 'supplier'
             ? (await this.prisma.supplier.count({ where: { code: value } })) > 0
-            : productCategories.includes(value as ProductCategory);
+            : kind === 'registry'
+              ? registryBrand(value.toLowerCase())?.slug === value.toLowerCase()
+              : productCategories.includes(value as ProductCategory);
     if (!exists) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${kind}.`, 'target_id');
-    return kind === 'brand' ? value.toLowerCase() : value;
+    return kind === 'brand' || kind === 'registry' ? value.toLowerCase() : value;
   }
 
   async createUpload(actor: MediaActor, input: UploadInput) {
@@ -188,14 +191,19 @@ export class MediaService {
     const add = (url: string | null, label: string) => {
       if (url && urls.includes(url)) uses.set(url, [...(uses.get(url) ?? []), label]);
     };
-    const [brands, products, suppliers, categories, stores, pages] = await Promise.all([
+    const [brands, products, suppliers, categories, stores, pages, registry] = await Promise.all([
       this.prisma.brand.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { imageUrl: { in: urls } }] }, select: { slug: true, logoUrl: true, imageUrl: true } }),
       this.prisma.product.findMany({ where: { imageUrl: { in: urls } }, select: { key: true, imageUrl: true } }),
       this.prisma.supplier.findMany({ where: { logoUrl: { in: urls } }, select: { code: true, logoUrl: true } }),
       this.prisma.categoryPresentation.findMany({ where: { OR: [{ iconUrl: { in: urls } }, { imageUrl: { in: urls } }] } }),
       this.prisma.store.findMany({ where: { logoUrl: { in: urls } }, select: { subdomain: true, logoUrl: true } }),
       this.prisma.storefrontPage.findMany({ select: { key: true, draft: true, published: true } }),
+      this.prisma.brandAsset.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { cardUrl: { in: urls } }] } }),
     ]);
+    for (const entry of registry) {
+      add(entry.logoUrl, `registry:${entry.slug}:logo`);
+      add(entry.cardUrl, `registry:${entry.slug}:card`);
+    }
     for (const brand of brands) {
       add(brand.logoUrl, `brand:${brand.slug}:logo`);
       add(brand.imageUrl, `brand:${brand.slug}:card`);
