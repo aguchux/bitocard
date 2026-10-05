@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { StubAdapter, type SupplierAdapter } from './adapter.js';
 import { DidwwAdapter } from './didww.adapter.js';
 import { ReloadlyAdapter } from './reloadly.adapter.js';
+import { StockAdapter } from './stock.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
 
 /** Reloadly on given credentials; the API addresses follow the sandbox setting unless overridden (tests). */
@@ -22,14 +25,22 @@ function reloadly(config: { RELOADLY_SANDBOX: boolean; RELOADLY_AUTH_URL: string
 @Injectable()
 export class SupplierAdapters {
   private readonly configured: () => Map<string, SupplierAdapter>;
+  /** BitoCard's own stock: always there, needs no credentials. */
+  private readonly stock: StockAdapter;
 
-  constructor(private readonly integrations: IntegrationsService) {
+  constructor(
+    private readonly integrations: IntegrationsService,
+    prisma: PrismaService,
+    @Inject(APP_CONFIG) config: AppConfig,
+  ) {
+    this.stock = new StockAdapter(prisma, config.ENCRYPTION_KEY);
     // Rebuilt when an admin changes supplier credentials, so a new key is used without a restart.
     this.configured = integrations.derive(config => {
       const adapters: SupplierAdapter[] = [
         reloadly(config, { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET }),
         new VtpassAdapter({ apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
         new DidwwAdapter({ apiKey: config.DIDWW_API_KEY, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL }),
+        this.stock,
       ];
       return new Map(adapters.map(adapter => [adapter.code, adapter]));
     });

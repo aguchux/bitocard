@@ -29,7 +29,7 @@ import { can, useReseller } from "@/components/reseller";
 /** How often a processing order is checked while its page is open. */
 const orderPollMs = 5000;
 
-const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number" };
+const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number" };
 
 /** A secret (code, PIN, token): masked until revealed, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {

@@ -20,6 +20,7 @@ import { ProvidersModule } from './payments/providers.module.js';
 import { PayoutsModule } from './payouts/payouts.module.js';
 import { TaxModule } from './tax/tax.module.js';
 import { CatalogueModule } from './catalogue/catalogue.module.js';
+import { StockModule } from './stock/stock.module.js';
 import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
@@ -77,6 +78,7 @@ export class AppModule {
         TaxModule,
         BillingModule,
         SuppliersModule,
+        StockModule,
         CatalogueModule,
         WebhooksModule,
         IdentityModule,

@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { type LedgerMode, Prisma, type Product, type Quote } from '../generated/prisma/client.js';
 import { minor } from '../ledger/mode.js';
 import type { RecipientCheck } from '../suppliers/adapter.js';
+import { stockSupplier } from '../suppliers/stock.adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { TaxService } from '../tax/tax.service.js';
 import { offersInclude } from './catalogue.service.js';
@@ -16,6 +17,8 @@ import { type PricedOffer, PricingService } from './pricing.service.js';
 /** How long a quote price is held. */
 export const quoteLifetimeMs = 10 * 60 * 1000;
 export const maxQuantity = 10;
+/** Categories bought several at a time (each unit is its own code). */
+const multiples = new Set(['gift_cards', 'software']);
 /** Sandbox smartcard or meter number that is never recognised, for testing the failure. */
 export const sandboxUnknownAccount = '0000000000';
 
@@ -94,7 +97,7 @@ export class QuotesService {
       throw invalid('This face value is not offered for the product.', 'face_value');
     }
     const quantity = input.quantity ?? 1;
-    if (quantity > 1 && product.category !== 'gift_cards') throw invalid('Only gift cards can be bought several at a time; quote each top-up or payment separately.', 'quantity');
+    if (quantity > 1 && !multiples.has(product.category)) throw invalid('Only gift cards and software licences can be bought several at a time; quote each top-up or payment separately.', 'quantity');
     const recipient: RecipientRecord = {};
     if (product.recipientType === 'phone') recipient.phone = this.phone(product, input.recipient?.phone);
     if (product.recipientType === 'smartcard' || product.recipientType === 'meter') {
@@ -105,7 +108,16 @@ export class QuotesService {
     }
     if (product.category === 'pay_tv') recipient.transaction_type = input.recipient?.transaction_type ?? 'change';
 
-    const priced = await this.pricing.choose(ctx, product, face);
+    let priced = await this.pricing.choose(ctx, product, face);
+    if (priced.offer.supplierCode === stockSupplier && mode === 'live') {
+      // BitoCard's own stock can only sell the codes it holds; another supplier may still cover the rest.
+      const inStock = await this.prisma.stockCode.count({ where: { offerId: priced.offer.id, status: 'available' } });
+      if (inStock < quantity) {
+        priced = await this.pricing.price(ctx, product, face, new Set([stockSupplier])).catch(() => {
+          throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'insufficient_stock', `Only ${inStock} left. Lower the quantity.`, 'quantity');
+        });
+      }
+    }
     const own = priced.source === 'own' && priced.fee ? priced.fee : null;
     if (recipient.account_number) Object.assign(recipient, await this.checkAccount(mode, product, priced.offer, recipient.account_number, resellerId, Boolean(own)));
 

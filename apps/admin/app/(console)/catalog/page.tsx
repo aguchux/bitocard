@@ -1,8 +1,10 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
-import { AlertTriangle, Database, Globe2, Package, Search } from "lucide-react";
+import { Suspense, useDeferredValue, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { AlertTriangle, Database, Globe2, Package, Search, Store } from "lucide-react";
 import {
+  ActionDialog,
   Badge,
   Button,
   Card,
@@ -30,6 +32,7 @@ import {
   type SupplierOffer,
   useCountriesQuery,
   useProductsInfiniteQuery,
+  useSetProductListingMutation,
   useSuppliersQuery,
   useUpdateOfferMutation,
   useUpdateProductMutation,
@@ -98,14 +101,59 @@ function OfferRow({ offer, editable }: { offer: SupplierOffer; editable: boolean
   );
 }
 
+/** Lists or unlists one product on bitocard.com, from its row (without opening the product). */
+function ListingButton({ product, editable }: { product: AdminProduct; editable: boolean }) {
+  const [update, state] = useUpdateProductMutation();
+  return (
+    <Button
+      size="sm"
+      variant={product.listed ? "secondary" : "primary"}
+      disabled={!editable}
+      loading={state.isLoading}
+      onClick={event => {
+        event.stopPropagation();
+        void update({ id: product.id, listed: !product.listed });
+      }}
+      aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on bitocard.com`}
+    >
+      {product.listed ? "Unlist" : "List"}
+    </Button>
+  );
+}
+
+type Listing = "" | "listed" | "unlisted";
+
 export default function ProductsPage() {
+  // useSearchParams needs a Suspense boundary (a supplier's card links here with ?supplier=<code>).
+  return (
+    <Suspense>
+      <Products />
+    </Suspense>
+  );
+}
+
+function Products() {
   const admin = useAdmin();
+  const linkedSupplier = useSearchParams().get("supplier") ?? "";
   const [country, setCountry] = useState("");
   const [category, setCategory] = useState<"" | ProductCategory>("");
+  const [supplier, setSupplier] = useState(linkedSupplier);
+  const [listing, setListing] = useState<Listing>("");
   const [search, setSearch] = useState("");
   const q = useDeferredValue(search.trim());
   const [open, setOpen] = useState<AdminProduct | null>(null);
-  const products = useProductsInfiniteQuery({ country: country || undefined, category: category || undefined, q: q.length >= 2 ? q : undefined });
+  const [bulk, setBulk] = useState<"list" | "unlist" | null>(null);
+  const [setProductListing] = useSetProductListingMutation();
+  const filter = {
+    country: country || undefined,
+    category: category || undefined,
+    supplier: supplier || undefined,
+    listed: listing === "" ? undefined : listing === "listed",
+    q: q.length >= 2 ? q : undefined,
+  };
+  const products = useProductsInfiniteQuery(filter);
+  const total = products.data?.pages[0]?.total ?? 0;
+  const listedCount = products.data?.pages[0]?.listed ?? 0;
   const suppliers = useSuppliersQuery();
   const countries = useCountriesQuery();
   const [updateProduct, productState] = useUpdateProductMutation();
@@ -145,6 +193,24 @@ export default function ProductsPage() {
               onChange={value => setCategory(value as "" | ProductCategory)}
               options={[{ value: "", label: "All categories" }, ...productCategories.map(value => ({ value, label: categoryName(value) }))]}
             />
+            <FilterSelect
+              id="supplier"
+              label="Supplier"
+              value={supplier}
+              onChange={setSupplier}
+              options={[{ value: "", label: "All suppliers" }, { value: "stock", label: "BitoCard stock" }, ...(suppliers.data?.data.map(item => ({ value: item.code, label: item.name })) ?? [])]}
+            />
+            <FilterSelect
+              id="listing"
+              label="On bitocard.com"
+              value={listing}
+              onChange={value => setListing(value as Listing)}
+              options={[
+                { value: "", label: "Listed or not" },
+                { value: "listed", label: "Listed" },
+                { value: "unlisted", label: "Not listed" },
+              ]}
+            />
             <label className="relative flex min-w-56 flex-1 items-center">
               <span className="sr-only">Search products</span>
               <Search className="pointer-events-none absolute left-4 size-4 text-subtle" aria-hidden />
@@ -152,6 +218,30 @@ export default function ProductsPage() {
             </label>
           </div>
           {productState.error ? <Notice tone="red">{errorMessage(productState.error)}</Notice> : null}
+          {/* bitocard.com shows only listed products; resellers list for their own stores. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-3">
+            <p className="flex items-center gap-2 text-sm">
+              <Store className="size-4 text-brand-600" aria-hidden />
+              {products.isLoading ? (
+                "Counting…"
+              ) : (
+                <span>
+                  <span className="font-semibold">{total.toLocaleString("en-GB")}</span> {total === 1 ? "product" : "products"} ·{" "}
+                  <span className="font-semibold">{listedCount.toLocaleString("en-GB")}</span> listed on bitocard.com
+                </span>
+              )}
+            </p>
+            {operator ? (
+              <span className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={total === 0 || listedCount === total} onClick={() => setBulk("list")}>
+                  {`List all ${(total - listedCount).toLocaleString("en-GB")}`}
+                </Button>
+                <Button size="sm" variant="secondary" disabled={listedCount === 0} onClick={() => setBulk("unlist")}>
+                  {`Unlist all ${listedCount.toLocaleString("en-GB")}`}
+                </Button>
+              </span>
+            ) : null}
+          </div>
           <Card>
             <DataTable
               caption="Products"
@@ -168,9 +258,9 @@ export default function ProductsPage() {
                   header: "Product",
                   cell: product => (
                     <span className="flex min-w-0 items-center gap-3">
-                      {product.image_url || product.logo_url ? (
+                      {product.image_url || product.card_url || product.logo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element -- uploaded files and supplier logos on outside hosts
-                        <img src={(product.image_url ?? product.logo_url)!} alt="" className="size-9 shrink-0 rounded-lg border border-line bg-white object-contain p-0.5" loading="lazy" />
+                        <img src={(product.image_url ?? product.card_url ?? product.logo_url)!} alt="" className="h-9 w-14 shrink-0 rounded-md border border-line bg-white object-contain" loading="lazy" />
                       ) : null}
                       <span className="min-w-0">
                         <span className="font-semibold">{product.name}</span>
@@ -194,6 +284,16 @@ export default function ProductsPage() {
                   },
                 },
                 { key: "status", header: "Status", cell: product => <StatusBadge status={product.active ? "active" : "disabled"} label={product.active ? "Active" : "Hidden"} /> },
+                {
+                  key: "store",
+                  header: "bitocard.com",
+                  cell: product => (
+                    <span className="flex flex-col items-start gap-1">
+                      {product.listed ? <Badge tone="green" dot={false}>Listed</Badge> : null}
+                      <ListingButton product={product} editable={operator} />
+                    </span>
+                  ),
+                },
               ]}
             />
             <LoadMore hasMore={products.hasNextPage} loading={products.isFetchingNextPage} onClick={() => products.fetchNextPage()} />
@@ -212,6 +312,13 @@ export default function ProductsPage() {
               </span>
               <Toggle label="Product active" checked={current.active} disabled={!operator || productState.isLoading} onChange={active => updateProduct({ id: current.id, active })} />
             </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-canvas px-4 py-3">
+              <span className="text-sm">
+                <span className="font-semibold">Listed on bitocard.com</span>
+                <span className="block text-xs text-muted">BitoCard&apos;s store shows only listed products. Resellers list for their own stores.</span>
+              </span>
+              <Toggle label="Listed on bitocard.com" checked={current.listed} disabled={!operator || productState.isLoading} onChange={listed => updateProduct({ id: current.id, listed })} />
+            </div>
             <ProductImage key={`${current.id}:${current.image_url ?? ""}`} product={current} editable={operator} />
             <ul className="space-y-3">
               {current.offers.map(offer => (
@@ -222,6 +329,26 @@ export default function ProductsPage() {
           </div>
         ) : null}
       </Dialog>
+
+      {bulk ? (
+        <ActionDialog
+          open
+          onClose={() => setBulk(null)}
+          title={bulk === "list" ? "List on bitocard.com" : "Unlist from bitocard.com"}
+          description={
+            bulk === "list"
+              ? `Every product matching the filters (${(total - listedCount).toLocaleString("en-GB")} not yet listed) will show on bitocard.com where it is on sale. Resellers' stores are not affected.`
+              : `Every listed product matching the filters (${listedCount.toLocaleString("en-GB")}) will be taken off bitocard.com. Resellers' stores are not affected.`
+          }
+          confirmLabel={bulk === "list" ? "List them" : "Unlist them"}
+          tone={bulk === "list" ? "primary" : "danger"}
+          requireReason={false}
+          onConfirm={async () => {
+            const { q: words, ...rest } = filter;
+            await setProductListing({ listed: bulk === "list", filter: { ...rest, ...(words ? { q: words } : {}) } }).unwrap();
+          }}
+        />
+      ) : null}
     </AdminShell>
   );
 }

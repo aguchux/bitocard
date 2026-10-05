@@ -443,6 +443,7 @@ model Reseller {
   webhookEndpoints      WebhookEndpoint[]
   verifications         IdentityVerification[]
   mediaAssets           MediaAsset[]
+  listings              ResellerListing[]
 
   @@map("resellers")
 }
@@ -1055,6 +1056,10 @@ model Product {
   logoUrl            String?           @map("logo_url")
   /// What the product can do (`src/catalogue/features.ts`), for example sms_in or app_codes on a virtual number.
   features           String[]          @default([])
+  /// Listed on BitoCard's own store (bitocard.com) by an admin. Unlisted products are never shown there; resellers'
+  /// catalogues and stores are not affected (they keep their own listings).
+  listed             Boolean           @default(false)
+  listedAt           DateTime?         @map("listed_at")
   /// Set by an admin (an uploaded image or an https address); shown instead of the supplier's logo. Never synced over.
   imageUrl           String?           @map("image_url")
   /// Admin switch; inactive products are hidden and cannot be quoted.
@@ -1065,9 +1070,27 @@ model Product {
   resellerOffers     ResellerOffer[]
   quotes             Quote[]
   orders             Order[]
+  /// Resellers listing it on their hosted storefront.
+  listings           ResellerListing[]
 
   @@index([category, country])
+  @@index([listed])
   @@map("products")
+}
+
+/// A product a reseller lists on their hosted storefront (SHQ Catalogue > List). Their API catalogue is not gated by it:
+/// a reseller's own systems can sell anything in their catalogue; the listing only decides what their BitoCard-hosted
+/// store shows.
+model ResellerListing {
+  resellerId String   @map("reseller_id") @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  reseller   Reseller @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([resellerId, productId])
+  @@index([productId])
+  @@map("reseller_listings")
 }
 
 /// A supplier offer for a product, and what it costs BitoCard.
@@ -1092,10 +1115,45 @@ model SupplierProduct {
   syncedAt     DateTime @map("synced_at")
   supplier     Supplier @relation(fields: [supplierCode], references: [code])
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// BitoCard's own stock (supplier `stock`): the codes held for this offer.
+  stockCodes   StockCode[]
 
   @@unique([supplierCode, sku])
   @@index([productId])
   @@map("supplier_products")
+}
+
+enum StockCodeStatus {
+  available
+  sold
+  withdrawn
+}
+
+/// One code (licence key or gift card) in BitoCard's own stock, held for a `stock` supplier offer. Codes are secrets:
+/// encrypted, never shown to admins (only the last four characters), handed over once to the order that claims them.
+model StockCode {
+  id             String          @id @default(uuid()) @db.Uuid
+  /// Order added: codes are handed out first in, first out.
+  seq            BigInt          @unique @default(autoincrement())
+  offerId        String          @map("offer_id") @db.Uuid
+  codeEncrypted  String          @map("code_encrypted")
+  pinEncrypted   String?         @map("pin_encrypted")
+  /// HMAC-SHA256 of the code keyed with ENCRYPTION_KEY, so the same code is never stocked twice.
+  codeHash       String          @unique @map("code_hash")
+  /// The code's last four characters, so admins can tell codes apart.
+  hint           String
+  status         StockCodeStatus @default(available)
+  /// The order attempt that claimed it (the order's supplier reference).
+  orderReference String?         @map("order_reference")
+  addedById      String?         @map("added_by_id") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at")
+  soldAt         DateTime?       @map("sold_at")
+  withdrawnAt    DateTime?       @map("withdrawn_at")
+  offer          SupplierProduct @relation(fields: [offerId], references: [id], onDelete: Restrict)
+
+  @@index([offerId, status, seq])
+  @@index([orderReference])
+  @@map("stock_codes")
 }
 
 /// BitoCard pricing. The most specific rule wins: product, then category in a market, then category, then the default.

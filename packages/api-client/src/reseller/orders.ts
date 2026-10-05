@@ -6,7 +6,7 @@ export const orderStatuses = ['processing', 'completed', 'failed', 'refunded'] a
 /** `processing`: sent to the supplier and not yet confirmed. */
 export type OrderStatus = (typeof orderStatuses)[number];
 
-export type OrderDeliveryKind = 'gift_card' | 'token' | 'confirmation' | 'virtual_number';
+export type OrderDeliveryKind = 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number';
 /**
  * What was delivered. Codes, PINs and tokens are secrets: they appear only on the single order, never in lists or
  * webhooks. A virtual number's phone number is in `details.number` (and `serial`).

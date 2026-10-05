@@ -348,10 +348,19 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Admins lay out its home page in the Storefront Manager (admin app): sections on a 12-column desktop grid (6 on tablets, one column on phones), dragged into place and sized per screen. The sections are a hero with search and category shortcuts; product rails (trending, top selling, new, featured, a category, a brand or hand-picked); category and brand grids; promo cards; and a trust bar. Every publish is a version that can be restored; previews show the draft before it goes live.
 - Search covers everything on sale: brands and the companies behind them, products, categories (including the words people use, such as "top up" or "electricity") and countries. It never shows BitoCard's own suppliers.
 - Brands are presented with their name, company, logo, card art, colour, tags and search aliases, set by admins.
+- **Listing. Decided**
+  - Products synced from suppliers are not on bitocard.com until an admin lists them, one by one or in bulk (for example all of a supplier's gift cards). Unlisting takes them off at once.
+  - Each reseller lists the products their own hosted store shows. A reseller's own systems (the API) can sell every product in their catalogue, listed or not.
+  - BitoCard's listing and a reseller's are separate: neither changes the other.
+- **BitoCard's own stock. Decided**
+  - Admins add products BitoCard has bought outright, such as software licences and gift cards: title, brand, description, how to redeem, region, face value, cost per code, an optional margin, and the codes themselves.
+  - They sell like any supplier's products: resellers see and sell them through the API and their own stores, and bitocard.com shows them once listed. The quantity on sale is the number of codes left; a product goes off sale when they run out and comes back when codes are added.
+  - Each code is handed to one order only, oldest first. Codes are encrypted, never shown to admins (only their last four characters and the order each went to), and a code already stocked or sold can never be added again. Admins can pause sales and withdraw faulty codes.
 - **Brand registry. Decided**
   - A registry of well-known brands (mobile networks, gift cards, pay-TV, shopping, gaming…) gives each brand its name, company, colour, search words and logo, so stores look branded from the start.
   - Admins upload each brand's logo (PNG or SVG) and card art on one page (Storefront > Brand registry). One upload covers every product of that brand.
   - Until a logo is uploaded, the brand uses its bundled icon from the brand icon pack (most networks, gift cards and payment brands); brands with neither show their initials on the brand colour.
+  - Until card art is uploaded, the brand uses its bundled gift card design (about 150 brands, mainly UK retail, dining, travel and experiences, added to the registry with them), on bitocard.com, in resellers' catalogues and in the admin app. An admin upload always replaces it.
 - **Images are uploaded, not only linked. Decided** Admins upload brand logos (network operators are brands), gift-card and brand card art, product images (shown instead of the supplier's logo), supplier logos (admin only), category icons and images, and storefront images. Resellers upload their store's logo and images in SHQ.
   - Files go straight from the browser to DigitalOcean Spaces with signed links, and are kept in clear folders: `platform/brands/<brand>/logos`, `platform/products/<category>/<country>/<brand>/<variant>`, `resellers/<reseller>/store/logos`, and so on.
   - The API checks every file before it can be used: really an image of the declared type and size; SVG from admins only, and only plain drawings.

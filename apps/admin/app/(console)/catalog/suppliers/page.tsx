@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import { Badge, Button, Card, CardHeader, categoryName, EmptyState, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, Input, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
-import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type ProductCategory, type Supplier, useCountriesQuery, useSetSupplierMarketMutation, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
 import { healthOf } from "../supplier-health";
 
@@ -168,6 +168,9 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
           ]}
         />
         {supplier.notes ? <p className="text-sm text-muted">{supplier.notes}</p> : null}
+        <AppLink href={`/catalog?supplier=${supplier.code}`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
+          View its products and list them on bitocard.com →
+        </AppLink>
         <SupplierMarkets supplier={supplier} editable={operator} />
         <SupplierLogo key={supplier.logo_url ?? ""} supplier={supplier} editable={operator} />
       </div>

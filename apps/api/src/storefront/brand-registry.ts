@@ -13,7 +13,9 @@ import data from './brand-registry.json' with { type: 'json' };
  *
  * `icon` names the entry's mark in the bundled icon pack (`assets/BitoCard-Brand-Icons-500x500`); `node
  * scripts/brand-icons.mjs` copies it to the store as `/brand-icons/<slug>.svg`, the logo used when there is no upload
- * and no `logo`.
+ * and no `logo`. `art` names the entry's gift card design in the bundled card art pack (`assets/BitoCard-Gift-Card-Art`);
+ * `node scripts/brand-cards.mjs` writes it to the store as `/brand-cards/<slug>.webp`, the card art used when there is no
+ * upload and no `card`.
  */
 const location = z
   .string()
@@ -36,6 +38,10 @@ const entry = z.object({
   icon: z
     .string()
     .regex(/^[a-z0-9-]+\/[a-z0-9-]+\.svg$/)
+    .optional(),
+  art: z
+    .string()
+    .regex(/^[a-z0-9-]+\.png$/)
     .optional(),
 });
 
@@ -78,6 +84,12 @@ export function brandInitials(name: string, override?: string) {
 export function registryIconUrl(brand: RegistryBrand | null, config: Pick<AppConfig, 'STOREFRONT_URL'>) {
   if (!brand?.icon) return null;
   return `${config.STOREFRONT_URL.replace(/\/+$/, '')}/brand-icons/${brand.slug}.svg`;
+}
+
+/** The entry's bundled card art on the store (`/brand-cards/<slug>.webp`), if it has one. */
+export function registryCardArtUrl(brand: RegistryBrand | null, config: Pick<AppConfig, 'STOREFRONT_URL'>) {
+  if (!brand?.art) return null;
+  return `${config.STOREFRONT_URL.replace(/\/+$/, '')}/brand-cards/${brand.slug}.webp`;
 }
 
 /**

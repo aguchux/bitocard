@@ -2,7 +2,8 @@ import { bitocardApi } from '../base';
 import type {
   AdminOrder,
   AdminOrderDetail,
-  AdminProduct,
+  AdminProductFilter,
+  AdminProductList,
   AdminSession,
   AuditEntry,
   Country,
@@ -121,7 +122,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     }),
     resolveOrder: build.mutation<
       AdminOrderDetail,
-      { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'token' | 'confirmation' | 'virtual_number'; code?: string; pin?: string; serial?: string }> }
+      { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number'; code?: string; pin?: string; serial?: string }> }
     >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/orders/${id}/resolve`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity'],
@@ -147,14 +148,22 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: code => ({ url: `/v1/admin/suppliers/${code}/sync`, method: 'POST' }),
       invalidatesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, { type: 'Product', id: 'LIST' }, 'Overview'],
     }),
-    products: build.infiniteQuery<List<AdminProduct>, { category?: ProductCategory; country?: string; q?: string }, string>({
+    products: build.infiniteQuery<AdminProductList, AdminProductFilter, string>({
       infiniteQueryOptions: cursorPages,
       query: ({ queryArg, pageParam }) => ({ url: '/v1/admin/products', params: params({ ...queryArg, limit: 50, starting_after: pageParam }) }),
       providesTags: [{ type: 'Product', id: 'LIST' }],
     }),
-    updateProduct: build.mutation<{ id: string; active: boolean; name: string; image_url: string | null }, { id: string; active?: boolean; name?: string; description?: string | null; image_url?: string | null }>({
+    updateProduct: build.mutation<
+      { id: string; active: boolean; listed: boolean; name: string; image_url: string | null },
+      { id: string; active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }
+    >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/products/${id}`, method: 'PATCH', body }),
       invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity', 'Media'],
+    }),
+    /** Lists or unlists products on BitoCard's store: these IDs, or everything matching the filters. */
+    setProductListing: build.mutation<{ object: 'product_listing'; listed: boolean; updated: number }, { listed: boolean; product_ids?: string[]; filter?: AdminProductFilter }>({
+      query: body => ({ url: '/v1/admin/products/listing', method: 'POST', body }),
+      invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity'],
     }),
     updateOffer: build.mutation<{ id: string; discount_bps: number; priority: number; available: boolean }, { id: string; discount_bps?: number; priority?: number; available?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/supplier-products/${id}`, method: 'PATCH', body }),
@@ -222,6 +231,7 @@ export const {
   useSyncSupplierMutation,
   useProductsInfiniteQuery,
   useUpdateProductMutation,
+  useSetProductListingMutation,
   useUpdateOfferMutation,
   usePricingRulesQuery,
   useSetPricingRuleMutation,
@@ -236,3 +246,4 @@ export const {
 export * from './reseller-integrations';
 export * from './fees';
 export * from './storefront';
+export * from './stock';

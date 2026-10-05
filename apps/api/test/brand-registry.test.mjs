@@ -1,6 +1,7 @@
 // The brand registry: well-known brands (MTN, Airtel, Amazon, Steam…) look branded before an admin sets them up, with
 // their name, company, colour, initials and search words; logos resolve from file storage paths or https addresses,
-// else the bundled icon on the store; admins' settings win; and npm run brands:logos uploads a folder of logos and
+// else the bundled icon on the store; card art likewise falls back to the bundled card art, everywhere the catalogue is
+// shown (the store, resellers, admins); admins' settings win; and npm run brands:logos uploads a folder of logos and
 // writes their paths into the registry.
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -12,12 +13,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, startApp } from './helpers.mjs';
+import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
 import { fakeReloadly } from './fakes.mjs';
 
-const { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryIconUrl, registrySlugsMatching } = await import('../dist/storefront/brand-registry.js');
+const { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } = await import('../dist/storefront/brand-registry.js');
 const { svgProblem } = await import('../dist/media/images.js');
 const storeIcons = fileURLToPath(new URL('../../storefront/public/brand-icons/', import.meta.url));
+const storeCards = fileURLToPath(new URL('../../storefront/public/brand-cards/', import.meta.url));
 
 /** A small but real PNG header (the checks read its IHDR chunk). */
 function png(width, height) {
@@ -77,6 +79,21 @@ describe('the registry file', () => {
     assert.deepEqual(readdirSync(storeIcons).sort(), withIcons.map(brand => `${brand.slug}.svg`).sort(), 'no stray files: run node scripts/brand-icons.mjs');
   });
 
+  test('bundled card art: every entry with art has its card on the store as WebP, and nothing else is there', () => {
+    const withArt = brandRegistry.filter(brand => brand.art);
+    assert.ok(withArt.length >= 140, 'gift card brands have bundled card art');
+    for (const slug of ['nike', 'asda', 'playstation', 'marks-spencer', 'costa', 'john-lewis', 'xbox']) assert.ok(registryBrand(slug).art, slug);
+    for (const brand of withArt) {
+      const file = join(storeCards, `${brand.slug}.webp`);
+      assert.ok(existsSync(file), `${brand.slug}.webp is missing: run node scripts/brand-cards.mjs`);
+      const bytes = readFileSync(file);
+      assert.deepEqual([bytes.subarray(0, 4).toString(), bytes.subarray(8, 12).toString()], ['RIFF', 'WEBP'], brand.slug);
+    }
+    assert.deepEqual(readdirSync(storeCards).sort(), withArt.map(brand => `${brand.slug}.webp`).sort(), 'no stray files: run node scripts/brand-cards.mjs');
+    assert.equal(registryCardArtUrl(registryBrand('marks-and-spencer'), { STOREFRONT_URL: 'https://store.example/' }), 'https://store.example/brand-cards/marks-spencer.webp', 'named after the entry');
+    assert.equal(registryCardArtUrl(registryBrand('mtn'), { STOREFRONT_URL: 'https://store.example' }), null, 'entries without art have none');
+  });
+
   test('the bundled icon address is on the store address', () => {
     assert.equal(registryIconUrl(registryBrand('psn-plus'), { STOREFRONT_URL: 'https://store.example/' }), 'https://store.example/brand-icons/playstation.svg', 'named after the entry, for every slug it covers');
     assert.equal(registryIconUrl(registryBrand('dstv'), { STOREFRONT_URL: 'https://store.example' }), null, 'entries without an icon have none');
@@ -100,6 +117,8 @@ describe('brands on the store', () => {
       await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
     }
     assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
+    // BitoCard's store shows only listed products: list the whole catalogue, as an admin would.
+    assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
   });
 
   after(async () => {
@@ -143,6 +162,30 @@ describe('brands on the store', () => {
 
     assert.equal((await admin.put('/v1/admin/storefront/registry/psn-plus', { logo_url: 'https://cdn.example/x.png' })).status, 404, 'edited by its main slug');
     assert.equal((await admin.put('/v1/admin/storefront/registry/steam', { logo_url: 'http://insecure.example/x.png' })).status, 400);
+  });
+
+  test('card art: the bundled card on the store, to resellers and admins, until an admin uploads one', async () => {
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    const amazon = await prisma.product.findUniqueOrThrow({ where: { key: 'gift_cards:US:amazon-us' } });
+    for (const field of ['id', 'key', 'createdAt', 'updatedAt']) delete amazon[field];
+    const nike = await prisma.product.create({
+      data: { ...amazon, key: 'gift_cards:US:nike', brand: 'nike', name: 'Nike US', imageUrl: null, supplierProducts: { create: { supplierCode: 'reloadly', sku: 'nike-test', costCurrency: 'USD', costRatio: 0.95, syncedAt: new Date() } } },
+    });
+    const bundled = 'https://store.example/brand-cards/nike.webp';
+    assert.equal((await brandOf('nike')).image_url, bundled);
+    const entry = (await admin.get('/v1/admin/storefront/registry')).json.data.find(item => item.slug === 'nike');
+    assert.deepEqual([entry.card_url, entry.card_source], [bundled, 'bundled']);
+    assert.equal((await admin.get('/v1/admin/products?q=nike')).json.data.find(product => product.id === nike.id).card_url, bundled);
+    const { browser } = await resellerClient(server);
+    const sandbox = { 'bitocard-mode': 'test' };
+    assert.equal((await browser.get(`/v1/catalogue/products/${nike.id}`, sandbox)).json.image_url, bundled, 'resellers get it too');
+
+    await admin.put('/v1/admin/storefront/registry/nike', { card_url: 'https://cdn.example/nike-card.png' });
+    await server.app.get((await import('../dist/storefront/storefront.service.js')).StorefrontService).refreshBrandAssets(true);
+    assert.equal((await brandOf('nike')).image_url, 'https://cdn.example/nike-card.png', 'an upload replaces it');
+    assert.equal((await browser.get(`/v1/catalogue/products/${nike.id}`, sandbox)).json.image_url, 'https://cdn.example/nike-card.png');
+    await prisma.product.update({ where: { id: nike.id }, data: { imageUrl: 'https://cdn.example/nike-product.png' } });
+    assert.equal((await browser.get(`/v1/catalogue/products/${nike.id}`, sandbox)).json.image_url, 'https://cdn.example/nike-product.png', "the product's own image comes first");
   });
 
   test('a brand’s own settings win over the registry, field by field', async () => {

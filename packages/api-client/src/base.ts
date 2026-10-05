@@ -87,6 +87,7 @@ export const tagTypes = [
   'ResellerIntegration',
   'Fee',
   'FeeRule',
+  'Stock',
   // Both apps
   'Notification',
   'SupplierNotification',

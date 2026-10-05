@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { minor } from '../ledger/mode.js';
 import { receiptNumber } from '../orders/orders.service.js';
+import { stockSupplier } from '../suppliers/stock.adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 
 const day = 24 * 3600 * 1000;
@@ -72,7 +73,7 @@ export class AdminOverviewService {
       this.prisma.order.count({ where: { mode, status: 'processing' } }),
       this.prisma.identityVerification.count({ where: { status: 'in_review' } }),
     ]);
-    const suppliers = await this.prisma.supplier.findMany({ where: { OR: [{ enabled: true }, { status: 'mvp_live' }] }, orderBy: { name: 'asc' } });
+    const suppliers = await this.prisma.supplier.findMany({ where: { OR: [{ enabled: true }, { status: 'mvp_live' }], code: { not: stockSupplier } }, orderBy: { name: 'asc' } });
     const usd = await this.usdView([...new Set([...currencies, ...float.map(row => row.currency)])], { totals, points, dates, float });
     const recent = await this.prisma.order.findMany({
       where: { mode },

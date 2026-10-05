@@ -293,7 +293,7 @@ describe('signed uploads', () => {
     const image = await upload(admin, '/v1/admin/media', { purpose: 'product_image', target_id: product.key }, png(400, 250));
     assert.equal(image.completed.status, 200, JSON.stringify(image.completed.json));
     assert.equal(image.created.json.folder, `test/platform/products/${product.key.split(':').join('/').toLowerCase()}`);
-    const patched = await admin.patch(`/v1/admin/products/${product.id}`, { image_url: image.completed.json.url });
+    const patched = await admin.patch(`/v1/admin/products/${product.id}`, { image_url: image.completed.json.url, listed: true });
     assert.equal(patched.json.image_url, image.completed.json.url);
     const shown = await client(server.base).get(`/v1/store/products/${encodeURIComponent(product.key)}`);
     assert.equal(shown.json.logo_url, image.completed.json.url, 'the admin image replaces the supplier logo');

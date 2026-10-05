@@ -6,7 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Brand, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
-import { brandInitials, registryAssetUrl, registryBrand, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
+import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
 import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
 
 const homeKey = 'home';
@@ -75,6 +75,8 @@ export class StorefrontService {
       categories,
       where: {
         active: true,
+        // Only products an admin has listed on BitoCard's store (Catalog > Products > List).
+        listed: true,
         brand: { notIn: hidden.map(row => row.slug) },
         supplierProducts: { some: { available: true, supplier: { enabled: true } } },
         OR: [...enabled.map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])],
@@ -90,8 +92,8 @@ export class StorefrontService {
   /**
    * A brand as the stores show it: the admin's settings when the brand is set up (`brands`), otherwise the brand
    * registry's defaults (`brand-registry.json`), otherwise a name from the slug. The logo falls back from the brand's own
-   * to the registry upload, the registry file's logo, then the bundled icon. `initials` is what to show when there is
-   * no logo.
+   * to the registry upload, the registry file's logo, then the bundled icon; the card art likewise, ending with the
+   * bundled card art. `initials` is what to show when there is no logo.
    */
   presentBrand(slug: string, row?: Brand | null) {
     const registry = registryBrand(slug);
@@ -105,7 +107,7 @@ export class StorefrontService {
       company: row?.company ?? registry?.company ?? null,
       description: row?.description ?? null,
       logo_url: row?.logoUrl ?? uploaded?.logoUrl ?? registryAssetUrl(registry?.logo ?? null, config) ?? registryIconUrl(registry, config),
-      image_url: row?.imageUrl ?? uploaded?.cardUrl ?? registryAssetUrl(registry?.card ?? null, config),
+      image_url: row?.imageUrl ?? uploaded?.cardUrl ?? registryAssetUrl(registry?.card ?? null, config) ?? registryCardArtUrl(registry, config),
       color: row?.color ?? registry?.color ?? null,
       initials: brandInitials(name, registry && name === registry.name ? registry.initials : undefined),
       tags: row?.tags.length ? row.tags : (registry?.tags ?? []),
@@ -152,6 +154,16 @@ export class StorefrontService {
       features: product.features,
       brand: this.presentBrand(product.brand, brand),
     };
+  }
+
+  /**
+   * The picture for each product where BitoCard's catalogue is shown to resellers and admins: the admin's product
+   * image, else its brand's card art (the same chain as the store), else none.
+   */
+  async productImages(products: Pick<Product, 'id' | 'brand' | 'imageUrl'>[]) {
+    await this.refreshBrandAssets();
+    const brands = await this.brandsFor(products.map(product => product.brand));
+    return new Map(products.map(product => [product.id, product.imageUrl ?? this.presentBrand(product.brand, brands.get(product.brand)).image_url]));
   }
 
   private async present(products: Product[]) {

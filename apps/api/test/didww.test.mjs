@@ -28,6 +28,8 @@ before(async () => {
   assert.equal((await admin.put('/v1/admin/countries/NG/categories/virtual_numbers', { enabled: true })).status, 200);
   const sync = await admin.post('/v1/admin/suppliers/didww/sync');
   assert.equal(sync.status, 200, JSON.stringify(sync.json));
+  // BitoCard's store shows only listed products: list the whole catalogue, as an admin would.
+  assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
 });
 
 after(async () => {

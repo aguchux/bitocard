@@ -23,6 +23,8 @@ before(async () => {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
+  // BitoCard's store shows only listed products: list the whole catalogue, as an admin would.
+  assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
   visitor = client(server.base);
 });
 

@@ -55,7 +55,7 @@ export type BrandRegistryEntry = {
   /** upload (Brand registry page), file (the registry's logo), bundled (the icon pack, on the store), or none. */
   logo_source: 'upload' | 'file' | 'bundled' | null;
   card_url: string | null;
-  card_source: 'upload' | 'file' | null;
+  card_source: 'upload' | 'file' | 'bundled' | null;
   products: number;
   updated_at: string | null;
 };

@@ -668,6 +668,7 @@ export class OrdersService {
 function sandboxDeliveries(category: ProductCategory, quantity: number): Delivery[] {
   const code = () => `SANDBOX-${randomBytes(6).toString('hex').toUpperCase()}`;
   if (category === 'gift_cards') return Array.from({ length: quantity }, () => ({ kind: 'gift_card' as const, code: code(), pin: String(1000 + Math.floor(Math.random() * 9000)) }));
+  if (category === 'software') return Array.from({ length: quantity }, () => ({ kind: 'licence_key' as const, code: `SANDBOX-${randomBytes(10).toString('hex').toUpperCase().match(/.{5}/g)!.join('-')}` }));
   if (category === 'bills') return [{ kind: 'token', code: '0000-0000-0000-0000-0000', details: { units: '0.0' } }];
   if (category === 'virtual_numbers') {
     // 555-0100 to 555-0199 are reserved for fiction in North America: never a real subscriber.

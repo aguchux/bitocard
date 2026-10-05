@@ -214,8 +214,17 @@ export type AdminProduct = {
   image_url: string | null;
   face_currency: string;
   active: boolean;
+  /** Shown on BitoCard's own store (bitocard.com). Resellers' catalogues are not affected. */
+  listed: boolean;
+  listed_at: string | null;
+  /** The brand's gift card design (uploaded, registry or bundled), shown when the product has no image of its own. */
+  card_url: string | null;
   offers: SupplierOffer[];
 };
+/** Admin product filters: a supplier's offers and BitoCard store listing among them. */
+export type AdminProductFilter = { category?: ProductCategory; country?: string; q?: string; supplier?: string; listed?: boolean };
+/** Products, with how many match the filters and how many of those are listed. */
+export type AdminProductList = List<AdminProduct> & { total: number; listed: number };
 export type PricingRule = {
   object: 'pricing_rule';
   id: string;

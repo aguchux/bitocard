@@ -5,6 +5,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Product, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
 import { worldwideCategories } from '../catalogue/pricing.service.js';
 import type { CatalogueItem, CatalogueScope } from './adapter.js';
+import { stockSupplier } from './stock.adapter.js';
+import { StorefrontService } from '../storefront/storefront.service.js';
 import { SupplierAdapters } from './supplier-adapters.js';
 
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
@@ -93,6 +95,9 @@ export function offerChanged(
   );
 }
 
+/** The admin's product filters (Catalog > Products). */
+export type ProductFilter = { category?: ProductCategory; country?: string; q?: string; supplier?: string; listed?: boolean };
+
 export type SupplierUpdate = Partial<{
   enabled: boolean;
   status: SupplierStatus;
@@ -146,10 +151,12 @@ export class SuppliersService {
     private readonly prisma: PrismaService,
     private readonly adapters: SupplierAdapters,
     private readonly audit: AuditService,
+    private readonly storefront: StorefrontService,
   ) {}
 
   async list() {
-    const suppliers = await this.prisma.supplier.findMany({ include: { markets: true }, orderBy: { code: 'asc' } });
+    // BitoCard's own stock is managed under Catalog > Stock, not as an outside supplier.
+    const suppliers = await this.prisma.supplier.findMany({ where: { code: { not: stockSupplier } }, include: { markets: true }, orderBy: { code: 'asc' } });
     return { object: 'list' as const, data: suppliers.map(s => presentSupplier(s, this.adapters.get(s.code).configured())) };
   }
 
@@ -219,6 +226,9 @@ export class SuppliersService {
   async sync(code: string) {
     const supplier = await this.prisma.supplier.findUnique({ where: { code } });
     if (!supplier) throw notFound('supplier');
+    if (code === stockSupplier) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'supplier_not_synced', 'BitoCard stock is not synced: add products and codes under Catalog > Stock.');
+    }
     const adapter = this.adapters.get(code);
     if (!adapter.configured()) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'supplier_not_configured', `${supplier.name} has no API credentials configured.`);
@@ -261,7 +271,7 @@ export class SuppliersService {
 
   /** Syncs every enabled, configured supplier. Run daily; one failing supplier does not stop the others. */
   async syncAll() {
-    const suppliers = await this.prisma.supplier.findMany({ where: { enabled: true } });
+    const suppliers = await this.prisma.supplier.findMany({ where: { enabled: true, code: { not: stockSupplier } } });
     const results: Record<string, unknown> = {};
     for (const supplier of suppliers) {
       if (!this.adapters.get(supplier.code).configured()) continue;
@@ -326,22 +336,40 @@ export class SuppliersService {
 
   // -- Products (admin) ------------------------------------------------------------------------------------------
 
-  async products(filter: { category?: ProductCategory; country?: string; q?: string; limit?: number; starting_after?: string }) {
+  /** Products matching the admin's filters: category, country, words, a supplier's offers, and BitoCard store listing. */
+  private productWhere(filter: ProductFilter): Prisma.ProductWhereInput {
+    return {
+      category: filter.category,
+      country: filter.country?.toUpperCase(),
+      ...(filter.supplier ? { supplierProducts: { some: { supplierCode: filter.supplier } } } : {}),
+      ...(filter.listed === undefined ? {} : { listed: filter.listed }),
+      ...(filter.q ? { OR: [{ name: { contains: filter.q, mode: 'insensitive' } }, { brand: { contains: filter.q.toLowerCase() } }, { key: { contains: filter.q.toLowerCase() } }] } : {}),
+    };
+  }
+
+  async products(filter: ProductFilter & { limit?: number; starting_after?: string }) {
     const limit = filter.limit ?? 50;
-    const products = await this.prisma.product.findMany({
-      where: {
-        category: filter.category,
-        country: filter.country?.toUpperCase(),
-        ...(filter.q ? { OR: [{ name: { contains: filter.q, mode: 'insensitive' } }, { brand: { contains: filter.q.toLowerCase() } }] } : {}),
-      },
-      include: { supplierProducts: true },
-      orderBy: { key: 'asc' },
-      take: limit + 1,
-      ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
-    });
+    const where = this.productWhere(filter);
+    const [products, total, listed] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: { supplierProducts: true },
+        orderBy: { key: 'asc' },
+        take: limit + 1,
+        ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
+      }),
+      this.prisma.product.count({ where }),
+      this.prisma.product.count({ where: { ...where, listed: true } }),
+    ]);
+    const page = products.slice(0, limit);
+    // The brand's card art (upload, registry or bundled), shown when the product has no image of its own.
+    const cards = await this.storefront.productImages(page.map(product => ({ id: product.id, brand: product.brand, imageUrl: null })));
     return {
       object: 'list' as const,
-      data: products.slice(0, limit).map(product => ({
+      /** Every product matching the filters, and how many of them are listed on BitoCard's store. */
+      total,
+      listed,
+      data: page.map(product => ({
         object: 'admin_product' as const,
         id: product.id,
         key: product.key,
@@ -351,8 +379,12 @@ export class SuppliersService {
         brand: product.brand,
         logo_url: product.logoUrl,
         image_url: product.imageUrl,
+        card_url: cards.get(product.id) ?? null,
         face_currency: product.faceCurrency,
         active: product.active,
+        /** Shown on BitoCard's own store. */
+        listed: product.listed,
+        listed_at: product.listedAt?.toISOString() ?? null,
         offers: product.supplierProducts.map(offer => ({
           id: offer.id,
           supplier: offer.supplierCode,
@@ -370,12 +402,43 @@ export class SuppliersService {
     };
   }
 
-  async updateProduct(actorId: string | null, id: string, input: { active?: boolean; name?: string; description?: string | null; image_url?: string | null }) {
+  async updateProduct(actorId: string | null, id: string, input: { active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }) {
     const before = await this.prisma.product.findUnique({ where: { id } });
     if (!before) throw notFound('product');
-    const after = await this.prisma.product.update({ where: { id }, data: { active: input.active, name: input.name, description: input.description, imageUrl: input.image_url } });
+    const listing = input.listed === undefined || input.listed === before.listed ? {} : { listed: input.listed, listedAt: input.listed ? new Date() : null };
+    const after = await this.prisma.product.update({ where: { id }, data: { active: input.active, name: input.name, description: input.description, imageUrl: input.image_url, ...listing } });
     await this.audit.record({ actorId, action: 'product.updated', targetType: 'product', targetId: id, before, after });
-    return { object: 'admin_product' as const, id, key: after.key, name: after.name, description: after.description, image_url: after.imageUrl, active: after.active };
+    return {
+      object: 'admin_product' as const,
+      id,
+      key: after.key,
+      name: after.name,
+      description: after.description,
+      image_url: after.imageUrl,
+      active: after.active,
+      listed: after.listed,
+      listed_at: after.listedAt?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * Lists or unlists products on BitoCard's own store in one go: the given products, or every product matching the
+   * filters (for example all of a supplier's gift cards). Resellers' catalogues and stores are not affected.
+   */
+  async setListing(actorId: string | null, input: { listed: boolean; product_ids?: string[]; filter?: ProductFilter }) {
+    if (!input.product_ids?.length && !input.filter) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Give product_ids or a filter.', 'product_ids');
+    }
+    const where: Prisma.ProductWhereInput = { AND: [input.product_ids?.length ? { id: { in: input.product_ids } } : this.productWhere(input.filter!), { listed: !input.listed }] };
+    const result = await this.prisma.product.updateMany({ where, data: { listed: input.listed, listedAt: input.listed ? new Date() : null } });
+    await this.audit.record({
+      actorId,
+      action: input.listed ? 'products.listed' : 'products.unlisted',
+      targetType: 'product',
+      targetId: input.product_ids?.length === 1 ? input.product_ids[0] : 'many',
+      after: { count: result.count, product_ids: input.product_ids ?? null, filter: input.filter ?? null },
+    });
+    return { object: 'product_listing' as const, listed: input.listed, updated: result.count };
   }
 
   /** The commission agreed with a supplier for one offer, and its routing priority. */

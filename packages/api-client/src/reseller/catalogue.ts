@@ -29,13 +29,17 @@ export type Product = {
   /** What it can do, for example `sms_in` or `app_codes` on a virtual number. */
   features: string[];
   logo_url: string | null;
+  /** A picture for the product: its own image, else its brand's gift card design. */
+  image_url: string | null;
+  /** Listed on your BitoCard-hosted store. Your own systems can sell any product, listed or not. */
+  listed: boolean;
   /** Fixed values (up to 20), or the lowest and highest of a range. A quote locks the exact price. */
   pricing: { currency: string; denominations: PricedDenomination[] };
 };
 
 /** The catalogue pages on `next_cursor`: products that cannot be priced are left out, so the last item is not always the cursor. */
 export type ProductList = List<Product> & { next_cursor: string | null };
-export type ProductFilter = { category?: CatalogueCategory; country?: string; q?: string; limit?: number };
+export type ProductFilter = { category?: CatalogueCategory; country?: string; q?: string; listed?: boolean; limit?: number };
 
 export type QuoteStatus = 'open' | 'used' | 'expired';
 /** The recipient as checked: phone for airtime and data; account number, account name and details (such as the current package) for pay-TV and bills. */
@@ -104,6 +108,11 @@ export const resellerCatalogueApi = bitocardApi.injectEndpoints({
       query: id => `/v1/catalogue/products/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Catalogue', id }],
     }),
+    /** Lists or unlists products on your BitoCard-hosted store (at most 100 at a time). */
+    setListing: build.mutation<{ object: 'listing_update'; listed: boolean; product_ids: string[]; updated: number }, { listed: boolean; product_ids: string[] }>({
+      query: body => ({ url: '/v1/catalogue/listing', method: 'POST', body }),
+      invalidatesTags: ['Catalogue'],
+    }),
     createQuote: build.mutation<Quote, CreateQuote>({ query: body => ({ url: '/v1/quotes', method: 'POST', body }) }),
     quote: build.query<Quote, string>({ query: id => `/v1/quotes/${id}` }),
 
@@ -122,6 +131,7 @@ export const resellerCatalogueApi = bitocardApi.injectEndpoints({
 export const {
   useCatalogueProductsInfiniteQuery,
   useCatalogueProductQuery,
+  useSetListingMutation,
   useCreateQuoteMutation,
   useQuoteQuery,
   useResellerPricingQuery,

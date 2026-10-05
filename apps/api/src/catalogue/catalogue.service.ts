@@ -3,6 +3,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode, Product, ProductCategory } from '../generated/prisma/client.js';
 import { minor } from '../ledger/mode.js';
+import { StorefrontService } from '../storefront/storefront.service.js';
 import { type PricingContext, PricingService, type ProductWithOffers, worldwideCategories } from './pricing.service.js';
 
 /** At most this many denominations are priced in a catalogue listing; quotes price any valid value. */
@@ -39,9 +40,10 @@ export class CatalogueService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pricing: PricingService,
+    private readonly storefront: StorefrontService,
   ) {}
 
-  private async present(ctx: PricingContext, product: ProductWithOffers) {
+  private async present(ctx: PricingContext, product: ProductWithOffers, listed: boolean, imageUrl: string | null) {
     const values = product.denominationType === 'fixed' ? product.fixedValues.slice(0, maxListedValues) : [product.minValueMinor ?? 0n, product.maxValueMinor ?? 0n];
     const denominations = [];
     for (const value of values) {
@@ -57,6 +59,10 @@ export class CatalogueService {
     if (denominations.length === 0) return null;
     return {
       ...presentProductBase(product),
+      /** A picture for the product: its own image, else its brand's gift card design. */
+      image_url: imageUrl,
+      /** Listed on your BitoCard-hosted store. Your own systems can sell any product here, listed or not. */
+      listed,
       pricing: {
         currency: ctx.currency,
         /** Prices per denomination, before any tax added at checkout. Quotes lock the exact price. */
@@ -65,7 +71,7 @@ export class CatalogueService {
     };
   }
 
-  async list(resellerId: string, mode: LedgerMode, filter: { category?: ProductCategory; country?: string; q?: string; limit?: number; starting_after?: string }) {
+  async list(resellerId: string, mode: LedgerMode, filter: { category?: ProductCategory; country?: string; q?: string; listed?: boolean; limit?: number; starting_after?: string }) {
     const ctx = await this.pricing.context(resellerId, mode);
     const limit = filter.limit ?? 25;
     const categories = ctx.country.categories.filter(c => c.enabled).map(c => c.category);
@@ -79,6 +85,7 @@ export class CatalogueService {
           // BitoCard's offers, or the reseller's own.
           { OR: [{ supplierProducts: { some: { available: true } } }, { id: { in: [...ctx.own.keys()] } }] },
           ...(filter.q ? [{ OR: [{ name: { contains: filter.q, mode: 'insensitive' as const } }, { brand: { contains: filter.q.toLowerCase() } }] }] : []),
+          ...(filter.listed === undefined ? [] : [{ listings: filter.listed ? { some: { resellerId } } : { none: { resellerId } } }]),
         ],
       },
       include: offersInclude,
@@ -86,9 +93,14 @@ export class CatalogueService {
       take: limit + 1,
       ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
     });
+    const page = products.slice(0, limit);
+    const listings = new Set(
+      (await this.prisma.resellerListing.findMany({ where: { resellerId, productId: { in: page.map(product => product.id) } }, select: { productId: true } })).map(row => row.productId),
+    );
+    const images = await this.storefront.productImages(page);
     const data = [];
-    for (const product of products.slice(0, limit)) {
-      const presented = await this.present(ctx, product);
+    for (const product of page) {
+      const presented = await this.present(ctx, product, listings.has(product.id), images.get(product.id) ?? null);
       if (presented) data.push(presented);
     }
     return { object: 'list' as const, data, has_more: products.length > limit, next_cursor: products.length > limit ? products[limit - 1].id : null };
@@ -101,8 +113,33 @@ export class CatalogueService {
     if (!product) throw missing;
     const reason = this.pricing.unavailableReason(ctx, product);
     if (reason) throw reason;
-    const presented = await this.present(ctx, product);
+    const listed = await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId, productId: id } } });
+    const images = await this.storefront.productImages([product]);
+    const presented = await this.present(ctx, product, Boolean(listed), images.get(product.id) ?? null);
     if (!presented) throw missing;
     return presented;
+  }
+
+  /**
+   * Lists or unlists products on the reseller's BitoCard-hosted store. Only products they can sell can be listed
+   * (`product_unavailable` names the first that cannot); unlisting always works. Their API catalogue is not affected.
+   */
+  async setListing(resellerId: string, mode: LedgerMode, productIds: string[], listed: boolean) {
+    const ids = [...new Set(productIds)];
+    if (!listed) {
+      const removed = await this.prisma.resellerListing.deleteMany({ where: { resellerId, productId: { in: ids } } });
+      return { object: 'listing_update' as const, listed, product_ids: ids, updated: removed.count };
+    }
+    const ctx = await this.pricing.context(resellerId, mode);
+    const products = await this.prisma.product.findMany({ where: { id: { in: ids } } });
+    for (const id of ids) {
+      const product = products.find(row => row.id === id);
+      const reason = product ? this.pricing.unavailableReason(ctx, product) : null;
+      if (!product || reason) {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'product_unavailable', `Product ${id} is not available to you, so it cannot be listed.`, 'product_ids');
+      }
+    }
+    const added = await this.prisma.resellerListing.createMany({ data: ids.map(productId => ({ resellerId, productId })), skipDuplicates: true });
+    return { object: 'listing_update' as const, listed, product_ids: ids, updated: added.count };
   }
 }

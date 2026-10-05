@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { adminApi, percentToPpb } from '../src/admin';
+import { adminApi, parseStockCodes, percentToPpb } from '../src/admin';
 import { resellerSessionApi } from '../src/reseller';
 import { makeStore, notificationsApi, pushApi, setRequestContext, toApiError, uploadMedia } from '../src';
 
@@ -164,6 +164,18 @@ describe('percentToPpb', () => {
 
   test('refuses anything outside 0% to 10% or finer than 0.0000001%', () => {
     for (const text of ['10.0000001', '11', '0.00000001', '-1', 'abc', '', '1e-3']) expect(percentToPpb(text)).toBeNull();
+  });
+});
+
+describe('parseStockCodes', () => {
+  test('one code per line, with an optional PIN after a bar, tab or comma; blanks and repeats skipped', () => {
+    expect(parseStockCodes('AAAA-1111\n\n  BBBB-2222 | 1234 \r\nCCCC-3333\t99\nDDDD,5\nAAAA-1111')).toEqual([
+      { code: 'AAAA-1111' },
+      { code: 'BBBB-2222', pin: '1234' },
+      { code: 'CCCC-3333', pin: '99' },
+      { code: 'DDDD', pin: '5' },
+    ]);
+    expect(parseStockCodes('   \n')).toEqual([]);
   });
 });
 

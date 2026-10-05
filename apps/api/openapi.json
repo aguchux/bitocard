@@ -2204,6 +2204,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "listed",
+            "required": false,
+            "in": "query",
+            "description": "Only products listed (true) or not listed (false) on your BitoCard-hosted store.",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2255,6 +2264,47 @@
           }
         ],
         "summary": "Get a product",
+        "tags": [
+          "Catalogue"
+        ]
+      }
+    },
+    "/v1/catalogue/listing": {
+      "post": {
+        "description": "Chooses what your BitoCard-hosted store shows: products are shown there only once you list them. Your own systems can sell every product in your catalogue, listed or not. Only products available to you can be listed.",
+        "operationId": "CatalogueController_setListing",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List or unlist products on your store",
         "tags": [
           "Catalogue"
         ]
@@ -4780,6 +4830,27 @@
         },
         "required": [
           "plan"
+        ]
+      },
+      "ListingDto": {
+        "type": "object",
+        "properties": {
+          "listed": {
+            "type": "boolean",
+            "description": "List (true) or unlist (false) on your BitoCard-hosted store."
+          },
+          "product_ids": {
+            "description": "The products, at most 100.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "listed",
+          "product_ids"
         ]
       },
       "RecipientDto": {

@@ -88,6 +88,15 @@ function EntryDialog({ entry, editable, onClose }: { entry: BrandRegistryEntry; 
           disabled={!editable}
           hint="Square, PNG or SVG, on a transparent background."
         />
+        {entry.card_source === "bundled" || entry.card_source === "file" ? (
+          <div className="flex items-center gap-3 rounded-xl bg-canvas p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element -- the store's bundled card art */}
+            <img src={entry.card_url!} alt={`${entry.name} card`} className="h-16 w-26 shrink-0 rounded-lg border border-line bg-white object-cover" loading="lazy" />
+            <p className="text-sm text-muted">
+              {entry.card_source === "bundled" ? "The bundled card art is shown on stores and to resellers until you upload a card image." : "Card art is set in the registry file."} An upload here replaces it.
+            </p>
+          </div>
+        ) : null}
         <ImageField label="Card image" realm="admin" purpose="registry_card" targetId={entry.slug} value={card} onChange={setCard} disabled={!editable} shape="wide" hint="Optional gift card art for product cards." />
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
@@ -192,6 +201,11 @@ export default function BrandRegistryPage() {
                         Initials
                       </Badge>
                     )}
+                    {entry.card_url ? (
+                      <Badge tone={entry.card_source === "upload" ? "green" : "blue"} dot={false}>
+                        {entry.card_source === "upload" ? "Card uploaded" : "Card art"}
+                      </Badge>
+                    ) : null}
                     <Badge dot={false}>{`${entry.products.toLocaleString("en-GB")} product${entry.products === 1 ? "" : "s"}`}</Badge>
                   </span>
                 </span>

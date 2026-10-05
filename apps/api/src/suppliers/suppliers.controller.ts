@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import { productCategories } from '../countries/countries.service.js';
@@ -31,14 +32,38 @@ class MarketDto {
   @IsBoolean() enabled: boolean;
 }
 
+const toBoolean = ({ value }: { value: unknown }) => (value === 'true' || value === true ? true : value === 'false' || value === false ? false : value);
+
+class ProductFilterFields {
+  @IsOptional() @IsIn(productCategories) category?: ProductCategory;
+  @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
+  @IsOptional() @IsString() @Length(1, 60) q?: string;
+  /** Products with an offer from this supplier. */
+  @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier?: string;
+  /** Listed on BitoCard's store, or not. */
+  @IsOptional() @Transform(toBoolean) @IsBoolean() listed?: boolean;
+}
+
 class ProductFilterDto extends PageDto {
   @IsOptional() @IsIn(productCategories) category?: ProductCategory;
   @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
   @IsOptional() @IsString() @Length(1, 60) q?: string;
+  @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier?: string;
+  @IsOptional() @Transform(toBoolean) @IsBoolean() listed?: boolean;
+}
+
+class ListingDto {
+  @IsBoolean() listed: boolean;
+  /** These products (at most 500)… */
+  @IsOptional() @IsArray() @ArrayMaxSize(500) @IsUUID('all', { each: true }) product_ids?: string[];
+  /** …or every product matching these filters. */
+  @IsOptional() @ValidateNested() @Type(() => ProductFilterFields) filter?: ProductFilterFields;
 }
 
 class UpdateProductDto {
   @IsOptional() @IsBoolean() active?: boolean;
+  /** Shown on BitoCard's own store. */
+  @IsOptional() @IsBoolean() listed?: boolean;
   @IsOptional() @IsString() @Length(2, 120) name?: string;
   @IsOptional() @ValidateIf(nullable) @IsString() @Length(0, 2000) description?: string | null;
   /** Shown instead of the supplier's logo; null goes back to it. */
@@ -105,6 +130,14 @@ export class AdminSuppliersController {
   @Patch('products/:id')
   updateProduct(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateProductDto) {
     return this.suppliers.updateProduct(adminId(caller), id, body);
+  }
+
+  /** List or unlist products on BitoCard's store: by ID, or everything matching filters. Audited. */
+  @AdminRoles('operations')
+  @Post('products/listing')
+  @HttpCode(HttpStatus.OK)
+  setListing(@CurrentCaller() caller: Caller, @Body() body: ListingDto) {
+    return this.suppliers.setListing(adminId(caller), body);
   }
 
   /** Agreed commission (discount), routing priority and availability of one supplier offer. */

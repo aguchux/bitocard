@@ -19,6 +19,7 @@ import {
 } from '../generated/prisma/client.js';
 import { exactFeeNano, maxFeeMinor, pickFeeRule } from '../fees/platform-fees.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { stockSupplier } from '../suppliers/stock.adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 
 const Decimal = Prisma.Decimal;
@@ -178,14 +179,17 @@ export class PricingService {
     return { amount: BigInt(rate.mul(amount.toString()).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)), rate };
   }
 
-  /** Offers that may be used: available, supplier on, supplier switched on for this market, and (live) configured. */
+  /**
+   * Offers that may be used: available, supplier on, supplier switched on for this market (BitoCard's own stock sells
+   * in every market), and (live) configured.
+   */
   eligibleOffers(ctx: PricingContext, product: ProductWithOffers, exclude: ReadonlySet<string> = new Set()) {
     return product.supplierProducts.filter(
       offer =>
         !exclude.has(offer.supplierCode) &&
         offer.available &&
         offer.supplier.enabled &&
-        ctx.markets.has(`${offer.supplierCode}:${product.category}`) &&
+        (offer.supplierCode === stockSupplier || ctx.markets.has(`${offer.supplierCode}:${product.category}`)) &&
         (ctx.mode === 'test' || this.adapters.get(offer.supplierCode).configured()),
     );
   }

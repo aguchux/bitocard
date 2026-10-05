@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { adminId } from '../countries/countries.controller.js';
@@ -25,6 +25,25 @@ class CatalogueFilterDto extends PageDto {
   @ApiPropertyOptional({ description: 'Search by name or brand.' })
   @IsOptional() @IsString() @Length(1, 60)
   q?: string;
+
+  @ApiPropertyOptional({ description: 'Only products listed (true) or not listed (false) on your BitoCard-hosted store.' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  listed?: boolean;
+}
+
+class ListingDto {
+  @ApiProperty({ description: 'List (true) or unlist (false) on your BitoCard-hosted store.' })
+  @IsBoolean()
+  listed: boolean;
+
+  @ApiProperty({ description: 'The products, at most 100.', type: [String], format: 'uuid' })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsUUID('all', { each: true })
+  product_ids: string[];
 }
 
 class RecipientDto {
@@ -126,6 +145,19 @@ export class CatalogueController {
   @Get('products/:id')
   get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
     return this.catalogue.get(resellerOf(caller), mode, id);
+  }
+
+  @ApiOperation({
+    summary: 'List or unlist products on your store',
+    description:
+      'Chooses what your BitoCard-hosted store shows: products are shown there only once you list them. Your own systems can sell every product in your catalogue, listed or not. Only products available to you can be listed.',
+  })
+  @Roles('admin')
+  @Scopes('stores:manage')
+  @Post('listing')
+  @HttpCode(HttpStatus.OK)
+  setListing(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: ListingDto) {
+    return this.catalogue.setListing(resellerOf(caller), mode, body.product_ids, body.listed);
   }
 }
 

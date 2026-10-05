@@ -4,7 +4,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { Prisma, type ProductCategory, type StorefrontPage } from '../generated/prisma/client.js';
-import { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryIconUrl } from './brand-registry.js';
+import { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl } from './brand-registry.js';
 import { categoryLabels, defaultHome, sections as sectionsSchema } from './layout.js';
 import { StorefrontService } from './storefront.service.js';
 
@@ -189,7 +189,7 @@ export class StorefrontAdminService {
 
   /**
    * Every brand registry entry (`brand-registry.json`) with its logo and card art: an admin upload (Storefront > Brand
-   * registry) if there is one, else the file's own, else the bundled icon, else none (initials show). Product counts cover every slug it lists.
+   * registry) if there is one, else the file's own, else the bundled icon or card art, else none (initials show). Product counts cover every slug it lists.
    */
   async registry() {
     const [assets, grouped] = await Promise.all([this.prisma.brandAsset.findMany(), this.prisma.product.groupBy({ by: ['brand'], _count: { _all: true } })]);
@@ -202,6 +202,7 @@ export class StorefrontAdminService {
         const fileLogo = registryAssetUrl(entry.logo, config);
         const bundled = registryIconUrl(entry, config);
         const fileCard = registryAssetUrl(entry.card, config);
+        const bundledCard = registryCardArtUrl(entry, config);
         const slugs = [...new Set([entry.slug, ...entry.slugs])];
         return {
           object: 'brand_registry_entry' as const,
@@ -215,8 +216,8 @@ export class StorefrontAdminService {
           tags: entry.tags,
           logo_url: asset?.logoUrl ?? fileLogo ?? bundled,
           logo_source: asset?.logoUrl ? ('upload' as const) : fileLogo ? ('file' as const) : bundled ? ('bundled' as const) : null,
-          card_url: asset?.cardUrl ?? fileCard,
-          card_source: asset?.cardUrl ? ('upload' as const) : fileCard ? ('file' as const) : null,
+          card_url: asset?.cardUrl ?? fileCard ?? bundledCard,
+          card_source: asset?.cardUrl ? ('upload' as const) : fileCard ? ('file' as const) : bundledCard ? ('bundled' as const) : null,
           products: slugs.reduce((sum, slug) => sum + (counts.get(slug) ?? 0), 0),
           updated_at: asset?.updatedAt.toISOString() ?? null,
         };
