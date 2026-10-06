@@ -99,40 +99,49 @@ export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
  */
 export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
   const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    closeButton.current?.focus();
+    const opener = trigger.current;
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      opener?.focus();
     };
   }, [open]);
   return (
     <div className="xl:hidden">
-      <button type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
+      <button ref={trigger} type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
         <Menu className="size-6" aria-hidden="true" />
       </button>
       {open
         ? createPortal(
             <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Menu">
-              <button type="button" aria-label="Close menu" className="flex-1 bg-[#070f4c]/50" onClick={() => setOpen(false)} />
-              <div className="flex w-[min(22rem,88vw)] flex-col overflow-y-auto bg-white p-5 shadow-2xl">
-                <div className="flex justify-end">
-                  <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
+              <button type="button" tabIndex={-1} aria-hidden="true" className="flex-1 bg-[#070f4c]/50" onClick={() => setOpen(false)} />
+              {/* The categories scroll; sign in and the reseller link stay at the bottom, in reach of a thumb. */}
+              <div className="flex h-dvh w-[min(22rem,88vw)] flex-col bg-white shadow-2xl">
+                <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 pr-3 pl-5">
+                  <p className="font-display text-lg font-bold text-[#070f4c]">Shop</p>
+                  <button ref={closeButton} type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
                     <X className="size-6" aria-hidden="true" />
                   </button>
                 </div>
-                <nav aria-label="Categories" className="mt-2 space-y-4">
+                <nav aria-label="Categories" className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
                   {groups.map(group => (
                     <div key={group.key}>
-                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex items-center gap-2.5 text-lg font-bold text-[#070f4c]">
+                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-[#070f4c]">
                         <GroupIcon group={group} className="size-10" />
-                        {group.label}
+                        <span className="flex-1">{group.label}</span>
+                        {/* A group of one category is that category: no list repeating its name. */}
+                        {group.categories.length === 1 && !group.on_sale ? <span className="rounded-full bg-slate-100 px-2 py-0.5 font-sans text-[11px] font-semibold text-slate-500">Soon</span> : null}
                       </Link>
-                      {group.categories.length > 1 || !group.on_sale ? (
-                        <ul className="mt-1">
+                      {group.categories.length > 1 ? (
+                        <ul className="mt-0.5">
                           {group.categories.map(category => (
                             <li key={category.category}>
                               <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex min-h-11 items-center justify-between gap-3 pl-12 text-slate-600">
@@ -149,13 +158,15 @@ export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                     </div>
                   ))}
                 </nav>
-                <Link href="/signin" onClick={() => setOpen(false)} className="mt-6 flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]">
-                  Sign in
-                </Link>
-                <Link href="/resellers" onClick={() => setOpen(false)} className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
-                  <Store className="size-5" aria-hidden="true" />
-                  Open a reseller store
-                </Link>
+                <div className="grid shrink-0 gap-2.5 border-t border-slate-100 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <Link href="/signin" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]">
+                    Sign in
+                  </Link>
+                  <Link href="/resellers" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
+                    <Store className="size-5" aria-hidden="true" />
+                    Open a reseller store
+                  </Link>
+                </div>
               </div>
             </div>,
             document.body,

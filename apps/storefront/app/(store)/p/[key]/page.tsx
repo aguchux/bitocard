@@ -43,7 +43,7 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
   const values = product.denominations ?? [];
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
       <nav aria-label="Breadcrumb">
         <ol className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
           <li>
@@ -64,8 +64,8 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
         </ol>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-        <div className="aspect-[16/10] overflow-hidden rounded-3xl shadow-lg">
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-12">
+        <div className="aspect-[16/10] overflow-hidden rounded-2xl shadow-lg sm:rounded-3xl">
           <BrandArt brand={product.brand} product={product} className="text-4xl" />
         </div>
         <div>
@@ -130,10 +130,10 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
 
       {product.other_countries.length ? (
         <section aria-labelledby="countries-heading">
-          <h2 id="countries-heading" className="font-display mb-4 text-2xl font-extrabold">
+          <h2 id="countries-heading" className="font-display mb-3 text-[22px] font-extrabold sm:mb-4 sm:text-2xl">
             {product.brand.name} in other countries
           </h2>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {product.other_countries.map(item => (
               <li key={item.id}>
                 <ProductCard product={item} />
@@ -144,10 +144,10 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
       ) : null}
       {product.related.length ? (
         <section aria-labelledby="related-heading">
-          <h2 id="related-heading" className="font-display mb-4 text-2xl font-extrabold">
+          <h2 id="related-heading" className="font-display mb-3 text-[22px] font-extrabold sm:mb-4 sm:text-2xl">
             More {product.category_label.toLowerCase()}
           </h2>
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {product.related.map(item => (
               <li key={item.id}>
                 <ProductCard product={item} />

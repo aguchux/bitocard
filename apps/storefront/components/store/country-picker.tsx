@@ -25,6 +25,7 @@ export function CountryPicker({ countries, value = "", className = "" }: { count
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const root = useRef<HTMLDivElement>(null);
+  const filterField = useRef<HTMLInputElement>(null);
   const current = options.find(option => option.value.toLowerCase() === selected.toLowerCase()) ?? options[0];
   const shown = filter.trim() ? options.filter(option => option.label.toLowerCase().includes(filter.trim().toLowerCase()) || option.value.toLowerCase() === filter.trim().toLowerCase()) : options;
 
@@ -34,6 +35,8 @@ export function CountryPicker({ countries, value = "", className = "" }: { count
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", close);
+    // Straight into the filter with a mouse or keyboard; not on touch screens, where the keyboard would cover the list.
+    if (window.matchMedia("(pointer: fine)").matches) filterField.current?.focus();
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
@@ -73,9 +76,9 @@ export function CountryPicker({ countries, value = "", className = "" }: { count
           <label className="flex items-center gap-2 border-b border-slate-100 px-3 focus-within:bg-slate-50">
             <Search className="size-4 text-slate-400" aria-hidden="true" />
             <span className="sr-only">Find a country</span>
-            <input autoFocus value={filter} onChange={event => setFilter(event.target.value)} placeholder="Find a country" className="min-h-11 w-full bg-transparent text-sm outline-none focus-visible:outline-none" />
+            <input ref={filterField} value={filter} onChange={event => setFilter(event.target.value)} placeholder="Find a country" className="min-h-11 w-full bg-transparent text-base outline-none focus-visible:outline-none sm:text-sm" />
           </label>
-          <ul id={`${id}-list`} role="listbox" aria-label="Countries" className="max-h-72 overflow-y-auto p-1.5">
+          <ul id={`${id}-list`} role="listbox" aria-label="Countries" className="max-h-[min(18rem,45svh)] overflow-y-auto overscroll-contain p-1.5">
             {shown.map(option => {
               const active = option.value === current.value;
               return (

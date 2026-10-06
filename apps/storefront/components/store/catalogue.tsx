@@ -5,6 +5,7 @@ import { query, storeApi } from "@/lib/api";
 import { featureIcon, filterFeatures, isFeature } from "./features";
 import { ProductCard } from "./product-card";
 import { CategoryIcon, GroupIcon } from "./category-icon";
+import { SubmitOnChange } from "./submit-on-change";
 
 export const pageSize = 24;
 
@@ -48,11 +49,55 @@ export function hrefWith(path: string, params: CatalogueParams, change: Partial<
   return `${path}${query(next)}`;
 }
 
+/** A row of chips: one line scrolling sideways, edge to edge, on phones and tablets; wrapping beside the sidebar. */
+const chipRow = "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden";
+
+/** Fields at 16px on phones: iOS zooms the page into any smaller field when it is focused. */
+const field = "min-h-11 w-full rounded-xl border border-slate-200 bg-white text-base text-[#070f4c] focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none sm:text-sm";
+
+/** Country and sort, with Apply (a plain form, so it works without script). `compact`: one row, labels for screen readers only. */
+function Filters({ path, params, countries, compact = false }: { path: string; params: CatalogueParams; countries: StoreCountry[]; compact?: boolean }) {
+  const label = compact ? "sr-only" : "mb-1 block font-semibold";
+  return (
+    // Compact: the two fields share the row, applying as soon as one changes; Apply shows only until script runs.
+    <form method="get" action={path} className={compact ? "group grid grid-flow-col grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2" : "mt-6 grid gap-2"}>
+      {compact ? <SubmitOnChange /> : null}
+      {params.q ? <input type="hidden" name="q" value={params.q} /> : null}
+      {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
+      {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
+      {params.features ? <input type="hidden" name="features" value={params.features} /> : null}
+      <label className="min-w-0 text-sm">
+        <span className={label}>Country</span>
+        <select name="country" defaultValue={params.country ?? ""} className={`${field} px-3`}>
+          <option value="">All countries</option>
+          <option value="global">Usable anywhere</option>
+          {countries.map(item => (
+            <option key={item.code} value={item.code.toLowerCase()}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="min-w-0 text-sm">
+        <span className={label}>Sort by</span>
+        <select name="sort" defaultValue={params.sort ?? ""} className={`${field} px-3`}>
+          <option value="">Most popular</option>
+          <option value="name">Name</option>
+          <option value="new">Newest</option>
+        </select>
+      </label>
+      <button type="submit" className="min-h-11 rounded-xl bg-[#070f4c] px-4 font-semibold text-white group-data-auto:hidden hover:bg-[#121a6b]">
+        Apply
+      </button>
+    </form>
+  );
+}
+
 /** Number filters: each chip switches one feature on or off (products must have every chosen feature). */
 function FeatureFilters({ path, params }: { path: string; params: CatalogueParams }) {
   const chosen = new Set((params.features ?? "").split(",").filter(Boolean));
   return (
-    <ul aria-label="Filter by what it can do" className="mt-4 flex flex-wrap gap-2">
+    <ul aria-label="Filter by what it can do" className={`mt-4 ${chipRow}`}>
       {filterFeatures.map(feature => {
         const Icon = featureIcon[feature];
         const on = chosen.has(feature);
@@ -60,11 +105,11 @@ function FeatureFilters({ path, params }: { path: string; params: CatalogueParam
         if (on) next.delete(feature);
         else next.add(feature);
         return (
-          <li key={feature}>
+          <li key={feature} className="shrink-0">
             <Link
               href={hrefWith(path, params, { features: next.size ? [...next].join(",") : undefined })}
               aria-current={on ? "true" : undefined}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition ${on ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-[#070f4c]"}`}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold whitespace-nowrap transition ${on ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-[#070f4c]"}`}
             >
               <Icon className="size-4" aria-hidden="true" />
               {productFeatureLabels[feature]}
@@ -116,8 +161,9 @@ export function CatalogueView({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside className="lg:sticky lg:top-24 lg:self-start">
-        <nav aria-label="Catalogue" className="hidden lg:block">
+      {/* The sidebar is for desktops; phones and tablets get the same choices under the title. */}
+      <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
+        <nav aria-label="Catalogue">
           <Link href="/catalogs" aria-current={active === undefined ? "page" : undefined} className={`block rounded-lg px-3 py-2 font-semibold ${active === undefined ? "bg-pink-50 text-[#e0116d]" : "text-[#070f4c] hover:bg-slate-50"}`}>
             Everything
           </Link>
@@ -159,35 +205,7 @@ export function CatalogueView({
             );
           })}
         </nav>
-        <form method="get" action={path} className="mt-0 grid grid-cols-2 gap-2 lg:mt-6 lg:grid-cols-1">
-          {params.q ? <input type="hidden" name="q" value={params.q} /> : null}
-          {params.brand ? <input type="hidden" name="brand" value={params.brand} /> : null}
-          {params.tag ? <input type="hidden" name="tag" value={params.tag} /> : null}
-          {params.features ? <input type="hidden" name="features" value={params.features} /> : null}
-          <label className="text-sm">
-            <span className="mb-1 block font-semibold">Country</span>
-            <select name="country" defaultValue={params.country ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none">
-              <option value="">All countries</option>
-              <option value="global">Usable anywhere</option>
-              {countries.map(item => (
-                <option key={item.code} value={item.code.toLowerCase()}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            <span className="mb-1 block font-semibold">Sort by</span>
-            <select name="sort" defaultValue={params.sort ?? ""} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none">
-              <option value="">Most popular</option>
-              <option value="name">Name</option>
-              <option value="new">Newest</option>
-            </select>
-          </label>
-          <button type="submit" className="col-span-2 min-h-11 rounded-xl bg-[#070f4c] font-semibold text-white hover:bg-[#121a6b] lg:col-span-1">
-            Apply
-          </button>
-        </form>
+        <Filters path={path} params={params} countries={countries} />
       </aside>
 
       <div className="min-w-0">
@@ -197,24 +215,37 @@ export function CatalogueView({
             {/* eslint-disable-next-line @next/next/no-img-element -- banners uploaded by admins, served from the storage CDN */}
             <img src={banner} alt="" className="absolute inset-0 -z-10 size-full object-cover object-right" />
             <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(7,15,76,.92),rgba(7,15,76,.7)_45%,rgba(7,15,76,.15)_75%)]" />
-            <div className="flex min-h-44 max-w-xl flex-col justify-center px-6 py-8 sm:min-h-56 sm:px-10">
-              <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl">{title}</h1>
-              <p className="mt-2 text-white/80 sm:text-lg">{description}</p>
+            <div className="flex min-h-36 max-w-xl flex-col justify-center px-5 py-6 sm:min-h-56 sm:px-10 sm:py-8">
+              <h1 className="font-display text-[1.75rem] leading-tight font-extrabold tracking-tight text-white sm:text-5xl">{title}</h1>
+              <p className="mt-1.5 text-sm text-white/80 sm:mt-2 sm:text-lg">{description}</p>
             </div>
           </header>
         ) : (
           <>
-            <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
-            <p className="mt-1 text-slate-500">{description}</p>
+            <h1 className="font-display text-[1.75rem] leading-tight font-extrabold tracking-tight sm:text-4xl">{title}</h1>
+            <p className="mt-1 text-sm text-slate-500 sm:text-base">{description}</p>
           </>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-2 lg:hidden">
-          {groups.map(group => (
-            <Link key={group.key} href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700">
-              <GroupIcon group={group} className="size-7" />
-              {group.label}
-            </Link>
-          ))}
+        <ul aria-label="Categories" className={`mt-4 lg:hidden ${chipRow}`}>
+          {groups.map(group => {
+            const href = `/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`;
+            const current = path === href;
+            return (
+              <li key={group.key} className="shrink-0">
+                <Link
+                  href={href}
+                  aria-current={current ? "page" : undefined}
+                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border py-1 pr-3.5 pl-1.5 text-sm whitespace-nowrap ${current ? "border-[#ff2382] bg-pink-50 font-semibold text-[#e0116d]" : "border-slate-200 bg-white text-slate-700"}`}
+                >
+                  <GroupIcon group={group} className="size-7" />
+                  {group.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-3 lg:hidden">
+          <Filters path={path} params={params} countries={countries} compact />
         </div>
         {path === "/catalogs/virtual_numbers" || params.features ? (
           <FeatureFilters path={path} params={params} />
@@ -251,12 +282,12 @@ export function CatalogueView({
               defaultValue={params.q ?? ""}
               autoComplete="off"
               placeholder={`Search ${title.toLowerCase()}…`}
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-10 text-sm text-[#070f4c] placeholder:text-slate-400 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none"
+              className={`${field} pr-3 pl-10 placeholder:text-slate-400`}
             />
           </form>
         </div>
         {products.length ? (
-          <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <ul className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
             {products.map(product => (
               <li key={product.id}>
                 <ProductCard product={product} />

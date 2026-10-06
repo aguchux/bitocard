@@ -40,10 +40,11 @@ export function CurrencyMenu() {
         aria-expanded={open}
         aria-label={`Currency: ${current.code}`}
         onClick={() => setOpen(value => !value)}
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-[#070f4c] hover:border-slate-300"
+        className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold whitespace-nowrap text-[#070f4c] hover:border-slate-300"
       >
         <Flag code={current.flag} className="h-3.5 w-5" />
-        {current.code} ({current.symbol})
+        {current.code}
+        <span className="-ml-1 xl:max-2xl:hidden">({current.symbol})</span>
         <ChevronDown className="size-4 text-slate-500" aria-hidden="true" />
       </button>
       {open ? (

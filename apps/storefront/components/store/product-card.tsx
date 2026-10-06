@@ -46,8 +46,9 @@ export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand
     >
       {product?.category === "virtual_numbers" && !brand.logo_url ? (
         // A number shows its country's flag, not the initials of its type ("local", "mobile").
-        <span className="flex flex-col items-center gap-2">
-          <Flag code={product.country} className="h-14 w-20 rounded-md shadow-lg sm:h-16 sm:w-24" />
+        // Sized by the art's width, so the flag and its label fit small cards in phone grids too.
+        <span className="flex w-full flex-col items-center gap-[6%]">
+          <Flag code={product.country} className="aspect-[3/2] h-auto w-[34%] max-w-24 rounded-md shadow-lg" />
           <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.55em] font-bold tracking-wide text-[#070f4c] uppercase">{brand.name} number</span>
         </span>
       ) : brand.logo_url ? (
@@ -71,24 +72,25 @@ export function ProductCard({ product }: { product: StoreProduct }) {
   return (
     <Link
       href={productHref(product)}
-      className="group flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      // A container, so the card tightens itself in two-column phone grids and carousels whatever the screen width.
+      className="group @container flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-3"
     >
       <div className="aspect-[16/9] overflow-hidden rounded-xl">
-        <BrandArt brand={product.brand} product={product} />
+        <BrandArt brand={product.brand} product={product} className="text-[13px] @[14rem]:text-base" />
       </div>
-      <div className="flex flex-1 flex-col px-1 pt-3">
-        <h3 className="font-display text-lg font-bold leading-snug text-[#070f4c]">{product.name}</h3>
-        <p className="mt-0.5 line-clamp-2 text-sm text-slate-500">{product.description ?? `${product.category_label}${product.global ? "" : ` · ${product.country_name}`}`}</p>
+      <div className="flex flex-1 flex-col px-0.5 pt-2.5 @[14rem]:px-1 @[14rem]:pt-3">
+        <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-[#070f4c] @[14rem]:text-lg">{product.name}</h3>
+        <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 @[14rem]:text-sm">{product.description ?? `${product.category_label}${product.global ? "" : ` · ${product.country_name}`}`}</p>
         {product.features?.length ? (
-          <div className="mt-2.5">
+          <div className="mt-2 @[14rem]:mt-2.5">
             <FeatureIcons features={product.features} compact />
           </div>
         ) : null}
-        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-          <p className="text-sm text-slate-500">
-            <span className="font-display text-lg font-extrabold text-[#070f4c]">{priceLabel(product)}</span>
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2.5 @[14rem]:pt-3">
+          <p className="min-w-0 text-sm text-slate-500">
+            <span className="font-display text-base font-extrabold text-[#070f4c] @[14rem]:text-lg">{priceLabel(product)}</span>
           </p>
-          <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white">
+          <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white @[14rem]:grid">
             <ArrowRight className="size-5" />
           </span>
         </div>
@@ -100,12 +102,13 @@ export function ProductCard({ product }: { product: StoreProduct }) {
 /** The same product as a row: compact art on the left. */
 export function ProductRow({ product }: { product: StoreProduct }) {
   return (
-    <Link href={productHref(product)} className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:shadow-md">
-      <div className="aspect-[16/10] w-28 shrink-0 overflow-hidden rounded-xl sm:w-36">
-        <BrandArt brand={product.brand} product={product} className="text-base" />
+    <Link href={productHref(product)} className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:shadow-md sm:gap-4 sm:p-3">
+      <div className="aspect-[16/10] w-24 shrink-0 overflow-hidden rounded-xl sm:w-36">
+        <BrandArt brand={product.brand} product={product} className="text-[13px] sm:text-base" />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="font-display truncate text-base font-bold text-[#070f4c] sm:text-lg">{product.name}</h3>
+        {/* Two lines on phones rather than cutting the name after a word or two. */}
+        <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-[#070f4c] sm:line-clamp-1 sm:text-lg">{product.name}</h3>
         <p className="truncate text-sm text-slate-500">{product.description ?? `${product.category_label} · ${product.country_name}`}</p>
         {product.features?.length ? (
           <div className="mt-1.5">
@@ -114,7 +117,7 @@ export function ProductRow({ product }: { product: StoreProduct }) {
         ) : null}
         <p className="mt-1 font-display text-base font-extrabold text-[#070f4c]">{priceLabel(product)}</p>
       </div>
-      <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white">
+      <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white min-[400px]:grid">
         <ArrowRight className="size-5" />
       </span>
     </Link>

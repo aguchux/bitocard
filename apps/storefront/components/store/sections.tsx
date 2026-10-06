@@ -14,24 +14,30 @@ const mdSpan = { 3: "md:col-span-3", 6: "md:col-span-6" } as const;
 
 const groupHref = (group: StoreNavigationGroup) => `/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`;
 
+/**
+ * A section's title. On phones "View all" sits beside the title and any filters run on one line below it, scrolling
+ * sideways; from `sm` they share the title's line.
+ */
 function Heading({ title, subtitle, href, children }: { title: string; subtitle?: string; href?: string; children?: React.ReactNode }) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0">
-        <h2 className="font-display text-2xl font-extrabold tracking-tight text-[#070f4c] sm:text-3xl">{title}</h2>
-        {subtitle ? <p className="mt-1 text-slate-500">{subtitle}</p> : null}
+    <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-x-6">
+      <div className="min-w-0 sm:mr-auto">
+        <h2 className="font-display text-[22px] leading-tight font-extrabold tracking-tight text-[#070f4c] sm:text-3xl">{title}</h2>
+        {subtitle ? <p className="mt-1 text-sm text-slate-500 sm:text-base">{subtitle}</p> : null}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {children}
-        {href ? (
-          <Link href={href} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 font-semibold text-[#e0116d] hover:bg-pink-50">
-            View all <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
-        ) : null}
-      </div>
+      {href ? (
+        <Link href={href} className="-mr-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-semibold whitespace-nowrap text-[#e0116d] hover:bg-pink-50 sm:order-last sm:mr-0 sm:min-h-10 sm:self-end sm:text-base">
+          View all <ArrowRight className="size-4" aria-hidden="true" />
+        </Link>
+      ) : null}
+      {children ? <div className="col-span-2 min-w-0">{children}</div> : null}
     </div>
   );
 }
+
+/** Phones: a row that scrolls sideways, edge to edge, with no scroll bar; from `md` the row sits in its column. */
+const sideScroll = "-mx-4 flex overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden";
+const chip = "inline-flex min-h-10 shrink-0 items-center rounded-full border bg-white px-4 text-sm whitespace-nowrap";
 
 function Hero({ section, groups, countries, bleed = false }: { section: Extract<ResolvedSection, { type: "hero" }>; groups: StoreNavigationGroup[]; countries: StoreCountry[]; bleed?: boolean }) {
   const featured = section.data.featured.slice(0, 4);
@@ -43,9 +49,10 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
       {/* The banner: a lit globe with orbits on the right, darkened behind the text so it stays readable. */}
       <Image src="/hero/globe.webp" alt="" aria-hidden="true" fill priority sizes="100vw" className="-z-20 object-cover object-[72%_center] lg:object-right" />
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,10,51,.92),rgba(5,10,51,.7)_45%,rgba(5,10,51,.1)_75%)] lg:bg-[linear-gradient(90deg,rgba(5,10,51,.75),rgba(5,10,51,.35)_45%,transparent_65%)]" />
-      <div className={`grid items-center gap-8 lg:grid-cols-12 ${bleed ? "mx-auto max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8 lg:py-12" : "px-5 py-10 sm:px-10 lg:px-14 lg:py-14"}`}>
-        <div className="relative z-10 lg:col-span-7">
-          <h1 id={`hero-${section.id}`} className="font-display text-4xl leading-[1.02] font-extrabold tracking-tight sm:text-6xl xl:text-7xl">
+      {/* minmax(0, 1fr): the chips' sideways scroller must not widen the column past the screen. */}
+      <div className={`grid grid-cols-[minmax(0,1fr)] items-center gap-8 lg:grid-cols-12 ${bleed ? "mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12" : "px-5 py-8 sm:px-10 sm:py-10 lg:px-14 lg:py-14"}`}>
+        <div className="relative z-10 min-w-0 lg:col-span-7">
+          <h1 id={`hero-${section.id}`} className="font-display text-[2.5rem] leading-[1.02] font-extrabold tracking-tight sm:text-6xl xl:text-7xl">
             {section.title}
             {section.accent ? (
               <>
@@ -54,15 +61,16 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
               </>
             ) : null}
           </h1>
-          {section.subtitle ? <p className="mt-4 max-w-2xl text-lg text-slate-200 sm:text-xl">{section.subtitle}</p> : null}
+          {section.subtitle ? <p className="mt-3 max-w-2xl text-base text-slate-200 sm:mt-4 sm:text-xl">{section.subtitle}</p> : null}
           {section.search ? (
-            <div className="mt-7 max-w-3xl text-[#070f4c]">
+            <div className="mt-6 max-w-3xl text-[#070f4c] sm:mt-7">
               <SearchForm countries={countries} />
             </div>
           ) : null}
           {section.categoryChips && groups.length ? (
-            // One line, no pills: icon and label only. On narrow screens the line scrolls sideways instead of wrapping.
-            <ul className="-mx-1 mt-5 flex max-w-3xl items-center gap-x-4 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:gap-x-5 [&::-webkit-scrollbar]:hidden">
+            // One line, no pills: icon and label only. On narrow screens the line scrolls sideways instead of wrapping,
+            // fading at the right edge so it reads as more to scroll.
+            <ul className="-mx-1 mt-5 flex max-w-3xl items-center gap-x-4 overflow-x-auto px-1 pb-1 [mask-image:linear-gradient(90deg,#000_82%,transparent)] [scrollbar-width:none] sm:gap-x-5 lg:[mask-image:none] [&::-webkit-scrollbar]:hidden">
               {groups.map(group => (
                 <li key={group.key} className="shrink-0">
                   <Link href={groupHref(group)} className="flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold whitespace-nowrap text-white/90 transition hover:text-white">
@@ -124,15 +132,15 @@ function ProductRail({ section }: { section: Extract<ResolvedSection, { type: "p
     <section aria-label={section.title} className="@container h-full">
       <Heading title={section.title} subtitle={section.subtitle} href={section.viewAllHref}>
         {section.filters ? (
-          <nav aria-label={`${section.title} filters`} className="flex flex-wrap gap-2">
-            <Link href="/catalogs" className="rounded-full border border-[#ff2382] px-4 py-1.5 text-sm font-semibold text-[#e0116d]">
+          <nav aria-label={`${section.title} filters`} className={`${sideScroll} gap-2 md:flex-wrap`}>
+            <Link href="/catalogs" className={`${chip} border-[#ff2382] font-semibold text-[#e0116d]`}>
               All
             </Link>
-            <Link href="/catalogs?country=global" className="rounded-full border border-slate-200 px-4 py-1.5 text-sm text-slate-600 hover:border-slate-300">
+            <Link href="/catalogs?country=global" className={`${chip} border-slate-200 text-slate-600 hover:border-slate-300`}>
               Global
             </Link>
             {tags.map(tag => (
-              <Link key={tag} href={`/catalogs?tag=${encodeURIComponent(tag)}`} className="rounded-full border border-slate-200 px-4 py-1.5 text-sm capitalize text-slate-600 hover:border-slate-300">
+              <Link key={tag} href={`/catalogs?tag=${encodeURIComponent(tag)}`} className={`${chip} border-slate-200 capitalize text-slate-600 hover:border-slate-300`}>
                 {tag}
               </Link>
             ))}
@@ -151,17 +159,27 @@ function ProductRail({ section }: { section: Extract<ResolvedSection, { type: "p
         </ul>
       ) : (
         <>
-          <ul className="grid grid-cols-1 gap-3 @md:hidden">
+          {/* Phones and tablets: a carousel of cards, a peek of the next one showing, instead of a long list or grid.
+              Desktops (mouse users) keep a grid, or rows in a narrow column. */}
+          <ul className={`${sideScroll} snap-x snap-mandatory scroll-px-4 gap-3 pb-1 sm:scroll-px-6 md:scroll-px-0 @3xl:hidden lg:hidden`}>
             {products.map(product => (
-              <li key={product.id}>
-                <ProductRow product={product} />
+              <li key={product.id} className="w-[min(72%,17rem)] shrink-0 snap-start">
+                <ProductCard product={product} />
               </li>
             ))}
           </ul>
-          <ul className="hidden gap-4 @md:grid @md:grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-4">
+          <ul className="hidden gap-4 @md:grid-cols-2 @3xl:grid @3xl:grid-cols-3 @6xl:grid-cols-4 lg:@md:grid">
             {products.map(product => (
               <li key={product.id}>
                 <ProductCard product={product} />
+              </li>
+            ))}
+          </ul>
+          {/* Desktops, in a column too narrow for two cards: rows. */}
+          <ul className="hidden grid-cols-1 gap-3 lg:grid lg:@md:hidden">
+            {products.map(product => (
+              <li key={product.id}>
+                <ProductRow product={product} />
               </li>
             ))}
           </ul>
@@ -179,11 +197,11 @@ function CategoryGrid({ section }: { section: Extract<ResolvedSection, { type: "
         {section.data.categories.map(category => {
           return (
             <li key={category.category}>
-              <Link href={`/catalogs/${category.category}`} className="flex h-full flex-col items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-14 rounded-xl" />
-                <span>
-                  <span className="font-display block font-bold text-[#070f4c]">{category.label}</span>
-                  <span className="text-sm text-slate-500">{category.products} {category.products === 1 ? "product" : "products"}</span>
+              <Link href={`/catalogs/${category.category}`} className="flex h-full flex-col items-start gap-2.5 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:p-4">
+                <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-11 rounded-xl sm:size-14" />
+                <span className="min-w-0">
+                  <span className="font-display block leading-snug font-bold text-[#070f4c]">{category.label}</span>
+                  <span className="text-sm text-slate-500">{category.on_sale ? `${category.products} ${category.products === 1 ? "product" : "products"}` : "Coming soon"}</span>
                 </span>
               </Link>
             </li>
@@ -253,15 +271,15 @@ function Promo({ section }: { section: Extract<ResolvedSection, { type: "promo" 
   const dark = section.theme === "navy";
   const external = section.cta?.href.startsWith("http");
   return (
-    <section aria-label={section.title} className={`relative flex h-full flex-col overflow-hidden rounded-3xl p-6 sm:p-7 ${promoThemes[section.theme]}`}>
+    <section aria-label={section.title} className={`relative flex h-full flex-col overflow-hidden rounded-3xl p-5 sm:p-7 ${promoThemes[section.theme]}`}>
       {section.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- promo images are admin-set https addresses on any host
         <img src={section.imageUrl} alt="" className="absolute inset-0 -z-0 h-full w-full object-cover opacity-90" />
       ) : null}
       <div className="relative flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-2xl font-extrabold tracking-tight">{section.title}</h2>
-          {section.subtitle ? <p className={`mt-1 text-lg ${dark ? "text-slate-200" : "text-slate-700"}`}>{section.subtitle}</p> : null}
+          <h2 className="font-display text-[22px] leading-tight font-extrabold tracking-tight sm:text-2xl">{section.title}</h2>
+          {section.subtitle ? <p className={`mt-1 text-base sm:text-lg ${dark ? "text-slate-200" : "text-slate-700"}`}>{section.subtitle}</p> : null}
           {section.body ? <p className={`mt-2 text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>{section.body}</p> : null}
           {section.bullets.length ? (
             <ul className="mt-3 space-y-1.5 text-sm">
@@ -286,7 +304,12 @@ function Promo({ section }: { section: Extract<ResolvedSection, { type: "promo" 
             </Link>
           ) : null}
         </div>
-        {section.imageUrl ? null : <PromoArt illustration={section.illustration} />}
+        {/* The illustration only where there is room beside the text; on phones it would add a screen of scrolling. */}
+        {section.imageUrl ? null : (
+          <div className="hidden sm:block">
+            <PromoArt illustration={section.illustration} />
+          </div>
+        )}
       </div>
     </section>
   );
@@ -295,11 +318,12 @@ function Promo({ section }: { section: Extract<ResolvedSection, { type: "promo" 
 function TrustBar({ section }: { section: Extract<ResolvedSection, { type: "trust_bar" }> }) {
   return (
     <section aria-label="Why shop with us" className="rounded-3xl bg-slate-50 p-5 sm:p-6">
-      <ul className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-5 lg:grid-cols-4">
         {section.items.map(item => {
           const Icon = trustIcon[item.icon];
           return (
-            <li key={item.title} className="flex items-start gap-3">
+            // Phones: the icon above the text, so two columns keep a readable line length.
+            <li key={item.title} className="flex flex-col items-start gap-2.5 sm:flex-row sm:gap-3">
               <span className="grid size-11 shrink-0 place-items-center rounded-full bg-pink-100 text-[#e0116d]">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
@@ -328,7 +352,7 @@ export function HomeSections({ sections, groups, countries }: { sections: Resolv
           <Hero section={bleed} groups={groups} countries={countries} bleed />
         </div>
       ) : null}
-    <div className="grid grid-flow-row-dense grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12 lg:gap-7">
+    <div className="grid grid-flow-row-dense grid-cols-1 gap-8 md:grid-cols-6 md:gap-6 lg:grid-cols-12 lg:gap-7">
       {grid.map(section => (
         <div key={section.id} className={`min-w-0 ${mdSpan[section.span.md]} ${lgSpan[section.span.lg]} ${section.span.rows === 2 ? "md:row-span-2" : ""}`}>
           {section.type === "hero" ? <Hero section={section} groups={groups} countries={countries} /> : null}
