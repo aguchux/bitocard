@@ -20,7 +20,11 @@ export type Account = {
   object: 'account';
   reseller: ResellerRef;
   plan: Plan;
-  authenticated_as: { type: 'session'; user_id: string; role: ResellerRole | null } | { type: 'api_key'; api_key_id: string; mode: 'test' | 'live'; scopes: string[] };
+  authenticated_as:
+    | { type: 'session'; user_id: string; role: ResellerRole | null }
+    | { type: 'api_key'; api_key_id: string; mode: 'test' | 'live'; scopes: string[] }
+    /** A "Try it" token from the API docs. */
+    | { type: 'docs_token'; mode: 'test' | 'live'; scopes: string[]; expires_at: string };
 };
 export type Notice = { object: 'notice'; message: string };
 

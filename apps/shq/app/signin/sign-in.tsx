@@ -5,13 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { apiBaseUrl } from "@bitocard/api-client";
 import { useSessionQuery, useSignInMutation } from "@bitocard/api-client/reseller";
-import { AppLink } from "@bitocard/admin-ui/shell";
+import { AppLink, goNext, safeNext } from "@bitocard/admin-ui/shell";
 import { Button, cn, errorMessage, Input, Notice, Wordmark } from "@bitocard/admin-ui";
 
-/** Only same-site paths, so a crafted link cannot send a reseller elsewhere after sign-in. */
-export function safeNext(value: string | null) {
-  return value && value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\") ? value : "/";
-}
+export { goNext, safeNext } from "@bitocard/admin-ui/shell";
 
 /** An input with an icon on the left (and an optional control on the right). */
 export function IconInput({ icon: Icon, end, className, ...props }: React.ComponentProps<typeof Input> & { icon: typeof Mail; end?: React.ReactNode }) {
@@ -40,7 +37,7 @@ export function GoogleMark() {
  * with a Google account that never signed up fails with `google_account_not_found`.
  */
 export function continueWithGoogle(next: string, intent: "signin" | "signup" = "signin") {
-  const returnTo = `${window.location.origin}${next}`;
+  const returnTo = /^https?:\/\//.test(next) ? next : `${window.location.origin}${next}`;
   // The API's Google start page, on another origin.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(`${apiBaseUrl()}/v1/auth/google/start?intent=${intent}&return_to=${encodeURIComponent(returnTo)}`);
@@ -72,13 +69,13 @@ export function SignIn() {
   const [signIn, signInState] = useSignInMutation();
 
   useEffect(() => {
-    if (session.data) router.replace(next);
+    if (session.data) goNext(next, router);
   }, [session.data, next, router]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const done = await signIn({ identifier: identifier.trim(), password }).unwrap().catch(() => null);
-    if (done) router.replace(next);
+    if (done) goNext(next, router);
   }
 
   return (

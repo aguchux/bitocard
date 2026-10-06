@@ -207,7 +207,7 @@ describe('delivery', () => {
     await sandboxOrder(browser);
     await topUp(browser);
     await settle();
-    const schemaFor = { order: 'WebhookOrder', top_up: 'WebhookTopUp', payout: 'WebhookPayout' };
+    const schemaFor = { order: 'Order', top_up: 'TopUp', payout: 'Payout' };
     for (const call of hook.state.calls) {
       const object = call.json.data.object;
       const schema = eventObjectSchemas[schemaFor[object.object]];

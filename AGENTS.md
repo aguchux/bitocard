@@ -244,6 +244,17 @@ BitoCard is API-first. Every capability is built as a public, versioned API befo
 - Reading the docs needs no account. Calling the API from the docs ("Try it") requires the reseller to sign in; it then runs against that reseller's own **sandbox** (simulated fulfilment) or **production** account. Requests go from the browser straight to the API.
 - Production calls from the docs are real: they can debit wallets and fulfil orders. Default to the sandbox, clearly mark live mode, require explicit confirmation before any live write, and offer a read-only option for production testing.
 - "Try it" uses a short-lived, tenant-scoped token issued from the reseller's sign-in, never a pasted or stored API key. Never send tokens to the docs server, log them or store them.
+- How it is built:
+  - **Static.** Every page is generated at build time from `apps/api/openapi.json` (`lib/openapi.ts`) and the Markdown guides in `apps/docs/content/` (listed in `lib/guides.ts`). Code is highlighted at build time with shiki, so pages ship no highlighting script.
+  - **Pages.** `/guides/<slug>`, `/reference` and `/reference/<tag>` (every operation of a tag on one page, anchored `#get-v1-orders-id`), `/reference/webhook-events/<type>`, search (Ctrl K or `/`, in the browser), `sitemap.xml`, and robots allowing indexing.
+  - **Reference sections.** They are ordered in `sections`; a tag's one-line introduction is in `tagIntros`. A new tag needs both.
+  - **What each operation shows.** Who may call it (`x-bitocard-auth`: API key with its `x-bitocard-scopes`, dashboard session only, or public), parameters with their limits, the request body's fields, every response with the full schema and example, and code in cURL, Node.js, Python and PHP (`lib/samples.ts`: keys from an environment variable, a fresh `Idempotency-Key` on every POST).
+  - **Try it** (`components/try-it-context.tsx`, `try-it.tsx`):
+    - Signing in goes to SHQ with `?next=<docs page>`. SHQ only returns to the docs origins in `docsOrigins` (`@bitocard/admin-ui/shell`); anything else goes home.
+    - The docs read the session from `GET /v1/auth/session` (the cookie is shared on `.bitocard.com`) and ask for a token with `POST /v1/auth/docs-token`, held in memory per account and mode.
+    - Every page load starts in Sandbox. Live is red, read-only by default (GET only), and asks for confirmation before each live change.
+    - Dashboard-only operations cannot be tried; public ones are called without a token.
+  - **Configuration.** `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SHQ_URL` override the production addresses (local development: `http://localhost:3001` and `:3004`, with the API's `ALLOWED_ORIGINS` including `http://localhost:3002`).
 
 ### Platform decisions
 
@@ -414,7 +425,19 @@ Do not add customer sign-in, wallets, checkout or live customer prices to the st
 - This is an npm-workspaces Turborepo with six applications in `apps/`. `docs`, `storefront` (the main site, bitocard.com), `admin`, `shq` (Seller Head Quarters, the reseller back office) and `legals` are Next.js apps: use App Router directly in each and do not introduce `src/` wrappers. `api` is a NestJS 12 app with the standard Nest `src/` layout. Root tooling and this file stay at the repository root.
 - API rules: keep the entrypoint at `apps/api/src/main.ts` and app setup in `src/bootstrap.ts`. Never name a top-level `src/` file `app`, `index` or `server`, because Vercel would pick it as the entrypoint. Build with `nest build` (tsc, decorator metadata on), not an esbuild or SWC bundler. The API is an ES module package (`"type": "module"`, as NestJS 12 ships ESM only): relative imports end in `.js` (`./x.js`, `./dir/index.js`) and the Prisma client is generated as ESM. Never go back to CommonJS: Vercel's function loader refuses `require()` of ES modules even on Node versions that allow it (`ERR_REQUIRE_ESM`). Mark providers `@Injectable()` and rely on constructor injection.
 - API foundation (`apps/api`):
-  - Every public route is under `/v1` except `/`, `/health` and `/robots.txt`. The OpenAPI document is served at `/v1/openapi.json` and committed as `apps/api/openapi.json`; run `npm run openapi -w @bitocard/api` after changing endpoints (`npm test` fails if it is stale). The same command writes `packages/api-client/src/reseller/api-lists.generated.ts` (API key scopes and webhook event types) from the API source, so SHQ never keeps its own copy; never edit it by hand.
+  - Every public route is under `/v1` except `/`, `/health` and `/robots.txt`. The OpenAPI document is served at `/v1/openapi.json` and committed as `apps/api/openapi.json`; run `npm run openapi -w @bitocard/api` after changing endpoints (`npm test` fails if it is stale).
+  - Every operation documents its response, merged into the document by `addResponses` (`src/openapi/responses/`):
+    - **One file per area:** `account`, `commerce`, `money`, `developers`, `stores` and `dashboard`. Each holds reusable component schemas and each operation's success status, schema and full, realistic example, keyed `'GET /v1/orders/{id}'`. Builders are in `src/openapi/schema.ts`: objects list every field as required and allow no others.
+    - **Shared objects:** `Order`, `TopUp`, `Payout` and `CustomerVerification` are defined once, in `src/webhooks/openapi.ts`, for both responses and webhook payloads.
+    - **Errors and access:** errors (400, 401, 403, 404, 429 with the shared `Error` schema) are added to each operation. Access is written by the auth decorators themselves (`@Public`, `@SessionOnly`, `@Scopes` and `@Roles` set `x-bitocard-auth`, `x-bitocard-scopes` and `x-bitocard-roles`), so the docs show exactly what the guard enforces. A route that refuses API keys must say `@SessionOnly()`.
+    - **Tests:**
+      - `test/openapi-docs.test.mjs` fails while any operation lacks a documented response, or an example does not match its schema.
+      - `test/openapi-<area>.test.mjs` check real responses against the schemas with `responseChecker` (`test/openapi-docs.mjs`, Ajv 2020).
+      - A new or changed endpoint ships its response docs and a real-response check in the same change.
+  - "Try it" tokens for the docs (`src/auth/docs-tokens.ts`, `POST /v1/auth/docs-token`, sessions only):
+    - **What they are:** `bc_docs_…`, signed with `ENCRYPTION_KEY` and never stored, valid 15 minutes, for one reseller and one mode. They are tied to the dashboard session that issued them, so signing out, leaving the reseller or its suspension ends them.
+    - **How the guard treats them:** as an API key with `apiKeyId: null`. They get every scope, or only `:read` scopes when `read_only` is asked or the person's role cannot create API keys. Plan restrictions apply, and `@SessionOnly` routes refuse them.
+    - **Rules:** live needs an active (verified) reseller. `GET /v1/account` reports `authenticated_as.type: docs_token`. CORS allows the `Authorization` header from `ALLOWED_ORIGINS` for them. The same command writes `packages/api-client/src/reseller/api-lists.generated.ts` (API key scopes and webhook event types) from the API source, so SHQ never keeps its own copy; never edit it by hand.
   - Errors always use `{ "error": { "type", "code", "message", "param"?, "request_id" } }`: throw `ApiError` for expected failures; anything else becomes a generic `api_error`. Never return internal details.
   - Every POST requires an `Idempotency-Key` header (handled globally by `IdempotencyInterceptor`, stored in Postgres for 24 hours).
   - Request bodies are DTO classes with class-validator decorators; unknown fields are rejected.

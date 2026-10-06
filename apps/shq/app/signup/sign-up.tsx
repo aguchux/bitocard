@@ -13,7 +13,7 @@ import {
 } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { Button, CodeInput, cn, errorMessage, Notice, Select, Skeleton, Wordmark } from "@bitocard/admin-ui";
-import { continueWithGoogle, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
+import { continueWithGoogle, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
 type Step = "details" | "verify" | "business" | "password";
 
@@ -97,7 +97,7 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
 
   useEffect(() => {
     // Already signed in: nothing to create here.
-    if (session.data && !signUpState.isSuccess) router.replace(next);
+    if (session.data && !signUpState.isSuccess) goNext(next, router);
   }, [session.data, signUpState.isSuccess, next, router]);
 
   const go = (target: Step, message: string | null = null) => {
@@ -159,7 +159,7 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
         return null;
       });
     // With an invitation, sign-up has already joined the team.
-    if (done) router.replace(invitation ? "/" : next);
+    if (done) goNext(invitation ? "/" : next, router);
   }
 
   const google = () => {

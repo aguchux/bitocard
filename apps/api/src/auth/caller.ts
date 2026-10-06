@@ -1,4 +1,5 @@
-import { createParamDecorator, type ExecutionContext, HttpStatus, SetMetadata } from '@nestjs/common';
+import { applyDecorators, createParamDecorator, type ExecutionContext, HttpStatus, SetMetadata } from '@nestjs/common';
+import { ApiExtension } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { ApiKeyMode, Realm, ResellerRole } from '../generated/prisma/client.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -20,7 +21,10 @@ export type Caller =
       kind: 'api_key';
       id: string;
       realm: 'reseller';
-      apiKeyId: string;
+      /** Null for a docs "Try it" token, which acts like a key but is not one (see auth/docs-tokens.ts). */
+      apiKeyId: string | null;
+      /** Set for a docs "Try it" token: when it expires. */
+      docsTokenExpiresAt?: Date;
       resellerId: string;
       mode: ApiKeyMode;
       scopes: string[];
@@ -38,8 +42,15 @@ export const ROUTE_SESSION_ONLY = 'auth:session-only';
 export const ROUTE_ADMIN_ROLES = 'auth:admin-roles';
 export const ROUTE_CRON = 'auth:cron';
 
+/**
+ * The same rules, written into the OpenAPI document for the docs: `x-bitocard-auth` (`public`, `session` or, by default,
+ * `api_key` for routes that also accept keys), `x-bitocard-scopes` and `x-bitocard-roles`. A route's own value wins over its
+ * controller's, as in the guard.
+ */
+export const authExtension = 'x-bitocard-auth';
+
 /** No sign-in needed (a caller is still identified if credentials are sent). */
-export const Public = () => SetMetadata(PUBLIC_ROUTE, true);
+export const Public = () => applyDecorators(SetMetadata(PUBLIC_ROUTE, true), ApiExtension(authExtension, 'public'));
 
 /**
  * Scheduled jobs: no user or API key; the handler checks the cron secret itself (Vercel Cron sends it as a Bearer token,
@@ -51,16 +62,16 @@ export const CronOnly = () => SetMetadata(ROUTE_CRON, true);
 export const RealmOnly = (realm: Realm) => SetMetadata(ROUTE_REALM, realm);
 
 /** Reseller staff roles allowed to call the route (sessions). Owners are always allowed. */
-export const Roles = (...roles: ResellerRole[]) => SetMetadata(ROUTE_ROLES, roles);
+export const Roles = (...roles: ResellerRole[]) => applyDecorators(SetMetadata(ROUTE_ROLES, roles), ApiExtension('x-bitocard-roles', roles));
 
 /** Admin roles allowed to call an admin route. super_admin is always allowed. */
 export const AdminRoles = (...roles: string[]) => SetMetadata(ROUTE_ADMIN_ROLES, roles);
 
 /** API key scopes required to call the route (API keys). */
-export const Scopes = (...scopes: string[]) => SetMetadata(ROUTE_SCOPES, scopes);
+export const Scopes = (...scopes: string[]) => applyDecorators(SetMetadata(ROUTE_SCOPES, scopes), ApiExtension('x-bitocard-scopes', scopes));
 
 /** Only a signed-in person may call the route, never an API key (for example, managing API keys). */
-export const SessionOnly = () => SetMetadata(ROUTE_SESSION_ONLY, true);
+export const SessionOnly = () => applyDecorators(SetMetadata(ROUTE_SESSION_ONLY, true), ApiExtension(authExtension, 'session'));
 
 /** The reseller a caller acts for; people who belong to several resellers choose one with the BitoCard-Reseller header. */
 export function resellerOf(caller: Caller) {

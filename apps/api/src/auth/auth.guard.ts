@@ -16,6 +16,7 @@ import {
   ROUTE_SCOPES,
   ROUTE_SESSION_ONLY,
 } from './caller.js';
+import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
 import { SessionsService, sessionPolicy } from './sessions.service.js';
 
 const apiKeyPattern = /^bc_(test|live)_[A-Za-z0-9_-]{20,}$/;
@@ -100,7 +101,9 @@ export class AuthGuard implements CanActivate {
     const authorization = req.get('authorization');
     if (authorization) {
       const [scheme, token] = authorization.split(' ');
-      if (scheme?.toLowerCase() !== 'bearer' || !token || !apiKeyPattern.test(token)) throw unauthenticated();
+      if (scheme?.toLowerCase() !== 'bearer' || !token) throw unauthenticated();
+      if (docsTokenPattern.test(token)) return this.identifyDocsToken(token);
+      if (!apiKeyPattern.test(token)) throw unauthenticated();
       return this.identifyApiKey(token);
     }
 
@@ -129,6 +132,32 @@ export class AuthGuard implements CanActivate {
       resellerId,
       role,
       adminRoles: session.user.adminRoles,
+    };
+  }
+
+  /**
+   * A docs "Try it" token: genuine and unexpired, its dashboard session still open, the person still a member of the
+   * reseller (write access only while their role allows it), and the reseller not suspended (live: active).
+   */
+  private async identifyDocsToken(token: string): Promise<Caller> {
+    const key = this.config.ENCRYPTION_KEY;
+    const claims = key ? readDocsToken(key, token) : null;
+    if (!claims) throw unauthenticated();
+    const session = await this.prisma.session.findUnique({ where: { id: claims.sid }, include: { user: true } });
+    if (!session || session.realm !== 'reseller' || session.revokedAt || session.expiresAt <= new Date() || session.user.status !== 'active') throw unauthenticated();
+    const member = await this.prisma.resellerMember.findFirst({ where: { userId: session.userId, resellerId: claims.rid }, include: { reseller: { include: { plan: true } } } });
+    if (!member || member.reseller.status === 'suspended' || (claims.mode === 'live' && member.reseller.status !== 'active')) throw unauthenticated();
+    const readOnly = claims.ro || !docsWriteRoles.includes(member.role);
+    return {
+      kind: 'api_key',
+      id: `docs:${claims.sid}:${claims.mode}`,
+      realm: 'reseller',
+      apiKeyId: null,
+      docsTokenExpiresAt: new Date(claims.exp),
+      resellerId: claims.rid,
+      mode: claims.mode,
+      scopes: docsTokenScopes(readOnly),
+      planRestrictions: member.reseller.plan.apiRestrictions,
     };
   }
 

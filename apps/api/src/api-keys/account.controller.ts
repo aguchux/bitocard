@@ -22,7 +22,9 @@ export class AccountController {
       reseller: { object: 'reseller' as const, id: reseller.id, name: reseller.name, country: reseller.country, status: reseller.status },
       plan: presentPlan(reseller.plan),
       authenticated_as:
-        caller.kind === 'api_key'
+        caller.kind === 'api_key' && caller.docsTokenExpiresAt
+          ? { type: 'docs_token' as const, mode: caller.mode, scopes: caller.scopes, expires_at: caller.docsTokenExpiresAt.toISOString() }
+          : caller.kind === 'api_key'
           ? { type: 'api_key' as const, api_key_id: caller.apiKeyId, mode: caller.mode, scopes: caller.scopes }
           : { type: 'session' as const, user_id: caller.userId, role: caller.role },
     };

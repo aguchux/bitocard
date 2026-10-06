@@ -2,9 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
+import { DocsTokensService } from './docs-tokens.service.js';
 import { SessionsService } from './sessions.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
 
@@ -20,6 +21,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly sessions: SessionsService,
     private readonly signupVerification: SignupVerificationService,
+    private readonly docsTokens: DocsTokensService,
   ) {}
 
   /** Step-by-step sign-up, step 1: email a code to confirm the address before the account exists. */
@@ -94,6 +96,19 @@ export class AuthController {
   @Get('session')
   session(@CurrentCaller() caller: Caller) {
     return this.auth.describe(caller.kind === 'session' ? caller.userId : '');
+  }
+
+  /** A short-lived token for trying the API from the documentation. */
+  @ApiOperation({
+    summary: 'Get a "Try it" token for the API documentation',
+    description:
+      'For the docs at docs.bitocard.com: a token for the reseller account in use (`BitoCard-Reseller`) and one mode, valid 15 minutes and only while this dashboard session lasts. It works like an API key with every scope (only the reading ones when `read_only`, or for staff who cannot create API keys). Live mode needs a verified business. Never store it.',
+  })
+  @SessionOnly()
+  @Post('docs-token')
+  @HttpCode(HttpStatus.OK)
+  docsToken(@CurrentCaller() caller: Caller, @Body() body: DocsTokenDto) {
+    return this.docsTokens.issue(caller, body.mode, body.read_only ?? false);
   }
 
   /** Confirm your email address with the code that was sent to it. */

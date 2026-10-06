@@ -18,7 +18,8 @@ const money = (what: string) => int(`${what}, in minor units of \`currency\` (fo
 const objectSchema = (name: string, properties: Record<string, Schema>): Schema => ({ type: 'object', title: name, required: Object.keys(properties), properties });
 
 export const eventObjectSchemas: Record<string, Schema> = {
-  WebhookOrder: objectSchema('Order', {
+  Order: {
+    ...objectSchema('Order', {
     object: str('Always `order`.', { const: 'order' }),
     id: str('Order ID.', { format: 'uuid' }),
     mode,
@@ -27,6 +28,7 @@ export const eventObjectSchemas: Record<string, Schema> = {
     product: {
       type: 'object',
       required: ['id', 'name', 'category'],
+      additionalProperties: false,
       properties: { id: str('Product ID.', { format: 'uuid' }), name: str('Product name.'), category: str('Product category, for example `gift_cards`, `airtime`, `pay_tv`.') },
     },
     face_value: int('Face value of one item, in minor units of `face_currency`.'),
@@ -45,6 +47,7 @@ export const eventObjectSchemas: Record<string, Schema> = {
       type: ['object', 'null'],
       description: 'For `own` orders: your supplier account that fulfilled it.',
       required: ['id', 'name'],
+      additionalProperties: false,
       properties: { id: str('Integration ID, for example `reloadly`.'), name: str('Integration name.') },
     },
     failure_reason: nullableStr('Why the order failed, for failed orders.'),
@@ -52,21 +55,23 @@ export const eventObjectSchemas: Record<string, Schema> = {
     created_at: time('When the order was placed.'),
     updated_at: time('When the order last changed. Use it to ignore an older event that arrives after a newer one.'),
     completed_at: nullableTime('When the order completed or failed.'),
-  }),
-  WebhookTopUp: objectSchema('Top-up', {
+    }),
+    additionalProperties: false,
+  },
+  TopUp: objectSchema('Top-up', {
     object: str('Always `top_up`.', { const: 'top_up' }),
     id: str('Top-up ID.', { format: 'uuid' }),
     mode,
-    status: str('Final status.', { enum: ['pending', 'succeeded', 'failed'] }),
+    status: str('`pending` until the payment is confirmed, then `succeeded` or `failed` (events carry only the final status).', { enum: ['pending', 'succeeded', 'failed'] }),
     source: str('`checkout` (payment page) or `bank_transfer` (into your reserved bank account).', { enum: ['checkout', 'bank_transfer'] }),
     amount: money('Amount added to your wallet'),
     currency: str('ISO 4217 currency.'),
-    checkout_url: nullableStr('Always null in events.'),
+    checkout_url: nullableStr('The payment page to send the payer to, while a checkout top-up is pending; null otherwise, and always null in events.'),
     failure_reason: nullableStr('Why the payment failed, for failed top-ups.'),
     created_at: time('When the top-up started.'),
     completed_at: nullableTime('When it succeeded or failed.'),
   }),
-  WebhookPayout: objectSchema('Payout', {
+  Payout: objectSchema('Payout', {
     object: str('Always `payout`.', { const: 'payout' }),
     id: str('Payout ID.', { format: 'uuid' }),
     mode,
@@ -78,17 +83,17 @@ export const eventObjectSchemas: Record<string, Schema> = {
     created_at: time('When the withdrawal was requested.'),
     completed_at: nullableTime('When it was paid or failed.'),
   }),
-  WebhookCustomerVerification: objectSchema('Customer verification', {
+  CustomerVerification: objectSchema('Customer verification', {
     object: str('Always `customer_verification`.', { const: 'customer_verification' }),
     id: str('Verification ID.', { format: 'uuid' }),
     mode,
     customer_reference: str('Your own reference for the customer.'),
-    status: str('`approved` or `declined` in events.', { enum: ['in_progress', 'approved', 'declined', 'in_review', 'expired'] }),
+    status: str('`in_progress` (waiting for the customer at `url`), `in_review`, `approved`, `declined` or `expired` (not finished within 7 days). Only `approved` or `declined` in events.', { enum: ['in_progress', 'approved', 'declined', 'in_review', 'expired'] }),
     method: str('`bvn` (Nigeria: BVN with the customer’s consent) or `document` (ID document and face check).', { enum: ['bvn', 'document'] }),
     country: str('ISO 3166-1 alpha-2 country of the customer.'),
-    url: nullableStr('Always null in events.'),
+    url: nullableStr('Where to send the customer to finish the check, while it is `in_progress` in live mode; otherwise null (always null in test mode and in events).'),
     verified_name: nullableStr('The name on the verified record, for approved checks.'),
-    reason: nullableStr('For declined checks: `name_mismatch` (the BVN record has a different name), `bvn_consent_declined`, or `not_verified`.'),
+    reason: nullableStr('Why it did not pass: `name_mismatch` (the BVN record has a different name), `bvn_consent_declined` or `not_verified` for declined checks; `expired` for expired ones. Null otherwise.', { enum: ['name_mismatch', 'bvn_consent_declined', 'not_verified', 'expired', null] }),
     created_at: time('When the check started.'),
     decided_at: nullableTime('When it was decided.'),
   }),
@@ -172,7 +177,7 @@ type EventDoc = { schema: string; summary: string; description: string; example:
 /** When each event fires, when it does not, and what comes before and after it. */
 export const eventDocs: Record<EventType, EventDoc> = {
   'order.completed': {
-    schema: 'WebhookOrder',
+    schema: 'Order',
     summary: 'An order was delivered',
     description: [
       'Fires once when the supplier confirms delivery: straight away for most orders, or after a later status check if the order was `processing` when you placed it. The wholesale cost and tax have been taken from your wallet.',
@@ -182,7 +187,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: exampleOrder('completed'),
   },
   'order.failed': {
-    schema: 'WebhookOrder',
+    schema: 'Order',
     summary: 'An order could not be fulfilled',
     description: [
       'Fires once when an order fails for good: every eligible supplier refused it, or the supplier confirmed it failed. The amount held from your wallet has been returned.',
@@ -192,7 +197,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: exampleOrder('failed', { failure_reason: 'The order could not be fulfilled. The amount held has been returned to your wallet.', receipt_number: null }),
   },
   'order.refunded': {
-    schema: 'WebhookOrder',
+    schema: 'Order',
     summary: 'A completed order was refunded',
     description: [
       'Fires when BitoCard refunds a completed order after reviewing it. The wholesale cost and tax are back in your wallet as topped-up funds.',
@@ -202,7 +207,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: exampleOrder('refunded', { updated_at: '2026-10-07T14:30:00.000Z' }),
   },
   'top_up.succeeded': {
-    schema: 'WebhookTopUp',
+    schema: 'TopUp',
     summary: 'Money was added to your wallet',
     description: [
       'Fires once when a payment into your wallet is confirmed: a checkout top-up (`source: checkout`) or a transfer into your reserved bank account (`source: bank_transfer`). The amount is available to spend.',
@@ -212,7 +217,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: exampleTopUp('succeeded'),
   },
   'top_up.failed': {
-    schema: 'WebhookTopUp',
+    schema: 'TopUp',
     summary: 'A checkout top-up failed',
     description: [
       'Fires once when a checkout top-up fails or is abandoned, or the amount paid does not match. Nothing was added to your wallet.',
@@ -222,7 +227,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: exampleTopUp('failed', { failure_reason: 'The payment failed.' }),
   },
   'payout.paid': {
-    schema: 'WebhookPayout',
+    schema: 'Payout',
     summary: 'A withdrawal reached your bank',
     description: [
       'Fires once when the bank transfer for a withdrawal of your earnings is confirmed.',
@@ -232,7 +237,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: examplePayout('paid'),
   },
   'payout.failed': {
-    schema: 'WebhookPayout',
+    schema: 'Payout',
     summary: 'A withdrawal failed',
     description: [
       'Fires once when the bank refuses or fails the transfer. The amount is back in your withdrawable earnings.',
@@ -242,7 +247,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: examplePayout('failed', { failure_reason: 'The bank transfer was refused.' }),
   },
   'customer_verification.approved': {
-    schema: 'WebhookCustomerVerification',
+    schema: 'CustomerVerification',
     summary: "A customer's identity was verified",
     description: [
       'Fires once when a customer check you started (`POST /v1/customers/{reference}/verification`) passes: the BVN record released with the customer’s consent matches their name, or their ID document and face check passed.',
@@ -252,7 +257,7 @@ export const eventDocs: Record<EventType, EventDoc> = {
     example: exampleVerification('approved'),
   },
   'customer_verification.declined': {
-    schema: 'WebhookCustomerVerification',
+    schema: 'CustomerVerification',
     summary: "A customer's identity check did not pass",
     description: [
       'Fires once when a customer check fails: the name on the BVN record differs, the customer refused consent, or the document or face check failed. `reason` says which.',

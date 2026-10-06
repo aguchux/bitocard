@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { passwordLength } from './passwords.service.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -198,4 +198,16 @@ export class PhoneDto {
   @IsString()
   @Length(6, 20)
   phone: string;
+}
+
+/** A "Try it" token for the API documentation. */
+export class DocsTokenDto {
+  @ApiProperty({ description: '`test` (sandbox, simulated fulfilment) or `live` (real money and real orders).', enum: ['test', 'live'], example: 'test' })
+  @IsIn(['test', 'live'])
+  mode: 'test' | 'live';
+
+  @ApiPropertyOptional({ description: 'Only the reading scopes: nothing can be changed. Staff who cannot create API keys always get read-only tokens.', default: false })
+  @IsOptional()
+  @IsBoolean()
+  read_only?: boolean;
 }

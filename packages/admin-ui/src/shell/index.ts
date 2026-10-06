@@ -5,3 +5,4 @@ export { AdminGate, AdminProviders, can, goToSignIn, AppLink, type AppLinkProps,
 export { AppProviders } from './app-providers';
 export { NotificationBell, NotificationsInbox, unreadPollMs } from './notifications';
 export { PushSettings, pushSupported, usePushSync } from './push';
+export { docsOrigins, goNext, safeNext } from './return-to';

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, IsUrl, Length, Matches, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, Roles, Scopes } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, Roles, Scopes, SessionOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
 import { StoresService } from './stores.service.js';
@@ -69,6 +69,7 @@ export class ResellerController {
   constructor(private readonly stores: StoresService) {}
 
   @ApiOperation({ summary: 'Update business details', description: 'The business name, and the country if it is not yet set.' })
+  @SessionOnly()
   @Roles('admin')
   @Patch()
   update(@CurrentCaller() caller: Caller, @Body() body: ResellerProfileDto) {

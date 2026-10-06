@@ -10,6 +10,7 @@ import { originAllowed } from './auth/auth.guard.js';
 import { APP_CONFIG, type AppConfig } from './config/config.js';
 import { validationPipe } from './common/errors/validation.js';
 import { securityHeaders } from './common/security-headers.js';
+import { addResponses } from './openapi/responses/index.js';
 import { addWebhooks } from './webhooks/openapi.js';
 
 /** Routes outside /v1: service info, health and robots.txt. Everything else is versioned. */
@@ -31,7 +32,8 @@ export async function createApp(options: AppOptions = {}) {
   app.enableCors({
     origin: (origin, done) => done(null, !origin || originAllowed(origin, config.ALLOWED_ORIGINS)),
     credentials: true,
-    allowedHeaders: ['content-type', 'idempotency-key', 'bitocard-reseller', 'bitocard-mode', 'x-request-id'],
+    // `authorization`: the docs send a short-lived "Try it" token (never a stored API key) from the browser.
+    allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'bitocard-reseller', 'bitocard-mode', 'x-request-id'],
     exposedHeaders: ['request-id', 'idempotent-replayed', 'ratelimit-limit', 'ratelimit-remaining', 'ratelimit-reset', 'retry-after'],
     maxAge: 600,
   });
@@ -57,5 +59,5 @@ export function buildOpenApi(app: NestExpressApplication): OpenAPIObject {
     .addServer('https://api.bitocard.com')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'API key', description: 'API key: bc_test_… (sandbox) or bc_live_… (live).' })
     .build();
-  return addWebhooks(SwaggerModule.createDocument(app, config));
+  return addResponses(addWebhooks(SwaggerModule.createDocument(app, config)));
 }
