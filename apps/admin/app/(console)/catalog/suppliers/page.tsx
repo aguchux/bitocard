@@ -4,7 +4,8 @@ import { useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
 import { Badge, Button, Card, CardHeader, categoryName, EmptyState, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, Input, KeyValue, Notice, PageHeader, RefreshFailed, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type ProductCategory, type Supplier, useCountriesQuery, useSetSupplierMarketMutation, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
+import { type FeatureRule, type ProductCategory, type ProductFeature, type Supplier, useCountriesQuery, useSetSupplierMarketMutation, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
+import { productFeatureLabels } from "@bitocard/api-client/storefront";
 import { healthOf } from "../supplier-health";
 
 type Filter = "live" | "all";
@@ -32,6 +33,61 @@ function SupplierLogo({ supplier, editable }: { supplier: Supplier; editable: bo
         </div>
       ) : null}
     </div>
+  );
+}
+
+const ruleOptions: Array<{ value: FeatureRule; label: string }> = [
+  { value: "required", label: "Required" },
+  { value: "allowed", label: "Allowed" },
+  { value: "excluded", label: "Excluded" },
+];
+
+/**
+ * Which of the supplier's products are synced, by what they can do (DIDWW's numbers: calls, SMS, app codes, fax…).
+ * Each feature is required (products must have it), allowed (either way) or excluded (products must not have it).
+ * Applied on the next sync: products that no longer match are taken off sale.
+ */
+function SupplierFeatures({ supplier, editable }: { supplier: Supplier; editable: boolean }) {
+  const [update, state] = useUpdateSupplierMutation();
+  const rules = supplier.feature_rules;
+  if (!rules) return null;
+  const features = Object.keys(rules) as ProductFeature[];
+  const required = features.filter(feature => rules[feature] === "required");
+  return (
+    <section aria-label={`${supplier.name} features`} className="space-y-2">
+      <h3 className="text-sm font-semibold text-ink">Features</h3>
+      <p className="text-xs text-muted">
+        Only products keeping to these rules are synced: required features must be there, excluded ones must not. Changes apply on the next sync, and products that no longer match are taken off sale.
+      </p>
+      {required.length === 0 ? <Notice tone="amber">No feature is required, so every product in stock is synced.</Notice> : null}
+      {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      <ul className="divide-y divide-line rounded-xl border border-line">
+        {features.map(feature => (
+          <li key={feature} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5">
+            <span className="text-sm font-medium text-ink">{productFeatureLabels[feature]}</span>
+            <span role="radiogroup" aria-label={productFeatureLabels[feature]} className="flex flex-wrap gap-1.5">
+              {ruleOptions.map(option => {
+                const chosen = rules[feature] === option.value;
+                const tone = option.value === "required" ? "border-brand-600 bg-brand-600 text-white" : option.value === "excluded" ? "border-red-600 bg-red-600 text-white" : "border-ink bg-ink text-white";
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={chosen}
+                    disabled={!editable}
+                    onClick={() => (chosen ? undefined : update({ code: supplier.code, feature_rules: { ...rules, [feature]: option.value } }))}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition disabled:opacity-60 ${chosen ? tone : "border-line bg-white text-muted hover:border-brand-500 hover:text-ink"}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -171,6 +227,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
         <AppLink href={`/catalog?supplier=${supplier.code}`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
           View its products and list them on bitocard.com →
         </AppLink>
+        <SupplierFeatures supplier={supplier} editable={operator} />
         <SupplierMarkets supplier={supplier} editable={operator} />
         <SupplierLogo key={supplier.logo_url ?? ""} supplier={supplier} editable={operator} />
       </div>

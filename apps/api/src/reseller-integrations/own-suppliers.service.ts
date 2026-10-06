@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { readFeatureRules } from '../catalogue/features.js';
 import { worldwideCategories } from '../catalogue/pricing.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -60,10 +61,12 @@ export class OwnSuppliersService {
         const adapter = await this.adapterFor(resellerId, integrationId);
         if (!adapter) throw notConnected();
         const enabled = new Set(reseller.countryRef?.categories.filter(item => item.enabled).map(item => item.category) ?? []);
+        // The same feature rules as BitoCard's own account with this supplier (DIDWW's numbers, for example).
+        const features = adapter.gatedFeatures?.length ? readFeatureRules((await this.prisma.supplier.findUnique({ where: { code: adapter.code } }))?.featureRules) : undefined;
         const scopes = new Map<string, CatalogueScope>();
         for (const category of adapter.syncs.filter(item => enabled.has(item))) {
           const country = worldwideCategories.has(category) ? null : reseller.country;
-          scopes.set(`${category}:${country}`, { category, country });
+          scopes.set(`${category}:${country}`, { category, country, ...(features ? { features } : {}) });
         }
         const items: CatalogueItem[] = [];
         const skus = new Set<string>();

@@ -1008,6 +1008,9 @@ model Supplier {
   resaleApproved       Boolean           @default(false) @map("resale_approved")
   requiresIpAllowlist  Boolean?          @map("requires_ip_allowlist")
   notes                String?
+  /// Admin feature rules for the supplier's products ({ feature: required | allowed | excluded }), for adapters with
+  /// gatedFeatures (DIDWW's numbers). Products breaking a rule are not synced.
+  featureRules         Json              @default("{}") @map("feature_rules")
   lastSyncedAt         DateTime?         @map("last_synced_at")
   lastSyncError        String?           @map("last_sync_error")
   updatedAt            DateTime          @updatedAt @map("updated_at")

@@ -78,7 +78,7 @@ const until = async (check, what) => {
 };
 
 describe('DIDWW catalogue', () => {
-  test('numbers are products per country, type, area, capabilities and plan; regulated, metered and fax-only ones are left out', async () => {
+  test('numbers are products per country, type, area, capabilities and plan; only numbers receiving SMS codes from apps, needing no documents and not metered', async () => {
     const products = await prisma.product.findMany({ where: { category: 'virtual_numbers' }, include: { supplierProducts: true }, orderBy: { key: 'asc' } });
     assert.deepEqual(
       products.map(p => [p.key, p.country, p.faceCurrency, p.fixedValues.map(Number), p.recipientType]),
@@ -88,8 +88,8 @@ describe('DIDWW catalogue', () => {
       ],
     );
     assert.equal(products[0].name, 'United Kingdom local number, London');
-    assert.match(products[0].description, /with incoming calls, incoming SMS, SMS from people, SMS codes from apps and services\./);
-    assert.deepEqual(products[0].features, ['calls_in', 'sms_in', 'sms_people', 'app_codes'], 'what the number can do, in BitoCard names');
+    assert.match(products[0].description, /with incoming calls, incoming SMS, SMS from people, SMS codes from apps and services, fax\./);
+    assert.deepEqual(products[0].features, ['calls_in', 'sms_in', 'sms_people', 'app_codes', 'fax'], 'what the number can do, in BitoCard names');
     assert.deepEqual(products[0].supplierProducts[0].meta, {
       didGroupId: 'grp-london',
       skuId: 'sku-london-0',
@@ -116,11 +116,51 @@ describe('DIDWW catalogue', () => {
       assert.deepEqual(items[0].meta.capabilities, ['voice', 'sms']);
       assert.equal(
         adapter.syncReport(),
-        'GB: 2 number groups in stock without documents or per-minute billing, 2 products; 1 have neither calls nor SMS (features: t38). ZZ: not a DIDWW country.',
+        'GB: 4 number groups in stock without documents or per-minute billing, 2 products; 3 do not match the feature settings (features: t38, voice, voice_out, sms, p2p). ZZ: not a DIDWW country.',
       );
     } finally {
       didww.state.groups = original;
     }
+  });
+
+  test('admins set which features numbers must have or must not have; the next sync follows them', async () => {
+    const supplier = (await admin.get('/v1/admin/suppliers/didww')).json;
+    assert.deepEqual(
+      Object.entries(supplier.feature_rules).filter(([, rule]) => rule !== 'allowed'),
+      [['sms_in', 'required'], ['app_codes', 'required']],
+      'until changed: numbers receiving SMS codes from apps',
+    );
+    assert.equal(supplier.feature_rules.fax, 'allowed');
+    assert.equal((await admin.get('/v1/admin/suppliers/reloadly')).json.feature_rules, null, 'nothing to set for other suppliers');
+
+    const rules = { ...supplier.feature_rules, sms_in: 'allowed', app_codes: 'allowed', calls_in: 'required', fax: 'excluded' };
+    const saved = await admin.patch('/v1/admin/suppliers/didww', { feature_rules: rules });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.deepEqual([saved.json.feature_rules.calls_in, saved.json.feature_rules.fax, saved.json.feature_rules.sms_in], ['required', 'excluded', 'allowed']);
+    try {
+      const sync = await admin.post('/v1/admin/suppliers/didww/sync');
+      assert.equal(sync.status, 200, JSON.stringify(sync.json));
+      const onSale = await prisma.supplierProduct.findMany({ where: { supplierCode: 'didww', available: true }, include: { product: true } });
+      assert.deepEqual(
+        [...new Set(onSale.map(offer => offer.product.key))].sort(),
+        ['virtual_numbers:GB:local:birmingham-voice-voice-out'],
+        'calls required and fax excluded: London (fax) and Glasgow (no calls) are taken off sale',
+      );
+      const audit = await prisma.auditLog.findFirst({ where: { action: 'supplier.updated', targetId: 'didww' }, orderBy: { createdAt: 'desc' } });
+      assert.equal(audit.after.featureRules.fax, 'excluded');
+    } finally {
+      assert.equal((await admin.patch('/v1/admin/suppliers/didww', { feature_rules: supplier.feature_rules })).status, 200);
+      assert.equal((await admin.post('/v1/admin/suppliers/didww/sync')).status, 200);
+    }
+    const back = await prisma.supplierProduct.findMany({ where: { supplierCode: 'didww', available: true }, include: { product: true } });
+    assert.ok(back.every(offer => offer.product.key.includes('london')) && back.length === 2);
+
+    const unknown = await admin.patch('/v1/admin/suppliers/didww', { feature_rules: { whatsapp: 'required' } });
+    assert.deepEqual([unknown.status, unknown.json.error.param], [400, 'feature_rules.whatsapp']);
+    const wrong = await admin.patch('/v1/admin/suppliers/didww', { feature_rules: { fax: 'maybe' } });
+    assert.deepEqual([wrong.status, wrong.json.error.param], [400, 'feature_rules.fax']);
+    const other = await admin.patch('/v1/admin/suppliers/reloadly', { feature_rules: { fax: 'required' } });
+    assert.deepEqual([other.status, other.json.error.param], [400, 'feature_rules']);
   });
 
   test('a sync that brings back nothing says why', async () => {
@@ -129,7 +169,7 @@ describe('DIDWW catalogue', () => {
     try {
       const sync = await admin.post('/v1/admin/suppliers/didww/sync');
       assert.deepEqual([sync.status, sync.json.products_created + sync.json.offers_updated], [200, 0]);
-      assert.equal(sync.json.note, 'GB: 1 number groups in stock without documents or per-minute billing, 0 products; 1 have neither calls nor SMS (features: t38).');
+      assert.equal(sync.json.note, 'GB: 3 number groups in stock without documents or per-minute billing, 0 products; 3 do not match the feature settings (features: t38, voice_in, voice_out, sms_in, p2p).');
     } finally {
       didww.state.groups = original;
       assert.equal((await admin.post('/v1/admin/suppliers/didww/sync')).json.note, null);
@@ -171,7 +211,7 @@ describe('DIDWW catalogue', () => {
     const all = await visitor.get('/v1/store/products?category=virtual_numbers&limit=60');
     assert.equal(all.status, 200, JSON.stringify(all.json));
     const london = all.json.data.find(product => product.key === londonKey);
-    assert.deepEqual(london.features, ['calls_in', 'sms_in', 'sms_people', 'app_codes']);
+    assert.deepEqual(london.features, ['calls_in', 'sms_in', 'sms_people', 'app_codes', 'fax']);
     const codes = await visitor.get('/v1/store/products?category=virtual_numbers&features=sms_in,app_codes');
     assert.ok(codes.json.data.length > 0 && codes.json.data.every(product => product.features.includes('app_codes') && product.features.includes('sms_in')));
     assert.equal((await visitor.get('/v1/store/products?category=virtual_numbers&features=caller_name')).json.data.length, 0, 'none shows the caller name');

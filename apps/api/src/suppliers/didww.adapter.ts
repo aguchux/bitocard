@@ -1,5 +1,5 @@
 import type { ProductCategory } from '../generated/prisma/client.js';
-import { type ProductFeature, productFeatureKeys } from '../catalogue/features.js';
+import { type FeatureRules, meetsFeatureRules, type ProductFeature, productFeatureKeys } from '../catalogue/features.js';
 import { providerRequest } from '../payments/provider-error.js';
 import { type CatalogueItem, type CatalogueScope, type FulfilmentRequest, type FulfilmentResult, slug, type SupplierAdapter } from './adapter.js';
 
@@ -18,13 +18,13 @@ type TypeAttributes = { name: string };
 type OrderAttributes = { status: string; reference?: string; amount?: string; callback_url?: string | null; created_at?: string };
 type DidAttributes = { number: string; expires_at?: string | null; channels_included_count?: number };
 
-/** Number capabilities BitoCard shows, in DIDWW's names. Fax (t38) is not sold. */
+/** Number capabilities in product keys, in DIDWW's names (fax shows in a key only on numbers with no calls or SMS). */
 const capabilities = ['voice', 'voice_out', 'sms', 'sms_out'] as const;
 /** DIDWW API 2026-04-16 names incoming calls and SMS `voice_in` and `sms_in`; older versions `voice` and `sms`. Read both. */
 const featureAliases: Record<string, (typeof capabilities)[number]> = { voice: 'voice', voice_in: 'voice', voice_out: 'voice_out', sms: 'sms', sms_in: 'sms', sms_out: 'sms_out' };
 /**
  * DIDWW features as BitoCard's product features (`src/catalogue/features.ts`): `a2p` numbers receive SMS sent by apps
- * and services (verification codes), `p2p` SMS from people, `cnam_out` shows the caller's name. Fax (t38) is not sold.
+ * and services (verification codes), `p2p` SMS from people, `cnam_out` shows the caller's name, `t38` receives fax.
  */
 const publicFeatures: Record<string, ProductFeature> = {
   voice: 'calls_in',
@@ -37,6 +37,7 @@ const publicFeatures: Record<string, ProductFeature> = {
   a2p: 'app_codes',
   emergency: 'emergency',
   cnam_out: 'caller_name',
+  t38: 'fax',
 };
 /** How each feature reads in a number's description. */
 const describe: Record<ProductFeature, string> = {
@@ -48,6 +49,7 @@ const describe: Record<ProductFeature, string> = {
   app_codes: 'SMS codes from apps and services',
   emergency: 'emergency calls',
   caller_name: 'caller name display',
+  fax: 'fax',
 };
 const pageSize = 100;
 
@@ -71,8 +73,12 @@ export type DidwwSettings = {
 /**
  * DIDWW: virtual phone numbers (DIDs). A product is one country, number type, area and capability set at one price
  * (DIDWW's DID group and stock keeping unit). The customer pays the setup fee and the first month; numbers are ordered
- * for one billing cycle, so DIDWW never renews (and charges for) a number BitoCard has not been paid for. Renewals,
- * numbers needing the end user's documents and metered (per-minute) numbers are not sold yet.
+ * for one billing cycle, so DIDWW never renews (and charges for) a number BitoCard has not been paid for.
+ *
+ * Only numbers in stock, needing no end user documents and not billed per minute are synced, and only those keeping to
+ * the admin's feature rules (Catalog > Suppliers > DIDWW > Features: each feature required, allowed or excluded). Until
+ * an admin changes them, numbers must receive SMS and SMS codes from apps (`a2p`), whose SMS will be read in BitoCard or
+ * forwarded by email.
  *
  * DIDWW orders carry no reference of ours, so each order's callback address names it (`?reference=`): DIDWW echoes the
  * address on the order, which lets an order whose reply was lost be found again instead of being placed twice.
@@ -80,6 +86,10 @@ export type DidwwSettings = {
 export class DidwwAdapter implements SupplierAdapter {
   readonly code = 'didww';
   readonly syncs: ProductCategory[] = ['virtual_numbers'];
+  readonly gatedFeatures: readonly ProductFeature[] = productFeatureKeys;
+  readonly defaultFeatureRules: FeatureRules = { sms_in: 'required', app_codes: 'required' };
+  /** The rules of the sync in progress. */
+  private rules: FeatureRules = this.defaultFeatureRules;
 
   constructor(private readonly settings: DidwwSettings) {}
 
@@ -111,6 +121,7 @@ export class DidwwAdapter implements SupplierAdapter {
     if (scope.category !== 'virtual_numbers') return [];
     const countries = scope.country ? [scope.country] : this.settings.countries;
     this.report = countries.length ? [] : ['No number countries are set (Settings > Integrations > DIDWW).'];
+    this.rules = scope.features ?? this.defaultFeatureRules;
     const items: CatalogueItem[] = [];
     for (const iso of countries) items.push(...(await this.country(iso.toUpperCase())));
     return items;
@@ -125,7 +136,7 @@ export class DidwwAdapter implements SupplierAdapter {
     }
     const items: CatalogueItem[] = [];
     let groups = 0;
-    const skipped = { documents: 0, metered: 0, unavailable: 0, features: 0, prices: 0 };
+    const skipped = { documents: 0, metered: 0, unavailable: 0, rules: 0, prices: 0 };
     const seen = new Set<string>();
     for (let page = 1; ; page += 1) {
       const query = [
@@ -146,8 +157,8 @@ export class DidwwAdapter implements SupplierAdapter {
         else if (group.meta?.is_available === false) skipped.unavailable += 1;
         const found = this.groupItems(country.attributes, group, included);
         if (!group.meta?.needs_registration && !group.attributes.is_metered && group.meta?.is_available !== false && found.length === 0) {
-          if (this.features(group).length === 0) {
-            skipped.features += 1;
+          if (!this.sellable(group)) {
+            skipped.rules += 1;
             for (const feature of group.attributes.features ?? []) seen.add(feature);
           } else skipped.prices += 1;
         }
@@ -159,7 +170,7 @@ export class DidwwAdapter implements SupplierAdapter {
       skipped.documents && `${skipped.documents} need the end user's documents`,
       skipped.metered && `${skipped.metered} are billed per minute`,
       skipped.unavailable && `${skipped.unavailable} are out of stock`,
-      skipped.features && `${skipped.features} have neither calls nor SMS (features: ${[...seen].join(', ') || 'none'})`,
+      skipped.rules && `${skipped.rules} do not match the feature settings (features: ${[...seen].join(', ') || 'none'})`,
       skipped.prices && `${skipped.prices} have no prices`,
     ].filter(Boolean);
     // DIDWW is asked only for numbers in stock that need no documents and are not billed per minute.
@@ -175,11 +186,10 @@ export class DidwwAdapter implements SupplierAdapter {
       return (Array.isArray(data) ? data : data ? [data] : []).map(ref => included.get(`${ref.type}:${ref.id}`)).filter(Boolean) as Resource<unknown>[];
     };
     const typeName = (related('did_group_type')[0]?.attributes as TypeAttributes | undefined)?.name ?? 'Local';
+    if (!this.sellable(group)) return [];
     const features = this.features(group);
-    if (features.length === 0) return [];
-    // Everything the number can do, for the stores' icons and filters (calls and SMS, app codes, emergency, caller name).
-    const named = new Set((group.attributes.features ?? []).map(feature => publicFeatures[feature]).filter(Boolean));
-    const productFeatureList = productFeatureKeys.filter(feature => named.has(feature));
+    // Everything the number can do, for the stores' icons and filters (calls and SMS, app codes, emergency, caller name, fax).
+    const productFeatureList = this.productFeatures(group);
     const skus = related('stock_keeping_units') as Resource<SkuAttributes>[];
     const area = group.attributes.area_name?.trim() || typeName;
     const numberType = slug(typeName);
@@ -187,7 +197,9 @@ export class DidwwAdapter implements SupplierAdapter {
       const setup = centsUp(sku.attributes.setup_price);
       const monthly = centsUp(sku.attributes.monthly_price);
       const channels = sku.attributes.channels_included_count ?? 0;
-      const variant = [slug(area), ...features.map(feature => feature.replace('_', '-')), ...(skus.length > 1 ? [`${channels}ch`] : [])].join('-');
+      // Keys name calls and SMS only, so they stay stable when fax is added; a fax-only number is named by its fax.
+      const named = features.length ? features.map(feature => feature.replace('_', '-')) : ['fax'];
+      const variant = [slug(area), ...named, ...(skus.length > 1 ? [`${channels}ch`] : [])].join('-');
       const what = productFeatureList.map(feature => describe[feature]).join(', ');
       return {
         sku: `${group.id}:${sku.id}`,
@@ -220,11 +232,23 @@ export class DidwwAdapter implements SupplierAdapter {
     });
   }
 
-  /** The group's capabilities in BitoCard's names; empty when it has neither calls nor SMS (fax only, for example). */
+  /** The group's capabilities in BitoCard's names (calls and SMS in and out). */
   private features(group: Resource<DidGroupAttributes>) {
     const names = new Set((group.attributes.features ?? []).map(feature => featureAliases[feature]).filter(Boolean));
-    const list = capabilities.filter(feature => names.has(feature));
-    return list.includes('voice') || list.includes('sms') ? list : [];
+    return capabilities.filter(feature => names.has(feature));
+  }
+
+  /** Everything the group's numbers can do, in BitoCard's names. */
+  private productFeatures(group: Resource<DidGroupAttributes>) {
+    const named = new Set((group.attributes.features ?? []).map(feature => publicFeatures[feature]).filter(Boolean));
+    return productFeatureKeys.filter(feature => named.has(feature));
+  }
+
+  /** Sold only when the numbers receive calls, SMS or fax, and keep to the admin's feature rules. */
+  private sellable(group: Resource<DidGroupAttributes>) {
+    const features = this.productFeatures(group);
+    const usable = features.some(feature => feature === 'calls_in' || feature === 'sms_in' || feature === 'fax');
+    return usable && meetsFeatureRules(features, this.rules);
   }
 
   /** The callback address for one order: it names our reference, which is how a lost order is found again. */

@@ -9,6 +9,7 @@ import type {
   AdminSession,
   AuditEntry,
   Country,
+  FeatureRule,
   Integration,
   List,
   MfaChallenge,
@@ -18,6 +19,7 @@ import type {
   Overview,
   Plan,
   PricingRule,
+  ProductFeature,
   ProductCategory,
   ResellerDetail,
   ResellerStatus,
@@ -139,7 +141,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     suppliers: build.query<List<Supplier>, void>({ query: () => '/v1/admin/suppliers', providesTags: [{ type: 'Supplier', id: 'LIST' }] }),
     supplier: build.query<Supplier, string>({ query: code => `/v1/admin/suppliers/${code}`, providesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }] }),
     /** Shown at once in the list and on the supplier; the saved supplier replaces both, so neither is refetched. */
-    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null }>>({
+    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null; feature_rules: Partial<Record<ProductFeature, FeatureRule>> }>>({
       query: ({ code, ...body }) => ({ url: `/v1/admin/suppliers/${code}`, method: 'PATCH', body }),
       async onQueryStarted({ code, resale_approved, ...change }, { dispatch, queryFulfilled }) {
         const apply = (supplier: Supplier) => {

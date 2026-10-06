@@ -1,4 +1,4 @@
-import { BadgeCheck, MessageSquare, PhoneIncoming, PhoneOutgoing, Send, Siren, UserRound, UsersRound, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Printer, MessageSquare, PhoneIncoming, PhoneOutgoing, Send, Siren, UserRound, UsersRound, type LucideIcon } from "lucide-react";
 import { type ProductFeature, productFeatureLabels } from "@bitocard/api-client/storefront";
 
 /** One icon per product feature (virtual numbers' calls and SMS). */
@@ -11,6 +11,7 @@ export const featureIcon: Record<ProductFeature, LucideIcon> = {
   app_codes: BadgeCheck,
   emergency: Siren,
   caller_name: UserRound,
+  fax: Printer,
 };
 
 /** Features shoppers filter numbers by, in this order. */

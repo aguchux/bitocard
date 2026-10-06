@@ -398,6 +398,9 @@ export async function fakeDidww() {
       group('grp-manchester', { prefix: '161', features: ['voice'], is_metered: false, area_name: 'Manchester' }, local, [sku('sku-manchester', '0', '1', 0)], { needs_registration: true }),
       group('grp-freephone', { prefix: '800', features: ['voice'], is_metered: true, area_name: '' }, tollFree, [sku('sku-freephone', '0', '5', 0)]),
       group('grp-fax', { prefix: '113', features: ['t38'], is_metered: false, area_name: 'Leeds' }, local, [sku('sku-fax', '0', '1', 0)]),
+      // Only numbers receiving SMS codes from apps are sold: not voice-only numbers, nor SMS from people only.
+      group('grp-voice', { prefix: '121', features: ['voice_in', 'voice_out'], is_metered: false, area_name: 'Birmingham' }, local, [sku('sku-voice', '0', '1', 0)]),
+      group('grp-people', { prefix: '141', features: ['sms_in', 'p2p'], is_metered: false, area_name: 'Glasgow' }, local, [sku('sku-people', '0', '1', 0)]),
     ],
     orders: {},
     dids: [],

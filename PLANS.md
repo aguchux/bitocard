@@ -96,7 +96,7 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 19 | TD SYNNEX | Software, Microsoft | To confirm | Later (phase B alternative) |
 | 20 | Pax8 | Business subscriptions | To confirm | Later (phase C) |
 | 21 | ALSO Cloud Marketplace | Business subscriptions | Mainly Europe | Later (phase C alternative) |
-| 22 | DIDWW | Virtual numbers, SIP, SMS | 90+ countries | Later (adapter built: first month of unregulated numbers; renewals and regulated numbers to follow) |
+| 22 | DIDWW | Virtual numbers, SIP, SMS | 90+ countries | Later (adapter built: first month of numbers with no documents and no per-minute billing, filtered by admin feature rules per feature (required, allowed or excluded; default SMS and app codes required, for SMS read in BitoCard or forwarded by email); renewals to follow) |
 | 23 | Telnyx | Virtual numbers, SMS | Global | Later |
 | 24 | Vonage | Virtual numbers, SMS | Global | Later |
 | 25 | Twilio | Virtual numbers, SMS | Global | Later |

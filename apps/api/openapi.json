@@ -17020,7 +17020,7 @@
             "name": "features",
             "required": false,
             "in": "query",
-            "description": "Products that can do all of these, separated by commas: calls_in, calls_out, sms_in, sms_out, sms_people, app_codes, emergency, caller_name. For example virtual numbers that receive SMS and app codes.",
+            "description": "Products that can do all of these, separated by commas: calls_in, calls_out, sms_in, sms_out, sms_people, app_codes, emergency, caller_name, fax. For example virtual numbers that receive SMS and app codes.",
             "schema": {
               "type": "array",
               "items": {
@@ -22267,7 +22267,8 @@
                 "sms_people",
                 "app_codes",
                 "emergency",
-                "caller_name"
+                "caller_name",
+                "fax"
               ]
             },
             "description": "What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products."
@@ -25578,7 +25579,8 @@
                 "sms_people",
                 "app_codes",
                 "emergency",
-                "caller_name"
+                "caller_name",
+                "fax"
               ]
             },
             "description": "What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products."
@@ -25716,7 +25718,8 @@
                 "sms_people",
                 "app_codes",
                 "emergency",
-                "caller_name"
+                "caller_name",
+                "fax"
               ]
             },
             "description": "What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products."

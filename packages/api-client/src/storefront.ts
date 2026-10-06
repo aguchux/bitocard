@@ -20,7 +20,7 @@ export const categoryLabels: Record<ProductCategory, string> = {
 };
 
 /** What a product can do (virtual numbers' calls and SMS), mirroring `apps/api/src/catalogue/features.ts`. */
-export type ProductFeature = 'calls_in' | 'calls_out' | 'sms_in' | 'sms_out' | 'sms_people' | 'app_codes' | 'emergency' | 'caller_name';
+export type ProductFeature = 'calls_in' | 'calls_out' | 'sms_in' | 'sms_out' | 'sms_people' | 'app_codes' | 'emergency' | 'caller_name' | 'fax';
 
 export const productFeatureLabels: Record<ProductFeature, string> = {
   calls_in: 'Incoming calls',
@@ -31,6 +31,7 @@ export const productFeatureLabels: Record<ProductFeature, string> = {
   app_codes: 'Receives app codes',
   emergency: 'Emergency calls',
   caller_name: 'Shows caller name',
+  fax: 'Receives fax',
 };
 
 export type StoreBrand = {

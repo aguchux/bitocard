@@ -1,5 +1,5 @@
 import type { DenominationType, ProductCategory } from '../generated/prisma/client.js';
-import type { ProductFeature } from '../catalogue/features.js';
+import type { FeatureRules, ProductFeature } from '../catalogue/features.js';
 
 /** One product as a supplier offers it, already in BitoCard terms. Amounts are minor units. */
 export type CatalogueItem = {
@@ -31,7 +31,8 @@ export type CatalogueItem = {
 };
 
 /** What to sync: one category, for one country (null for categories bought worldwide, such as gift cards). */
-export type CatalogueScope = { category: ProductCategory; country: string | null };
+/** `features`: the admin's feature rules for the supplier (only adapters with `gatedFeatures` read them). */
+export type CatalogueScope = { category: ProductCategory; country: string | null; features?: FeatureRules };
 
 export type RecipientCheck =
   | { valid: true; accountName: string; details: Record<string, string> }
@@ -78,6 +79,9 @@ export interface SupplierAdapter {
   catalogue(scope: CatalogueScope): Promise<CatalogueItem[]>;
   /** Optional: what the last catalogue fetch found, so a sync that brings back nothing can say why. */
   syncReport?(): string | null;
+  /** Features an admin can require or exclude for this supplier's products, and the rules used until they do. */
+  readonly gatedFeatures?: readonly ProductFeature[];
+  readonly defaultFeatureRules?: FeatureRules;
   /** Pay-TV and bills: confirm a smartcard or meter number before a quote. */
   validateRecipient?(meta: Record<string, unknown>, accountNumber: string): Promise<RecipientCheck>;
   /**
