@@ -1,4 +1,5 @@
 import { bitocardApi } from '../base';
+import { settleOptimistic } from '../optimistic';
 import { type List, type Mode, type Page, params } from './common';
 
 /** Product categories, in the order the catalogue shows them. */
@@ -111,7 +112,23 @@ export const resellerCatalogueApi = bitocardApi.injectEndpoints({
     /** Lists or unlists products on your BitoCard-hosted store (at most 100 at a time). */
     setListing: build.mutation<{ object: 'listing_update'; listed: boolean; product_ids: string[]; updated: number }, { listed: boolean; product_ids: string[] }>({
       query: body => ({ url: '/v1/catalogue/listing', method: 'POST', body }),
-      invalidatesTags: ['Catalogue'],
+      // Shown at once on every loaded catalogue page and product, undone if refused; nothing is refetched, so a
+      // product that no longer matches a "listed" filter stays in view until the list is next refreshed.
+      async onQueryStarted({ listed, product_ids }, { dispatch, getState, queryFulfilled }) {
+        const ids = new Set(product_ids);
+        const state = getState() as Parameters<typeof resellerCatalogueApi.util.selectCachedArgsForQuery>[0];
+        const patches = [
+          ...resellerCatalogueApi.util.selectCachedArgsForQuery(state, 'catalogueProducts').map(args =>
+            dispatch(
+              resellerCatalogueApi.util.updateQueryData('catalogueProducts', args, draft => {
+                for (const product of draft.pages.flatMap(page => page.data)) if (ids.has(product.id)) product.listed = listed;
+              }),
+            ),
+          ),
+          ...product_ids.map(id => dispatch(resellerCatalogueApi.util.updateQueryData('catalogueProduct', id, draft => void (draft.listed = listed)))),
+        ];
+        await settleOptimistic(patches, queryFulfilled, () => dispatch(resellerCatalogueApi.util.invalidateTags(['Catalogue'])));
+      },
     }),
     createQuote: build.mutation<Quote, CreateQuote>({ query: body => ({ url: '/v1/quotes', method: 'POST', body }) }),
     quote: build.query<Quote, string>({ query: id => `/v1/quotes/${id}` }),

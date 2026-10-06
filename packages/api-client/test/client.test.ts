@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { adminApi, parseStockCodes, percentToPpb } from '../src/admin';
-import { resellerFeesApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi } from '../src/reseller';
+import { resellerCatalogueApi, resellerFeesApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi } from '../src/reseller';
 import { keepUnusedSeconds, makeStore, notificationsApi, pushApi, readTimeoutMs, revalidateAfterSeconds, setRequestContext, toApiError, uploadMedia } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
@@ -244,6 +244,106 @@ describe('notifications read at once', () => {
     await all;
     list.unsubscribe();
     badge.unsubscribe();
+  });
+});
+
+describe('optimistic toggles', () => {
+  /** A request the test answers when it chooses. */
+  const holdNext = () => {
+    let answer!: (response: Response) => void;
+    vi.stubGlobal('fetch', async (input: Request) => {
+      calls.push({ url: input.url, method: input.method, headers: input.headers, credentials: input.credentials, body: null });
+      return new Promise<Response>(resolve => (answer = resolve));
+    });
+    return async (response: Response) => {
+      await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+      answer(response);
+    };
+  };
+  const product = (id: string, listed: boolean) => ({ object: 'admin_product', id, name: id, listed, active: true, image_url: null, offers: [{ id: `${id}-o`, available: true, discount_bps: 0, priority: 0 }] });
+
+  test('listing a product shows at once with the listed count, then takes the saved values without refetching the list', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ object: 'list', data: [product('p1', false), product('p2', true)], has_more: false, total: 2, listed: 1 });
+    const list = store.dispatch(adminApi.endpoints.products.initiate({}));
+    await list;
+    const answer = holdNext();
+    const saving = store.dispatch(adminApi.endpoints.updateProduct.initiate({ id: 'p1', listed: true }));
+    const page = () => adminApi.endpoints.products.select({})(store.getState()).data!.pages[0];
+    expect(page().data[0].listed).toBe(true);
+    expect(page().listed).toBe(2);
+    await answer(Response.json({ id: 'p1', active: true, listed: true, name: 'Renamed by the API', image_url: null }));
+    await saving;
+    expect(page().data[0].name).toBe('Renamed by the API');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(calls.filter(call => call.url.includes('/v1/admin/products?'))).toHaveLength(1);
+    list.unsubscribe();
+  });
+
+  test('a refused change flips back and the list is fetched again', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ object: 'list', data: [product('p1', false)], has_more: false, total: 1, listed: 0 });
+    const list = store.dispatch(adminApi.endpoints.products.initiate({}));
+    await list;
+    const answer = holdNext();
+    const saving = store.dispatch(adminApi.endpoints.updateOffer.initiate({ id: 'p1-o', available: false }));
+    const offer = () => adminApi.endpoints.products.select({})(store.getState()).data!.pages[0].data[0].offers[0];
+    expect(offer().available).toBe(false);
+    await vi.waitFor(() => expect(calls.some(call => call.method === 'PATCH')).toBe(true));
+    vi.stubGlobal('fetch', async (input: Request) => {
+      calls.push({ url: input.url, method: input.method, headers: input.headers, credentials: input.credentials, body: null });
+      return Response.json({ object: 'list', data: [product('p1', false)], has_more: false, total: 1, listed: 0 });
+    });
+    await answer(Response.json({ error: { type: 'invalid_request_error', code: 'not_allowed', message: 'No.' } }, { status: 409 }));
+    await saving;
+    expect(offer().available).toBe(true);
+    await vi.waitFor(() => expect(calls.filter(call => call.url.includes('/v1/admin/products?'))).toHaveLength(2));
+    list.unsubscribe();
+  });
+
+  test('a switch shows at once at its scope; reset removes it', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ object: 'list', data: [{ object: 'switch', key: 'own_integrations', scope: 'country', country_code: 'NG', reseller_id: null, enabled: true }], definitions: {} });
+    const switches = store.dispatch(adminApi.endpoints.switches.initiate());
+    await switches;
+    const rows = () => adminApi.endpoints.switches.select()(store.getState()).data!.data;
+    let answer = holdNext();
+    let saving = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'own_integrations', enabled: true }));
+    expect(rows().map(row => [row.scope, row.country_code, row.enabled])).toEqual([
+      ['country', 'NG', true],
+      ['global', null, true],
+    ]);
+    await answer(Response.json({ object: 'switch' }));
+    await saving;
+    answer = holdNext();
+    saving = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'own_integrations', country_code: 'NG', enabled: null }));
+    expect(rows().some(row => row.country_code === 'NG')).toBe(false);
+    await answer(Response.json({ object: 'switch' }));
+    await saving;
+    switches.unsubscribe();
+  });
+
+  test('a supplier market and a reseller listing show at once', async () => {
+    const store = makeStore();
+    reply = call =>
+      call.url.includes('/v1/admin/suppliers/')
+        ? Response.json({ object: 'supplier', code: 'zendit', enabled: true, funding: { resale_approved: false }, markets: [{ country: 'NG', category: 'airtime', enabled: false }] })
+        : Response.json({ object: 'list', data: [{ object: 'product', id: 'c1', listed: false }], has_more: false, next_cursor: null });
+    const supplier = store.dispatch(adminApi.endpoints.supplier.initiate('zendit'));
+    const catalogue = store.dispatch(resellerCatalogueApi.endpoints.catalogueProducts.initiate({}));
+    await Promise.all([supplier, catalogue]);
+    let answer = holdNext();
+    const market = store.dispatch(adminApi.endpoints.setSupplierMarket.initiate({ code: 'zendit', country: 'NG', category: 'airtime', enabled: true }));
+    expect(adminApi.endpoints.supplier.select('zendit')(store.getState()).data!.markets![0].enabled).toBe(true);
+    await answer(Response.json({ object: 'supplier', code: 'zendit', enabled: true, funding: { resale_approved: false }, markets: [{ country: 'NG', category: 'airtime', enabled: true }] }));
+    await market;
+    answer = holdNext();
+    const listing = store.dispatch(resellerCatalogueApi.endpoints.setListing.initiate({ listed: true, product_ids: ['c1'] }));
+    expect(resellerCatalogueApi.endpoints.catalogueProducts.select({})(store.getState()).data!.pages[0].data[0].listed).toBe(true);
+    await answer(Response.json({ object: 'listing_update', listed: true, product_ids: ['c1'], updated: 1 }));
+    await listing;
+    supplier.unsubscribe();
+    catalogue.unsubscribe();
   });
 });
 

@@ -41,7 +41,7 @@ export default function SwitchesPage() {
                     <Toggle
                       label={`${humanise(key)} globally`}
                       checked={Boolean(value(key))}
-                      disabled={!editable || state.isLoading}
+                      disabled={!editable}
                       onChange={enabled => setSwitch({ key, enabled })}
                     />
                   </li>
@@ -68,7 +68,7 @@ export default function SwitchesPage() {
                             <Toggle
                               label={`${humanise(key)} in ${country.name}`}
                               checked={set ?? Boolean(value(key))}
-                              disabled={!editable || state.isLoading}
+                              disabled={!editable}
                               onChange={enabled => setSwitch({ key, country_code: country.code, enabled })}
                             />
                           </span>

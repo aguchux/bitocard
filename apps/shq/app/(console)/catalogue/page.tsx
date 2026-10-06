@@ -28,19 +28,26 @@ const priceRange = (product: Product) => {
 function ListingButton({ product, manage }: { product: Product; manage: boolean }) {
   const [setListing, state] = useSetListingMutation();
   if (!manage) return product.listed ? <Badge tone="green" dot={false}>Listed</Badge> : <span className="text-xs text-muted">Not listed</span>;
+  // The button flips at once (optimistic); if the API refuses, it flips back and says so.
   return (
-    <Button
-      size="sm"
-      variant={product.listed ? "secondary" : "primary"}
-      loading={state.isLoading}
-      onClick={event => {
-        event.stopPropagation();
-        void setListing({ listed: !product.listed, product_ids: [product.id] });
-      }}
-      aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on your store`}
-    >
-      {product.listed ? "Unlist" : "List"}
-    </Button>
+    <span className="inline-flex items-center gap-2">
+      <Button
+        size="sm"
+        variant={product.listed ? "secondary" : "primary"}
+        onClick={event => {
+          event.stopPropagation();
+          void setListing({ listed: !product.listed, product_ids: [product.id] });
+        }}
+        aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on your store`}
+      >
+        {product.listed ? "Unlist" : "List"}
+      </Button>
+      {state.isError ? (
+        <span role="alert" className="text-xs text-red-700" title={errorMessage(state.error)}>
+          Not saved
+        </span>
+      ) : null}
+    </span>
   );
 }
 

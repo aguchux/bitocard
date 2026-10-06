@@ -214,7 +214,7 @@ function StockDialog({ item, onClose }: { item: StockItem; onClose: () => void }
             <span className="font-semibold">On sale</span>
             <span className="block text-xs text-muted">Pause to stop sales without withdrawing codes.</span>
           </span>
-          <Toggle label="On sale" checked={!item.paused} disabled={!pricing || updateState.isLoading} onChange={onSale => void update({ id: item.id, on_sale: onSale })} />
+          <Toggle label="On sale" checked={!item.paused} disabled={!pricing} onChange={onSale => void update({ id: item.id, on_sale: onSale })} />
         </div>
 
         <section className="space-y-3">

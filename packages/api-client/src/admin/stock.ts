@@ -1,4 +1,5 @@
 import { bitocardApi } from '../base';
+import { settleOptimistic } from '../optimistic';
 import type { List } from './types';
 
 export const stockCategories = ['gift_cards', 'software'] as const;
@@ -80,7 +81,21 @@ export const adminStockApi = bitocardApi.injectEndpoints({
     }),
     updateStock: build.mutation<StockItem, { id: string; cost?: number; margin_bps?: number | null; on_sale?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/stock/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Stock', { type: 'Product', id: 'LIST' }, 'Activity'],
+      // Shown at once (pausing or resuming sales), then the saved item replaces it in every loaded stock list.
+      async onQueryStarted({ id, ...change }, { dispatch, getState, queryFulfilled }) {
+        const patchItem = (values: Partial<StockItem>) =>
+          adminStockApi.util.selectCachedArgsForQuery(getState() as Parameters<typeof adminStockApi.util.selectCachedArgsForQuery>[0], 'stock').map(args =>
+            dispatch(
+              adminStockApi.util.updateQueryData('stock', args, draft => {
+                const item = draft.data.find(row => row.id === id);
+                if (item) Object.assign(item, values);
+              }),
+            ),
+          );
+        const saved = await settleOptimistic(patchItem(change), queryFulfilled, () => dispatch(adminStockApi.util.invalidateTags(['Stock'])));
+        if (saved) patchItem(saved);
+      },
+      invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity'],
     }),
     stockCodes: build.query<List<StockCode>, { id: string; status?: StockCodeStatus }>({
       query: ({ id, status }) => ({ url: `/v1/admin/stock/${id}/codes`, params: { limit: 100, ...(status ? { status } : {}) } }),

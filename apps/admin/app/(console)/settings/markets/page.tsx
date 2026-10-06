@@ -72,7 +72,7 @@ export default function MarketsPage() {
                           <Toggle
                             label={`${categoryName(item.category)} in ${country.name}: ${field.label}`}
                             checked={item[field.key]}
-                            disabled={!editable || state.isLoading}
+                            disabled={!editable}
                             onChange={checked => update({ code: country.code, category: item.category, [field.key]: checked })}
                           />
                         </td>

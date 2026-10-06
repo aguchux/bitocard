@@ -1,7 +1,9 @@
 import { bitocardApi } from '../base';
+import { type Patch, settleOptimistic } from '../optimistic';
 import type {
   AdminOrder,
   AdminOrderDetail,
+  AdminProduct,
   AdminProductFilter,
   AdminProductList,
   AdminSession,
@@ -136,13 +138,35 @@ export const adminApi = bitocardApi.injectEndpoints({
     // -- Catalogue and suppliers ------------------------------------------------------------------------------------
     suppliers: build.query<List<Supplier>, void>({ query: () => '/v1/admin/suppliers', providesTags: [{ type: 'Supplier', id: 'LIST' }] }),
     supplier: build.query<Supplier, string>({ query: code => `/v1/admin/suppliers/${code}`, providesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }] }),
+    /** Shown at once in the list and on the supplier; the saved supplier replaces both, so neither is refetched. */
     updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null }>>({
       query: ({ code, ...body }) => ({ url: `/v1/admin/suppliers/${code}`, method: 'PATCH', body }),
-      invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, 'Overview', 'Activity', 'Media'],
+      async onQueryStarted({ code, resale_approved, ...change }, { dispatch, queryFulfilled }) {
+        const apply = (supplier: Supplier) => {
+          Object.assign(supplier, change as Partial<Supplier>);
+          if (resale_approved !== undefined) supplier.funding.resale_approved = resale_approved;
+        };
+        const saved = await settleOptimistic(patchSupplier(dispatch, code, apply), queryFulfilled, () => dispatch(adminApi.util.invalidateTags([{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }])));
+        if (saved) patchSupplier(dispatch, code, supplier => void Object.assign(supplier, saved));
+      },
+      invalidatesTags: ['Overview', 'Activity', 'Media'],
     }),
+    /** Shown at once; the saved supplier (with its markets) replaces the cached one. */
     setSupplierMarket: build.mutation<Supplier, { code: string; country: string; category: ProductCategory; enabled: boolean }>({
       query: ({ code, country, category, enabled }) => ({ url: `/v1/admin/suppliers/${code}/markets/${country}/${category}`, method: 'PUT', body: { enabled } }),
-      invalidatesTags: (_result, _error, { code }) => [{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }, 'Activity'],
+      async onQueryStarted({ code, country, category, enabled }, { dispatch, queryFulfilled }) {
+        const apply = (supplier: Supplier) => {
+          // Only where the markets are loaded (the supplier's own card, not every list).
+          const markets = supplier.markets;
+          if (!markets) return;
+          const market = markets.find(item => item.country === country && item.category === category);
+          if (market) market.enabled = enabled;
+          else markets.push({ country, category, enabled });
+        };
+        const saved = await settleOptimistic(patchSupplier(dispatch, code, apply), queryFulfilled, () => dispatch(adminApi.util.invalidateTags([{ type: 'Supplier', id: code }, { type: 'Supplier', id: 'LIST' }])));
+        if (saved) patchSupplier(dispatch, code, supplier => void Object.assign(supplier, saved));
+      },
+      invalidatesTags: ['Activity'],
     }),
     /** `note` says why a sync brought back nothing (what the supplier returned and what was left out). */
     syncSupplier: build.mutation<{ object: 'supplier_sync'; supplier: string; products_created: number; offers_updated: number; offers_withdrawn: number; note: string | null }, string>({
@@ -159,16 +183,38 @@ export const adminApi = bitocardApi.injectEndpoints({
       { id: string; active?: boolean; listed?: boolean; name?: string; description?: string | null; image_url?: string | null }
     >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/products/${id}`, method: 'PATCH', body }),
-      invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity', 'Media'],
+      // Shown at once in every loaded product list (with the listed count), then the saved fields replace it: one
+      // product changing never refetches every page loaded. A product that no longer matches a filter stays in view
+      // until the list is next refreshed, so it does not jump away under the pointer.
+      async onQueryStarted({ id, ...change }, { dispatch, getState, queryFulfilled }) {
+        const patches = patchProducts(dispatch, getState, product => product.id === id, product => void Object.assign(product, change));
+        const saved = await settleOptimistic(patches, queryFulfilled, () => dispatch(adminApi.util.invalidateTags([{ type: 'Product', id: 'LIST' }])));
+        if (saved) patchProducts(dispatch, getState, product => product.id === id, product => void Object.assign(product, saved));
+      },
+      invalidatesTags: ['Activity', 'Media'],
     }),
     /** Lists or unlists products on BitoCard's store: these IDs, or everything matching the filters. */
     setProductListing: build.mutation<{ object: 'product_listing'; listed: boolean; updated: number }, { listed: boolean; product_ids?: string[]; filter?: AdminProductFilter }>({
       query: body => ({ url: '/v1/admin/products/listing', method: 'POST', body }),
+      // Chosen products show the change at once; "everything matching" cannot be drawn ahead, so the lists refetch.
+      async onQueryStarted({ listed, product_ids }, { dispatch, getState, queryFulfilled }) {
+        const ids = new Set(product_ids ?? []);
+        const patches = ids.size ? patchProducts(dispatch, getState, product => ids.has(product.id), product => void (product.listed = listed)) : [];
+        await settleOptimistic(patches, queryFulfilled);
+      },
       invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity'],
     }),
     updateOffer: build.mutation<{ id: string; discount_bps: number; priority: number; available: boolean }, { id: string; discount_bps?: number; priority?: number; available?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/supplier-products/${id}`, method: 'PATCH', body }),
-      invalidatesTags: [{ type: 'Product', id: 'LIST' }, 'Activity'],
+      // Shown at once on the product that holds the offer; the saved values replace it, with no list refetch.
+      async onQueryStarted({ id, ...change }, { dispatch, getState, queryFulfilled }) {
+        const holds = (product: AdminProduct) => product.offers.some(offer => offer.id === id);
+        const update = (values: object) => (product: AdminProduct) => void Object.assign(product.offers.find(offer => offer.id === id)!, values);
+        const patches = patchProducts(dispatch, getState, holds, update(change));
+        const saved = await settleOptimistic(patches, queryFulfilled, () => dispatch(adminApi.util.invalidateTags([{ type: 'Product', id: 'LIST' }])));
+        if (saved) patchProducts(dispatch, getState, holds, update(saved));
+      },
+      invalidatesTags: ['Activity'],
     }),
     pricingRules: build.query<List<PricingRule>, void>({ query: () => '/v1/admin/pricing-rules', providesTags: [{ type: 'PricingRule', id: 'LIST' }] }),
     setPricingRule: build.mutation<PricingRule, { category?: ProductCategory; country?: string; product_id?: string; margin_bps: number; reseller_discount_bps?: number }>({
@@ -182,14 +228,47 @@ export const adminApi = bitocardApi.injectEndpoints({
 
     // -- Settings ---------------------------------------------------------------------------------------------------
     switches: build.query<Switches, void>({ query: () => '/v1/admin/switches', providesTags: ['Switch'] }),
+    /** Shown at once; `enabled: null` removes the setting at that scope (the wider one applies again). */
     setSwitch: build.mutation<unknown, { key: string; enabled: boolean | null; country_code?: string; reseller_id?: string }>({
       query: ({ key, ...body }) => ({ url: `/v1/admin/switches/${key}`, method: 'PUT', body }),
+      async onQueryStarted({ key, enabled, country_code, reseller_id }, { dispatch, queryFulfilled }) {
+        const scope = reseller_id ? 'reseller' : country_code ? 'country' : 'global';
+        const patch = dispatch(
+          adminApi.util.updateQueryData('switches', undefined, draft => {
+            const at = draft.data.findIndex(row => row.key === key && row.scope === scope && (row.country_code ?? undefined) === country_code && (row.reseller_id ?? undefined) === reseller_id);
+            if (enabled === null) {
+              if (at >= 0) draft.data.splice(at, 1);
+            } else if (at >= 0) draft.data[at].enabled = enabled;
+            else draft.data.push({ object: 'switch', key, scope, country_code: country_code ?? null, reseller_id: reseller_id ?? null, enabled });
+          }),
+        );
+        await settleOptimistic([patch], queryFulfilled);
+      },
+      // The list is small: refetched after the change (and after a refusal) so it matches the server exactly.
       invalidatesTags: ['Switch', 'Activity'],
     }),
     countries: build.query<List<Country>, void>({ query: () => '/v1/admin/countries', providesTags: ['Country'] }),
+    /** Shown at once; the saved country replaces the cached one, so nothing is refetched. */
     updateCountryCategory: build.mutation<Country, { code: string; category: ProductCategory; enabled?: boolean; customer_verification?: boolean; taxable?: boolean }>({
       query: ({ code, category, ...body }) => ({ url: `/v1/admin/countries/${code}/categories/${category}`, method: 'PUT', body }),
-      invalidatesTags: ['Country', 'Activity'],
+      async onQueryStarted({ code, category, ...change }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          adminApi.util.updateQueryData('countries', undefined, draft => {
+            const row = draft.data.find(country => country.code === code)?.categories.find(item => item.category === category);
+            if (row) Object.assign(row, change);
+          }),
+        );
+        const saved = await settleOptimistic([patch], queryFulfilled, () => dispatch(adminApi.util.invalidateTags(['Country'])));
+        if (saved) {
+          dispatch(
+            adminApi.util.updateQueryData('countries', undefined, draft => {
+              const at = draft.data.findIndex(country => country.code === code);
+              if (at >= 0) draft.data[at] = saved;
+            }),
+          );
+        }
+      },
+      invalidatesTags: ['Activity'],
     }),
     integrations: build.query<List<Integration>, void>({ query: () => '/v1/admin/integrations', providesTags: ['Integration'] }),
     /** Sets fields (null clears an admin value). Needs the admin's current authenticator code. */
@@ -199,6 +278,41 @@ export const adminApi = bitocardApi.injectEndpoints({
     }),
   }),
 });
+
+type Dispatch = (action: unknown) => unknown;
+
+/** Changes every loaded product list's matching products (keeping each page's listed count right); returns the patches. */
+function patchProducts(dispatch: Dispatch, getState: () => unknown, matches: (product: AdminProduct) => boolean, apply: (product: AdminProduct) => void): Patch[] {
+  const state = getState() as Parameters<typeof adminApi.util.selectCachedArgsForQuery>[0];
+  return adminApi.util.selectCachedArgsForQuery(state, 'products').map(
+    args =>
+      dispatch(
+        adminApi.util.updateQueryData('products', args, draft => {
+          let listedChange = 0;
+          for (const product of draft.pages.flatMap(page => page.data)) {
+            if (!matches(product)) continue;
+            const before = product.listed;
+            apply(product);
+            listedChange += Number(product.listed) - Number(before);
+          }
+          if (listedChange) for (const page of draft.pages) page.listed = Math.max(0, page.listed + listedChange);
+        }),
+      ) as Patch,
+  );
+}
+
+/** Changes the supplier in the suppliers list and its own detail, where cached; returns the patches. */
+function patchSupplier(dispatch: Dispatch, code: string, apply: (supplier: Supplier) => void): Patch[] {
+  return [
+    dispatch(
+      adminApi.util.updateQueryData('suppliers', undefined, draft => {
+        const supplier = draft.data.find(item => item.code === code);
+        if (supplier) apply(supplier);
+      }),
+    ) as Patch,
+    dispatch(adminApi.util.updateQueryData('supplier', code, apply)) as Patch,
+  ];
+}
 
 export const {
   useResellerWalletQuery,

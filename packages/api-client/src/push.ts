@@ -1,4 +1,5 @@
 import { bitocardApi } from './base';
+import { settleOptimistic } from './optimistic';
 import type { NotificationRealm, NotificationSeverity } from './notifications';
 
 /** A browser registered for push notifications, with its own ID. `current`: this browser's session registered it. */
@@ -55,7 +56,18 @@ export const pushApi = bitocardApi.injectEndpoints({
     }),
     setNotificationPreference: build.mutation<NotificationPreference, { realm: NotificationRealm; type: string; push: boolean }>({
       query: ({ realm, type, push }) => ({ url: `${base(realm)}/notification-preferences/${encodeURIComponent(type)}`, method: 'PUT', body: { push } }),
-      invalidatesTags: ['NotificationPreference'],
+      // Shown at once, then the saved preference replaces it; undone if refused (locked types are never sent).
+      async onQueryStarted({ realm, type, push }, { dispatch, queryFulfilled }) {
+        const set = (values: Partial<NotificationPreference>) =>
+          dispatch(
+            pushApi.util.updateQueryData('notificationPreferences', realm, draft => {
+              const preference = draft.data.find(item => item.type === type);
+              if (preference) Object.assign(preference, values);
+            }),
+          );
+        const saved = await settleOptimistic([set({ push })], queryFulfilled, () => dispatch(pushApi.util.invalidateTags(['NotificationPreference'])));
+        if (saved) set(saved);
+      },
     }),
   }),
 });

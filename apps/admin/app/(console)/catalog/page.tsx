@@ -59,7 +59,7 @@ function OfferRow({ offer, editable }: { offer: SupplierOffer; editable: boolean
         </p>
         <span className="flex items-center gap-2 text-sm">
           Available
-          <Toggle label={`${offer.supplier} available`} checked={offer.available} disabled={!editable || state.isLoading} onChange={available => update({ id: offer.id, available })} />
+          <Toggle label={`${offer.supplier} available`} checked={offer.available} disabled={!editable} onChange={available => update({ id: offer.id, available })} />
         </span>
       </div>
       <p className="text-xs text-muted">{`Cost ${offer.cost_currency} × ${offer.cost_ratio}${offer.cost_fee_minor ? ` + ${offer.cost_fee_minor} fee` : ""} · synced ${formatRelative(offer.synced_at)}`}</p>
@@ -84,20 +84,27 @@ function OfferRow({ offer, editable }: { offer: SupplierOffer; editable: boolean
 /** Lists or unlists one product on bitocard.com, from its row (without opening the product). */
 function ListingButton({ product, editable }: { product: AdminProduct; editable: boolean }) {
   const [update, state] = useUpdateProductMutation();
+  // The button flips at once (optimistic); if the API refuses, it flips back and says so.
   return (
-    <Button
-      size="sm"
-      variant={product.listed ? "secondary" : "primary"}
-      disabled={!editable}
-      loading={state.isLoading}
-      onClick={event => {
-        event.stopPropagation();
-        void update({ id: product.id, listed: !product.listed });
-      }}
-      aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on bitocard.com`}
-    >
-      {product.listed ? "Unlist" : "List"}
-    </Button>
+    <span className="inline-flex items-center gap-2">
+      <Button
+        size="sm"
+        variant={product.listed ? "secondary" : "primary"}
+        disabled={!editable}
+        onClick={event => {
+          event.stopPropagation();
+          void update({ id: product.id, listed: !product.listed });
+        }}
+        aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on bitocard.com`}
+      >
+        {product.listed ? "Unlist" : "List"}
+      </Button>
+      {state.isError ? (
+        <span role="alert" className="text-xs text-red-700" title={errorMessage(state.error)}>
+          Not saved
+        </span>
+      ) : null}
+    </span>
   );
 }
 

@@ -140,7 +140,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
             </Button>
             <span className="flex items-center gap-2 text-sm font-medium">
               Switched on
-              <Toggle label={`${supplier.name} switched on`} checked={supplier.enabled} disabled={!operator || updateState.isLoading} onChange={enabled => update({ code: supplier.code, enabled })} />
+              <Toggle label={`${supplier.name} switched on`} checked={supplier.enabled} disabled={!operator} onChange={enabled => update({ code: supplier.code, enabled })} />
             </span>
           </>
         }
