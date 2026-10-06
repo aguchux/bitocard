@@ -151,6 +151,7 @@ describe('notifications and push', () => {
 describe('your own integrations', () => {
   test('connecting, checking, syncing, routing, notifications and disconnecting', async () => {
     const admin = await adminClient(server);
+    for (const id of ['reloadly', 'monnify']) assert.equal((await admin.put(`/v1/admin/integrations/${id}/reseller-access`, { enabled: true })).status, 200);
     assert.equal((await admin.put('/v1/admin/integrations/reloadly/reseller-availability', { global: true, countries: [], approval: 'automatic' })).status, 200);
     assert.equal((await admin.put('/v1/admin/integrations/monnify/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 200);
     const { browser, resellerId } = await resellerClient(server);

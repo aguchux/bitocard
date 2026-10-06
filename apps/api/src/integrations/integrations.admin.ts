@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Injectable, Module, Param, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Module, Param, Post, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsObject, IsString, Matches } from 'class-validator';
 import { AdminAuthService } from '../auth/admin-auth.service.js';
@@ -9,7 +9,10 @@ import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { type AppConfig, configSchema } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { ProviderError } from '../payments/provider-error.js';
+import { connectable } from '../reseller-integrations/connectable.js';
 import { integrationGroups, isPlatformKey, type IntegrationField, type IntegrationGroup } from './definitions.js';
+import { inSandbox, urlsFor } from './endpoints.js';
 import { IntegrationsService, schemaFor } from './integrations.service.js';
 import { linksFor } from './links.js';
 
@@ -35,7 +38,49 @@ export class IntegrationsAdminService {
 
   async list() {
     await this.integrations.refresh(true);
-    return { object: 'list' as const, data: integrationGroups.map(group => this.presentGroup(group)) };
+    const access = await this.resellerAccess();
+    return { object: 'list' as const, data: integrationGroups.map(group => this.presentGroup(group, access)) };
+  }
+
+  /**
+   * Tests BitoCard's own credentials for an integration with a harmless call (a token, a balance), at the provider's
+   * sandbox address when its Sandbox switch is on, otherwise live. Changes nothing; the outcome is audited.
+   */
+  async test(adminId: string, groupId: string) {
+    const group = integrationGroups.find(item => item.id === groupId);
+    if (!group) throw notFound();
+    const integration = connectable(groupId);
+    if (!integration) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
+    }
+    await this.integrations.refresh(true);
+    const config = this.integrations.config;
+    const environment = inSandbox(config, groupId) ? ('sandbox' as const) : ('live' as const);
+    const where = environment === 'sandbox' ? `${group.name}’s sandbox` : group.name;
+    const values = integration.fromSettings(config);
+    const missing = integration.fields.filter(item => item.secret && item.required && !values[item.key]?.trim());
+    let ok = false;
+    let message: string | null;
+    if (missing.length) {
+      message = `Set the ${missing.map(item => item.label).join(' and ')} first.`;
+    } else {
+      try {
+        await integration.check(values as Record<string, string>, urlsFor(config, environment), environment);
+        ok = true;
+        message = null;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.replace(new RegExp(`^${groupId}: `), '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `${where} refused these credentials (${detail}).` : `Could not reach ${where} (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
+    return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Which integrations resellers may connect their own accounts to. */
+  private async resellerAccess() {
+    const offers = await this.prisma.integrationOffer.findMany({ select: { integrationId: true, resellerAccess: true } });
+    return new Set(offers.filter(offer => offer.resellerAccess).map(offer => offer.integrationId));
   }
 
   /**
@@ -68,7 +113,7 @@ export class IntegrationsAdminService {
     });
     await this.integrations.refresh(true);
     await this.audit.record({ actorId: adminId, action: 'integration.updated', targetType: 'integration', targetId: group.id, before, after: this.auditView(group) });
-    return this.presentGroup(group);
+    return this.presentGroup(group, await this.resellerAccess());
   }
 
   /** Validates one submitted value against the same rules as the environment variable it replaces. */
@@ -91,8 +136,9 @@ export class IntegrationsAdminService {
     return typeof value === 'string' ? value.trim() : null;
   }
 
-  private presentGroup(group: IntegrationGroup) {
+  private presentGroup(group: IntegrationGroup, access: Set<string>) {
     const fields = group.fields.map(field => this.presentField(field));
+    const sandboxField = fields.find(field => field.kind === 'flag' && field.key.endsWith('_SANDBOX'));
     const required = fields.filter(field => field.required);
     const secrets = fields.filter(field => field.secret);
     const isSet = (field: (typeof fields)[number]) => field.source !== 'unset';
@@ -111,6 +157,12 @@ export class IntegrationsAdminService {
       /** False while the supplier's adapter is not built: its credentials are saved for later and not used yet. */
       adapter_ready: group.adapterReady,
       webhook_url: group.webhookPath ? `https://api.bitocard.com${group.webhookPath}` : null,
+      /** The Sandbox switch: true while BitoCard's account uses the provider's sandbox (never live); null without one. */
+      sandbox: sandboxField ? sandboxField.value === true : null,
+      /** Whether Test connection can check these credentials (a built adapter with a check). */
+      testable: Boolean(connectable(group.id)),
+      /** Resellers' own accounts: `available` once BitoCard's adapter can take them, `enabled` when an admin allows it. */
+      reseller_access: { available: Boolean(connectable(group.id)), enabled: access.has(group.id) },
       updated_at: updates.sort().at(-1) ?? null,
       fields,
     };
@@ -120,7 +172,8 @@ export class IntegrationsAdminService {
     const stored = this.integrations.stored.get(field.key);
     // Supplier credentials live only in the admin app; platform settings fall back to the environment, then the default.
     const platform = isPlatformKey(field.key);
-    const effective: unknown = platform ? this.integrations.config[field.key as keyof AppConfig] : stored?.value;
+    // Switches stored for suppliers whose adapter is not built are read as booleans, like platform flags.
+    const effective: unknown = platform ? this.integrations.config[field.key as keyof AppConfig] : field.kind === 'flag' && stored ? stored.value === 'on' : stored?.value;
     const fallback = platform ? configSchema.shape[field.key as keyof typeof configSchema.shape].safeParse(undefined) : null;
     const fromEnv: unknown = platform ? this.integrations.env[field.key as keyof AppConfig] : undefined;
     const source: Source = stored
@@ -187,6 +240,13 @@ export class IntegrationsAdminController {
   @Put(':id')
   update(@CurrentCaller() caller: Caller, @Param('id') id: string, @Body() body: UpdateIntegrationDto) {
     return this.service.update(caller.kind === 'session' ? caller.userId : '', id, body.values, body.code);
+  }
+
+  /** Tests the saved credentials (sandbox or live, as the Sandbox switch says). */
+  @Post(':id/test')
+  @HttpCode(HttpStatus.OK)
+  test(@CurrentCaller() caller: Caller, @Param('id') id: string) {
+    return this.service.test(caller.kind === 'session' ? caller.userId : '', id);
   }
 }
 

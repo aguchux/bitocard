@@ -24,6 +24,12 @@ class RoutingDto {
   routing: 'preferred' | 'fallback' | 'off';
 }
 
+class AccessDto {
+  @ApiProperty({ description: 'Whether resellers may connect their own account to this integration.' })
+  @IsBoolean()
+  enabled: boolean;
+}
+
 class OfferDto {
   @ApiProperty({ description: 'Offered to resellers in every country.' })
   @IsBoolean()
@@ -119,7 +125,10 @@ export class ResellerIntegrationsController {
     return this.integrations.connect(resellerOf(caller), mode, personOf(caller), integrationId(id), body.values);
   }
 
-  @ApiOperation({ summary: 'Check a connection again', description: 'Live: asks the provider whether the saved credentials still work.' })
+  @ApiOperation({
+    summary: 'Check a connection again',
+    description: 'Asks the provider whether the saved credentials work: live credentials at its live address, sandbox credentials (test mode) at its sandbox address. Never changes the connection.',
+  })
   @Roles('admin')
   @Post(':id/connection/check')
   @HttpCode(HttpStatus.OK)
@@ -153,6 +162,12 @@ export class AdminResellerIntegrationsController {
   @Put('integrations/:id/reseller-availability')
   setOffer(@CurrentCaller() caller: Caller, @Param('id') id: string, @Body() body: OfferDto) {
     return this.integrations.setOffer(adminId(caller), integrationId(id), body);
+  }
+
+  @AdminRoles('super_admin')
+  @Put('integrations/:id/reseller-access')
+  setAccess(@CurrentCaller() caller: Caller, @Param('id') id: string, @Body() body: AccessDto) {
+    return this.integrations.setResellerAccess(adminId(caller), integrationId(id), body.enabled);
   }
 
   @AdminRoles('operations', 'support')

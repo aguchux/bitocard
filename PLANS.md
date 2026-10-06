@@ -175,7 +175,8 @@ Rules resolve like feature switches: **reseller, then country, then global**. At
   - Admins enable a supplier per country and category (today's `supplier_markets`). It then supplies the parent store and resupplies resellers in that country.
   - Admins can also block or allow it for one reseller. A blocked supplier is never routed to for that reseller's orders. The products stay on sale wherever another supplier covers them.
 - **`own` channel:**
-  - Admins offer a supplier globally or in chosen countries (today's `integration_offers`, extended with a category).
+  - Admins switch on reseller access per integration (built: the Reseller access switch on each integration card; only those show in the Reseller access tab), then offer it globally or in chosen countries (today's `integration_offers`, extended with a category).
+  - Every integration has a Sandbox switch (built): the provider's sandbox or live address is picked automatically, admins test BitoCard's credentials with Test connection, and resellers test their sandbox credentials with the provider's sandbox. A sandboxed integration is never used live.
   - Admins can also allow or block it for one reseller: for example, a pilot with one reseller before opening a country, or a block after abuse.
   - The M13b gates still apply unchanged: the `own_integrations` switch, the plan feature, a verified account and the connection's approval.
   - Blocking a reseller who is already connected suspends their connection, with the reason shown, exactly as when operations suspend one.

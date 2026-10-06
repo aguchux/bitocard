@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Globe2, Pencil } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, ErrorState, errorMessage, Field, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
+import { Globe2, Pencil, Plug } from "lucide-react";
+import { ActionDialog, Badge, Button, Card, CardHeader, EmptyState, ErrorState, errorMessage, Field, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { type IntegrationApproval, type IntegrationOffer, useCountriesQuery, useIntegrationOffersQuery, useSetIntegrationOfferMutation } from "@bitocard/api-client/admin";
 
@@ -10,7 +10,7 @@ const kindLabels = { supplier: "Supplier", payment_gateway: "Payment gateway" } 
 
 function where(offer: IntegrationOffer) {
   if (offer.global) return "All countries";
-  return offer.countries.length ? offer.countries.join(", ") : "Not offered";
+  return offer.countries.length ? offer.countries.join(", ") : "No countries yet";
 }
 
 function OfferDialog({ offer, onClose }: { offer: IntegrationOffer; onClose: () => void }) {
@@ -68,9 +68,13 @@ function OfferDialog({ offer, onClose }: { offer: IntegrationOffer; onClose: () 
   );
 }
 
-/** Which integrations resellers may connect their own accounts to, and where. Super admins edit; others read. */
+/**
+ * The integrations with Reseller access switched on (on each integration's card, Suppliers or Platform), and where
+ * they are offered. Super admins edit; others read.
+ */
 export function ResellerAvailability({ editable }: { editable: boolean }) {
   const { data, error, isFetching, refetch } = useIntegrationOffersQuery();
+  const enabled = data?.data.filter(offer => offer.reseller_access) ?? [];
   const [editing, setEditing] = useState<string | null>(null);
   const current = data?.data.find(item => item.integration_id === editing) ?? null;
 
@@ -91,15 +95,22 @@ export function ResellerAvailability({ editable }: { editable: boolean }) {
           Review connections
         </AppLink>
       </Notice>
+      {enabled.length === 0 ? (
+        <Card>
+          <EmptyState title="No integration open to resellers" icon={<Plug className="size-6" aria-hidden />}>
+            Switch on Reseller access on an integration’s card (Suppliers, or Platform for payment gateways). It then shows here, where you choose the countries.
+          </EmptyState>
+        </Card>
+      ) : null}
       <div className="grid gap-4 lg:grid-cols-2">
-        {data.data.map(offer => (
+        {enabled.map(offer => (
           <Card key={offer.integration_id} className="flex flex-col">
             <CardHeader
               title={offer.name}
               description={kindLabels[offer.kind]}
               actions={
                 <>
-                  <Badge tone={offer.offered ? "green" : "grey"}>{offer.offered ? "Offered" : "Not offered"}</Badge>
+                  <Badge tone={offer.offered ? "green" : "grey"}>{offer.offered ? "Offered" : "Choose countries"}</Badge>
                   {editable ? (
                     <Button variant="secondary" size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setEditing(offer.integration_id)} aria-label={`Edit where ${offer.name} is offered`}>
                       Edit

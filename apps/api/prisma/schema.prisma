@@ -289,15 +289,18 @@ enum IntegrationApproval {
 /// Which integrations resellers may connect their own accounts to, and where. No row: not offered.
 model IntegrationOffer {
   /// The connectable integration's id (`src/reseller-integrations/connectable.ts`).
-  integrationId String              @id @map("integration_id")
+  integrationId  String              @id @map("integration_id")
+  /// Switched on by an admin (Settings > Integrations, on the integration's card): only then can resellers see and use
+  /// it. Off hides it and stops resellers' connections being used, without erasing them.
+  resellerAccess Boolean             @default(false) @map("reseller_access")
   /// Offered to resellers in every country.
-  global        Boolean             @default(false)
+  global         Boolean             @default(false)
   /// Offered to resellers in these countries (when not global).
-  countries     String[]            @default([])
+  countries      String[]            @default([])
   /// Live connections start active, or wait for an admin's review.
-  approval      IntegrationApproval @default(review)
-  updatedById   String?             @map("updated_by_id") @db.Uuid
-  updatedAt     DateTime            @updatedAt @map("updated_at")
+  approval       IntegrationApproval @default(review)
+  updatedById    String?             @map("updated_by_id") @db.Uuid
+  updatedAt      DateTime            @updatedAt @map("updated_at")
 
   @@map("integration_offers")
 }
@@ -1100,26 +1103,26 @@ model ResellerListing {
 
 /// A supplier offer for a product, and what it costs BitoCard.
 model SupplierProduct {
-  id           String   @id @default(uuid()) @db.Uuid
-  supplierCode String   @map("supplier_code")
-  productId    String   @map("product_id") @db.Uuid
+  id           String      @id @default(uuid()) @db.Uuid
+  supplierCode String      @map("supplier_code")
+  productId    String      @map("product_id") @db.Uuid
   /// The supplier identifier, for example a product ID or service:variation.
   sku          String
-  costCurrency String   @map("cost_currency") @db.Char(3)
+  costCurrency String      @map("cost_currency") @db.Char(3)
   /// Cost per unit of face value, in cost currency (for example 0.97 USD per 1 USD of face value), from the supplier catalogue.
-  costRatio    Decimal  @map("cost_ratio") @db.Decimal(24, 10)
+  costRatio    Decimal     @map("cost_ratio") @db.Decimal(24, 10)
   /// Fixed fee per item, minor units of the cost currency.
-  costFeeMinor BigInt   @default(0) @map("cost_fee_minor")
+  costFeeMinor BigInt      @default(0) @map("cost_fee_minor")
   /// Commission agreed with the supplier and not in its catalogue (basis points off the cost). Kept across syncs.
-  discountBps  Int      @default(0) @map("discount_bps")
+  discountBps  Int         @default(0) @map("discount_bps")
   /// What the adapter needs to order it (for example the operator ID).
   meta         Json?
-  available    Boolean  @default(true)
+  available    Boolean     @default(true)
   /// Lower wins when costs are equal.
-  priority     Int      @default(100)
-  syncedAt     DateTime @map("synced_at")
-  supplier     Supplier @relation(fields: [supplierCode], references: [code])
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priority     Int         @default(100)
+  syncedAt     DateTime    @map("synced_at")
+  supplier     Supplier    @relation(fields: [supplierCode], references: [code])
+  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   /// BitoCard's own stock (supplier `stock`): the codes held for this offer.
   stockCodes   StockCode[]
 

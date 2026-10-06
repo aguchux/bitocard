@@ -67,10 +67,15 @@ export const configSchema = z.object({
   /** The secret hash set in the Flutterwave dashboard; webhooks must carry it in the verif-hash header. */
   FLUTTERWAVE_WEBHOOK_HASH: z.string().optional(),
   FLUTTERWAVE_API_URL: z.string().url().default('https://api.flutterwave.com/v3'),
+  /** on: test keys (FLWSECK_TEST-…) for checks only; never used for live payments. Flutterwave's address is the same. */
+  FLUTTERWAVE_SANDBOX: flag.prefault('off'),
   MONNIFY_API_KEY: z.string().optional(),
   MONNIFY_SECRET_KEY: z.string().optional(),
   MONNIFY_CONTRACT_CODE: z.string().optional(),
+  /** Leave at the default to follow MONNIFY_SANDBOX (src/integrations/endpoints.ts); any other value overrides it. */
   MONNIFY_API_URL: z.string().url().default('https://api.monnify.com'),
+  /** on: Monnify's sandbox for checks only; never used for live payments. */
+  MONNIFY_SANDBOX: flag.prefault('off'),
   /** Where the payment page sends the payer back to when the caller gives no return_url. */
   PAYMENT_RETURN_URL: z.string().url().default('https://shq.bitocard.com/wallet'),
 
@@ -85,7 +90,7 @@ export const configSchema = z.object({
   RELOADLY_CLIENT_SECRET: z.string().optional(),
   /** The webhook signature secret (Reloadly dashboard > Developers > Webhooks); signs X-Reloadly-Signature. */
   RELOADLY_WEBHOOK_SECRET: z.string().optional(),
-  /** on: Reloadly sandbox (test credits, no real cards); off: live. */
+  /** on: Reloadly's sandbox (test credits) with sandbox credentials, for checks only; never used for live orders or syncs. */
   RELOADLY_SANDBOX: flag.prefault('off'),
   RELOADLY_AUTH_URL: z.string().url().default('https://auth.reloadly.com'),
   /** Override the gift card and top-up API addresses (tests); by default they follow RELOADLY_SANDBOX. */
@@ -94,25 +99,30 @@ export const configSchema = z.object({
   VTPASS_API_KEY: z.string().optional(),
   VTPASS_PUBLIC_KEY: z.string().optional(),
   VTPASS_SECRET_KEY: z.string().optional(),
-  /** https://sandbox.vtpass.com/api for the VTpass sandbox. */
+  /** Leave at the default to follow VTPASS_SANDBOX; any other value overrides it. */
   VTPASS_API_URL: z.string().url().default('https://vtpass.com/api'),
+  /** on: VTpass's sandbox with sandbox keys, for checks only; never used for live orders or syncs. */
+  VTPASS_SANDBOX: flag.prefault('off'),
   /** VTpass needs a phone number on every payment; used when the customer gave none. */
   VTPASS_CONTACT_PHONE: z.string().default('08011111111'),
   DIDWW_API_KEY: z.string().optional(),
-  /** https://sandbox-api.didww.com/v3 for the DIDWW sandbox. */
+  /** Leave at the default to follow DIDWW_SANDBOX; any other value overrides it. */
   DIDWW_API_URL: z.string().url().default('https://api.didww.com/v3'),
+  DIDWW_SANDBOX: flag.prefault('off'),
   /** Countries whose numbers are synced (ISO codes); numbers are sold to resellers in every market. */
   DIDWW_COUNTRIES: list.prefault('GB,US'),
   /** BitoCard's public API address: DIDWW order callbacks go to <this>/v1/webhooks/didww and are signed over it. */
   DIDWW_CALLBACK_URL: z.string().url().default('https://api.bitocard.com'),
   ZENDIT_API_KEY: z.string().optional(),
-  /** https://test-api.zendit.io/v1 for Zendit's test mode (with a test key). */
+  /** Leave at the default to follow ZENDIT_SANDBOX (test mode, https://test-api.zendit.io/v1); any other value overrides it. */
   ZENDIT_API_URL: z.string().url().default('https://api.zendit.io/v1'),
+  ZENDIT_SANDBOX: flag.prefault('off'),
   /** Expected as `X-Webhook-Token: <secret>` on Zendit's webhooks (set in the Zendit console). */
   ZENDIT_WEBHOOK_SECRET: z.string().optional(),
   PAWAPAY_API_TOKEN: z.string().optional(),
-  /** https://api.sandbox.pawapay.io for pawaPay's sandbox (with a sandbox token). */
+  /** Leave at the default to follow PAWAPAY_SANDBOX (https://api.sandbox.pawapay.io); any other value overrides it. */
   PAWAPAY_API_URL: z.string().url().default('https://api.pawapay.io'),
+  PAWAPAY_SANDBOX: flag.prefault('off'),
   /** The payout fee agreed with pawaPay, in percent (for example 1.5): BitoCard's cost is the amount plus this. */
   PAWAPAY_PAYOUT_FEE_PERCENT: z.string().optional(),
   /** In the callback address set in the pawaPay dashboard: /v1/webhooks/pawapay?token=<this>. */

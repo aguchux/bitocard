@@ -25,6 +25,7 @@ before(async () => {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
+  assert.equal((await admin.put('/v1/admin/integrations/reloadly/reseller-access', { enabled: true })).status, 200);
   assert.equal((await admin.put('/v1/admin/integrations/reloadly/reseller-availability', { global: true, countries: [], approval: 'automatic' })).status, 200);
   // 1% on own-supplier orders in Nigeria.
   assert.equal((await admin.put('/v1/admin/fee-rules', { kind: 'supplier_order', country_code: 'NG', rate_ppb: 10_000_000 })).status, 200);

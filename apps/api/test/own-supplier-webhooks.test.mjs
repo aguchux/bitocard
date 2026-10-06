@@ -30,6 +30,7 @@ before(async () => {
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
   assert.equal((await admin.put('/v1/admin/countries/NG/categories/virtual_numbers', { enabled: true })).status, 200);
   for (const id of ['reloadly', 'didww']) {
+    assert.equal((await admin.put(`/v1/admin/integrations/${id}/reseller-access`, { enabled: true })).status, 200);
     assert.equal((await admin.put(`/v1/admin/integrations/${id}/reseller-availability`, { global: true, countries: [], approval: 'automatic' })).status, 200);
   }
   assert.equal((await admin.put('/v1/admin/fee-rules', { kind: 'supplier_order', country_code: 'NG', rate_ppb: 10_000_000 })).status, 200);

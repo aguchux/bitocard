@@ -177,6 +177,8 @@ export type Supplier = {
   status: SupplierStatus;
   enabled: boolean;
   configured: boolean;
+  /** BitoCard's account is switched to the supplier's sandbox: tested only, never synced or used live. */
+  sandbox: boolean;
   funding: {
     billing_model: string | null;
     currency: string | null;
@@ -288,11 +290,20 @@ export type Integration = {
   adapter_ready: boolean;
   /** The address to paste into the provider's dashboard, when it sends webhooks. */
   webhook_url: string | null;
+  /** The Sandbox switch: true while BitoCard's account uses the provider's sandbox (tested only, never live); null without one. */
+  sandbox: boolean | null;
+  /** Whether Test connection can check the saved credentials. */
+  testable: boolean;
+  /** Resellers' own accounts: `available` once the adapter can take them, `enabled` when an admin allows it. */
+  reseller_access: { available: boolean; enabled: boolean };
   /** Where to sign up with the provider and find the credentials. */
   links: Array<{ label: string; url: string }>;
   updated_at: string | null;
   fields: IntegrationField[];
 };
+
+/** The outcome of Test connection: the provider's sandbox or live address, as the Sandbox switch said. */
+export type IntegrationTest = { object: 'integration_test'; integration: string; environment: 'live' | 'sandbox'; ok: boolean; message: string | null; tested_at: string };
 
 export type SupplierWebhookStatus = 'received' | 'processed' | 'unmatched' | 'failed';
 /** A notification a supplier sent (for example a Reloadly transaction status), and what became of it. */

@@ -51,7 +51,11 @@ async function allowedReseller(country = 'NG') {
   return reseller;
 }
 
-const offer = (id, body) => admin.put(`/v1/admin/integrations/${id}/reseller-availability`, body);
+/** Offers an integration to resellers: reseller access switched on, then where and how. */
+const offer = async (id, body) => {
+  assert.equal((await admin.put(`/v1/admin/integrations/${id}/reseller-access`, { enabled: true })).status, 200);
+  return admin.put(`/v1/admin/integrations/${id}/reseller-availability`, body);
+};
 const reloadly = { client_id: 'my-client', client_secret: 'my-very-secret-value' };
 const testMode = { 'bitocard-mode': 'test' };
 
@@ -61,7 +65,10 @@ describe('availability', () => {
     const set = await offer('vtpass', { global: false, countries: ['ng'], approval: 'review' });
     assert.deepEqual([set.status, set.json.countries, set.json.offered], [200, ['NG'], true]);
     assert.equal((await offer('flutterwave', { global: false, countries: ['ZZ'], approval: 'review' })).json.error.code, 'country_unknown');
-    assert.equal((await offer('telnyx', { global: true, countries: [], approval: 'review' })).status, 404, 'only integrations with a built adapter');
+    const stub = await admin.put('/v1/admin/integrations/telnyx/reseller-access', { enabled: true });
+    assert.deepEqual([stub.status, stub.json.error.code], [400, 'integration_not_connectable'], 'only integrations with a built adapter');
+    assert.equal((await admin.put('/v1/admin/integrations/telnyx/reseller-availability', { global: true, countries: [], approval: 'review' })).status, 404);
+    assert.equal((await admin.put('/v1/admin/integrations/nope/reseller-access', { enabled: true })).status, 404, 'no such integration');
 
     const ng = await allowedReseller('NG');
     const gh = await allowedReseller('GH');
@@ -71,6 +78,30 @@ describe('availability', () => {
 
     const list = await admin.get('/v1/admin/integrations/reseller-availability');
     assert.ok(list.json.data.some(item => item.integration_id === 'monnify' && item.offered === false));
+  });
+
+  test('only integrations an admin switches reseller access on for are shown; off hides them and stops their connections', async () => {
+    await offer('didww', { global: true, countries: [], approval: 'automatic' });
+    const { browser, resellerId } = await allowedReseller();
+    const listed = async () => (await browser.get('/v1/integrations')).json.data.some(item => item.id === 'didww');
+    assert.equal(await listed(), true);
+    assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-own' } })).status, 200);
+    const service = server.app.get((await import('../dist/reseller-integrations/reseller-integrations.service.js')).ResellerIntegrationsService);
+    assert.ok(await service.active(resellerId, 'didww', 'live'));
+
+    const off = await admin.put('/v1/admin/integrations/didww/reseller-access', { enabled: false });
+    assert.deepEqual([off.status, off.json.reseller_access, off.json.offered], [200, false, false]);
+    assert.equal(await listed(), false);
+    assert.equal(await service.active(resellerId, 'didww', 'live'), null, 'its connections are not used');
+    assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-own' } })).status, 404);
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'integration_offer.access_updated', targetId: 'didww' } }));
+
+    assert.equal((await admin.put('/v1/admin/integrations/didww/reseller-access', { enabled: true })).status, 200);
+    assert.ok(await service.active(resellerId, 'didww', 'live'), 'kept, and used again once switched back on');
+    const card = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
+    assert.deepEqual(card.reseller_access, { available: true, enabled: true });
+    const operations = await adminClient(server, ['operations']);
+    assert.equal((await operations.put('/v1/admin/integrations/didww/reseller-access', { enabled: false })).status, 403);
   });
 
   test('only super admins change availability; support can read it', async () => {
@@ -162,13 +193,18 @@ describe('connecting', () => {
     assert.deepEqual([required.status, required.json.error.code], [400, 'parameter_missing']);
   });
 
-  test('sandbox connections are never checked with the provider and need no review', async () => {
+  test('sandbox connections are saved without a check and need no review; Test checks them at the provider’s sandbox', async () => {
     await offer('vtpass', { global: true, countries: [], approval: 'review' });
     const { browser } = await allowedReseller();
     answer = 'refuse';
     const res = await browser.put('/v1/integrations/vtpass/connection', { values: { api_key: 'a', public_key: 'b', secret_key: 'c' } }, testMode);
+    const refused = await browser.post('/v1/integrations/vtpass/connection/check', undefined, testMode);
     answer = 'ok';
     assert.deepEqual([res.status, res.json.connection.status, res.json.connection.mode], [200, 'active', 'test']);
+    assert.deepEqual([refused.json.connection.last_check.ok, refused.json.connection.status], [false, 'active'], 'a failed test never changes the connection');
+    assert.match(refused.json.connection.last_check.message, /VTpass’s sandbox did not accept/);
+    const passed = await browser.post('/v1/integrations/vtpass/connection/check', undefined, testMode);
+    assert.equal(passed.json.connection.last_check.ok, true);
     assert.equal((await browser.get('/v1/integrations')).json.data.find(item => item.id === 'vtpass').connection, null, 'live is separate');
     const reloadly = (await browser.get('/v1/integrations')).json.data.find(item => item.id === 'reloadly');
     assert.ok(reloadly.links.some(link => link.label === 'Sign up' && link.url.startsWith('https://')), 'where to sign up and get credentials');

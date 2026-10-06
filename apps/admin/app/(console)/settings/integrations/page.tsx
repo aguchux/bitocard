@@ -1,10 +1,18 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Check, Copy, KeyRound, Pencil } from "lucide-react";
+import { Check, Copy, FlaskConical, KeyRound, Pencil, PlugZap } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, ExternalLinks, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, RefreshFailed, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type Integration, type IntegrationField, type IntegrationSource, useIntegrationsQuery, useUpdateIntegrationMutation } from "@bitocard/api-client/admin";
+import {
+  type Integration,
+  type IntegrationField,
+  type IntegrationSource,
+  useIntegrationsQuery,
+  useSetIntegrationResellerAccessMutation,
+  useTestIntegrationMutation,
+  useUpdateIntegrationMutation,
+} from "@bitocard/api-client/admin";
 import { ResellerAvailability } from "@/components/reseller-availability";
 
 const sourceLabels: Record<IntegrationSource, string> = { admin: "Set here", environment: "From .env", default: "Default", unset: "Not set" };
@@ -37,6 +45,97 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** The integration's Sandbox switch field (`RELOADLY_SANDBOX`), if it has one. */
+const sandboxField = (integration: Integration) => integration.fields.find(field => field.kind === "flag" && field.key.endsWith("_SANDBOX")) ?? null;
+
+/** Switching Sandbox on or off changes where BitoCard's credentials are used, so it needs an authenticator code. */
+function SandboxDialog({ integration, on, onClose }: { integration: Integration; on: boolean; onClose: () => void }) {
+  const [update] = useUpdateIntegrationMutation();
+  const [code, setCode] = useState("");
+  const field = sandboxField(integration);
+  return (
+    <ActionDialog
+      open
+      onClose={onClose}
+      title={on ? `Switch ${integration.name} to its sandbox?` : `Switch ${integration.name} to live?`}
+      description={
+        on
+          ? `BitoCard will call ${integration.name}’s sandbox address with the credentials saved here, for Test connection only. While in sandbox it is never synced or used for live orders or payments. Save your sandbox credentials, then use Test connection.`
+          : `BitoCard will call ${integration.name}’s live address and use it for live orders and payments again. Save your live credentials first, then use Test connection.`
+      }
+      confirmLabel={on ? "Switch to sandbox" : "Switch to live"}
+      requireReason={false}
+      onConfirm={async () => {
+        if (!field) return;
+        if (!/^\d{6}$/.test(code)) throw new Error("Enter the 6-digit code from your authenticator app.");
+        await update({ id: integration.id, values: { [field.key]: on }, code }).unwrap();
+      }}
+    >
+      <div className="space-y-2 rounded-lg bg-canvas p-4">
+        <p className="text-sm font-semibold text-ink">Authenticator code</p>
+        <CodeInput label="Authenticator code" value={code} onChange={setCode} />
+      </div>
+    </ActionDialog>
+  );
+}
+
+/**
+ * The card's switches: Sandbox (the provider's sandbox or live address, picked automatically), Test connection, and
+ * Reseller access (whether resellers may connect their own accounts; only then is it in the Reseller access tab).
+ */
+function IntegrationControls({ integration, editable }: { integration: Integration; editable: boolean }) {
+  const [test, testState] = useTestIntegrationMutation();
+  const [setAccess, accessState] = useSetIntegrationResellerAccessMutation();
+  const [sandboxTo, setSandboxTo] = useState<boolean | null>(null);
+  const result = testState.data?.integration === integration.id ? testState.data : null;
+  const showAccess = integration.section === "suppliers" || integration.reseller_access.available;
+  if (integration.sandbox === null && !integration.testable && !showAccess) return null;
+  return (
+    <div className="mx-5 mt-4 space-y-3 sm:mx-6">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        {integration.sandbox !== null ? (
+          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+            Sandbox
+            <Toggle label={`${integration.name} sandbox`} checked={integration.sandbox} disabled={!editable} onChange={checked => setSandboxTo(checked)} />
+          </span>
+        ) : null}
+        {showAccess ? (
+          <span className="flex items-center gap-2 text-sm font-medium text-ink" title={integration.reseller_access.available ? undefined : "BitoCard’s adapter for this integration is still to be built"}>
+            Reseller access
+            <Toggle
+              label={`${integration.name} reseller access`}
+              checked={integration.reseller_access.enabled}
+              disabled={!editable || !integration.reseller_access.available || accessState.isLoading}
+              onChange={enabled => setAccess({ id: integration.id, enabled })}
+            />
+          </span>
+        ) : null}
+        {integration.testable ? (
+          <Button size="sm" variant="secondary" icon={<PlugZap className="size-4" aria-hidden />} loading={testState.isLoading} disabled={!editable} onClick={() => test(integration.id)}>
+            {integration.sandbox ? "Test sandbox connection" : "Test connection"}
+          </Button>
+        ) : null}
+      </div>
+      {result ? (
+        <Notice tone={result.ok ? "green" : "red"}>
+          {result.ok ? `${result.environment === "sandbox" ? "Sandbox" : "Live"} credentials work (${formatRelative(result.tested_at)}).` : result.message}
+        </Notice>
+      ) : null}
+      {testState.error ? <Notice tone="red">{errorMessage(testState.error)}</Notice> : null}
+      {accessState.error ? <Notice tone="red">{errorMessage(accessState.error)}</Notice> : null}
+      {integration.sandbox ? (
+        <Notice tone="amber">
+          <span className="inline-flex items-center gap-2">
+            <FlaskConical className="size-4 shrink-0" aria-hidden />
+            In sandbox: used only to test its credentials, never for live orders, syncs or payments.
+          </span>
+        </Notice>
+      ) : null}
+      {sandboxTo !== null ? <SandboxDialog integration={integration} on={sandboxTo} onClose={() => setSandboxTo(null)} /> : null}
+    </div>
+  );
+}
+
 function IntegrationCard({ integration, editable, onEdit }: { integration: Integration; editable: boolean; onEdit: () => void }) {
   return (
     <Card className="flex flex-col">
@@ -45,6 +144,11 @@ function IntegrationCard({ integration, editable, onEdit }: { integration: Integ
         description={integration.description}
         actions={
           <>
+            {integration.sandbox ? (
+              <Badge tone="amber" dot={false}>
+                Sandbox
+              </Badge>
+            ) : null}
             <StatusBadge
               status={integration.adapter_ready ? integration.status : integration.status === "connected" ? "pending" : integration.status}
               label={integration.adapter_ready ? statusLabels[integration.status] : integration.status === "connected" ? "Saved for later" : statusLabels[integration.status]}
@@ -58,6 +162,7 @@ function IntegrationCard({ integration, editable, onEdit }: { integration: Integ
         }
       />
       <ExternalLinks links={integration.links} className="mx-5 mt-3 sm:mx-6" />
+      <IntegrationControls integration={integration} editable={editable} />
       {integration.adapter_ready ? null : (
         <p className="mx-5 mt-4 rounded-lg bg-canvas px-3 py-2 text-xs text-muted sm:mx-6">
           Not connected yet: BitoCard’s adapter for this supplier is still to be built. Keys saved now are kept encrypted and used once it is.
@@ -240,7 +345,7 @@ export default function IntegrationsPage() {
             items={[
               { value: "platform", label: "Platform", count: data.data.filter(item => item.section === "platform").length },
               { value: "suppliers", label: "Suppliers", count: data.data.filter(item => item.section === "suppliers").length },
-              { value: "resellers", label: "Resellers' own" },
+              { value: "resellers", label: "Reseller access", count: data.data.filter(item => item.reseller_access.enabled).length },
             ]}
           />
           {section === "resellers" ? (

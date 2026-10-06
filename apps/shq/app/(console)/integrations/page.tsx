@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { BellRing, Check, Copy, CreditCard, DownloadCloud, Package, Plug, RefreshCw, Search, Unplug } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, ExternalLinks, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, QueryView, RefreshFailed, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, ExternalLinks, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, QueryView, RefreshFailed, Select, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   type IntegrationAccessReason,
@@ -41,7 +41,7 @@ function ConnectDialog({ integration, sandbox, onClose }: { integration: Reselle
       title={`${connected ? "Update" : "Connect"} ${integration.name}`}
       description={
         sandbox
-          ? "Sandbox: use your sandbox credentials. They are stored but never sent to the provider; orders in the sandbox are simulated."
+          ? `Sandbox: use your ${integration.name} sandbox credentials. After saving, use Test to check them with ${integration.name}’s sandbox. Orders in BitoCard’s sandbox stay simulated.`
           : `We check these with ${integration.name} before saving them. They are encrypted and never shown again.${integration.approval === "review" ? " BitoCard reviews new and changed credentials before you can use them." : ""}`
       }
       confirmLabel={connected ? "Save credentials" : "Connect"}
@@ -197,7 +197,21 @@ function SupplierControls({ integration, manage }: { integration: ResellerIntegr
   );
 }
 
-function IntegrationCard({ integration, manage, onConnect, onDisconnect }: { integration: ResellerIntegration; manage: boolean; onConnect: () => void; onDisconnect: () => void }) {
+function IntegrationCard({
+  integration,
+  manage,
+  sandbox,
+  onSandbox,
+  onConnect,
+  onDisconnect,
+}: {
+  integration: ResellerIntegration;
+  manage: boolean;
+  sandbox: boolean;
+  onSandbox: (on: boolean) => void;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}) {
   const [check, checkState] = useCheckIntegrationMutation();
   const connection = integration.connection;
   const status = connection?.status ?? "disconnected";
@@ -207,6 +221,13 @@ function IntegrationCard({ integration, manage, onConnect, onDisconnect }: { int
       <CardHeader title={integration.name} description={integration.description} actions={<StatusBadge status={status} label={statusLabels[status]} />} />
       <div className="flex flex-1 flex-col gap-3 px-5 pb-5 sm:px-6">
         <ExternalLinks links={integration.links} />
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-canvas px-3 py-2">
+          <span className="text-xs text-muted">{sandbox ? `Sandbox: credentials are tested with ${integration.name}’s sandbox.` : "Live: your real account."}</span>
+          <span className="flex items-center gap-2 text-sm font-medium text-ink">
+            Sandbox
+            <Toggle label={`${integration.name} sandbox`} checked={sandbox} onChange={onSandbox} />
+          </span>
+        </div>
         {connection ? (
           <dl className="grid gap-2 text-sm">
             {integration.fields
@@ -237,9 +258,9 @@ function IntegrationCard({ integration, manage, onConnect, onDisconnect }: { int
                 {connection ? "Update credentials" : "Connect"}
               </Button>
             ) : null}
-            {connection && connection.mode === "live" && (status === "active" || status === "pending_review") ? (
+            {connection && (connection.mode === "test" ? status === "active" : status === "active" || status === "pending_review") ? (
               <Button size="sm" variant="ghost" icon={<RefreshCw className="size-4" aria-hidden />} loading={checkState.isLoading} onClick={() => check(integration.id)}>
-                Check
+                {connection.mode === "test" ? "Test with sandbox" : "Check"}
               </Button>
             ) : null}
             {connection && status !== "suspended" ? (
@@ -272,7 +293,7 @@ function Group({ title, icon, items, render }: { title: string; icon: React.Reac
  * BitoCard is paid by its fees and your subscription from your wallet. Owners and admins manage them.
  */
 export default function IntegrationsPage() {
-  const { membership, mode } = useReseller();
+  const { membership, mode, setMode } = useReseller();
   const manage = can(membership, "admin");
   const sandbox = mode === "test";
   const { data, error, isFetching, refetch } = useResellerIntegrationsQuery();
@@ -293,6 +314,9 @@ export default function IntegrationsPage() {
       key={integration.id}
       integration={integration}
       manage={manage && allowed}
+      sandbox={sandbox}
+      // The sandbox and live connections are separate; switching shows the other (for the whole dashboard).
+      onSandbox={on => setMode(on ? "test" : "live")}
       onConnect={() => setConnecting(integration.id)}
       onDisconnect={() => setRemoving(integration.id)}
     />

@@ -15528,7 +15528,7 @@
     },
     "/v1/integrations/{id}/connection/check": {
       "post": {
-        "description": "Live: asks the provider whether the saved credentials still work.",
+        "description": "Asks the provider whether the saved credentials work: live credentials at its live address, sandbox credentials (test mode) at its sandbox address. Never changes the connection.",
         "operationId": "ResellerIntegrationsController_check",
         "parameters": [
           {
@@ -27668,6 +27668,8 @@
               "reloadly",
               "vtpass",
               "didww",
+              "zendit",
+              "pawapay",
               "flutterwave",
               "monnify"
             ]
@@ -27812,6 +27814,8 @@
               "reloadly",
               "vtpass",
               "didww",
+              "zendit",
+              "pawapay",
               "flutterwave",
               "monnify"
             ]

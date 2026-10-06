@@ -11,6 +11,7 @@ import type {
   Country,
   FeatureRule,
   Integration,
+  IntegrationTest,
   List,
   MfaChallenge,
   MfaSetup,
@@ -276,7 +277,12 @@ export const adminApi = bitocardApi.injectEndpoints({
     /** Sets fields (null clears an admin value). Needs the admin's current authenticator code. */
     updateIntegration: build.mutation<Integration, { id: string; values: Record<string, string | number | boolean | null>; code: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/integrations/${id}`, method: 'PUT', body }),
-      invalidatesTags: ['Integration', 'Activity'],
+      invalidatesTags: ['Integration', 'Activity', 'Supplier'],
+    }),
+    /** Tests the saved credentials at the sandbox or live address; changes nothing. */
+    testIntegration: build.mutation<IntegrationTest, string>({
+      query: id => ({ url: `/v1/admin/integrations/${id}/test`, method: 'POST' }),
+      invalidatesTags: ['Activity'],
     }),
   }),
 });
@@ -359,6 +365,7 @@ export const {
   useUpdateCountryCategoryMutation,
   useIntegrationsQuery,
   useUpdateIntegrationMutation,
+  useTestIntegrationMutation,
 } = adminApi;
 export * from './reseller-integrations';
 export * from './fees';

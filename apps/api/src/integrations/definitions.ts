@@ -56,10 +56,12 @@ const integrationKeyList = [
   'GOOGLE_REDIRECT_URI',
   'FLUTTERWAVE_SECRET_KEY',
   'FLUTTERWAVE_WEBHOOK_HASH',
+  'FLUTTERWAVE_SANDBOX',
   'MONNIFY_API_KEY',
   'MONNIFY_SECRET_KEY',
   'MONNIFY_CONTRACT_CODE',
   'MONNIFY_API_URL',
+  'MONNIFY_SANDBOX',
   'OPEN_EXCHANGE_RATES_APP_ID',
   'FX_MAX_AGE_MINUTES',
   'RELOADLY_CLIENT_ID',
@@ -70,16 +72,20 @@ const integrationKeyList = [
   'VTPASS_PUBLIC_KEY',
   'VTPASS_SECRET_KEY',
   'VTPASS_API_URL',
+  'VTPASS_SANDBOX',
   'VTPASS_CONTACT_PHONE',
   'DIDWW_API_KEY',
   'DIDWW_API_URL',
+  'DIDWW_SANDBOX',
   'DIDWW_COUNTRIES',
   'DIDWW_CALLBACK_URL',
   'ZENDIT_API_KEY',
   'ZENDIT_API_URL',
+  'ZENDIT_SANDBOX',
   'ZENDIT_WEBHOOK_SECRET',
   'PAWAPAY_API_TOKEN',
   'PAWAPAY_API_URL',
+  'PAWAPAY_SANDBOX',
   'PAWAPAY_PAYOUT_FEE_PERCENT',
   'PAWAPAY_CALLBACK_TOKEN',
   'DIDIT_API_KEY',
@@ -186,6 +192,10 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     fields: [
       secret('FLUTTERWAVE_SECRET_KEY', 'Secret key'),
       secret('FLUTTERWAVE_WEBHOOK_HASH', 'Webhook secret hash', { help: 'The secret hash set under Webhooks in the Flutterwave dashboard.' }),
+      field('FLUTTERWAVE_SANDBOX', 'Sandbox', {
+        kind: 'flag',
+        help: 'On: test the test secret key (FLWSECK_TEST-…) with Test connection; Flutterwave is not used for live payments. Off: live.',
+      }),
     ],
   },
   {
@@ -197,7 +207,8 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       secret('MONNIFY_API_KEY', 'API key'),
       secret('MONNIFY_SECRET_KEY', 'Secret key'),
       field('MONNIFY_CONTRACT_CODE', 'Contract code', { required: true }),
-      field('MONNIFY_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://sandbox.monnify.com' }),
+      field('MONNIFY_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Monnify’s sandbox (https://sandbox.monnify.com) with sandbox keys, for Test connection only; Monnify is not used for live payments. Off: live.' }),
+      field('MONNIFY_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
     ],
   },
   {
@@ -217,7 +228,10 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     fields: [
       field('RELOADLY_CLIENT_ID', 'Client ID', { required: true, help: 'Reloadly dashboard > Developers > API settings. Test and live keys differ.' }),
       secret('RELOADLY_CLIENT_SECRET', 'Client secret'),
-      field('RELOADLY_SANDBOX', 'Use Reloadly’s sandbox', { kind: 'flag', help: 'On: Reloadly test credits, no real cards. Off: live.' }),
+      field('RELOADLY_SANDBOX', 'Sandbox', {
+        kind: 'flag',
+        help: 'On: Reloadly’s sandbox with test credentials, for Test connection only; Reloadly is not synced or used for live orders. Off: live.',
+      }),
       secret('RELOADLY_WEBHOOK_SECRET', 'Webhook signature secret', {
         required: false,
         help: 'Developers > Webhooks in the Reloadly dashboard. Subscribe to the gift card and airtime transaction status events. Without it, notifications are refused and orders are still checked on schedule.',
@@ -232,7 +246,8 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       secret('VTPASS_API_KEY', 'API key'),
       secret('VTPASS_PUBLIC_KEY', 'Public key'),
       secret('VTPASS_SECRET_KEY', 'Secret key'),
-      field('VTPASS_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://sandbox.vtpass.com/api' }),
+      field('VTPASS_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: VTpass’s sandbox (https://sandbox.vtpass.com/api) with sandbox keys, for Test connection only; VTpass is not used for live orders. Off: live.' }),
+      field('VTPASS_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
       field('VTPASS_CONTACT_PHONE', 'Fallback phone number', { help: 'VTpass needs a phone number on every payment; used when the customer gave none.' }),
     ],
   },
@@ -243,7 +258,8 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     webhookPath: '/v1/webhooks/didww',
     fields: [
       secret('DIDWW_API_KEY', 'API key', { help: 'DIDWW dashboard > API. Also verifies DIDWW’s order callbacks.' }),
-      field('DIDWW_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://sandbox-api.didww.com/v3' }),
+      field('DIDWW_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: DIDWW’s sandbox (https://sandbox-api.didww.com/v3) with a sandbox key, for Test connection only; DIDWW is not synced or used for live orders. Off: live.' }),
+      field('DIDWW_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
       field('DIDWW_COUNTRIES', 'Number countries', { help: 'ISO codes of the countries whose numbers are synced, separated by commas, for example GB,US.' }),
       field('DIDWW_CALLBACK_URL', 'API public address', { kind: 'url', help: 'Order callbacks go to this address plus /v1/webhooks/didww. Default: https://api.bitocard.com' }),
     ],
@@ -255,7 +271,8 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     webhookPath: '/v1/webhooks/zendit',
     fields: [
       secret('ZENDIT_API_KEY', 'API key', { help: 'Zendit console > Developers > API settings. Test mode and production keys differ.' }),
-      field('ZENDIT_API_URL', 'API address', { kind: 'url', help: 'Test mode: https://test-api.zendit.io/v1 (with the test key). Default: production.' }),
+      field('ZENDIT_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Zendit’s test mode (https://test-api.zendit.io/v1) with the test key, for Test connection only; Zendit is not synced or used for live orders. Off: live.' }),
+      field('ZENDIT_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
       secret('ZENDIT_WEBHOOK_SECRET', 'Webhook secret', {
         required: false,
         help: 'Choose a long random value. In the Zendit console webhook settings, add the header X-Webhook-Token with this secret as its value. Without it, notifications are refused and orders are still checked on schedule.',
@@ -270,7 +287,8 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     webhookPath: '/v1/webhooks/pawapay?token=<callback token>',
     fields: [
       secret('PAWAPAY_API_TOKEN', 'API token', { help: 'pawaPay dashboard > System configuration > API tokens. Sandbox and production tokens differ.' }),
-      field('PAWAPAY_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://api.sandbox.pawapay.io (with the sandbox token). Default: production.' }),
+      field('PAWAPAY_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: pawaPay’s sandbox (https://api.sandbox.pawapay.io) with the sandbox token, for Test connection only; pawaPay is not synced or used for live orders. Off: live.' }),
+      field('PAWAPAY_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
       field('PAWAPAY_PAYOUT_FEE_PERCENT', 'Payout fee (%)', {
         required: true,
         help: 'The payout fee in your pawaPay agreement, for example 1.5. BitoCard’s cost is the amount sent plus this fee, so prices never fall below it. Syncing refuses until it is set.',
@@ -305,7 +323,17 @@ export const integrationGroups: IntegrationGroup[] = [
     description: group.description,
     section: 'suppliers' as const,
     adapterReady: false,
-    fields: group.fields.map(item => ({ key: supplierCredentialKey(group.code, item.suffix), label: item.label, secret: item.secret, kind: item.kind, required: item.required, help: item.help })),
+    fields: [
+      ...group.fields.map(item => ({ key: supplierCredentialKey(group.code, item.suffix), label: item.label, secret: item.secret, kind: item.kind, required: item.required, help: item.help })),
+      {
+        key: supplierCredentialKey(group.code, 'SANDBOX'),
+        label: 'Sandbox',
+        secret: false,
+        kind: 'flag' as const,
+        required: false,
+        help: `On: the credentials saved are ${group.name}’s sandbox ones. Kept for when BitoCard’s adapter is built, which will then use the sandbox address.`,
+      },
+    ],
   })),
 ];
 

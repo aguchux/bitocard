@@ -12,6 +12,8 @@ export type IntegrationOffer = {
   integration_id: string;
   kind: ConnectableKind;
   name: string;
+  /** Switched on by an admin on the integration's card: only then do resellers see it. */
+  reseller_access: boolean;
   offered: boolean;
   global: boolean;
   countries: string[];
@@ -41,6 +43,10 @@ export const adminResellerIntegrationsApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     integrationOffers: build.query<List<IntegrationOffer>, void>({ query: () => '/v1/admin/integrations/reseller-availability', providesTags: ['IntegrationOffer'] }),
     /** Super admins: offered globally or in these countries, with automatic approval or review. */
+    setIntegrationResellerAccess: build.mutation<IntegrationOffer, { id: string; enabled: boolean }>({
+      query: ({ id, enabled }) => ({ url: `/v1/admin/integrations/${id}/reseller-access`, method: 'PUT', body: { enabled } }),
+      invalidatesTags: ['IntegrationOffer', 'Integration', 'Activity'],
+    }),
     setIntegrationOffer: build.mutation<IntegrationOffer, { id: string; global: boolean; countries: string[]; approval: IntegrationApproval }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/integrations/${id}/reseller-availability`, method: 'PUT', body }),
       invalidatesTags: ['IntegrationOffer', 'Activity'],
@@ -57,4 +63,4 @@ export const adminResellerIntegrationsApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useIntegrationOffersQuery, useSetIntegrationOfferMutation, useConnectionsQuery, useDecideConnectionMutation } = adminResellerIntegrationsApi;
+export const { useIntegrationOffersQuery, useSetIntegrationOfferMutation, useSetIntegrationResellerAccessMutation, useConnectionsQuery, useDecideConnectionMutation } = adminResellerIntegrationsApi;

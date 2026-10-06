@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { inSandbox, urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { StubAdapter, type SupplierAdapter } from './adapter.js';
 import { DidwwAdapter } from './didww.adapter.js';
@@ -10,14 +11,9 @@ import { VtpassAdapter } from './vtpass.adapter.js';
 import { PawapayAdapter } from './pawapay.adapter.js';
 import { ZenditAdapter } from './zendit.adapter.js';
 
-/** Reloadly on given credentials; the API addresses follow the sandbox setting unless overridden (tests). */
-function reloadly(config: { RELOADLY_SANDBOX: boolean; RELOADLY_AUTH_URL: string; RELOADLY_GIFTCARDS_URL?: string; RELOADLY_TOPUPS_URL?: string }, credentials: { clientId?: string; clientSecret?: string }) {
-  const sandbox = config.RELOADLY_SANDBOX;
-  return new ReloadlyAdapter(credentials, {
-    auth: config.RELOADLY_AUTH_URL,
-    giftcards: config.RELOADLY_GIFTCARDS_URL ?? (sandbox ? 'https://giftcards-sandbox.reloadly.com' : 'https://giftcards.reloadly.com'),
-    topups: config.RELOADLY_TOPUPS_URL ?? (sandbox ? 'https://topups-sandbox.reloadly.com' : 'https://topups.reloadly.com'),
-  });
+/** Reloadly on given credentials, at the gift card and top-up addresses given (live, or an override in tests). */
+function reloadly(config: { RELOADLY_AUTH_URL: string; RELOADLY_GIFTCARDS_URL?: string; RELOADLY_TOPUPS_URL?: string }, credentials: { clientId?: string; clientSecret?: string }) {
+  return new ReloadlyAdapter(credentials, { auth: config.RELOADLY_AUTH_URL, giftcards: config.RELOADLY_GIFTCARDS_URL!, topups: config.RELOADLY_TOPUPS_URL! });
 }
 
 /**
@@ -37,13 +33,17 @@ export class SupplierAdapters {
   ) {
     this.stock = new StockAdapter(prisma, config.ENCRYPTION_KEY);
     // Rebuilt when an admin changes supplier credentials, so a new key is used without a restart.
-    this.configured = integrations.derive(config => {
+    // A supplier switched to its sandbox (Settings > Integrations) gets no credentials here: it is never used for live
+    // orders or syncs, and serves only BitoCard's simulated sandbox. Its credentials are tested from the integration.
+    this.configured = integrations.derive(settings => {
+      const config = urlsFor(settings, 'live');
+      const live = (code: string) => !inSandbox(settings, code);
       const adapters: SupplierAdapter[] = [
-        reloadly(config, { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET }),
-        new VtpassAdapter({ apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
-        new DidwwAdapter({ apiKey: config.DIDWW_API_KEY, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL }),
-        new ZenditAdapter({ apiKey: config.ZENDIT_API_KEY, baseUrl: config.ZENDIT_API_URL }),
-        new PawapayAdapter({ apiToken: config.PAWAPAY_API_TOKEN, baseUrl: config.PAWAPAY_API_URL, feePercent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
+        reloadly(config, live('reloadly') ? { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET } : {}),
+        new VtpassAdapter(live('vtpass') ? { apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY } : {}, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
+        new DidwwAdapter({ apiKey: live('didww') ? config.DIDWW_API_KEY : undefined, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL }),
+        new ZenditAdapter({ apiKey: live('zendit') ? config.ZENDIT_API_KEY : undefined, baseUrl: config.ZENDIT_API_URL }),
+        new PawapayAdapter({ apiToken: live('pawapay') ? config.PAWAPAY_API_TOKEN : undefined, baseUrl: config.PAWAPAY_API_URL, feePercent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
         this.stock,
       ];
       return new Map(adapters.map(adapter => [adapter.code, adapter]));
@@ -56,11 +56,19 @@ export class SupplierAdapters {
    * calls suppliers. The connection names the account's own notification address (DIDWW callbacks).
    */
   forAccount(code: string, credentials: Record<string, string>, connectionId?: string): SupplierAdapter | null {
-    const config = this.integrations.config;
-    if (code === 'reloadly') return reloadly({ ...config, RELOADLY_SANDBOX: false }, { clientId: credentials.client_id, clientSecret: credentials.client_secret });
+    // Always the providers' live addresses, whatever BitoCard's own Sandbox switches say.
+    const config = urlsFor(this.integrations.config, 'live');
+    if (code === 'reloadly') return reloadly(config, { clientId: credentials.client_id, clientSecret: credentials.client_secret });
     if (code === 'vtpass') return new VtpassAdapter({ apiKey: credentials.api_key, publicKey: credentials.public_key, secretKey: credentials.secret_key }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE);
     if (code === 'didww') return new DidwwAdapter({ apiKey: credentials.api_key, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL, connectionId });
+    if (code === 'zendit') return new ZenditAdapter({ apiKey: credentials.api_key, baseUrl: config.ZENDIT_API_URL });
+    if (code === 'pawapay') return new PawapayAdapter({ apiToken: credentials.api_token, baseUrl: config.PAWAPAY_API_URL, feePercent: credentials.payout_fee_percent });
     return null;
+  }
+
+  /** Whether BitoCard's own account with this supplier is switched to its sandbox (so not used live). */
+  sandbox(code: string) {
+    return inSandbox(this.integrations.config, code);
   }
 
   get(code: string): SupplierAdapter {

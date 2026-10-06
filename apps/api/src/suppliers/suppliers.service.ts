@@ -132,7 +132,7 @@ function presentFeatureRules(supplier: Supplier, adapter: Pick<SupplierAdapter, 
   return Object.fromEntries(adapter.gatedFeatures.map(feature => [feature, rules[feature] ?? 'allowed'])) as Record<ProductFeature, FeatureRule>;
 }
 
-export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[] }, adapter: Pick<SupplierAdapter, 'configured' | 'gatedFeatures'>) {
+export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[] }, adapter: Pick<SupplierAdapter, 'configured' | 'gatedFeatures'>, sandbox = false) {
   const configured = adapter.configured();
   return {
     object: 'supplier' as const,
@@ -144,6 +144,8 @@ export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[
     status: supplier.status,
     enabled: supplier.enabled,
     configured,
+    /** BitoCard's account is switched to the supplier's sandbox: tested only, never synced or used live. */
+    sandbox,
     funding: {
       billing_model: supplier.billingModel,
       currency: supplier.fundingCurrency,
@@ -177,13 +179,13 @@ export class SuppliersService {
   async list() {
     // BitoCard's own stock is managed under Catalog > Stock, not as an outside supplier.
     const suppliers = await this.prisma.supplier.findMany({ where: { code: { not: stockSupplier } }, include: { markets: true }, orderBy: { code: 'asc' } });
-    return { object: 'list' as const, data: suppliers.map(s => presentSupplier(s, this.adapters.get(s.code))) };
+    return { object: 'list' as const, data: suppliers.map(s => presentSupplier(s, this.adapters.get(s.code), this.adapters.sandbox(s.code))) };
   }
 
   async get(code: string) {
     const supplier = await this.prisma.supplier.findUnique({ where: { code }, include: { markets: true } });
     if (!supplier) throw notFound('supplier');
-    return presentSupplier(supplier, this.adapters.get(code));
+    return presentSupplier(supplier, this.adapters.get(code), this.adapters.sandbox(code));
   }
 
   async update(actorId: string | null, code: string, input: SupplierUpdate) {
@@ -270,6 +272,14 @@ export class SuppliersService {
     if (!supplier) throw notFound('supplier');
     if (code === stockSupplier) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'supplier_not_synced', 'BitoCard stock is not synced: add products and codes under Catalog > Stock.');
+    }
+    if (this.adapters.sandbox(code)) {
+      throw new ApiError(
+        HttpStatus.CONFLICT,
+        'conflict_error',
+        'supplier_in_sandbox',
+        `${supplier.name} is switched to its sandbox, which is only for testing credentials (Settings > Integrations > Test connection). Switch Sandbox off to sync and sell it.`,
+      );
     }
     const adapter = this.adapters.get(code);
     if (!adapter.configured()) {

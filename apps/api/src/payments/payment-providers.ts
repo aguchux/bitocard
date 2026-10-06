@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
+import { inSandbox, urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { FlutterwaveProvider } from './flutterwave.provider.js';
@@ -19,14 +20,20 @@ export class PaymentProviders {
   private readonly clients: () => { sandbox: SandboxProvider; flutterwave: FlutterwaveProvider | null; monnify: MonnifyProvider | null };
 
   constructor(integrations: IntegrationsService) {
-    this.clients = integrations.derive(config => ({
-      sandbox: new SandboxProvider(config.DASHBOARD_URL),
-      flutterwave: config.FLUTTERWAVE_SECRET_KEY ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH) : null,
-      monnify:
-        config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE
-          ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
-          : null,
-    }));
+    // A gateway switched to its sandbox (Settings > Integrations) is never used for live money: its credentials are
+    // only tested from the integration, so sandbox payments can never credit a wallet.
+    this.clients = integrations.derive(settings => {
+      const config = urlsFor(settings, 'live');
+      return {
+        sandbox: new SandboxProvider(config.DASHBOARD_URL),
+        flutterwave:
+          config.FLUTTERWAVE_SECRET_KEY && !inSandbox(settings, 'flutterwave') ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH) : null,
+        monnify:
+          config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE && !inSandbox(settings, 'monnify')
+            ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
+            : null,
+      };
+    });
   }
 
   get sandbox() {

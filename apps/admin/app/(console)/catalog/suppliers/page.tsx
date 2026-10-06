@@ -175,6 +175,11 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
             ) : null}
             {supplier.name}
             <StatusBadge status={healthOf(supplier)} />
+            {supplier.sandbox ? (
+              <Badge dot={false} tone="amber">
+                Sandbox
+              </Badge>
+            ) : null}
             <Badge dot={false} tone="blue">
               {humanise(supplier.status)}
             </Badge>
@@ -188,8 +193,8 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
               size="sm"
               icon={<RefreshCw className="size-4" aria-hidden />}
               loading={syncState.isLoading}
-              disabled={!operator || !supplier.configured}
-              title={supplier.configured ? undefined : "No API credentials configured"}
+              disabled={!operator || !supplier.configured || supplier.sandbox}
+              title={supplier.sandbox ? "In sandbox: test it under Settings > Integrations" : supplier.configured ? undefined : "No API credentials configured"}
               onClick={() => sync(supplier.code)}
             >
               Sync catalogue
@@ -212,7 +217,13 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
         ) : null}
         {syncState.error || updateState.error ? <Notice tone="red">{errorMessage(syncState.error ?? updateState.error)}</Notice> : null}
         {supplier.last_sync_error ? <Notice tone="amber" title="Last sync failed">{supplier.last_sync_error}</Notice> : null}
-        {!supplier.configured ? <Notice tone="amber">No API credentials are configured, so it serves the sandbox only.</Notice> : null}
+        {supplier.sandbox ? (
+          <Notice tone="amber" title="In sandbox">
+            BitoCard’s account is switched to this supplier’s sandbox, for testing credentials only: it is not synced or used for live orders. Switch Sandbox off under Settings &gt; Integrations to sell it.
+          </Notice>
+        ) : !supplier.configured ? (
+          <Notice tone="amber">No API credentials are configured, so it serves the sandbox only.</Notice>
+        ) : null}
         <KeyValue
           items={[
             { label: "Last synced", value: formatRelative(supplier.last_synced_at) },

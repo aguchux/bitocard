@@ -227,6 +227,7 @@ describe('real events', () => {
   });
 
   test('connection reviews and decisions reach operations and the reseller', async () => {
+    await admin.put('/v1/admin/integrations/vtpass/reseller-access', { enabled: true });
     await admin.put('/v1/admin/integrations/vtpass/reseller-availability', { global: true, countries: [], approval: 'review' });
     const owner = await resellerClient(server);
     await prisma.reseller.update({ where: { id: owner.resellerId }, data: { status: 'active', planCode: 'premium', verifiedAt: new Date() } });

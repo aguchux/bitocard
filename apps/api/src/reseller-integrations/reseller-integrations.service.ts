@@ -4,6 +4,8 @@ import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { ConnectionStatus, IntegrationApproval, LedgerMode, ResellerConnection } from '../generated/prisma/client.js';
+import { type Environment, urlsFor } from '../integrations/endpoints.js';
+import { integrationGroups } from '../integrations/definitions.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
@@ -31,10 +33,11 @@ const decisions: Record<ConnectionDecision, { from: ConnectionStatus[]; to: Conn
 
 /**
  * Resellers' own integrations, phase 1: which integrations are offered where, and resellers' own connections to them
- * (credentials stored like BitoCard's: encrypted, write-only, audited). Three gates: the `own_integrations` switch and
- * plan feature, the integration offered in the reseller's country, and the connection approved (live only; automatic
- * or by review, per integration). Live credentials are checked with a harmless call when saved; sandbox credentials
- * are never sent anywhere (the sandbox never calls real providers).
+ * (credentials stored like BitoCard's: encrypted, write-only, audited). Gates: the `own_integrations` switch and plan
+ * feature, the integration's reseller access switched on by an admin and offered in the reseller's country, and the
+ * connection approved (live only; automatic or by review, per integration). Live credentials are checked with a
+ * harmless call at the provider's live address when saved; sandbox credentials are tested at the provider's sandbox
+ * address only when the reseller asks (Test), and BitoCard's sandbox orders stay simulated.
  */
 @Injectable()
 export class ResellerIntegrationsService {
@@ -101,8 +104,8 @@ export class ResellerIntegrationsService {
     const saved = existing?.credentialsEncrypted ? (JSON.parse(this.encryption().decrypt(existing.credentialsEncrypted)) as Record<string, string>) : {};
     const values = prepare(integration, submitted, saved);
 
-    // Live credentials must work before they are saved; the sandbox never calls real providers.
-    if (mode === 'live') await this.runCheck(integration, values);
+    // Live credentials must work before they are saved; sandbox ones are tested on request (Test).
+    if (mode === 'live') await this.runCheck(integration, values, 'live');
 
     const changed = !existing?.credentialsEncrypted || JSON.stringify(sorted(values)) !== JSON.stringify(sorted(saved));
     // New or changed live credentials are reviewed again where the integration needs review.
@@ -144,20 +147,21 @@ export class ResellerIntegrationsService {
     return presentIntegration(integration, offer.approval, connection, this.apiBase);
   }
 
-  /** Runs the check again (live); the sandbox has nothing to check. */
+  /**
+   * Checks the saved credentials again: live ones at the provider's live address, sandbox ones at its sandbox address
+   * (how a reseller tests their sandbox credentials before going live). Never changes the connection's status.
+   */
   async check(resellerId: string, mode: LedgerMode, integrationId: string) {
     const integration = connectable(integrationId);
     const connection = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode } } });
     if (!integration || !connection?.credentialsEncrypted) throw notFound();
     let ok = true;
     let message: string | null = null;
-    if (mode === 'live') {
-      try {
-        await this.runCheck(integration, JSON.parse(this.encryption().decrypt(connection.credentialsEncrypted)) as Record<string, string>);
-      } catch (error) {
-        ok = false;
-        message = error instanceof ApiError ? error.message : 'The check failed.';
-      }
+    try {
+      await this.runCheck(integration, JSON.parse(this.encryption().decrypt(connection.credentialsEncrypted)) as Record<string, string>, mode === 'live' ? 'live' : 'sandbox');
+    } catch (error) {
+      ok = false;
+      message = error instanceof ApiError ? error.message : 'The check failed.';
     }
     const updated = await this.prisma.resellerConnection.update({ where: { id: connection.id }, data: { lastCheckedAt: new Date(), lastCheckOk: ok, lastCheckMessage: message } });
     const offer = await this.prisma.integrationOffer.findUnique({ where: { integrationId } });
@@ -189,6 +193,8 @@ export class ResellerIntegrationsService {
   async active(resellerId: string, integrationId: string, mode: LedgerMode) {
     const connection = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode } } });
     if (connection?.status !== 'active' || !connection.credentialsEncrypted) return null;
+    // An admin switching reseller access off stops every connection being used.
+    if (!(await this.accessOn(integrationId))) return null;
     return { id: connection.id, credentials: JSON.parse(this.encryption().decrypt(connection.credentialsEncrypted)) as Record<string, string> };
   }
 
@@ -221,7 +227,9 @@ export class ResellerIntegrationsService {
           integration_id: item.id,
           kind: item.kind,
           name: item.name,
-          offered: Boolean(offer && (offer.global || offer.countries.length)),
+          /** Switched on by an admin: only then does it show to resellers (and in the admin's Reseller access tab). */
+          reseller_access: offer?.resellerAccess ?? false,
+          offered: Boolean(offer?.resellerAccess && (offer.global || offer.countries.length)),
           global: offer?.global ?? false,
           countries: offer?.countries ?? [],
           approval: offer?.approval ?? 'review',
@@ -243,6 +251,38 @@ export class ResellerIntegrationsService {
     const after = await this.prisma.integrationOffer.upsert({ where: { integrationId }, create: { integrationId, ...data }, update: data });
     await this.audit.record({ actorId: adminId, action: 'integration_offer.updated', targetType: 'integration_offer', targetId: integrationId, before, after });
     return (await this.adminOffers()).data.find(item => item.integration_id === integrationId);
+  }
+
+  /**
+   * Switches resellers' access to an integration on or off. Off hides it from resellers and stops their connections
+   * being used (they are kept, and work again when switched back on). Only integrations with a built adapter can be on.
+   */
+  async setResellerAccess(adminId: string | null, integrationId: string, enabled: boolean) {
+    if (!connectable(integrationId)) {
+      if (!integrationGroups.some(group => group.id === integrationId)) throw notFound();
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'invalid_request_error',
+        'integration_not_connectable',
+        'Resellers cannot connect this integration yet: BitoCard’s adapter for it is still to be built.',
+        'enabled',
+      );
+    }
+    const before = await this.prisma.integrationOffer.findUnique({ where: { integrationId } });
+    const after = await this.prisma.integrationOffer.upsert({
+      where: { integrationId },
+      create: { integrationId, resellerAccess: enabled, updatedById: adminId },
+      update: { resellerAccess: enabled, updatedById: adminId },
+    });
+    if ((before?.resellerAccess ?? false) !== enabled) {
+      await this.audit.record({ actorId: adminId, action: 'integration_offer.access_updated', targetType: 'integration_offer', targetId: integrationId, before, after });
+    }
+    return (await this.adminOffers()).data.find(item => item.integration_id === integrationId);
+  }
+
+  /** Whether resellers may use this integration now (reseller access on). */
+  private async accessOn(integrationId: string) {
+    return (await this.prisma.integrationOffer.findUnique({ where: { integrationId } }))?.resellerAccess === true;
   }
 
   /** Connections for review and oversight, newest first. Live only unless asked. */
@@ -309,12 +349,13 @@ export class ResellerIntegrationsService {
     return this.integrations.config.DIDWW_CALLBACK_URL;
   }
 
-  private async runCheck(integration: ConnectableIntegration, values: Record<string, string>) {
+  private async runCheck(integration: ConnectableIntegration, values: Record<string, string>, environment: Environment) {
     try {
-      await integration.check(values, this.integrations.config);
+      await integration.check(values, urlsFor(this.integrations.config, environment), environment);
     } catch (error) {
       if (error instanceof ProviderError && error.definite) {
-        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'credentials_rejected', `${integration.name} did not accept these credentials. Check them and try again.`, 'values');
+        const where = environment === 'sandbox' ? `${integration.name}’s sandbox` : integration.name;
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'credentials_rejected', `${where} did not accept these credentials. Check them and try again.`, 'values');
       }
       this.logger.warn({ err: error, integration: integration.id }, 'Could not check a reseller connection');
       throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'integration_unreachable', `We could not reach ${integration.name} to check these credentials. Try again in a moment.`);
@@ -333,7 +374,8 @@ export class ResellerIntegrationsService {
   }
 }
 
-const offeredIn = (offer: { global: boolean; countries: string[] }, country: string | null) => offer.global || Boolean(country && offer.countries.includes(country));
+const offeredIn = (offer: { resellerAccess: boolean; global: boolean; countries: string[] }, country: string | null) =>
+  offer.resellerAccess && (offer.global || Boolean(country && offer.countries.includes(country)));
 
 const sorted = (values: Record<string, string>) => Object.fromEntries(Object.entries(values).sort(([a], [b]) => a.localeCompare(b)));
 
