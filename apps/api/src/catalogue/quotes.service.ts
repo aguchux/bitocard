@@ -119,6 +119,8 @@ export class QuotesService {
       }
     }
     const own = priced.source === 'own' && priced.fee ? priced.fee : null;
+    // Some mobile money providers take whole amounts only.
+    if ((priced.offer.meta as { whole_units?: boolean } | null)?.whole_units && face % 100n !== 0n) throw invalid('This provider takes whole amounts only.', 'face_value');
     if (recipient.account_number) Object.assign(recipient, await this.checkAccount(mode, product, priced.offer, recipient.account_number, resellerId, Boolean(own)));
 
     const net = priced.price * BigInt(quantity);

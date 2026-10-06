@@ -471,3 +471,122 @@ export async function fakeDidww() {
   });
   return { ...service, state, complete, env: { DIDWW_API_KEY: 'didww-key', DIDWW_API_URL: service.url, DIDWW_COUNTRIES: 'GB' } };
 }
+
+/**
+ * Zendit: voucher and top-up offers, purchases by our transaction ID. `state.reply` is the status new purchases get
+ * ('DONE', 'PENDING', 'FAILED', or { http } to refuse); `state.purchases` maps transaction ID to { kind, body, status }.
+ */
+export async function fakeZendit() {
+  const usd = (value, extra = {}) => ({ currency: 'USD', currencyDivisor: 100, fee: 0, feePct: 0, discount: 0, ...value, ...extra });
+  const offer = (fields) => ({ enabled: true, productType: 'VOUCHER', subTypes: ['Shopping'], requiredFields: [], shortNotes: '', notes: '', regions: ['North America'], ...fields });
+  const state = {
+    vouchers: [
+      offer({ offerId: 'AMZ-US-25', brand: 'AMAZON_US', brandName: 'Amazon', country: 'US', priceType: 'FIXED', send: { currency: 'USD', currencyDivisor: 100, fixed: 2500 }, cost: usd({ fixed: 2400 }) }),
+      offer({ offerId: 'AMZ-US-50', brand: 'AMAZON_US', brandName: 'Amazon', country: 'US', priceType: 'FIXED', send: { currency: 'USD', currencyDivisor: 100, fixed: 5000 }, cost: usd({ fixed: 4750 }, { fee: 10 }) }),
+      // Needs the customer's email: never synced.
+      offer({ offerId: 'NFX-US-30', brand: 'NETFLIX_US', brandName: 'Netflix', country: 'US', priceType: 'FIXED', requiredFields: ['recipient.email'], send: { currency: 'USD', currencyDivisor: 100, fixed: 3000 }, cost: usd({ fixed: 2900 }) }),
+      // A utility payment: not a gift card.
+      offer({ offerId: 'UTIL-1', brand: 'POWER', brandName: 'Power Co', country: 'US', priceType: 'FIXED', subTypes: ['Utilities'], send: { currency: 'USD', currencyDivisor: 100, fixed: 1000 }, cost: usd({ fixed: 990 }) }),
+      offer({ offerId: 'OFF-1', brand: 'GONE', brandName: 'Gone', country: 'US', priceType: 'FIXED', enabled: false, send: { currency: 'USD', currencyDivisor: 100, fixed: 1000 }, cost: usd({ fixed: 900 }) }),
+    ],
+    topups: [
+      { offerId: 'MTN-NG-ANY', brand: 'MTN_NG', brandName: 'MTN Nigeria', country: 'NG', enabled: true, priceType: 'RANGE', productType: 'TOPUP', subTypes: ['Mobile Top Up'], send: { currency: 'NGN', currencyDivisor: 100, min: 10000, max: 5000000 }, cost: usd({ min: 6, max: 3000 }) },
+      { offerId: 'MTN-NG-1GB', brand: 'MTN_NG', brandName: 'MTN Nigeria', country: 'NG', enabled: true, priceType: 'FIXED', productType: 'TOPUP', subTypes: ['Mobile Data'], shortNotes: '1GB 30 days', dataGB: 1, send: { currency: 'NGN', currencyDivisor: 100, fixed: 100000 }, cost: usd({ fixed: 60 }) },
+    ],
+    purchases: {},
+    reply: 'DONE',
+    next: 1000,
+  };
+  const page = (list, query) => {
+    const limit = Number(query.get('_limit'));
+    const offset = Number(query.get('_offset'));
+    return { body: { limit, offset, total: list.length, list: list.slice(offset, offset + limit) } };
+  };
+  const view = (id, purchase) => ({
+    transactionId: id,
+    status: purchase.status,
+    offerId: purchase.body.offerId,
+    ...(purchase.kind === 'vouchers' && purchase.status === 'DONE' ? { receipt: { epin: `ZEN-${purchase.n}`, voucherId: `V${purchase.n}`, redemptionUrl: 'https://redeem.example/x', expiresAt: '2027-10-01T00:00:00Z' } } : {}),
+    ...(purchase.status === 'FAILED' ? { error: { code: 'X', message: 'Simulated failure', description: '' } } : {}),
+  });
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (headers.authorization !== 'Bearer zendit-key') return { status: 401, body: { errorCode: 'UNAUTHORIZED', message: 'Invalid API key', fields: {} } };
+    if (method === 'GET' && path === '/vouchers/offers') return page(state.vouchers, query);
+    if (method === 'GET' && path === '/topups/offers') return page(state.topups.filter(item => !query.get('country') || item.country === query.get('country')), query);
+    const buy = /^\/(vouchers|topups)\/purchases$/.exec(path);
+    if (method === 'POST' && buy) {
+      if (state.purchases[body.transactionId]) return { status: 400, body: { errorCode: 'DUPLICATE', message: 'Duplicate transaction ID', fields: {} } };
+      if (typeof state.reply === 'object') return { status: state.reply.http, body: { errorCode: 'REFUSED', message: 'Simulated refusal', fields: {} } };
+      state.purchases[body.transactionId] = { kind: buy[1], body, status: state.reply, n: (state.next += 1) };
+      return { body: { transactionId: body.transactionId, status: 'ACCEPTED' } };
+    }
+    const one = /^\/(vouchers|topups)\/purchases\/(\w+)$/.exec(path);
+    if (method === 'GET' && one) {
+      const purchase = state.purchases[one[2]];
+      return purchase ? { body: view(one[2], purchase) } : { status: 404, body: { errorCode: 'NOT_FOUND', message: 'Not found', fields: {} } };
+    }
+    return { status: 404, body: { errorCode: 'NOT_FOUND', message: `Fake Zendit has no ${method} ${path}`, fields: {} } };
+  });
+  return { ...service, state, env: { ZENDIT_API_KEY: 'zendit-key', ZENDIT_API_URL: service.url, ZENDIT_WEBHOOK_SECRET: 'zendit-hook' } };
+}
+
+/**
+ * pawaPay v2: the active configuration (payout providers by country) and payouts by payoutId. `state.reply` is what a
+ * new payout becomes ('COMPLETED', 'PROCESSING', 'FAILED', or 'REJECTED' at initiation); `state.payouts` maps payoutId
+ * to { body, status }.
+ */
+export async function fakePawapay() {
+  const provider = (code, name, currency, min, max, decimals = 'NONE', status = 'OPERATIONAL') => ({
+    provider: code,
+    displayName: name,
+    logo: `https://static-content.pawapay.io/company_logos/${name.toLowerCase()}.png`,
+    currencies: [{ currency, displayName: currency, operationTypes: { PAYOUT: { minAmount: min, maxAmount: max, decimalsInAmount: decimals, status } } }],
+  });
+  const state = {
+    countries: [
+      { country: 'GHA', prefix: '233', displayName: { en: 'Ghana' }, providers: [provider('MTN_MOMO_GHA', 'MTN', 'GHS', '1', '5000'), provider('VODAFONE_GHA', 'Telecel', 'GHS', '1', '3000', 'NONE', 'CLOSED')] },
+      { country: 'KEN', prefix: '254', displayName: { en: 'Kenya' }, providers: [provider('MPESA_KEN', 'M-Pesa', 'KES', '10', '150000')] },
+      { country: 'ZMB', prefix: '260', displayName: { en: 'Zambia' }, providers: [provider('AIRTEL_OAPI_ZMB', 'Airtel', 'ZMW', '1', '10000', 'TWO_PLACES')] },
+    ],
+    payouts: {},
+    reply: 'COMPLETED',
+  };
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (headers.authorization !== 'Bearer pawapay-token') return { status: 401, body: { failureReason: { failureCode: 'AUTHENTICATION_ERROR', failureMessage: 'Invalid token' } } };
+    if (method === 'GET' && path === '/v2/active-conf') {
+      if (query.get('operationType') !== 'PAYOUT') return { status: 400, body: {} };
+      return { body: { companyName: 'BitoCard', countries: state.countries } };
+    }
+    if (method === 'POST' && path === '/v2/payouts') {
+      if (state.payouts[body.payoutId]) return { body: { payoutId: body.payoutId, status: 'DUPLICATE_IGNORED' } };
+      if (state.reply === 'REJECTED') return { body: { payoutId: body.payoutId, status: 'REJECTED', failureReason: { failureCode: 'INVALID_PHONE_NUMBER', failureMessage: 'Not a valid MSISDN' } } };
+      state.payouts[body.payoutId] = { body, status: state.reply };
+      return { body: { payoutId: body.payoutId, status: 'ACCEPTED', created: new Date().toISOString() } };
+    }
+    const one = /^\/v2\/payouts\/([\w-]+)$/.exec(path);
+    if (method === 'GET' && one) {
+      const payout = state.payouts[one[1]];
+      if (!payout) return { body: { status: 'NOT_FOUND' } };
+      return {
+        body: {
+          status: 'FOUND',
+          data: {
+            payoutId: one[1],
+            status: payout.status,
+            amount: payout.body.amount,
+            currency: payout.body.currency,
+            clientReferenceId: payout.body.clientReferenceId,
+            ...(payout.status === 'COMPLETED' ? { providerTransactionId: `PT-${one[1].slice(0, 8)}` } : {}),
+            ...(payout.status === 'FAILED' ? { failureReason: { failureCode: 'RECIPIENT_NOT_FOUND', failureMessage: 'Wallet not found' } } : {}),
+          },
+        },
+      };
+    }
+    return { status: 404, body: { failureReason: { failureCode: 'NOT_FOUND', failureMessage: `Fake pawaPay has no ${method} ${path}` } } };
+  });
+  return { ...service, state, env: { PAWAPAY_API_TOKEN: 'pawapay-token', PAWAPAY_API_URL: service.url, PAWAPAY_PAYOUT_FEE_PERCENT: '1.5', PAWAPAY_CALLBACK_TOKEN: 'pawapay-callback' } };
+}

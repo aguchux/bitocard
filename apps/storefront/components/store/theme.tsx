@@ -1,4 +1,4 @@
-import { CreditCard, Gift, Globe, Laptop, Lock, Phone, ReceiptText, Shield, Signal, Smartphone, Tv, Wifi, Zap, Headphones, type LucideIcon } from "lucide-react";
+import { CreditCard, Gift, HandCoins, Globe, Laptop, Lock, Phone, ReceiptText, Shield, Signal, Smartphone, Tv, Wifi, Zap, Headphones, type LucideIcon } from "lucide-react";
 import type { ProductCategory, TrustIcon } from "@bitocard/api-client/storefront";
 
 /** Each category's icon and colours (tile background, icon colour, card gradient when a brand has no art). */
@@ -12,6 +12,7 @@ export const categoryTheme: Record<ProductCategory, { icon: LucideIcon; tile: st
   software: { icon: Laptop, tile: "bg-orange-50", ink: "text-orange-600", card: "from-orange-400 to-amber-600" },
   virtual_numbers: { icon: Phone, tile: "bg-indigo-50", ink: "text-indigo-600", card: "from-indigo-500 to-blue-700" },
   virtual_cards: { icon: CreditCard, tile: "bg-sky-50", ink: "text-sky-600", card: "from-sky-500 to-cyan-600" },
+  mobile_money: { icon: HandCoins, tile: "bg-lime-50", ink: "text-lime-700", card: "from-lime-500 to-green-600" },
 };
 
 /** The menu groups' icons (the hero chips). */

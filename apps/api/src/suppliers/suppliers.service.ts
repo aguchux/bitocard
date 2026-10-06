@@ -20,6 +20,14 @@ export function chunks<T>(list: T[], size: number) {
   return out;
 }
 
+/**
+ * Runs writes a few at a time, outside a transaction. Each is a whole-row update that a later sync repeats, so a
+ * partial run is harmless; one transaction over hundreds of round trips outran Prisma's 5-second limit on Neon.
+ */
+export async function inGroups(tasks: Array<() => Promise<unknown>>, size = 20) {
+  for (const group of chunks(tasks, size)) await Promise.all(group.map(task => task()));
+}
+
 /** JSON with sorted keys, so a stored value (Postgres reorders jsonb keys) compares equal to the same value. */
 const stableJson = (value: unknown): string =>
   value === null || typeof value !== 'object'
@@ -292,17 +300,17 @@ export class SuppliersService {
       const existing = await this.prisma.supplierProduct.findMany({ where: { supplierCode, sku: { in: chunk.map(item => item.sku) } } });
       const bySku = new Map(existing.map(offer => [offer.sku, offer]));
       const fresh: Prisma.SupplierProductCreateManyInput[] = [];
-      const changed: Prisma.PrismaPromise<unknown>[] = [];
+      const changed: Array<() => Promise<unknown>> = [];
       const unchanged: string[] = [];
       for (const item of chunk) {
         const offer = offerData(item, ids.get(item.productKey)!);
         const old = bySku.get(item.sku);
         if (!old) fresh.push({ supplierCode, sku: item.sku, ...offer, available: true, syncedAt: now });
-        else if (offerChanged(old, offer)) changed.push(this.prisma.supplierProduct.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
+        else if (offerChanged(old, offer)) changed.push(() => this.prisma.supplierProduct.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
         else unchanged.push(old.id);
       }
       if (fresh.length) await this.prisma.supplierProduct.createMany({ data: fresh, skipDuplicates: true });
-      if (changed.length) await this.prisma.$transaction(changed);
+      await inGroups(changed);
       if (unchanged.length) await this.prisma.supplierProduct.updateMany({ where: { id: { in: unchanged } }, data: { available: true, syncedAt: now } });
     }
     return { created: created.size, updated: items.length - created.size };
@@ -328,7 +336,7 @@ export class SuppliersService {
         for (const row of await this.prisma.product.findMany({ where: { key: { in: fresh } }, select: { id: true, key: true } })) ids.set(row.key, row.id);
       }
       const updates = existing.filter(product => productChanged(product, productData(byKey.get(product.key)!)));
-      if (updates.length) await this.prisma.$transaction(updates.map(product => this.prisma.product.update({ where: { id: product.id }, data: productData(byKey.get(product.key)!) })));
+      await inGroups(updates.map(product => () => this.prisma.product.update({ where: { id: product.id }, data: productData(byKey.get(product.key)!) })));
       for (const product of existing) ids.set(product.key, product.id);
     }
     return { ids, created };

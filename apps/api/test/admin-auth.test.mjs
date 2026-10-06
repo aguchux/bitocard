@@ -30,8 +30,19 @@ const totpFor = (secret, email) => new TOTP({ issuer: 'BitoCard Admin', label: e
 /** A code for an adjacent 30-second step, so two sign-ins in one test do not reuse the same step. */
 const codeAt = (secret, email, offsetSteps) => totpFor(secret, email).generate({ timestamp: Date.now() + offsetSteps * 30_000 });
 
+/**
+ * Waits out the last seconds of a 30-second step. The first sign-in uses the previous step's code (so later sign-ins can
+ * use the current and next ones); made at the very end of a step it would be two steps old by the time it is checked,
+ * outside the server's window of one.
+ */
+async function awayFromStepEdge() {
+  const left = 30_000 - (Date.now() % 30_000);
+  if (left < 3000) await new Promise(resolve => setTimeout(resolve, left + 100));
+}
+
 /** First sign-in: password, authenticator setup, first code. Returns the browser, secret and recovery codes. */
 async function firstSignIn(email) {
+  await awayFromStepEdge();
   const browser = client(server.base);
   const step1 = await browser.post('/v1/admin/auth/signin', { email, password });
   assert.equal(step1.status, 200);

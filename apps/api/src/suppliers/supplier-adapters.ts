@@ -7,6 +7,8 @@ import { DidwwAdapter } from './didww.adapter.js';
 import { ReloadlyAdapter } from './reloadly.adapter.js';
 import { StockAdapter } from './stock.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
+import { PawapayAdapter } from './pawapay.adapter.js';
+import { ZenditAdapter } from './zendit.adapter.js';
 
 /** Reloadly on given credentials; the API addresses follow the sandbox setting unless overridden (tests). */
 function reloadly(config: { RELOADLY_SANDBOX: boolean; RELOADLY_AUTH_URL: string; RELOADLY_GIFTCARDS_URL?: string; RELOADLY_TOPUPS_URL?: string }, credentials: { clientId?: string; clientSecret?: string }) {
@@ -40,6 +42,8 @@ export class SupplierAdapters {
         reloadly(config, { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET }),
         new VtpassAdapter({ apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
         new DidwwAdapter({ apiKey: config.DIDWW_API_KEY, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL }),
+        new ZenditAdapter({ apiKey: config.ZENDIT_API_KEY, baseUrl: config.ZENDIT_API_URL }),
+        new PawapayAdapter({ apiToken: config.PAWAPAY_API_TOKEN, baseUrl: config.PAWAPAY_API_URL, feePercent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
         this.stock,
       ];
       return new Map(adapters.map(adapter => [adapter.code, adapter]));

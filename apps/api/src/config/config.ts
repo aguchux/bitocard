@@ -105,6 +105,18 @@ export const configSchema = z.object({
   DIDWW_COUNTRIES: list.prefault('GB,US'),
   /** BitoCard's public API address: DIDWW order callbacks go to <this>/v1/webhooks/didww and are signed over it. */
   DIDWW_CALLBACK_URL: z.string().url().default('https://api.bitocard.com'),
+  ZENDIT_API_KEY: z.string().optional(),
+  /** https://test-api.zendit.io/v1 for Zendit's test mode (with a test key). */
+  ZENDIT_API_URL: z.string().url().default('https://api.zendit.io/v1'),
+  /** Expected as `X-Webhook-Token: <secret>` on Zendit's webhooks (set in the Zendit console). */
+  ZENDIT_WEBHOOK_SECRET: z.string().optional(),
+  PAWAPAY_API_TOKEN: z.string().optional(),
+  /** https://api.sandbox.pawapay.io for pawaPay's sandbox (with a sandbox token). */
+  PAWAPAY_API_URL: z.string().url().default('https://api.pawapay.io'),
+  /** The payout fee agreed with pawaPay, in percent (for example 1.5): BitoCard's cost is the amount plus this. */
+  PAWAPAY_PAYOUT_FEE_PERCENT: z.string().optional(),
+  /** In the callback address set in the pawaPay dashboard: /v1/webhooks/pawapay?token=<this>. */
+  PAWAPAY_CALLBACK_TOKEN: z.string().optional(),
 
   // File storage (DigitalOcean Spaces, S3-compatible): logos, icons and images uploaded by admins and resellers.
   // Browsers upload straight to the bucket with signed links; uploads are refused until the key, secret and bucket are set.

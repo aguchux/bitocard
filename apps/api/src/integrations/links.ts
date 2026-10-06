@@ -37,6 +37,8 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   reloadly: [signUp('https://www.reloadly.com/registration'), docs('https://developers.reloadly.com/')],
   vtpass: [signUp('https://www.vtpass.com/register'), { label: 'Sandbox sign up', url: 'https://sandbox.vtpass.com/register' }, docs('https://www.vtpass.com/documentation/')],
   didww: [signUp('https://www.didww.com/'), keys('https://my.didww.com/'), docs('https://doc.didww.com/api3/')],
+  pawapay: [signUp('https://www.pawapay.io/'), { label: 'Sandbox sign up', url: 'https://dashboard.sandbox.pawapay.io/' }, docs('https://docs.pawapay.io/v2/docs/payouts')],
+  zendit: [signUp('https://zendit.io/'), keys('https://console.zendit.io/', 'Zendit console'), docs('https://developers.zendit.io/api/')],
 
   // Registry suppliers whose adapter is not built yet.
   quickteller: [site('https://www.quickteller.com/'), { label: 'Developer portal', url: 'https://developer.interswitchgroup.com/' }],

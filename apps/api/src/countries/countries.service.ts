@@ -90,7 +90,8 @@ export class CountriesService {
         name: input.name,
         currency: input.currency.toUpperCase(),
         minWithdrawalMinor: BigInt(input.min_withdrawal_minor),
-        categories: { create: productCategories.map(category => ({ category })) },
+        // Money sent to a wallet is a payout: customers verify by default.
+        categories: { create: productCategories.map(category => ({ category, customerVerification: category === 'mobile_money' })) },
       },
       include: { categories: true },
     });

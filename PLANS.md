@@ -29,7 +29,7 @@ All **Decided**. BitoCard's own retail store (the parent store) is on the main s
 **When customers must verify (Decided).** Whether verification is required is an admin setting per product category and country, which admins can set or unset at any time. Defaults:
 
 - **Not required:** utility products such as airtime, data, pay-TV, electricity and internet/Wi-Fi.
-- **Required:** gift cards (buying and selling), virtual numbers and virtual cards, plus wallets and any payout.
+- **Required:** gift cards (buying and selling), virtual numbers, virtual cards and mobile money top-ups, plus wallets and any payout.
 - Other categories (for example eSIMs and software): set by admins.
 
 ## 3. Catalogue
@@ -45,6 +45,7 @@ All **Decided**. BitoCard's own retail store (the parent store) is on the main s
 | Software and licences | Consumer software, antivirus, Windows; retail/ESD, OEM and subscriptions kept separate | Decided |
 | Virtual numbers, voice, SMS | Capabilities shown per number; Africa, Asia and Europe where supported | Decided |
 | Virtual payment cards | Issued to verified storefront customers through a licensed issuer; card details shown only via the issuer's secure display | Decided; issuer approval **To confirm** |
+| Mobile money top-ups | Money sent to a customer's mobile money wallet (pawaPay payouts) in every country and provider the account supports; any amount within the provider's limits; customer verification by default | Decided (built); legal advice per country **To confirm** before live |
 | Domains | Buy through BitoCard (Vercel) or connect an existing domain | Decided |
 | Physical goods, Jumia/Konga integrations | | Deferred |
 
@@ -106,6 +107,8 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 30 | Onafriq | Virtual payment cards | Pan-African | Later (expansion) |
 | 31 | DT One | Airtime, data, eSIM, bills, gift cards, gaming PINs | 160+ countries claimed; the live feed decides | **Qualify** (broad pan-African alternative to Reloadly) |
 | 32 | expressPay | Bills, airtime, data | Ghana | Qualify (confirm fulfilment, not only collections) |
+| 33 | Zendit | Gift cards, airtime, bundles and data (eSIMs and bill payments not yet used) | 150+ countries claimed; the live feed decides | **Pilot** (adapter built; prepaid USD wallet, separate test mode) |
+| 34 | pawaPay | Mobile money top-ups (payouts to customers' wallets) | The countries and providers on the pawaPay account (Sub-Saharan Africa) | **Pilot** (adapter built; prefunded wallet per country; legal advice before live) |
 
 **Platform vendors** (also behind adapters)
 

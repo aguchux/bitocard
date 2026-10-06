@@ -78,6 +78,12 @@ export type Priced = {
   basis: 'markup' | 'discount' | 'cost';
 };
 
+/** Offers for one face value only (a supplier listing each value as its own offer) carry it as `meta.face_value`. */
+export const offerCovers = (offer: { meta: Prisma.JsonValue | null }, faceValue: bigint) => {
+  const only = (offer.meta as { face_value?: string } | null)?.face_value;
+  return only === undefined || BigInt(only) === faceValue;
+};
+
 const mulBps = (amount: bigint, bps: number) => amount * BigInt(bps);
 const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
 /** amount x (1 + bps/10000), rounded up. */
@@ -201,6 +207,7 @@ export class PricingService {
     const faceValueProduct = product.faceCurrency === ctx.currency && faceValueCategories.has(product.category);
     let best: (Priced & { offer: Offer }) | null = null;
     for (const offer of this.eligibleOffers(ctx, product, exclude)) {
+      if (!offerCovers(offer, faceValue)) continue;
       const discounted = new Decimal(faceValue.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
       const supplierCost = BigInt(discounted.toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
       const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
@@ -232,6 +239,7 @@ export class PricingService {
     const rule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category, planCode: ctx.planCode });
     let best: Priced | null = null;
     for (const offer of ctx.own.get(product.id) ?? []) {
+      if (!offerCovers(offer, faceValue)) continue;
       const supplierCost = BigInt(new Decimal(faceValue.toString()).mul(offer.costRatio).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
       const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
       const base = faceValueProduct ? faceValue : cost;

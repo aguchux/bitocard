@@ -6,7 +6,7 @@ export type Mode = 'test' | 'live';
 export type List<T> = { object: 'list'; data: T[]; has_more?: boolean };
 export type Page = { limit?: number; starting_after?: string };
 
-export const productCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards'] as const;
+export const productCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 export type ProductCategory = (typeof productCategories)[number];
 
 export const adminRoles = ['super_admin', 'operations', 'finance', 'support'] as const;

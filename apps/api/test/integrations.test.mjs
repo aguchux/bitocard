@@ -41,7 +41,7 @@ describe('integration settings', () => {
     const registry = await prisma.supplier.findMany({ select: { code: true } });
     const suppliers = json.data.filter(item => item.section === 'suppliers');
     assert.deepEqual(new Set(suppliers.map(item => item.id)), new Set(registry.map(item => item.code).filter(code => code !== 'flutterwave_cards' && code !== 'stock')));
-    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['didww', 'reloadly', 'vtpass']);
+    assert.deepEqual(suppliers.filter(item => item.adapter_ready).map(item => item.id).sort(), ['didww', 'pawapay', 'reloadly', 'vtpass', 'zendit']);
     const sms = json.data.find(item => item.id === 'sms');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').source, 'environment');
     assert.equal(fieldOf(sms, 'TERMII_SENDER_ID').value, 'EnvSender');

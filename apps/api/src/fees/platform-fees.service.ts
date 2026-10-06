@@ -334,7 +334,7 @@ export class PlatformFeesService {
   /** The rates that apply to the reseller now, per fee kind and category. */
   async ratesFor(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-    const categories: Array<ProductCategory | null> = [null, 'gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards'];
+    const categories: Array<ProductCategory | null> = [null, 'gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'];
     const data = [];
     for (const kind of ['supplier_order', 'gateway_payment'] as const) {
       for (const category of kind === 'gateway_payment' ? [null] : categories) {

@@ -13,12 +13,13 @@ export const categoryLabels: Record<ProductCategory, string> = {
   software: 'Software',
   virtual_numbers: 'Virtual numbers',
   virtual_cards: 'Virtual cards',
+  mobile_money: 'Mobile money',
 };
 
 /** The storefront's main menu: each group links to its categories (and lists their top brands). */
 export const navigationGroups: Array<{ key: string; label: string; categories: ProductCategory[] }> = [
   { key: 'gift-cards', label: 'Gift cards', categories: ['gift_cards'] },
-  { key: 'mobile', label: 'Mobile', categories: ['airtime', 'data', 'virtual_numbers'] },
+  { key: 'mobile', label: 'Mobile', categories: ['airtime', 'data', 'mobile_money', 'virtual_numbers'] },
   { key: 'bills', label: 'Bills', categories: ['bills', 'pay_tv'] },
   { key: 'esims', label: 'eSIMs', categories: ['esim'] },
   { key: 'software', label: 'Software', categories: ['software'] },
@@ -36,6 +37,7 @@ export const categorySynonyms: Record<ProductCategory, string[]> = {
   software: ['software', 'licence', 'license', 'antivirus', 'windows', 'office', 'key'],
   virtual_numbers: ['virtual number', 'phone number', 'number', 'sms', 'did'],
   virtual_cards: ['virtual card', 'card', 'debit card', 'dollar card'],
+  mobile_money: ['mobile money', 'momo', 'm-pesa', 'mpesa', 'wallet', 'send money', 'cash in'],
 };
 
 const categories = Object.keys(categoryLabels) as [ProductCategory, ...ProductCategory[]];

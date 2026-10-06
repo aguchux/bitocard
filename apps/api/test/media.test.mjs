@@ -307,7 +307,7 @@ describe('signed uploads', () => {
     const categories = await client(server.base).get('/v1/store/categories');
     assert.equal(categories.json.data.find(item => item.category === 'gift_cards').icon_url, icon.completed.json.url);
     const admins = await admin.get('/v1/admin/storefront/categories');
-    assert.equal(admins.json.data.length, 9, 'every category, on sale or not');
+    assert.equal(admins.json.data.length, 10, 'every category, on sale or not');
   });
 
   test('resellers upload store images into their own folder and never see anyone else’s files', async () => {

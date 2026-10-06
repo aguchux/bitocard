@@ -2182,7 +2182,8 @@
                 "esim",
                 "software",
                 "virtual_numbers",
-                "virtual_cards"
+                "virtual_cards",
+                "mobile_money"
               ]
             }
           },
@@ -2458,7 +2459,8 @@
                 "esim",
                 "software",
                 "virtual_numbers",
-                "virtual_cards"
+                "virtual_cards",
+                "mobile_money"
               ]
             }
           },
@@ -3665,7 +3667,8 @@
                 "esim",
                 "software",
                 "virtual_numbers",
-                "virtual_cards"
+                "virtual_cards",
+                "mobile_money"
               ]
             }
           },
@@ -4921,7 +4924,8 @@
               "esim",
               "software",
               "virtual_numbers",
-              "virtual_cards"
+              "virtual_cards",
+              "mobile_money"
             ]
           },
           "product_id": {

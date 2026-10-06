@@ -18,6 +18,8 @@ import { connectable } from '../reseller-integrations/connectable.js';
 import { ResellerIntegrationsService } from '../reseller-integrations/reseller-integrations.service.js';
 import { didwwNotice, didwwSignatureValid } from '../suppliers/didww.webhooks.js';
 import { reloadlyNotice, reloadlySignatureValid } from '../suppliers/reloadly.webhooks.js';
+import { pawapayCallbackValid, pawapayNotice } from '../suppliers/pawapay.adapter.js';
+import { zenditNotice, zenditWebhookHeader, zenditWebhookValid } from '../suppliers/zendit.adapter.js';
 import { OrdersService } from './orders.service.js';
 
 /** After the first try (straight after receipt): 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 1 day. */
@@ -32,7 +34,7 @@ const keepOthersMs = 365 * 24 * 3600_000;
 const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'signature_invalid', 'Webhook signature is missing or wrong.');
 
 /**
- * Supplier notifications (Reloadly and DIDWW), to BitoCard's own accounts and to resellers' own connections (each live
+ * Supplier notifications (Reloadly, DIDWW, Zendit and pawaPay), to BitoCard's own accounts and to resellers' own connections (each live
  * connection has its own address, checked with that reseller's own secret, and can only name that reseller's own
  * orders through that connection). Nothing is lost: each one is verified and stored (encrypted) before it is
  * acknowledged; a supplier's retry of the same delivery is stored once. Processing happens after the reply (suppliers
@@ -62,6 +64,30 @@ export class SupplierWebhooksService {
       // Stored all the same: an admin can look at it, and nothing is acted on without a reference.
     }
     return this.store('reloadly', rawBody!, reloadlyNotice(payload));
+  }
+
+  /** Zendit: authenticated by the header value set in the Zendit console; the body only names the order. */
+  async receiveZendit(rawBody: Buffer | undefined, token: string | undefined) {
+    if (!rawBody || !zenditWebhookValid(this.integrations.config.ZENDIT_WEBHOOK_SECRET, token)) throw untrusted();
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      // Stored all the same, as for Reloadly.
+    }
+    return this.store('zendit', rawBody, zenditNotice(payload));
+  }
+
+  /** pawaPay payout callbacks: authenticated by the token in the callback address; the body only names the payout. */
+  async receivePawapay(rawBody: Buffer | undefined, token: string | undefined) {
+    if (!rawBody || !pawapayCallbackValid(this.integrations.config.PAWAPAY_CALLBACK_TOKEN, token)) throw untrusted();
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      // Stored all the same.
+    }
+    return this.store('pawapay', rawBody, pawapayNotice(payload));
   }
 
   /** Reloadly, to a reseller's own connection: signed with the webhook secret they saved on it. */
@@ -318,6 +344,18 @@ export class SupplierWebhooksController {
   @HttpCode(HttpStatus.OK)
   reloadly(@Req() req: Request & { rawBody?: Buffer }) {
     return this.webhooks.receiveReloadly(req.rawBody, req.get('x-reloadly-signature'), req.get('x-reloadly-request-timestamp'));
+  }
+
+  @Post('zendit')
+  @HttpCode(HttpStatus.OK)
+  zendit(@Req() req: Request & { rawBody?: Buffer }) {
+    return this.webhooks.receiveZendit(req.rawBody, req.get(zenditWebhookHeader));
+  }
+
+  @Post('pawapay')
+  @HttpCode(HttpStatus.OK)
+  pawapay(@Req() req: Request & { rawBody?: Buffer }, @Query('token') token?: string) {
+    return this.webhooks.receivePawapay(req.rawBody, token);
   }
 
   @Post('didww')

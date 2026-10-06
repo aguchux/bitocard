@@ -2,7 +2,7 @@ import { bitocardApi } from '../base';
 import { type List, type Mode, type Page, params } from './common';
 
 /** Product categories, in the order the catalogue shows them. */
-export const catalogueCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards'] as const;
+export const catalogueCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 export type CatalogueCategory = (typeof catalogueCategories)[number];
 
 /** What the customer must give when buying: a phone number, a smartcard or IUC number, a meter number, or nothing. */

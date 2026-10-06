@@ -13,6 +13,9 @@ npm-workspaces Turborepo with five Next.js 16 App Router applications, one NestJ
 | SHQ | apps/shq | http://localhost:3004 | No | Seller Head Quarters, the reseller back office (shq.bitocard.com) |
 | Legals | apps/legals | http://localhost:3005 | Yes | Legals & Compliance site (legals.bitocard.com): Home, Documents (privacy, terms, cookies, legal notice under /documents) and Contact |
 
+DATABASE_URL="<your-database-url>" npm run admin:create -w @bitocard/api -- --email agu.chux@golojan.co.uk --name "Agu Chux" --roles super_admin
+
+
 ## Shared packages
 
 | Package | Purpose |

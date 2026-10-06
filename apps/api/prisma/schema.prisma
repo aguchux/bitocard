@@ -554,6 +554,8 @@ enum ProductCategory {
   software
   virtual_numbers
   virtual_cards
+  /// Money sent to a customer's mobile money wallet (cash-in), for example through pawaPay.
+  mobile_money
 }
 
 /// Whether a category is sold in a country, and whether storefront customers must verify their identity to buy it.

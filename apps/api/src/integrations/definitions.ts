@@ -75,6 +75,13 @@ const integrationKeyList = [
   'DIDWW_API_URL',
   'DIDWW_COUNTRIES',
   'DIDWW_CALLBACK_URL',
+  'ZENDIT_API_KEY',
+  'ZENDIT_API_URL',
+  'ZENDIT_WEBHOOK_SECRET',
+  'PAWAPAY_API_TOKEN',
+  'PAWAPAY_API_URL',
+  'PAWAPAY_PAYOUT_FEE_PERCENT',
+  'PAWAPAY_CALLBACK_TOKEN',
   'DIDIT_API_KEY',
   'DIDIT_WORKFLOW_ID',
   'DIDIT_WEBHOOK_SECRET',
@@ -242,6 +249,39 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     ],
   },
   {
+    id: 'zendit',
+    name: 'Zendit',
+    description: 'Gift cards worldwide, and mobile airtime, bundles and data by country. Without an API key it serves only the sandbox, never live orders.',
+    webhookPath: '/v1/webhooks/zendit',
+    fields: [
+      secret('ZENDIT_API_KEY', 'API key', { help: 'Zendit console > Developers > API settings. Test mode and production keys differ.' }),
+      field('ZENDIT_API_URL', 'API address', { kind: 'url', help: 'Test mode: https://test-api.zendit.io/v1 (with the test key). Default: production.' }),
+      secret('ZENDIT_WEBHOOK_SECRET', 'Webhook secret', {
+        required: false,
+        help: 'Choose a long random value. In the Zendit console webhook settings, add the header X-Webhook-Token with this secret as its value. Without it, notifications are refused and orders are still checked on schedule.',
+      }),
+    ],
+  },
+  {
+    id: 'pawapay',
+    name: 'pawaPay',
+    description:
+      'Mobile money top-ups: sends money to customers’ mobile money wallets in every country and provider enabled for payouts on the pawaPay account. Without a token it serves only the sandbox, never live orders.',
+    webhookPath: '/v1/webhooks/pawapay?token=<callback token>',
+    fields: [
+      secret('PAWAPAY_API_TOKEN', 'API token', { help: 'pawaPay dashboard > System configuration > API tokens. Sandbox and production tokens differ.' }),
+      field('PAWAPAY_API_URL', 'API address', { kind: 'url', help: 'Sandbox: https://api.sandbox.pawapay.io (with the sandbox token). Default: production.' }),
+      field('PAWAPAY_PAYOUT_FEE_PERCENT', 'Payout fee (%)', {
+        required: true,
+        help: 'The payout fee in your pawaPay agreement, for example 1.5. BitoCard’s cost is the amount sent plus this fee, so prices never fall below it. Syncing refuses until it is set.',
+      }),
+      secret('PAWAPAY_CALLBACK_TOKEN', 'Callback token', {
+        required: false,
+        help: 'Choose a long random value. In the pawaPay dashboard (System configuration > Callback URLs), set the payout callback to https://api.bitocard.com/v1/webhooks/pawapay?token= followed by this value. Without it, callbacks are refused and payouts are still checked on schedule.',
+      }),
+    ],
+  },
+  {
     id: 'didit',
     name: 'Didit identity checks',
     description: 'Reseller owners everywhere, and customers outside Nigeria. Switched off until the API key and workflow are set.',
@@ -255,7 +295,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay']);
 
 export const integrationGroups: IntegrationGroup[] = [
   ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),

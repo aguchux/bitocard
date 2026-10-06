@@ -19,7 +19,7 @@ import {
 } from "@bitocard/api-client/admin";
 
 const kindLabels: Record<FeeKind, string> = { supplier_order: "Own-supplier orders", gateway_payment: "Own-gateway payments" };
-const categories = ["gift_cards", "airtime", "data", "bills", "pay_tv", "esim", "software", "virtual_numbers", "virtual_cards"];
+const categories = ["gift_cards", "airtime", "data", "bills", "pay_tv", "esim", "software", "virtual_numbers", "virtual_cards", "mobile_money"];
 const humanise = (value: string) => value.replace(/_/g, " ").replace(/^./, char => char.toUpperCase());
 
 function RuleDialog({ rule, onClose }: { rule: FeeRule | null; onClose: () => void }) {

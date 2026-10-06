@@ -5,7 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { type ConnectionRouting, type LedgerMode, Prisma } from '../generated/prisma/client.js';
 import type { CatalogueItem, CatalogueScope, SupplierAdapter } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
-import { chunks, offerChanged, offerData, SuppliersService } from '../suppliers/suppliers.service.js';
+import { chunks, inGroups, offerChanged, offerData, SuppliersService } from '../suppliers/suppliers.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { connectable } from './connectable.js';
 import { ResellerIntegrationsService } from './reseller-integrations.service.js';
@@ -96,16 +96,16 @@ export class OwnSuppliersService {
       const existing = await this.prisma.resellerOffer.findMany({ where: { connectionId: connection.id, sku: { in: chunk.map(entry => entry.sku) } } });
       const bySku = new Map(existing.map(offer => [offer.sku, offer]));
       const fresh: Prisma.ResellerOfferCreateManyInput[] = [];
-      const changed: Prisma.PrismaPromise<unknown>[] = [];
+      const changed: Array<() => Promise<unknown>> = [];
       const unchanged: string[] = [];
       for (const { sku, offer } of chunk) {
         const old = bySku.get(sku);
         if (!old) fresh.push({ connectionId: connection.id, resellerId, mode, supplierCode, sku, ...offer, available: true, syncedAt: now });
-        else if (offerChanged(old, offer)) changed.push(this.prisma.resellerOffer.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
+        else if (offerChanged(old, offer)) changed.push(() => this.prisma.resellerOffer.update({ where: { id: old.id }, data: { ...offer, available: true, syncedAt: now } }));
         else unchanged.push(old.id);
       }
       if (fresh.length) await this.prisma.resellerOffer.createMany({ data: fresh, skipDuplicates: true });
-      if (changed.length) await this.prisma.$transaction(changed);
+      await inGroups(changed);
       if (unchanged.length) await this.prisma.resellerOffer.updateMany({ where: { id: { in: unchanged } }, data: { available: true, syncedAt: now } });
     }
   }
