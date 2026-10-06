@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Globe2, Pencil } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, ErrorState, errorMessage, Field, Notice, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, ErrorState, errorMessage, Field, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { type IntegrationApproval, type IntegrationOffer, useCountriesQuery, useIntegrationOffersQuery, useSetIntegrationOfferMutation } from "@bitocard/api-client/admin";
 
@@ -43,7 +43,7 @@ function OfferDialog({ offer, onClose }: { offer: IntegrationOffer; onClose: () 
           <legend className="text-sm font-semibold text-ink">Countries</legend>
           {countries.isLoading ? (
             <Skeleton className="h-16 w-full" />
-          ) : countries.error ? (
+          ) : !countries.data && countries.error ? (
             <Notice tone="red">{errorMessage(countries.error)}</Notice>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -70,20 +70,21 @@ function OfferDialog({ offer, onClose }: { offer: IntegrationOffer; onClose: () 
 
 /** Which integrations resellers may connect their own accounts to, and where. Super admins edit; others read. */
 export function ResellerAvailability({ editable }: { editable: boolean }) {
-  const { data, error, isLoading, refetch } = useIntegrationOffersQuery();
+  const { data, error, isFetching, refetch } = useIntegrationOffersQuery();
   const [editing, setEditing] = useState<string | null>(null);
   const current = data?.data.find(item => item.integration_id === editing) ?? null;
 
-  if (error) {
+  if (!data && error) {
     return (
       <Card>
         <ErrorState message={errorMessage(error)} onRetry={refetch} />
       </Card>
     );
   }
-  if (isLoading || !data) return <Skeleton className="h-56 w-full" />;
+  if (!data) return <Skeleton className="h-56 w-full" />;
   return (
     <>
+      {error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
       <Notice tone="blue">
         Resellers connect their own accounts only to integrations offered in their country, when own integrations are switched on for them and their plan includes them.{" "}
         <AppLink href="/resellers/connections" className="font-semibold underline">

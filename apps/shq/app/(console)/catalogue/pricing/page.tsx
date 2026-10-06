@@ -1,22 +1,8 @@
 "use client";
 
-import { useDeferredValue, useId, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { BadgePercent, Coins, Plus, Search, ShieldCheck, Trash2 } from "lucide-react";
-import {
-  Button,
-  Card,
-  CardHeader,
-  categoryName,
-  Dialog,
-  ErrorState,
-  errorMessage,
-  formatBps,
-  Input,
-  Notice,
-  PageHeader,
-  Skeleton,
-  StatCard,
-} from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, categoryName, Dialog, errorMessage, ErrorState, formatBps, Input, Notice, PageHeader, RefreshFailed, Skeleton, StatCard, useDebouncedValue } from "@bitocard/admin-ui";
 import {
   type CatalogueCategory,
   catalogueCategories,
@@ -135,7 +121,7 @@ function ProductMarkup({ markup, capPercent, editable }: { markup: Markup & { pr
 
 function AddProductMarkup({ open, onClose, pricing }: { open: boolean; onClose: () => void; pricing: Pricing }) {
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const query = useCatalogueProductsInfiniteQuery({ q: q || undefined, limit: 10 }, { skip: !open });
   const rows = query.data?.pages.flatMap(page => page.data);
   const [product, setProduct] = useState<Product | null>(null);
@@ -168,9 +154,10 @@ function AddProductMarkup({ open, onClose, pricing }: { open: boolean; onClose: 
             <Search className="pointer-events-none absolute left-3 size-4 text-subtle" aria-hidden />
             <Input type="search" placeholder="Search by name or brand" value={search} maxLength={60} onChange={event => setSearch(event.target.value)} className="pl-9" />
           </label>
-          {query.error ? (
+          {query.error && rows && !query.isFetching ? <RefreshFailed message={errorMessage(query.error)} onRetry={query.refetch} /> : null}
+          {!rows && query.error ? (
             <Notice tone="red">{errorMessage(query.error)}</Notice>
-          ) : query.isLoading ? (
+          ) : !rows && query.isLoading ? (
             <Skeleton className="h-32 w-full" />
           ) : rows?.length ? (
             <ul className="divide-y divide-line rounded-xl border border-line">
@@ -199,20 +186,20 @@ function AddProductMarkup({ open, onClose, pricing }: { open: boolean; onClose: 
 
 function PricingSettings({ editable }: { editable: boolean }) {
   const { membership } = useReseller();
-  const { data: pricing, error, isLoading, refetch } = useResellerPricingQuery();
+  const { data: pricing, error, isFetching, refetch } = useResellerPricingQuery();
   // Only the categories sold in the reseller's country (all of them until the country is known).
   const country = usePublicCountryQuery(membership.reseller.country ?? "", { skip: !membership.reseller.country });
   const sold = country.data ? new Set(country.data.categories.map(item => item.category)) : null;
   const [adding, setAdding] = useState(false);
 
-  if (error) {
-    return (
-      <Card>
-        <ErrorState message={errorMessage(error, "Could not load your pricing.")} onRetry={refetch} />
-      </Card>
-    );
-  }
-  if (isLoading || !pricing) {
+  if (!pricing) {
+    if (error) {
+      return (
+        <Card>
+          <ErrorState message={errorMessage(error, "Could not load your pricing.")} onRetry={refetch} />
+        </Card>
+      );
+    }
     return (
       <div className="space-y-4" aria-busy="true" aria-label="Loading pricing">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -229,6 +216,7 @@ function PricingSettings({ editable }: { editable: boolean }) {
 
   return (
     <>
+      {error && !isFetching ? <RefreshFailed message={errorMessage(error, "Could not load your pricing.")} onRetry={refetch} /> : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Markup cap" icon={<ShieldCheck />} tone="green" value={`${pricing.markup_cap_percent}%`} footer={<p className="text-xs text-muted">Markup Protection Scheme: the most above wholesale price.</p>} />
         <StatCard

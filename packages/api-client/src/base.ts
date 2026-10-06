@@ -25,14 +25,28 @@ export function toApiError(status: number | string, data: unknown): ApiError {
     return { status: typeof status === 'number' ? status : 0, type: body.type ?? 'api_error', code: body.code, message: body.message, param: body.param, requestId: body.request_id };
   }
   if (status === 'FETCH_ERROR') return { status: 0, type: 'network_error', code: 'network_error', message: 'Could not reach BitoCard. Check your connection and try again.' };
+  if (status === 'TIMEOUT_ERROR') return { status: 0, type: 'network_error', code: 'timeout', message: 'BitoCard took too long to answer. Try again.' };
   return { status: typeof status === 'number' ? status : 0, type: 'api_error', code: 'unexpected', message: 'Something went wrong. Try again.' };
 }
 
 /**
+ * Reads give up after this long, so a stalled connection shows an error with Retry instead of a spinner for ever.
+ * Changes have no limit: some (a supplier's catalogue sync) legitimately take minutes.
+ */
+export const readTimeoutMs = 30_000;
+
+/**
  * Sends cookies (the admin session cookie is shared on .bitocard.com), adds the Idempotency-Key every POST needs,
- * and returns ApiError on failure.
+ * and returns ApiError on failure. A 401 outside sign-in means the session ended while the page was open: the session
+ * is checked again, so the app's gate sends the person to sign in instead of leaving every panel showing an error.
  */
 export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn<string | FetchArgs, unknown, ApiError> {
+  const clients = new Map<string, ReturnType<typeof fetchBaseQuery>>();
+  const client = (url: string) => {
+    let raw = clients.get(url);
+    if (!raw) clients.set(url, (raw = fetchBaseQuery({ baseUrl: url, credentials: 'include' })));
+    return raw;
+  };
   return async (args, api, extra) => {
     const request: FetchArgs = typeof args === 'string' ? { url: args } : { ...args };
     const method = (request.method ?? 'GET').toUpperCase();
@@ -43,9 +57,12 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
       ...(request.headers as Record<string, string> | undefined),
       ...(method === 'POST' ? { 'idempotency-key': newKey() } : {}),
     };
-    const raw = fetchBaseQuery({ baseUrl: baseUrl(), credentials: 'include' });
-    const result = await raw(request, api, extra);
-    if (result.error) return { error: toApiError(result.error.status, result.error.data), meta: result.meta };
+    if (method === 'GET' && request.timeout === undefined) request.timeout = readTimeoutMs;
+    const result = await client(baseUrl())(request, api, extra);
+    if (result.error) {
+      if (result.error.status === 401 && !request.url.includes('/auth/')) api.dispatch(bitocardApi.util.invalidateTags(['Session']));
+      return { error: toApiError(result.error.status, result.error.data), meta: result.meta };
+    }
     return { data: result.data, meta: result.meta };
   };
 }
@@ -102,10 +119,25 @@ export const tagTypes = [
   'Category',
 ] as const;
 
-/** The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache. */
+/**
+ * How long a screen's data stays cached after the last screen using it closes, so going back is instant.
+ * Anything older than `revalidateAfterSeconds` is shown at once and refreshed in the background.
+ */
+export const keepUnusedSeconds = 300;
+export const revalidateAfterSeconds = 30;
+
+/**
+ * The one API slice. Endpoint modules add to it with `injectEndpoints`, so every app and package shares one cache.
+ * Stale while revalidate: cached data shows straight away, and is refreshed when it is older than 30 seconds on
+ * opening a screen, when the tab comes back into focus and when the connection returns (`setupListeners`).
+ */
 export const bitocardApi = createApi({
   reducerPath: 'bitocardApi',
   baseQuery: createBaseQuery(),
   tagTypes,
+  keepUnusedDataFor: keepUnusedSeconds,
+  refetchOnMountOrArgChange: revalidateAfterSeconds,
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
   endpoints: () => ({}),
 });

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, Sparkles } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, cn, ErrorState, errorMessage, formatDate, formatMoney, humanise, Notice, PageHeader, Skeleton } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, cn, ErrorState, errorMessage, formatDate, formatMoney, humanise, Notice, PageHeader, RefreshFailed, Skeleton } from "@bitocard/admin-ui";
 import { type Plan, type Subscription, useChangePlanMutation, useExchangeRatesQuery, useResellerPlansQuery, useSubscriptionQuery, useWalletQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -76,6 +76,11 @@ export default function PlanPage() {
   const [changed, setChanged] = useState<string | null>(null);
   const sub = subscription.data;
   const currency = wallet.data?.currency;
+  const loadError = subscription.error ?? plans.error;
+  const retry = () => {
+    void subscription.refetch();
+    void plans.refetch();
+  };
 
   const confirmText = (plan: Plan, current: Subscription) => {
     if (plan.code === current.plan.code) return `${plan.name} carries on and renews ${formatDate(current.renews_at)}. Nothing is charged now.`;
@@ -94,23 +99,20 @@ export default function PlanPage() {
       {mode === "test" ? <Notice tone="amber">Plans are paid from your live wallet, so they cannot be changed in the sandbox. Switch to live to change your plan.</Notice> : null}
       {!can(membership, "finance") ? <Notice tone="grey">Only the owner and finance members can change the plan.</Notice> : null}
 
-      {subscription.error || plans.error ? (
-        <Card>
-          <ErrorState
-            message={errorMessage(subscription.error ?? plans.error, "Could not load your plan.")}
-            onRetry={() => {
-              void subscription.refetch();
-              void plans.refetch();
-            }}
-          />
-        </Card>
-      ) : !sub || !plans.data ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-72 w-full" />
-          <Skeleton className="h-72 w-full" />
-        </div>
+      {!sub || !plans.data ? (
+        loadError ? (
+          <Card>
+            <ErrorState message={errorMessage(loadError, "Could not load your plan.")} onRetry={retry} />
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Skeleton className="h-72 w-full" />
+            <Skeleton className="h-72 w-full" />
+          </div>
+        )
       ) : (
         <>
+          {loadError && !subscription.isFetching && !plans.isFetching ? <RefreshFailed message={errorMessage(loadError, "Could not load your plan.")} onRetry={retry} /> : null}
           {sub.past_due_since ? (
             <Notice tone="red" title="Renewal failed">
               {`We could not take the ${sub.plan.name} renewal from your wallet on ${formatDate(sub.past_due_since)}. Top up your live wallet: we try again daily, and the plan moves to Standard if the renewal still fails after 7 days.`}

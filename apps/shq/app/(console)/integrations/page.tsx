@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { BellRing, Check, Copy, CreditCard, DownloadCloud, Package, Plug, RefreshCw, Search, Unplug } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, ExternalLinks, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, ErrorState, ExternalLinks, errorMessage, Field, formatDateTime, formatRelative, Input, LoadMore, Notice, PageHeader, QueryView, RefreshFailed, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   type IntegrationAccessReason,
@@ -80,37 +80,37 @@ const notificationStatus = { received: "Checking", processed: "Matched", unmatch
 /** What the supplier sent to this connection's address, newest first. */
 function NotificationsDialog({ integration, onClose }: { integration: ResellerIntegration; onClose: () => void }) {
   const query = useIntegrationNotificationsInfiniteQuery(integration.id);
-  const items = query.data?.pages.flatMap(page => page.data) ?? [];
   return (
     <Dialog open onClose={onClose} title={`${integration.name} order updates`} description="Each update makes BitoCard check that order with your account; nothing in it is trusted on its own.">
-      {query.error ? (
-        <ErrorState message={errorMessage(query.error)} onRetry={query.refetch} />
-      ) : query.isLoading ? (
-        <Skeleton className="h-24" />
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted">No updates received yet.</p>
-      ) : (
-        <ul className="divide-y divide-line">
-          {items.map(item => (
-            <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
-              <div className="min-w-0 space-y-0.5">
-                <p className="font-mono text-xs text-ink">{item.event_type ?? "update"}</p>
-                {item.order_id ? (
-                  <AppLink href={`/orders/${item.order_id}`} className="font-semibold text-brand-600 hover:underline">
-                    View order
-                  </AppLink>
-                ) : (
-                  <p className="font-mono text-xs text-muted break-all">{item.reference ?? "no reference"}</p>
-                )}
-                <p className="text-xs text-subtle" title={formatDateTime(item.received_at)}>
-                  {formatRelative(item.received_at)}
-                </p>
-              </div>
-              <StatusBadge status={item.status === "received" ? "pending" : item.status === "unmatched" ? "expired" : item.status} label={notificationStatus[item.status]} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <QueryView query={query} loading={<Skeleton className="h-24" />}>
+        {({ pages }) => {
+          const items = pages.flatMap(page => page.data);
+          return items.length === 0 ? (
+            <p className="text-sm text-muted">No updates received yet.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {items.map(item => (
+                <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="font-mono text-xs text-ink">{item.event_type ?? "update"}</p>
+                    {item.order_id ? (
+                      <AppLink href={`/orders/${item.order_id}`} className="font-semibold text-brand-600 hover:underline">
+                        View order
+                      </AppLink>
+                    ) : (
+                      <p className="font-mono text-xs text-muted break-all">{item.reference ?? "no reference"}</p>
+                    )}
+                    <p className="text-xs text-subtle" title={formatDateTime(item.received_at)}>
+                      {formatRelative(item.received_at)}
+                    </p>
+                  </div>
+                  <StatusBadge status={item.status === "received" ? "pending" : item.status === "unmatched" ? "expired" : item.status} label={notificationStatus[item.status]} />
+                </li>
+              ))}
+            </ul>
+          );
+        }}
+      </QueryView>
       <LoadMore hasMore={query.hasNextPage} loading={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} />
     </Dialog>
   );
@@ -275,7 +275,7 @@ export default function IntegrationsPage() {
   const { membership, mode } = useReseller();
   const manage = can(membership, "admin");
   const sandbox = mode === "test";
-  const { data, error, isLoading, refetch } = useResellerIntegrationsQuery();
+  const { data, error, isFetching, refetch } = useResellerIntegrationsQuery();
   const [disconnect] = useDisconnectIntegrationMutation();
   const [connecting, setConnecting] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -304,18 +304,21 @@ export default function IntegrationsPage() {
         title="Your integrations"
         description="Connect your own supplier and payment gateway accounts. You fund them yourself, at your own prices; sales through your own suppliers are yours, and BitoCard charges a small fee per transaction from your wallet."
       />
-      {error ? (
-        <Card>
-          <ErrorState message={errorMessage(error)} onRetry={refetch} />
-        </Card>
-      ) : isLoading || !data ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {[0, 1].map(index => (
-            <Skeleton key={index} className="h-48 w-full" />
-          ))}
-        </div>
+      {!data ? (
+        error ? (
+          <Card>
+            <ErrorState message={errorMessage(error)} onRetry={refetch} />
+          </Card>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {[0, 1].map(index => (
+              <Skeleton key={index} className="h-48 w-full" />
+            ))}
+          </div>
+        )
       ) : (
         <div className="space-y-6">
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
           {help ? (
             <Notice tone="amber" title="Not available on your account yet">
               {help.text}{" "}

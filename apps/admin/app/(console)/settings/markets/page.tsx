@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, Notice, PageHeader, Skeleton, Toggle } from "@bitocard/admin-ui";
+import { Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, Notice, PageHeader, RefreshFailed, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
 
@@ -13,7 +13,7 @@ const fields = [
 /** Markets: what each country sells and where customers must verify their identity. */
 export default function MarketsPage() {
   const admin = useAdmin();
-  const { data, error, isLoading, refetch } = useCountriesQuery();
+  const { data, error, isFetching, refetch } = useCountriesQuery();
   const [update, state] = useUpdateCountryCategoryMutation();
   const editable = can(admin, "operations");
 
@@ -24,11 +24,12 @@ export default function MarketsPage() {
         description="Product categories sold in each country, and where customers on hosted storefronts must verify their identity first."
       />
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-      {error ? (
+      {data && error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
+      {!data && error ? (
         <Card>
           <ErrorState message={errorMessage(error)} onRetry={refetch} />
         </Card>
-      ) : isLoading || !data ? (
+      ) : !data ? (
         <Skeleton className="h-64 w-full" />
       ) : (
         data.data.map(country => (

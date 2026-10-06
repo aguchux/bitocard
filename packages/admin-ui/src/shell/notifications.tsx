@@ -13,7 +13,7 @@ import {
 } from '@bitocard/api-client';
 import { cn, errorMessage, formatDateTime, formatRelative } from '../format';
 import { LoadMore, Tabs } from '../ui/data';
-import { Badge, EmptyState, ErrorState } from '../ui/status';
+import { Badge, EmptyState, ErrorState, RefreshFailed } from '../ui/status';
 import { usePushSync } from './push';
 import { AppLink } from './session';
 
@@ -136,9 +136,12 @@ export function NotificationBell({ realm, href = '/notifications', userId }: { r
             ) : null}
           </div>
           <div className="max-h-[60svh] overflow-y-auto p-2">
-            {latest.isLoading ? (
+            {latest.data && latest.error && !latest.isFetching ? (
+              <RefreshFailed message={errorMessage(latest.error, 'Could not load your notifications.')} onRetry={() => void latest.refetch()} />
+            ) : null}
+            {!latest.data && latest.isLoading ? (
               <p className="px-3 py-6 text-center text-sm text-muted">Loading…</p>
-            ) : latest.error ? (
+            ) : !latest.data && latest.error ? (
               <p className="px-3 py-6 text-center text-sm text-red-600">{errorMessage(latest.error, 'Could not load your notifications.')}</p>
             ) : items.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-muted">You are all caught up.</p>
@@ -187,11 +190,16 @@ export function NotificationsInbox({ realm }: { realm: NotificationRealm }) {
           Mark all read
         </button>
       </div>
-      {query.error ? (
+      {query.data && query.error && !query.isFetching ? (
+        <div className="px-4 pt-4">
+          <RefreshFailed message={errorMessage(query.error, 'Could not load your notifications.')} onRetry={() => void query.refetch()} />
+        </div>
+      ) : null}
+      {!query.data && query.error ? (
         <div className="p-4">
           <ErrorState message={errorMessage(query.error, 'Could not load your notifications.')} onRetry={query.refetch} />
         </div>
-      ) : query.isLoading ? (
+      ) : !query.data && query.isLoading ? (
         <p className="p-6 text-center text-sm text-muted">Loading…</p>
       ) : items.length === 0 ? (
         <div className="p-4">

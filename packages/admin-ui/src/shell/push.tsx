@@ -15,7 +15,7 @@ import {
 } from '@bitocard/api-client';
 import { errorMessage, formatRelative } from '../format';
 import { Button, Card, CardHeader, Skeleton, Toggle } from '../ui/primitives';
-import { Badge, ErrorState, Notice } from '../ui/status';
+import { Badge, Notice, QueryView } from '../ui/status';
 
 /** Remembered per person in this browser: they turned push on here, so it is kept registered when they sign in again. */
 const markerKey = (realm: NotificationRealm, userId: string) => `bc_push:${realm}:${userId}`;
@@ -168,63 +168,61 @@ export function PushSettings({ realm, userId }: { realm: NotificationRealm; user
 
         <section aria-label="Your devices" className="space-y-2">
           <h3 className="text-sm font-bold text-ink">Your devices</h3>
-          {devices.error ? (
-            <ErrorState message={errorMessage(devices.error)} onRetry={devices.refetch} />
-          ) : devices.isLoading ? (
-            <Skeleton className="h-16" />
-          ) : devices.data?.data.length ? (
-            <ul className="divide-y divide-line rounded-xl border border-line">
-              {devices.data.data.map(device => (
-                <li key={device.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
-                  <Laptop className="size-5 shrink-0 text-muted" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
-                      {device.label}
-                      {device.current ? (
-                        <Badge tone="blue" dot={false}>
-                          This browser
-                        </Badge>
-                      ) : null}
-                    </p>
-                    <p className="text-xs text-muted">{device.last_pushed_at ? `Last push ${formatRelative(device.last_pushed_at)}` : `Added ${formatRelative(device.created_at)}`}</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" icon={<Send className="size-4" aria-hidden />} onClick={() => void test({ realm, id: device.id })}>
-                      Test
-                    </Button>
-                    <Button size="sm" variant="ghost" aria-label={`Remove ${device.label}`} icon={<Trash2 className="size-4" aria-hidden />} onClick={() => void removeDevice(device.id, device.current)}>
-                      Remove
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted">No devices yet.</p>
-          )}
+          <QueryView query={devices} loading={<Skeleton className="h-16" />}>
+            {({ data: list }) =>
+              list.length ? (
+                <ul className="divide-y divide-line rounded-xl border border-line">
+                  {list.map(device => (
+                    <li key={device.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
+                      <Laptop className="size-5 shrink-0 text-muted" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink">
+                          {device.label}
+                          {device.current ? (
+                            <Badge tone="blue" dot={false}>
+                              This browser
+                            </Badge>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-muted">{device.last_pushed_at ? `Last push ${formatRelative(device.last_pushed_at)}` : `Added ${formatRelative(device.created_at)}`}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" icon={<Send className="size-4" aria-hidden />} onClick={() => void test({ realm, id: device.id })}>
+                          Test
+                        </Button>
+                        <Button size="sm" variant="ghost" aria-label={`Remove ${device.label}`} icon={<Trash2 className="size-4" aria-hidden />} onClick={() => void removeDevice(device.id, device.current)}>
+                          Remove
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted">No devices yet.</p>
+              )
+            }
+          </QueryView>
         </section>
 
         <section aria-label="What is pushed" className="space-y-2">
           <h3 className="text-sm font-bold text-ink">What is pushed</h3>
           <p className="text-xs text-muted">Everything still appears in your notifications here. Urgent and security notifications are always pushed.</p>
           {preferenceState.error ? <Notice tone="red">{errorMessage(preferenceState.error)}</Notice> : null}
-          {preferences.error ? (
-            <ErrorState message={errorMessage(preferences.error)} onRetry={preferences.refetch} />
-          ) : preferences.isLoading ? (
-            <Skeleton className="h-24" />
-          ) : (
-            <ul className="divide-y divide-line rounded-xl border border-line">
-              {preferences.data?.data.map(item => (
-                <li key={item.type} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                  <span className="text-sm text-ink">
-                    {item.label}
-                    {item.locked ? <span className="ml-2 text-xs text-muted">Always</span> : null}
-                  </span>
-                  <Toggle checked={item.push} disabled={item.locked} label={`Push “${item.label}”`} onChange={push => void setPreference({ realm, type: item.type, push })} />
-                </li>
-              ))}
-            </ul>
-          )}
+          <QueryView query={preferences} loading={<Skeleton className="h-24" />}>
+            {({ data: list }) => (
+              <ul className="divide-y divide-line rounded-xl border border-line">
+                {list.map(item => (
+                  <li key={item.type} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <span className="text-sm text-ink">
+                      {item.label}
+                      {item.locked ? <span className="ml-2 text-xs text-muted">Always</span> : null}
+                    </span>
+                    <Toggle checked={item.push} disabled={item.locked} label={`Push “${item.label}”`} onChange={push => void setPreference({ realm, type: item.type, push })} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </QueryView>
         </section>
       </div>
     </Card>

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { adminApi, parseStockCodes, percentToPpb } from '../src/admin';
-import { resellerSessionApi } from '../src/reseller';
-import { makeStore, notificationsApi, pushApi, setRequestContext, toApiError, uploadMedia } from '../src';
+import { resellerFeesApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi } from '../src/reseller';
+import { keepUnusedSeconds, makeStore, notificationsApi, pushApi, readTimeoutMs, revalidateAfterSeconds, setRequestContext, toApiError, uploadMedia } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
 
@@ -87,6 +87,61 @@ describe('base query', () => {
     expect(next.hasNextPage).toBe(false);
   });
 
+  test('reads time out; a timeout comes back as a network error with its own message', async () => {
+    const store = makeStore();
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal('fetch', (input: Request) => {
+      signal = input.signal;
+      return new Promise<Response>((_resolve, reject) => input.signal.addEventListener('abort', () => reject(input.signal.reason)));
+    });
+    vi.useFakeTimers();
+    const pending = store.dispatch(adminApi.endpoints.overview.initiate({ days: 7, mode: 'live' }));
+    await vi.advanceTimersByTimeAsync(readTimeoutMs);
+    const result = await pending;
+    vi.useRealTimers();
+    expect(signal?.aborted).toBe(true);
+    expect(result.error).toMatchObject({ code: 'timeout', type: 'network_error' });
+    pending.unsubscribe();
+  });
+
+  test('a 401 outside sign-in checks the session again, so the app can send the person to sign in', async () => {
+    const store = makeStore();
+    reply = call => (call.url.endsWith('/auth/session') ? Response.json({ object: 'session', user: { id: 'u' }, memberships: [] }) : Response.json({ error: { type: 'authentication_error', code: 'unauthenticated', message: 'Sign in again.' } }, { status: 401 }));
+    const session = store.dispatch(resellerSessionApi.endpoints.session.initiate());
+    await session;
+    await store.dispatch(resellerSessionApi.endpoints.account.initiate());
+    await vi.waitFor(() => expect(calls.filter(call => call.url.endsWith('/v1/auth/session'))).toHaveLength(2));
+    session.unsubscribe();
+  });
+
+  test('a 401 from the session check itself does not loop', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ error: { type: 'authentication_error', code: 'unauthenticated', message: 'Sign in.' } }, { status: 401 });
+    const session = store.dispatch(resellerSessionApi.endpoints.session.initiate());
+    await session;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(calls).toHaveLength(1);
+    session.unsubscribe();
+  });
+
+  test('cached data is kept for 5 minutes and revalidated after 30 seconds, on focus and on reconnect', () => {
+    expect([keepUnusedSeconds, revalidateAfterSeconds]).toEqual([300, 30]);
+    const config = makeStore().getState().bitocardApi.config;
+    expect(config).toMatchObject({ keepUnusedDataFor: 300, refetchOnMountOrArgChange: 30, refetchOnFocus: true, refetchOnReconnect: true });
+  });
+
+  test('orders, simulated outcomes and plan changes refresh the BitoCard fee lists', async () => {
+    const store = makeStore();
+    reply = call => Response.json(call.method === 'GET' ? { object: 'list', data: [] } : { object: 'order', id: 'o1' });
+    const fees = store.dispatch(resellerFeesApi.endpoints.feeRates.initiate());
+    await fees;
+    await store.dispatch(resellerOrdersApi.endpoints.placeOrder.initiate({ quote_id: 'q1' }));
+    await vi.waitFor(() => expect(calls.filter(call => call.url.endsWith('/v1/wallet/fee-rates'))).toHaveLength(2));
+    await store.dispatch(resellerPayoutsApi.endpoints.changePlan.initiate({ plan: 'premium' }));
+    await vi.waitFor(() => expect(calls.filter(call => call.url.endsWith('/v1/wallet/fee-rates'))).toHaveLength(3));
+    fees.unsubscribe();
+  });
+
   test('a mutation refetches the lists it changes', async () => {
     const store = makeStore();
     reply = call => (call.method === 'POST' ? Response.json({ object: 'verification', id: 'v1', status: 'approved' }) : Response.json({ object: 'list', data: [] }));
@@ -133,6 +188,62 @@ describe('notifications', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(calls[0]).toMatchObject({ method: 'POST', url: 'http://api.test/v1/admin/notifications/n1/read' });
     expect(calls.some(call => call.url === 'http://api.test/v1/admin/notifications/unread-count')).toBe(true);
+  });
+});
+
+describe('notifications read at once', () => {
+  const page = (read: boolean) => ({
+    object: 'list',
+    has_more: false,
+    unread_count: read ? 0 : 2,
+    data: [
+      { object: 'notification', id: 'n1', read, read_at: null, title: 'A' },
+      { object: 'notification', id: 'n2', read, read_at: null, title: 'B' },
+    ],
+  });
+  const inbox = (store: ReturnType<typeof makeStore>) => notificationsApi.endpoints.notifications.select({ realm: 'reseller' })(store.getState()).data;
+  const count = (store: ReturnType<typeof makeStore>) => notificationsApi.endpoints.unreadNotifications.select('reseller')(store.getState()).data?.count;
+
+  test('marking one read shows it read and lowers the count before the API answers', async () => {
+    const store = makeStore();
+    let answer!: () => void;
+    reply = call => (call.url.endsWith('/unread-count') ? Response.json({ object: 'unread_count', count: 2 }) : Response.json(page(false)));
+    const list = store.dispatch(notificationsApi.endpoints.notifications.initiate({ realm: 'reseller' }));
+    const badge = store.dispatch(notificationsApi.endpoints.unreadNotifications.initiate('reseller'));
+    await Promise.all([list, badge]);
+    vi.stubGlobal('fetch', () => new Promise<Response>(resolve => (answer = () => resolve(Response.json({ object: 'notification', id: 'n1', read: true })))));
+    const marking = store.dispatch(notificationsApi.endpoints.markNotificationRead.initiate({ realm: 'reseller', id: 'n1' }));
+    expect(inbox(store)?.pages[0].data.map(item => item.read)).toEqual([true, false]);
+    expect(inbox(store)?.pages[0].unread_count).toBe(1);
+    expect(count(store)).toBe(1);
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    answer();
+    await marking;
+    list.unsubscribe();
+    badge.unsubscribe();
+  });
+
+  test('a refused change is undone; marking all read empties the count', async () => {
+    const store = makeStore();
+    reply = call => (call.url.endsWith('/unread-count') ? Response.json({ object: 'unread_count', count: 2 }) : Response.json(page(false)));
+    const list = store.dispatch(notificationsApi.endpoints.notifications.initiate({ realm: 'reseller' }));
+    const badge = store.dispatch(notificationsApi.endpoints.unreadNotifications.initiate('reseller'));
+    await Promise.all([list, badge]);
+    reply = () => Response.json({ error: { type: 'api_error', code: 'unexpected', message: 'No.' } }, { status: 500 });
+    await store.dispatch(notificationsApi.endpoints.markNotificationRead.initiate({ realm: 'reseller', id: 'n1' }));
+    expect(inbox(store)?.pages[0].data.map(item => item.read)).toEqual([false, false]);
+    expect(count(store)).toBe(2);
+
+    let answer!: () => void;
+    vi.stubGlobal('fetch', () => new Promise<Response>(resolve => (answer = () => resolve(Response.json({ object: 'notifications_read', updated: 2 })))));
+    const all = store.dispatch(notificationsApi.endpoints.markAllNotificationsRead.initiate('reseller'));
+    expect(inbox(store)?.pages[0].data.every(item => item.read)).toBe(true);
+    expect(count(store)).toBe(0);
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    answer();
+    await all;
+    list.unsubscribe();
+    badge.unsubscribe();
   });
 });
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, Inbox, RotateCw } from 'lucide-react';
-import { cn, humanise } from '../format';
+import { cn, errorMessage, humanise } from '../format';
 
 export type Tone = 'green' | 'amber' | 'red' | 'blue' | 'grey' | 'pink';
 
@@ -99,6 +99,53 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         <button type="button" onClick={onRetry} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-brand-600 hover:bg-brand-50">
           <RotateCw className="size-4" aria-hidden />
           Try again
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** What `QueryView` needs from an RTK Query result. */
+export type QueryLike<T> = { data?: T; error?: unknown; isFetching?: boolean; refetch: () => unknown };
+
+/**
+ * Shows a query's data whenever there is any, so a background refresh never blanks the screen: the loading view
+ * only until the first answer, the error panel only when nothing has loaded, and a slim notice with Retry when a
+ * refresh fails over data already shown (the screen, and anything typed into it, stays).
+ */
+export function QueryView<T>({
+  query,
+  loading,
+  message = errorMessage,
+  children,
+}: {
+  query: QueryLike<T>;
+  loading: ReactNode;
+  /** Turns the error into words; by default the API's own message. */
+  message?: (error: unknown) => string;
+  children: (data: T) => ReactNode;
+}) {
+  if (query.data === undefined) return query.error ? <ErrorState message={message(query.error)} onRetry={() => void query.refetch()} /> : <>{loading}</>;
+  return (
+    <>
+      {query.error && !query.isFetching ? <RefreshFailed message={message(query.error)} onRetry={() => void query.refetch()} /> : null}
+      {children(query.data)}
+    </>
+  );
+}
+
+/** A refresh failed: what is on screen is the last data loaded. */
+export function RefreshFailed({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div role="status" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+      <AlertTriangle className="size-4 shrink-0" aria-hidden />
+      <p className="min-w-0 flex-1">
+        <span className="font-semibold">Showing the last data loaded.</span> {message}
+      </p>
+      {onRetry ? (
+        <button type="button" onClick={onRetry} className="inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2 font-semibold hover:bg-amber-100">
+          <RotateCw className="size-4" aria-hidden />
+          Retry
         </button>
       ) : null}
     </div>

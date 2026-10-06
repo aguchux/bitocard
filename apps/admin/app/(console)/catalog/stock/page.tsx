@@ -1,29 +1,8 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 import { KeyRound, PackagePlus, Search } from "lucide-react";
-import {
-  ActionDialog,
-  Badge,
-  Button,
-  Card,
-  categoryName,
-  DataTable,
-  Dialog,
-  errorMessage,
-  Field,
-  FilterSelect,
-  formatBps,
-  formatDateTime,
-  formatMoney,
-  Input,
-  KeyValue,
-  Notice,
-  PageHeader,
-  Select,
-  Textarea,
-  Toggle,
-} from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, Field, FilterSelect, formatBps, formatDateTime, formatMoney, Input, KeyValue, Notice, PageHeader, Select, Textarea, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   parseStockCodes,
@@ -334,7 +313,7 @@ export default function StockPage() {
   const operator = can(admin, "operations");
   const [category, setCategory] = useState<"" | StockCategory>("");
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const stock = useStockQuery({ ...(category ? { category } : {}), ...(q.length >= 2 ? { q } : {}) });
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);

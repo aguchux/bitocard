@@ -1,10 +1,10 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
-import { Card, categoryName, DataTable, errorMessage, formatDateTime, formatMoney, Input, LoadMore, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
+import { Card, categoryName, DataTable, errorMessage, formatDateTime, formatMoney, Input, LoadMore, PageHeader, StatusBadge, Tabs, useDebouncedValue } from "@bitocard/admin-ui";
 import { type OrderStatus, useResellerOrdersInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -16,7 +16,7 @@ export default function OrdersPage() {
   const { membership, mode } = useReseller();
   const [status, setStatus] = useState<Filter>("all");
   const [reference, setReference] = useState("");
-  const customerReference = useDeferredValue(reference.trim());
+  const customerReference = useDebouncedValue(reference.trim());
   const [polling, setPolling] = useState(false);
   // Refreshes every 15 seconds while a listed order is still processing (paused while the tab is in the background).
   const query = useResellerOrdersInfiniteQuery(

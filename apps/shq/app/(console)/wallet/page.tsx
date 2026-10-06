@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownToLine, Banknote, CircleDollarSign, Clock, Gift, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
-import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, formatDateTime, formatMoney, formatRelative, humanise, LoadMore, Notice, PageHeader, StatCard, StatusBadge } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, formatDateTime, formatMoney, formatRelative, humanise, LoadMore, Notice, PageHeader, RefreshFailed, StatCard, StatusBadge } from "@bitocard/admin-ui";
 import { type WalletTransaction, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -94,12 +94,13 @@ export default function WalletPage() {
         <Notice tone="grey" title="No access to the wallet">
           Your role ({humanise(membership.role)}) cannot see the wallet. Ask the account owner if you need it.
         </Notice>
-      ) : wallet.error ? (
+      ) : wallet.error && !data ? (
         <Card>
           <ErrorState message={errorMessage(wallet.error, "Could not load your wallet.")} onRetry={wallet.refetch} />
         </Card>
       ) : (
         <>
+          {wallet.error && !wallet.isFetching ? <RefreshFailed message={errorMessage(wallet.error, "Could not load your wallet.")} onRetry={wallet.refetch} /> : null}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <StatCard
               label="Available to spend"

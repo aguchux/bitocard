@@ -75,7 +75,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     }),
     updateReseller: build.mutation<ResellerDetail, { id: string; status?: ResellerStatus; plan?: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}`, method: 'PATCH', body }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity', 'Fee'],
     }),
     resellerWallet: build.query<ResellerWallet, string>({ query: id => `/v1/admin/resellers/${id}/wallet`, providesTags: (_result, _error, id) => [{ type: 'Reseller', id }] }),
     /** Finance: grants the startup allowance (verified reseller, switch on, once only). */
@@ -125,11 +125,12 @@ export const adminApi = bitocardApi.injectEndpoints({
       { id: string; outcome: 'completed' | 'failed'; reason: string; deliveries?: Array<{ kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number'; code?: string; pin?: string; serial?: string }> }
     >({
       query: ({ id, ...body }) => ({ url: `/v1/admin/orders/${id}/resolve`, method: 'POST', body }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity'],
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity', 'Fee'],
     }),
     refundOrder: build.mutation<AdminOrderDetail, { id: string; reason: string; supplier_refunded: boolean }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/orders/${id}/refund`, method: 'POST', body }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity'],
+      // Refunding an own-supplier order refunds BitoCard's fee.
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Overview', 'Activity', 'Fee'],
     }),
 
     // -- Catalogue and suppliers ------------------------------------------------------------------------------------

@@ -266,7 +266,8 @@ export function ResellerGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (error || !data) return <ErrorState message={errorMessage(error, "Could not check your session.")} onRetry={refetch} />;
+  // A failed background refresh keeps the app on screen (and anything typed into it); only a first failure blocks it.
+  if (!data) return <ErrorState message={errorMessage(error, "Could not check your session.")} onRetry={refetch} />;
   if (!data.user.email_verified) return <VerifyEmail user={data.user} />;
   if (!value) return <Onboarding user={data.user} />;
   return <ResellerContext.Provider value={value}>{children}</ResellerContext.Provider>;

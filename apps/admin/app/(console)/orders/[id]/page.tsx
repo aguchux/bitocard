@@ -21,6 +21,7 @@ import {
   KeyValue,
   Notice,
   PageHeader,
+  RefreshFailed,
   Select,
   Skeleton,
   StatusBadge,
@@ -34,7 +35,7 @@ const emptyDelivery = (): Delivery => ({ kind: "gift_card", code: "", pin: "", s
 export default function OrderPage() {
   const { id } = useParams<{ id: string }>();
   const admin = useAdmin();
-  const { data: order, error, isLoading, refetch } = useOrderQuery(id);
+  const { data: order, error, isFetching, refetch } = useOrderQuery(id);
   const [requery, requeryState] = useRequeryOrderMutation();
   const [resolve] = useResolveOrderMutation();
   const [refund] = useRefundOrderMutation();
@@ -48,14 +49,15 @@ export default function OrderPage() {
 
   return (
     <AdminShell section="orders" current={order?.needs_review ? "/orders/review" : "/orders"} crumbs={[{ label: "Orders", href: "/orders" }, { label: title }]}>
-      {error ? (
+      {!order && error ? (
         <Card>
           <ErrorState message={errorMessage(error, "Could not load this order.")} onRetry={refetch} />
         </Card>
-      ) : isLoading || !order ? (
+      ) : !order ? (
         <Skeleton className="h-72 w-full" />
       ) : (
         <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error, "Could not refresh this order.")} onRetry={refetch} /> : null}
           <PageHeader
             title={
               <span className="flex flex-wrap items-center gap-3">

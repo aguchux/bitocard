@@ -17,6 +17,7 @@ import {
   KeyValue,
   Notice,
   PageHeader,
+  RefreshFailed,
   Select,
   Skeleton,
   StatusBadge,
@@ -28,7 +29,7 @@ import { type ResellerStatus, usePlansQuery, useResellerHistoryQuery, useReselle
 export default function ResellerPage() {
   const { id } = useParams<{ id: string }>();
   const admin = useAdmin();
-  const { data: reseller, error, isLoading, refetch } = useResellerQuery(id);
+  const { data: reseller, error, isFetching, refetch } = useResellerQuery(id);
   const history = useResellerHistoryQuery(id);
   const checks = useVerificationsInfiniteQuery({ reseller_id: id, subject: "reseller" });
   const plans = usePlansQuery();
@@ -41,14 +42,15 @@ export default function ResellerPage() {
 
   return (
     <AdminShell section="resellers" current="/resellers" crumbs={[{ label: "Resellers", href: "/resellers" }, { label: reseller?.name ?? "Reseller" }]}>
-      {error ? (
+      {!reseller && error ? (
         <Card>
           <ErrorState message={errorMessage(error, "Could not load this reseller.")} onRetry={refetch} />
         </Card>
-      ) : isLoading || !reseller ? (
+      ) : !reseller ? (
         <Skeleton className="h-64 w-full" />
       ) : (
         <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error, "Could not refresh this reseller.")} onRetry={refetch} /> : null}
           <PageHeader
             title={reseller.name}
             description={`${reseller.country ?? "No country yet"} · joined ${formatDate(reseller.created_at)}`}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
-import { Badge, Button, Card, CardHeader, categoryName, EmptyState, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, Input, KeyValue, Notice, PageHeader, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, categoryName, EmptyState, ErrorState, errorMessage, formatMoney, formatRelative, humanise, ImageField, Input, KeyValue, Notice, PageHeader, RefreshFailed, Skeleton, StatusBadge, Tabs, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type ProductCategory, type Supplier, useCountriesQuery, useSetSupplierMarketMutation, useSuppliersQuery, useSyncSupplierMutation, useUpdateSupplierMutation } from "@bitocard/api-client/admin";
 import { healthOf } from "../supplier-health";
@@ -179,7 +179,7 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
 }
 
 export default function SuppliersPage() {
-  const { data, error, isLoading, refetch } = useSuppliersQuery();
+  const { data, error, isFetching, refetch } = useSuppliersQuery();
   const [filter, setFilter] = useState<Filter>("live");
   const [search, setSearch] = useState("");
   const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -207,11 +207,12 @@ export default function SuppliersPage() {
           <Input type="search" placeholder="Search name, category, country…" value={search} onChange={event => setSearch(event.target.value)} className="min-h-11 rounded-2xl pl-11" />
         </label>
       </div>
-      {error ? (
+      {data && error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
+      {!data && error ? (
         <Card>
           <ErrorState message={errorMessage(error)} onRetry={refetch} />
         </Card>
-      ) : isLoading || !suppliers ? (
+      ) : !suppliers ? (
         <Skeleton className="h-64 w-full" />
       ) : suppliers.length === 0 ? (
         <Card>

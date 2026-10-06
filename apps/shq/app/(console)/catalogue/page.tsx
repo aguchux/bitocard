@@ -1,9 +1,9 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Search, ShoppingCart, Store } from "lucide-react";
-import { Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatMoney, Input, LoadMore, Notice, PageHeader } from "@bitocard/admin-ui";
+import { Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatMoney, Input, LoadMore, Notice, PageHeader, useDebouncedValue } from "@bitocard/admin-ui";
 import { type CatalogueCategory, catalogueCategories, type Product, useCatalogueProductsInfiniteQuery, useSetListingMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -118,7 +118,7 @@ export default function CataloguePage() {
   const [country, setCountry] = useState("");
   const [listing, setListingFilter] = useState<Listing>("");
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
   const rows = query.data?.pages.flatMap(page => page.data);
   const [opened, setOpen] = useState<Product | null>(null);

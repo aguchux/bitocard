@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Gift } from "lucide-react";
-import { ActionDialog, Button, Card, CardHeader, errorMessage, formatDateTime, formatMoney, KeyValue, Notice, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { ActionDialog, Button, Card, CardHeader, errorMessage, formatDateTime, formatMoney, KeyValue, Notice, RefreshFailed, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useGrantStartupAllowanceMutation, useResellerWalletQuery, useRevokeStartupAllowanceMutation } from "@bitocard/api-client/admin";
 
@@ -27,9 +27,10 @@ export function StartupAllowanceCard({ resellerId, verified, switchedOn }: { res
         actions={allowance ? <StatusBadge status={allowance.status} /> : null}
       />
       <div className="space-y-3 px-5 pb-5 sm:px-6">
+        {wallet.data && wallet.error && !wallet.isFetching ? <RefreshFailed message={errorMessage(wallet.error)} onRetry={wallet.refetch} /> : null}
         {wallet.isLoading ? (
           <Skeleton className="h-16 w-full" />
-        ) : wallet.error ? (
+        ) : !wallet.data && wallet.error ? (
           <Notice tone="red">{errorMessage(wallet.error)}</Notice>
         ) : allowance ? (
           <KeyValue

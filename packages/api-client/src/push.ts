@@ -34,7 +34,8 @@ const base = (realm: NotificationRealm) => (realm === 'admin' ? '/v1/admin' : '/
 /** Push to your own devices, in SHQ and the admin app. */
 export const pushApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
-    pushSettings: build.query<PushSettings, NotificationRealm>({ query: realm => `${base(realm)}/devices/push-settings` }),
+    // Push keys are integration settings: saving one refreshes this.
+    pushSettings: build.query<PushSettings, NotificationRealm>({ query: realm => `${base(realm)}/devices/push-settings`, providesTags: ['Integration'] }),
     pushDevices: build.query<{ object: 'list'; data: PushDevice[] }, NotificationRealm>({ query: realm => `${base(realm)}/devices`, providesTags: ['Device'] }),
     registerPushDevice: build.mutation<PushDevice, { realm: NotificationRealm; subscription: PushSubscriptionInput }>({
       query: ({ realm, subscription }) => ({ url: `${base(realm)}/devices`, method: 'POST', body: subscription }),

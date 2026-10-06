@@ -18,6 +18,7 @@ import {
   Input,
   Notice,
   PageHeader,
+  RefreshFailed,
   Select,
   type Column,
 } from "@bitocard/admin-ui";
@@ -178,12 +179,13 @@ export default function TeamPage() {
     >
       <PageHeader title="Team" description={`The people who can work on ${membership.reseller.name}.`} />
       {!manage ? <Notice tone="grey">Only the owner or an admin can invite people or change roles.</Notice> : null}
-      {error ? (
+      {error && !data ? (
         <Card>
           <ErrorState message={errorMessage(error, "Could not load your team.")} onRetry={refetch} />
         </Card>
       ) : (
         <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error, "Could not load your team.")} onRetry={refetch} /> : null}
           <Card>
             <CardHeader title="Members" description="The owner always has full access and cannot be changed or removed." />
             <div className="mt-4">

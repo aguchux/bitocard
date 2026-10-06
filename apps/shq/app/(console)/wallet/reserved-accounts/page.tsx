@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Check, Copy, Landmark, PiggyBank, ShieldCheck } from "lucide-react";
-import { Button, Card, currencyDigits, Dialog, EmptyState, ErrorState, errorMessage, Field, formatMoney, Input, Notice, PageHeader, Skeleton } from "@bitocard/admin-ui";
+import { Button, Card, currencyDigits, Dialog, EmptyState, errorMessage, Field, formatMoney, Input, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import {
   type BvnCheck,
   type ReservedAccount,
@@ -268,7 +268,6 @@ export default function ReservedAccountsPage() {
   // Offered country by country; a country that does not offer them yet shows a notice instead of the create form.
   const offered = country.data?.reserved_accounts !== false;
   const [simulating, setSimulating] = useState<ReservedAccount | null>(null);
-  const list = accounts.data?.data;
 
   return (
     <ShqShell section="wallet" current="/wallet/reserved-accounts" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Bank transfer accounts" }]}>
@@ -277,40 +276,46 @@ export default function ReservedAccountsPage() {
         <Notice tone="grey" title="No access to bank transfer accounts">
           Only the owner, admins and finance members can see these accounts.
         </Notice>
-      ) : accounts.error ? (
-        <Card>
-          <ErrorState message={errorMessage(accounts.error, "Could not load your accounts.")} onRetry={accounts.refetch} />
-        </Card>
-      ) : accounts.isLoading || !list ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      ) : list.length === 0 && !offered ? (
-        <Notice tone="grey" title="Not offered in your country yet">
-          {`Bank transfer accounts are not available in ${country.data?.name ?? "your country"} yet. Top up by card or bank on the Top-ups page instead.`}
-        </Notice>
-      ) : list.length === 0 ? (
-        <CreateAccounts nigeria={membership.reseller.country === "NG"} sandbox={sandbox} />
       ) : (
-        <>
-          <Notice tone="blue" title="How it works">
-            Transfer from any bank to an account below. Your wallet is credited once the bank confirms the transfer, usually within minutes. Bank charges may apply.
-            {sandbox ? " These are sandbox accounts: real transfers to them are not credited." : ""}
-          </Notice>
-          <div className="grid gap-4 md:grid-cols-2">
-            {list.map(account => (
-              <AccountCard key={account.id} account={account} onSimulate={sandbox ? () => setSimulating(account) : undefined} />
-            ))}
-          </div>
-          <p className="text-sm text-muted">
-            Prefer to pay by card?{" "}
-            <Link href="/wallet/top-ups" className="font-semibold text-brand-600 underline-offset-2 hover:underline">
-              Top up through the payment page
-            </Link>
-            .
-          </p>
-        </>
+        <QueryView
+          query={accounts}
+          message={error => errorMessage(error, "Could not load your accounts.")}
+          loading={
+            <div className="grid gap-4 md:grid-cols-2" aria-busy="true" aria-label="Loading">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </div>
+          }
+        >
+          {({ data: list }) =>
+            list.length === 0 && !offered ? (
+              <Notice tone="grey" title="Not offered in your country yet">
+                {`Bank transfer accounts are not available in ${country.data?.name ?? "your country"} yet. Top up by card or bank on the Top-ups page instead.`}
+              </Notice>
+            ) : list.length === 0 ? (
+              <CreateAccounts nigeria={membership.reseller.country === "NG"} sandbox={sandbox} />
+            ) : (
+              <>
+                <Notice tone="blue" title="How it works">
+                  Transfer from any bank to an account below. Your wallet is credited once the bank confirms the transfer, usually within minutes. Bank charges may apply.
+                  {sandbox ? " These are sandbox accounts: real transfers to them are not credited." : ""}
+                </Notice>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {list.map(account => (
+                    <AccountCard key={account.id} account={account} onSimulate={sandbox ? () => setSimulating(account) : undefined} />
+                  ))}
+                </div>
+                <p className="text-sm text-muted">
+                  Prefer to pay by card?{" "}
+                  <Link href="/wallet/top-ups" className="font-semibold text-brand-600 underline-offset-2 hover:underline">
+                    Top up through the payment page
+                  </Link>
+                  .
+                </p>
+              </>
+            )
+          }
+        </QueryView>
       )}
       <SimulateDeposit account={simulating} onClose={() => setSimulating(null)} />
     </ShqShell>

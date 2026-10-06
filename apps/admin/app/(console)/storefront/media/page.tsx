@@ -1,8 +1,8 @@
 "use client";
 
-import { useDeferredValue, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Copy, ImagePlus, Search, Trash2 } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, EmptyState, ErrorState, errorMessage, FilterSelect, formatRelative, Input, Notice, PageHeader, Skeleton } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, EmptyState, errorMessage, ErrorState, FilterSelect, formatRelative, Input, Notice, PageHeader, RefreshFailed, Skeleton, useDebouncedValue } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type MediaAsset, type MediaPurpose, useDeleteMediaMutation, useMediaLibraryQuery, useMediaSettingsQuery, useMediaUpload } from "@bitocard/api-client";
 
@@ -82,7 +82,7 @@ export default function MediaLibraryPage() {
   const [owner, setOwner] = useState("platform");
   const [purpose, setPurpose] = useState<"" | MediaPurpose>("");
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const settings = useMediaSettingsQuery("admin");
   const library = useMediaLibraryQuery({ realm: "admin", owner, purpose: purpose || undefined, q: q || undefined, limit: 100 });
   const [remove] = useDeleteMediaMutation();
@@ -161,7 +161,8 @@ export default function MediaLibraryPage() {
           <Input type="search" placeholder="Search by file, folder or brand…" value={search} onChange={event => setSearch(event.target.value)} className="min-h-[3.75rem] rounded-2xl pl-11" />
         </label>
       </div>
-      {library.error ? (
+      {library.data && library.error && !library.isFetching ? <RefreshFailed message={errorMessage(library.error)} onRetry={library.refetch} /> : null}
+      {!library.data && library.error ? (
         <Card>
           <ErrorState message={errorMessage(library.error)} onRetry={library.refetch} />
         </Card>

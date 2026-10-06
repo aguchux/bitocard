@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../format';
-import { EmptyState, ErrorState } from './status';
+import { EmptyState, ErrorState, RefreshFailed } from './status';
 import { Skeleton } from './primitives';
 
 const iconTones = {
@@ -65,7 +65,8 @@ export function DataTable<T>({
   onRowClick?: (row: T) => void;
   caption?: string;
 }) {
-  if (error) return <ErrorState message={error} onRetry={onRetry} />;
+  // Rows already shown win over a failed refresh: the error panel is only for when there are none to show.
+  if (error && !rows?.length) return <ErrorState message={error} onRetry={onRetry} />;
   if (loading && !rows) {
     return (
       <div className="space-y-3 p-5" aria-busy="true" aria-label="Loading">
@@ -94,6 +95,11 @@ export function DataTable<T>({
 
   return (
     <>
+      {error ? (
+        <div className="px-5 pt-4">
+          <RefreshFailed message={error} onRetry={onRetry} />
+        </div>
+      ) : null}
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] text-left text-sm">
           {caption ? <caption className="sr-only">{caption}</caption> : null}

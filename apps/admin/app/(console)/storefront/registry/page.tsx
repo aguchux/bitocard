@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useState } from "react";
 import { Search } from "lucide-react";
-import { Badge, Button, Card, Dialog, EmptyState, ErrorState, errorMessage, ImageField, Input, Notice, PageHeader, Skeleton, Tabs } from "@bitocard/admin-ui";
+import { Badge, Button, Card, Dialog, EmptyState, ErrorState, errorMessage, ImageField, Input, Notice, PageHeader, RefreshFailed, Skeleton, Tabs } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type BrandRegistryEntry, useBrandRegistryQuery, useSaveBrandRegistryMutation } from "@bitocard/api-client/admin";
 
@@ -168,11 +168,12 @@ export default function BrandRegistryPage() {
           <Input type="search" placeholder="Search by brand, company, slug or tag…" value={search} onChange={event => setSearch(event.target.value)} className="min-h-12 rounded-2xl pl-11" />
         </label>
       </div>
-      {registry.error ? (
+      {registry.data && registry.error && !registry.isFetching ? <RefreshFailed message={errorMessage(registry.error)} onRetry={registry.refetch} /> : null}
+      {!registry.data && registry.error ? (
         <Card>
           <ErrorState message={errorMessage(registry.error)} onRetry={registry.refetch} />
         </Card>
-      ) : registry.isLoading ? (
+      ) : !registry.data ? (
         <Skeleton className="h-64 w-full" />
       ) : !rows.length ? (
         <Card>

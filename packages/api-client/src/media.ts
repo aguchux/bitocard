@@ -65,7 +65,8 @@ const clean = (values: Record<string, unknown>) => Object.fromEntries(Object.ent
 /** Uploaded logos, icons and images, shared by the admin app and SHQ. */
 export const mediaApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
-    mediaSettings: build.query<MediaSettings, MediaRealm>({ query: realm => `${base(realm)}/settings` }),
+    // Storage keys are integration settings: saving one refreshes this.
+    mediaSettings: build.query<MediaSettings, MediaRealm>({ query: realm => `${base(realm)}/settings`, providesTags: ['Integration'] }),
     mediaLibrary: build.query<{ object: 'list'; data: MediaAsset[]; has_more: boolean }, { realm: MediaRealm } & MediaFilter>({
       query: ({ realm, ...filter }) => ({ url: base(realm), params: clean(filter) }),
       providesTags: ['Media'],

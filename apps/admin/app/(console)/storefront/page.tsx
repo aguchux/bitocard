@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CloudOff, ExternalLink, History, Monitor, Plus, Rocket, RotateCcw, Smartphone, Tablet } from "lucide-react";
-import { ActionDialog, Badge, Button, Dialog, ErrorState, errorMessage, formatDateTime, formatRelative, Notice, PageHeader, Skeleton, Tabs } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Dialog, errorMessage, formatDateTime, formatRelative, Notice, PageHeader, QueryView, Skeleton, Tabs } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   addSection,
@@ -386,16 +386,17 @@ export default function StorefrontHomePage() {
 
   return (
     <AdminShell section="storefront" current="/storefront" crumbs={[{ label: "Storefront", href: "/storefront" }, { label: "Home page" }]}>
-      {home.error ? (
-        <ErrorState message={errorMessage(home.error)} onRetry={home.refetch} />
-      ) : !home.data ? (
-        <div className="space-y-4" aria-busy="true" aria-label="Loading">
-          <Skeleton className="h-12 w-72" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      ) : (
-        <Editor page={home.data} editable={editable} previewable={previewable} />
-      )}
+      <QueryView
+        query={home}
+        loading={
+          <div className="space-y-4" aria-busy="true" aria-label="Loading">
+            <Skeleton className="h-12 w-72" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        }
+      >
+        {page => <Editor page={page} editable={editable} previewable={previewable} />}
+      </QueryView>
     </AdminShell>
   );
 }

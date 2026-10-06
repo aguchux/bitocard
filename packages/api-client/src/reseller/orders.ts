@@ -78,13 +78,14 @@ export const resellerOrdersApi = bitocardApi.injectEndpoints({
     /** Holds wholesale plus tax from the wallet. A `processing` result means the supplier has not confirmed yet. */
     placeOrder: build.mutation<OrderDetail, { quote_id: string; simulate?: 'completed' | 'failed' | 'pending' }>({
       query: body => ({ url: '/v1/orders', method: 'POST', body }),
-      invalidatesTags: [{ type: 'Order', id: 'LIST' }, 'Wallet'],
+      // Own-supplier orders hold BitoCard's fee, so the fee list changes too.
+      invalidatesTags: [{ type: 'Order', id: 'LIST' }, 'Wallet', 'Fee'],
     }),
     orderReceipt: build.query<Receipt, string>({ query: id => `/v1/orders/${id}/receipt`, providesTags: (_result, _error, id) => [{ type: 'Order', id }] }),
     /** Sandbox only: completes or fails a processing order. */
     simulateOrder: build.mutation<OrderDetail, { id: string; outcome: 'completed' | 'failed' }>({
       query: ({ id, outcome }) => ({ url: `/v1/orders/${id}/simulate`, method: 'POST', body: { outcome } }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Wallet'],
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Order', id }, { type: 'Order', id: 'LIST' }, 'Wallet', 'Fee'],
     }),
   }),
 });

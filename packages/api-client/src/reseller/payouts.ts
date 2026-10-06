@@ -89,7 +89,8 @@ export const resellerPayoutsApi = bitocardApi.injectEndpoints({
     /** Upgrading charges the first month from the live wallet at once; moving to Standard keeps Premium to the end of the paid month. */
     changePlan: build.mutation<Subscription, { plan: string }>({
       query: body => ({ url: '/v1/subscription', method: 'POST', body }),
-      invalidatesTags: ['Subscription', 'Account', 'Wallet'],
+      // The plan charge appears on the fee statement.
+      invalidatesTags: ['Subscription', 'Account', 'Wallet', 'Fee'],
     }),
   }),
 });

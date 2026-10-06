@@ -1,30 +1,10 @@
 "use client";
 
-import { Suspense, useDeferredValue, useEffect, useId, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useId, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, Search, ShoppingCart } from "lucide-react";
-import {
-  Button,
-  Card,
-  CardHeader,
-  categoryName,
-  cn,
-  currencyDigits,
-  EmptyState,
-  ErrorState,
-  errorMessage,
-  Field,
-  FilterSelect,
-  formatMoney,
-  humanise,
-  Input,
-  LoadMore,
-  Notice,
-  PageHeader,
-  Select,
-  Skeleton,
-} from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, categoryName, cn, currencyDigits, EmptyState, errorMessage, ErrorState, Field, FilterSelect, formatMoney, humanise, Input, LoadMore, Notice, PageHeader, RefreshFailed, Select, Skeleton, useDebouncedValue } from "@bitocard/admin-ui";
 import {
   type CatalogueCategory,
   catalogueCategories,
@@ -53,7 +33,7 @@ function toMinor(value: string, currency: string) {
 function ProductPicker({ onPick }: { onPick: (product: Product) => void }) {
   const [category, setCategory] = useState<"" | CatalogueCategory>("");
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, q: q || undefined, limit: 10 });
   const rows = query.data?.pages.flatMap(page => page.data);
   return (
@@ -73,9 +53,14 @@ function ProductPicker({ onPick }: { onPick: (product: Product) => void }) {
           <Input type="search" placeholder="Search by name or brand" value={search} maxLength={60} onChange={event => setSearch(event.target.value)} className="min-h-[3.75rem] pl-9" />
         </label>
       </div>
-      {query.error ? (
+      {query.error && rows && !query.isFetching ? (
+        <div className="px-5 sm:px-6">
+          <RefreshFailed message={errorMessage(query.error)} onRetry={query.refetch} />
+        </div>
+      ) : null}
+      {!rows && query.error ? (
         <ErrorState message={errorMessage(query.error)} onRetry={query.refetch} />
-      ) : query.isLoading ? (
+      ) : !rows && query.isLoading ? (
         <div className="space-y-3 px-5 pb-5 sm:px-6" aria-busy="true" aria-label="Loading products">
           {Array.from({ length: 4 }, (_, index) => (
             <Skeleton key={index} className="h-14 w-full" />
@@ -396,7 +381,8 @@ function NewOrder() {
     if (productId) router.replace("/orders/new");
   };
 
-  if (productId && !picked && fromLink.error) {
+  // The error only replaces the form when the product never loaded: a failed background refresh keeps what is typed.
+  if (productId && !picked && fromLink.error && !fromLink.data) {
     return (
       <Card>
         <ErrorState message={errorMessage(fromLink.error, "Could not load this product.")} onRetry={fromLink.refetch} />
@@ -409,7 +395,13 @@ function NewOrder() {
     );
   }
   if (productId && !picked && fromLink.isLoading) return <Skeleton className="h-72 w-full" />;
-  return product ? <OrderForm key={product.id} product={product} onChange={change} /> : <ProductPicker onPick={setPicked} />;
+  if (!product) return <ProductPicker onPick={setPicked} />;
+  return (
+    <>
+      {!picked && fromLink.error && !fromLink.isFetching ? <RefreshFailed message={errorMessage(fromLink.error, "Could not load this product.")} onRetry={fromLink.refetch} /> : null}
+      <OrderForm key={product.id} product={product} onChange={change} />
+    </>
+  );
 }
 
 export default function NewOrderPage() {

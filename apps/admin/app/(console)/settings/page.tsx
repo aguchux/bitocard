@@ -1,13 +1,13 @@
 "use client";
 
-import { Card, CardHeader, ErrorState, errorMessage, humanise, Notice, PageHeader, Skeleton, Toggle } from "@bitocard/admin-ui";
+import { Card, CardHeader, ErrorState, errorMessage, humanise, Notice, PageHeader, RefreshFailed, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useSetSwitchMutation, useSwitchesQuery } from "@bitocard/api-client/admin";
 
 /** Global and per-country feature switches. Switches set for one reseller stay in the API for now. */
 export default function SwitchesPage() {
   const admin = useAdmin();
-  const { data, error, isLoading, refetch } = useSwitchesQuery();
+  const { data, error, isFetching, refetch } = useSwitchesQuery();
   const countries = useCountriesQuery();
   const [setSwitch, state] = useSetSwitchMutation();
   const editable = can(admin, "operations");
@@ -22,11 +22,12 @@ export default function SwitchesPage() {
         description="Turn gated features on globally or per country. A country setting overrides the global one; a reseller setting overrides both."
       />
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
-      {error ? (
+      {data && error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
+      {!data && error ? (
         <Card>
           <ErrorState message={errorMessage(error)} onRetry={refetch} />
         </Card>
-      ) : isLoading || !data ? (
+      ) : !data ? (
         <Skeleton className="h-48 w-full" />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">

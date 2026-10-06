@@ -18,6 +18,8 @@ import {
   KeyValue,
   Notice,
   PageHeader,
+  QueryView,
+  RefreshFailed,
   Skeleton,
   StatusBadge,
 } from "@bitocard/admin-ui";
@@ -90,7 +92,8 @@ function Delivery({ delivery, index, count }: { delivery: OrderDelivery; index: 
 }
 
 function ReceiptDialog({ order, open, onClose }: { order: OrderDetail; open: boolean; onClose: () => void }) {
-  const { data: receipt, error, isLoading, refetch } = useOrderReceiptQuery(order.id, { skip: !open });
+  const receiptQuery = useOrderReceiptQuery(order.id, { skip: !open });
+  const receipt = receiptQuery.data;
   const money = (amount: number) => (receipt ? formatMoney(amount, receipt.currency) : "");
   const registration = receipt ? Object.entries(receipt.seller).filter(([key]) => key !== "name" && key !== "registered_address") : [];
   return (
@@ -106,55 +109,53 @@ function ReceiptDialog({ order, open, onClose }: { order: OrderDetail; open: boo
         ) : null
       }
     >
-      {error ? (
-        <ErrorState message={errorMessage(error, "Could not load the receipt.")} onRetry={refetch} />
-      ) : isLoading || !receipt ? (
-        <Skeleton className="h-48 w-full" />
-      ) : (
-        <div className="space-y-4 text-sm">
-          <div>
-            <p className="font-semibold">{receipt.sold_through}</p>
-            <p className="text-muted">{`Issued ${formatDateTime(receipt.issued_at)}`}</p>
-            {receipt.customer_reference ? <p className="text-muted">{`Customer reference: ${receipt.customer_reference}`}</p> : null}
-          </div>
-          <ul className="divide-y divide-line rounded-xl border border-line">
-            {receipt.items.map(item => (
-              <li key={item.description} className="flex justify-between gap-3 px-4 py-3">
-                <span className="min-w-0">
-                  {item.description}
-                  {item.quantity > 1 ? <span className="block text-xs text-muted">{`${item.quantity} × ${money(item.unit_price)}`}</span> : null}
-                </span>
-                <span className="font-semibold">{money(item.amount)}</span>
-              </li>
-            ))}
-          </ul>
-          <dl className="space-y-1">
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted">Subtotal</dt>
-              <dd>{money(receipt.subtotal)}</dd>
+      <QueryView query={receiptQuery} message={error => errorMessage(error, "Could not load the receipt.")} loading={<Skeleton className="h-48 w-full" />}>
+        {shown => (
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="font-semibold">{shown.sold_through}</p>
+              <p className="text-muted">{`Issued ${formatDateTime(shown.issued_at)}`}</p>
+              {shown.customer_reference ? <p className="text-muted">{`Customer reference: ${shown.customer_reference}`}</p> : null}
             </div>
-            {receipt.tax ? (
+            <ul className="divide-y divide-line rounded-xl border border-line">
+              {shown.items.map(item => (
+                <li key={item.description} className="flex justify-between gap-3 px-4 py-3">
+                  <span className="min-w-0">
+                    {item.description}
+                    {item.quantity > 1 ? <span className="block text-xs text-muted">{`${item.quantity} × ${money(item.unit_price)}`}</span> : null}
+                  </span>
+                  <span className="font-semibold">{money(item.amount)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="space-y-1">
               <div className="flex justify-between gap-3">
-                <dt className="text-muted">{`${receipt.tax.name ?? "Tax"} (${receipt.tax.rate_percent}%)`}</dt>
-                <dd>{money(receipt.tax.amount)}</dd>
+                <dt className="text-muted">Subtotal</dt>
+                <dd>{money(shown.subtotal)}</dd>
               </div>
-            ) : null}
-            <div className="flex justify-between gap-3 font-semibold">
-              <dt>Total</dt>
-              <dd>{money(receipt.total)}</dd>
+              {shown.tax ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted">{`${shown.tax.name ?? "Tax"} (${shown.tax.rate_percent}%)`}</dt>
+                  <dd>{money(shown.tax.amount)}</dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-3 font-semibold">
+                <dt>Total</dt>
+                <dd>{money(shown.total)}</dd>
+              </div>
+            </dl>
+            <div className="rounded-xl bg-canvas px-4 py-3 text-xs text-muted">
+              <p>
+                Sold by <span className="font-semibold text-ink">{shown.seller.name}</span>
+              </p>
+              {registration.map(([key, value]) => (
+                <p key={key}>{`${humanise(key)}: ${value}`}</p>
+              ))}
+              <p>{shown.seller.registered_address}</p>
             </div>
-          </dl>
-          <div className="rounded-xl bg-canvas px-4 py-3 text-xs text-muted">
-            <p>
-              Sold by <span className="font-semibold text-ink">{receipt.seller.name}</span>
-            </p>
-            {registration.map(([key, value]) => (
-              <p key={key}>{`${humanise(key)}: ${value}`}</p>
-            ))}
-            <p>{receipt.seller.registered_address}</p>
           </div>
-        </div>
-      )}
+        )}
+      </QueryView>
     </Dialog>
   );
 }
@@ -164,7 +165,7 @@ export default function OrderPage() {
   const { membership, mode } = useReseller();
   // While the supplier has not confirmed, look again every few seconds (paused while the tab is in the background).
   const [polling, setPolling] = useState(true);
-  const { data: order, error, isLoading, isFetching, refetch } = useResellerOrderQuery(id, { pollingInterval: polling ? orderPollMs : 0, skipPollingIfUnfocused: true });
+  const { data: order, error, isFetching, refetch } = useResellerOrderQuery(id, { pollingInterval: polling ? orderPollMs : 0, skipPollingIfUnfocused: true });
   const dispatch = useDispatch();
   const lastStatus = useRef<string | null>(null);
   useEffect(() => {
@@ -193,17 +194,20 @@ export default function OrderPage() {
 
   return (
     <ShqShell section="orders" current="/orders" crumbs={[{ label: "Orders", href: "/orders" }, { label: title }]}>
-      {error ? (
-        <Card>
-          <ErrorState message={errorMessage(error, "Could not load this order.")} onRetry={refetch} />
-        </Card>
-      ) : isLoading || !order ? (
-        <div className="space-y-4" aria-busy="true" aria-label="Loading order">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-64 w-full" />
-        </div>
+      {!order ? (
+        error ? (
+          <Card>
+            <ErrorState message={errorMessage(error, "Could not load this order.")} onRetry={refetch} />
+          </Card>
+        ) : (
+          <div className="space-y-4" aria-busy="true" aria-label="Loading order">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        )
       ) : (
         <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error, "Could not load this order.")} onRetry={refetch} /> : null}
           <PageHeader
             title={
               <span className="flex flex-wrap items-center gap-3">

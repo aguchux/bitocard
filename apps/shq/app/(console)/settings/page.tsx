@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Button, Card, CardHeader, ErrorState, errorMessage, Field, Input, KeyValue, Notice, PageHeader, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, ErrorState, errorMessage, Field, Input, KeyValue, Notice, PageHeader, RefreshFailed, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { type ResellerRef, usePublicCountriesQuery, usePublicCountryQuery, useUpdateBusinessMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
@@ -31,10 +31,13 @@ function CountryPicker({ onSaved }: { onSaved: () => void }) {
     if (done) onSaved();
   };
 
-  if (countries.error) return <ErrorState message={errorMessage(countries.error, "Could not load countries.")} onRetry={countries.refetch} />;
-  if (countries.isLoading) return <Skeleton className="h-11 w-full" />;
+  if (!countries.data) {
+    if (countries.error) return <ErrorState message={errorMessage(countries.error, "Could not load countries.")} onRetry={countries.refetch} />;
+    return <Skeleton className="h-11 w-full" />;
+  }
   return (
     <form onSubmit={submit} className="space-y-3">
+      {countries.error && !countries.isFetching ? <RefreshFailed message={errorMessage(countries.error, "Could not load countries.")} onRetry={countries.refetch} /> : null}
       <Notice tone="amber">Choose the country your business operates in. You sell in its currency, and it cannot be changed afterwards without contacting support.</Notice>
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
       <Field label="Business country" htmlFor="business-country">

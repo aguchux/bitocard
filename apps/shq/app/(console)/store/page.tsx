@@ -8,7 +8,6 @@ import {
   Card,
   CardHeader,
   EmptyState,
-  ErrorState,
   errorMessage,
   Field,
   formatDateTime,
@@ -17,6 +16,7 @@ import {
   KeyValue,
   Notice,
   PageHeader,
+  QueryView,
   Skeleton,
   StatusBadge,
 } from "@bitocard/admin-ui";
@@ -303,32 +303,35 @@ function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }
 export default function StorePage() {
   const { membership } = useReseller();
   const canManage = can(membership, "admin");
-  const { data, error, isLoading, refetch } = useStoresQuery();
-  const store = data?.data[0];
+  const stores = useStoresQuery();
 
   return (
     <ShqShell section="store" current="/store" crumbs={[{ label: "Store" }]}>
       <PageHeader title="Your store" description="Your branded storefront on a BitoCard address." />
-      {error ? (
-        <Card>
-          <ErrorState message={errorMessage(error, "Could not load your store.")} onRetry={refetch} />
-        </Card>
-      ) : isLoading || !data ? (
-        <div className="space-y-6" aria-busy="true" aria-label="Loading your store">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-72 w-full" />
-        </div>
-      ) : store ? (
-        <StoreDetails key={store.id} store={store} canManage={canManage} />
-      ) : canManage ? (
-        <CreateStore />
-      ) : (
-        <Card>
-          <EmptyState title="No store yet" icon={<StoreIcon className="size-6" aria-hidden />}>
-            The owner or an admin of {membership.reseller.name} can create the store.
-          </EmptyState>
-        </Card>
-      )}
+      <QueryView
+        query={stores}
+        message={error => errorMessage(error, "Could not load your store.")}
+        loading={
+          <div className="space-y-6" aria-busy="true" aria-label="Loading your store">
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-72 w-full" />
+          </div>
+        }
+      >
+        {({ data: [store] }) =>
+          store ? (
+            <StoreDetails key={store.id} store={store} canManage={canManage} />
+          ) : canManage ? (
+            <CreateStore />
+          ) : (
+            <Card>
+              <EmptyState title="No store yet" icon={<StoreIcon className="size-6" aria-hidden />}>
+                The owner or an admin of {membership.reseller.name} can create the store.
+              </EmptyState>
+            </Card>
+          )
+        }
+      </QueryView>
     </ShqShell>
   );
 }

@@ -1,29 +1,9 @@
 "use client";
 
-import { Suspense, useDeferredValue, useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Database, Globe2, Package, Search, Store } from "lucide-react";
-import {
-  ActionDialog,
-  Badge,
-  Button,
-  Card,
-  categoryName,
-  DataTable,
-  Dialog,
-  errorMessage,
-  FilterSelect,
-  formatBps,
-  ImageField,
-  formatRelative,
-  Input,
-  LoadMore,
-  Notice,
-  PageHeader,
-  StatCard,
-  StatusBadge,
-  Toggle,
-} from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatBps, formatRelative, ImageField, Input, LoadMore, Notice, PageHeader, StatCard, StatusBadge, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type AdminProduct,
@@ -140,7 +120,7 @@ function Products() {
   const [supplier, setSupplier] = useState(linkedSupplier);
   const [listing, setListing] = useState<Listing>("");
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const [open, setOpen] = useState<AdminProduct | null>(null);
   const [bulk, setBulk] = useState<"list" | "unlist" | null>(null);
   const [setProductListing] = useSetProductListingMutation();

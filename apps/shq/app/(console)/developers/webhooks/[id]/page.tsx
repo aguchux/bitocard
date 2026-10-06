@@ -21,6 +21,7 @@ import {
   LoadMore,
   Notice,
   PageHeader,
+  RefreshFailed,
   Select,
   Skeleton,
   StatusBadge,
@@ -125,15 +126,18 @@ function DeliveryDialog({ endpointId, deliveryId, manage, onClose }: { endpointI
         ) : undefined
       }
     >
-      {delivery.error ? (
-        <ErrorState message={errorMessage(delivery.error)} onRetry={delivery.refetch} />
-      ) : !data ? (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading">
-          <Skeleton className="h-6 w-1/2" />
-          <Skeleton className="h-24 w-full" />
-        </div>
+      {!data ? (
+        delivery.error ? (
+          <ErrorState message={errorMessage(delivery.error)} onRetry={delivery.refetch} />
+        ) : (
+          <div className="space-y-3" aria-busy="true" aria-label="Loading">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        )
       ) : (
         <div className="space-y-5">
+          {delivery.error && !delivery.isFetching ? <RefreshFailed message={errorMessage(delivery.error)} onRetry={delivery.refetch} /> : null}
           {resendState.error ? <Notice tone="red">{errorMessage(resendState.error)}</Notice> : null}
           {resendState.data ? (
             <Notice tone={resendState.data.log?.[0]?.success ? "green" : "red"}>
@@ -276,6 +280,7 @@ export default function WebhookEndpointPage() {
 
   return (
     <ShqShell section="developers" current="/developers/webhooks" crumbs={crumbs}>
+      {endpoint.error && !endpoint.isFetching ? <RefreshFailed message={errorMessage(endpoint.error)} onRetry={endpoint.refetch} /> : null}
       <PageHeader
         title={<span className="block break-all text-xl sm:text-2xl">{data.url}</span>}
         description={data.description ?? undefined}

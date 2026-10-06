@@ -14,6 +14,7 @@ import {
   formatShortDate,
   LineChart,
   percentChange,
+  RefreshFailed,
   Select,
   StatCard,
   StatusBadge,
@@ -114,12 +115,13 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {error ? (
+      {!data && error ? (
         <Card>
           <ErrorState message={errorMessage(error, "Could not load the overview.")} onRetry={refetch} />
         </Card>
       ) : (
         <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error, "Could not refresh the overview.")} onRetry={refetch} /> : null}
           {data ? <AttentionStrip attention={data.attention} /> : null}
           <div className={cn("grid gap-4 sm:grid-cols-2 xl:grid-cols-4", isFetching && !isLoading && "opacity-70 transition-opacity")}>
             <StatCard

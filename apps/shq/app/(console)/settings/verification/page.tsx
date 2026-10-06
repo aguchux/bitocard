@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ExternalLink, RotateCw, ShieldCheck } from "lucide-react";
-import { Button, Card, CardHeader, ErrorState, errorMessage, formatDateTime, KeyValue, Notice, PageHeader, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, errorMessage, formatDateTime, KeyValue, Notice, PageHeader, QueryView, Skeleton, StatusBadge } from "@bitocard/admin-ui";
 import { type Verification, useAccountVerificationQuery, useStartAccountVerificationMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { useReseller } from "@/components/reseller";
@@ -91,8 +91,8 @@ function StartCheck({ check }: { check: Verification }) {
 export default function VerificationPage() {
   const { membership } = useReseller();
   const owner = membership.role === "owner";
-  const { data, error, isLoading, isFetching, refetch } = useAccountVerificationQuery();
-  const canStart = owner && data && !data.verified && data.status !== "in_review";
+  const verification = useAccountVerificationQuery();
+  const { isFetching, refetch } = verification;
 
   return (
     <ShqShell
@@ -106,31 +106,27 @@ export default function VerificationPage() {
       }
     >
       <PageHeader title="Identity check" description="We verify the business owner before the account can take live orders." />
-      {error ? (
-        <Card>
-          <ErrorState message={errorMessage(error, "Could not load your identity check.")} onRetry={refetch} />
-        </Card>
-      ) : isLoading || !data ? (
-        <Skeleton className="h-64 w-full" />
-      ) : (
-        <Card>
-          <CardHeader title="Status" actions={<StatusBadge status={data.verified ? "approved" : data.status} />} />
-          <div className="space-y-5 p-5 sm:p-6">
-            <Outcome check={data} />
-            <KeyValue
-              items={[
-                { label: "Account", value: <StatusBadge status={data.reseller_status} /> },
-                { label: data.verified ? "Verified" : "Started", value: formatDateTime(data.verified ? data.verified_at : data.started_at) },
-              ]}
-            />
-            {canStart ? (
-              <StartCheck check={data} />
-            ) : !owner && !data.verified ? (
-              <Notice tone="grey">Only the business owner can take the identity check.</Notice>
-            ) : null}
-          </div>
-        </Card>
-      )}
+      <QueryView query={verification} message={error => errorMessage(error, "Could not load your identity check.")} loading={<Skeleton className="h-64 w-full" />}>
+        {data => (
+          <Card>
+            <CardHeader title="Status" actions={<StatusBadge status={data.verified ? "approved" : data.status} />} />
+            <div className="space-y-5 p-5 sm:p-6">
+              <Outcome check={data} />
+              <KeyValue
+                items={[
+                  { label: "Account", value: <StatusBadge status={data.reseller_status} /> },
+                  { label: data.verified ? "Verified" : "Started", value: formatDateTime(data.verified ? data.verified_at : data.started_at) },
+                ]}
+              />
+              {owner && !data.verified && data.status !== "in_review" ? (
+                <StartCheck check={data} />
+              ) : !owner && !data.verified ? (
+                <Notice tone="grey">Only the business owner can take the identity check.</Notice>
+              ) : null}
+            </div>
+          </Card>
+        )}
+      </QueryView>
     </ShqShell>
   );
 }

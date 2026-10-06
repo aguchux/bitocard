@@ -5,6 +5,7 @@ import { ImagePlus, Images, LoaderCircle, Trash2 } from 'lucide-react';
 import { type MediaAsset, type MediaPurpose, type MediaRealm, useMediaLibraryQuery, useMediaSettingsQuery, useMediaUpload } from '@bitocard/api-client';
 import { cn, errorMessage } from '../format';
 import { Dialog } from './data';
+import { useDebouncedValue } from './hooks';
 import { Button, Input } from './primitives';
 
 const https = /^https:\/\/\S+$/;
@@ -31,18 +32,20 @@ export type ImageFieldProps = {
 /** Reusing a file already uploaded for the same purpose (brands often share card art). */
 function LibraryDialog({ realm, purpose, onPick, onClose }: { realm: MediaRealm; purpose: MediaPurpose; onPick: (asset: MediaAsset) => void; onClose: () => void }) {
   const [q, setQ] = useState('');
-  const library = useMediaLibraryQuery({ realm, purpose, q: q.trim() || undefined, limit: 60 });
+  const search = useDebouncedValue(q.trim());
+  const library = useMediaLibraryQuery({ realm, purpose, q: search || undefined, limit: 60 });
   return (
     <Dialog open onClose={onClose} title="Choose an uploaded image" description="Files uploaded before for the same use.">
       <div className="space-y-3">
         <Input type="search" aria-label="Search files" placeholder="Search by file or folder name…" value={q} onChange={event => setQ(event.target.value)} />
-        {library.isLoading ? (
-          <p className="text-sm text-muted">Loading…</p>
-        ) : library.error ? (
+        {/* The last files found stay on screen while a new search or a refresh runs. */}
+        {!library.data && library.error ? (
           <p className="text-sm text-red-700" role="alert">
             {errorMessage(library.error)}
           </p>
-        ) : !library.data?.data.length ? (
+        ) : !library.data ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : !library.data.data.length ? (
           <p className="text-sm text-muted">Nothing uploaded yet.</p>
         ) : (
           <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">

@@ -1,8 +1,8 @@
 "use client";
 
-import { useDeferredValue, useId, useState } from "react";
+import { useId, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Search, X } from "lucide-react";
-import { Button, Card, CardHeader, cn, errorMessage, Field, ImageField, Input, Notice, Select, Skeleton, Textarea, Toggle } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, cn, errorMessage, Field, ImageField, Input, Notice, RefreshFailed, Select, Skeleton, Textarea, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { sectionTypeLabel } from "@bitocard/admin-ui/storefront";
 import { useProductsInfiniteQuery, useStorefrontBrandsQuery } from "@bitocard/api-client/admin";
 import {
@@ -107,7 +107,7 @@ function HeroForm({ section, onChange }: FormProps<HeroSection>) {
 function ProductPicker({ section, onChange }: FormProps<ProductRailSection>) {
   const id = useId();
   const [search, setSearch] = useState("");
-  const q = useDeferredValue(search.trim());
+  const q = useDebouncedValue(search.trim());
   const products = useProductsInfiniteQuery({ q }, { skip: q.length < 2 });
   const results = products.data?.pages[0]?.data ?? [];
   const keys = section.productKeys;
@@ -154,10 +154,15 @@ function ProductPicker({ section, onChange }: FormProps<ProductRailSection>) {
       {q.length >= 2 ? (
         products.isLoading ? (
           <Skeleton className="h-20 w-full" />
-        ) : products.error ? (
+        ) : products.error && !products.data ? (
           <Notice tone="red">{errorMessage(products.error)}</Notice>
         ) : results.length ? (
           <ul className="max-h-64 space-y-1 overflow-y-auto">
+            {products.error && !products.isFetching ? (
+              <li>
+                <RefreshFailed message={errorMessage(products.error)} onRetry={products.refetch} />
+              </li>
+            ) : null}
             {results.map(product => {
               const added = keys.includes(product.key);
               return (

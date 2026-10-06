@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Check, Copy, KeyRound, Pencil } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, ExternalLinks, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, CardHeader, CodeInput, ErrorState, ExternalLinks, Tabs, errorMessage, Field, formatRelative, Input, Notice, PageHeader, RefreshFailed, Skeleton, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type Integration, type IntegrationField, type IntegrationSource, useIntegrationsQuery, useUpdateIntegrationMutation } from "@bitocard/api-client/admin";
 import { ResellerAvailability } from "@/components/reseller-availability";
@@ -196,7 +196,7 @@ function EditDialog({ integration, onClose }: { integration: Integration; onClos
 export default function IntegrationsPage() {
   const admin = useAdmin();
   const allowed = can(admin);
-  const { data, error, isLoading, refetch } = useIntegrationsQuery(undefined, { skip: !allowed });
+  const { data, error, isFetching, refetch } = useIntegrationsQuery(undefined, { skip: !allowed });
   const [editing, setEditing] = useState<string | null>(null);
   const [section, setSection] = useState<Integration["section"] | "resellers">("platform");
   const shown = data?.data.filter(item => item.section === section) ?? [];
@@ -214,11 +214,11 @@ export default function IntegrationsPage() {
         <Notice tone="amber" title="Super admins only">
           Service credentials can be viewed and changed only by a super admin.
         </Notice>
-      ) : error ? (
+      ) : !data && error ? (
         <Card>
           <ErrorState message={errorMessage(error)} onRetry={refetch} />
         </Card>
-      ) : isLoading || !data ? (
+      ) : !data ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {[0, 1, 2, 3].map(index => (
             <Skeleton key={index} className="h-56 w-full" />
@@ -226,6 +226,7 @@ export default function IntegrationsPage() {
         </div>
       ) : (
         <>
+          {error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
           <Notice tone="blue">
             <span className="inline-flex items-center gap-2">
               <KeyRound className="size-4 shrink-0" aria-hidden />

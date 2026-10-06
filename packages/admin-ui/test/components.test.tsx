@@ -72,6 +72,15 @@ describe('DataTable', () => {
     fireEvent.click(screen.getByRole('button', { name: /try again/i }));
     expect(retry).toHaveBeenCalled();
   });
+
+  test('a failed refresh keeps the rows shown, with a notice and Retry', () => {
+    const retry = vi.fn();
+    render(<DataTable columns={columns} rows={[{ id: 'a1', name: 'Ada' }]} rowKey={row => row.id} error="Could not refresh" onRetry={retry} />);
+    expect(within(screen.getByRole('table')).getByText('Ada')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('Could not refresh');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(retry).toHaveBeenCalled();
+  });
 });
 
 describe('LineChart', () => {

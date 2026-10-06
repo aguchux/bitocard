@@ -1,6 +1,6 @@
 "use client";
 
-import { Badge, Card, CardHeader, cn, ErrorState, errorMessage, humanise, Notice, PageHeader, Skeleton } from "@bitocard/admin-ui";
+import { Badge, Card, CardHeader, cn, errorMessage, humanise, Notice, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { type SettingsOption, type SettingsOptionKey, useResellerSettingsQuery, useSetSettingsOptionMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -81,29 +81,31 @@ function OptionCard({ optionKey, option, editable }: { optionKey: SettingsOption
 export default function PreferencesPage() {
   const { membership } = useReseller();
   const editable = can(membership, "admin");
-  const { data, error, isLoading, refetch } = useResellerSettingsQuery();
+  const settings = useResellerSettingsQuery();
 
   return (
     <ShqShell section="settings" current="/settings/preferences" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Preferences" }]}>
       <PageHeader title="Preferences" description="Choose from the options BitoCard offers in your country. If an option is withdrawn, your country's default applies." />
       {!editable ? <Notice tone="grey">Only the owner or an admin can change these preferences.</Notice> : null}
       {!membership.reseller.country ? <Notice tone="amber">Set your business country to see the options available to you.</Notice> : null}
-      {error ? (
-        <Card>
-          <ErrorState message={errorMessage(error, "Could not load your preferences.")} onRetry={refetch} />
-        </Card>
-      ) : isLoading || !data ? (
-        <div className="grid gap-6 lg:grid-cols-2" aria-busy="true" aria-label="Loading preferences">
-          <Skeleton className="h-56 w-full" />
-          <Skeleton className="h-56 w-full" />
-        </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {(Object.entries(data.options) as Array<[SettingsOptionKey, SettingsOption]>).map(([key, option]) => (
-            <OptionCard key={key} optionKey={key} option={option} editable={editable} />
-          ))}
-        </div>
-      )}
+      <QueryView
+        query={settings}
+        message={error => errorMessage(error, "Could not load your preferences.")}
+        loading={
+          <div className="grid gap-6 lg:grid-cols-2" aria-busy="true" aria-label="Loading preferences">
+            <Skeleton className="h-56 w-full" />
+            <Skeleton className="h-56 w-full" />
+          </div>
+        }
+      >
+        {data => (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {(Object.entries(data.options) as Array<[SettingsOptionKey, SettingsOption]>).map(([key, option]) => (
+              <OptionCard key={key} optionKey={key} option={option} editable={editable} />
+            ))}
+          </div>
+        )}
+      </QueryView>
     </ShqShell>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Pencil, Plus, Trash2, XCircle } from "lucide-react";
-import { ActionDialog, Button, Card, CardHeader, type Column, DataTable, errorMessage, Field, formatMoney, Input, Notice, PageHeader, Select, Skeleton } from "@bitocard/admin-ui";
+import { ActionDialog, Button, Card, CardHeader, type Column, DataTable, errorMessage, Field, formatMoney, Input, Notice, PageHeader, RefreshFailed, Select, Skeleton } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type FeeKind,
@@ -155,9 +155,12 @@ function Report() {
       <Card>
         <CardHeader title="Reconciliation" description="Exact fees = charged + carried; the fee account = charged − refunded." />
         <div className="px-5 pb-5 sm:px-6">
+          {reconciliation.data && reconciliation.error && !reconciliation.isFetching ? (
+            <RefreshFailed message={errorMessage(reconciliation.error)} onRetry={reconciliation.refetch} />
+          ) : null}
           {reconciliation.isLoading ? (
             <Skeleton className="h-12 w-full" />
-          ) : reconciliation.error ? (
+          ) : !reconciliation.data && reconciliation.error ? (
             <Notice tone="red">{errorMessage(reconciliation.error)}</Notice>
           ) : reconciliation.data?.ok ? (
             <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">

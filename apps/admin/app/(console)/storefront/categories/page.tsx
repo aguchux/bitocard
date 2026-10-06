@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, CardHeader, ErrorState, errorMessage, ImageField, PageHeader, Skeleton } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, ErrorState, errorMessage, ImageField, PageHeader, RefreshFailed, Skeleton } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type AdminCategory, useSaveStorefrontCategoryMutation, useStorefrontCategoriesQuery } from "@bitocard/api-client/admin";
 
@@ -44,7 +44,8 @@ export default function StorefrontCategoriesPage() {
   return (
     <AdminShell section="storefront" current="/storefront/categories" crumbs={[{ label: "Storefront", href: "/storefront" }, { label: "Categories" }]}>
       <PageHeader title="Categories" description="Icons and images for each category, shown in menus, category grids and category pages. Names are fixed." />
-      {categories.error ? (
+      {categories.data && categories.error && !categories.isFetching ? <RefreshFailed message={errorMessage(categories.error)} onRetry={categories.refetch} /> : null}
+      {!categories.data && categories.error ? (
         <Card>
           <ErrorState message={errorMessage(categories.error)} onRetry={categories.refetch} />
         </Card>

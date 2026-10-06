@@ -20,6 +20,7 @@ import {
   LoadMore,
   Notice,
   PageHeader,
+  RefreshFailed,
   Select,
   Skeleton,
   StatusBadge,
@@ -54,8 +55,7 @@ function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boo
   const [done, setDone] = useState<Payout | null>(null);
   const [now] = useState(() => Date.now());
 
-  if (wallet.error) return <Notice tone="red">{errorMessage(wallet.error, "Could not load your wallet.")}</Notice>;
-  if (!wallet.data) return <Skeleton className="h-64 w-full" />;
+  if (!wallet.data) return wallet.error ? <Notice tone="red">{errorMessage(wallet.error, "Could not load your wallet.")}</Notice> : <Skeleton className="h-64 w-full" />;
   const { currency, earnings, minimum_withdrawal: minimum, payouts_in_progress: inProgress } = wallet.data;
   const chosen = accounts.find(item => item.id === (accountId || accounts[0]?.id));
   const coolingOff = chosen && !sandbox && new Date(chosen.payouts_available_from).getTime() > now;
@@ -75,6 +75,7 @@ function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boo
 
   return (
     <Card className="p-5 sm:p-6">
+      {wallet.error && !wallet.isFetching ? <RefreshFailed message={errorMessage(wallet.error, "Could not load your wallet.")} onRetry={wallet.refetch} /> : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="space-y-4">
           <div>
@@ -187,10 +188,9 @@ export default function PayoutsPage() {
         </Notice>
       ) : (
         <>
-          {accounts.error ? (
-            <Notice tone="red">{errorMessage(accounts.error, "Could not load your bank accounts.")}</Notice>
-          ) : !list ? (
-            <Skeleton className="h-64 w-full" />
+          {accounts.error && !accounts.isFetching && list ? <RefreshFailed message={errorMessage(accounts.error, "Could not load your bank accounts.")} onRetry={accounts.refetch} /> : null}
+          {!list ? (
+            accounts.error ? <Notice tone="red">{errorMessage(accounts.error, "Could not load your bank accounts.")}</Notice> : <Skeleton className="h-64 w-full" />
           ) : list.length === 0 ? (
             <Notice tone="blue" title="Add a payout bank account first">
               Withdrawals go to a bank account in your verified name or your business name.{" "}
