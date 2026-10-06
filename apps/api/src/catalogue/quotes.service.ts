@@ -114,7 +114,7 @@ export class QuotesService {
       const inStock = await this.prisma.stockCode.count({ where: { offerId: priced.offer.id, status: 'available' } });
       if (inStock < quantity) {
         priced = await this.pricing.price(ctx, product, face, new Set([stockSupplier])).catch(() => {
-          throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'insufficient_stock', `Only ${inStock} left. Lower the quantity.`, 'quantity');
+          throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'insufficient_stock', `Only ${inStock} left. Lower the quantity.`, 'quantity');
         });
       }
     }

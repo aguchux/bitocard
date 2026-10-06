@@ -203,7 +203,8 @@ const FeeRate = objectSchema(
     category: nullable(oneOf('Product category; null for any category without its own rate (and always for gateway payments).', categories)),
     rate_ppb: ratePpb,
     rate_percent: ratePercent,
-    min_fee: nullableInt('The minimum fee per transaction in minor units of your wallet currency, if any.'),
+    min_fee: nullableInt('The minimum fee per transaction, in minor units of `currency`, if any.'),
+    currency: nullableStr('ISO 4217 currency of `min_fee`: the currency of your country, which is your wallet currency. Null only before your business country is set.'),
   },
   'A BitoCard fee rate that applies to you now, for your country and plan. Zero means no fee.',
 );
@@ -393,10 +394,10 @@ const feeCharge = {
 };
 
 const feeRates = [
-  { object: 'fee_rate', kind: 'supplier_order', category: null, rate_ppb: 2_500_000, rate_percent: '0.25', min_fee: null },
-  { object: 'fee_rate', kind: 'supplier_order', category: 'gift_cards', rate_ppb: 5_000_000, rate_percent: '0.5', min_fee: 5_000 },
-  { object: 'fee_rate', kind: 'supplier_order', category: 'airtime', rate_ppb: 1_000_000, rate_percent: '0.1', min_fee: null },
-  { object: 'fee_rate', kind: 'gateway_payment', category: null, rate_ppb: 150_000, rate_percent: '0.015', min_fee: null },
+  { object: 'fee_rate', kind: 'supplier_order', category: null, rate_ppb: 2_500_000, rate_percent: '0.25', min_fee: null, currency: 'NGN' },
+  { object: 'fee_rate', kind: 'supplier_order', category: 'gift_cards', rate_ppb: 5_000_000, rate_percent: '0.5', min_fee: 5_000, currency: 'NGN' },
+  { object: 'fee_rate', kind: 'supplier_order', category: 'airtime', rate_ppb: 1_000_000, rate_percent: '0.1', min_fee: null, currency: 'NGN' },
+  { object: 'fee_rate', kind: 'gateway_payment', category: null, rate_ppb: 150_000, rate_percent: '0.015', min_fee: null, currency: 'NGN' },
 ];
 
 const bankAccount = {

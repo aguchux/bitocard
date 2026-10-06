@@ -93,7 +93,7 @@ export default function FeesPage() {
                   </span>
                   <span className="font-semibold text-ink">
                     {`${rate.rate_percent}%`}
-                    {rate.min_fee ? ` (min ${formatMoney(rate.min_fee, currency)})` : ""}
+                    {rate.min_fee ? ` (min ${formatMoney(rate.min_fee, rate.currency ?? currency)})` : ""}
                   </span>
                 </div>
               ))

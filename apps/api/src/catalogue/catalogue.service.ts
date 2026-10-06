@@ -11,7 +11,8 @@ const maxListedValues = 20;
 
 export const offersInclude = { supplierProducts: { where: { available: true }, include: { supplier: true } } } as const;
 
-export function presentProductBase(product: Product) {
+/** `logoUrl` must come from BitoCard's own files (`StorefrontService.productArt`), never the supplier's catalogue. */
+export function presentProductBase(product: Product, logoUrl: string | null) {
   return {
     object: 'product' as const,
     id: product.id,
@@ -28,7 +29,7 @@ export function presentProductBase(product: Product) {
     recipient_type: product.recipientType,
     description: product.description,
     redeem_instructions: product.redeemInstructions,
-    logo_url: product.logoUrl,
+    logo_url: logoUrl,
     /** What it can do, for example `sms_in` or `app_codes` on a virtual number (see the docs for the list). */
     features: product.features,
   };
@@ -43,7 +44,7 @@ export class CatalogueService {
     private readonly storefront: StorefrontService,
   ) {}
 
-  private async present(ctx: PricingContext, product: ProductWithOffers, listed: boolean, imageUrl: string | null) {
+  private async present(ctx: PricingContext, product: ProductWithOffers, listed: boolean, art: { image: string | null; logo: string | null } | undefined) {
     const values = product.denominationType === 'fixed' ? product.fixedValues.slice(0, maxListedValues) : [product.minValueMinor ?? 0n, product.maxValueMinor ?? 0n];
     const denominations = [];
     for (const value of values) {
@@ -58,9 +59,9 @@ export class CatalogueService {
     }
     if (denominations.length === 0) return null;
     return {
-      ...presentProductBase(product),
+      ...presentProductBase(product, art?.logo ?? null),
       /** A picture for the product: its own image, else its brand's gift card design. */
-      image_url: imageUrl,
+      image_url: art?.image ?? null,
       /** Listed on your BitoCard-hosted store. Your own systems can sell any product here, listed or not. */
       listed,
       pricing: {
@@ -97,10 +98,10 @@ export class CatalogueService {
     const listings = new Set(
       (await this.prisma.resellerListing.findMany({ where: { resellerId, productId: { in: page.map(product => product.id) } }, select: { productId: true } })).map(row => row.productId),
     );
-    const images = await this.storefront.productImages(page);
+    const art = await this.storefront.productArt(page);
     const data = [];
     for (const product of page) {
-      const presented = await this.present(ctx, product, listings.has(product.id), images.get(product.id) ?? null);
+      const presented = await this.present(ctx, product, listings.has(product.id), art.get(product.id));
       if (presented) data.push(presented);
     }
     return { object: 'list' as const, data, has_more: products.length > limit, next_cursor: products.length > limit ? products[limit - 1].id : null };
@@ -114,8 +115,8 @@ export class CatalogueService {
     const reason = this.pricing.unavailableReason(ctx, product);
     if (reason) throw reason;
     const listed = await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId, productId: id } } });
-    const images = await this.storefront.productImages([product]);
-    const presented = await this.present(ctx, product, Boolean(listed), images.get(product.id) ?? null);
+    const art = await this.storefront.productArt([product]);
+    const presented = await this.present(ctx, product, Boolean(listed), art.get(product.id));
     if (!presented) throw missing;
     return presented;
   }

@@ -219,6 +219,13 @@ describe('reserved bank accounts', () => {
     assert.equal((await browser.get('/v1/wallet', sandbox)).json.available, 70_000);
     const [txn] = (await browser.get('/v1/wallet/transactions', sandbox)).json.data;
     assert.deepEqual([txn.type, txn.amount], ['deposit', 70_000]);
+
+    // The transfer is a top-up like any other: listed, and fetchable by its ID.
+    const listed = (await browser.get('/v1/wallet/top-ups', sandbox)).json.data.find(item => item.source === 'bank_transfer');
+    assert.ok(listed, 'the transfer is in the top-up list');
+    const one = await browser.get(`/v1/wallet/top-ups/${listed.id}`, sandbox);
+    assert.equal(one.status, 200, JSON.stringify(one.json));
+    assert.deepEqual([one.json.id, one.json.source, one.json.status, one.json.amount], [listed.id, 'bank_transfer', 'succeeded', 70_000]);
   });
 
   test('not offered where the country has no reserved accounts', async () => {

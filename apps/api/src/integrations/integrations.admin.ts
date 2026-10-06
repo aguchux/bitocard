@@ -17,7 +17,7 @@ type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
 
 const maxValueLength = 4000;
-const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'invalid_request_error', 'resource_missing', 'No such integration.');
+const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such integration.');
 const invalidValue = (key: string, message: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'invalid_value', message, `values.${key}`);
 
 /** The last four characters of a secret, so an admin can tell which key is set without it ever being shown. */

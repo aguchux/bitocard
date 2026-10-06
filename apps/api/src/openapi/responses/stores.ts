@@ -102,7 +102,7 @@ const productProperties: Record<string, Schema> = {
   from: int('Lowest face value, in minor units of `face_currency`.'),
   to: int('Highest face value, in minor units of `face_currency`.'),
   description: nullableStr('About the product.'),
-  logo_url: nullableStr('The product image or logo, if any.'),
+  logo_url: nullableStr('The product logo from BitoCard files: the product image, else the brand logo; or null.'),
   features,
   brand: ref('StoreBrand'),
 };

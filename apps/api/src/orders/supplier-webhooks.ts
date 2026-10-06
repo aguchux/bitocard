@@ -295,8 +295,8 @@ export class SupplierWebhooksService {
   /** Tries an unmatched or failed notification again now (for example after an order was fixed). Audited. */
   async retry(actorId: string | null, id: string) {
     const before = /^[0-9a-f-]{36}$/i.test(id) ? await this.prisma.supplierWebhook.findUnique({ where: { id } }) : null;
-    if (!before) throw new ApiError(HttpStatus.NOT_FOUND, 'invalid_request_error', 'resource_missing', 'No such supplier notification.');
-    if (before.status === 'processed') throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'already_processed', 'This notification has already been processed.');
+    if (!before) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such supplier notification.');
+    if (before.status === 'processed') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_processed', 'This notification has already been processed.');
     await this.prisma.supplierWebhook.update({ where: { id }, data: { status: 'received', attempts: 0, nextAttemptAt: new Date() } });
     await this.process(id);
     const after = await this.prisma.supplierWebhook.findUniqueOrThrow({ where: { id } });

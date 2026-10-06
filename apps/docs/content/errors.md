@@ -5,12 +5,12 @@ description: Every error has the same shape, with a stable code to branch on, a 
 
 # Errors
 
-BitoCard uses standard HTTP status codes, and every error has the same body:
+BitoCard uses standard HTTP status codes, every error has the same body, and its `type` always matches its status:
 
 ```json
 {
   "error": {
-    "type": "invalid_request_error",
+    "type": "conflict_error",
     "code": "quote_expired",
     "message": "This quote has expired. Create a new one.",
     "param": "quote_id",
@@ -31,12 +31,12 @@ BitoCard uses standard HTTP status codes, and every error has the same body:
 
 | `type` | Usual status | Meaning |
 | --- | --- | --- |
-| `invalid_request_error` | 400, 402, 409 | The request cannot be done as asked: a bad field, an expired quote, too little in the wallet. |
+| `invalid_request_error` | 400, 402, 422 | The request cannot be done as asked: a bad or missing field, too little in the wallet. |
 | `idempotency_error` | 400, 409, 422 | A problem with the `Idempotency-Key`: missing, reused for another request, or still in progress. |
 | `authentication_error` | 401 | No valid API key or session. |
 | `permission_error` | 403 | Valid key, but not allowed: a missing scope, a plan restriction, an unverified business for live, or a dashboard-only endpoint. |
 | `not_found_error` | 404 | Nothing with that ID belongs to your account (and mode). |
-| `conflict_error` | 409 | The object's state does not allow it, for example refunding an order twice. |
+| `conflict_error` | 409 | The current state does not allow it: an expired or used quote, an order refunded twice, live-only actions in the sandbox. |
 | `rate_limit_error` | 429 | Too many requests. Wait for `Retry-After` seconds. |
 | `api_error` | 500, 502, 503 | Something failed on BitoCard's side or a partner's. |
 

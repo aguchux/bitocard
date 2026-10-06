@@ -16148,7 +16148,8 @@
                       "category": null,
                       "rate_ppb": 2500000,
                       "rate_percent": "0.25",
-                      "min_fee": null
+                      "min_fee": null,
+                      "currency": "NGN"
                     },
                     {
                       "object": "fee_rate",
@@ -16156,7 +16157,8 @@
                       "category": "gift_cards",
                       "rate_ppb": 5000000,
                       "rate_percent": "0.5",
-                      "min_fee": 5000
+                      "min_fee": 5000,
+                      "currency": "NGN"
                     },
                     {
                       "object": "fee_rate",
@@ -16164,7 +16166,8 @@
                       "category": "airtime",
                       "rate_ppb": 1000000,
                       "rate_percent": "0.1",
-                      "min_fee": null
+                      "min_fee": null,
+                      "currency": "NGN"
                     },
                     {
                       "object": "fee_rate",
@@ -16172,7 +16175,8 @@
                       "category": null,
                       "rate_ppb": 150000,
                       "rate_percent": "0.015",
-                      "min_fee": null
+                      "min_fee": null,
+                      "currency": "NGN"
                     }
                   ]
                 }
@@ -22252,7 +22256,7 @@
               "string",
               "null"
             ],
-            "description": "The product logo, if any."
+            "description": "The product logo from BitoCard files: the product image, else the brand logo; or null. Show it on a white tile."
           },
           "features": {
             "type": "array",
@@ -23809,7 +23813,8 @@
           "category",
           "rate_ppb",
           "rate_percent",
-          "min_fee"
+          "min_fee",
+          "currency"
         ],
         "additionalProperties": false,
         "properties": {
@@ -23865,7 +23870,14 @@
               "integer",
               "null"
             ],
-            "description": "The minimum fee per transaction in minor units of your wallet currency, if any."
+            "description": "The minimum fee per transaction, in minor units of `currency`, if any."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 4217 currency of `min_fee`: the currency of your country, which is your wallet currency. Null only before your business country is set."
           }
         }
       },
@@ -25564,7 +25576,7 @@
               "string",
               "null"
             ],
-            "description": "The product image or logo, if any."
+            "description": "The product logo from BitoCard files: the product image, else the brand logo; or null."
           },
           "features": {
             "type": "array",
@@ -25703,7 +25715,7 @@
               "string",
               "null"
             ],
-            "description": "The product image or logo, if any."
+            "description": "The product logo from BitoCard files: the product image, else the brand logo; or null."
           },
           "features": {
             "type": "array",

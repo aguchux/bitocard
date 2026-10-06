@@ -37,7 +37,7 @@ export class BillingController {
   @HttpCode(HttpStatus.OK)
   change(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: ChangePlanDto) {
     // Plans are real (paid from the live wallet): never change one from sandbox mode by mistake.
-    if (mode === 'test') throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'live_only', 'Plans are paid from your live wallet. Switch to live to change your plan.');
+    if (mode === 'test') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'live_only', 'Plans are paid from your live wallet. Switch to live to change your plan.');
     return this.billing.change(resellerOf(caller), body.plan);
   }
 }

@@ -166,7 +166,7 @@ export class InboxService {
 
   async markRead(recipient: Recipient, id: string) {
     const row = /^[0-9a-f-]{36}$/i.test(id) ? await this.prisma.notification.findFirst({ where: { id, ...this.scope(recipient) } }) : null;
-    if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'invalid_request_error', 'resource_missing', 'No such notification.');
+    if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such notification.');
     if (row.readAt) return this.present(row);
     return this.present(await this.prisma.notification.update({ where: { id }, data: { readAt: new Date() } }));
   }

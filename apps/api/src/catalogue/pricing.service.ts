@@ -89,7 +89,7 @@ const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
 /** amount x (1 + bps/10000), rounded up. */
 const addBps = (amount: bigint, bps: number) => ceilDiv(mulBps(amount, 10_000 + bps), 10_000n);
 
-export const unavailable = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', code, message, param);
+export const unavailable = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
 
 /**
  * BitoCard pricing. Routing picks the cheapest eligible supplier offer; BitoCard wholesale price comes from it

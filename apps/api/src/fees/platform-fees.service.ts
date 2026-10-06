@@ -171,7 +171,7 @@ export class PlatformFeesService {
       if (claimed.count === 0) return tx.feeCharge.findUniqueOrThrow({ where: { id: charge.id } });
       if (hold) {
         const holdClaimed = await tx.hold.updateMany({ where: { id: hold.id, status: 'held' }, data: { status: 'captured', resolvedAt: new Date() } });
-        if (holdClaimed.count === 0) throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'fee_hold_resolved', 'The fee hold was already returned.');
+        if (holdClaimed.count === 0) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'fee_hold_resolved', 'The fee hold was already returned.');
       }
       const [row] = await tx.$queryRaw<Array<{ carry_nano: bigint }>>`
         SELECT carry_nano FROM fee_carries WHERE reseller_id = ${charge.resellerId}::uuid AND mode = ${charge.mode}::"LedgerMode" AND currency = ${charge.currency} FOR UPDATE`;
@@ -248,7 +248,7 @@ export class PlatformFeesService {
     const charge = await this.prisma.feeCharge.findUnique({ where: { id: chargeId } });
     if (!charge) throw notFound();
     if (charge.status === 'refunded') return charge;
-    if (charge.status !== 'charged') throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'fee_not_charged', 'Only a charged fee can be refunded.');
+    if (charge.status !== 'charged') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'fee_not_charged', 'Only a charged fee can be refunded.');
     const amount = charge.chargedMinor ?? 0n;
     const entry =
       amount > 0n
@@ -334,12 +334,14 @@ export class PlatformFeesService {
   /** The rates that apply to the reseller now, per fee kind and category. */
   async ratesFor(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+    // Minimum fees are set per country, so they are in its currency (the reseller's wallet currency).
+    const currency = reseller.country ? ((await this.prisma.country.findUnique({ where: { code: reseller.country }, select: { currency: true } }))?.currency ?? null) : null;
     const categories: Array<ProductCategory | null> = [null, 'gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'];
     const data = [];
     for (const kind of ['supplier_order', 'gateway_payment'] as const) {
       for (const category of kind === 'gateway_payment' ? [null] : categories) {
         const rule = await this.ruleFor({ kind, countryCode: reseller.country, category, planCode: reseller.planCode });
-        data.push({ object: 'fee_rate' as const, kind, category, rate_ppb: rule?.ratePpb ?? 0, rate_percent: percentOf(rule?.ratePpb ?? 0), min_fee: rule?.minFeeMinor === null || !rule ? null : minor(rule.minFeeMinor) });
+        data.push({ object: 'fee_rate' as const, kind, category, rate_ppb: rule?.ratePpb ?? 0, rate_percent: percentOf(rule?.ratePpb ?? 0), min_fee: rule?.minFeeMinor === null || !rule ? null : minor(rule.minFeeMinor), currency });
       }
     }
     return { object: 'list' as const, data };

@@ -148,8 +148,8 @@ export class StorefrontService {
       from: minor(from),
       to: minor(to),
       description: product.description,
-      /** The admin's image, else the supplier's logo. */
-      logo_url: product.imageUrl ?? product.logoUrl,
+      /** The admin's product image, else the brand's logo from BitoCard's own files: never the supplier's (it would name them). */
+      logo_url: product.imageUrl ?? this.presentBrand(product.brand, brand).logo_url,
       /** What it can do (calls, SMS, app codes on numbers), for icons and filters. */
       features: product.features,
       brand: this.presentBrand(product.brand, brand),
@@ -161,9 +161,24 @@ export class StorefrontService {
    * image, else its brand's card art (the same chain as the store), else none.
    */
   async productImages(products: Pick<Product, 'id' | 'brand' | 'imageUrl'>[]) {
+    const art = await this.productArt(products);
+    return new Map([...art].map(([id, item]) => [id, item.image]));
+  }
+
+  /**
+   * Each product's picture and logo, both from BitoCard's own files (the admin's product image, the brand's
+   * settings, registry uploads, the registry file or the bundled icons and card art), never a supplier's address:
+   * a supplier's logo URL would tell resellers and customers who BitoCard buys from.
+   */
+  async productArt(products: Pick<Product, 'id' | 'brand' | 'imageUrl'>[]) {
     await this.refreshBrandAssets();
     const brands = await this.brandsFor(products.map(product => product.brand));
-    return new Map(products.map(product => [product.id, product.imageUrl ?? this.presentBrand(product.brand, brands.get(product.brand)).image_url]));
+    return new Map(
+      products.map(product => {
+        const brand = this.presentBrand(product.brand, brands.get(product.brand));
+        return [product.id, { image: product.imageUrl ?? brand.image_url, logo: product.imageUrl ?? brand.logo_url }] as const;
+      }),
+    );
   }
 
   private async present(products: Product[]) {

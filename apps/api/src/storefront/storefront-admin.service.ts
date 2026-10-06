@@ -104,7 +104,7 @@ export class StorefrontAdminService {
   /** Takes the home page offline: the site shows the reseller landing page until it is published again. */
   async unpublish(actorId: string | null) {
     const before = await this.page();
-    if (before.published === null) throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'storefront_not_published', 'The storefront is not published.');
+    if (before.published === null) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'storefront_not_published', 'The storefront is not published.');
     const page = await this.prisma.storefrontPage.update({ where: { key: homeKey }, data: { published: Prisma.DbNull } });
     await this.audit.record({ actorId, action: 'storefront.unpublished', targetType: 'storefront_page', targetId: homeKey, before: { version: before.version }, after: { live: false } });
     return this.present(page);

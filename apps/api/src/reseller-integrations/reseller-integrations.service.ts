@@ -96,7 +96,7 @@ export class ResellerIntegrationsService {
 
     const existing = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode } } });
     if (existing?.status === 'suspended') {
-      throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'connection_suspended', 'BitoCard suspended this connection. Contact support to have it reinstated.');
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'connection_suspended', 'BitoCard suspended this connection. Contact support to have it reinstated.');
     }
     const saved = existing?.credentialsEncrypted ? (JSON.parse(this.encryption().decrypt(existing.credentialsEncrypted)) as Record<string, string>) : {};
     const values = prepare(integration, submitted, saved);
@@ -264,7 +264,7 @@ export class ResellerIntegrationsService {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Give a reason; the reseller sees it.', 'reason');
     }
     if (decision === 'reinstate' && !connection.credentialsEncrypted) {
-      throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'connection_empty', 'The reseller disconnected it; they connect again instead.');
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'connection_empty', 'The reseller disconnected it; they connect again instead.');
     }
     // Conditional on the current status, so two admins cannot both decide.
     const claimed = await this.prisma.resellerConnection.updateMany({
@@ -279,7 +279,7 @@ export class ResellerIntegrationsService {
       },
     });
     if (claimed.count === 0) {
-      throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'connection_state_changed', `This connection is ${connection.status.replace('_', ' ')}; it cannot be ${decision}d.`);
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'connection_state_changed', `This connection is ${connection.status.replace('_', ' ')}; it cannot be ${decision}d.`);
     }
     const updated = await this.prisma.resellerConnection.findUniqueOrThrow({ where: { id } });
     await this.audit.record({ actorId: adminId, action: `connection.${decision}d`, targetType: 'reseller_connection', targetId: id, before: auditView(connection), after: { ...auditView(updated), reason } });

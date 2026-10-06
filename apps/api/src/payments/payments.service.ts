@@ -150,11 +150,14 @@ export class PaymentsService {
     return { object: 'list' as const, data: payments.slice(0, limit).map(presentTopUp), has_more: payments.length > limit };
   }
 
-  /** A pending live top-up is checked with the provider before it is returned. */
+  /**
+   * Any top-up the list shows: a checkout payment or a bank transfer into a reserved account. A pending live checkout
+   * is checked with the provider before it is returned (transfers are only recorded once they settle).
+   */
   async getTopUp(resellerId: string, mode: LedgerMode, id: string) {
-    const payment = await this.prisma.payment.findFirst({ where: { id, resellerId, mode, purpose: 'wallet_top_up' } });
+    const payment = await this.prisma.payment.findFirst({ where: { id, resellerId, mode } });
     if (!payment) throw notFound('top-up');
-    if (payment.status !== 'pending' || payment.mode === 'test') return presentTopUp(payment);
+    if (payment.status !== 'pending' || payment.mode === 'test' || payment.purpose !== 'wallet_top_up') return presentTopUp(payment);
     return presentTopUp(await this.requery(payment).catch(() => payment));
   }
 

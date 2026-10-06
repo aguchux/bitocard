@@ -11,7 +11,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { connectable } from './connectable.js';
 import { ResellerIntegrationsService } from './reseller-integrations.service.js';
 
-const notConnected = () => new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'connection_not_active', 'Connect this supplier, and have it approved, first.');
+const notConnected = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'connection_not_active', 'Connect this supplier, and have it approved, first.');
 
 /**
  * Resellers' own supplier accounts as a source (phase 3): their catalogue, synced with their own credentials onto the

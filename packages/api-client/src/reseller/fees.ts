@@ -45,7 +45,8 @@ export type FeeStatement = {
   carried_nano: string;
 };
 
-export type FeeRate = { object: 'fee_rate'; kind: FeeKind; category: string | null; rate_ppb: number; rate_percent: string; min_fee: number | null };
+/** `currency`: the currency of `min_fee` (your country's, which is your wallet currency). */
+export type FeeRate = { object: 'fee_rate'; kind: FeeKind; category: string | null; rate_ppb: number; rate_percent: string; min_fee: number | null; currency: string | null };
 
 /** BitoCard's fees on your own-integration transactions (`/v1/wallet/fees`), per mode. */
 export const resellerFeesApi = bitocardApi.injectEndpoints({

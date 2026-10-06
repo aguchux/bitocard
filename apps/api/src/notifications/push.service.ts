@@ -116,7 +116,7 @@ export class PushService {
 
   /** Registers this browser for the signed-in person (or moves it to them, if someone else used it before). */
   async register(caller: PushCaller, input: { endpoint: string; keys: { p256dh: string; auth: string }; label?: string }, userAgent?: string | null) {
-    if (!this.vapid()) throw new ApiError(HttpStatus.CONFLICT, 'invalid_request_error', 'push_not_configured', 'Push notifications are not switched on yet.');
+    if (!this.vapid()) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'push_not_configured', 'Push notifications are not switched on yet.');
     if (!pushEndpointAllowed(input.endpoint, this.integrations.env.WEBHOOK_ALLOW_PRIVATE_URLS)) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'push_endpoint_invalid', 'This browser’s push service is not supported.', 'endpoint');
     }

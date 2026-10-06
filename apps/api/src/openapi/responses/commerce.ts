@@ -31,7 +31,7 @@ const product = objectSchema(
     recipient_type: oneOf('What the quote needs about the customer: `phone` (airtime and data: `recipient.phone`), `smartcard` (pay-TV) or `meter` (electricity: `recipient.account_number`), or `none` (gift cards, software and the like).', recipientTypes),
     description: nullableStr('About the product.'),
     redeem_instructions: nullableStr('How the customer redeems it, where it applies.'),
-    logo_url: nullableStr('The product logo, if any.'),
+    logo_url: nullableStr('The product logo from BitoCard files: the product image, else the brand logo; or null. Show it on a white tile.'),
     features,
     image_url: nullableStr('A picture for the product: its own image, else its brand’s gift card design.'),
     listed: bool('Listed on your BitoCard-hosted store. Your own systems can sell any product in your catalogue, listed or not.'),
