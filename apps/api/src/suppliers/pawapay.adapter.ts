@@ -75,9 +75,26 @@ export class PawapayAdapter implements SupplierAdapter {
     return this.report.length ? this.report.join(' ') : null;
   }
 
-  private request<T>(path: string, init: { method?: string; body?: unknown } = {}) {
+  private async request<T>(path: string, init: { method?: string; body?: unknown } = {}) {
     if (!this.configured()) throw new ProviderError(this.code, 'not configured', true);
-    return providerRequest<T>(this.code, `${this.config.baseUrl.replace(/\/+$/, '')}${path}`, { ...init, headers: { authorization: `Bearer ${this.config.apiToken}` } });
+    const base = this.config.baseUrl.replace(/\/+$/, '');
+    // Tokens are often pasted with "Bearer " or spaces from the dashboard.
+    const token = (this.config.apiToken ?? '').trim().replace(/^bearer\s+/i, '');
+    try {
+      return await providerRequest<T>(this.code, `${base}${path}`, { ...init, headers: { authorization: `Bearer ${token}` } });
+    } catch (error) {
+      if (error instanceof ProviderError && (error.status === 401 || error.status === 403)) {
+        // Refused before anything happened, so a clear failure; say what to check (never the token itself).
+        const sandbox = /sandbox/i.test(base);
+        throw new ProviderError(
+          this.code,
+          `pawaPay refused the API token (HTTP ${error.status}) at ${base}. Sandbox and production tokens differ: ${sandbox ? 'this is the sandbox address, so use a sandbox token' : 'this is the production address, so use a production token, or set the API address to https://api.sandbox.pawapay.io for a sandbox token'} (Settings > Integrations > pawaPay).`,
+          true,
+          error.status,
+        );
+      }
+      throw error;
+    }
   }
 
   /** Every country pawaPay pays out to on this account, whichever market asked: money can be sent across borders. */

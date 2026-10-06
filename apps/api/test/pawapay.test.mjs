@@ -73,6 +73,13 @@ describe('pawaPay catalogue', () => {
     await assert.rejects(() => adapter.catalogue(), /payout fee/);
   });
 
+  test('a refused token says which token the address needs; a token pasted with "Bearer " still works', async () => {
+    const wrong = new PawapayAdapter({ apiToken: 'sandbox-token', baseUrl: pawapay.url, feePercent: '1.5' });
+    await assert.rejects(() => wrong.catalogue(), error => /refused the API token \(HTTP 401\).*production address.*api\.sandbox\.pawapay\.io/.test(error.message) && error.definite === true && !error.message.includes('sandbox-token'));
+    const pasted = new PawapayAdapter({ apiToken: '  Bearer pawapay-token ', baseUrl: pawapay.url, feePercent: '1.5' });
+    assert.equal((await pasted.catalogue()).length, 3);
+  });
+
   test('payout IDs are UUIDv4s made from our reference: the same reference always gives the same payout', () => {
     const id = payoutId('202610061200BCabc123');
     assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
