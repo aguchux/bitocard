@@ -9,7 +9,7 @@ BitoCard sends an HTTPS `POST` to your endpoint when something happens to your o
 
 Webhooks are a fast signal, not the record. The [events API](#catch-up-with-get-v1events) (`GET /v1/events`) and the objects themselves (`GET /v1/orders/{id}`) are the source of truth.
 
-- Every event type, with its full payload, is in the [event reference](/reference/webhooks).
+- Every event type, with its full payload, is in the [event reference](/reference/webhook-events).
 - Sandbox endpoints (created with a `bc_test_…` key, or in test mode in the dashboard) receive sandbox events only. Live endpoints receive live events only.
 - Webhooks never carry secrets: no gift card codes, PINs or electricity tokens. When `order.completed` arrives, fetch the order to get them.
 

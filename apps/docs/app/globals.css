@@ -1,2 +1,129 @@
 @import "tailwindcss";
 @import "@bitocard/ui/styles/interactive.css";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  scroll-padding-top: 5rem;
+}
+
+/* Code highlighted at build time (shiki) inside our own dark panels. */
+.code-panel pre,
+.code-block pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 1rem 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
+  background: #0d1117 !important;
+}
+.code-panel pre {
+  max-height: 32rem;
+}
+.code-block {
+  margin: 1.25rem 0;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+/* Inline code in descriptions. */
+.schema-description code,
+.prose-docs :not(pre) > code {
+  border-radius: 0.3rem;
+  background: rgb(7 15 76 / 0.06);
+  padding: 0.1rem 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: #070f4c;
+}
+.schema-description a,
+.prose-docs a {
+  color: #e0116d;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+.schema-description a:hover,
+.prose-docs a:hover {
+  text-decoration: underline;
+}
+
+/* Guides. */
+.prose-docs {
+  max-width: 48rem;
+  color: #334155;
+  line-height: 1.75;
+}
+.prose-docs > * + * {
+  margin-top: 1rem;
+}
+.prose-docs h1 {
+  font-size: 2.25rem;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #070f4c;
+}
+.prose-docs h2 {
+  margin-top: 2.75rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #070f4c;
+}
+.prose-docs h3 {
+  margin-top: 2rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #070f4c;
+}
+.prose-docs .heading-anchor {
+  color: inherit;
+  font-weight: inherit;
+}
+.prose-docs ul,
+.prose-docs ol {
+  padding-left: 1.4rem;
+}
+.prose-docs ul {
+  list-style: disc;
+}
+.prose-docs ol {
+  list-style: decimal;
+}
+.prose-docs li + li {
+  margin-top: 0.35rem;
+}
+.prose-docs strong {
+  color: #0f172a;
+}
+.prose-docs table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.prose-docs th,
+.prose-docs td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-docs th {
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.prose-docs blockquote {
+  border-left: 3px solid #ff2382;
+  background: #fdf2f8;
+  padding: 0.75rem 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
