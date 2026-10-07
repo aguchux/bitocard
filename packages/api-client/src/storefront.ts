@@ -170,3 +170,53 @@ export function formatFace(minor: number, currency: string) {
     return `${currency} ${(minor / 10 ** digits).toFixed(digits)}`;
   }
 }
+
+// -- Customers and checkout (M10b) -------------------------------------------------------------------------------
+
+/** A way customers in a market can pay (`/v1/store/payment-methods?country=`). */
+export type StorePaymentMethod = { object: 'payment_method'; id: string; label: string; description: string };
+export type StorePaymentMethods = { object: 'list'; mode: 'live' | 'test'; data: StorePaymentMethod[] };
+
+export type CheckoutStatus = 'awaiting_payment' | 'paid' | 'completed' | 'failed' | 'refund_pending' | 'refunded';
+
+/** A delivered code, licence key or token: shown only on the customer's own order. */
+export type StoreDelivery = { kind: string; code: string | null; pin: string | null; serial: string | null; details: Record<string, string> };
+
+/** A customer's purchase: the payment, then the order placed once it is paid. Never shows costs or suppliers. */
+export type StoreCheckout = {
+  object: 'checkout';
+  id: string;
+  mode: 'live' | 'test';
+  status: CheckoutStatus;
+  product: { id: string; key: string; name: string; category: ProductCategory; brand: string };
+  face_value: number;
+  face_currency: string;
+  quantity: number;
+  amount: number;
+  currency: string;
+  tax: { name: string; amount: number } | null;
+  method: StorePaymentMethod;
+  checkout_url: string | null;
+  recipient: Record<string, string> | null;
+  order: {
+    id: string;
+    status: 'processing' | 'completed' | 'failed' | 'refunded';
+    receipt_number: string | null;
+    completed_at: string | null;
+    deliveries?: StoreDelivery[];
+    redeem_instructions?: string | null;
+  } | null;
+  failure_reason: string | null;
+  refunded_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Money in minor units (two decimal places) in a currency, for prices customers pay. */
+export function formatPrice(minor: number, currency: string) {
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: minor % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(minor / 100);
+  } catch {
+    return `${currency} ${(minor / 100).toFixed(2)}`;
+  }
+}

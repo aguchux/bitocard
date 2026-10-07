@@ -2,13 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, Info } from "lucide-react";
-import { formatFace, type StoreProductDetail } from "@bitocard/api-client/storefront";
-import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
+import {
+  formatFace,
+  type StorePaymentMethods,
+  type StoreProductDetail,
+} from "@bitocard/api-client/storefront";
+import { BuyForm } from "@/components/store/buy-form";
+import {
+  BrandArt,
+  ProductCard,
+  priceLabel,
+} from "@/components/store/product-card";
 import { FeatureIcons } from "@/components/store/features";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
 import { categoryTheme } from "@/components/store/theme";
 import { storeNavigation } from "@/lib/navigation";
-import { storeApi } from "@/lib/api";
+import { query, storeApi } from "@/lib/api";
+import { currentCustomer } from "@/lib/customer";
+import { currentStore } from "@/lib/store";
+import { currentMarket } from "@/lib/market";
 
 export const revalidate = 60;
 
@@ -16,31 +28,72 @@ export const revalidate = 60;
 const delivery: Record<string, string> = {
   none: "Delivered digitally as a code with instructions, straight after payment.",
   phone: "Sent straight to the mobile number you enter at checkout.",
-  smartcard: "Paid to the smartcard or IUC number you enter; we show the account name to confirm before you pay.",
-  meter: "Paid to the meter number you enter; we show the account name to confirm before you pay.",
+  smartcard:
+    "Paid to the smartcard or IUC number you enter; we show the account name to confirm before you pay.",
+  meter:
+    "Paid to the meter number you enter; we show the account name to confirm before you pay.",
 };
 
 async function load(key: string) {
-  return storeApi<StoreProductDetail>(`/v1/store/products/${encodeURIComponent(key)}`);
+  return storeApi<StoreProductDetail>(
+    `/v1/store/products/${encodeURIComponent(key)}`,
+  );
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ key: string }>;
+}): Promise<Metadata> {
   const { key } = await params;
   const result = await load(decodeURIComponent(key));
-  if (!result.ok) return { title: "Product not found", robots: { index: false } };
+  if (!result.ok)
+    return { title: "Product not found", robots: { index: false } };
   const product = result.data;
-  const description = product.description ?? `${product.name}: ${product.category_label.toLowerCase()} from ${product.brand.name}, delivered digitally. ${priceLabel(product)}.`;
-  return { title: product.name, description, alternates: { canonical: `/p/${encodeURIComponent(product.key)}` }, openGraph: { title: product.name, description } };
+  const description =
+    product.description ??
+    `${product.name}: ${product.category_label.toLowerCase()} from ${product.brand.name}, delivered digitally. ${priceLabel(product)}.`;
+  return {
+    title: product.name,
+    description,
+    alternates: { canonical: `/p/${encodeURIComponent(product.key)}` },
+    openGraph: { title: product.name, description },
+  };
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ key: string }> }) {
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ key: string }>;
+}) {
   const { key } = await params;
   const result = await load(decodeURIComponent(key));
   if (!result.ok) notFound();
   const product = result.data;
   const theme = categoryTheme[product.category];
-  const art = categoryArt((await storeNavigation()).groups);
+  const [navigation, customer, market, { store }] = await Promise.all([
+    storeNavigation(),
+    currentCustomer(),
+    currentMarket(),
+    currentStore(),
+  ]);
+  const art = categoryArt(navigation.groups);
   const values = product.denominations ?? [];
+  // Where the customer pays from: their chosen market, else the product's own country (worldwide products ask).
+  // A reseller's store sells in its own country only.
+  const country = store?.country
+    ? store.country
+    : market && market !== "global"
+      ? market
+      : product.global
+        ? null
+        : product.country;
+  const methods = country
+    ? await storeApi<StorePaymentMethods>(
+        `/v1/store/payment-methods${query({ country })}`,
+        { fresh: true },
+      )
+    : null;
 
   return (
     <div className="space-y-8 sm:space-y-12">
@@ -53,7 +106,10 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
           </li>
           <ChevronRight className="size-3.5" aria-hidden="true" />
           <li>
-            <Link href={`/catalogs/${product.category}`} className="hover:text-[#070f4c]">
+            <Link
+              href={`/catalogs/${product.category}`}
+              className="hover:text-[#070f4c]"
+            >
               {product.category_label}
             </Link>
           </li>
@@ -66,63 +122,109 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
 
       <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-12">
         <div className="aspect-[16/10] overflow-hidden rounded-2xl shadow-lg sm:rounded-3xl">
-          <BrandArt brand={product.brand} product={product} className="text-4xl" />
+          <BrandArt
+            brand={product.brand}
+            product={product}
+            className="text-4xl"
+          />
         </div>
         <div>
-          <p className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${theme.tile} ${theme.ink}`}>
-            <CategoryIcon category={product.category} iconUrl={art.get(product.category)?.icon} className="size-7" />
+          <p
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${theme.tile} ${theme.ink}`}
+          >
+            <CategoryIcon
+              category={product.category}
+              iconUrl={art.get(product.category)?.icon}
+              className="size-7"
+            />
             {product.category_label}
-            {product.global ? " · Usable anywhere" : ` · ${product.country_name}`}
+            {product.global
+              ? " · Usable anywhere"
+              : ` · ${product.country_name}`}
           </p>
-          <h1 className="font-display mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">{product.name}</h1>
+          <h1 className="font-display mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
+            {product.name}
+          </h1>
           <p className="mt-1 text-slate-500">
             {product.brand.name}
             {product.brand.company ? ` · ${product.brand.company}` : ""}
           </p>
-          {product.description ? <p className="mt-4 text-lg text-slate-700">{product.description}</p> : null}
+          {product.description ? (
+            <p className="mt-4 text-lg text-slate-700">{product.description}</p>
+          ) : null}
           {product.features?.length ? (
             <section aria-labelledby="features" className="mt-6">
               <h2 id="features" className="font-display text-lg font-bold">
-                What this {product.category === "virtual_numbers" ? "number" : "product"} can do
+                What this{" "}
+                {product.category === "virtual_numbers" ? "number" : "product"}{" "}
+                can do
               </h2>
               <div className="mt-3">
                 <FeatureIcons features={product.features} />
               </div>
               {product.features.includes("app_codes") ? (
-                <p className="mt-3 text-sm text-slate-500">Receives SMS codes from apps and services. Some apps do not accept virtual numbers, so check before you rely on one.</p>
+                <p className="mt-3 text-sm text-slate-500">
+                  Receives SMS codes from apps and services. Some apps do not
+                  accept virtual numbers, so check before you rely on one.
+                </p>
               ) : null}
             </section>
           ) : null}
 
-          <section aria-labelledby="values-heading" className="mt-6">
-            <h2 id="values-heading" className="font-semibold">
-              {values.length ? "Choose a value" : "Value"}
-            </h2>
-            {values.length ? (
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {values.map(value => (
-                  <li key={value} className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-display font-bold">
-                    {formatFace(value, product.face_currency)}
-                  </li>
-                ))}
-              </ul>
-            ) : product.range ? (
-              <p className="mt-2 font-display text-lg font-bold">
-                Any amount from {formatFace(product.range.min, product.face_currency)} to {formatFace(product.range.max, product.face_currency)}
-              </p>
-            ) : null}
-          </section>
+          {/* Signed in, the buy form lists the values itself. */}
+          {customer ? null : (
+            <section aria-labelledby="values-heading" className="mt-6">
+              <h2 id="values-heading" className="font-semibold">
+                {values.length ? "Choose a value" : "Value"}
+              </h2>
+              {values.length ? (
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {values.map((value) => (
+                    <li
+                      key={value}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-display font-bold"
+                    >
+                      {formatFace(value, product.face_currency)}
+                    </li>
+                  ))}
+                </ul>
+              ) : product.range ? (
+                <p className="mt-2 font-display text-lg font-bold">
+                  Any amount from{" "}
+                  {formatFace(product.range.min, product.face_currency)} to{" "}
+                  {formatFace(product.range.max, product.face_currency)}
+                </p>
+              ) : null}
+            </section>
+          )}
 
-          <button type="button" disabled className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-2xl bg-[#ff2382] px-6 text-lg font-semibold text-white opacity-60 sm:w-auto">
-            Checkout opens soon
-          </button>
-          <p className="mt-2 text-sm text-slate-500">Values shown are what the product is worth; your price is confirmed at checkout.</p>
+          <BuyForm
+            product={product}
+            countries={navigation.countries}
+            country={country}
+            lockCountry={Boolean(store?.country)}
+            methods={methods?.ok ? methods.data.data : []}
+            signedIn={Boolean(customer)}
+            back={`/p/${encodeURIComponent(product.key)}`}
+            sandbox={methods?.ok ? methods.data.mode === "test" : false}
+          />
+          <p className="mt-2 text-sm text-slate-500">
+            Values shown are what the product is worth; your price is confirmed
+            on the payment page.
+          </p>
 
           <div className="mt-6 flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-            <Info className="mt-0.5 size-5 shrink-0 text-slate-500" aria-hidden="true" />
+            <Info
+              className="mt-0.5 size-5 shrink-0 text-slate-500"
+              aria-hidden="true"
+            />
             <div>
               <p>{delivery[product.recipient_type] ?? delivery.none}</p>
-              {product.redeem_instructions ? <p className="mt-2 whitespace-pre-line">{product.redeem_instructions}</p> : null}
+              {product.redeem_instructions ? (
+                <p className="mt-2 whitespace-pre-line">
+                  {product.redeem_instructions}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -130,11 +232,14 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
 
       {product.other_countries.length ? (
         <section aria-labelledby="countries-heading">
-          <h2 id="countries-heading" className="font-display mb-3 text-[22px] font-extrabold sm:mb-4 sm:text-2xl">
+          <h2
+            id="countries-heading"
+            className="font-display mb-3 text-[22px] font-extrabold sm:mb-4 sm:text-2xl"
+          >
             {product.brand.name} in other countries
           </h2>
           <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {product.other_countries.map(item => (
+            {product.other_countries.map((item) => (
               <li key={item.id}>
                 <ProductCard product={item} />
               </li>
@@ -144,11 +249,14 @@ export default async function ProductPage({ params }: { params: Promise<{ key: s
       ) : null}
       {product.related.length ? (
         <section aria-labelledby="related-heading">
-          <h2 id="related-heading" className="font-display mb-3 text-[22px] font-extrabold sm:mb-4 sm:text-2xl">
+          <h2
+            id="related-heading"
+            className="font-display mb-3 text-[22px] font-extrabold sm:mb-4 sm:text-2xl"
+          >
             More {product.category_label.toLowerCase()}
           </h2>
           <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {product.related.map(item => (
+            {product.related.map((item) => (
               <li key={item.id}>
                 <ProductCard product={item} />
               </li>

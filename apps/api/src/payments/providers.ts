@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client.js';
 
 /** Minor units (bigint) to a provider's decimal amount. All pilot currencies and USD use two decimal places. */
@@ -25,13 +26,48 @@ export type ChargeResult = {
   failureReason?: string;
 };
 
-/** Hosted payment pages (card, bank, mobile money) for wallet top-ups. */
+export type CheckoutInput = {
+  reference: string;
+  amount: bigint;
+  currency: string;
+  /** The payer's country (ISO alpha-2). */
+  country: string;
+  email: string;
+  name: string;
+  returnUrl: string;
+  description: string;
+};
+
+export type RefundResult = { status: 'refunded' | 'pending' | 'failed'; providerRefundId: string; failureReason?: string };
+
+/** What a payment record gives a provider to look it up or refund it. */
+export type PaymentRef = { reference: string; providerTransactionId: string | null; amount: bigint; currency: string };
+
+/** Hosted payment pages (card, bank, mobile money) for wallet top-ups and customer checkout. */
 export interface CheckoutProvider {
   readonly name: string;
   supportsCheckout(country: string, currency: string): boolean;
-  createCheckout(input: { reference: string; amount: bigint; currency: string; email: string; name: string; returnUrl: string; description: string }): Promise<{ checkoutUrl: string }>;
-  /** Null when the provider has no transaction for the reference yet. */
-  verifyByReference(reference: string): Promise<ChargeResult | null>;
+  /**
+   * Opens a payment page. `providerTransactionId` is the provider's own ID for it when the provider gives one up front
+   * (Stripe's session, pawaPay's deposit, Monnify's transaction), stored so checks and notifications find the payment.
+   */
+  createCheckout(input: CheckoutInput): Promise<{ checkoutUrl: string; providerTransactionId?: string }>;
+  /** Null when the provider has no transaction for it yet (the payer has not paid). */
+  verify(payment: PaymentRef): Promise<ChargeResult | null>;
+  /** Returns a confirmed payment to the payer, in full. Repeating it with the same refund reference is safe. */
+  refund(payment: PaymentRef & { refundReference: string }): Promise<RefundResult>;
+  /** A refund sent earlier: has it reached the payer? */
+  refundStatus(payment: PaymentRef & { refundReference: string; providerRefundId: string }): Promise<RefundResult>;
+}
+
+/**
+ * A UUIDv4 made from one of our references (pawaPay wants UUIDs for its deposit, payout and refund IDs), so a repeat
+ * or a check always names the same transaction.
+ */
+export function uuidFor(kind: string, reference: string) {
+  const hex = createHash('sha256').update(`bitocard-${kind}:${reference}`).digest('hex');
+  const variant = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
 export type ReservedAccountDetails = { bankName: string; accountNumber: string; accountName: string };

@@ -15,6 +15,11 @@ const alpha2: Record<string, string> = {
   ZMB: 'ZM', ZWE: 'ZW',
 };
 
+/** pawaPay's alpha-3 code for one of BitoCard's alpha-2 countries, or null where pawaPay does not work. */
+export function pawapayCountry(code: string) {
+  return Object.entries(alpha2).find(([, two]) => two === code.toUpperCase())?.[0] ?? null;
+}
+
 type PayoutConfig = { operationType: string; status?: string; decimalsInAmount?: 'NONE' | 'TWO_PLACES' | string; minAmount?: string; maxAmount?: string; minTransactionLimit?: string; maxTransactionLimit?: string };
 type ActiveConf = {
   countries: Array<{

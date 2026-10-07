@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import type { StoreHome } from "@bitocard/api-client/storefront";
 import { HomeSections } from "@/components/store/sections";
+import { notFound } from "next/navigation";
 import { storeApi } from "@/lib/api";
+import { onResellerStore } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Preview", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 /** The draft home page, from a Storefront Manager preview link (valid for 30 minutes). */
 export default async function Preview({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
+  // bitocard.com's Storefront Manager previews only.
+  if (await onResellerStore()) notFound();
   const { token } = await searchParams;
   const home = token ? await storeApi<StoreHome>(`/v1/store/home?preview=${encodeURIComponent(token)}`, { fresh: true }) : null;
   return (

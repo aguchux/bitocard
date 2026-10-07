@@ -4,11 +4,11 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { worldwideCategories, worldwideCountry } from '../catalogue/pricing.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Brand, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
+import type { Brand, LedgerMode, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
 import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
-import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
+import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema, storeHome } from './layout.js';
 
 const homeKey = 'home';
 const previewLifetimeMs = 30 * 60_000;
@@ -46,6 +46,9 @@ export type StoreProductFilter = {
 
 type Availability = { where: Prisma.ProductWhereInput; categories: Set<ProductCategory> };
 
+/** What a request sees: the shopper's market, and on a reseller's hosted store, that reseller (their listings and offers). */
+type Scope = { market: string | null; store?: { resellerId: string; country: string; mode: LedgerMode } };
+
 /**
  * BitoCard's own storefront (bitocard.com), read by anyone: the published home page with its sections filled in, the
  * catalogue, search across brands, companies, products, categories and countries, and product pages. Shows face
@@ -53,8 +56,8 @@ type Availability = { where: Prisma.ProductWhereInput; categories: Set<ProductCa
  */
 @Injectable()
 export class StorefrontService {
-  /** The shopper's market for the request in progress (`inMarket`), or null for the whole store. */
-  private readonly market = new AsyncLocalStorage<string | null>();
+  /** The request in progress: the shopper's market (`inMarket`, null for the whole store), and a reseller's store (`inStore`). */
+  private readonly scope = new AsyncLocalStorage<Scope>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -68,7 +71,30 @@ export class StorefrontService {
    */
   inMarket<T>(market: string | undefined, work: () => Promise<T>) {
     const code = market && market.toLowerCase() !== 'global' ? market.toUpperCase() : null;
-    return this.market.run(code, work);
+    const store = this.scope.getStore()?.store;
+    // A reseller's store always sells in its own country.
+    return this.scope.run(store ? { market: store.country, store } : { market: code }, work);
+  }
+
+  /**
+   * Runs `work` for a reseller's hosted store (`<subdomain>.bitocard.com`, named by the `store` query): only the
+   * products the reseller listed for their store (SHQ Catalogue), available from BitoCard's suppliers or their own, in
+   * their country plus products usable anywhere. No store (or `bitocard`) is bitocard.com. A store that is not
+   * published is a 404.
+   */
+  async inStore<T>(subdomain: string | null, market: string | undefined, work: () => Promise<T>) {
+    if (!subdomain) return this.inMarket(market, work);
+    const store = await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: true } });
+    if (!store || store.status !== 'published' || store.reseller.status === 'suspended' || store.reseller.house || !store.reseller.country) {
+      throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
+    }
+    const scope = { resellerId: store.resellerId, country: store.reseller.country, mode: store.checkoutMode };
+    return this.scope.run({ market: scope.country, store: scope }, work);
+  }
+
+  /** Whether the request is for a reseller's hosted store. */
+  private get onResellerStore() {
+    return Boolean(this.scope.getStore()?.store);
   }
 
   // -- What is on sale -------------------------------------------------------------------------------------------
@@ -85,16 +111,21 @@ export class StorefrontService {
     ]);
     const categories = new Set(enabled.map(row => row.category));
     const worldwide = [...categories].filter(category => worldwideCategories.has(category));
-    const market = this.market.getStore() ?? null;
+    const market = this.scope.getStore()?.market ?? null;
+    const store = this.scope.getStore()?.store;
+    const fromBitocard: Prisma.ProductWhereInput = { supplierProducts: { some: { available: true, supplier: { enabled: true } } } };
     return {
       categories,
       where: {
-        ...(market ? { AND: [{ OR: [{ country: market }, { country: worldwideCountry }, { category: { in: [...worldwideCategories] } }] }] } : {}),
+        AND: [
+          ...(market ? [{ OR: [{ country: market }, { country: worldwideCountry }, { category: { in: [...worldwideCategories] } }] }] : []),
+          // On sale from BitoCard's suppliers, or on a reseller's store from their own supplier account too.
+          store ? { OR: [fromBitocard, { resellerOffers: { some: { resellerId: store.resellerId, mode: store.mode, available: true, connection: { status: 'active', routing: { not: 'off' } } } } }] } : fromBitocard,
+        ],
         active: true,
-        // Only products an admin has listed on BitoCard's store (Catalog > Products > List).
-        listed: true,
+        // bitocard.com: only products an admin listed (Catalog > Products > List); a reseller's store: what they listed.
+        ...(store ? { listings: { some: { resellerId: store.resellerId } } } : { listed: true }),
         brand: { notIn: hidden.map(row => row.slug) },
-        supplierProducts: { some: { available: true, supplier: { enabled: true } } },
         OR: [...enabled.map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])],
       },
     };
@@ -365,8 +396,14 @@ export class StorefrontService {
    * sale there (none yet is fine), plus any other country with products on sale.
    */
   async countries() {
+    // A reseller's store sells in its own country only.
+    const store = this.scope.getStore()?.store;
+    if (store) {
+      const market = await this.prisma.country.findUnique({ where: { code: store.country }, select: { name: true } });
+      return [{ code: store.country, name: market?.name ?? countryName(store.country), products: await this.prisma.product.count({ where: (await this.availability()).where }) }];
+    }
     // Always the whole store's countries, so a shopper can pick another market.
-    const { where } = await this.market.run(null, () => this.availability());
+    const { where } = await this.scope.run({ market: null }, () => this.availability());
     const [grouped, markets] = await Promise.all([
       this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } }),
       this.prisma.country.findMany({ select: { code: true, name: true } }),
@@ -551,6 +588,11 @@ export class StorefrontService {
    * taken offline), the approved default layout (`defaultHome()`), so bitocard.com is always the store.
    */
   async home(previewToken?: string) {
+    if (this.onResellerStore) {
+      // A reseller's store: their listed products under their brand (the Storefront Manager is bitocard.com's).
+      const [sections, navigation, countries] = await Promise.all([this.resolve(storeHome()), this.navigation(), this.countries()]);
+      return { object: 'store_home' as const, preview: false, published: false, version: null, published_at: null, sections, navigation, countries };
+    }
     const page = await this.prisma.storefrontPage.findUnique({ where: { key: homeKey } });
     const preview = previewToken ? this.verifyPreview(previewToken) : false;
     if (previewToken && !preview) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'preview_expired', 'This preview link has expired. Open a new one from the Storefront Manager.');

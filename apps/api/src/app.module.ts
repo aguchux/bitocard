@@ -5,6 +5,7 @@ import { AppController } from './app.controller.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuditModule } from './audit/audit.service.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CheckoutModule } from './checkout/checkout.module.js';
 import { CountriesModule } from './countries/countries.module.js';
 import { PlansModule } from './plans/plans.module.js';
 import { SettingsModule } from './settings/settings.module.js';
@@ -89,6 +90,7 @@ export class AppModule {
         StorefrontModule,
         MediaModule,
         OrdersModule,
+        CheckoutModule,
         CronModule,
         ...(options.extraModules ?? []),
       ],

@@ -12,12 +12,14 @@ export type Store = {
   url: string;
   status: StoreStatus;
   branding: StoreBranding;
+  /** Customer checkout: `test` (sandbox: simulated payments and orders) until switched `live` (needs a verified business). */
+  checkout_mode: 'test' | 'live';
   published_at: string | null;
   created_at: string;
 };
 /** `reason` explains why an address cannot be used (format, reserved or taken). Your own store's address reads as taken. */
 export type SubdomainCheck = { object: 'subdomain_availability'; subdomain: string; available: boolean; reason: string | null };
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string };
+export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: 'test' | 'live' };
 
 /** The business details (`PATCH /v1/reseller`). The country can only be set once. */
 export type ResellerProfile = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus };

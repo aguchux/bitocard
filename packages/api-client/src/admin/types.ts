@@ -156,6 +156,19 @@ export type AdminOrderDetail = Order & {
   supplier: { code: string; reference: string; transaction_id: string | null; cost: number; currency: string };
   checks: number;
   next_check_at: string | null;
+  /** A store customer paid for it at checkout: refunds go back to them, through how they paid. */
+  checkout: {
+    id: string;
+    status: 'awaiting_payment' | 'paid' | 'completed' | 'failed' | 'refund_pending' | 'refunded';
+    store_id: string;
+    gateway: string;
+    /** Paid into the reseller's own gateway account, not BitoCard's. */
+    own_gateway: boolean;
+    amount: number;
+    currency: string;
+    refund_attempts: number;
+    refunded_at: string | null;
+  } | null;
   attempts: Array<{ supplier: string; reference: string; action: 'place' | 'check'; outcome: string; detail: string | null; at: string }>;
   /** Supplier notifications about this order (never their bodies). */
   notifications: Array<{ id: string; supplier: string; event_type: string | null; status: SupplierWebhookStatus; received_at: string }>;

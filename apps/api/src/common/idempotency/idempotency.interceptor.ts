@@ -112,5 +112,9 @@ function isHttpError(error: unknown) {
 
 /** Keys are unique per caller (a person or an API key); requests without credentials share the anonymous scope. */
 export function callerScope(req: Request) {
-  return (req as Request & { caller?: { id: string } }).caller?.id ?? 'anonymous';
+  const caller = (req as Request & { caller?: { id: string } }).caller?.id;
+  if (caller) return caller;
+  // A store customer's requests come from the store's server: scope them by their session, not the server's address.
+  const customer = req.originalUrl.startsWith('/v1/store/') ? req.get('bitocard-customer-session') : undefined;
+  return customer ? `customer:${createHash('sha256').update(customer).digest('hex').slice(0, 32)}` : 'anonymous';
 }

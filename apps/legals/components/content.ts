@@ -4,7 +4,7 @@ import type { IconName } from "@/components/icons";
 export const documentDetails: Record<string, { icon: IconName; summary: string }> = {
   "/documents/privacy": { icon: "shield", summary: "What our websites collect, why, who we share it with, and your rights in each region." },
   "/documents/terms": { icon: "document", summary: "The rules for using BitoCard websites, and the law that applies where you are." },
-  "/documents/cookies": { icon: "cookie", summary: "The few cookies we use: your chosen country and signing in. Never for tracking." },
+  "/documents/cookies": { icon: "cookie", summary: "The few cookies we use: your chosen country and keeping you signed in. Never for tracking." },
   "/documents/notice": { icon: "building", summary: "The Golojan group companies behind BitoCard and how to reach them." },
 };
 

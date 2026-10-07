@@ -94,6 +94,12 @@ export type ExchangeRate = {
 
 export type TopUpStatus = 'pending' | 'succeeded' | 'failed';
 
+/** The payment gateways BitoCard offers per market. */
+export type PaymentGateway = 'stripe' | 'flutterwave' | 'monnify' | 'pawapay';
+
+/** A way to pay that BitoCard offers in the reseller's market (`GET /v1/wallet/payment-methods`). */
+export type PaymentMethod = { object: 'payment_method'; id: PaymentGateway; label: string; description: string };
+
 export type TopUp = {
   object: 'top_up';
   id: string;
@@ -103,6 +109,8 @@ export type TopUp = {
   source: 'checkout' | 'bank_transfer';
   amount: number;
   currency: string;
+  /** How it was paid: a gateway, or `sandbox` in test mode. */
+  method: PaymentGateway | 'sandbox';
   /** The payment page, while the top-up is pending. */
   checkout_url: string | null;
   failure_reason: string | null;
@@ -139,8 +147,10 @@ export const resellerWalletApi = bitocardApi.injectEndpoints({
       providesTags: [{ type: 'TopUp', id: 'LIST' }],
     }),
     topUp: build.query<TopUp, string>({ query: id => `/v1/wallet/top-ups/${id}`, providesTags: (_result, _error, id) => [{ type: 'TopUp', id }] }),
-    /** Returns the top-up with its `checkout_url`; send the payer there. */
-    createTopUp: build.mutation<TopUp, { amount: number; return_url?: string }>({
+    /** The ways to top up in the reseller's market, best first. */
+    topUpMethods: build.query<{ object: 'list'; data: PaymentMethod[] }, void>({ query: () => '/v1/wallet/payment-methods', providesTags: [{ type: 'TopUp', id: 'METHODS' }] }),
+    /** Returns the top-up with its `checkout_url`; send the payer there. `method` is one of `topUpMethods` (default: the first). */
+    createTopUp: build.mutation<TopUp, { amount: number; method?: PaymentGateway; return_url?: string }>({
       query: body => ({ url: '/v1/wallet/top-ups', method: 'POST', body }),
       invalidatesTags: [{ type: 'TopUp', id: 'LIST' }],
     }),
@@ -171,6 +181,7 @@ export const {
   useExchangeRatesQuery,
   useTopUpsInfiniteQuery,
   useTopUpQuery,
+  useTopUpMethodsQuery,
   useCreateTopUpMutation,
   useSimulateTopUpMutation,
   useReservedAccountsQuery,

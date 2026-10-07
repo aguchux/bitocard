@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { ProviderError } from './provider-error.js';
-import type { CheckoutProvider, ReservedAccountProvider, TransferProvider, TransferResult } from './providers.js';
+import type { CheckoutProvider, RefundResult, ReservedAccountProvider, TransferProvider, TransferResult } from './providers.js';
 
 /** Account number the sandbox refuses to resolve, so integrations can test the failure. */
 export const sandboxUnknownAccount = '0000000000';
@@ -27,8 +27,17 @@ export class SandboxProvider implements CheckoutProvider, ReservedAccountProvide
     return { checkoutUrl: `${this.checkoutBaseUrl}/sandbox/checkout/${encodeURIComponent(input.reference)}` };
   }
 
-  async verifyByReference() {
+  async verify() {
     return null;
+  }
+
+  /** Sandbox refunds reach the payer at once. */
+  async refund(input: { refundReference: string }): Promise<RefundResult> {
+    return { status: 'refunded', providerRefundId: `sandbox_${input.refundReference}` };
+  }
+
+  async refundStatus(input: { providerRefundId: string }): Promise<RefundResult> {
+    return { status: 'refunded', providerRefundId: input.providerRefundId };
   }
 
   supportsReservedAccounts() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { CheckCircle2, ExternalLink, Globe, Store as StoreIcon, XCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, ExternalLink, Globe, Store as StoreIcon, XCircle } from "lucide-react";
 import {
   ActionDialog,
   Button,
@@ -162,6 +162,62 @@ function ColourField({ id, label, value, onChange, disabled }: { id: string; lab
   );
 }
 
+/**
+ * Customer checkout on the store: the sandbox (simulated payments and orders, to try the store) until the reseller
+ * switches it live, which needs a verified business. Live orders' cost comes from what the customer paid through
+ * BitoCard's gateways, or from the wallet when they pay into the reseller's own gateway (Integrations).
+ */
+function StoreCheckout({ store, canManage }: { store: Store; canManage: boolean }) {
+  const { membership } = useReseller();
+  const [update, state] = useUpdateStoreMutation();
+  const [confirmLive, setConfirmLive] = useState(false);
+  const live = store.checkout_mode === "live";
+  const verified = membership.reseller.status === "active";
+  const setMode = (checkout_mode: "test" | "live") => update({ id: store.id, checkout_mode }).unwrap();
+  return (
+    <Card>
+      <CardHeader
+        title="Customer checkout"
+        description={live ? "Customers pay and receive real products." : "Test checkout: orders are simulated and no money is taken."}
+        actions={
+          canManage ? (
+            live ? (
+              <Button size="sm" variant="secondary" loading={state.isLoading} onClick={() => setMode("test").catch(() => null)}>
+                Switch to test
+              </Button>
+            ) : (
+              <Button size="sm" loading={state.isLoading} disabled={!verified} onClick={() => setConfirmLive(true)}>
+                Go live
+              </Button>
+            )
+          ) : null
+        }
+      />
+      <div className="space-y-4 p-5 sm:p-6">
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        <div className="flex items-start gap-3">
+          <CreditCard className="mt-0.5 size-5 shrink-0 text-subtle" aria-hidden />
+          <p className="text-sm text-muted">
+            {live
+              ? "Customers pay through the payment methods BitoCard offers in your country, or your own payment gateway where you connected one (Integrations). Through your own gateway, the order’s cost and BitoCard’s fee come from your wallet, so keep it topped up."
+              : "Your store shows a test banner, and customers can place simulated orders to try it. Nothing is charged and the codes are not real."}
+          </p>
+        </div>
+        {!live && !verified ? <Notice tone="grey">Your store can take real payments once your business is verified (Settings &gt; Verification).</Notice> : null}
+      </div>
+      <ActionDialog
+        open={confirmLive}
+        onClose={() => setConfirmLive(false)}
+        title="Take real payments?"
+        description="Customers will pay real money and receive real products. BitoCard sells and delivers each order under your store's name."
+        confirmLabel="Go live"
+        requireReason={false}
+        onConfirm={() => setMode("live")}
+      />
+    </Card>
+  );
+}
+
 function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }) {
   const [name, setName] = useState(store.name);
   const [subdomain, setSubdomain] = useState(store.subdomain);
@@ -251,6 +307,8 @@ function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }
           />
         </div>
       </Card>
+
+      <StoreCheckout store={store} canManage={canManage} />
 
       <Card>
         <CardHeader title="Name and branding" description={canManage ? "Changes show on your store straight away." : "Only the owner or an admin can change the store."} />

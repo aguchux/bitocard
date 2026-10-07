@@ -8,6 +8,8 @@ export default createNextConfig({
     return [
       { source: "/legal", destination: legals, permanent: true },
       { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/documents/:doc`, permanent: true },
+      // Resellers' stores (<subdomain>.bitocard.com) are their own brand: BitoCard's reseller page lives on bitocard.com only.
+      { source: "/resellers", has: [{ type: "host", value: "(?!www\\.)[a-z0-9-]+\\.bitocard\\.com" }], destination: "https://bitocard.com/resellers", permanent: false },
     ];
   },
 });

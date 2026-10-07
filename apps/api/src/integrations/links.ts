@@ -10,7 +10,7 @@
 export type IntegrationLink = { label: string; url: string };
 
 /** Integrations without an outside provider account: nothing to sign up for. */
-export const internalIntegrations = new Set(['general', 'web_push']);
+export const internalIntegrations = new Set(['general', 'web_push', 'checkout']);
 
 const signUp = (url: string): IntegrationLink => ({ label: 'Sign up', url });
 const keys = (url: string, label = 'Get API keys'): IntegrationLink => ({ label, url });
@@ -29,6 +29,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   file_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/')],
   google: [keys('https://console.cloud.google.com/apis/credentials', 'Google Cloud credentials'), docs('https://developers.google.com/identity/protocols/oauth2/web-server')],
   flutterwave: [signUp('https://app.flutterwave.com/register'), keys('https://app.flutterwave.com/dashboard/settings/apis'), docs('https://developer.flutterwave.com/')],
+  stripe: [signUp('https://dashboard.stripe.com/register'), keys('https://dashboard.stripe.com/apikeys'), { label: 'Webhooks', url: 'https://dashboard.stripe.com/webhooks' }, docs('https://docs.stripe.com/api/checkout/sessions')],
   monnify: [signUp('https://app.monnify.com/create-account'), keys('https://app.monnify.com/developer'), docs('https://developers.monnify.com/')],
   exchange_rates: [signUp('https://openexchangerates.org/signup'), keys('https://openexchangerates.org/account/app-ids', 'Get an App ID'), docs('https://docs.openexchangerates.org/')],
   didit: [signUp('https://business.didit.me/'), docs('https://docs.didit.me/')],

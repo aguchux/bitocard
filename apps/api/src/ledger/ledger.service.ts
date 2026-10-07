@@ -27,7 +27,7 @@ export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ acco
 
 /** Assets and expenses grow with debits; every other account (what BitoCard owes, revenue, tax) grows with credits. */
 const debitNormal = new Set<AccountKind>(['provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales', 'promotions']);
-const resellerKinds = new Set<AccountKind>(['reseller_funding', 'reseller_earnings', 'reseller_earnings_held', 'reseller_reserved', 'reseller_payouts_pending', 'reseller_allowance']);
+const resellerKinds = new Set<AccountKind>(['reseller_funding', 'reseller_earnings', 'reseller_earnings_held', 'reseller_reserved', 'reseller_payouts_pending', 'reseller_allowance', 'customer_payments']);
 
 export const insufficientFunds = () =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'insufficient_funds', 'The wallet balance is too low for this.');

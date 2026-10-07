@@ -15,7 +15,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -139,6 +139,24 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       if (result?.status !== 'success') throw refused('flutterwave');
     },
     fromSettings: config => ({ secret_key: config.FLUTTERWAVE_SECRET_KEY }),
+  },
+  {
+    id: 'stripe',
+    kind: 'payment_gateway',
+    name: 'Stripe',
+    description: 'Card checkout on Stripe, paid into your own Stripe account.',
+    fields: [
+      secret('secret_key', 'Secret key', { help: 'Stripe dashboard > Developers > API keys. Test keys (sk_test_…) are for the sandbox, live keys (sk_live_…) for live.' }),
+      secret('webhook_secret', 'Webhook signing secret', { required: false, help: 'From Stripe’s Developers > Webhooks (whsec_…).' }),
+    ],
+    check: async (values, urls, environment) => {
+      // Stripe decides test or live by the key itself (sk_test_… or rk_test_… for test), at the same address.
+      if (/^(sk|rk)_test_/.test(values.secret_key ?? '') !== (environment === 'sandbox')) {
+        throw new ProviderError('stripe', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
+      }
+      await providerRequest('stripe', `${urls.STRIPE_API_URL}/v1/balance`, { headers: { authorization: `Bearer ${values.secret_key}` } });
+    },
+    fromSettings: config => ({ secret_key: config.STRIPE_SECRET_KEY, webhook_secret: config.STRIPE_WEBHOOK_SECRET }),
   },
   {
     id: 'monnify',

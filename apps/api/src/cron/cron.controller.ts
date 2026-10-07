@@ -4,6 +4,7 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CronOnly } from '../auth/caller.js';
 import { BillingService } from '../billing/billing.service.js';
+import { CheckoutService } from '../checkout/checkout.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { FxService } from '../fx/fx.service.js';
@@ -46,12 +47,15 @@ export class CronController {
     inbox: InboxService,
     push: PushService,
     media: MediaService,
+    checkout: CheckoutService,
   ) {
     this.jobs = {
       /** Hourly. */
       'exchange-rates': () => fx.refresh(),
-      /** Every 10 minutes: settle top-ups and payouts the providers have not notified us about. */
+      /** Every 10 minutes: settle top-ups, checkout payments and payouts the providers have not notified us about. */
       payments: async () => ({ top_ups: await payments.requeryPending(), payouts: await payouts.refreshProcessing() }),
+      /** Every 5 minutes: place orders for paid checkouts the request did not finish, send and check customer refunds. */
+      checkout: () => checkout.job(),
       /** Hourly. */
       earnings: () => wallets.releaseDueEarnings(),
       /** Daily. */

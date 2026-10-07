@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsUrl, Max, Min } from 'class-validator';
+import { paymentGateways } from './payment-providers.js';
 import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
@@ -14,6 +15,10 @@ class CreateTopUpDto {
   @ApiProperty({ description: 'Minor units of the wallet currency (for example 500000 = NGN 5,000.00).', minimum: 100, example: 500000 })
   @IsInt() @Min(100) @Max(maxAmount)
   amount: number;
+
+  @ApiPropertyOptional({ description: 'How to pay: one of the methods `GET /v1/wallet/payment-methods` lists (default: the first). Test mode always uses the sandbox payment page.', enum: Object.keys(paymentGateways) })
+  @IsOptional() @IsIn(Object.keys(paymentGateways))
+  method?: string;
 
   @ApiPropertyOptional({ description: 'HTTPS page the payer returns to after paying.' })
   @IsOptional() @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: false })
@@ -41,9 +46,19 @@ export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @ApiOperation({
+    summary: 'List top-up payment methods',
+    description: 'The ways to top up in your country, best first: card, bank or mobile money, as BitoCard offers them in your market. Empty when none is available yet (reserved bank accounts may still be).',
+  })
+  @Scopes('wallet:read')
+  @Get('payment-methods')
+  topUpMethods(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+    return this.payments.topUpMethods(resellerOf(caller), mode);
+  }
+
+  @ApiOperation({
     summary: 'Top up the wallet',
     description:
-      'Returns a `checkout_url` for the payer to pay by card, bank or mobile money. The wallet is credited once the payment provider confirms it. Live top-ups need a verified business; in test mode, finish it with the simulate endpoint.',
+      'Returns a `checkout_url` for the payer to pay with the chosen `method` (card, bank or mobile money; see `GET /v1/wallet/payment-methods`). The wallet is credited once the payment provider confirms it. Live top-ups need a verified business; in test mode, finish it with the simulate endpoint.',
   })
   @Scopes('wallet:write')
   @Post('top-ups')

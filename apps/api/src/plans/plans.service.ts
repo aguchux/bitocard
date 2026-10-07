@@ -45,7 +45,8 @@ export class PlansService {
 
   async listResellers(filter: { status?: ResellerStatus; country?: string }) {
     const resellers = await this.prisma.reseller.findMany({
-      where: { status: filter.status, country: filter.country?.toUpperCase() },
+      // BitoCard's own store accounts are not resellers.
+      where: { status: filter.status, country: filter.country?.toUpperCase(), house: false },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });

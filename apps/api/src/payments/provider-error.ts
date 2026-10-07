@@ -16,14 +16,22 @@ export class ProviderError extends Error {
 
 const timeoutMs = 15_000;
 
-/** JSON request to a provider, classifying failures as definite (4xx) or unclear (everything else). */
-export async function providerRequest<T>(provider: string, url: string, init: { method?: string; headers?: Record<string, string>; body?: unknown } = {}): Promise<T> {
+/**
+ * Request to a provider with a JSON body (or a form body, `form`, as Stripe takes), classifying failures as definite
+ * (4xx) or unclear (everything else).
+ */
+export async function providerRequest<T>(
+  provider: string,
+  url: string,
+  init: { method?: string; headers?: Record<string, string>; body?: unknown; form?: Record<string, string> } = {},
+): Promise<T> {
   let res: Response;
+  const type = init.form ? 'application/x-www-form-urlencoded' : init.body !== undefined ? 'application/json' : null;
   try {
     res = await fetch(url, {
       method: init.method ?? 'GET',
-      headers: { accept: 'application/json', ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}), ...init.headers },
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      headers: { accept: 'application/json', ...(type ? { 'content-type': type } : {}), ...init.headers },
+      body: init.form ? new URLSearchParams(init.form).toString() : init.body !== undefined ? JSON.stringify(init.body) : undefined,
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
@@ -37,7 +45,8 @@ export async function providerRequest<T>(provider: string, url: string, init: { 
     throw new ProviderError(provider, `unreadable response (HTTP ${res.status})`, false, res.status);
   }
   if (!res.ok) {
-    const message = (body as { message?: string; responseMessage?: string } | null)?.message ?? (body as { responseMessage?: string } | null)?.responseMessage ?? `HTTP ${res.status}`;
+    const reply = body as { message?: string; responseMessage?: string; error?: { message?: string } } | null;
+    const message = reply?.message ?? reply?.responseMessage ?? reply?.error?.message ?? `HTTP ${res.status}`;
     throw new ProviderError(provider, message, res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429, res.status);
   }
   return body as T;

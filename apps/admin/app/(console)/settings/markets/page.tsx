@@ -3,6 +3,7 @@
 import { Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, Notice, PageHeader, RefreshFailed, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
+import { PaymentMethods } from "./payment-methods";
 
 const fields = [
   { key: "enabled", label: "Sold here" },
@@ -16,12 +17,13 @@ export default function MarketsPage() {
   const { data, error, isFetching, refetch } = useCountriesQuery();
   const [update, state] = useUpdateCountryCategoryMutation();
   const editable = can(admin, "operations");
+  const paymentsEditable = can(admin, "operations", "finance");
 
   return (
     <AdminShell section="settings" current="/settings/markets" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Markets" }]}>
       <PageHeader
         title="Markets"
-        description="Product categories sold in each country, and where customers on hosted storefronts must verify their identity first."
+        description="Product categories sold in each country, where customers must verify their identity first, and how resellers and customers pay there."
       />
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
       {data && error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
@@ -82,6 +84,8 @@ export default function MarketsPage() {
                 </tbody>
               </table>
             </div>
+            <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Payment methods</h3>
+            <PaymentMethods code={country.code} country={country.name} editable={paymentsEditable} />
           </Card>
         ))
       )}

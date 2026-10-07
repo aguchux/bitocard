@@ -3,7 +3,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CountriesService } from '../countries/countries.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { Prisma, type Store } from '../generated/prisma/client.js';
+import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.js';
 
 export const maxStoresPerReseller = 1;
 
@@ -37,12 +37,13 @@ export function presentStore(store: Store) {
     url: `https://${store.subdomain}.bitocard.com`,
     status: store.status,
     branding: { logo_url: store.logoUrl, primary_color: store.primaryColor, accent_color: store.accentColor },
+    checkout_mode: store.checkoutMode,
     published_at: store.publishedAt?.toISOString() ?? null,
     created_at: store.createdAt.toISOString(),
   };
 }
 
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string };
+export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: LedgerMode };
 
 /** Hosted storefronts on <subdomain>.bitocard.com, and the reseller's business details. */
 @Injectable()
@@ -111,9 +112,18 @@ export class StoresService {
     return store;
   }
 
-  /** Branding and name can change any time; the subdomain only while the store is a draft. */
+  /**
+   * Branding and name can change any time; the subdomain only while the store is a draft. Checkout goes live only for a
+   * verified (active) business; until then the store's customers buy in the sandbox.
+   */
   async update(resellerId: string, id: string, input: StoreInput) {
     const store = await this.get(resellerId, id);
+    if (input.checkout_mode === 'live' && store.checkoutMode !== 'live') {
+      const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
+      if (reseller.status !== 'active') {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'reseller_not_verified', 'Your store can take real payments once your business is verified. Use test checkout until then.', 'checkout_mode');
+      }
+    }
     let subdomain: string | undefined;
     if (input.subdomain && input.subdomain.toLowerCase() !== store.subdomain) {
       if (store.status !== 'draft') {
@@ -130,6 +140,7 @@ export class StoresService {
           logoUrl: input.logo_url,
           primaryColor: input.primary_color?.toLowerCase(),
           accentColor: input.accent_color?.toLowerCase(),
+          checkoutMode: input.checkout_mode,
         },
       });
       return presentStore(updated);
@@ -174,6 +185,7 @@ export class StoresService {
       branding: { logo_url: store.logoUrl, primary_color: store.primaryColor, accent_color: store.accentColor },
       country: store.reseller.country,
       currency: store.reseller.countryRef?.currency ?? null,
+      checkout_mode: store.checkoutMode,
     };
   }
 

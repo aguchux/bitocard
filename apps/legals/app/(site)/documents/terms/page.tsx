@@ -20,9 +20,9 @@ export default function TermsOfUse() {
       </Section>
 
       <Section id="coming-soon" title="2. BitoCard is coming soon">
-        <p>These websites are for information only. BitoCard does not yet offer accounts, reseller onboarding, wallets, payments, or the purchase, sale or trade of gift cards, airtime, data or any other product.</p>
+        <p>You can create a customer account on our store at bitocard.com. Buying on the store opens country by country: before you can pay in your country, our terms of sale (delivery, refunds and the company you buy from) will be published here and shown before you pay. Until then, BitoCard does not offer wallets, payments, or the purchase, sale or trade of gift cards, airtime, data or any other product in your country.</p>
         <ul>
-          <li>Nothing on these websites is an offer to sell, buy or trade anything.</li>
+          <li>Until our terms of sale apply in your country, nothing on these websites is an offer to sell, buy or trade anything.</li>
           <li>Storefront images and previews are illustrative. They do not show live products, prices or availability.</li>
           <li>Planned features, products, markets, timings and prices may change or may not launch. Availability will vary by country and depends on local law, regulatory approval, payment and verification arrangements, and supplier coverage.</li>
           <li>Setup times, including our five-minute store setup goal, are goals, not promises. Verification, funding and readiness to take orders may take longer.</li>

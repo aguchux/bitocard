@@ -285,11 +285,12 @@ describe('admins', () => {
 });
 
 describe('storefront customers (baseline)', () => {
-  /** A store and a customer of it (customer accounts come with hosted checkout; their IDs are all this needs). */
+  /** A store and a customer of it. */
   async function storeCustomer(logoUrl = null) {
     const owner = await resellerClient(server);
     const store = await prisma.store.create({ data: { resellerId: owner.resellerId, name: 'Ada Gifts', subdomain: `ada${Date.now()}${(browserCount += 1)}`, logoUrl } });
-    return { owner, store, customerId: randomUUID() };
+    const customer = await prisma.customer.create({ data: { storeId: store.id, email: `chi${Date.now()}${browserCount}@example.com`, name: 'Chi', passwordHash: 'x' } });
+    return { owner, store, customerId: customer.id };
   }
 
   test('customer devices and preferences are their own; until customer sign-in exists nothing is pushed to them', async () => {

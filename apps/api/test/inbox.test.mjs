@@ -108,7 +108,7 @@ describe('storefront customers (baseline)', () => {
   test('a customer’s notifications are theirs alone, under their store, and never reach staff', async () => {
     const owner = await resellerClient(server);
     const store = await prisma.store.create({ data: { resellerId: owner.resellerId, name: 'Ada Gifts', subdomain: `inbox${Date.now()}` } });
-    const customerId = randomUUID();
+    const customerId = (await prisma.customer.create({ data: { storeId: store.id, email: `c${Date.now()}@example.com`, name: 'Chi', passwordHash: 'x' } })).id;
     await inbox.customer({ customerId, storeId: store.id }, 'customer.order.completed', content('order-1', { link: '/account/orders/1' }));
     await inbox.customer({ customerId, storeId: store.id }, 'customer.order.completed', content('order-1', { link: '/account/orders/1' }));
     const rows = await prisma.notification.findMany({ where: { customerId } });

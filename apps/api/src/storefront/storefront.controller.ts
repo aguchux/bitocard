@@ -15,12 +15,25 @@ const groups = navigationGroups.map(group => group.key);
 const httpsUrl = /^https:\/\/\S+$/;
 const lower = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 
+/** Endpoints that only take the store. */
+class StoreQueryDto {
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain): only the products that reseller listed for their store. Without it, bitocard.com.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
+}
+
 /** Endpoints that only take the shopper’s market. */
 class MarketQueryDto {
   @ApiPropertyOptional({ description: 'The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.', example: 'NG' })
   @IsOptional()
   @Matches(/^([A-Za-z]{2}|global)$/, { message: 'market must be a 2-letter code or global' })
   market?: string;
+
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
 }
 
 class HomeQueryDto {
@@ -28,6 +41,11 @@ class HomeQueryDto {
   @IsOptional()
   @Matches(/^([A-Za-z]{2}|global)$/, { message: 'market must be a 2-letter code or global' })
   market?: string;
+
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
 
   @ApiPropertyOptional({ description: 'A preview link token from the Storefront Manager: shows the draft.' })
   @IsOptional()
@@ -41,6 +59,11 @@ class StoreProductsQueryDto {
   @IsOptional()
   @Matches(/^([A-Za-z]{2}|global)$/, { message: 'market must be a 2-letter code or global' })
   market?: string;
+
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
 
   @ApiPropertyOptional({ enum: categories })
   @IsOptional()
@@ -116,6 +139,11 @@ class SearchQueryDto {
   @Matches(/^([A-Za-z]{2}|global)$/, { message: 'market must be a 2-letter code or global' })
   market?: string;
 
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
+
   @ApiProperty({ description: 'What to look for: a brand, a company, a product, a category or a country.', example: 'playstation' })
   @IsString()
   @Length(1, 100)
@@ -142,6 +170,11 @@ class BrandsQueryDto {
   @Matches(/^([A-Za-z]{2}|global)$/, { message: 'market must be a 2-letter code or global' })
   market?: string;
 
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
+
   @ApiPropertyOptional({ description: 'Only brands with this tag, for example gaming.' })
   @IsOptional()
   @Transform(lower)
@@ -158,9 +191,12 @@ class BrandsQueryDto {
   limit?: number;
 }
 
+/** The reseller store named (`store`), or null for bitocard.com. */
+const storeOf = (query: { store?: string }) => (query.store && query.store !== 'bitocard' ? query.store : null);
+
 /**
- * BitoCard's own storefront (bitocard.com): the published home page, the catalogue, search and product pages.
- * Public and cacheable for a minute. Shows face values; prices are quoted at checkout.
+ * BitoCard's own storefront (bitocard.com) and resellers' hosted stores (`store`): the home page, the catalogue,
+ * search and product pages. Public and cacheable for a minute. Shows face values; prices are quoted at checkout.
  */
 @ApiTags('Storefront')
 @Public()
@@ -172,42 +208,42 @@ export class StorefrontController {
   @Get('home')
   @Header('Cache-Control', 'public, max-age=60')
   home(@Query() query: HomeQueryDto) {
-    return this.storefront.inMarket(query.market, () => this.storefront.home(query.preview));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.home(query.preview));
   }
 
   @ApiOperation({ summary: 'List products', description: 'Filter by category, menu group, country, brand, tag or words; sorted by popularity, name or newest.' })
   @Get('products')
   @Header('Cache-Control', 'public, max-age=60')
   products(@Query() query: StoreProductsQueryDto) {
-    return this.storefront.inMarket(query.market, () => this.storefront.products(query));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.products(query));
   }
 
   @ApiOperation({ summary: 'Get a product', description: 'Its face values, how it is delivered, and related products.' })
   @Get('products/:key')
   @Header('Cache-Control', 'public, max-age=60')
-  product(@Param('key') key: string) {
-    return this.storefront.product(key);
+  product(@Param('key') key: string, @Query() query: StoreQueryDto) {
+    return this.storefront.inStore(storeOf(query), undefined, () => this.storefront.product(key));
   }
 
   @ApiOperation({ summary: 'Search everything', description: 'Products, brands and the companies behind them, categories and countries, best matches first.' })
   @Get('search')
   @Header('Cache-Control', 'public, max-age=60')
   search(@Query() query: SearchQueryDto) {
-    return this.storefront.inMarket(query.market, () => this.storefront.search(query.q, query));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.search(query.q, query));
   }
 
   @ApiOperation({ summary: 'List categories on sale' })
   @Get('categories')
   @Header('Cache-Control', 'public, max-age=60')
   categories(@Query() query: MarketQueryDto) {
-    return this.storefront.inMarket(query.market, () => this.storefront.categories()).then(data => ({ object: 'list' as const, data }));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.categories()).then(data => ({ object: 'list' as const, data }));
   }
 
   @ApiOperation({ summary: 'List brands on sale' })
   @Get('brands')
   @Header('Cache-Control', 'public, max-age=60')
   brands(@Query() query: BrandsQueryDto) {
-    return this.storefront.inMarket(query.market, () => this.storefront.brands(query)).then(data => ({ object: 'list' as const, data }));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.brands(query)).then(data => ({ object: 'list' as const, data }));
   }
 
   @ApiOperation({ summary: 'Get the menu', description: 'Category groups on sale with their top brands, and the countries with products.' })
@@ -215,7 +251,7 @@ export class StorefrontController {
   @Header('Cache-Control', 'public, max-age=60')
   async navigation(@Query() query: MarketQueryDto) {
     // The countries are the whole store's, for choosing a market; the menu follows the market chosen.
-    const [groups, countries] = await Promise.all([this.storefront.inMarket(query.market, () => this.storefront.navigation()), this.storefront.countries()]);
+    const [groups, countries] = await this.storefront.inStore(storeOf(query), query.market, () => Promise.all([this.storefront.navigation(), this.storefront.countries()]));
     return { object: 'store_navigation' as const, groups, countries };
   }
 }

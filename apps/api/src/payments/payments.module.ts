@@ -3,13 +3,15 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { PayoutsModule } from '../payouts/payouts.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { PaymentsController } from './payments.controller.js';
+import { AdminPaymentMethodsController } from './payment-methods.controller.js';
+import { PaymentMethodsService } from './payment-methods.service.js';
 import { PaymentsService } from './payments.service.js';
 import { ProviderWebhooksController } from './webhooks.controller.js';
 
 @Module({
   imports: [PayoutsModule, IdentityModule, SettingsModule],
-  controllers: [PaymentsController, ProviderWebhooksController],
-  providers: [PaymentsService],
-  exports: [PaymentsService],
+  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController],
+  providers: [PaymentsService, PaymentMethodsService],
+  exports: [PaymentsService, PaymentMethodsService],
 })
 export class PaymentsModule {}

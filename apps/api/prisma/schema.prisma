@@ -447,6 +447,10 @@ model Reseller {
   verifications         IdentityVerification[]
   mediaAssets           MediaAsset[]
   listings              ResellerListing[]
+  /// BitoCard's own store (bitocard.com): one house account per market sells to its retail customers, and one with no
+  /// country owns the store itself. Never a real reseller.
+  house                 Boolean                @default(false)
+  checkouts             Checkout[]
 
   @@map("resellers")
 }
@@ -541,6 +545,7 @@ model Country {
   updatedAt          DateTime          @updatedAt @map("updated_at")
   categories         CountryCategory[]
   options            CountryOption[]
+  paymentMethods     PaymentMethod[]
   resellers          Reseller[]
 
   @@map("countries")
@@ -644,6 +649,8 @@ model Store {
   /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.
   subdomain     String         @unique
   status        StoreStatus    @default(draft)
+  /// Customer checkout on the store: `test` (sandbox: simulated payments and orders) until the reseller switches it live.
+  checkoutMode  LedgerMode     @default(test) @map("checkout_mode")
   logoUrl       String?        @map("logo_url")
   primaryColor  String         @default("#070f4c") @map("primary_color")
   accentColor   String         @default("#ff2382") @map("accent_color")
@@ -653,6 +660,8 @@ model Store {
   reseller      Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   notifications Notification[]
   devices       Device[]
+  customers     Customer[]
+  checkouts     Checkout[]
 
   @@index([resellerId])
   @@map("stores")
@@ -699,6 +708,9 @@ enum AccountKind {
   /// The startup allowance (USD): restricted, never cash. Pays only the wholesale cost of customer-paid orders; never
   /// withdrawn, transferred or spent directly.
   reseller_allowance
+  /// What a store's customers paid at checkout, held for their orders: taken when the order is delivered (wholesale and
+  /// tax to BitoCard, the rest to the reseller's earnings) or refunded to the customer.
+  customer_payments
   /// What BitoCard grants as promotions such as the startup allowance (a marketing expense).
   promotions
   /// Money BitoCard holds at a payment provider (an asset).
@@ -787,6 +799,8 @@ model Hold {
   /// How much came from topped-up funds and how much from earnings, so a release returns it to the same place.
   fromFundingMinor  BigInt     @map("from_funding_minor")
   fromEarningsMinor BigInt     @map("from_earnings_minor")
+  /// Checkout orders: held from what the customer paid (`customer_payments`) instead of the wallet.
+  fromCustomerMinor BigInt     @default(0) @map("from_customer_minor")
   status            HoldStatus @default(held)
   reference         String     @unique
   createdAt         DateTime   @default(now()) @map("created_at")
@@ -807,6 +821,8 @@ model EarningsLot {
   reference   String     @unique
   releaseAt   DateTime   @map("release_at")
   releasedAt  DateTime?  @map("released_at")
+  /// Taken back before release (the sale was refunded); `releasedAt` is set too, so it is never released.
+  reversedAt  DateTime?  @map("reversed_at")
   createdAt   DateTime   @default(now()) @map("created_at")
   reseller    Reseller   @relation(fields: [resellerId], references: [id])
 
@@ -844,6 +860,8 @@ model CurrencySetting {
 enum PaymentPurpose {
   wallet_top_up
   reserved_account_deposit
+  /// A storefront customer paying for an order at checkout.
+  checkout
 }
 
 enum PaymentStatus {
@@ -871,11 +889,14 @@ model Payment {
   checkoutUrl           String?          @map("checkout_url")
   returnUrl             String?          @map("return_url")
   reservedAccountId     String?          @map("reserved_account_id") @db.Uuid
+  /// Taken through a reseller's own gateway (their connection), checked with their credentials: never in BitoCard's ledger.
+  connectionId          String?          @map("connection_id") @db.Uuid
   failureReason         String?          @map("failure_reason")
   createdAt             DateTime         @default(now()) @map("created_at")
   completedAt           DateTime?        @map("completed_at")
   reseller              Reseller         @relation(fields: [resellerId], references: [id])
   reservedAccount       ReservedAccount? @relation(fields: [reservedAccountId], references: [id])
+  checkout              Checkout?
 
   @@unique([provider, providerTransactionId])
   @@index([resellerId, createdAt])
@@ -1308,6 +1329,9 @@ model Order {
   completedAt           DateTime?       @map("completed_at")
   /// When the codes or licence keys were emailed to the customer (`recipient.email`); retried until sent.
   deliveryEmailedAt     DateTime?       @map("delivery_emailed_at")
+  /// A storefront customer's order (checkout); they see it in their account.
+  customerId            String?         @map("customer_id") @db.Uuid
+  customer              Customer?       @relation(fields: [customerId], references: [id])
   reseller              Reseller        @relation(fields: [resellerId], references: [id])
   product               Product         @relation(fields: [productId], references: [id])
   deliveries            OrderDelivery[]
@@ -1623,6 +1647,7 @@ model Notification {
   readAt     DateTime?            @map("read_at")
   createdAt  DateTime             @default(now()) @map("created_at")
   user       User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer   Customer?            @relation(fields: [customerId], references: [id], onDelete: Cascade)
   store      Store?               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   pushes     PushDelivery[]
 
@@ -1668,6 +1693,7 @@ model Device {
   lastSeenAt    DateTime             @default(now()) @map("last_seen_at")
   createdAt     DateTime             @default(now()) @map("created_at")
   user          User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer      Customer?            @relation(fields: [customerId], references: [id], onDelete: Cascade)
   store         Store?               @relation(fields: [storeId], references: [id], onDelete: Cascade)
   pushes        PushDelivery[]
 
@@ -1704,13 +1730,14 @@ model PushDelivery {
 /// A recipient's choice to push (or not) one notification type to their devices (a user or a customer, exactly one).
 /// Without a row, the type's default applies. Urgent and security types are always pushed.
 model NotificationPreference {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String?  @map("user_id") @db.Uuid
-  customerId String?  @map("customer_id") @db.Uuid
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  customerId String?   @map("customer_id") @db.Uuid
   type       String
   push       Boolean
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
   @@unique([customerId, type])
@@ -1870,4 +1897,149 @@ model BrandAsset {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("brand_assets")
+}
+
+// ---------------------------------------------------------------------------
+// M10b: payment methods, storefront customers and checkout
+// ---------------------------------------------------------------------------
+
+enum PaymentMethodPurpose {
+  /// Resellers topping up their wallet.
+  wallet_top_up
+  /// Storefront customers paying for an order.
+  checkout
+}
+
+/// A payment gateway an admin offers in a country, for wallet top-ups or customer checkout (Settings > Markets).
+/// It is offered only while it is also set up for live payments (credentials set, not switched to its sandbox).
+model PaymentMethod {
+  countryCode String               @map("country_code") @db.Char(2)
+  purpose     PaymentMethodPurpose
+  /// stripe, flutterwave, monnify or pawapay.
+  gateway     String
+  enabled     Boolean              @default(true)
+  /// Lower first; the first offered is the default.
+  position    Int                  @default(0)
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+  country     Country              @relation(fields: [countryCode], references: [code], onDelete: Cascade)
+
+  @@id([countryCode, purpose, gateway])
+  @@map("payment_methods")
+}
+
+/// A storefront customer: an account at one store only (the same email can be a customer at any other store).
+model Customer {
+  id              String                   @id @default(uuid()) @db.Uuid
+  storeId         String                   @map("store_id") @db.Uuid
+  /// Stored lower-case.
+  email           String
+  name            String
+  /// Argon2id.
+  passwordHash    String                   @map("password_hash")
+  emailVerifiedAt DateTime?                @map("email_verified_at")
+  status          UserStatus               @default(active)
+  failedSignIns   Int                      @default(0) @map("failed_sign_ins")
+  lockedUntil     DateTime?                @map("locked_until")
+  lastSignInAt    DateTime?                @map("last_sign_in_at")
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  store           Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sessions        CustomerSession[]
+  codes           CustomerCode[]
+  checkouts       Checkout[]
+  orders          Order[]
+  notifications   Notification[]
+  devices         Device[]
+  preferences     NotificationPreference[]
+
+  @@unique([storeId, email])
+  @@map("customers")
+}
+
+/// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
+model CustomerSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_sessions")
+}
+
+enum CustomerCodePurpose {
+  email_verification
+  password_reset
+}
+
+/// Single-use 6-digit codes emailed to customers. Only a hash is stored.
+model CustomerCode {
+  id         String              @id @default(uuid()) @db.Uuid
+  customerId String              @map("customer_id") @db.Uuid
+  purpose    CustomerCodePurpose
+  codeHash   String              @map("code_hash") @db.Char(64)
+  attempts   Int                 @default(0)
+  expiresAt  DateTime            @map("expires_at")
+  consumedAt DateTime?           @map("consumed_at")
+  createdAt  DateTime            @default(now()) @map("created_at")
+  customer   Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, purpose])
+  @@map("customer_codes")
+}
+
+enum CheckoutStatus {
+  /// The customer has the payment page and has not paid yet.
+  awaiting_payment
+  /// Paid; the order is being fulfilled.
+  paid
+  completed
+  /// Not paid (refused or abandoned): nothing to refund.
+  failed
+  /// The order failed after payment; the refund to the customer's payment method is being sent.
+  refund_pending
+  refunded
+}
+
+/// A storefront customer buying one quoted product: the payment, then the order placed once it is paid.
+model Checkout {
+  id              String         @id @default(uuid()) @db.Uuid
+  storeId         String         @map("store_id") @db.Uuid
+  customerId      String         @map("customer_id") @db.Uuid
+  /// The account selling: the store's reseller, or BitoCard's house account for the market.
+  resellerId      String         @map("reseller_id") @db.Uuid
+  mode            LedgerMode
+  quoteId         String         @unique @map("quote_id") @db.Uuid
+  paymentId       String?        @unique @map("payment_id") @db.Uuid
+  orderId         String?        @unique @map("order_id") @db.Uuid
+  gateway         String
+  status          CheckoutStatus @default(awaiting_payment)
+  /// What the customer pays, tax included.
+  amountMinor     BigInt         @map("amount_minor")
+  currency        String         @db.Char(3)
+  /// The provider's ID for the refund, once sent.
+  refundReference String?        @map("refund_reference")
+  refundAttempts  Int            @default(0) @map("refund_attempts")
+  /// Paid into the reseller's own payment gateway (their connection): BitoCard never holds the money, the order's cost
+  /// comes from the reseller's wallet, and BitoCard's `gateway_payment` fee is charged (`feeChargeId`).
+  connectionId    String?        @map("connection_id") @db.Uuid
+  feeChargeId     String?        @map("fee_charge_id") @db.Uuid
+  /// Why it was refunded: `undelivered` (the order failed) or `admin` (a delivered order refunded by finance).
+  refundKind      String?        @map("refund_kind")
+  refundedAt      DateTime?      @map("refunded_at")
+  failureReason   String?        @map("failure_reason")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  store           Store          @relation(fields: [storeId], references: [id])
+  customer        Customer       @relation(fields: [customerId], references: [id])
+  reseller        Reseller       @relation(fields: [resellerId], references: [id])
+  payment         Payment?       @relation(fields: [paymentId], references: [id])
+
+  @@index([customerId, createdAt])
+  @@index([status, updatedAt])
+  @@map("checkouts")
 }

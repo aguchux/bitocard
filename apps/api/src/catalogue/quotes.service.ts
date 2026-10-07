@@ -88,8 +88,13 @@ export class QuotesService {
     private readonly own: OwnSuppliersService,
   ) {}
 
-  async create(resellerId: string, mode: LedgerMode, input: QuoteInput) {
+  /**
+   * `ownSources: false` leaves out the reseller's own supplier offers: a hosted store's customer paying through
+   * BitoCard's gateway buys only BitoCard-sourced products (BitoCard never collects for a sale it is not the seller of).
+   */
+  async create(resellerId: string, mode: LedgerMode, input: QuoteInput, options: { ownSources?: boolean } = {}) {
     const ctx = await this.pricing.context(resellerId, mode);
+    if (options.ownSources === false) ctx.own.clear();
     const product = await this.prisma.product.findUnique({ where: { id: input.product_id }, include: offersInclude });
     if (!product) throw invalid('No such product.', 'product_id', 'resource_missing');
     const reason = this.pricing.unavailableReason(ctx, product);

@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const found = await resolve(slug);
   if (!found) return {};
-  return { title: found.title, description: `Shop ${found.title.toLowerCase()} on BitoCard, delivered digitally.`, alternates: { canonical: `/catalogs/${slug}` } };
+  return { title: found.title, description: `Shop ${found.title.toLowerCase()}, delivered digitally.`, alternates: { canonical: `/catalogs/${slug}` } };
 }
 
 export default async function CataloguePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {

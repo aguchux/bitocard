@@ -4,39 +4,73 @@ import type { StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/st
 import { Brand } from "@bitocard/ui/brand";
 import { legalDocuments } from "@bitocard/ui/legal";
 import { appUrl, brand } from "@bitocard/ui/site";
+import type { HostedStore } from "@/lib/store";
 import { CountryPicker } from "./country-picker";
 import { CurrencyMenu } from "./currency-menu";
 import { MarketChooser } from "./market-chooser";
 import { DesktopNav, MobileMenu } from "./header-menus";
 
-/** The store header: wordmark, the category menus, then the shopper's country, currency, sign in and the reseller call to action. */
-export function StoreHeader({ groups, countries, market }: { groups: StoreNavigationGroup[]; countries: StoreCountry[]; market: string | null }) {
+/** A reseller's store name, with its logo when it has one. */
+function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "lg" | "md" }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2.5">
+      {store.branding.logo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- the reseller's own logo, from any https address
+        <img src={store.branding.logo_url} alt="" className={`${size === "lg" ? "size-10" : "size-9"} shrink-0 rounded-xl object-contain`} />
+      ) : null}
+      <span className={`truncate font-extrabold tracking-tight ${size === "lg" ? "text-[22px] sm:text-[26px]" : "text-[22px]"}`} style={{ color: store.branding.primary_color }}>
+        {store.name}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The store header: wordmark, the category menus, then the shopper's country, currency, sign in and the reseller call
+ * to action. On a reseller's store: their name and logo, and no market, currency or reseller call to action.
+ */
+export function StoreHeader({ groups, countries, market, signedIn, store = null }: { groups: StoreNavigationGroup[]; countries: StoreCountry[]; market: string | null; signedIn: boolean; store?: HostedStore | null }) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
-        <Link href="/" aria-label="Bitocard home" className="wordmark mr-2 inline-flex min-h-11 items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] no-underline sm:text-[32px]">
-          <Brand />
-        </Link>
+        {store ? (
+          <Link href="/" aria-label={`${store.name} home`} className="mr-2 inline-flex min-h-11 min-w-0 items-center no-underline">
+            <StoreName store={store} />
+          </Link>
+        ) : (
+          <Link href="/" aria-label="Bitocard home" className="wordmark mr-2 inline-flex min-h-11 items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] no-underline sm:text-[32px]">
+            <Brand />
+          </Link>
+        )}
         <DesktopNav groups={groups} />
         <div className="-mr-2 ml-auto flex items-center gap-1 sm:mr-0 sm:gap-3">
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
           </Link>
-          <MarketChooser countries={countries} market={market} />
-          <div className="hidden lg:block">
-            <CurrencyMenu />
-          </div>
-          <Link href="/signin" className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-[#070f4c] hover:border-slate-300 lg:inline-flex">
-            Sign in
-          </Link>
+          {store ? null : (
+            <>
+              <MarketChooser countries={countries} market={market} />
+              <div className="hidden lg:block">
+                <CurrencyMenu />
+              </div>
+            </>
+          )}
           <Link
-            href="/resellers"
-            className="hidden min-h-11 items-center gap-2 rounded-xl bg-[#ff2382] px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#e8116d] sm:inline-flex"
+            href={signedIn ? "/account" : "/signin"}
+            className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-[#070f4c] hover:border-slate-300 lg:inline-flex"
           >
-            <Store className="size-5" aria-hidden="true" />
-            Open a reseller store
+            {signedIn ? "Account" : "Sign in"}
           </Link>
-          <MobileMenu groups={groups} />
+          {store ? null : (
+            <Link
+              href="/resellers"
+              className="hidden min-h-11 items-center gap-2 rounded-xl bg-[#ff2382] px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#e8116d] sm:inline-flex"
+            >
+              <Store className="size-5" aria-hidden="true" />
+              Start Reselling
+            </Link>
+          )}
+          <MobileMenu groups={groups} signedIn={signedIn} reseller={!store} />
         </div>
       </div>
     </header>
@@ -66,15 +100,21 @@ export function SearchForm({ countries, q = "", country = "", size = "lg" }: { c
   );
 }
 
-export function StoreFooter({ groups }: { groups: StoreNavigationGroup[] }) {
+export function StoreFooter({ groups, store = null }: { groups: StoreNavigationGroup[]; store?: HostedStore | null }) {
   return (
     <footer className="mt-12 border-t border-slate-100 bg-white pb-[env(safe-area-inset-bottom)] sm:mt-16">
       {/* Phones: the brand across the top, then the link lists two to a row. */}
-      <div className="mx-auto grid max-w-[1400px] grid-cols-2 gap-x-6 gap-y-8 px-4 py-10 sm:px-6 md:grid-cols-4 lg:px-8">
+      <div className={`mx-auto grid max-w-[1400px] grid-cols-2 gap-x-6 gap-y-8 px-4 py-10 sm:px-6 lg:px-8 ${store ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
         <div className="col-span-2 md:col-span-1">
-          <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] no-underline">
-            <Brand />
-          </Link>
+          {store ? (
+            <Link href="/" aria-label={`${store.name} home`} className="inline-flex min-w-0 items-center no-underline">
+              <StoreName store={store} size="md" />
+            </Link>
+          ) : (
+            <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] no-underline">
+              <Brand />
+            </Link>
+          )}
           <p className="mt-3 max-w-xs text-sm text-slate-500">Gift cards, mobile top-ups, bills and digital essentials, delivered digitally.</p>
         </div>
         <nav aria-label="Shop" className="text-sm">
@@ -89,6 +129,7 @@ export function StoreFooter({ groups }: { groups: StoreNavigationGroup[] }) {
             ))}
           </ul>
         </nav>
+        {store ? null : (
         <nav aria-label="Business" className="text-sm">
           <p className="font-semibold text-[#070f4c]">Business</p>
           <ul className="mt-2">
@@ -104,6 +145,7 @@ export function StoreFooter({ groups }: { groups: StoreNavigationGroup[] }) {
             </li>
           </ul>
         </nav>
+        )}
         <nav aria-label="Legal" className="text-sm">
           <p className="font-semibold text-[#070f4c]">Legal</p>
           <ul className="mt-2">
@@ -117,7 +159,8 @@ export function StoreFooter({ groups }: { groups: StoreNavigationGroup[] }) {
           </ul>
         </nav>
       </div>
-      <p className="border-t border-slate-100 py-5 text-center text-xs text-slate-500">{brand.credit}</p>
+      {/* BitoCard sells every order on a reseller's store (the terms of sale are BitoCard's), so it is named there too. */}
+      <p className="border-t border-slate-100 py-5 text-center text-xs text-slate-500">{store ? `${store.name} · Sold and delivered by BitoCard` : brand.credit}</p>
     </footer>
   );
 }

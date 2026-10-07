@@ -97,7 +97,7 @@ export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
  * Phones and tablets: the menu in a drawer, rendered into <body>: the sticky header's backdrop blur makes the header
  * the containing block of fixed elements inside it, which clipped the drawer to the header's height.
  */
-export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
+export function MobileMenu({ groups, signedIn = false, reseller = true }: { groups: StoreNavigationGroup[]; signedIn?: boolean; reseller?: boolean }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -159,13 +159,19 @@ export function MobileMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                   ))}
                 </nav>
                 <div className="grid shrink-0 gap-2.5 border-t border-slate-100 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                  <Link href="/signin" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]">
-                    Sign in
+                  <Link
+                    href={signedIn ? "/account" : "/signin"}
+                    onClick={() => setOpen(false)}
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]"
+                  >
+                    {signedIn ? "Account" : "Sign in"}
                   </Link>
-                  <Link href="/resellers" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
-                    <Store className="size-5" aria-hidden="true" />
-                    Open a reseller store
-                  </Link>
+                  {reseller ? (
+                    <Link href="/resellers" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
+                      <Store className="size-5" aria-hidden="true" />
+                      Start Reselling
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             </div>,

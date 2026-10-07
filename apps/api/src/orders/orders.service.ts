@@ -31,6 +31,15 @@ export const checkScheduleMs = [30, 60, 120, 300, 600, 1800, 3600, 7200, 14_400,
 const reviewCheckMs = 6 * 3600 * 1000;
 
 type OrderWithProduct = Order & { product: Product };
+
+/** Told when a customer's checkout order settles, so the checkout can close or refund the customer. */
+export type CheckoutOrderListener = {
+  settled(orderId: string, outcome: 'completed' | 'failed' | 'refunded'): Promise<void>;
+  /** The checkout that paid for an order: whether it was paid into the reseller's own gateway. */
+  checkoutOf(orderId: string): Promise<{ id: string; ownGateway: boolean } | null>;
+  /** A finance admin refunded the delivered order: send the customer their money back through how they paid. */
+  refundDelivered(orderId: string): Promise<void>;
+};
 type RecipientRecord = { phone?: string; account_number?: string; transaction_type?: string; [detail: string]: string | undefined };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such order.');
@@ -54,6 +63,7 @@ export const receiptNumber = (number: number | null) => (number === null ? null 
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger('Orders');
+  private checkoutListener: CheckoutOrderListener | null = null;
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -69,6 +79,21 @@ export class OrdersService {
     private readonly inbox: InboxService,
     private readonly email: EmailService,
   ) {}
+
+  /** The checkout service listens for its customers' orders (registered once at start-up). */
+  onCheckoutOrder(listener: CheckoutOrderListener) {
+    this.checkoutListener = listener;
+  }
+
+  private async tellCheckout(order: Pick<Order, 'id' | 'customerId'>, outcome: 'completed' | 'failed' | 'refunded') {
+    if (!order.customerId) return;
+    try {
+      await this.checkoutListener?.settled(order.id, outcome);
+    } catch (error) {
+      // The checkout job repairs anything this missed (refunds due, checkouts to close).
+      this.logger.error({ err: error, orderId: order.id }, 'Checkout could not handle a settled order; the checkout job retries');
+    }
+  }
 
   private encryption() {
     if (!this.config.ENCRYPTION_KEY) throw new Error('ENCRYPTION_KEY is not configured');
@@ -137,12 +162,26 @@ export class OrdersService {
 
   // -- Reseller API ----------------------------------------------------------------------------------------------
 
-  async create(resellerId: string, mode: LedgerMode, input: { quote_id: string; simulate?: 'completed' | 'failed' | 'pending' }) {
+  /**
+   * Places an order on an open quote. A customer's checkout (`checkout`) honours its quote even after it expires (the
+   * customer paid that price) and, when BitoCard took the payment (`funding: 'customer'`, the default), holds the cost
+   * from what the customer paid instead of the wallet. A payment into the reseller's own gateway (`funding: 'wallet'`)
+   * left the money with them, so the cost comes from their wallet like any order.
+   */
+  async create(
+    resellerId: string,
+    mode: LedgerMode,
+    input: { quote_id: string; simulate?: 'completed' | 'failed' | 'pending' },
+    checkout?: { customerId: string; funding?: 'customer' | 'wallet' },
+  ) {
     if (input.simulate && mode !== 'test') throw testModeOnly();
     const quote = await this.prisma.quote.findFirst({ where: { id: input.quote_id, resellerId, mode }, include: { product: true } });
     if (!quote) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such quote.', 'quote_id');
     if (quote.status === 'used') throw conflict('quote_used', 'This quote has already been used for an order. Create a new quote.');
-    if (quote.expiresAt <= new Date()) throw conflict('quote_expired', 'This quote has expired. Create a new quote.');
+    if (!checkout && quote.expiresAt <= new Date()) throw conflict('quote_expired', 'This quote has expired. Create a new quote.');
+    const fromCustomer = Boolean(checkout) && checkout?.funding !== 'wallet';
+    // BitoCard never collects money for a sale it is not the seller of: own-supplier products need the reseller's gateway.
+    if (fromCustomer && quote.source === 'own') throw new Error('Own-supplier products are paid through the reseller gateway');
     if (mode === 'live') {
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
       if (reseller.status !== 'active') throw resellerNotVerified();
@@ -167,11 +206,18 @@ export class OrdersService {
         locked: { ruleId: quote.feeRuleId, ratePpb: quote.feeRatePpb ?? 0, minFeeMinor: quote.feeMinMinor },
       });
     } else {
-      hold = await this.wallets.hold({ resellerId, mode, amount: quote.wholesaleMinor + quote.taxMinor, reference: `order:${id}`, description: `Order: ${quote.product.name}` });
+      hold = await this.wallets.hold({
+        resellerId,
+        mode,
+        amount: quote.wholesaleMinor + quote.taxMinor,
+        reference: `order:${id}`,
+        description: `Order: ${quote.product.name}`,
+        from: fromCustomer ? 'customer' : 'wallet',
+      });
     }
     try {
       await this.prisma.$transaction(async tx => {
-        const claimed = await tx.quote.updateMany({ where: { id: quote.id, status: 'open', expiresAt: { gt: new Date() } }, data: { status: 'used' } });
+        const claimed = await tx.quote.updateMany({ where: { id: quote.id, status: 'open', ...(checkout ? {} : { expiresAt: { gt: new Date() } }) }, data: { status: 'used' } });
         if (claimed.count === 0) throw conflict('quote_used', 'This quote has already been used for an order. Create a new quote.');
         await tx.order.create({
           data: {
@@ -190,6 +236,7 @@ export class OrdersService {
             resellerProfitMinor: quote.resellerProfitMinor,
             recipient: quote.recipient ?? undefined,
             customerReference: quote.customerReference,
+            customerId: checkout?.customerId ?? null,
             holdId: hold?.id ?? null,
             source: quote.source,
             connectionId: quote.connectionId,
@@ -413,6 +460,7 @@ export class OrdersService {
       this.events.committed();
       await this.settle(order.id);
       await this.emailDeliveries(order.id);
+      await this.tellCheckout(order, 'completed');
     }
   }
 
@@ -466,6 +514,19 @@ export class OrdersService {
     }
     if (order.holdId) {
       await this.wallets.captureHold(order.holdId, `Order delivered: ${order.product.name}`, [{ kind: 'tax_payable', amount: order.taxMinor }]);
+    }
+    const paidByCustomer = order.customerId && order.holdId ? ((await this.prisma.hold.findUnique({ where: { id: order.holdId } }))?.fromCustomerMinor ?? 0n) > 0n : false;
+    if (paidByCustomer && order.resellerProfitMinor > 0n) {
+      // A customer paid the store through BitoCard: the store's margin becomes its earnings, inside the payout hold like
+      // any sale. (Paid into the reseller's own gateway, the margin is already theirs.)
+      await this.wallets.creditEarnings({
+        resellerId: order.resellerId,
+        mode: order.mode,
+        amount: order.resellerProfitMinor,
+        reference: `order:${order.id}`,
+        description: `Sale: ${order.product.name}`,
+        source: this.wallets.ref(order.resellerId, order.currency, 'customer_payments'),
+      });
     }
     const reference = `order_cost:${order.id}`;
     if (!(await this.prisma.journalEntry.findUnique({ where: { reference } }))) {
@@ -540,6 +601,7 @@ export class OrdersService {
       await this.prisma.order.update({ where: { id: orderId }, data: { feeMinor: 0n } });
     }
     this.logger.log({ orderId, detail }, 'Order failed');
+    await this.tellCheckout(order, 'failed');
   }
 
   /** Checks orders whose next check is due, and repairs completed orders whose ledger entries were interrupted. Run every few minutes. */
@@ -606,9 +668,11 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id }, include: { product: true, attempts: { orderBy: { createdAt: 'asc' } } } });
     if (!order) throw notFound();
     const fee = order.feeChargeId ? await this.prisma.feeCharge.findUnique({ where: { id: order.feeChargeId } }) : null;
+    const checkout = order.customerId ? await this.prisma.checkout.findUnique({ where: { orderId: id }, include: { payment: true } }) : null;
     const references = [
       `order_cost:${id}`,
       `order_refund:${id}`,
+      ...(checkout ? [`payment:${checkout.paymentId}`, `checkout_refund:${checkout.id}`, `earnings:order:${id}`] : []),
       ...(order.holdId ? [`hold:${order.holdId}`, `hold_capture:${order.holdId}`, `hold_release:${order.holdId}`] : []),
       ...(fee ? [fee.reference, `fee:refund:${fee.id}`, ...(fee.holdId ? [`hold:${fee.holdId}`, `hold_release:${fee.holdId}`] : [])] : []),
     ];
@@ -621,6 +685,21 @@ export class OrdersService {
       supplier: { code: order.supplierCode, reference: order.supplierReference, transaction_id: order.supplierTransactionId, cost: minor(order.supplierCostMinor), currency: order.supplierCurrency },
       checks: order.checks,
       next_check_at: order.nextCheckAt?.toISOString() ?? null,
+      /** A store customer paid for it at checkout: refunds go back to them, through how they paid. */
+      checkout: checkout
+        ? {
+            id: checkout.id,
+            status: checkout.status,
+            store_id: checkout.storeId,
+            gateway: checkout.payment?.provider ?? checkout.gateway,
+            /** Paid into the reseller's own gateway account (their connection), not BitoCard's. */
+            own_gateway: Boolean(checkout.connectionId),
+            amount: minor(checkout.amountMinor),
+            currency: checkout.currency,
+            refund_attempts: checkout.refundAttempts,
+            refunded_at: checkout.refundedAt?.toISOString() ?? null,
+          }
+        : null,
       attempts: order.attempts.map(a => ({ supplier: a.supplierCode, reference: a.reference, action: a.action, outcome: a.outcome, detail: a.detail, at: a.createdAt.toISOString() })),
       notifications: notifications.map(n => ({ id: n.id, supplier: n.supplierCode, event_type: n.eventType, status: n.status, received_at: n.receivedAt.toISOString() })),
       ledger: entries.map(e => ({
@@ -678,7 +757,86 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id }, include: { product: true } });
     if (!order) throw notFound();
     if (order.status !== 'completed') throw conflict('order_not_refundable', 'Only completed orders can be refunded.');
-    if (order.source === 'own') return this.refundOwn(actorId, order, input.reason);
+    const checkout = order.customerId ? await this.checkoutListener?.checkoutOf(order.id) : null;
+    if (order.customerId && !checkout) throw conflict('order_not_refundable', 'This store order has no checkout to refund.');
+    if (checkout && !checkout.ownGateway) return this.refundCustomerPaid(actorId, order, input);
+    const result = order.source === 'own' ? await this.refundOwn(actorId, order, input.reason) : await this.refundToWallet(actorId, order, input);
+    // Paid into the reseller's own gateway: the wholesale (or BitoCard's fee) goes back to their wallet, and the
+    // customer is refunded from their gateway account.
+    if (checkout) await this.refundCheckout(order.id);
+    return checkout ? this.adminGet(order.id) : result;
+  }
+
+  private async refundCheckout(orderId: string) {
+    try {
+      await this.checkoutListener?.refundDelivered(orderId);
+    } catch (error) {
+      // The checkout job retries refunds that are due.
+      this.logger.error({ err: error, orderId }, 'Customer refund not sent yet; the checkout job retries');
+    }
+  }
+
+  /**
+   * A delivered order a store customer paid through BitoCard: the sale is reversed into what the customer paid
+   * (`customer_payments`): wholesale and tax back from BitoCard, the store's margin back from its earnings (still held,
+   * or withdrawable), then the customer is refunded in full through their payment method.
+   */
+  private async refundCustomerPaid(actorId: string | null, order: OrderWithProduct, input: { reason: string; supplier_refunded: boolean }) {
+    const profit = order.resellerProfitMinor;
+    const lot = profit > 0n ? await this.prisma.earningsLot.findUnique({ where: { reference: `order:${order.id}` } }) : null;
+    const entry = (from: 'reseller_earnings_held' | 'reseller_earnings') =>
+      this.ledger.prepare({
+        mode: order.mode,
+        type: 'order_refund',
+        reference: `order_refund:${order.id}`,
+        resellerId: order.resellerId,
+        description: `Refund to customer: ${order.product.name}`,
+        metadata: { order_id: order.id, reason: input.reason, actor_id: actorId, to: 'customer' },
+        lines: [
+          { account: { kind: 'platform_revenue', currency: order.currency }, debit: order.wholesaleMinor },
+          ...(order.taxMinor > 0n ? [{ account: { kind: 'tax_payable' as const, currency: order.currency }, debit: order.taxMinor }] : []),
+          ...(lot ? [{ account: { kind: from, currency: order.currency, resellerId: order.resellerId }, debit: profit }] : []),
+          { account: { kind: 'customer_payments', currency: order.currency, resellerId: order.resellerId }, credit: order.wholesaleMinor + order.taxMinor + (lot ? profit : 0n) },
+          ...this.supplierRefundLines(order, input.supplier_refunded),
+        ],
+      });
+    const [fromHeld, fromReleased] = await Promise.all([entry('reseller_earnings_held'), entry('reseller_earnings')]);
+    let refunded: boolean;
+    try {
+      refunded = await this.prisma.$transaction(async tx => {
+        const claimed = await tx.order.updateMany({ where: { id: order.id, status: 'completed' }, data: { status: 'refunded' } });
+        if (claimed.count !== 1) return false;
+        // Still inside the payout hold: taken back from held earnings, and never released.
+        const reversed = lot ? await tx.earningsLot.updateMany({ where: { id: lot.id, releasedAt: null }, data: { releasedAt: new Date(), reversedAt: new Date() } }) : { count: 1 };
+        await this.ledger.write(tx, reversed.count === 1 ? fromHeld : fromReleased);
+        await this.recordEvent(tx, 'order.refunded', order.id);
+        return true;
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'insufficient_funds') {
+        throw conflict('earnings_withdrawn', 'The store has already withdrawn the profit from this sale, so it cannot be refunded here. Refund the customer from the payment provider’s dashboard and adjust the store’s wallet.');
+      }
+      throw error;
+    }
+    if (!refunded) throw conflict('order_not_refundable', 'Only completed orders can be refunded.');
+    this.events.committed();
+    await this.audit.record({ actorId, action: 'order.refunded', targetType: 'order', targetId: order.id, before: order, after: { status: 'refunded', ...input, to: 'customer' } });
+    await this.refundCheckout(order.id);
+    return this.adminGet(order.id);
+  }
+
+  private supplierRefundLines(order: Order, supplierRefunded: boolean) {
+    return supplierRefunded
+      ? [
+          { account: { kind: 'supplier_float' as const, currency: order.supplierCurrency, provider: order.supplierCode }, debit: order.supplierCostMinor },
+          { account: { kind: 'cost_of_sales' as const, currency: order.supplierCurrency, provider: order.supplierCode }, credit: order.supplierCostMinor },
+        ]
+      : [];
+  }
+
+  /** Refunds a completed order to the reseller wallet (as topped-up funds). */
+  private async refundToWallet(actorId: string | null, order: OrderWithProduct, input: { reason: string; supplier_refunded: boolean }) {
+    const id = order.id;
     const total = order.wholesaleMinor + order.taxMinor;
     const entry = await this.ledger.prepare({
       mode: order.mode,
@@ -691,12 +849,7 @@ export class OrdersService {
         { account: { kind: 'platform_revenue', currency: order.currency }, debit: order.wholesaleMinor },
         ...(order.taxMinor > 0n ? [{ account: { kind: 'tax_payable' as const, currency: order.currency }, debit: order.taxMinor }] : []),
         { account: { kind: 'reseller_funding', currency: order.currency, resellerId: order.resellerId }, credit: total },
-        ...(input.supplier_refunded
-          ? [
-              { account: { kind: 'supplier_float' as const, currency: order.supplierCurrency, provider: order.supplierCode }, debit: order.supplierCostMinor },
-              { account: { kind: 'cost_of_sales' as const, currency: order.supplierCurrency, provider: order.supplierCode }, credit: order.supplierCostMinor },
-            ]
-          : []),
+        ...this.supplierRefundLines(order, input.supplier_refunded),
       ],
     });
     const refunded = await this.prisma.$transaction(async tx => {

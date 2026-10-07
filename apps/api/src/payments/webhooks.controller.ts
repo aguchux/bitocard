@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Logger, Post, Req } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Logger, Post, Query, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../auth/caller.js';
@@ -13,7 +13,11 @@ const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_er
 
 type FlutterwaveEvent = { event?: string; 'event.type'?: string; data?: { id?: number | string; reference?: string } };
 
-type MonnifyEvent = { eventType?: string; eventData?: { transactionReference?: string; product?: { type?: string } } };
+type MonnifyEvent = { eventType?: string; eventData?: { transactionReference?: string; paymentReference?: string; product?: { type?: string } } };
+
+type StripeEvent = { type?: string; data?: { object?: { id?: string; object?: string } } };
+
+type PawapayDeposit = { depositId?: string };
 
 /**
  * Notifications from payment providers. Each is authenticated, then the result is re-read from the provider before
@@ -56,6 +60,29 @@ export class ProviderWebhooksController {
     if (body.eventType === 'SUCCESSFUL_TRANSACTION' && body.eventData?.product?.type === 'RESERVED_ACCOUNT' && reference) {
       return { received: true, ...(await this.payments.monnifyDeposit(reference)) };
     }
+    // A payment page (top-up or checkout): re-read by our reference.
+    if (body.eventData?.paymentReference) return { received: true, ...(await this.payments.paymentNotice('monnify', { reference: body.eventData.paymentReference })) };
     return { received: true };
+  }
+
+  /** Stripe Checkout: the session named is re-read from Stripe before any money moves. */
+  @Post('stripe')
+  @HttpCode(HttpStatus.OK)
+  async stripe(@Req() req: Request & { rawBody?: Buffer }, @Body() body: StripeEvent) {
+    if (!this.providers.stripe?.webhookTrusted(req.rawBody, req.get('stripe-signature'))) throw untrusted();
+    const session = body.data?.object;
+    if (body.type?.startsWith('checkout.session.') && session?.object === 'checkout.session' && session.id) {
+      return { received: true, ...(await this.payments.paymentNotice('stripe', { providerTransactionId: session.id })) };
+    }
+    return { received: true };
+  }
+
+  /** pawaPay deposit callbacks (mobile money payments): the deposit named is re-read from pawaPay. */
+  @Post('pawapay-deposits')
+  @HttpCode(HttpStatus.OK)
+  async pawapayDeposits(@Query('token') token: string | undefined, @Body() body: PawapayDeposit) {
+    if (!this.providers.pawapay?.callbackTrusted(token)) throw untrusted();
+    if (!body.depositId) return { received: true };
+    return { received: true, ...(await this.payments.paymentNotice('pawapay', { providerTransactionId: body.depositId })) };
   }
 }

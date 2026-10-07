@@ -62,6 +62,10 @@ const integrationKeyList = [
   'MONNIFY_CONTRACT_CODE',
   'MONNIFY_API_URL',
   'MONNIFY_SANDBOX',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_SANDBOX',
+  'CHECKOUT_SANDBOX',
   'OPEN_EXCHANGE_RATES_APP_ID',
   'FX_MAX_AGE_MINUTES',
   'RELOADLY_CLIENT_ID',
@@ -187,7 +191,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
   {
     id: 'flutterwave',
     name: 'Flutterwave',
-    description: 'Card and bank top-ups, reserved accounts, payouts, BVN checks and offered exchange rates.',
+    description: 'Payment pages (card, bank and mobile money) for wallet top-ups and customer checkout where offered in Settings > Markets, reserved accounts, payouts, BVN checks and offered exchange rates.',
     webhookPath: '/v1/webhooks/flutterwave',
     fields: [
       secret('FLUTTERWAVE_SECRET_KEY', 'Secret key'),
@@ -201,7 +205,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
   {
     id: 'monnify',
     name: 'Monnify',
-    description: 'Nigerian reserved accounts, after Flutterwave.',
+    description: 'Nigerian payment pages (card and bank transfer) for wallet top-ups and customer checkout where offered in Settings > Markets, and reserved accounts after Flutterwave.',
     webhookPath: '/v1/webhooks/monnify',
     fields: [
       secret('MONNIFY_API_KEY', 'API key'),
@@ -209,6 +213,30 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       field('MONNIFY_CONTRACT_CODE', 'Contract code', { required: true }),
       field('MONNIFY_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Monnify’s sandbox (https://sandbox.monnify.com) with sandbox keys, for Test connection only; Monnify is not used for live payments. Off: live.' }),
       field('MONNIFY_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch. Set only to use another address.' }),
+    ],
+  },
+  {
+    id: 'stripe',
+    name: 'Stripe',
+    description: 'Card payments (Stripe Checkout) for wallet top-ups and customer checkout, in the markets where an admin offers it (Settings > Markets).',
+    webhookPath: '/v1/webhooks/stripe',
+    fields: [
+      secret('STRIPE_SECRET_KEY', 'Secret key', { help: 'Stripe dashboard > Developers > API keys. A restricted key needs Checkout Sessions and Refunds (write) and Balance (read).' }),
+      secret('STRIPE_WEBHOOK_SECRET', 'Webhook signing secret', {
+        help: 'Stripe dashboard > Developers > Webhooks: add the endpoint https://api.bitocard.com/v1/webhooks/stripe with checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed and checkout.session.expired, then copy its signing secret (whsec_…).',
+      }),
+      field('STRIPE_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: test the test secret key (sk_test_…) with Test connection; Stripe is not used for live payments. Off: live.' }),
+    ],
+  },
+  {
+    id: 'checkout',
+    name: 'Customer checkout',
+    description: 'Checkout on bitocard.com. The payment methods offered are set per market (Settings > Markets > Payment methods).',
+    fields: [
+      field('CHECKOUT_SANDBOX', 'Sandbox', {
+        kind: 'flag',
+        help: 'On: bitocard.com checkout runs in the sandbox, for trying it before launch: simulated payment pages, no real money, SANDBOX- codes. Off: live payments.',
+      }),
     ],
   },
   {
@@ -283,7 +311,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     id: 'pawapay',
     name: 'pawaPay',
     description:
-      'Mobile money top-ups: sends money to customers’ mobile money wallets in every country and provider enabled for payouts on the pawaPay account. Without a token it serves only the sandbox, never live orders.',
+      'Mobile money top-ups: sends money to customers’ mobile money wallets in every country and provider enabled for payouts on the pawaPay account. Also takes mobile money payments (its payment page) for wallet top-ups and customer checkout where offered in Settings > Markets. Without a token it serves only the sandbox, never live orders.',
     webhookPath: '/v1/webhooks/pawapay?token=<callback token>',
     fields: [
       secret('PAWAPAY_API_TOKEN', 'API token', { help: 'pawaPay dashboard > System configuration > API tokens. Sandbox and production tokens differ.' }),
@@ -295,7 +323,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       }),
       secret('PAWAPAY_CALLBACK_TOKEN', 'Callback token', {
         required: false,
-        help: 'Choose a long random value. In the pawaPay dashboard (System configuration > Callback URLs), set the payout callback to https://api.bitocard.com/v1/webhooks/pawapay?token= followed by this value. Without it, callbacks are refused and payouts are still checked on schedule.',
+        help: 'Choose a long random value. In the pawaPay dashboard (System configuration > Callback URLs), set the payout callback to https://api.bitocard.com/v1/webhooks/pawapay?token= followed by this value, and the deposit callback to https://api.bitocard.com/v1/webhooks/pawapay-deposits?token= followed by the same value. Without it, callbacks are refused and payouts and payments are still checked on schedule.',
       }),
     ],
   },

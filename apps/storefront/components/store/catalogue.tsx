@@ -297,7 +297,7 @@ export function CatalogueView({
           </ul>
         ) : result.ok ? (
           <p className="mt-6 rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
-            {comingSoon ? `${title} are coming soon to BitoCard. Check back shortly.` : "Nothing matches these filters yet."}
+            {comingSoon ? `${title} are coming soon. Check back shortly.` : "Nothing matches these filters yet."}
           </p>
         ) : null}
         {result.ok && (page > 1 || result.data.has_more) ? (

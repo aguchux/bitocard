@@ -270,3 +270,26 @@ export function deliveryEmail(to: string, input: { store: string; product: strin
   ].join('\n');
   return { to, subject, text, html };
 }
+
+/** A storefront customer's code, under the store's name (never BitoCard's, unless the store is BitoCard's own). */
+export function customerCodeEmail(to: string, input: { store: string; code: string; purpose: 'email_verification' | 'password_reset' }): EmailMessage {
+  const verify = input.purpose === 'email_verification';
+  const heading = verify ? 'Confirm your email' : 'Reset your password';
+  const paragraphs = verify
+    ? [`Enter this code to confirm your email for your ${input.store} account. It expires in 30 minutes.`, 'If you did not create an account, you can ignore this email.']
+    : [`Enter this code to choose a new password for your ${input.store} account. It expires in 30 minutes.`, 'If you did not ask to reset your password, you can ignore this email.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} is your ${input.store} ${verify ? 'verification' : 'password reset'} code`,
+    html,
+    text: [heading, '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
+  };
+}

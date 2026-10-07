@@ -23,10 +23,14 @@ export default function CookieNotice() {
             <strong>bc_market</strong> (bitocard.com): remembers the country you chose to shop from, or that you chose to see everything, so the store shows products for your country. It is set only when you make that choice, lasts one year, and is read only by our servers. Choose another country at any time from the store&apos;s header; deleting the cookie makes the store ask again.
           </li>
           <li>
+            <strong>bc_customer</strong> (bitocard.com): keeps you signed in to your customer account on our store, so you can buy and see your orders. It is strictly necessary, is set only when you sign in or create an account, holds a random sign-in token that only our servers can read, and lasts up to 30 days or until you sign out.
+          </li>
+          <li>
             <strong>bc_session</strong> and <strong>bc_admin_session</strong> (our reseller dashboard and admin console): keep you signed in and protect your account. They are strictly necessary, are set only when you sign in, and end when you sign out or the session expires.
           </li>
         </ul>
         <p>We do not use local storage, pixels, fingerprinting or other tracking technologies on our websites, other than to remember on your own device choices you make in our dashboards (for example which account you were using).</p>
+        <p>When you pay for an order, you do so on the payment provider&apos;s own page (for example Stripe, Flutterwave, Monnify or pawaPay), which uses its own cookies under its own cookie notice.</p>
         <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/documents/privacy">privacy notice</Link>. This does not involve cookies on your device. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
       </Section>
 

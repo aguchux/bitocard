@@ -25,6 +25,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/v1/cron/checkout",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/v1/cron/earnings",
       "schedule": "15 * * * *"
     },

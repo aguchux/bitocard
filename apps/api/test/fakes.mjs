@@ -69,7 +69,8 @@ export async function fakeFlutterwave() {
 
 /** Monnify. `state.transactions` maps transactionReference to a transaction. Set `state.down` to fail everything. */
 export async function fakeMonnify() {
-  const state = { transactions: {}, down: false, nextAccount: 5000 };
+  // `checkouts` maps our paymentReference to { transactionReference, amount, currency, status }; `refunds` by refundReference.
+  const state = { transactions: {}, checkouts: {}, refunds: {}, down: false, nextAccount: 5000 };
   const ok = responseBody => ({ body: { requestSuccessful: true, responseMessage: 'success', responseBody } });
   const service = await fakeService(({ method, url, body }) => {
     if (state.down) return { status: 503, body: { requestSuccessful: false, responseMessage: 'Unavailable' } };
@@ -80,6 +81,29 @@ export async function fakeMonnify() {
         accountReference: body.accountReference,
         accounts: [{ bankName: 'Moniepoint MFB', accountNumber: `60${String((state.nextAccount += 1)).padStart(8, '0')}`, accountName: body.accountName }],
       });
+    }
+    if (method === 'POST' && path === '/api/v1/merchant/transactions/init-transaction') {
+      const transactionReference = `MNFY|${Object.keys(state.checkouts).length + 1}|${Date.now()}`;
+      state.checkouts[body.paymentReference] = { transactionReference, amount: body.amount, currency: body.currencyCode, status: 'PENDING', body };
+      return ok({ transactionReference, paymentReference: body.paymentReference, checkoutUrl: `https://sandbox.sdk.monnify.com/checkout/${encodeURIComponent(transactionReference)}` });
+    }
+    if (method === 'GET' && path === '/api/v2/merchant/transactions/query') {
+      const reference = new URLSearchParams(url.split('?')[1] ?? '').get('paymentReference');
+      const found = state.checkouts[reference];
+      if (!found) return { status: 404, body: { requestSuccessful: false, responseMessage: 'Could not find transaction' } };
+      const paid = found.status === 'PAID';
+      return ok({
+        transactionReference: found.transactionReference,
+        paymentReference: reference,
+        paymentStatus: found.status,
+        amountPaid: paid ? found.amount : 0,
+        settlementAmount: paid ? found.amount - 50 : 0,
+        currencyCode: found.currency,
+      });
+    }
+    if (method === 'POST' && path === '/api/v1/refunds/initiate-refund') {
+      state.refunds[body.refundReference] = { ...body, refundStatus: 'COMPLETED' };
+      return ok({ refundReference: body.refundReference, refundStatus: 'COMPLETED' });
     }
     const tx = /^\/api\/v2\/transactions\/(.+)$/.exec(path);
     if (method === 'GET' && tx) {
@@ -555,6 +579,9 @@ export async function fakePawapay() {
     ],
     payouts: {},
     reply: 'COMPLETED',
+    // Payment page deposits by depositId ({ body, status }), and refunds by refundId.
+    deposits: {},
+    refunds: {},
   };
   const service = await fakeService(({ method, url, headers, body }) => {
     const [path, search = ''] = url.split('?');
@@ -569,6 +596,36 @@ export async function fakePawapay() {
       if (state.reply === 'REJECTED') return { body: { payoutId: body.payoutId, status: 'REJECTED', failureReason: { failureCode: 'INVALID_PHONE_NUMBER', failureMessage: 'Not a valid MSISDN' } } };
       state.payouts[body.payoutId] = { body, status: state.reply };
       return { body: { payoutId: body.payoutId, status: 'ACCEPTED', created: new Date().toISOString() } };
+    }
+    if (method === 'POST' && path === '/v2/paymentpage') {
+      state.deposits[body.depositId] = { body, status: null };
+      return { body: { redirectUrl: `https://paywith.pawapay.io/?token=${body.depositId}` } };
+    }
+    const deposit = /^\/v2\/deposits\/([\w-]+)$/.exec(path);
+    if (method === 'GET' && deposit) {
+      const found = state.deposits[deposit[1]];
+      if (!found?.status) return { body: { status: 'NOT_FOUND' } };
+      return {
+        body: {
+          status: 'FOUND',
+          data: {
+            depositId: deposit[1],
+            status: found.status,
+            amount: found.body.amountDetails.amount,
+            currency: found.body.amountDetails.currency,
+            ...(found.status === 'FAILED' ? { failureReason: { failureCode: 'PAYER_NOT_FOUND', failureMessage: 'The payer declined' } } : {}),
+          },
+        },
+      };
+    }
+    if (method === 'POST' && path === '/v2/refunds') {
+      state.refunds[body.refundId] = { body, status: 'COMPLETED' };
+      return { body: { refundId: body.refundId, status: 'ACCEPTED' } };
+    }
+    const refund = /^\/v2\/refunds\/([\w-]+)$/.exec(path);
+    if (method === 'GET' && refund) {
+      const found = state.refunds[refund[1]];
+      return found ? { body: { status: 'FOUND', data: { refundId: refund[1], status: found.status } } } : { body: { status: 'NOT_FOUND' } };
     }
     const one = /^\/v2\/payouts\/([\w-]+)$/.exec(path);
     if (method === 'GET' && one) {
@@ -592,4 +649,49 @@ export async function fakePawapay() {
     return { status: 404, body: { failureReason: { failureCode: 'NOT_FOUND', failureMessage: `Fake pawaPay has no ${method} ${path}` } } };
   });
   return { ...service, state, env: { PAWAPAY_API_TOKEN: 'pawapay-token', PAWAPAY_API_URL: service.url, PAWAPAY_PAYOUT_FEE_PERCENT: '1.5', PAWAPAY_CALLBACK_TOKEN: 'pawapay-callback' } };
+}
+
+/**
+ * Stripe: Checkout Sessions, refunds and the balance (key checks). `state.sessions` maps session ID to its form fields
+ * and `status`/`payment_status`, which tests set to simulate payment; `state.refunds` maps refund ID to its fields.
+ */
+export async function fakeStripe() {
+  const state = { sessions: {}, refunds: {}, next: 1, fee: 0 };
+  const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const path = url.split('?')[0];
+    if (!/^Bearer sk_(live|test)_/.test(headers.authorization ?? '')) return { status: 401, body: { error: { type: 'invalid_request_error', message: 'Invalid API Key provided' } } };
+    if (method === 'GET' && path === '/v1/balance') return { body: { object: 'balance', available: [] } };
+    if (method === 'POST' && path === '/v1/checkout/sessions') {
+      const fields = form(body);
+      const id = `cs_test_${(state.next += 1)}`;
+      state.sessions[id] = { fields, status: 'open', payment_status: 'unpaid', payment_intent: `pi_${state.next}`, key: headers.authorization.slice(7) };
+      return { body: { id, object: 'checkout.session', url: `https://checkout.stripe.com/c/pay/${id}`, status: 'open', payment_status: 'unpaid' } };
+    }
+    const one = /^\/v1\/checkout\/sessions\/([\w-]+)$/.exec(path);
+    if (method === 'GET' && one) {
+      const session = state.sessions[one[1]];
+      if (!session) return { status: 404, body: { error: { message: 'No such checkout.session' } } };
+      return {
+        body: {
+          id: one[1],
+          object: 'checkout.session',
+          status: session.status,
+          payment_status: session.payment_status,
+          amount_total: Number(session.fields['line_items[0][price_data][unit_amount]']),
+          currency: session.fields['line_items[0][price_data][currency]'],
+          client_reference_id: session.fields.client_reference_id,
+          payment_intent: url.includes('expand') ? { id: session.payment_intent, latest_charge: { balance_transaction: { fee: state.fee } } } : session.payment_intent,
+        },
+      };
+    }
+    if (method === 'POST' && path === '/v1/refunds') {
+      const fields = form(body);
+      const id = `re_${(state.next += 1)}`;
+      state.refunds[id] = { ...fields, status: 'succeeded', key: headers.authorization.slice(7) };
+      return { body: { id, object: 'refund', status: 'succeeded', amount: Number(fields.amount) } };
+    }
+    return { status: 404, body: { error: { message: `Fake Stripe has no ${method} ${path}` } } };
+  });
+  return { ...service, state, env: { STRIPE_SECRET_KEY: 'sk_live_fake', STRIPE_WEBHOOK_SECRET: 'whsec_fake', STRIPE_API_URL: service.url } };
 }

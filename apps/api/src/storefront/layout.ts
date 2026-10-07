@@ -171,6 +171,28 @@ const id = () => randomUUID().slice(0, 8);
  * The first home page, laid out like the approved design: hero, trending beside two promos, then everything else
  * the store sells. Admins rearrange it in the Storefront Manager; it stays a draft until published.
  */
+/** A reseller's hosted store's home page: their listed products under their brand, with nothing about BitoCard. */
+export function storeHome(): Sections {
+  return sections.parse([
+    { id: id(), type: 'hero', span: { lg: 12, md: 6 }, title: 'Digital products,', accent: 'delivered fast.', subtitle: 'Gift cards, top-ups, bills and more, paid the way that suits you.' },
+    { id: id(), type: 'product_rail', span: { lg: 12, md: 6 }, title: 'Popular now', subtitle: 'What customers are buying.', source: 'trending', limit: 8, filters: true, viewAllHref: '/catalogs' },
+    { id: id(), type: 'category_grid', span: { lg: 12, md: 6 }, title: 'Shop by category', subtitle: 'Everything in one place.' },
+    { id: id(), type: 'brand_grid', span: { lg: 12, md: 6 }, title: 'Brands', subtitle: 'Find the brands you love.', limit: 12 },
+    { id: id(), type: 'product_rail', span: { lg: 12, md: 6 }, title: 'New in store', subtitle: 'The latest additions.', source: 'new', limit: 8, viewAllHref: '/catalogs' },
+    {
+      id: id(),
+      type: 'trust_bar',
+      span: { lg: 12, md: 6 },
+      items: [
+        { icon: 'lock', title: 'Secure checkout', body: 'Your information is protected.' },
+        { icon: 'bolt', title: 'Digital delivery', body: 'Most products arrive in minutes.' },
+        { icon: 'card', title: 'Local payment options', body: 'Pay the way that suits you.' },
+        { icon: 'support', title: 'Help when you need it', body: 'We are here if anything goes wrong.' },
+      ],
+    },
+  ]);
+}
+
 export function defaultHome(shqSignupUrl = '/resellers'): Sections {
   return sections.parse([
     { id: id(), type: 'hero', span: { lg: 12, md: 6 }, title: 'One marketplace.', accent: 'More ways to pay.', subtitle: 'Shop gift cards, top up mobile, pay bills, and explore digital essentials.' },

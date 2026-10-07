@@ -41,6 +41,10 @@ class StoreFieldsDto {
   @ApiPropertyOptional({ example: '#ff2382' })
   @IsOptional() @Matches(hex, { message: 'accent_color must be a hex colour like #ff2382' })
   accent_color?: string;
+
+  @ApiPropertyOptional({ enum: ['test', 'live'], description: 'Customer checkout: `test` (sandbox) or `live` (real payments; needs a verified business).' })
+  @IsOptional() @IsIn(['test', 'live'])
+  checkout_mode?: 'test' | 'live';
 }
 
 class CreateStoreDto extends StoreFieldsDto {

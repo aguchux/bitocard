@@ -54,6 +54,7 @@ export const notificationTypes = {
   'supplier_notification.failed': { realm: 'reseller', roles: ['admin', 'developer'], severity: 'warning', label: 'Supplier notification not processed' },
   'order.needs_review': { realm: 'reseller', roles: ['admin', 'support'], severity: 'warning', label: 'Order outcome unclear' },
   'top_up.credited': { realm: 'reseller', roles: ['finance'], severity: 'success', label: 'Wallet topped up' },
+  'store.checkout_refused': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Store order turned away' },
   'payout.paid': { realm: 'reseller', roles: ['finance'], severity: 'success', label: 'Withdrawal paid' },
   'payout.failed': { realm: 'reseller', roles: ['finance'], severity: 'critical', label: 'Withdrawal failed' },
   'bank_account.added': { realm: 'reseller', roles: ['finance'], severity: 'info', label: 'Payout bank account added' },
@@ -78,6 +79,7 @@ export const notificationTypes = {
   'admin.order.needs_review': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'Order in the exception queue' },
   'admin.supplier_notification.failed': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Supplier notification not processed' },
   'admin.payout.failed': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Withdrawal failed' },
+  'admin.checkout.refund_stuck': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Customer refund refused' },
   'admin.fx.paused': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Conversions paused' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------

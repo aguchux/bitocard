@@ -105,10 +105,11 @@ export class WalletService {
   }
 
   /**
-   * Holds wholesale cost for an order: from topped-up funds first, then earnings. Concurrent holds cannot overspend.
-   * Repeating the same reference returns the existing hold.
+   * Holds wholesale cost for an order: from topped-up funds first, then earnings; or, for a customer's checkout
+   * (`from: 'customer'`), from what the customer paid. Concurrent holds cannot overspend. Repeating the same reference
+   * returns the existing hold.
    */
-  async hold(input: { resellerId: string; mode: LedgerMode; amount: bigint; reference: string; description: string }) {
+  async hold(input: { resellerId: string; mode: LedgerMode; amount: bigint; reference: string; description: string; from?: 'wallet' | 'customer' }) {
     const existing = await this.prisma.hold.findUnique({ where: { reference: input.reference } });
     if (existing) return existing;
     if (input.amount <= 0n) throw new Error('Hold amount must be positive');
@@ -116,6 +117,7 @@ export class WalletService {
     const fundingId = await this.ledger.accountId(input.mode, this.ref(input.resellerId, currency, 'reseller_funding'));
     const earningsId = await this.ledger.accountId(input.mode, this.ref(input.resellerId, currency, 'reseller_earnings'));
     const reservedId = await this.ledger.accountId(input.mode, this.ref(input.resellerId, currency, 'reseller_reserved'));
+    if (input.from === 'customer') return this.holdFromCustomer({ ...input, currency, reservedId });
 
     const run = this.prisma.$transaction(async tx => {
       const balances = await this.ledger.lockBalances(tx, [fundingId, earningsId]);
@@ -152,6 +154,45 @@ export class WalletService {
     }
   }
 
+  private async holdFromCustomer(input: { resellerId: string; mode: LedgerMode; amount: bigint; reference: string; description: string; currency: string; reservedId: string }) {
+    const paidId = await this.ledger.accountId(input.mode, this.ref(input.resellerId, input.currency, 'customer_payments'));
+    const run = this.prisma.$transaction(async tx => {
+      const balances = await this.ledger.lockBalances(tx, [paidId]);
+      if ((balances.get(paidId) ?? 0n) < input.amount) throw insufficientFunds();
+      const hold = await tx.hold.create({
+        data: {
+          resellerId: input.resellerId,
+          mode: input.mode,
+          currency: input.currency,
+          amountMinor: input.amount,
+          fromFundingMinor: 0n,
+          fromEarningsMinor: 0n,
+          fromCustomerMinor: input.amount,
+          reference: input.reference,
+        },
+      });
+      await this.ledger.write(tx, {
+        mode: input.mode,
+        type: 'hold',
+        reference: `hold:${hold.id}`,
+        resellerId: input.resellerId,
+        description: input.description,
+        metadata: { hold_id: hold.id, reference: input.reference },
+        postings: [
+          { accountId: paidId, kind: 'customer_payments' as const, amount: input.amount },
+          { accountId: input.reservedId, kind: 'reseller_reserved' as const, amount: -input.amount },
+        ],
+      });
+      return hold;
+    });
+    try {
+      return await run;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.hold.findUniqueOrThrow({ where: { reference: input.reference } });
+      throw error;
+    }
+  }
+
   /** Returns a held amount to where it came from (the order failed without delivery). Repeating it does nothing. */
   async releaseHold(holdId: string, description = 'Order did not complete: funds released') {
     return this.resolveHold(holdId, 'released', hold => ({
@@ -161,6 +202,7 @@ export class WalletService {
         { account: this.ref(hold.resellerId, hold.currency, 'reseller_reserved'), debit: hold.amountMinor },
         ...(hold.fromFundingMinor > 0n ? [{ account: this.ref(hold.resellerId, hold.currency, 'reseller_funding'), credit: hold.fromFundingMinor }] : []),
         ...(hold.fromEarningsMinor > 0n ? [{ account: this.ref(hold.resellerId, hold.currency, 'reseller_earnings'), credit: hold.fromEarningsMinor }] : []),
+        ...(hold.fromCustomerMinor > 0n ? [{ account: this.ref(hold.resellerId, hold.currency, 'customer_payments'), credit: hold.fromCustomerMinor }] : []),
       ],
     }));
   }

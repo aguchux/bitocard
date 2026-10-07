@@ -25,6 +25,8 @@ const addresses: Record<string, Address[]> = {
   monnify: [{ key: 'MONNIFY_API_URL', live: 'https://api.monnify.com', sandbox: 'https://sandbox.monnify.com' }],
   // Flutterwave test keys use the live address.
   flutterwave: [{ key: 'FLUTTERWAVE_API_URL', live: 'https://api.flutterwave.com/v3', sandbox: 'https://api.flutterwave.com/v3' }],
+  // Stripe test keys (sk_test_…) use the live address too.
+  stripe: [{ key: 'STRIPE_API_URL', live: 'https://api.stripe.com', sandbox: 'https://api.stripe.com' }],
 };
 
 /** Each integration's Sandbox switch. */
@@ -36,6 +38,7 @@ export const sandboxSwitches = {
   pawapay: 'PAWAPAY_SANDBOX',
   monnify: 'MONNIFY_SANDBOX',
   flutterwave: 'FLUTTERWAVE_SANDBOX',
+  stripe: 'STRIPE_SANDBOX',
 } as const satisfies Record<string, keyof AppConfig>;
 
 type Config = Partial<Record<keyof AppConfig, unknown>>;

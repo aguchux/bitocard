@@ -108,6 +108,17 @@ const WalletTransaction = objectSchema(
 
 // ---- Top-ups and reserved accounts
 
+const PaymentMethod = objectSchema(
+  'PaymentMethod',
+  {
+    object: constant('payment_method'),
+    id: oneOf('Pass it as `method` when topping up.', ['stripe', 'flutterwave', 'monnify', 'pawapay']),
+    label: str('What payers see, for example `Card` or `Mobile money`.'),
+    description: str('A line explaining it.'),
+  },
+  'A way to pay that BitoCard offers in your market.',
+);
+
 const ReservedAccount = objectSchema(
   'ReservedAccount',
   {
@@ -315,6 +326,7 @@ const resellerTopUp = (overrides: Record<string, unknown> = {}) => ({
   source: 'checkout',
   amount: 5_000_000,
   currency: 'NGN',
+  method: 'flutterwave',
   checkout_url: null,
   failure_reason: null,
   created_at: '2026-10-06T08:00:00.000Z',
@@ -443,10 +455,19 @@ const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '20
 const noMore = (item: Schema) => list(item, {}, false);
 
 export const moneyDocs: DocsArea = {
-  schemas: { Wallet, WalletTransaction, ReservedAccount, SimulatedDeposit, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
+  schemas: { Wallet, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
   responses: {
     'GET /v1/wallet': { status: 200, description: 'Your wallet in the mode of the key or session.', schema: 'Wallet', example: wallet },
     'GET /v1/wallet/transactions': { status: 200, description: 'Wallet transactions, newest first.', schema: list(ref('WalletTransaction')), example: listExample(transactions, true) },
+    'GET /v1/wallet/payment-methods': {
+      status: 200,
+      description: 'The ways to top up in your country, best first. Pass an `id` as `method` when creating a top-up.',
+      schema: list(ref('PaymentMethod'), {}, false),
+      example: ({ object: 'list', data: [
+        { object: 'payment_method', id: 'flutterwave', label: 'Card, bank or mobile money', description: 'Cards, bank transfer, USSD and mobile money where available' },
+        { object: 'payment_method', id: 'monnify', label: 'Bank transfer or card', description: 'Nigerian bank transfer, USSD or card' },
+      ] }),
+    },
     'POST /v1/wallet/top-ups': {
       status: 201,
       description: 'The top-up, `pending` with a `checkout_url` to send the payer to. The wallet is credited when the payment is confirmed (`top_up.succeeded`).',

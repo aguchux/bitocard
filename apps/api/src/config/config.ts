@@ -76,8 +76,17 @@ export const configSchema = z.object({
   MONNIFY_API_URL: z.string().url().default('https://api.monnify.com'),
   /** on: Monnify's sandbox for checks only; never used for live payments. */
   MONNIFY_SANDBOX: flag.prefault('off'),
+  /** Stripe: card payments (Checkout). Test keys (sk_test_…) use the same address; STRIPE_SANDBOX marks them as test keys. */
+  STRIPE_SECRET_KEY: z.string().optional(),
+  /** The endpoint's signing secret (whsec_…): webhooks are checked against it (Stripe-Signature). */
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_API_URL: z.string().url().default('https://api.stripe.com'),
+  /** on: the test secret key (sk_test_…) for checks only; Stripe is never used for live payments. */
+  STRIPE_SANDBOX: flag.prefault('off'),
   /** Where the payment page sends the payer back to when the caller gives no return_url. */
   PAYMENT_RETURN_URL: z.string().url().default('https://shq.bitocard.com/wallet'),
+  /** on: customer checkout on bitocard.com runs in the sandbox (simulated payment pages and SANDBOX- codes), for testing before launch. */
+  CHECKOUT_SANDBOX: flag.prefault('off'),
 
   // Exchange rates: Open Exchange Rates as the reference, checked against Flutterwave's offered rates.
   OPEN_EXCHANGE_RATES_APP_ID: z.string().optional(),

@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { CheckCircle2, CreditCard, ExternalLink, XCircle } from "lucide-react";
 import { Button, Card, CardHeader, currencyDigits, DataTable, errorMessage, Field, formatDateTime, formatMoney, Input, LoadMore, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
-import { type TopUp, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
+import { type PaymentGateway, type TopUp, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpMethodsQuery, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -21,6 +21,15 @@ function toMinor(value: string, currency: string) {
   return Math.round(Number(cleaned) * 10 ** digits);
 }
 
+/** What each top-up was paid with, as the list shows it. */
+const paidWith: Record<TopUp["method"], string> = {
+  stripe: "Card",
+  flutterwave: "Card, bank or mobile money",
+  monnify: "Bank transfer or card",
+  pawapay: "Mobile money",
+  sandbox: "Sandbox",
+};
+
 /** The payment page returns the payer to the wallet; only HTTPS addresses are accepted, so local development uses the API's default. */
 const returnUrl = () => (window.location.protocol === "https:" ? `${window.location.origin}/wallet` : undefined);
 
@@ -30,6 +39,12 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
   const [invalid, setInvalid] = useState<string | null>(null);
   const [created, setCreated] = useState<TopUp | null>(null);
   const [create, state] = useCreateTopUpMutation();
+  const methods = useTopUpMethodsQuery();
+  const offered = methods.data?.data ?? [];
+  const [chosen, setChosen] = useState<PaymentGateway | null>(null);
+  const method = offered.find(item => item.id === chosen)?.id ?? offered[0]?.id;
+  // Live top-ups need a method BitoCard offers in the market; the sandbox works without one.
+  const unavailable = !sandbox && methods.isSuccess && offered.length === 0;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -39,7 +54,7 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
     if (amount < minAmount) return setInvalid(`The smallest top-up is ${formatMoney(minAmount, currency)}.`);
     if (amount > maxAmount) return setInvalid(`The largest single top-up is ${formatMoney(maxAmount, currency)}.`);
     setInvalid(null);
-    const topUp = await create({ amount, return_url: returnUrl() })
+    const topUp = await create({ amount, method, return_url: returnUrl() })
       .unwrap()
       .catch(() => null);
     if (!topUp) return;
@@ -58,10 +73,36 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
         <div>
           <h2 className="text-lg font-bold text-ink">Add money</h2>
           <p className="mt-0.5 text-sm text-muted">
-            Pay by card, bank or mobile money on a secure payment page. Your wallet is credited once the payment is confirmed. Top-ups pay the wholesale cost of orders and cannot be withdrawn.
+            Pay on a secure payment page with any method below. Your wallet is credited once the payment is confirmed. Top-ups pay the wholesale cost of orders and cannot be withdrawn.
           </p>
         </div>
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        {methods.error ? <Notice tone="red">{errorMessage(methods.error, "Could not load the payment methods.")}</Notice> : null}
+        {unavailable ? (
+          <Notice tone="grey" title="Payment page top-ups are not available in your country yet">
+            Use your bank transfer accounts (Wallet &gt; Bank transfer accounts) where they are offered, or contact BitoCard support.
+          </Notice>
+        ) : null}
+        {offered.length > 0 ? (
+          <fieldset>
+            <legend className="mb-2 text-sm font-semibold text-ink">Pay with</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {offered.map(item => (
+                <label
+                  key={item.id}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50"
+                >
+                  <input type="radio" name={`${id}-method`} value={item.id} checked={method === item.id} onChange={() => setChosen(item.id)} className="mt-1 accent-brand-500" />
+                  <span>
+                    <span className="block text-sm font-semibold text-ink">{item.label}</span>
+                    <span className="block text-xs text-muted">{item.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {sandbox ? <p className="mt-2 text-xs text-muted">In the sandbox every method uses a simulated payment.</p> : null}
+          </fieldset>
+        ) : null}
         {created ? (
           <Notice tone="blue" title="Sandbox top-up created">
             {`${formatMoney(created.amount, created.currency)} is waiting for payment. Mark it as paid or failed in the list below.`}
@@ -82,7 +123,7 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
               />
             </Field>
           </div>
-          <Button type="submit" className="sm:mt-7" loading={state.isLoading} disabled={!currency || !value.trim()} icon={<CreditCard className="size-4" aria-hidden />}>
+          <Button type="submit" className="sm:mt-7" loading={state.isLoading} disabled={!currency || !value.trim() || unavailable} icon={<CreditCard className="size-4" aria-hidden />}>
             {sandbox ? "Create test top-up" : "Continue to payment"}
           </Button>
         </div>
@@ -143,7 +184,7 @@ export default function TopUpsPage() {
                     </span>
                   ),
                 },
-                { key: "source", header: "Paid by", cell: row => <span className="text-muted">{row.source === "bank_transfer" ? "Bank transfer" : "Payment page"}</span>, hideOnMobile: true },
+                { key: "source", header: "Paid by", cell: row => <span className="text-muted">{row.source === "bank_transfer" ? "Bank transfer" : (paidWith[row.method] ?? "Payment page")}</span>, hideOnMobile: true },
                 { key: "created", header: "Started", cell: row => <span className="whitespace-nowrap text-muted">{formatDateTime(row.created_at)}</span> },
                 { key: "completed", header: "Completed", cell: row => <span className="whitespace-nowrap text-muted">{formatDateTime(row.completed_at)}</span>, hideOnMobile: true },
                 {

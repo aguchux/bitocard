@@ -4,7 +4,7 @@ import { storeNavigation } from "@/lib/navigation";
 
 export const metadata: Metadata = {
   title: "Catalogue",
-  description: "Gift cards, airtime, data, bills, eSIMs, software and more: everything in the BitoCard store.",
+  description: "Gift cards, airtime, data, bills, eSIMs, software and more: everything in the store.",
   alternates: { canonical: "/catalogs" },
 };
 

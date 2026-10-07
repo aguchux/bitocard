@@ -124,6 +124,14 @@ export default function OrderPage() {
                       ),
                     },
                     { label: "Customer reference", value: order.customer_reference ?? "—" },
+                    ...(order.checkout
+                      ? [
+                          {
+                            label: "Store checkout",
+                            value: `${humanise(order.checkout.status)}: ${formatMoney(order.checkout.amount, order.checkout.currency)} through ${order.checkout.own_gateway ? `the reseller's own ${order.checkout.gateway}` : order.checkout.gateway}${order.checkout.refund_attempts ? ` (${order.checkout.refund_attempts} refund attempts)` : ""}`,
+                          },
+                        ]
+                      : []),
                     { label: "Recipient", value: order.recipient ? Object.entries(order.recipient).map(([key, value]) => `${humanise(key)}: ${value}`).join(", ") : "—" },
                     { label: "Completed", value: formatDateTime(order.completed_at) },
                   ]}
@@ -289,7 +297,13 @@ export default function OrderPage() {
             open={dialog === "refund"}
             onClose={() => setDialog(null)}
             title="Refund this order?"
-            description={`${money(order.charged)} goes back to the reseller wallet as topped-up funds.`}
+            description={
+              order.checkout?.own_gateway
+                ? `${money(order.charged)} goes back to the reseller wallet, and the customer is refunded ${formatMoney(order.checkout.amount, order.checkout.currency)} in full from the reseller's own ${order.checkout.gateway} account.`
+                : order.checkout
+                  ? `The sale is reversed (the store's margin taken back from its earnings) and the customer is refunded ${formatMoney(order.checkout.amount, order.checkout.currency)} in full through ${order.checkout.gateway}.`
+                  : `${money(order.charged)} goes back to the reseller wallet as topped-up funds.`
+            }
             confirmLabel="Refund"
             tone="danger"
             onConfirm={reason => refund({ id: order.id, reason, supplier_refunded: supplierRefunded }).unwrap()}

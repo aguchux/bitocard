@@ -11,8 +11,8 @@ export default function PrivacyNotice() {
     <LegalPage
       seo={seo}
       intro={<>
-        <p>This notice explains how BitoCard handles personal information when you visit our websites or contact us. BitoCard is coming soon: we do not yet offer accounts, payments, wallets or transactions, and we collect very little personal information.</p>
-        <p>We will update this notice before we launch any service that collects more.</p>
+        <p>This notice explains how BitoCard handles personal information when you visit our websites, create a customer account on our store at bitocard.com, buy from it, or contact us.</p>
+        <p>We will update this notice before we launch any other service that collects more.</p>
       </>}
     >
       <Section id="who" title="1. Who we are">
@@ -30,11 +30,18 @@ export default function PrivacyNotice() {
         <p>Like any website, our servers receive technical information so they can deliver pages and protect the service. This includes your IP address, browser and device type, the pages you request, the referring page, and the date and time of your visit. Our hosting provider processes this information in server and security logs.</p>
         <h3>When you choose your country on our store</h3>
         <p>If you tell our store which country you shop from (or that you want to see everything), we remember that choice in a cookie on your device so the store can show products for your country. We use it only for that, keep no record of it against you, and you can change or delete it at any time. See our <Link href="/documents/cookies">cookie notice</Link>.</p>
+        <h3>When you create an account on our store</h3>
+        <p>Your name, your email address, and your password, which we store only as a one-way hash we cannot reverse. We also keep when you signed in, failed sign-in attempts (to protect your account), and the codes we email to confirm your address or reset your password, stored only as hashes. A cookie keeps you signed in; see our <Link href="/documents/cookies">cookie notice</Link>.</p>
+        <h3>When you buy from our store</h3>
+        <p>What you bought, its value and price, when, and the details needed to deliver it: for example the mobile number to top up, the smartcard or meter number to pay (and the account name the provider returns for you to confirm), or the email address to send codes to. We keep the codes, PINs and licence keys you buy encrypted, and show them only to you.</p>
+        <p>You pay on the payment provider&apos;s secure page. We never receive or store your full card number, card security code or mobile money PIN. The provider tells us the payment&apos;s amount, status, reference and the method you used, which we keep with your order and use for refunds.</p>
+        <h3>When an identity check is needed</h3>
+        <p>For some products in some countries, the law or our fraud controls require you to verify your identity once before buying. In Nigeria we check your BVN with Flutterwave, after you approve it on your bank&apos;s page; we pass your BVN on and do not keep it. Elsewhere, Didit checks an identity document and compares it with a selfie, which involves biometric data, and we ask for your explicit consent first. We keep only the outcome, your verified name and the document&apos;s country, never images or document numbers.</p>
         <h3>When you contact us</h3>
         <p>If you email us, we receive your email address, your name if you include it, and the content of your message.</p>
         <h3>What we do not collect</h3>
-        <p>We do not currently collect account details, payment information, gift card codes, identity documents or precise location. There is no signup form. We do not use analytics, advertising or tracking cookies. See our <Link href="/documents/cookies">cookie notice</Link>.</p>
-        <p>We do not collect sensitive personal information, and we do not make decisions about you based solely on automated processing, including profiling.</p>
+        <p>We do not collect your full card details or precise location, and we do not use analytics, advertising or tracking cookies. See our <Link href="/documents/cookies">cookie notice</Link>.</p>
+        <p>Apart from biometric data in identity checks, with your explicit consent, we do not collect sensitive personal information, and we do not make decisions about you based solely on automated processing, including profiling. If an identity check fails, you can ask for it to be reviewed by a person.</p>
       </Section>
 
       <Section id="use" title="4. How we use it and our legal bases">
@@ -44,6 +51,9 @@ export default function PrivacyNotice() {
             <thead><tr><th scope="col">Purpose</th><th scope="col">Information</th><th scope="col">Legal basis (where required)</th></tr></thead>
             <tbody>
               <tr><th scope="row">Deliver the website, keep it secure, and prevent abuse and fraud</th><td>Technical information</td><td>Our legitimate interests in running a secure website</td></tr>
+              <tr><th scope="row">Provide your account, take your payment, deliver your order, send its codes and receipts, and refund you if we cannot deliver</th><td>Account, order and payment information</td><td>Performance of our contract with you</td></tr>
+              <tr><th scope="row">Check your identity where the law or fraud controls require it, and prevent fraud</th><td>Account and order information, identity check results; biometric data during a document check</td><td>Legal obligation, or our legitimate interests in preventing fraud; explicit consent for biometric data</td></tr>
+              <tr><th scope="row">Keep accounting and tax records</th><td>Order and payment information</td><td>Legal obligation</td></tr>
               <tr><th scope="row">Reply to your enquiries</th><td>Contact details and message</td><td>Our legitimate interests in responding to you, or steps you ask us to take before entering into a contract</td></tr>
               <tr><th scope="row">Meet legal obligations, and establish or defend legal claims</th><td>Any of the above, where relevant</td><td>Legal obligation, or our legitimate interests</td></tr>
             </tbody>
@@ -54,7 +64,10 @@ export default function PrivacyNotice() {
 
       <Section id="share" title="5. Who we share it with">
         <ul>
-          <li><strong>Service providers</strong> who act on our instructions. Vercel Inc. hosts our websites and delivers them through its global network. Our email provider handles messages you send us.</li>
+          <li><strong>Service providers</strong> who act on our instructions. Vercel Inc. hosts our websites and delivers them through its global network, and our database host stores our records in the United States. Resend and MailerSend send our emails, including your codes and receipts. Our email provider handles messages you send us.</li>
+          <li><strong>Payment providers</strong> that take your payment and send refunds: Stripe (cards), Flutterwave (cards, bank transfer and mobile money), Monnify (Nigerian bank transfer and cards) and pawaPay (mobile money), depending on your country and the method you choose. Each also processes your payment under its own privacy notice.</li>
+          <li><strong>Identity check providers</strong>, where a check is needed: Flutterwave (BVN checks in Nigeria) and Didit (document and selfie checks elsewhere).</li>
+          <li><strong>The companies that fulfil your order</strong>, such as the mobile network, pay-TV operator or utility, which receive only what they need to deliver it (for example the number to top up).</li>
           <li><strong>Golojan group companies</strong> listed above, where needed to run BitoCard or answer you.</li>
           <li><strong>Authorities, courts and advisers</strong>, where the law requires it or to protect our rights, users or the public.</li>
           <li><strong>A buyer or successor</strong>, if all or part of our business is reorganised or sold, subject to this notice.</li>
@@ -70,6 +83,9 @@ export default function PrivacyNotice() {
       <Section id="retention" title="7. How long we keep it">
         <ul>
           <li>Server and security logs are kept by our hosting provider for a short period, usually no longer than 30 days.</li>
+          <li>Your account is kept while it is open. Ask us to close it at any time; we then delete your account details within 30 days, except what we must keep for the records below.</li>
+          <li>Orders, payments and refunds are kept for as long as accounting and tax laws require, usually six years after the order.</li>
+          <li>Identity check outcomes are kept while your account is open and for up to five years after, where anti-fraud or anti-money-laundering rules require it.</li>
           <li>Correspondence is kept for as long as we need it to deal with your enquiry, then for up to two years, unless a longer period is needed to meet a legal obligation or to establish or defend a legal claim.</li>
         </ul>
       </Section>

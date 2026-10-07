@@ -63,10 +63,10 @@ export class AdminOverviewService {
 
     const float = await this.prisma.ledgerAccount.groupBy({ by: ['currency'], where: { mode, kind: { in: [...floatAccounts] } }, _sum: { balanceMinor: true } });
     const [active, pending, joined, previouslyJoined] = await Promise.all([
-      this.prisma.reseller.count({ where: { status: 'active' } }),
-      this.prisma.reseller.count({ where: { status: 'pending' } }),
-      this.prisma.reseller.count({ where: { createdAt: { gte: from } } }),
-      this.prisma.reseller.count({ where: { createdAt: { gte: previousFrom, lt: from } } }),
+      this.prisma.reseller.count({ where: { status: 'active', house: false } }),
+      this.prisma.reseller.count({ where: { status: 'pending', house: false } }),
+      this.prisma.reseller.count({ where: { house: false, createdAt: { gte: from } } }),
+      this.prisma.reseller.count({ where: { house: false, createdAt: { gte: previousFrom, lt: from } } }),
     ]);
     const [ordersNeedingReview, ordersProcessing, verificationsInReview] = await Promise.all([
       this.prisma.order.count({ where: { mode, needsReview: true, status: 'processing' } }),

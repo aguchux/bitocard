@@ -3,7 +3,10 @@ import type { BvnProvider, CheckResult } from '../identity/providers.js';
 import { ProviderError, providerRequest } from './provider-error.js';
 import {
   type ChargeResult,
+  type CheckoutInput,
   type CheckoutProvider,
+  type PaymentRef,
+  type RefundResult,
   fromMajor,
   type ReservedAccountDetails,
   type ReservedAccountProvider,
@@ -14,12 +17,16 @@ import {
 
 type FlwResponse<T> = { status: string; message?: string; data: T };
 type FlwCharge = { id: number; tx_ref: string; status: string; amount: number; currency: string; app_fee?: number; processor_response?: string };
+type FlwRefund = { id: number; status: string; comments?: string };
 type FlwTransfer = { id: number; status: string; fee?: number; complete_message?: string; reference?: string };
 
-const checkoutCountries = new Set(['NG', 'GH', 'KE']);
+/** Countries Flutterwave's payment page takes payments from (cards everywhere; bank and mobile money where local). */
+const checkoutCountries = new Set(['NG', 'GH', 'KE', 'UG', 'TZ', 'RW', 'ZA', 'ZM', 'MW', 'CM', 'CI', 'SN', 'SL', 'EG', 'US', 'GB']);
+/** Bank payouts. */
+const transferCountries = new Set(['NG', 'GH', 'KE']);
 const reservedAccountCountries = new Set(['NG', 'GH']);
 
-/** Flutterwave v3: checkout, reserved (virtual) accounts, bank payouts and offered exchange rates. */
+/** Flutterwave v3: payment pages, refunds, reserved (virtual) accounts, bank payouts and offered exchange rates. */
 export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountProvider, TransferProvider, BvnProvider {
   readonly name = 'flutterwave';
 
@@ -66,7 +73,7 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
     return checkoutCountries.has(country);
   }
 
-  async createCheckout(input: { reference: string; amount: bigint; currency: string; email: string; name: string; returnUrl: string; description: string }) {
+  async createCheckout(input: CheckoutInput) {
     const res = await this.call<{ link: string }>('/payments', {
       method: 'POST',
       body: {
@@ -80,6 +87,10 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
     });
     if (!res.data?.link) throw new ProviderError(this.name, 'no payment link returned', false);
     return { checkoutUrl: res.data.link };
+  }
+
+  verify(payment: PaymentRef) {
+    return this.verifyByReference(payment.reference);
   }
 
   async verifyByReference(reference: string) {
@@ -111,6 +122,27 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
     };
   }
 
+  /** Refunds go against Flutterwave's transaction ID, which the payment holds once it has settled. */
+  async refund(payment: PaymentRef & { refundReference: string }): Promise<RefundResult> {
+    if (!payment.providerTransactionId) throw new ProviderError(this.name, 'no transaction to refund', true);
+    const res = await this.call<FlwRefund>(`/transactions/${encodeURIComponent(payment.providerTransactionId)}/refund`, { method: 'POST', body: { amount: Number(toMajor(payment.amount)) } });
+    return this.refundResult(res.data);
+  }
+
+  async refundStatus(payment: { providerRefundId: string }): Promise<RefundResult> {
+    const res = await this.call<FlwRefund>(`/refunds/${encodeURIComponent(payment.providerRefundId)}`);
+    return this.refundResult(res.data);
+  }
+
+  private refundResult(data: FlwRefund): RefundResult {
+    const status = String(data.status ?? '').toLowerCase();
+    return {
+      status: status === 'completed' || status === 'successful' ? 'refunded' : status === 'failed' ? 'failed' : 'pending',
+      providerRefundId: String(data.id),
+      failureReason: status === 'failed' ? (data.comments ?? 'Refund failed') : undefined,
+    };
+  }
+
   supportsReservedAccounts(country: string) {
     return reservedAccountCountries.has(country);
   }
@@ -124,7 +156,7 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
   }
 
   supportsTransfers(country: string) {
-    return checkoutCountries.has(country);
+    return transferCountries.has(country);
   }
 
   async listBanks(country: string) {

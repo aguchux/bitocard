@@ -2418,6 +2418,7 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "checkout_mode": "test",
                   "published_at": null,
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -2559,6 +2560,7 @@
                         "primary_color": "#070f4c",
                         "accent_color": "#ff2382"
                       },
+                      "checkout_mode": "live",
                       "published_at": "2026-10-02T14:20:00.000Z",
                       "created_at": "2026-10-01T10:05:12.000Z"
                     }
@@ -2684,6 +2686,7 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "checkout_mode": "live",
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -2834,6 +2837,7 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "checkout_mode": "live",
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -2983,6 +2987,7 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "checkout_mode": "live",
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -3130,7 +3135,8 @@
                     "accent_color": "#ff2382"
                   },
                   "country": "NG",
-                  "currency": "NGN"
+                  "currency": "NGN",
+                  "checkout_mode": "live"
                 }
               }
             }
@@ -7547,9 +7553,144 @@
         "x-bitocard-auth": "public"
       }
     },
+    "/v1/wallet/payment-methods": {
+      "get": {
+        "description": "The ways to top up in your country, best first: card, bank or mobile money, as BitoCard offers them in your market. Empty when none is available yet (reserved bank accounts may still be).",
+        "operationId": "PaymentsController_topUpMethods",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ways to top up in your country, best first. Pass an `id` as `method` when creating a top-up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PaymentMethod"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "payment_method",
+                      "id": "flutterwave",
+                      "label": "Card, bank or mobile money",
+                      "description": "Cards, bank transfer, USSD and mobile money where available"
+                    },
+                    {
+                      "object": "payment_method",
+                      "id": "monnify",
+                      "label": "Bank transfer or card",
+                      "description": "Nigerian bank transfer, USSD or card"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List top-up payment methods",
+        "tags": [
+          "Wallet"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/wallet/top-ups": {
       "post": {
-        "description": "Returns a `checkout_url` for the payer to pay by card, bank or mobile money. The wallet is credited once the payment provider confirms it. Live top-ups need a verified business; in test mode, finish it with the simulate endpoint.",
+        "description": "Returns a `checkout_url` for the payer to pay with the chosen `method` (card, bank or mobile money; see `GET /v1/wallet/payment-methods`). The wallet is credited once the payment provider confirms it. Live top-ups need a verified business; in test mode, finish it with the simulate endpoint.",
         "operationId": "PaymentsController_createTopUp",
         "parameters": [
           {
@@ -7588,6 +7729,7 @@
                   "source": "checkout",
                   "amount": 5000000,
                   "currency": "NGN",
+                  "method": "flutterwave",
                   "checkout_url": "https://checkout.flutterwave.com/v3/hosted/pay/bc7f2a91d0e4",
                   "failure_reason": null,
                   "created_at": "2026-10-06T10:42:05.318Z",
@@ -7764,6 +7906,7 @@
                       "source": "checkout",
                       "amount": 5000000,
                       "currency": "NGN",
+                      "method": "flutterwave",
                       "checkout_url": "https://checkout.flutterwave.com/v3/hosted/pay/bc7f2a91d0e4",
                       "failure_reason": null,
                       "created_at": "2026-10-06T10:42:05.318Z",
@@ -7777,6 +7920,7 @@
                       "source": "bank_transfer",
                       "amount": 2000000,
                       "currency": "NGN",
+                      "method": "flutterwave",
                       "checkout_url": null,
                       "failure_reason": null,
                       "created_at": "2026-10-05T16:22:40.000Z",
@@ -7790,6 +7934,7 @@
                       "source": "checkout",
                       "amount": 5000000,
                       "currency": "NGN",
+                      "method": "flutterwave",
                       "checkout_url": null,
                       "failure_reason": null,
                       "created_at": "2026-10-06T08:00:00.000Z",
@@ -7933,6 +8078,7 @@
                   "source": "checkout",
                   "amount": 5000000,
                   "currency": "NGN",
+                  "method": "flutterwave",
                   "checkout_url": null,
                   "failure_reason": null,
                   "created_at": "2026-10-06T08:00:00.000Z",
@@ -8101,6 +8247,7 @@
                   "source": "checkout",
                   "amount": 5000000,
                   "currency": "NGN",
+                  "method": "flutterwave",
                   "checkout_url": null,
                   "failure_reason": null,
                   "created_at": "2026-10-06T10:42:05.318Z",
@@ -16274,6 +16421,16 @@
             }
           },
           {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
+          },
+          {
             "name": "preview",
             "required": false,
             "in": "query",
@@ -16953,6 +17110,16 @@
             }
           },
           {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
+          },
+          {
             "name": "category",
             "required": false,
             "in": "query",
@@ -17241,6 +17408,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain): only the products that reseller listed for their store. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17369,6 +17546,16 @@
             "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
             "schema": {
               "example": "NG",
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
               "type": "string"
             }
           },
@@ -17561,6 +17748,16 @@
               "example": "NG",
               "type": "string"
             }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17703,6 +17900,16 @@
             "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
             "schema": {
               "example": "NG",
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
               "type": "string"
             }
           },
@@ -17866,6 +18073,16 @@
             "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
             "schema": {
               "example": "NG",
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.",
+            "schema": {
+              "example": "adadigital",
               "type": "string"
             }
           }
@@ -19444,6 +19661,14 @@
           "accent_color": {
             "type": "string",
             "example": "#ff2382"
+          },
+          "checkout_mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ],
+            "description": "Customer checkout: `test` (sandbox) or `live` (real payments; needs a verified business)."
           }
         }
       },
@@ -19473,6 +19698,14 @@
           "accent_color": {
             "type": "string",
             "example": "#ff2382"
+          },
+          "checkout_mode": {
+            "type": "string",
+            "enum": [
+              "test",
+              "live"
+            ],
+            "description": "Customer checkout: `test` (sandbox) or `live` (real payments; needs a verified business)."
           }
         }
       },
@@ -19890,6 +20123,16 @@
             "description": "Minor units of the wallet currency (for example 500000 = NGN 5,000.00).",
             "minimum": 100,
             "example": 500000
+          },
+          "method": {
+            "type": "string",
+            "description": "How to pay: one of the methods `GET /v1/wallet/payment-methods` lists (default: the first). Test mode always uses the sandbox payment page.",
+            "enum": [
+              "stripe",
+              "flutterwave",
+              "monnify",
+              "pawapay"
+            ]
           },
           "return_url": {
             "type": "string",
@@ -20559,6 +20802,7 @@
           "source",
           "amount",
           "currency",
+          "method",
           "checkout_url",
           "failure_reason",
           "created_at",
@@ -20607,6 +20851,17 @@
           "currency": {
             "type": "string",
             "description": "ISO 4217 currency."
+          },
+          "method": {
+            "type": "string",
+            "description": "How it was paid: `stripe` (card), `flutterwave` (card, bank or mobile money), `monnify` (bank transfer or card), `pawapay` (mobile money), or `sandbox` in test mode. Bank transfers into a reserved account name the account’s provider.",
+            "enum": [
+              "stripe",
+              "flutterwave",
+              "monnify",
+              "pawapay",
+              "sandbox"
+            ]
           },
           "checkout_url": {
             "type": [
@@ -23506,6 +23761,43 @@
           }
         }
       },
+      "PaymentMethod": {
+        "type": "object",
+        "title": "PaymentMethod",
+        "description": "A way to pay that BitoCard offers in your market.",
+        "required": [
+          "object",
+          "id",
+          "label",
+          "description"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `payment_method`.",
+            "const": "payment_method"
+          },
+          "id": {
+            "type": "string",
+            "description": "Pass it as `method` when topping up.",
+            "enum": [
+              "stripe",
+              "flutterwave",
+              "monnify",
+              "pawapay"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "description": "What payers see, for example `Card` or `Mobile money`."
+          },
+          "description": {
+            "type": "string",
+            "description": "A line explaining it."
+          }
+        }
+      },
       "ReservedAccount": {
         "type": "object",
         "title": "ReservedAccount",
@@ -25133,6 +25425,7 @@
           "url",
           "status",
           "branding",
+          "checkout_mode",
           "published_at",
           "created_at"
         ],
@@ -25199,6 +25492,14 @@
               }
             }
           },
+          "checkout_mode": {
+            "type": "string",
+            "description": "Customer checkout on the store: `test` (sandbox: simulated payments and orders, for trying the store) until you switch it to `live`, which needs a verified business.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
           "published_at": {
             "type": [
               "string",
@@ -25250,14 +25551,15 @@
       "Storefront": {
         "type": "object",
         "title": "Storefront",
-        "description": "What a published store needs to render: its name, branding, country and currency.",
+        "description": "What a published store needs to render: its name, branding, country, currency and checkout mode.",
         "required": [
           "object",
           "name",
           "subdomain",
           "branding",
           "country",
-          "currency"
+          "currency",
+          "checkout_mode"
         ],
         "additionalProperties": false,
         "properties": {
@@ -25316,6 +25618,14 @@
               "null"
             ],
             "description": "ISO 4217 currency the store sells in."
+          },
+          "checkout_mode": {
+            "type": "string",
+            "description": "`live`, or `test` while the store’s checkout is the sandbox (show shoppers that orders are not real).",
+            "enum": [
+              "test",
+              "live"
+            ]
           }
         }
       },
@@ -27357,6 +27667,7 @@
               "supplier_notification.failed",
               "order.needs_review",
               "top_up.credited",
+              "store.checkout_refused",
               "payout.paid",
               "payout.failed",
               "bank_account.added",
@@ -27525,6 +27836,7 @@
               "supplier_notification.failed",
               "order.needs_review",
               "top_up.credited",
+              "store.checkout_refused",
               "payout.paid",
               "payout.failed",
               "bank_account.added",
@@ -27776,6 +28088,7 @@
               "zendit",
               "pawapay",
               "flutterwave",
+              "stripe",
               "monnify"
             ]
           },
@@ -27922,6 +28235,7 @@
               "zendit",
               "pawapay",
               "flutterwave",
+              "stripe",
               "monnify"
             ]
           },
@@ -28449,6 +28763,7 @@
                     "source": "checkout",
                     "amount": 5000000,
                     "currency": "NGN",
+                    "method": "flutterwave",
                     "checkout_url": null,
                     "failure_reason": null,
                     "created_at": "2026-10-06T08:00:00.000Z",
@@ -28539,6 +28854,7 @@
                     "source": "checkout",
                     "amount": 5000000,
                     "currency": "NGN",
+                    "method": "flutterwave",
                     "checkout_url": null,
                     "failure_reason": "The payment failed.",
                     "created_at": "2026-10-06T08:00:00.000Z",
