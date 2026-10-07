@@ -1,6 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { worldwideCategories } from '../catalogue/pricing.service.js';
+import { worldwideCategories, worldwideCountry } from '../catalogue/pricing.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Brand, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
@@ -52,10 +53,23 @@ type Availability = { where: Prisma.ProductWhereInput; categories: Set<ProductCa
  */
 @Injectable()
 export class StorefrontService {
+  /** The shopper's market for the request in progress (`inMarket`), or null for the whole store. */
+  private readonly market = new AsyncLocalStorage<string | null>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
   ) {}
+
+  /**
+   * Runs `work` for a shopper who chose a market (bitocard.com asks on the first visit and remembers it): other
+   * countries' local products (their airtime, data, bills, pay-TV, mobile money) are left out, while products usable
+   * anywhere (gift cards, eSIMs, software, numbers) stay. `global` or nothing shows the whole store.
+   */
+  inMarket<T>(market: string | undefined, work: () => Promise<T>) {
+    const code = market && market.toLowerCase() !== 'global' ? market.toUpperCase() : null;
+    return this.market.run(code, work);
+  }
 
   // -- What is on sale -------------------------------------------------------------------------------------------
 
@@ -71,9 +85,11 @@ export class StorefrontService {
     ]);
     const categories = new Set(enabled.map(row => row.category));
     const worldwide = [...categories].filter(category => worldwideCategories.has(category));
+    const market = this.market.getStore() ?? null;
     return {
       categories,
       where: {
+        ...(market ? { AND: [{ OR: [{ country: market }, { country: worldwideCountry }, { category: { in: [...worldwideCategories] } }] }] } : {}),
         active: true,
         // Only products an admin has listed on BitoCard's store (Catalog > Products > List).
         listed: true,
@@ -349,7 +365,8 @@ export class StorefrontService {
    * sale there (none yet is fine), plus any other country with products on sale.
    */
   async countries() {
-    const { where } = await this.availability();
+    // Always the whole store's countries, so a shopper can pick another market.
+    const { where } = await this.market.run(null, () => this.availability());
     const [grouped, markets] = await Promise.all([
       this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } }),
       this.prisma.country.findMany({ select: { code: true, name: true } }),
@@ -357,7 +374,8 @@ export class StorefrontService {
     const counts = new Map(grouped.map(row => [row.country, row._count._all]));
     const codes = new Set([...markets.map(row => row.code), ...counts.keys()]);
     return [...codes]
-      .filter(code => /^[A-Z]{2}$/.test(code))
+      // Products usable anywhere (`WW`) are not a country to pick: they show in every country.
+      .filter(code => /^[A-Z]{2}$/.test(code) && code !== worldwideCountry)
       .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0 }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }

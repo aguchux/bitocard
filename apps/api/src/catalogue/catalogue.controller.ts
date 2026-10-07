@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { adminId } from '../countries/countries.controller.js';
@@ -58,6 +58,13 @@ class RecipientDto {
   @ApiPropertyOptional({ enum: ['change', 'renew'], default: 'change', description: 'Pay-TV: change to this package, or renew it as the current package.' })
   @IsOptional() @IsIn(['change', 'renew'])
   transaction_type?: 'change' | 'renew';
+
+  @ApiPropertyOptional({
+    description: 'Gift cards and software licences: your customer’s email address. Once the order is delivered, the codes or licence keys are emailed there under your store’s name, as well as being returned on the order.',
+    example: 'ada@example.com',
+  })
+  @IsOptional() @IsEmail() @Length(3, 254)
+  email?: string;
 }
 
 class CreateQuoteDto {

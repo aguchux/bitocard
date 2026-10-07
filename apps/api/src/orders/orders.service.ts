@@ -19,7 +19,10 @@ import { EventsService } from '../webhooks/events.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
 import { connectable } from '../reseller-integrations/connectable.js';
 import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
+import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { deliveryEmail, type EmailedDelivery } from '../notifications/templates.js';
+import { emailedCategories } from '../catalogue/quotes.service.js';
 import { sellerFor } from './seller.js';
 
 /** When to check an unconfirmed order again, after each check. After the last, it joins the exception queue. */
@@ -64,6 +67,7 @@ export class OrdersService {
     private readonly fees: PlatformFeesService,
     private readonly own: OwnSuppliersService,
     private readonly inbox: InboxService,
+    private readonly email: EmailService,
   ) {}
 
   private encryption() {
@@ -408,6 +412,44 @@ export class OrdersService {
     if (claimed) {
       this.events.committed();
       await this.settle(order.id);
+      await this.emailDeliveries(order.id);
+    }
+  }
+
+  /**
+   * Emails the codes or licence keys to the reseller's customer when the quote named an address (`recipient.email`),
+   * under the reseller's store name. Sent once: the order is claimed (`delivery_emailed_at`) before sending and released
+   * if the send fails, so the `orders` job retries it for a day. Never throws, and never logs the codes.
+   */
+  private async emailDeliveries(orderId: string) {
+    const now = new Date();
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { product: true, deliveries: true } });
+    const to = (order?.recipient as RecipientRecord | null)?.email;
+    if (!order || order.status !== 'completed' || order.deliveryEmailedAt || !to || !emailedCategories.has(order.product.category)) return false;
+    const coded = order.deliveries.filter(delivery => delivery.codeEncrypted && (delivery.kind === 'gift_card' || delivery.kind === 'licence_key'));
+    if (!coded.length) return false;
+    const claimed = await this.prisma.order.updateMany({ where: { id: orderId, deliveryEmailedAt: null }, data: { deliveryEmailedAt: now } });
+    if (claimed.count === 0) return false;
+    try {
+      const encryption = this.encryption();
+      const [store, reseller] = await Promise.all([
+        this.prisma.store.findFirst({ where: { resellerId: order.resellerId }, select: { name: true } }),
+        this.prisma.reseller.findUniqueOrThrow({ where: { id: order.resellerId }, select: { name: true } }),
+      ]);
+      const deliveries: EmailedDelivery[] = coded.map(delivery => ({
+        kind: delivery.kind as EmailedDelivery['kind'],
+        code: encryption.decrypt(delivery.codeEncrypted!),
+        ...(delivery.pinEncrypted ? { pin: encryption.decrypt(delivery.pinEncrypted) } : {}),
+        ...(delivery.details ? { details: delivery.details as Record<string, string> } : {}),
+      }));
+      await this.email.send(
+        deliveryEmail(to, { store: store?.name ?? reseller.name, product: order.product.name, deliveries, instructions: order.product.redeemInstructions, sandbox: order.mode === 'test' }),
+      );
+      return true;
+    } catch (error) {
+      await this.prisma.order.updateMany({ where: { id: orderId, deliveryEmailedAt: now }, data: { deliveryEmailedAt: null } });
+      this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', orderId }, 'Could not email the delivery; the orders job retries it');
+      return false;
     }
   }
 
@@ -507,7 +549,7 @@ export class OrdersService {
       orderBy: { nextCheckAt: 'asc' },
       take: 50,
     });
-    const outcome = { checked: 0, completed: 0, failed: 0, repaired: 0 };
+    const outcome = { checked: 0, completed: 0, failed: 0, repaired: 0, emailed: 0 };
     for (const order of due) {
       try {
         const after = await this.attempt(order.id, 'check');
@@ -530,6 +572,14 @@ export class OrdersService {
       await this.settle(order.id);
       outcome.repaired += 1;
     }
+    // Delivery emails that could not be sent are retried for a day.
+    const unsent = await this.prisma.order.findMany({
+      where: { status: 'completed', deliveryEmailedAt: null, completedAt: { gte: new Date(now.getTime() - 24 * 3600_000) }, recipient: { path: ['email'], string_contains: '@' } },
+      select: { id: true },
+      take: 50,
+      orderBy: { completedAt: 'asc' },
+    });
+    for (const order of unsent) if (await this.emailDeliveries(order.id)) outcome.emailed += 1;
     return outcome;
   }
 

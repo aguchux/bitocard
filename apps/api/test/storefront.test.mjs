@@ -63,6 +63,25 @@ describe('the public catalogue', () => {
     assert.equal((await visitor.get('/v1/store/products?category=nope')).status, 400);
   });
 
+  test('a shopper’s market leaves out other countries’ local products and keeps those usable anywhere', async () => {
+    const all = (await visitor.get('/v1/store/products?limit=60')).json;
+    assert.ok(all.data.some(item => item.country === 'NG' && !item.global), 'Nigerian airtime on sale');
+    const ghana = (await visitor.get('/v1/store/products?limit=60&market=GH')).json;
+    assert.ok(ghana.data.every(item => item.global || item.country === 'GH'), 'no Nigerian airtime for a shopper in Ghana');
+    assert.equal(ghana.data.filter(item => item.global).length, all.data.filter(item => item.global).length, 'gift cards and the like stay');
+    const nigeria = (await visitor.get('/v1/store/products?limit=60&market=ng')).json;
+    assert.ok(nigeria.data.some(item => item.country === 'NG' && !item.global));
+    assert.equal((await visitor.get('/v1/store/products?limit=60&market=global')).json.total, all.total, 'global shows everything');
+    const search = (await visitor.get('/v1/store/search?q=mtn&market=GH')).json;
+    assert.ok(search.products.every(item => item.global || item.country !== 'NG'));
+    assert.equal((await visitor.get('/v1/store/home?market=GH')).status, 200);
+    assert.equal((await visitor.get('/v1/store/categories?market=GH')).status, 200);
+    assert.equal((await visitor.get('/v1/store/brands?market=GH')).status, 200);
+    const navigation = (await visitor.get('/v1/store/navigation?market=GH')).json;
+    assert.ok(navigation.countries.some(country => country.code === 'NG'), 'every country stays choosable');
+    assert.equal((await visitor.get('/v1/store/products?market=nigeria')).status, 400);
+  });
+
   test('a product page has its face values and related products; unavailable ones are not found', async () => {
     const key = await productKey('amazon');
     const res = await visitor.get(`/v1/store/products/${encodeURIComponent(key)}`);

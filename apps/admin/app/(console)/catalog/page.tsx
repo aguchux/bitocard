@@ -257,7 +257,7 @@ function Products() {
                   ),
                 },
                 { key: "category", header: "Category", cell: product => categoryName(product.category), hideOnMobile: true },
-                { key: "market", header: "Market", cell: product => <Badge dot={false}>{product.country}</Badge> },
+                { key: "market", header: "Market", cell: product => <Badge dot={false}>{product.country === "WW" ? "Worldwide" : product.country}</Badge> },
                 {
                   key: "offers",
                   header: "Supplier offers",

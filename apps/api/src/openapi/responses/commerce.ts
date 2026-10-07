@@ -145,7 +145,7 @@ const pricingExample = {
 
 const orderProduct = shape({ id: uuid('Product ID.'), name: str('Product name.'), category: category() }, 'The product.');
 const recipient = stringMap(
-  'Who receives it: `phone` for airtime and data; `account_number` (smartcard, IUC or meter) for pay-TV and bills, with the `account_name` the provider returned for the customer to confirm (and, for pay-TV, `current_package` and `transaction_type`). Null when the product needs no recipient.',
+  'Who receives it: `phone` for airtime and data; `account_number` (smartcard, IUC or meter) for pay-TV and bills, with the `account_name` the provider returned for the customer to confirm (and, for pay-TV, `current_package` and `transaction_type`); `email` for gift cards and software when you asked for the codes to be emailed to your customer. Null when the product needs no recipient.',
   true,
 );
 
@@ -226,7 +226,7 @@ const delivery = shape(
     code: nullableStr('The gift card code, licence key or electricity token. A secret: show it only to your customer.'),
     pin: nullableStr('The gift card PIN, where it has one. A secret.'),
     serial: nullableStr('A serial number, or the phone number for `virtual_number`.'),
-    details: stringMap('More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, or `number` and `number_type` for a virtual number.'),
+    details: stringMap('More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, `duration` for a software licence (for example `1 year` or `Lifetime`), or `number` and `number_type` for a virtual number.'),
   },
   'One delivered item.',
 );

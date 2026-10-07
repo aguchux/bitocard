@@ -80,7 +80,8 @@ export type CreateQuote = {
   product_id: string;
   face_value: number;
   quantity?: number;
-  recipient?: { phone?: string; account_number?: string; transaction_type?: 'change' | 'renew' };
+  /** `email`: gift cards and software, the customer the codes or keys are emailed to once delivered. */
+  recipient?: { phone?: string; account_number?: string; transaction_type?: 'change' | 'renew'; email?: string };
   customer_reference?: string;
 };
 

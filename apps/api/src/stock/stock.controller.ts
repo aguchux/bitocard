@@ -24,9 +24,12 @@ class CodesDto {
 
 class CreateStockDto {
   @IsIn(stockCategories) category: StockCategory;
-  /** Where the code can be used (the licence or card region). */
-  @Matches(/^[A-Za-z]{2}$/) country: string;
+  /** Gift cards: where the card works. Software is global, so it is ignored for software. */
+  @IsOptional() @Matches(/^[A-Za-z]{2}$/) country?: string;
+  /** A brand set up under Catalog > Brands (its slug or name). */
   @IsString() @Length(2, 60) brand: string;
+  /** Software: the licence term in months, 0 for lifetime. */
+  @IsOptional() @IsInt() @Min(0) @Max(120) duration_months?: number;
   @IsString() @Length(2, 120) title: string;
   @IsOptional() @IsString() @Length(0, 2000) description?: string;
   @IsOptional() @IsString() @Length(0, 2000) redeem_instructions?: string;

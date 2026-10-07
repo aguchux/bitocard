@@ -27,6 +27,8 @@ export type StockItem = {
     listed: boolean;
   };
   currency: string;
+  /** Software: the licence term in months (0 for lifetime); null for gift cards. */
+  duration_months: number | null;
   /** What BitoCard paid for one code, minor units. */
   cost: number;
   /** This product's own margin rule, or null when the category or default rule applies. */
@@ -53,8 +55,12 @@ export type StockCode = {
 export type StockCodeInput = { code: string; pin?: string };
 export type StockItemInput = {
   category: StockCategory;
-  country: string;
+  /** Gift cards: where the card works. Software is global (`WW`). */
+  country?: string;
+  /** A brand's slug from Catalog > Brands. */
   brand: string;
+  /** Software: the licence term in months, 0 for lifetime. */
+  duration_months?: number;
   title: string;
   description?: string;
   redeem_instructions?: string;
@@ -129,3 +135,12 @@ export function parseStockCodes(text: string): StockCodeInput[] {
   }
   return codes;
 }
+
+/** Licence terms offered when stocking software, in months (0 is lifetime). */
+export const licenceTerms = [1, 3, 6, 12, 24, 36, 0] as const;
+
+/** A licence term as people read it: `Lifetime`, `1 month`, `6 months`, `1 year`, `2 years`. */
+export const termLabel = (months: number) => (months === 0 ? 'Lifetime' : months % 12 === 0 ? (months === 12 ? '1 year' : `${months / 12} years`) : months === 1 ? '1 month' : `${months} months`);
+
+/** Licence keys pasted one per line (blank lines ignored, duplicates kept once). */
+export const parseLicenceKeys = (text: string): StockCodeInput[] => [...new Set(text.split(/\r?\n/).map(line => line.trim()).filter(Boolean))].map(code => ({ code }));

@@ -26,7 +26,7 @@ export type QuoteInput = {
   product_id: string;
   face_value: number;
   quantity?: number;
-  recipient?: { phone?: string; account_number?: string; transaction_type?: 'change' | 'renew' };
+  recipient?: { phone?: string; account_number?: string; transaction_type?: 'change' | 'renew'; email?: string };
   customer_reference?: string;
 };
 
@@ -34,6 +34,9 @@ type RecipientRecord = { phone?: string; account_number?: string; account_name?:
 
 /** A rate in parts per billion as a percentage string (exact). */
 const percent = (ratePpb: number) => (ratePpb / 10_000_000).toFixed(7).replace(/\.?0+$/, '');
+
+/** Categories delivered as codes or keys, which can be emailed to the customer (`recipient.email`). */
+export const emailedCategories = new Set<string>(['gift_cards', 'software']);
 
 const invalid = (message: string, param: string, code = 'parameter_invalid') => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 
@@ -107,6 +110,11 @@ export class QuotesService {
       if (input.recipient?.phone) recipient.phone = this.phone(product, input.recipient.phone);
     }
     if (product.category === 'pay_tv') recipient.transaction_type = input.recipient?.transaction_type ?? 'change';
+    if (input.recipient?.email) {
+      // Codes and licence keys are emailed to the customer once delivered; other products have nothing to email.
+      if (!emailedCategories.has(product.category)) throw invalid('recipient.email is only for gift cards and software licences.', 'recipient.email');
+      recipient.email = input.recipient.email.trim().toLowerCase();
+    }
 
     let priced = await this.pricing.choose(ctx, product, face);
     if (priced.offer.supplierCode === stockSupplier && mode === 'live') {

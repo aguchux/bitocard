@@ -6,10 +6,11 @@ import { legalDocuments } from "@bitocard/ui/legal";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { CountryPicker } from "./country-picker";
 import { CurrencyMenu } from "./currency-menu";
+import { MarketChooser } from "./market-chooser";
 import { DesktopNav, MobileMenu } from "./header-menus";
 
-/** The store header: wordmark, the category menus, then currency, sign in and the reseller call to action. */
-export function StoreHeader({ groups }: { groups: StoreNavigationGroup[] }) {
+/** The store header: wordmark, the category menus, then the shopper's country, currency, sign in and the reseller call to action. */
+export function StoreHeader({ groups, countries, market }: { groups: StoreNavigationGroup[]; countries: StoreCountry[]; market: string | null }) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
@@ -21,6 +22,7 @@ export function StoreHeader({ groups }: { groups: StoreNavigationGroup[] }) {
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
           </Link>
+          <MarketChooser countries={countries} market={market} />
           <div className="hidden lg:block">
             <CurrencyMenu />
           </div>

@@ -21,7 +21,7 @@ describe('public listing', () => {
     assert.deepEqual(json.data.map(c => c.code).sort(), ['GH', 'KE', 'NG']);
     const ng = json.data.find(c => c.code === 'NG');
     assert.equal(ng.currency, 'NGN');
-    assert.deepEqual(ng.categories.map(c => c.category).sort(), ['airtime', 'bills', 'data', 'gift_cards', 'pay_tv']);
+    assert.deepEqual(ng.categories.map(c => c.category).sort(), ['airtime', 'bills', 'data', 'gift_cards', 'pay_tv', 'software'], 'BitoCard’s own software is global');
     assert.equal(ng.categories.find(c => c.category === 'gift_cards').customer_verification, true);
     assert.equal(ng.categories.find(c => c.category === 'airtime').customer_verification, false);
     // Resellers see the money rules they work under; tax settings stay admin-only.
@@ -50,7 +50,11 @@ describe('admin management', () => {
 
     const created = await admin.post('/v1/admin/countries', { code: 'za', name: 'South Africa', currency: 'zar', min_withdrawal_minor: 18000 });
     assert.equal(created.status, 201);
-    assert.deepEqual([created.json.reseller_signup, created.json.categories.every(c => !c.enabled)], [false, true], 'new countries start closed');
+    assert.deepEqual(
+      [created.json.reseller_signup, created.json.categories.filter(c => c.enabled).map(c => c.category)],
+      [false, ['software']],
+      'new countries start closed, except BitoCard’s own software, which is global',
+    );
 
     const opened = await admin.patch('/v1/admin/countries/ZA', { reseller_signup: true });
     assert.equal(opened.json.reseller_signup, true);

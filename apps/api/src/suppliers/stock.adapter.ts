@@ -5,6 +5,13 @@ import type { ProductCategory, StockCode } from '../generated/prisma/client.js';
 import { ProviderError } from '../payments/provider-error.js';
 import type { Delivery, FulfilmentRequest, FulfilmentResult, SupplierAdapter } from './adapter.js';
 
+/** A licence term as people read it: `Lifetime`, `1 month`, `6 months`, `1 year`, `2 years`, `18 months`. */
+export function durationLabel(months: number) {
+  if (months === 0) return 'Lifetime';
+  if (months % 12 === 0) return months === 12 ? '1 year' : `${months / 12} years`;
+  return months === 1 ? '1 month' : `${months} months`;
+}
+
 /** BitoCard's own stock: codes an admin has bought and added (Catalog > Stock), sold like any supplier's offer. */
 export const stockSupplier = 'stock';
 /** Categories delivered as codes, which can be stocked. */
@@ -80,10 +87,13 @@ export class StockAdapter implements SupplierAdapter {
     }
     const encryption = new Encryption(this.encryptionKey);
     const kind: Delivery['kind'] = request.category === 'software' ? 'licence_key' : 'gift_card';
+    // A licence carries its term, shown with the key on the order and in the email to the customer.
+    const months = (offer.meta as { duration_months?: number } | null)?.duration_months;
+    const details = typeof months === 'number' ? { details: { duration: durationLabel(months) } } : {};
     return {
       status: 'completed',
       supplierTransactionId: `stock_${request.reference}`,
-      deliveries: codes.map(code => ({ kind, code: encryption.decrypt(code.codeEncrypted), ...(code.pinEncrypted ? { pin: encryption.decrypt(code.pinEncrypted) } : {}) })),
+      deliveries: codes.map(code => ({ kind, code: encryption.decrypt(code.codeEncrypted), ...(code.pinEncrypted ? { pin: encryption.decrypt(code.pinEncrypted) } : {}), ...details })),
     };
   }
 }

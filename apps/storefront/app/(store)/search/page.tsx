@@ -5,6 +5,7 @@ import { SearchForm } from "@/components/store/layout";
 import { BrandArt, ProductCard } from "@/components/store/product-card";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
 import { query, storeApi } from "@/lib/api";
+import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 
 export const metadata: Metadata = { title: "Search", robots: { index: false, follow: true } };
@@ -17,7 +18,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<R
   const q = one(search.q).trim().slice(0, 100);
   const country = one(search.country).toLowerCase();
   const validCountry = /^([a-z]{2}|global)$/.test(country) ? country : "";
-  const [{ countries, groups }, result] = await Promise.all([storeNavigation(), q ? storeApi<StoreSearch>(`/v1/store/search${query({ q, country: validCountry, limit: 36 })}`) : null]);
+  const [{ countries, groups }, result] = await Promise.all([storeNavigation(), q ? storeApi<StoreSearch>(await inMarket(`/v1/store/search${query({ q, country: validCountry, limit: 36 })}`)) : null]);
   const data = result?.ok ? result.data : null;
   const art = categoryArt(groups);
   const found = data ? data.products.length + data.brands.length + data.categories.length + data.countries.length : 0;

@@ -6,16 +6,22 @@ import { Encryption } from '../common/encryption.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type PricingRule, type Product, type StockCodeStatus, type SupplierProduct } from '../generated/prisma/client.js';
+import { worldwideCountry } from '../catalogue/pricing.service.js';
 import { slug } from '../suppliers/adapter.js';
-import { stockCategories, stockCodeHash, stockSupplier } from '../suppliers/stock.adapter.js';
+import { registryBrand } from '../storefront/brand-registry.js';
+import { durationLabel, stockCategories, stockCodeHash, stockSupplier } from '../suppliers/stock.adapter.js';
 
 export type StockCategory = (typeof stockCategories)[number];
 export type StockCodeInput = { code: string; pin?: string };
 
 export type StockItemInput = {
   category: StockCategory;
-  country: string;
+  /** Gift cards: where the card works. Software is global (`WW`), whatever is sent. */
+  country?: string;
+  /** A brand's slug from Catalog > Brands (or the brand registry). */
   brand: string;
+  /** Software: the licence term in months, 0 for lifetime. */
+  duration_months?: number;
   title: string;
   description?: string;
   redeem_instructions?: string;
@@ -35,8 +41,8 @@ const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 're
 const conflict = (code: string, message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message, param);
 
 type Item = SupplierProduct & { product: Product };
-/** What a stock offer keeps in `meta`: the exact cost per code, and whether an admin paused sales. */
-type StockMeta = { cost_minor: number; paused?: boolean };
+/** What a stock offer keeps in `meta`: the exact cost per code, whether an admin paused sales, and a licence's term. */
+type StockMeta = { cost_minor: number; paused?: boolean; duration_months?: number };
 
 /** Cost per unit of face value: the exact cost spread over the single face value, rounded up so it is never under cost. */
 const costRatio = (cost: number, face: bigint) => new Prisma.Decimal(cost).div(face.toString()).toDecimalPlaces(10, Prisma.Decimal.ROUND_UP);
@@ -90,6 +96,8 @@ export class StockService {
         listed: product.listed,
       },
       currency: item.costCurrency,
+      /** Software: the licence term in months (0 for lifetime); null for gift cards. */
+      duration_months: metaOf(item).duration_months ?? null,
       /** What BitoCard paid for one code. */
       cost: metaOf(item).cost_minor,
       /** This product's own margin rule, or null when the category or default rule applies. */
@@ -130,16 +138,37 @@ export class StockService {
     return this.present(await this.load(id));
   }
 
+  /** A brand must be set up first (Catalog > Brands) or known to the brand registry, so the store shows it properly. */
+  private async knownBrand(input: string) {
+    const brand = slug(input);
+    if (registryBrand(brand)) return brand;
+    if (await this.prisma.brand.findUnique({ where: { slug: brand } })) return brand;
+    if (await this.prisma.product.findFirst({ where: { brand }, select: { id: true } })) return brand;
+    throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'brand_unknown', 'Add this brand under Catalog > Brands first, then choose it here.', 'brand');
+  }
+
   /**
-   * Adds a product to BitoCard's stock, with any codes. The product key is built from the category, country, brand
-   * and title; if a product with that key already exists (from a supplier) with the same single face value, the stock
-   * is added to it as another source, otherwise the key is refused.
+   * Adds a product to BitoCard's stock, with any codes. Software is global (country `WW`, sold in every market where
+   * software is on) and has a licence term, which is part of the product: the same title for another term is another
+   * product. The product key is built from the category, country, brand, title (and term); if a product with that key
+   * already exists (from a supplier) with the same single face value, the stock is added to it as another source,
+   * otherwise the key is refused.
    */
   async create(actorId: string | null, input: StockItemInput) {
-    const country = input.country.toUpperCase();
+    const software = input.category === 'software';
+    if (!software && !input.country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Choose the region where the gift card works.', 'country');
+    if (software && input.duration_months === undefined) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Choose the licence term (0 for lifetime).', 'duration_months');
+    }
+    if (!software && input.duration_months !== undefined) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Only software licences have a term.', 'duration_months');
+    }
+    const country = software ? worldwideCountry : input.country!.toUpperCase();
     const currency = input.currency.toUpperCase();
-    const brand = slug(input.brand);
-    const key = `${input.category}:${country}:${brand}:${slug(input.title, [input.brand])}`;
+    const brand = await this.knownBrand(input.brand);
+    const term = software ? durationLabel(input.duration_months!) : null;
+    const key = `${input.category}:${country}:${brand}:${slug(input.title, [input.brand, brand])}${software ? `-${input.duration_months === 0 ? 'lifetime' : `${input.duration_months}m`}` : ''}`;
+    const name = term ? `${input.title.trim()} (${term})` : input.title.trim();
     const face = BigInt(input.face_value);
     const existing = await this.prisma.product.findUnique({ where: { key }, include: { supplierProducts: { where: { supplierCode: stockSupplier } } } });
     if (existing) {
@@ -157,7 +186,7 @@ export class StockService {
             category: input.category,
             country,
             brand,
-            name: input.title.trim(),
+            name,
             faceCurrency: currency,
             denominationType: 'fixed',
             fixedValues: [face],
@@ -177,7 +206,7 @@ export class StockService {
           costCurrency: currency,
           costRatio: costRatio(input.cost, face),
           costFeeMinor: 0n,
-          meta: { cost_minor: input.cost } satisfies StockMeta,
+          meta: { cost_minor: input.cost, ...(software ? { duration_months: input.duration_months } : {}) } satisfies StockMeta,
           available: false,
           syncedAt: new Date(),
         },

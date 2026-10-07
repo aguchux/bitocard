@@ -28,6 +28,8 @@ export default function PrivacyNotice() {
       <Section id="collect" title="3. What we collect">
         <h3>When you visit our websites</h3>
         <p>Like any website, our servers receive technical information so they can deliver pages and protect the service. This includes your IP address, browser and device type, the pages you request, the referring page, and the date and time of your visit. Our hosting provider processes this information in server and security logs.</p>
+        <h3>When you choose your country on our store</h3>
+        <p>If you tell our store which country you shop from (or that you want to see everything), we remember that choice in a cookie on your device so the store can show products for your country. We use it only for that, keep no record of it against you, and you can change or delete it at any time. See our <Link href="/documents/cookies">cookie notice</Link>.</p>
         <h3>When you contact us</h3>
         <p>If you email us, we receive your email address, your name if you include it, and the content of your message.</p>
         <h3>What we do not collect</h3>

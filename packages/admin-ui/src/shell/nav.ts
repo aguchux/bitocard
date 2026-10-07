@@ -42,6 +42,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     items: [
       { label: 'Products', href: '/catalog', icon: Package },
       { label: 'Stock', href: '/catalog/stock', icon: KeyRound },
+      { label: 'Brands', href: '/catalog/brands', icon: Image },
       { label: 'Suppliers', href: '/catalog/suppliers', icon: Truck },
       { label: 'Pricing rules', href: '/catalog/pricing', icon: BadgePercent },
     ],
@@ -66,7 +67,6 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     title: 'Storefront',
     items: [
       { label: 'Home page', href: '/storefront', icon: LayoutGrid },
-      { label: 'Brands', href: '/storefront/brands', icon: Image },
       { label: 'Brand registry', href: '/storefront/registry', icon: BookImage },
       { label: 'Categories', href: '/storefront/categories', icon: Shapes },
       { label: 'Media library', href: '/storefront/media', icon: Images },

@@ -3,6 +3,7 @@ import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { HomeSections } from "@/components/store/sections";
 import { storeApi } from "@/lib/api";
+import { inMarket } from "@/lib/market";
 
 export const revalidate = 60;
 
@@ -30,7 +31,7 @@ const offline: ResolvedSection[] = [
  * approved default layout, so bitocard.com is always the store; resellers find their page through its links.
  */
 export default async function Home() {
-  const home = await storeApi<StoreHome>("/v1/store/home");
+  const home = await storeApi<StoreHome>(await inMarket("/v1/store/home"));
   return (
     <>
       <JsonLd

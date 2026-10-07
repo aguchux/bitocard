@@ -33,9 +33,9 @@ export const ogPages = {
     chips: ["Acceptable use", "Intellectual property", "Governing law"],
   },
   "/documents/cookies": {
-    alt: "BitoCard cookie notice – no cookies today, consent first",
+    alt: "BitoCard cookie notice – only the cookies we need, consent first",
     crumbs: [host, "Documents", "Cookie notice"], eyebrow: updated, title: "Cookie notice",
-    subtitle: "We set no cookies today, and we will ask for your consent first if that ever changes.",
+    subtitle: "Only the cookies our sites need, never for tracking, and your consent first for anything optional.",
     chips: ["No tracking", "No analytics", "Consent first"],
   },
   "/documents/notice": {

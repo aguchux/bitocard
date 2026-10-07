@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Search, X } from "lucide-react";
 import { productFeatureLabels, type StoreCountry, type StoreList, type StoreNavigationGroup, type StoreProduct } from "@bitocard/api-client/storefront";
 import { query, storeApi } from "@/lib/api";
+import { inMarket } from "@/lib/market";
 import { featureIcon, filterFeatures, isFeature } from "./features";
 import { ProductCard } from "./product-card";
 import { CategoryIcon, GroupIcon } from "./category-icon";
@@ -38,7 +39,7 @@ export function readParams(search: Record<string, string | string[] | undefined>
 export async function loadCatalogue(base: { category?: string; group?: string }, params: CatalogueParams) {
   const page = Number(params.page ?? 1);
   const result = await storeApi<StoreList<StoreProduct>>(
-    `/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, features: params.features, limit: pageSize, offset: (page - 1) * pageSize })}`,
+    await inMarket(`/v1/store/products${query({ ...base, q: params.q, country: params.country, brand: params.brand, tag: params.tag, sort: params.sort, features: params.features, limit: pageSize, offset: (page - 1) * pageSize })}`),
   );
   return { page, result };
 }

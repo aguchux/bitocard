@@ -5,8 +5,12 @@ import { KeyRound, PackagePlus, Search } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, Field, FilterSelect, formatBps, formatDateTime, formatMoney, Input, KeyValue, Notice, PageHeader, Select, Textarea, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
+  licenceTerms,
+  parseLicenceKeys,
   parseStockCodes,
   stockCategories,
+  termLabel,
+  useStorefrontBrandsQuery,
   type StockCategory,
   type StockCode,
   type StockCodeStatus,
@@ -29,21 +33,35 @@ function stockStatus(item: StockItem) {
   return <Badge tone="green" dot={false}>On sale</Badge>;
 }
 
-/** Codes pasted one per line, `code | pin` for cards with a PIN. */
-function CodesField({ id, value, onChange }: { id: string; value: string; onChange: (value: string) => void }) {
-  const count = parseStockCodes(value).length;
+/** Where a stock item can be used: a country, or anywhere (software is global). */
+const regionOf = (country: string) => (country === "WW" ? "Worldwide" : country);
+
+/** What a pasted list holds: licence keys one per line (software), or gift card codes with an optional PIN. */
+const parseFor = (category: StockCategory, text: string) => (category === "software" ? parseLicenceKeys(text) : parseStockCodes(text));
+
+/** Codes pasted one per line: licence keys for software, `code | pin` for gift cards with a PIN. */
+function CodesField({ id, category, value, onChange }: { id: string; category: StockCategory; value: string; onChange: (value: string) => void }) {
+  const count = parseFor(category, value).length;
+  const software = category === "software";
+  const noun = software ? "licence key" : "code";
   return (
-    <Field label="Codes" htmlFor={id} hint={`One per line; add a PIN after a bar (CODE | PIN). ${count.toLocaleString("en-GB")} code${count === 1 ? "" : "s"}. Codes are encrypted and never shown again.`}>
-      <Textarea id={id} value={value} onChange={event => onChange(event.target.value)} className="font-mono text-sm" rows={6} spellCheck={false} autoComplete="off" />
+    <Field
+      label={software ? "Licence keys" : "Codes"}
+      htmlFor={id}
+      hint={`One per line${software ? "" : "; add a PIN after a bar (CODE | PIN)"}. ${count.toLocaleString("en-GB")} ${noun}${count === 1 ? "" : "s"}. They are encrypted and never shown again.`}
+    >
+      <Textarea id={id} value={value} onChange={event => onChange(event.target.value)} className="font-mono text-sm" rows={6} spellCheck={false} autoComplete="off" placeholder={software ? "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" : "CODE | PIN"} />
     </Field>
   );
 }
 
 function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [create, state] = useCreateStockMutation();
+  const brands = useStorefrontBrandsQuery();
   const [category, setCategory] = useState<StockCategory>("software");
   const [country, setCountry] = useState("US");
   const [brand, setBrand] = useState("");
+  const [term, setTerm] = useState<number>(12);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -57,14 +75,22 @@ function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void 
   const faceMinor = toMinor(face);
   const costMinor = toMinor(cost);
   const marginBps = margin.trim() === "" ? undefined : Math.round(Number(margin) * 100);
+  const software = category === "software";
   const valid =
-    /^[A-Za-z]{2}$/.test(country) && /^[A-Za-z]{3}$/.test(currency) && brand.trim().length >= 2 && title.trim().length >= 2 && faceMinor !== null && costMinor !== null && (marginBps === undefined || (marginBps >= 0 && marginBps <= 5000));
+    (software || /^[A-Za-z]{2}$/.test(country)) &&
+    /^[A-Za-z]{3}$/.test(currency) &&
+    brand !== "" &&
+    title.trim().length >= 2 &&
+    faceMinor !== null &&
+    costMinor !== null &&
+    (marginBps === undefined || (marginBps >= 0 && marginBps <= 5000));
 
   const submit = async () => {
     const result = await create({
       category,
-      country: country.toUpperCase(),
-      brand: brand.trim(),
+      // Software is global; gift cards work in one country.
+      ...(software ? { duration_months: term } : { country: country.toUpperCase() }),
+      brand,
       title: title.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(instructions.trim() ? { redeem_instructions: instructions.trim() } : {}),
@@ -73,11 +99,11 @@ function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void 
       cost: costMinor!,
       ...(marginBps !== undefined ? { margin_bps: marginBps } : {}),
       listed,
-      codes: parseStockCodes(codes),
+      codes: parseFor(category, codes),
     })
       .unwrap()
       .catch(() => null);
-    if (result) setDone(`${result.product.name} added with ${result.added} code${result.added === 1 ? "" : "s"}${result.duplicates ? ` (${result.duplicates} already in stock, skipped)` : ""}.`);
+    if (result) setDone(`${result.product.name} added with ${result.added} ${software ? "licence key" : "code"}${result.added === 1 ? "" : "s"}${result.duplicates ? ` (${result.duplicates} already in stock, skipped)` : ""}.`);
   };
 
   return (
@@ -116,17 +142,51 @@ function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void 
                 ))}
               </Select>
             </Field>
-            <Field label="Brand" htmlFor="stock-brand" hint="For example Microsoft or Kaspersky.">
-              <Input id="stock-brand" value={brand} onChange={event => setBrand(event.target.value)} maxLength={60} />
+            <Field
+              label="Brand"
+              htmlFor="stock-brand"
+              hint={
+                <>
+                  Not listed?{" "}
+                  <AppLink href="/catalog/brands" className="font-semibold text-brand-600 hover:underline">
+                    Add it under Brands
+                  </AppLink>
+                  .
+                </>
+              }
+            >
+              <Select id="stock-brand" value={brand} onChange={event => setBrand(event.target.value)} disabled={brands.isLoading}>
+                <option value="">{brands.isLoading ? "Loading brands…" : "Choose a brand"}</option>
+                {[...(brands.data?.data ?? [])]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map(item => (
+                    <option key={item.slug} value={item.slug}>
+                      {item.name}
+                    </option>
+                  ))}
+              </Select>
             </Field>
-            <Field label="Title" htmlFor="stock-title" hint="The product name customers see.">
+            <Field label="Title" htmlFor="stock-title" hint={software ? "The software's name, for example Microsoft 365 Personal." : "The product name customers see."}>
               <Input id="stock-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={120} />
             </Field>
-            <Field label="Region" htmlFor="stock-country" hint="Two-letter country where the code works (US, GB…).">
-              <Input id="stock-country" value={country} onChange={event => setCountry(event.target.value.toUpperCase())} maxLength={2} />
-            </Field>
+            {software ? (
+              <Field label="Licence term" htmlFor="stock-term" hint="Each term is its own product, priced on its own.">
+                <Select id="stock-term" value={String(term)} onChange={event => setTerm(Number(event.target.value))}>
+                  {licenceTerms.map(months => (
+                    <option key={months} value={months}>
+                      {termLabel(months)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : (
+              <Field label="Region" htmlFor="stock-country" hint="Two-letter country where the card works (US, GB…).">
+                <Input id="stock-country" value={country} onChange={event => setCountry(event.target.value.toUpperCase())} maxLength={2} />
+              </Field>
+            )}
           </div>
-          <Field label="Description" htmlFor="stock-description" hint="Optional: edition, devices, licence term.">
+          {software ? <p className="text-xs text-muted">Software is global: sold to resellers in every market where software is on, through the API and their stores.</p> : null}
+          <Field label="Description" htmlFor="stock-description" hint="Optional: edition, devices, what is included.">
             <Textarea id="stock-description" value={description} onChange={event => setDescription(event.target.value)} maxLength={2000} rows={3} />
           </Field>
           <Field label="How to redeem" htmlFor="stock-instructions" hint="Optional: sent with the code.">
@@ -146,7 +206,7 @@ function AddStockDialog({ open, onClose }: { open: boolean; onClose: () => void 
               <Input id="stock-margin" inputMode="decimal" value={margin} onChange={event => setMargin(event.target.value)} placeholder="10" />
             </Field>
           </div>
-          <CodesField id="stock-codes" value={codes} onChange={setCodes} />
+          <CodesField id="stock-codes" category={category} value={codes} onChange={setCodes} />
           <div className="flex items-center justify-between gap-3 rounded-xl bg-canvas px-4 py-3">
             <span className="text-sm">
               <span className="font-semibold">List on bitocard.com</span>
@@ -186,7 +246,7 @@ function StockDialog({ item, onClose }: { item: StockItem; onClose: () => void }
   const pricingChanged = costMinor !== item.cost || marginBps !== item.margin_bps;
 
   const add = async () => {
-    const result = await addCodes({ id: item.id, codes: parseStockCodes(pasted) })
+    const result = await addCodes({ id: item.id, codes: parseFor(item.product.category as StockCategory, pasted) })
       .unwrap()
       .catch(() => null);
     if (result) {
@@ -196,7 +256,12 @@ function StockDialog({ item, onClose }: { item: StockItem; onClose: () => void }
   };
 
   return (
-    <Dialog open onClose={onClose} title={item.product.name} description={`${categoryName(item.product.category)} · ${item.product.country} · face value ${formatMoney(item.product.face_value, item.product.face_currency)}`}>
+    <Dialog
+      open
+      onClose={onClose}
+      title={item.product.name}
+      description={`${categoryName(item.product.category)} · ${regionOf(item.product.country)}${item.duration_months !== null ? ` · ${termLabel(item.duration_months)}` : ""} · face value ${formatMoney(item.product.face_value, item.product.face_currency)}`}
+    >
       <div className="space-y-5">
         <KeyValue
           items={[
@@ -241,12 +306,12 @@ function StockDialog({ item, onClose }: { item: StockItem; onClose: () => void }
 
         {operator ? (
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Add codes</h3>
+            <h3 className="text-sm font-semibold">{item.product.category === "software" ? "Add licence keys" : "Add codes"}</h3>
             {addState.error ? <Notice tone="red">{errorMessage(addState.error)}</Notice> : null}
             {added ? <Notice tone="green">{added}</Notice> : null}
-            <CodesField id="stock-add-codes" value={pasted} onChange={setPasted} />
-            <Button icon={<KeyRound className="size-4" aria-hidden />} disabled={parseStockCodes(pasted).length === 0} loading={addState.isLoading} onClick={() => void add()}>
-              Add codes
+            <CodesField id="stock-add-codes" category={item.product.category as StockCategory} value={pasted} onChange={setPasted} />
+            <Button icon={<KeyRound className="size-4" aria-hidden />} disabled={parseFor(item.product.category as StockCategory, pasted).length === 0} loading={addState.isLoading} onClick={() => void add()}>
+              {item.product.category === "software" ? "Add licence keys" : "Add codes"}
             </Button>
           </section>
         ) : null}
@@ -363,7 +428,7 @@ export default function StockPage() {
               cell: item => (
                 <span className="block min-w-0">
                   <span className="block truncate font-semibold">{item.product.name}</span>
-                  <span className="block text-xs text-muted">{`${categoryName(item.product.category)} · ${item.product.country}`}</span>
+                  <span className="block text-xs text-muted">{`${categoryName(item.product.category)} · ${regionOf(item.product.country)}${item.duration_months !== null ? ` · ${termLabel(item.duration_months)}` : ""}`}</span>
                 </span>
               ),
             },

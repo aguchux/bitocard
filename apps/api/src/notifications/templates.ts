@@ -213,3 +213,60 @@ export function resellerVerificationEmail(to: string, status: 'approved' | 'decl
     ]),
   };
 }
+
+/** A delivered code or licence key, as emailed to the customer. */
+export type EmailedDelivery = { kind: 'gift_card' | 'licence_key'; code: string; pin?: string; details?: Record<string, string> };
+
+const detailLabels: Record<string, string> = { duration: 'Licence term', expires_at: 'Expires', redemption_url: 'Redeem at' };
+
+/**
+ * The codes or licence keys of an order, emailed to the reseller's customer (`recipient.email`) under the reseller's
+ * store name. Never names BitoCard's suppliers. Codes are secrets: this email is the one place they are sent, and
+ * nothing here is logged (the email service logs only the address and subject).
+ */
+export function deliveryEmail(to: string, input: { store: string; product: string; deliveries: EmailedDelivery[]; instructions?: string | null; sandbox: boolean }): EmailMessage {
+  const what = input.deliveries[0]?.kind === 'licence_key' ? 'licence key' : 'gift card code';
+  const plural = input.deliveries.length > 1 ? `${what}s` : what;
+  const subject = `${input.sandbox ? '[Sandbox] ' : ''}Your ${input.product} ${plural} from ${input.store}`;
+  const intro = [
+    `Thank you for your order from ${input.store}. Here ${input.deliveries.length > 1 ? `are your ${input.deliveries.length} ${plural}` : `is your ${what}`} for ${input.product}.`,
+    'Keep this email safe: anyone with the code can use it.',
+    ...(input.sandbox ? ['This is a sandbox test order: the codes below are not real.'] : []),
+  ];
+  const rows = input.deliveries.map((delivery, index) => {
+    const label = `${what[0].toUpperCase()}${what.slice(1)}${input.deliveries.length > 1 ? ` ${index + 1}` : ''}`;
+    const extras = [
+      ...(delivery.pin ? [['PIN', delivery.pin] as const] : []),
+      ...Object.entries(delivery.details ?? {})
+        .filter(([key]) => detailLabels[key])
+        .map(([key, value]) => [detailLabels[key], value] as const),
+    ];
+    return { label, code: delivery.code, extras };
+  });
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(`Your ${input.product}`)}</h1>`,
+    ...intro.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    ...rows.map(
+      row =>
+        `<div style="border:1px solid #dfe3f0;border-radius:10px;padding:12px 14px;margin:10px 0">` +
+        `<p style="margin:0;font-size:12px;color:#5b6488">${escape(row.label)}</p>` +
+        `<p style="margin:4px 0 0;font-family:Consolas,monospace;font-size:18px;font-weight:bold;word-break:break-all">${escape(row.code)}</p>` +
+        row.extras.map(([name, value]) => `<p style="margin:4px 0 0;font-size:13px">${escape(name)}: <strong>${escape(value)}</strong></p>`).join('') +
+        '</div>',
+    ),
+    ...(input.instructions ? [`<p style="font-size:15px;line-height:1.5"><strong>How to redeem:</strong> ${escape(input.instructions)}</p>`] : []),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  const text = [
+    `Your ${input.product}`,
+    '',
+    ...intro,
+    '',
+    ...rows.flatMap(row => [`${row.label}: ${row.code}`, ...row.extras.map(([name, value]) => `${name}: ${value}`), '']),
+    ...(input.instructions ? [`How to redeem: ${input.instructions}`, ''] : []),
+    `Sent for ${input.store}.`,
+  ].join('\n');
+  return { to, subject, text, html };
+}

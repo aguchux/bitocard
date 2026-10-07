@@ -1306,6 +1306,8 @@ model Order {
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
   completedAt           DateTime?       @map("completed_at")
+  /// When the codes or licence keys were emailed to the customer (`recipient.email`); retried until sent.
+  deliveryEmailedAt     DateTime?       @map("delivery_emailed_at")
   reseller              Reseller        @relation(fields: [resellerId], references: [id])
   product               Product         @relation(fields: [productId], references: [id])
   deliveries            OrderDelivery[]

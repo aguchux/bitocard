@@ -4,7 +4,7 @@ import type { IconName } from "@/components/icons";
 export const documentDetails: Record<string, { icon: IconName; summary: string }> = {
   "/documents/privacy": { icon: "shield", summary: "What our websites collect, why, who we share it with, and your rights in each region." },
   "/documents/terms": { icon: "document", summary: "The rules for using BitoCard websites, and the law that applies where you are." },
-  "/documents/cookies": { icon: "cookie", summary: "We set no cookies today. How we will ask first if that ever changes." },
+  "/documents/cookies": { icon: "cookie", summary: "The few cookies we use: your chosen country and signing in. Never for tracking." },
   "/documents/notice": { icon: "building", summary: "The Golojan group companies behind BitoCard and how to reach them." },
 };
 
@@ -19,7 +19,7 @@ export const regions = [
 
 export const commitments: { icon: IconName; title: string; body: string }[] = [
   { icon: "ban", title: "We don’t sell your data", body: "We do not sell personal information or use it for targeted advertising." },
-  { icon: "cookie", title: "No tracking cookies", body: "Our websites set no cookies and run no analytics or advertising trackers today." },
+  { icon: "cookie", title: "No tracking cookies", body: "We set only the cookies our sites need, such as the country you choose, and run no analytics or advertising trackers." },
   { icon: "scale", title: "Your rights, wherever you are", body: "Access, correction, deletion and more, under the law where you live." },
   { icon: "clock", title: "Updated before we launch", body: "We will publish service terms and update these notices before accounts or payments go live." },
 ];

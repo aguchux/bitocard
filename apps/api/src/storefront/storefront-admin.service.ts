@@ -165,6 +165,9 @@ export class StorefrontAdminService {
   }
 
   async saveBrand(actorId: string | null, slug: string, input: BrandInput) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 60) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A brand slug is lower-case letters, numbers and hyphens, up to 60 characters.', 'slug');
+    }
     const clean = (list: string[] | undefined) => [...new Set((list ?? []).map(item => item.trim().toLowerCase()).filter(Boolean))].slice(0, 20);
     const data = {
       name: input.name.trim(),

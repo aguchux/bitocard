@@ -16264,6 +16264,16 @@
         "operationId": "StorefrontController_home",
         "parameters": [
           {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
+          {
             "name": "preview",
             "required": false,
             "in": "query",
@@ -16933,6 +16943,16 @@
         "operationId": "StorefrontController_products",
         "parameters": [
           {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
+          {
             "name": "category",
             "required": false,
             "in": "query",
@@ -17343,6 +17363,16 @@
         "operationId": "StorefrontController_search",
         "parameters": [
           {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
+          {
             "name": "q",
             "required": true,
             "in": "query",
@@ -17521,7 +17551,18 @@
     "/v1/store/categories": {
       "get": {
         "operationId": "StorefrontController_categories",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Categories on sale.",
@@ -17606,6 +17647,25 @@
               }
             }
           },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
             "content": {
@@ -17636,6 +17696,16 @@
       "get": {
         "operationId": "StorefrontController_brands",
         "parameters": [
+          {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
           {
             "name": "tag",
             "required": false,
@@ -17788,7 +17858,18 @@
       "get": {
         "description": "Category groups on sale with their top brands, and the countries with products.",
         "operationId": "StorefrontController_navigation",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "market",
+            "required": false,
+            "in": "query",
+            "description": "The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The menu and the countries.",
@@ -18050,6 +18131,25 @@
                       "products": 12
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
                 }
               }
             }
@@ -19930,6 +20030,11 @@
             ],
             "default": "change",
             "description": "Pay-TV: change to this package, or renew it as the current package."
+          },
+          "email": {
+            "type": "string",
+            "description": "Gift cards and software licences: your customer’s email address. Once the order is delivered, the codes or licence keys are emailed there under your store’s name, as well as being returned on the order.",
+            "example": "ada@example.com"
           }
         }
       },
@@ -22675,7 +22780,7 @@
               "object",
               "null"
             ],
-            "description": "Who receives it: `phone` for airtime and data; `account_number` (smartcard, IUC or meter) for pay-TV and bills, with the `account_name` the provider returned for the customer to confirm (and, for pay-TV, `current_package` and `transaction_type`). Null when the product needs no recipient.",
+            "description": "Who receives it: `phone` for airtime and data; `account_number` (smartcard, IUC or meter) for pay-TV and bills, with the `account_name` the provider returned for the customer to confirm (and, for pay-TV, `current_package` and `transaction_type`); `email` for gift cards and software when you asked for the codes to be emailed to your customer. Null when the product needs no recipient.",
             "additionalProperties": {
               "type": "string"
             }
@@ -22950,7 +23055,7 @@
                 },
                 "details": {
                   "type": "object",
-                  "description": "More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, or `number` and `number_type` for a virtual number.",
+                  "description": "More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, `duration` for a software licence (for example `1 year` or `Lifetime`), or `number` and `number_type` for a virtual number.",
                   "additionalProperties": {
                     "type": "string"
                   }

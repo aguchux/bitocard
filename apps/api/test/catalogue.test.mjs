@@ -316,6 +316,9 @@ describe('quotes', () => {
     assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 4999, recipient: { phone: '08031234567' } })).json.error.param, 'face_value');
 
     assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 100_000, quantity: 2, recipient: { phone: '08031234567' } })).json.error.param, 'quantity', 'one top-up per quote');
+    const emailed = await browser.post('/v1/quotes', { product_id, face_value: 100_000, recipient: { phone: '08031234567', email: 'ada@example.com' } });
+    assert.deepEqual([emailed.status, emailed.json.error.param], [400, 'recipient.email'], 'only codes and licence keys are emailed');
+    assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 100_000, recipient: { phone: '08031234567', email: 'not-an-email' } })).json.error.param, 'recipient.email');
     const created = await browser.post('/v1/quotes', { product_id, face_value: 100_000, recipient: { phone: '0803 123 4567' }, customer_reference: 'cust-42' });
     assert.equal(created.status, 201);
     const quote = created.json;
