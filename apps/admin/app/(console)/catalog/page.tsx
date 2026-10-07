@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Database, Globe2, Package, Search, Store } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatBps, formatRelative, ImageField, Input, LoadMore, Notice, PageHeader, StatCard, StatusBadge, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatRelative, summariseOffers, ImageField, Input, LoadMore, Notice, PageHeader, StatCard, StatusBadge, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type AdminProduct,
@@ -264,7 +264,7 @@ function Products() {
                   cell: product => {
                     const available = product.offers.filter(offer => offer.available);
                     return available.length ? (
-                      <span className="text-sm">{available.map(offer => `${offer.supplier}${offer.discount_bps ? ` (${formatBps(offer.discount_bps)})` : ""}`).join(", ")}</span>
+                      <span className="text-sm">{summariseOffers(available).join(", ")}</span>
                     ) : (
                       <StatusBadge status="in_review" label="No offer" />
                     );

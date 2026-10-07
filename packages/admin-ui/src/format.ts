@@ -101,3 +101,16 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. T
   const message = (error as { message?: unknown } | null | undefined)?.message;
   return typeof message === 'string' && message ? message : fallback;
 }
+
+/**
+ * A product's supplier offers, one entry per supplier: suppliers such as Zendit list one offer per face value, so a
+ * product can have dozens from the same supplier. `zendit · 24 offers`, with the agreed discount when they all share it.
+ */
+export function summariseOffers(offers: ReadonlyArray<{ supplier: string; discount_bps: number }>) {
+  const bySupplier = new Map<string, number[]>();
+  for (const offer of offers) bySupplier.set(offer.supplier, [...(bySupplier.get(offer.supplier) ?? []), offer.discount_bps]);
+  return [...bySupplier].map(([supplier, discounts]) => {
+    const shared = discounts.every(bps => bps === discounts[0]) ? discounts[0] : 0;
+    return [supplier, discounts.length > 1 ? ` · ${discounts.length} offers` : '', shared ? ` (${formatBps(shared)})` : ''].join('');
+  });
+}
