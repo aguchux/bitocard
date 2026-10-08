@@ -3,9 +3,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
-import { Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Lock, Mail, MailCheck, ShieldCheck } from "lucide-react";
 import { Button, cn, CodeInput, Field, Input, Notice, Wordmark } from "@bitocard/admin-ui";
-import { useAdminMfaSetupMutation, useAdminMfaVerifyMutation, useAdminSessionQuery, useAdminSignInMutation, type MfaSetup } from "@bitocard/api-client/admin";
+import {
+  useAdminForgotPasswordMutation,
+  useAdminMfaSetupMutation,
+  useAdminMfaVerifyMutation,
+  useAdminSessionQuery,
+  useAdminSignInMutation,
+  useAdminSignInStartMutation,
+  type MfaSetup,
+} from "@bitocard/api-client/admin";
 import type { ApiError } from "@bitocard/api-client";
 
 /** Only same-site paths, so a crafted link cannot send an admin elsewhere after sign-in. */
@@ -26,29 +34,38 @@ function IconInput({ icon: Icon, end, className, ...props }: React.ComponentProp
   );
 }
 
-type Step = { kind: "password" } | { kind: "code"; challenge: string; setup: MfaSetup | null } | { kind: "recovery"; codes: string[] };
+type Step =
+  | { kind: "email" }
+  | { kind: "password" }
+  | { kind: "emailed"; reason: "setup" | "reset" }
+  | { kind: "code"; challenge: string; setup: MfaSetup | null }
+  | { kind: "recovery"; codes: string[] };
 
 /**
- * Admin sign-in: email and password, then an authenticator code (set up on first sign-in), then the one-time view of
- * recovery codes. The session is a cookie set by the API.
+ * Admin sign-in: the email first (an address in the API's ADMIN_SETUP_EMAILS with no account yet is set up and emailed
+ * a link to choose its password), then the password (with Forgot password, which emails a reset link to those same
+ * addresses only), then an authenticator code (set up on first sign-in), then the one-time view of recovery codes. The
+ * session is a cookie set by the API.
  */
 export function SignIn() {
   const router = useRouter();
   const next = safeNext(useSearchParams().get("next"));
   const session = useAdminSessionQuery();
-  const [step, setStep] = useState<Step>({ kind: "password" });
+  const [step, setStep] = useState<Step>({ kind: "email" });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
   const [useRecovery, setUseRecovery] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  const [start, startState] = useAdminSignInStartMutation();
+  const [forgot, forgotState] = useAdminForgotPasswordMutation();
   const [signIn, signInState] = useAdminSignInMutation();
   const [setup, setupState] = useAdminMfaSetupMutation();
   const [verify, verifyState] = useAdminMfaVerifyMutation();
 
   useEffect(() => {
-    if (session.data && step.kind === "password") router.replace(next);
+    if (session.data && (step.kind === "email" || step.kind === "password")) router.replace(next);
   }, [session.data, step.kind, next, router]);
 
   useEffect(() => {
@@ -61,6 +78,24 @@ export function SignIn() {
       cancelled = true;
     };
   }, [step]);
+
+  async function submitEmail(event: FormEvent) {
+    event.preventDefault();
+    const result = await start({ email }).unwrap().catch(() => null);
+    if (!result) return;
+    setStep(result.next === "link_sent" ? { kind: "emailed", reason: "setup" } : { kind: "password" });
+  }
+
+  async function forgotPassword() {
+    const result = await forgot({ email }).unwrap().catch(() => null);
+    if (result) setStep({ kind: "emailed", reason: "reset" });
+  }
+
+  function changeEmail() {
+    setPassword("");
+    signInState.reset();
+    setStep({ kind: "email" });
+  }
 
   async function submitPassword(event: FormEvent) {
     event.preventDefault();
@@ -94,13 +129,13 @@ export function SignIn() {
         <Wordmark className="text-3xl" />
       </div>
 
-      {step.kind === "password" ? (
-        <form onSubmit={submitPassword} className="space-y-5" noValidate>
+      {step.kind === "email" ? (
+        <form onSubmit={submitEmail} className="space-y-5" noValidate>
           <div className="text-center">
             <h1 className="text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">Welcome back</h1>
             <p className="mt-2 text-lg text-muted">Sign in to your admin account.</p>
           </div>
-          {signInState.error || setupState.error ? <Notice tone="red">{message(signInState.error ?? setupState.error)}</Notice> : null}
+          {startState.error ? <Notice tone="red">{message(startState.error)}</Notice> : null}
           <Field label="Email address" htmlFor="email" hint="Your @bitocard.com or @golojan.co.uk address.">
             <IconInput
               icon={Mail}
@@ -109,10 +144,34 @@ export function SignIn() {
               autoComplete="username"
               placeholder="admin@bitocard.com"
               required
+              autoFocus
               value={email}
               onChange={event => setEmail(event.target.value)}
             />
           </Field>
+          <Button type="submit" className="min-h-14 w-full text-lg" loading={startState.isLoading} disabled={!email.includes("@")}>
+            Continue
+          </Button>
+          <p className="text-center text-sm text-muted">
+            Need access? <span className="font-semibold text-brand-600">Contact your platform administrator.</span>
+          </p>
+        </form>
+      ) : null}
+
+      {step.kind === "password" ? (
+        <form onSubmit={submitPassword} className="space-y-5" noValidate>
+          <div className="text-center">
+            <h1 className="text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">Enter your password</h1>
+            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 text-muted">
+              <span className="font-semibold text-ink">{email}</span>
+              <button type="button" onClick={changeEmail} className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+                <ArrowLeft className="size-4" aria-hidden /> Change
+              </button>
+            </p>
+          </div>
+          {signInState.error || setupState.error || forgotState.error ? <Notice tone="red">{message(signInState.error ?? setupState.error ?? forgotState.error)}</Notice> : null}
+          {/* Lets password managers match the saved password to this address. */}
+          <input type="email" name="username" autoComplete="username" value={email} readOnly hidden />
           <Field label="Password" htmlFor="password">
             <IconInput
               icon={Lock}
@@ -120,6 +179,7 @@ export function SignIn() {
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               required
+              autoFocus
               value={password}
               onChange={event => setPassword(event.target.value)}
               end={
@@ -138,10 +198,33 @@ export function SignIn() {
           <Button type="submit" className="min-h-14 w-full text-lg" loading={signInState.isLoading || setupState.isLoading}>
             Sign in
           </Button>
-          <p className="text-center text-sm text-muted">
-            Need access? <span className="font-semibold text-brand-600">Contact your platform administrator.</span>
+          <p className="text-center text-sm">
+            <button type="button" onClick={() => void forgotPassword()} disabled={forgotState.isLoading} className="min-h-9 font-semibold text-brand-600 hover:text-brand-700">
+              Forgot password?
+            </button>
           </p>
         </form>
+      ) : null}
+
+      {step.kind === "emailed" ? (
+        <div className="space-y-5 text-center">
+          <MailCheck className="mx-auto size-12 text-brand-600" aria-hidden />
+          <h1 className="text-3xl font-extrabold tracking-tight text-navy-900">Check your email</h1>
+          <p className="text-muted">
+            {step.reason === "setup" ? (
+              <>
+                We emailed <span className="font-semibold text-ink">{email}</span> a link to choose your password. It works once, for 72 hours. Then sign in and set up your authenticator app.
+              </>
+            ) : (
+              <>
+                If <span className="font-semibold text-ink">{email}</span> can be reset here, we have emailed it a link to choose a new password. It works once, for 24 hours.
+              </>
+            )}
+          </p>
+          <Button variant="secondary" className="w-full" onClick={changeEmail}>
+            Back to sign in
+          </Button>
+        </div>
       ) : null}
 
       {step.kind === "code" ? (

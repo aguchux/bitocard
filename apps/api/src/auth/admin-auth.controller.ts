@@ -35,6 +35,13 @@ class MfaVerifyDto extends ChallengeDto {
   code: string;
 }
 
+class AdminEmailDto {
+  @ApiProperty({ format: 'email', example: 'ops@bitocard.com' })
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsEmail()
+  email: string;
+}
+
 class PasswordLinkDto {
   @ApiProperty({ description: 'The token from the emailed set-password link.' })
   @IsString()
@@ -47,6 +54,12 @@ class CompletePasswordLinkDto extends PasswordLinkDto {
   @IsString()
   @Length(passwordLength.min, passwordLength.max)
   password: string;
+
+  @ApiProperty({ required: false, description: 'A new admin\'s name (first password only).' })
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  name?: string;
 
   @ApiProperty({ required: false, description: 'Also remove the authenticator, to set it up again at the next sign-in.' })
   @IsOptional()
@@ -64,6 +77,25 @@ export class AdminAuthController {
     private readonly adminAuth: AdminAuthService,
     private readonly sessions: SessionsService,
   ) {}
+
+  /**
+   * Step 0: the email. `link_sent` when an address in ADMIN_SETUP_EMAILS was set up and emailed a link to choose its
+   * password; otherwise `password` (for every other address, admin or not).
+   */
+  @Public()
+  @Post('start')
+  @HttpCode(HttpStatus.OK)
+  start(@Body() body: AdminEmailDto) {
+    return this.adminAuth.startSignIn(body.email);
+  }
+
+  /** Forgot password: emails a reset link to addresses in ADMIN_SETUP_EMAILS only. The same answer every time. */
+  @Public()
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() body: AdminEmailDto) {
+    return this.adminAuth.forgotPassword(body.email);
+  }
 
   /** Step 1: email and password. Returns a 5-minute challenge to complete with an authenticator code. */
   @Public()
@@ -102,7 +134,7 @@ export class AdminAuthController {
   @Post('password-link/complete')
   @HttpCode(HttpStatus.OK)
   completePasswordLink(@Body() body: CompletePasswordLinkDto) {
-    return this.adminAuth.completePasswordLink(body.token, body.password, { resetAuthenticator: body.reset_authenticator });
+    return this.adminAuth.completePasswordLink(body.token, body.password, { resetAuthenticator: body.reset_authenticator, name: body.name });
   }
 
   @Get('session')

@@ -16,8 +16,6 @@
     "db:studio": "prisma studio",
     "test:docker": "node --env-file=test/docker.env --test --test-concurrency=1 \"test/*.test.mjs\"",
     "smoke": "node scripts/smoke.mjs",
-    "admin:create": "node --env-file-if-exists=.env scripts/create-admin.mjs",
-    "admin:reset-password": "node --env-file-if-exists=.env scripts/reset-admin-password.mjs",
     "push:keys": "node scripts/push-keys.mjs",
     "media:cors": "node scripts/media-cors.mjs",
     "brands:logos": "node scripts/brand-logos.mjs"

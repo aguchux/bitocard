@@ -4,7 +4,7 @@ import { SetPassword } from "./set-password";
 
 export const metadata: Metadata = { title: "Set your password", referrer: "no-referrer" };
 
-/** Where the emailed set-password links (admin:create and admin:reset-password) land. Outside the console's gate. */
+/** Where the emailed set-password links (from the sign-in page: a first visit, or Forgot password) land. Outside the console gate. */
 export default function SetPasswordPage() {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center bg-canvas px-4 py-10 sm:px-6">

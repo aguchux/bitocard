@@ -1,4 +1,4 @@
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Secret, TOTP } from 'otpauth';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
@@ -19,6 +19,13 @@ const maxChallengeAttempts = 5;
 const recoveryCodeCount = 10;
 /** How long an emailed set-password link works: a new admin may take a while to open it; a reset should be used soon. */
 const passwordLinkHours = { create: 72, reset: 24 } as const;
+const passwordLinksPerDay = 5;
+
+/** A first name for a new admin from their address (agu.chux@… is "Agu Chux"); they confirm it on the set-password page. */
+function nameFromEmail(email: string) {
+  const words = email.split('@')[0]!.split(/[._-]+/).filter(Boolean);
+  return words.map(word => word[0]!.toUpperCase() + word.slice(1)).join(' ') || 'Admin';
+}
 export const adminRoles = ['super_admin', 'operations', 'finance', 'support'] as const;
 
 const invalidCredentials = () =>
@@ -41,6 +48,8 @@ function recoveryCode() {
  */
 @Injectable()
 export class AdminAuthService {
+  private readonly logger = new Logger('AdminAuth');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordsService,
@@ -51,8 +60,8 @@ export class AdminAuthService {
   ) {}
 
   /**
-   * Creates an admin. Without a password (the `admin:create` script, through `inviteAdmin`) the account cannot sign in
-   * until its owner sets one with the emailed link.
+   * Creates an admin (tests and `startSignIn`). Without a password the account cannot sign in until its owner sets one
+   * with the emailed link.
    */
   async createAdmin(input: { email: string; name: string; password?: string; roles: string[] }) {
     const email = input.email.trim().toLowerCase();
@@ -72,41 +81,70 @@ export class AdminAuthService {
     });
   }
 
-  /** The `admin:create` script: creates the admin (no password) and emails them the link to set one. */
-  async inviteAdmin(input: { email: string; name: string; roles: string[] }) {
-    this.assertSetupEmail(input.email);
-    await this.createAdmin(input);
-    return this.sendPasswordLink(input.email, 'create');
+  /**
+   * Sign-in step 1, the email. An address in the environment's `ADMIN_SETUP_EMAILS` (on an admin domain) whose admin
+   * account does not exist yet, or has no password yet, gets its account set up (a super admin) and a link to choose
+   * the password: `link_sent`. Every other address goes on to the password (`password`), whether or not it is an
+   * admin, so the answer never tells anyone which addresses are admins.
+   */
+  async startSignIn(emailInput: string) {
+    const email = emailInput.trim().toLowerCase();
+    if (!this.isSetupEmail(email)) return { object: 'admin_sign_in' as const, next: 'password' as const };
+    let user = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'admin', email } } });
+    if (!user) {
+      user = await this.createAdmin({ email, name: nameFromEmail(email), roles: ['super_admin'] }).catch(async (error: unknown) => {
+        // Two first visits at once: the other one created it.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.user.findUniqueOrThrow({ where: { realm_email: { realm: 'admin', email } } });
+        throw error;
+      });
+      await this.audit.record({ actorId: null, action: 'admin.created', targetType: 'user', targetId: user.id, after: { email, roles: user.adminRoles, by: 'ADMIN_SETUP_EMAILS' } });
+    }
+    if (user.passwordHash || user.status !== 'active') return { object: 'admin_sign_in' as const, next: 'password' as const };
+    await this.sendPasswordLink(user, 'create');
+    return { object: 'admin_sign_in' as const, next: 'link_sent' as const };
   }
 
   /**
-   * Emails an admin a one-time link to set their password (the `admin:create` and `admin:reset-password` scripts;
-   * admins have no self-service reset). Only to addresses in the environment's `ADMIN_SETUP_EMAILS`, so whoever runs
-   * a script can never send a link anywhere else. A new link replaces any earlier one. Nothing changes on the account
-   * until the link is used.
+   * "Forgot password": emails a reset link, but only to an address in `ADMIN_SETUP_EMAILS` with an active admin account
+   * (one still without a password gets the set-up link again). The answer is the same whatever happened.
    */
-  async sendPasswordLink(emailInput: string, kind: 'create' | 'reset') {
-    const email = this.assertSetupEmail(emailInput);
-    const user = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'admin', email } } });
-    if (!user) throw new Error(`No admin account for ${email}.`);
+  async forgotPassword(emailInput: string) {
+    const email = emailInput.trim().toLowerCase();
+    if (this.isSetupEmail(email)) {
+      const user = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'admin', email } } });
+      if (user?.status === 'active') await this.sendPasswordLink(user, user.passwordHash ? 'reset' : 'create');
+    }
+    return { object: 'admin_password_reset_requested' as const };
+  }
+
+  /**
+   * Emails an admin a one-time link to set their password. A new link replaces any earlier one; nothing changes on the
+   * account until it is used. At most one a minute and five a day per admin (others are silently skipped), and a failed
+   * send is logged, never shown, so the answers stay the same.
+   */
+  private async sendPasswordLink(user: User, kind: 'create' | 'reset') {
+    const recent = await this.prisma.verificationCode.findMany({
+      where: { userId: user.id, purpose: 'admin_password_link', createdAt: { gt: new Date(Date.now() - 24 * 3600_000) } },
+      select: { createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (recent.length >= passwordLinksPerDay || (recent[0] && Date.now() - recent[0].createdAt.getTime() < 60_000)) return;
     const token = `${user.id}.${randomToken()}`;
     const hours = passwordLinkHours[kind];
     const expiresAt = new Date(Date.now() + hours * 3600_000);
     await this.prisma.$transaction([
       this.prisma.verificationCode.updateMany({ where: { userId: user.id, purpose: 'admin_password_link', consumedAt: null }, data: { consumedAt: new Date() } }),
-      this.prisma.verificationCode.create({ data: { userId: user.id, purpose: 'admin_password_link', target: email, codeHash: sha256(token), expiresAt } }),
+      this.prisma.verificationCode.create({ data: { userId: user.id, purpose: 'admin_password_link', target: user.email, codeHash: sha256(token), expiresAt } }),
     ]);
     // In the fragment, so the token never reaches a server log or a Referer header.
     const link = `${new URL('/set-password', this.config.ADMIN_APP_URL).toString()}#token=${token}`;
-    const sentWith = await this.email.send(adminPasswordLinkEmail(email, { name: user.name, kind, link, hours }));
-    await this.audit.record({
-      actorId: null,
-      action: 'admin.password_link_sent',
-      targetType: 'user',
-      targetId: user.id,
-      after: { email, kind, expires_at: expiresAt.toISOString(), by: `admin:${kind === 'create' ? 'create' : 'reset-password'} script` },
-    });
-    return { admin: user, sentWith, expiresAt };
+    try {
+      await this.email.send(adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours }));
+    } catch (error) {
+      this.logger.error({ err: error, userId: user.id }, 'Could not email an admin password link');
+      return;
+    }
+    await this.audit.record({ actorId: null, action: 'admin.password_link_sent', targetType: 'user', targetId: user.id, after: { email: user.email, kind, expires_at: expiresAt.toISOString() } });
   }
 
   /** What the set-password page shows before the admin chooses a password. */
@@ -127,15 +165,17 @@ export class AdminAuthService {
    * if they ask, removes their authenticator so they set it up again at their next sign-in. The link works once.
    * Admin accounts only; a reseller account with the same email is untouched.
    */
-  async completePasswordLink(token: string, password: string, options: { resetAuthenticator?: boolean } = {}) {
+  async completePasswordLink(token: string, password: string, options: { resetAuthenticator?: boolean; name?: string } = {}) {
     const { user, record } = await this.passwordLink(token);
     await this.passwords.assertAcceptable(password);
     const passwordHash = await this.passwords.hash(password);
     const resetAuthenticator = Boolean(options.resetAuthenticator && user.totp);
+    // A new admin confirms their name with their first password.
+    const name = !user.passwordHash && options.name?.trim() ? options.name.trim() : undefined;
     await this.prisma.$transaction(async tx => {
       const claimed = await tx.verificationCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
       if (claimed.count === 0) throw invalidLink();
-      await tx.user.update({ where: { id: user.id }, data: { passwordHash, failedSignIns: 0, lockedUntil: null } });
+      await tx.user.update({ where: { id: user.id }, data: { passwordHash, failedSignIns: 0, lockedUntil: null, ...(name ? { name } : {}) } });
       await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
       if (resetAuthenticator) await tx.totpCredential.deleteMany({ where: { userId: user.id } });
     });
@@ -144,12 +184,9 @@ export class AdminAuthService {
     return { object: 'admin_password_set' as const, email: user.email, authenticator_reset: resetAuthenticator };
   }
 
-  private assertSetupEmail(emailInput: string) {
-    const email = emailInput.trim().toLowerCase();
-    if (!this.config.ADMIN_SETUP_EMAILS.includes(email)) {
-      throw new Error(`${email} is not in ADMIN_SETUP_EMAILS. Only the addresses listed there (in the environment) can be sent a set-password link.`);
-    }
-    return email;
+  /** Listed in the environment's ADMIN_SETUP_EMAILS (never editable in the app) and on an admin domain. */
+  private isSetupEmail(email: string) {
+    return this.config.ADMIN_SETUP_EMAILS.includes(email) && this.allowedDomain(email);
   }
 
   private async passwordLink(token: string) {

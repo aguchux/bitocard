@@ -23,6 +23,8 @@ export type MfaChallenge = { object: 'mfa_challenge'; challenge_token: string; m
 export type MfaSetup = { object: 'mfa_setup'; secret: string; otpauth_uri: string };
 /** An emailed set-password link (admin:create or admin:reset-password), before it is used. */
 export type AdminPasswordLink = { object: 'admin_password_link'; email: string; name: string; kind: 'create' | 'reset'; authenticator_set_up: boolean; expires_at: string };
+/** Sign-in step 1: `link_sent` when an address in ADMIN_SETUP_EMAILS was set up and emailed a set-password link. */
+export type AdminSignInStart = { object: 'admin_sign_in'; next: 'password' | 'link_sent' };
 export type AdminPasswordSet = { object: 'admin_password_set'; email: string; authenticator_reset: boolean };
 
 // -- Overview and activity ----------------------------------------------------------------------------------------

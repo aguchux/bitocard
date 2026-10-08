@@ -15,13 +15,14 @@ function readToken() {
 }
 
 /**
- * The set-password form for an emailed link: the admin chooses a password (twice) and, when they already have an
- * authenticator, can tick a box to reset it too. The link works once; afterwards they sign in as usual.
+ * The set-password form for an emailed link: a new admin confirms their name and chooses a password (twice); on a
+ * reset, an admin who has an authenticator can tick a box to reset it too. The link works once; afterwards they sign in as usual.
  */
 export function SetPassword() {
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [lookup, lookupState] = useAdminPasswordLinkMutation();
   const [complete, completeState] = useAdminCompletePasswordLinkMutation();
+  const [name, setName] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
@@ -49,7 +50,8 @@ export function SetPassword() {
       return;
     }
     setMismatch(false);
-    const result = await complete({ token, password, reset_authenticator: resetAuthenticator }).unwrap().catch(() => null);
+    const chosenName = lookupState.data?.kind === "create" ? (name ?? lookupState.data.name).trim() : "";
+    const result = await complete({ token, password, reset_authenticator: resetAuthenticator, ...(chosenName ? { name: chosenName } : {}) }).unwrap().catch(() => null);
     if (result) setDone(result);
   }
 
@@ -103,6 +105,11 @@ export function SetPassword() {
       {mismatch ? <Notice tone="red">The two passwords do not match.</Notice> : null}
       {/* Lets password managers save the new password against the right account. */}
       <input type="email" name="username" autoComplete="username" value={link.email} readOnly hidden />
+      {creating ? (
+        <Field label="Your name" htmlFor="name" hint="Shown to other admins and in the activity log.">
+          <Input id="name" autoComplete="name" required maxLength={100} value={name ?? link.name} onChange={event => setName(event.target.value)} />
+        </Field>
+      ) : null}
       <Field label="New password" htmlFor="password" hint="10 to 128 characters. Passwords found in public data breaches are refused.">
         <div className="relative">
           <Input

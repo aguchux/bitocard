@@ -4,13 +4,11 @@ import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { Secret, TOTP } from 'otpauth';
 import { AdminAuthService } from '../dist/auth/admin-auth.service.js';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { client, dockerUrl, fakeService, startApp } from './helpers.mjs';
+import { client, startApp } from './helpers.mjs';
 
 const password = 'admin passphrase long';
 /** The addresses the set-password links may go to in these tests (ADMIN_SETUP_EMAILS). */
-const setupEmails = ['link-new@bitocard.com', 'Link-Reset@bitocard.com', 'link-other@golojan.co.uk'];
+const setupEmails = ['link-new@bitocard.com', 'Link-Reset@bitocard.com', 'link-other@golojan.co.uk', 'outsider@gmail.com'];
 let server;
 let admins;
 
@@ -183,29 +181,60 @@ describe('configuration', () => {
   });
 });
 
-/** The token in the last set-password link emailed to an address (the outbox: no email provider in tests). */
-async function linkToken(email) {
+/** Emails sent to an address (the outbox: no email provider in tests). */
+async function emailsTo(email) {
   const { EmailService } = await import('../dist/notifications/email.service.js');
-  const message = server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1);
-  assert.ok(message, `no email to ${email}`);
+  return server.app.get(EmailService).outbox.filter(item => item.to === email);
+}
+
+/** The token in the last set-password link emailed to an address. */
+async function linkToken(email) {
+  const message = (await emailsTo(email)).filter(item => /set-password#token=/.test(item.text)).at(-1);
+  assert.ok(message, `no link emailed to ${email}`);
   assert.match(message.text, /https:\/\/admin\.example\.test\/set-password#token=/);
   return /#token=(\S+)/.exec(message.text)[1];
 }
 
-describe('set-password links', () => {
-  test('only addresses in ADMIN_SETUP_EMAILS can be sent a link, and nothing is created for others', async () => {
+/** Lets the next link be sent at once (links are limited to one a minute per admin). */
+async function pastLinkLimit(email) {
+  const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  await prisma.verificationCode.updateMany({ where: { purpose: 'admin_password_link', user: { realm: 'admin', email } }, data: { createdAt: new Date(Date.now() - 2 * 60_000) } });
+}
+
+describe('the email step', () => {
+  test('only an address in ADMIN_SETUP_EMAILS on an admin domain is set up; everyone else is asked for a password', async () => {
     const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
-    const unlisted = await createAdmin();
-    await assert.rejects(admins.sendPasswordLink(unlisted, 'reset'), /not in ADMIN_SETUP_EMAILS/);
-    await assert.rejects(admins.inviteAdmin({ email: 'stranger@bitocard.com', name: 'X', roles: ['support'] }), /not in ADMIN_SETUP_EMAILS/);
-    assert.equal(await prisma.user.count({ where: { realm: 'admin', email: 'stranger@bitocard.com' } }), 0);
-    await assert.rejects(admins.sendPasswordLink('link-other@golojan.co.uk', 'reset'), /No admin account/, 'listed but no admin yet');
+    const browser = client(server.base);
+    const existing = await createAdmin();
+    for (const email of [existing, 'nobody@bitocard.com', 'someone@gmail.com', 'outsider@gmail.com']) {
+      const step = await browser.post('/v1/admin/auth/start', { email });
+      assert.deepEqual([step.status, step.json], [200, { object: 'admin_sign_in', next: 'password' }], email);
+    }
+    assert.equal(await prisma.user.count({ where: { realm: 'admin', email: { in: ['nobody@bitocard.com', 'outsider@gmail.com'] } } }), 0, 'nothing created');
+    assert.equal((await emailsTo('outsider@gmail.com')).length, 0, 'listed, but not an admin domain');
+    assert.equal((await browser.post('/v1/admin/auth/start', { email: 'not an email' })).status, 400);
   });
 
-  test('a new admin chooses their password with the link, which works once', async () => {
+  test('a listed address with no account is set up as a super admin and emailed a link, at most once a minute', async () => {
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
     const email = 'link-new@bitocard.com';
-    const { sentWith, admin } = await admins.inviteAdmin({ email, name: 'New Admin', roles: ['support'] });
-    assert.deepEqual([sentWith, admin.passwordHash], ['outbox', null]);
+    const first = await client(server.base).post('/v1/admin/auth/start', { email: 'LINK-NEW@bitocard.com' });
+    assert.deepEqual(first.json, { object: 'admin_sign_in', next: 'link_sent' });
+    const admin = await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email } });
+    assert.deepEqual([admin.name, admin.adminRoles, admin.passwordHash], ['Link New', ['super_admin'], null]);
+    assert.match((await emailsTo(email)).at(-1).subject, /Set up your BitoCard admin account/);
+    const again = await client(server.base).post('/v1/admin/auth/start', { email });
+    assert.equal(again.json.next, 'link_sent', 'still no password');
+    assert.equal((await emailsTo(email)).length, 1, 'no second email within a minute');
+    assert.equal(await prisma.user.count({ where: { realm: 'admin', email } }), 1);
+    const actions = (await prisma.auditLog.findMany({ where: { targetId: admin.id }, orderBy: { createdAt: 'asc' } })).map(entry => entry.action);
+    assert.deepEqual(actions, ['admin.created', 'admin.password_link_sent']);
+  });
+});
+
+describe('set-password links', () => {
+  test('a new admin confirms their name and chooses a password with the link, which works once', async () => {
+    const email = 'link-new@bitocard.com';
     const token = await linkToken(email);
     const browser = client(server.base);
     assert.equal((await browser.post('/v1/admin/auth/signin', { email, password })).status, 401, 'no password until the link is used');
@@ -214,56 +243,82 @@ describe('set-password links', () => {
     assert.equal(described.status, 200);
     assert.deepEqual(
       { ...described.json, expires_at: typeof described.json.expires_at },
-      { object: 'admin_password_link', email, name: 'New Admin', kind: 'create', authenticator_set_up: false, expires_at: 'string' },
+      { object: 'admin_password_link', email, name: 'Link New', kind: 'create', authenticator_set_up: false, expires_at: 'string' },
     );
     assert.ok(Date.parse(described.json.expires_at) - Date.now() > 71 * 3600_000, 'new admins get 72 hours');
 
     assert.equal((await browser.post('/v1/admin/auth/password-link/complete', { token, password: 'short' })).status, 400, 'the password rules apply');
-    const done = await browser.post('/v1/admin/auth/password-link/complete', { token, password: 'a chosen admin passphrase' });
+    const done = await browser.post('/v1/admin/auth/password-link/complete', { token, password: 'a chosen admin passphrase', name: ' Ngozi Link ' });
     assert.deepEqual([done.status, done.json], [200, { object: 'admin_password_set', email, authenticator_reset: false }]);
     const signin = await browser.post('/v1/admin/auth/signin', { email, password: 'a chosen admin passphrase' });
-    assert.deepEqual([signin.status, signin.json.mfa_setup_required], [200, true]);
+    assert.deepEqual([signin.status, signin.json.mfa_setup_required], [200, true], 'the authenticator is set up at first sign-in');
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    assert.equal((await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email } })).name, 'Ngozi Link');
+    assert.equal((await browser.post('/v1/admin/auth/start', { email })).json.next, 'password', 'set up: now the password step');
 
     for (const [path, body] of [['/v1/admin/auth/password-link', { token }], ['/v1/admin/auth/password-link/complete', { token, password: 'yet another admin passphrase' }]]) {
       const again = await browser.post(path, body);
       assert.deepEqual([again.status, again.json.error.code], [404, 'link_invalid'], `${path} works once`);
     }
-    const bogus = await browser.post('/v1/admin/auth/password-link', { token: `${token.slice(0, -4)}AAAA` });
-    assert.equal(bogus.status, 404);
-
-    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
-    const actions = (await prisma.auditLog.findMany({ where: { targetId: admin.id }, orderBy: { createdAt: 'asc' } })).map(entry => entry.action);
-    assert.deepEqual(actions, ['admin.password_link_sent', 'admin.password_set']);
+    assert.equal((await browser.post('/v1/admin/auth/password-link', { token: `${token.slice(0, -4)}AAAA` })).status, 404);
   });
 
-  test('a reset: nothing changes until used; then sessions end, the lockout clears and the authenticator is kept unless ticked', async () => {
-    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  test('forgot password: the same answer for everyone, a link only to listed admins, and nothing changes until it is used', async () => {
+    const browser = client(server.base);
+    const unlisted = await createAdmin();
+    for (const email of [unlisted, 'nobody@bitocard.com', 'someone@gmail.com']) {
+      const answer = await browser.post('/v1/admin/auth/password/forgot', { email });
+      assert.deepEqual([answer.status, answer.json], [200, { object: 'admin_password_reset_requested' }]);
+    }
+    assert.equal((await emailsTo(unlisted)).length, 0, 'admins not in ADMIN_SETUP_EMAILS are never emailed a link');
+
     const email = 'link-reset@bitocard.com';
     await admins.createAdmin({ email, name: 'Reset Admin', password, roles: ['operations'] });
-    const { browser } = await firstSignIn(email);
-
-    await admins.sendPasswordLink('LINK-RESET@bitocard.com', 'reset');
+    const { browser: signedIn } = await firstSignIn(email);
+    const answer = await browser.post('/v1/admin/auth/password/forgot', { email: 'Link-Reset@bitocard.com' });
+    assert.deepEqual(answer.json, { object: 'admin_password_reset_requested' });
     const first = await linkToken(email);
-    assert.equal((await browser.get('/v1/admin/auth/session')).status, 200, 'sending a link changes nothing');
-    await admins.sendPasswordLink(email, 'reset');
+    assert.match((await emailsTo(email)).at(-1).subject, /Reset your BitoCard admin password/);
+    assert.equal((await signedIn.get('/v1/admin/auth/session')).status, 200, 'asking changes nothing');
+    assert.equal((await browser.post('/v1/admin/auth/signin', { email, password })).status, 200, 'the old password still works until the link is used');
+
+    await browser.post('/v1/admin/auth/password/forgot', { email });
+    assert.equal(await linkToken(email), first, 'at most one link a minute');
+    await pastLinkLimit(email);
+    await browser.post('/v1/admin/auth/password/forgot', { email });
     const token = await linkToken(email);
-    assert.equal((await client(server.base).post('/v1/admin/auth/password-link', { token: first })).status, 404, 'a new link replaces the last');
+    assert.notEqual(token, first);
+    assert.equal((await browser.post('/v1/admin/auth/password-link', { token: first })).status, 404, 'a new link replaces the last');
+  });
 
-    const described = await client(server.base).post('/v1/admin/auth/password-link', { token });
+  test('using a reset link: sessions end, the lockout clears, and the authenticator is reset only when ticked', async () => {
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    const email = 'link-reset@bitocard.com';
+    await awayFromStepEdge();
+    const browser = client(server.base);
+    const step1 = await browser.post('/v1/admin/auth/signin', { email, password });
+    const user = await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email }, include: { totp: true } });
+    assert.ok(user.totp?.confirmedAt);
+    const token = await linkToken(email);
+    const described = await browser.post('/v1/admin/auth/password-link', { token });
     assert.deepEqual([described.json.kind, described.json.authenticator_set_up], ['reset', true]);
-    await prisma.user.updateMany({ where: { realm: 'admin', email }, data: { failedSignIns: 3, lockedUntil: new Date(Date.now() + 15 * 60_000) } });
+    await prisma.user.update({ where: { id: user.id }, data: { failedSignIns: 3, lockedUntil: new Date(Date.now() + 15 * 60_000) } });
+    const sessionsBefore = await prisma.session.count({ where: { userId: user.id, revokedAt: null } });
+    assert.ok(sessionsBefore > 0 || step1.status === 200);
 
-    const done = await client(server.base).post('/v1/admin/auth/password-link/complete', { token, password: 'a fresh admin passphrase' });
+    const done = await browser.post('/v1/admin/auth/password-link/complete', { token, password: 'a fresh admin passphrase', name: 'Ignored On Reset' });
     assert.deepEqual([done.status, done.json.authenticator_reset], [200, false]);
-    assert.equal((await browser.get('/v1/admin/auth/session')).status, 401, 'signed out everywhere');
-    const user = await prisma.user.findFirstOrThrow({ where: { realm: 'admin', email } });
-    assert.deepEqual([user.lockedUntil, user.failedSignIns], [null, 0]);
+    assert.equal(await prisma.session.count({ where: { userId: user.id, revokedAt: null } }), 0, 'signed out everywhere');
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    assert.deepEqual([after.lockedUntil, after.failedSignIns, after.name], [null, 0, 'Reset Admin']);
     assert.equal((await client(server.base).post('/v1/admin/auth/signin', { email, password })).status, 401, 'the old password no longer works');
     const fresh = await client(server.base).post('/v1/admin/auth/signin', { email, password: 'a fresh admin passphrase' });
     assert.deepEqual([fresh.status, fresh.json.mfa_setup_required], [200, false], 'the authenticator is kept');
+    assert.match((await emailsTo(email)).at(-1).subject, /password was changed/);
 
     // Ticking the box: the authenticator is set up again at the next sign-in.
-    await admins.sendPasswordLink(email, 'reset');
+    await pastLinkLimit(email);
+    await client(server.base).post('/v1/admin/auth/password/forgot', { email });
     const second = await client(server.base).post('/v1/admin/auth/password-link/complete', { token: await linkToken(email), password: 'another fresh passphrase', reset_authenticator: true });
     assert.deepEqual([second.status, second.json.authenticator_reset], [200, true]);
     const signin = await client(server.base).post('/v1/admin/auth/signin', { email, password: 'another fresh passphrase' });
@@ -272,47 +327,21 @@ describe('set-password links', () => {
     assert.equal(audit.after.authenticator_reset, true);
 
     // An expired link is refused.
-    await admins.sendPasswordLink(email, 'reset');
+    await pastLinkLimit(email);
+    await client(server.base).post('/v1/admin/auth/password/forgot', { email });
     const expired = await linkToken(email);
     await prisma.verificationCode.updateMany({ where: { userId: user.id, purpose: 'admin_password_link', consumedAt: null }, data: { expiresAt: new Date(Date.now() - 1000) } });
     assert.equal((await client(server.base).post('/v1/admin/auth/password-link/complete', { token: expired, password: 'never applied passphrase' })).status, 404);
   });
-});
 
-describe('admin:create and admin:reset-password scripts', () => {
-  test('email a link only to ADMIN_SETUP_EMAILS, and print no password', { skip: !dockerUrl && 'needs the Docker database' }, async () => {
-    const resend = await fakeService(() => ({ body: { id: 'email_1' } }));
-    try {
-      const email = `script-${Date.now()}@bitocard.com`;
-      const cwd = new URL('..', import.meta.url);
-      const env = { ...process.env, DATABASE_URL: dockerUrl, PASSWORD_BREACH_CHECK: 'off', RESEND_API_KEY: 're_test', RESEND_API_URL: resend.url, ADMIN_APP_URL: 'https://admin.example.test' };
-      const run = (script, args, extra = {}) => promisify(execFile)(process.execPath, [`scripts/${script}.mjs`, ...args], { cwd, env: { ...env, ...extra } }).catch(error => error);
-
-      const refused = await run('create-admin', ['--email', email, '--name', 'Script Admin'], { ADMIN_SETUP_EMAILS: 'someone-else@bitocard.com' });
-      assert.equal(refused.code, 1);
-      assert.match(refused.stderr, /not in ADMIN_SETUP_EMAILS/);
-      assert.equal(resend.calls.length, 0);
-
-      const created = await run('create-admin', ['--email', email, '--name', 'Script Admin', '--roles', 'support'], { ADMIN_SETUP_EMAILS: email });
-      assert.match(created.stdout, /Created admin .*\nEmailed them a link/);
-      assert.doesNotMatch(created.stdout, /password \(shown once\)/i);
-      const sent = resend.calls.at(-1).body;
-      assert.deepEqual(sent.to, [email]);
-      assert.match(sent.text, /https:\/\/admin\.example\.test\/set-password#token=\S+/);
-
-      const reset = await run('reset-admin-password', ['--email', email], { ADMIN_SETUP_EMAILS: email });
-      assert.match(reset.stdout, /Emailed .* a link to reset/);
-      assert.match(resend.calls.at(-1).body.subject, /Reset your BitoCard admin password/);
-      const token = /#token=(\S+)/.exec(resend.calls.at(-1).body.text)[1];
-      const done = await client(server.base).post('/v1/admin/auth/password-link/complete', { token, password: 'a scripted admin passphrase' });
-      assert.equal(done.status, 200, 'the link from the script works');
-
-      const unlisted = await run('reset-admin-password', ['--email', email], { ADMIN_SETUP_EMAILS: '' });
-      assert.equal(unlisted.code, 1);
-      assert.match(unlisted.stderr, /not in ADMIN_SETUP_EMAILS/);
-    } finally {
-      await resend.close();
+  test('at most five links a day per admin', async () => {
+    const email = 'link-other@golojan.co.uk';
+    await admins.createAdmin({ email, name: 'Other Admin', password, roles: ['support'] });
+    for (let i = 0; i < 7; i += 1) {
+      await client(server.base).post('/v1/admin/auth/password/forgot', { email });
+      await pastLinkLimit(email);
     }
+    assert.equal((await emailsTo(email)).length, 5);
   });
 });
 

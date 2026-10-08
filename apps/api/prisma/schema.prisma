@@ -153,7 +153,7 @@ enum CodePurpose {
   password_reset
   email_change
   admin_mfa_challenge
-  /// A set-password link emailed to an admin by the admin:create or admin:reset-password script.
+  /// A set-password link emailed to an admin from the sign-in page (first visit or Forgot password).
   admin_password_link
 }
 

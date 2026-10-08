@@ -62,8 +62,9 @@ export const configSchema = z.object({
   ADMIN_EMAIL_DOMAINS: list.prefault('bitocard.com,golojan.co.uk'),
   ENCRYPTION_KEY: z.string().optional(),
   /**
-   * The only addresses the admin:create and admin:reset-password scripts may email a set-password link to (lower case,
-   * comma separated). Environment only: an admin's edit can never widen it. Empty: the scripts send nothing.
+   * The admins' own addresses (comma separated): the only ones the sign-in page sets up as admins (super admins, on
+   * their first visit) and the only ones it emails set-password and reset links to. Environment only: an admin's edit
+   * can never widen it. Empty: no admin can be set up or reset from the sign-in page.
    */
   ADMIN_SETUP_EMAILS: list.transform(items => items.map(item => item.toLowerCase())).prefault(''),
   /** The admin app (admin.bitocard.com): set-password links point here. Environment only, like the line above. */
