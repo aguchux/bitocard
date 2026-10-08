@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [{ store, missing }, customer] = await Promise.all([currentStore(), currentCustomer()]);
-  const shell = `${inter.variable} min-h-svh overflow-x-clip bg-[#f8f9fc] font-[family-name:var(--font-inter)] text-[#070f4c]`;
+  const shell = `${inter.variable} min-h-svh overflow-x-clip bg-white font-[family-name:var(--font-inter)] text-[#070f4c]`;
   if (missing) {
     return (
       <div className={shell}>

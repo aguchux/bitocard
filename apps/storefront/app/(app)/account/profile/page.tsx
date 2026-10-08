@@ -49,7 +49,7 @@ export default async function ProfilePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="sr-only">Account</h1>
-      <section className="flex items-center gap-4 rounded-3xl bg-white p-5 ring-1 ring-slate-100">
+      <section className="flex items-center gap-4 rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
         <span aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-full bg-pink-50 text-xl font-extrabold text-[#ff2382]">
           {initials(customer.name) || "?"}
         </span>
@@ -60,13 +60,13 @@ export default async function ProfilePage() {
       </section>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <section aria-labelledby="details" className="rounded-3xl bg-white p-5 ring-1 ring-slate-100">
+        <section aria-labelledby="details" className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
           <h2 id="details" className="mb-4 text-lg font-bold">
             Your details
           </h2>
           <NameForm name={customer.name} />
         </section>
-        <section aria-labelledby="password" className="rounded-3xl bg-white p-5 ring-1 ring-slate-100">
+        <section aria-labelledby="password" className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
           <h2 id="password" className="mb-4 text-lg font-bold">
             Password
           </h2>
@@ -74,7 +74,7 @@ export default async function ProfilePage() {
         </section>
       </div>
 
-      <section aria-label="More" className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-100">
+      <section aria-label="More" className="divide-y divide-slate-100 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-200/70">
         <Row href="/account/verification" icon={ShieldCheck} label="Identity check" note="Needed once for some products in some countries" />
         <Row href="/" icon={Store} label="Shop the full store" />
         {legalDocuments.map(doc => (

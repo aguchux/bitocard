@@ -35,7 +35,7 @@ function Chip({ href, active, children }: { href: string; active: boolean; child
 function BrandTile({ brand }: { brand: StoreBrand }) {
   return (
     <Link href={`/account/catalog?brand=${encodeURIComponent(brand.slug)}`} className="flex flex-col items-center gap-2 rounded-2xl p-2 text-center hover:bg-white">
-      <span className="grid size-16 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100" style={brand.logo_url ? undefined : { backgroundColor: brand.color ?? "#070f4c" }}>
+      <span className="grid size-16 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style={brand.logo_url ? undefined : { backgroundColor: brand.color ?? "#070f4c" }}>
         {brand.logo_url ? (
           <BrandImage src={brand.logo_url} className="h-10 w-10 object-contain" fallback={<span className="font-extrabold text-[#070f4c]">{brand.initials}</span>} />
         ) : (
@@ -110,7 +110,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               ))}
             </ul>
           ) : (
-            <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-100">
+            <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">
               Nothing matches yet.{" "}
               <Link href="/account/catalog" className="font-semibold text-[#2477ff] hover:underline">
                 See everything
@@ -146,7 +146,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
                 </Carousel>
               </section>
             ))}
-          {rails.every(rail => !rail.products.length) ? <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-100">Products are on their way. Check back soon.</p> : null}
+          {rails.every(rail => !rail.products.length) ? <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">Products are on their way. Check back soon.</p> : null}
         </>
       )}
     </div>

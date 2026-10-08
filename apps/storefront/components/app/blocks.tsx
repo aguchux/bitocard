@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, Gift, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup, StoreProduct } from "@bitocard/api-client/storefront";
 import { GroupIcon } from "@/components/store/category-icon";
+import { groupIcon } from "@/components/store/theme";
 import { BrandImage } from "@/components/store/brand-image";
 import { priceLabel, productHref } from "@/components/store/product-card";
 import { groupTint } from "./theme";
@@ -17,51 +18,70 @@ export function StatCard({ icon: Icon, label, value, note, tone }: { icon: Lucid
     green: { card: "bg-emerald-50", tile: "bg-emerald-100 text-emerald-600" },
   }[tone];
   return (
-    // Three across on tablets leaves little width: the icon sits above the figure there, so amounts are never cut.
-    <div className={`flex items-center gap-4 rounded-3xl p-4 sm:p-5 md:flex-col md:items-start md:gap-3 lg:flex-row lg:items-center lg:gap-4 ${colours.card}`}>
-      <span className={`grid size-14 shrink-0 place-items-center rounded-2xl md:size-12 lg:size-14 ${colours.tile}`}>
-        <Icon className="size-7 md:size-6 lg:size-7" aria-hidden="true" />
+    // As in the mockups: the icon tile beside the label and figure at every width.
+    <div className={`flex h-full min-h-[88px] items-center gap-3.5 rounded-3xl p-4 sm:gap-4 sm:p-5 md:gap-3 md:p-4 lg:gap-4 lg:p-5 ${colours.card}`}>
+      <span className={`grid size-14 shrink-0 place-items-center rounded-2xl md:size-12 lg:size-16 ${colours.tile}`}>
+        <Icon className="size-7 md:size-6 lg:size-8" aria-hidden="true" strokeWidth={2.25} />
       </span>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-[#070f4c]">{label}</p>
-        <p className="text-2xl font-extrabold tracking-tight break-words text-[#070f4c] md:text-xl xl:text-[28px]">{value}</p>
+        <p className="text-[15px] font-semibold text-[#070f4c] md:text-sm lg:text-base">{label}</p>
+        <p className="text-[28px] leading-tight font-extrabold tracking-tight break-words text-[#070f4c] md:text-[22px] lg:text-[26px] xl:text-[32px]">{value}</p>
         {note ? <p className="text-xs text-slate-500">{note}</p> : null}
       </div>
     </div>
   );
 }
 
-/** A menu group as a tinted entry card: icon tile, name, subtitle and chevron. "Soon" groups are shown muted. */
+/**
+ * A menu group's solid icon (as in the mockups): filled in the group's colour with white detail; line-only icons
+ * (the signal bars) are drawn thick instead.
+ */
+function SolidGroupIcon({ group, tint }: { group: StoreNavigationGroup; tint: ReturnType<typeof groupTint> }) {
+  const Icon = groupIcon[group.key] ?? Gift;
+  const lineOnly = group.key === "esims";
+  return (
+    <span className={`grid size-14 shrink-0 place-items-center rounded-2xl md:size-12 lg:size-16 ${tint.tile} ${tint.ink}`}>
+      {lineOnly ? (
+        <Icon className="size-9 md:size-8 lg:size-10" strokeWidth={3} aria-hidden="true" />
+      ) : (
+        <Icon className="size-9 md:size-8 lg:size-10" fill="currentColor" stroke="white" strokeWidth={1.75} aria-hidden="true" />
+      )}
+    </span>
+  );
+}
+
+/** A menu group as a tinted entry card: icon tile, name, subtitle and chevron. Groups not open yet say "Coming soon". */
 export function CategoryEntry({ group }: { group: StoreNavigationGroup }) {
   const tint = groupTint(group.key);
+  const uploaded = group.categories.some(category => category.icon_url);
   const body = (
     <>
-      <GroupIcon group={group} className="size-14 rounded-2xl md:size-12 lg:size-14" ink={tint.ink} tile={tint.tile} />
+      {uploaded ? <GroupIcon group={group} className="size-14 rounded-2xl md:size-12 lg:size-16" ink={tint.ink} tile={tint.tile} /> : <SolidGroupIcon group={group} tint={tint} />}
       <span className="min-w-0 flex-1">
-        <span className="block text-lg leading-tight font-bold text-[#070f4c] md:text-base lg:text-lg">{group.label}</span>
-        <span className="mt-0.5 block text-sm leading-snug text-slate-500">{group.on_sale ? tint.subtitle : "Coming soon"}</span>
+        <span className="block text-xl leading-tight font-bold text-[#070f4c] md:text-lg lg:text-xl">{group.label}</span>
+        <span className="mt-0.5 block truncate text-sm text-slate-500 lg:text-[15px]">{group.on_sale ? tint.subtitle : "Coming soon"}</span>
       </span>
       {group.on_sale ? (
-        <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full md:size-8 lg:size-9 ${tint.chevron}`}>
-          <ChevronRight className="size-5" />
+        <span aria-hidden="true" className={`grid size-9 shrink-0 place-items-center rounded-full md:size-8 lg:size-10 ${tint.chevron}`}>
+          <ChevronRight className="size-5" strokeWidth={2.5} />
         </span>
       ) : null}
     </>
   );
-  const className = `flex min-h-[88px] items-center gap-4 rounded-3xl p-4 ${tint.card}`;
+  const className = `flex min-h-[88px] items-center gap-4 rounded-3xl p-4 md:gap-3 lg:min-h-[104px] lg:gap-4 lg:p-5 ${tint.card}`;
   return group.on_sale ? (
     <Link href={`/account/catalog?group=${encodeURIComponent(group.key)}`} className={`${className} transition hover:-translate-y-0.5 hover:shadow-md`}>
       {body}
     </Link>
   ) : (
-    <div className={`${className} opacity-60`}>{body}</div>
+    <div className={className}>{body}</div>
   );
 }
 
 /** A product as a compact row: logo art, name, what it is, price, chevron. */
 export function ProductLine({ product }: { product: StoreProduct }) {
   return (
-    <Link href={productHref(product, appProductBase)} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 ring-1 ring-slate-100 transition hover:shadow-md">
+    <Link href={productHref(product, appProductBase)} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200/70 transition hover:shadow-md">
       {/* The brand's logo on a white tile over its colour (the card art is padded for big cards, too much at this size). */}
       <span className="grid h-[52px] w-20 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: product.brand.color ?? "#070f4c" }}>
         <span className="grid size-10 place-items-center overflow-hidden rounded-lg bg-white p-1.5 shadow-sm">

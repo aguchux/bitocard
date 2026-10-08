@@ -47,7 +47,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       {!result.ok ? (
         <p className="rounded-3xl bg-red-50 p-5 text-red-800">{result.message}</p>
       ) : orders.length === 0 ? (
-        <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-100">
+        <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">
           {filter === "all" ? "No orders yet." : "No orders here."}{" "}
           <Link href="/account/catalog" className="font-semibold text-[#2477ff] hover:underline">
             Browse the catalog
@@ -57,7 +57,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <ul className="grid gap-3 lg:grid-cols-2">
           {orders.map(order => (
             <li key={order.id}>
-              <Link href={`/account/orders/${order.id}`} className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-100 transition hover:shadow-md">
+              <Link href={`/account/orders/${order.id}`} className="flex items-center gap-3 rounded-3xl bg-white p-4 ring-1 ring-slate-200/70 transition hover:shadow-md">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold">
                     {order.quantity > 1 ? `${order.quantity} × ` : ""}
