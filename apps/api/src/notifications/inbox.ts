@@ -80,6 +80,8 @@ export const notificationTypes = {
   'admin.supplier_notification.failed': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Supplier notification not processed' },
   'admin.payout.failed': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Withdrawal failed' },
   'admin.checkout.refund_stuck': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Customer refund refused' },
+  'admin.payment.unmatched': { realm: 'admin', roles: ['finance'], severity: 'warning', label: 'Payment that could not be credited' },
+  'admin.payment.unmatched_refund_stuck': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Refund of an uncredited payment refused' },
   'admin.fx.paused': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Conversions paused' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------

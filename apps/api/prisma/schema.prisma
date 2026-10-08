@@ -897,6 +897,17 @@ model Payment {
   failureReason         String?          @map("failure_reason")
   createdAt             DateTime         @default(now()) @map("created_at")
   completedAt           DateTime?        @map("completed_at")
+  /// Money the provider took that BitoCard cannot credit: paid after the payment was closed (`late`) or for another amount
+  /// (`mismatch`). Admins are told and it is refunded in full through the same gateway.
+  unmatchedReason       String?          @map("unmatched_reason")
+  unmatchedAmountMinor  BigInt?          @map("unmatched_amount_minor")
+  unmatchedCurrency     String?          @map("unmatched_currency") @db.Char(3)
+  unmatchedTransactionId String?         @map("unmatched_transaction_id")
+  unmatchedAt           DateTime?        @map("unmatched_at")
+  /// The gateway's refund of the unmatched money, once sent; attempts count refusals.
+  unmatchedRefundId     String?          @map("unmatched_refund_id")
+  unmatchedRefundAttempts Int            @default(0) @map("unmatched_refund_attempts")
+  unmatchedRefundedAt   DateTime?        @map("unmatched_refunded_at")
   reseller              Reseller         @relation(fields: [resellerId], references: [id])
   reservedAccount       ReservedAccount? @relation(fields: [reservedAccountId], references: [id])
   checkout              Checkout?
@@ -904,6 +915,7 @@ model Payment {
   @@unique([provider, providerTransactionId])
   @@index([resellerId, createdAt])
   @@index([status, createdAt])
+  @@index([unmatchedAt, unmatchedRefundedAt])
   @@map("payments")
 }
 

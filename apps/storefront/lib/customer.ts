@@ -1,7 +1,8 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
+import { appUrl } from "@bitocard/ui/site";
 import { apiUrl } from "./api";
 import { storeSubdomain } from "./store";
 
@@ -13,11 +14,28 @@ export const customerCookie = "bc_customer";
 const sessionHeader = "bitocard-customer-session";
 /** Names a reseller's store to the API (accounts belong to one store); none is bitocard.com. */
 const storeHeader = "bitocard-store";
+/** The shopper's address, signed (the API's `client-ip.ts`). */
+const clientHeader = "bitocard-client";
 const thirtyDays = 60 * 60 * 24 * 30;
 
 export type Customer = { object: "customer"; id: string; email: string; name: string; email_verified: boolean; created_at: string };
 
 export type CustomerResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
+
+/**
+ * The shopper's address, signed with the secret this server shares with the API (`STORE_SERVER_SECRET`), so the API
+ * rate limits signed-out shoppers one by one instead of all of them together under this server's address. The address
+ * comes from the platform (`x-real-ip`, else the first `x-forwarded-for`, which Vercel sets and callers cannot).
+ */
+export async function shopperHeader(now = Date.now()): Promise<Record<string, string>> {
+  const secret = process.env.STORE_SERVER_SECRET;
+  if (!secret) return {};
+  const list = await headers();
+  const ip = (list.get("x-real-ip") ?? list.get("x-forwarded-for")?.split(",")[0] ?? "").trim();
+  if (!/^[0-9a-fA-F:.]{2,45}$/.test(ip)) return {};
+  const t = Math.floor(now / 1000);
+  return { [clientHeader]: `t=${t},ip=${ip},v1=${createHmac("sha256", secret).update(`${t}.${ip}`).digest("hex")}` };
+}
 
 /** Calls a customer endpoint with the signed-in customer's session. Never cached; never throws. */
 export async function customerApi<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<CustomerResult<T>> {
@@ -32,6 +50,7 @@ export async function customerApi<T>(method: "GET" | "POST", path: string, body?
         ...(body !== undefined ? { "content-type": "application/json" } : {}),
         ...(token ? { [sessionHeader]: token } : {}),
         ...(store ? { [storeHeader]: store } : {}),
+        ...(await shopperHeader()),
         ...(method === "POST" ? { "idempotency-key": randomUUID() } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -60,12 +79,15 @@ export async function dropSession() {
   (await cookies()).delete(customerCookie);
 }
 
-/** This site's own address, for payment pages to return to. */
+/**
+ * This site's own address, for payment pages to return to: built from the store's configured address
+ * (`STOREFRONT_URL`, else bitocard.com on Vercel, else localhost) and the store's subdomain, never from forwarded
+ * headers a proxy might let callers set.
+ */
 export async function siteOrigin() {
-  const list = await headers();
-  const host = list.get("x-forwarded-host") ?? list.get("host") ?? "bitocard.com";
-  const proto = list.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
-  return `${proto}://${host}`;
+  const base = new URL(appUrl("storefront"));
+  const store = await storeSubdomain();
+  return store ? `${base.protocol}//${store}.${base.host}` : base.origin;
 }
 
 /** Only paths on this site are followed after signing in, never another site. */

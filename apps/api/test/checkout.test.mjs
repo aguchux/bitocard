@@ -173,6 +173,45 @@ describe('wallet top-ups through each gateway', () => {
     assert.equal(cron.status, 200);
     assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 1_200_000);
   });
+
+  test('money paid for another amount, or after the payment closed, is never credited: finance is told and it is refunded', async () => {
+    const reseller = await verifiedReseller();
+    const notify = reference => {
+      const raw = JSON.stringify({ eventType: 'SUCCESSFUL_TRANSACTION', eventData: { paymentReference: reference, product: { type: 'WEB_SDK' } } });
+      return fetch(`${server.base}/v1/webhooks/monnify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'monnify-signature': createHmac('sha512', 'monnify-secret').update(raw).digest('hex') },
+        body: raw,
+      });
+    };
+    const refundOf = id => monnify.state.refunds[`bc_rf_pay_${id.replaceAll('-', '')}`];
+
+    // Paid half the amount.
+    const short = await reseller.browser.post('/v1/wallet/top-ups', { amount: 500000, method: 'monnify' });
+    const shortPayment = await prisma.payment.findUniqueOrThrow({ where: { id: short.json.id } });
+    Object.assign(monnify.state.checkouts[shortPayment.reference], { status: 'PAID', amount: monnify.state.checkouts[shortPayment.reference].amount / 2 });
+    assert.equal((await notify(shortPayment.reference)).status, 200);
+    const mismatched = await prisma.payment.findUniqueOrThrow({ where: { id: short.json.id } });
+    assert.deepEqual([mismatched.status, mismatched.unmatchedReason, mismatched.unmatchedAmountMinor], ['failed', 'mismatch', 250000n]);
+    assert.ok(mismatched.unmatchedRefundedAt, 'refunded through Monnify');
+    assert.equal(refundOf(short.json.id).refundAmount, 2500, 'what was paid, not what was asked');
+    assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 0, 'never credited');
+    assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.payment.unmatched' } }), 'finance is told');
+
+    // Paid after the payment was closed.
+    const late = await reseller.browser.post('/v1/wallet/top-ups', { amount: 300000, method: 'monnify' });
+    const latePayment = await prisma.payment.update({ where: { id: late.json.id }, data: { createdAt: new Date(Date.now() - 2 * 24 * 60 * 60_000) } });
+    await fetch(`${server.base}/v1/cron/payments`, { headers: { authorization: 'Bearer cron-secret' } });
+    assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: late.json.id } })).status, 'failed', 'closed after its lifetime');
+    monnify.state.checkouts[latePayment.reference].status = 'PAID';
+    assert.equal((await notify(latePayment.reference)).status, 200);
+    const paidLate = await prisma.payment.findUniqueOrThrow({ where: { id: late.json.id } });
+    assert.deepEqual([paidLate.status, paidLate.unmatchedReason, paidLate.unmatchedAmountMinor], ['failed', 'late', 300000n]);
+    assert.ok(paidLate.unmatchedRefundedAt);
+    assert.equal((await notify(latePayment.reference)).status, 200, 'a repeated notification is harmless');
+    assert.equal(Object.keys(monnify.state.refunds).filter(key => key.includes(late.json.id.replaceAll('-', ''))).length, 1, 'refunded once');
+    assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 0);
+  });
 });
 
 /** The store's server: sends the customer's session token in a header, never a cookie. */
@@ -251,6 +290,9 @@ describe('store customer accounts', () => {
     for (let i = 0; i < 5; i += 1) assert.equal((await other.post('/v1/store/account/signin', { email: shopper.email, password: 'wrong password!!' })).status, 401);
     const locked = await other.post('/v1/store/account/signin', { email: shopper.email, password: 'correct horse battery' });
     assert.deepEqual([locked.status, locked.json.error.code], [429, 'account_locked']);
+    const guessing = await other.post('/v1/store/account/signin', { email: shopper.email, password: 'wrong password!!' });
+    const nobody = await other.post('/v1/store/account/signin', { email: 'nobody-here@example.com', password: 'wrong password!!' });
+    assert.deepEqual([guessing.status, guessing.json.error], [nobody.status, { ...nobody.json.error, request_id: guessing.json.error.request_id }], 'a wrong password never reveals the lock, or that the account exists');
 
     const forgot = await other.post('/v1/store/account/password/forgot', { email: shopper.email });
     assert.deepEqual([forgot.status, forgot.json.sent], [200, true]);

@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { StoreApp } from "@bitocard/api-client/storefront";
 import { Brand } from "@bitocard/ui/brand";
 import { brand } from "@bitocard/ui/site";
 import { AppHeader } from "@/components/app/app-header";
-import { AppNav } from "@/components/app/app-nav";
+import { AppNav, AppRail } from "@/components/app/app-nav";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
-import { currentCustomer } from "@/lib/customer";
+import { currentCustomer, safeNext } from "@/lib/customer";
+import { pathHeader } from "@/lib/path-header";
 import { currentStore, storeSubdomain } from "@/lib/store";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -42,9 +44,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
-  // Pages that need a deeper return address (an order) redirect themselves first.
-  if (!customer) redirect("/signin?next=/account");
-  if (!customer.email_verified) redirect("/account/verify?next=/account");
+  // Back to the page asked for after signing in (the proxy passes its path; only local paths are followed).
+  const next = encodeURIComponent(safeNext((await headers()).get(pathHeader), "/account"));
+  if (!customer) redirect(`/signin?next=${next}`);
+  if (!customer.email_verified) redirect(`/account/verify?next=${next}`);
 
   // The store's choice (else BitoCard's default); the side rail if the API cannot be reached.
   const app = store ? store.app : await storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined));
@@ -74,13 +77,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }
       />
       <AppNav desktopNav={desktopNav} />
-      <div className={`pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0 lg:pl-60" : ""}`}>
-        <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
-          {children}
-        </main>
-        <footer className="px-4 pb-6 text-center text-xs text-slate-500">
-          © {new Date().getFullYear()} {name} · {brand.credit}
-        </footer>
+      <div className={rail ? "lg:flex" : undefined}>
+        {rail ? <AppRail /> : null}
+        <div className={`min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
+          <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
+            {children}
+          </main>
+          <footer className="px-4 pb-6 text-center text-xs text-slate-500">
+            © {new Date().getFullYear()} {name} · {brand.credit}
+          </footer>
+        </div>
       </div>
     </div>
   );

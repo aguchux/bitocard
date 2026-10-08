@@ -212,6 +212,35 @@ describe('rate limit enforcement', () => {
   });
 });
 
+describe('shoppers behind a store server', () => {
+  const secret = 'store-server-secret-for-tests-0123456789';
+
+  test('signed-out shoppers are limited by the address the store server signs, not the server’s own', async () => {
+    const { signClient } = await import('../dist/common/rate-limit/client-ip.js');
+    const limited = await startApp({ env: { RATE_LIMIT_PER_MINUTE: '2', STORE_SERVER_SECRET: secret, UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, database: 'pglite' });
+    try {
+      const as = header => fetch(`${limited.base}/v1/store/navigation`, { headers: header ? { 'bitocard-client': header } : {} }).then(res => res.status);
+      // Shopper A uses up their limit; shopper B, through the same server, still gets in.
+      assert.deepEqual([await as(signClient(secret, '203.0.113.7')), await as(signClient(secret, '203.0.113.7')), await as(signClient(secret, '203.0.113.7'))], [200, 200, 429]);
+      assert.equal(await as(signClient(secret, '198.51.100.20')), 200);
+      // A wrong signature or a stale one is ignored: the caller's own address is used.
+      assert.deepEqual([await as(signClient('another-secret-entirely-0123456789ab', '192.0.2.1')), await as(null)], [200, 200]);
+      assert.equal(await as(signClient(secret, '192.0.2.99', Date.now() - 10 * 60_000)), 429, 'stale: the server’s own address, now used up');
+    } finally {
+      await limited.close();
+    }
+  });
+
+  test('the signature check refuses anything not signed with the secret', async () => {
+    const { signClient, signedClientIp } = await import('../dist/common/rate-limit/client-ip.js');
+    const header = signClient(secret, '203.0.113.7');
+    assert.equal(signedClientIp(header, secret), '203.0.113.7');
+    assert.equal(signedClientIp(header.replace('203.0.113.7', '203.0.113.8'), secret), null, 'address changed');
+    assert.equal(signedClientIp(header, undefined), null, 'no secret configured');
+    assert.equal(signedClientIp('t=1,ip=evil<script>,v1=00', secret), null);
+  });
+});
+
 describe('request logs', () => {
   test('customer session tokens are redacted like other credentials', async () => {
     const { loggerParams } = await import('../dist/common/request/logging.js');

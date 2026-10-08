@@ -12,7 +12,8 @@ const flwError = (status, message) => ({ status, body: { status: 'error', messag
  */
 export async function fakeFlutterwave() {
   // `bvns` maps a BVN to the name on its record; `bvnChecks` maps a consent reference to { bvn, status }.
-  const state = { charges: {}, transfers: {}, rates: {}, fail: {}, nextId: 1000, accounts: { '0123456789': 'ADA OBI DIGITAL', '0987654321': 'JOHN STRANGER' }, bvns: {}, bvnChecks: {} };
+  // `refunds` maps refund ID to a refund ({ id, tx_id, status }); new ones take `refundStatus`.
+  const state = { charges: {}, transfers: {}, refunds: {}, refundStatus: 'completed', rates: {}, fail: {}, nextId: 1000, accounts: { '0123456789': 'ADA OBI DIGITAL', '0987654321': 'JOHN STRANGER' }, bvns: {}, bvnChecks: {} };
   const service = await fakeService(({ method, url, body }) => {
     const path = url.split('?')[0];
     const query = new URLSearchParams(url.split('?')[1] ?? '');
@@ -62,6 +63,15 @@ export async function fakeFlutterwave() {
     }
     const transfer = /^\/transfers\/(\d+)$/.exec(path);
     if (method === 'GET' && transfer) return state.transfers[transfer[1]] ? flwOk(state.transfers[transfer[1]]) : flwError(404, 'Not found');
+    const refundTx = /^\/transactions\/(\d+)\/refund$/.exec(path);
+    if (method === 'POST' && refundTx) {
+      const id = (state.nextId += 1);
+      state.refunds[id] = { id, tx_id: Number(refundTx[1]), amount_refunded: body.amount, status: state.refundStatus };
+      return flwOk(state.refunds[id]);
+    }
+    if (method === 'GET' && path === '/refunds') return flwOk(Object.values(state.refunds).filter(refund => String(refund.tx_id) === query.get('id')));
+    const refund = /^\/refunds\/(\d+)$/.exec(path);
+    if (method === 'GET' && refund) return state.refunds[refund[1]] ? flwOk(state.refunds[refund[1]]) : flwError(404, 'Not found');
     return { status: 404, body: { status: 'error', message: `Fake Flutterwave has no ${method} ${path}` } };
   });
   return { ...service, state, env: { FLUTTERWAVE_SECRET_KEY: 'FLWSECK_TEST-fake', FLUTTERWAVE_API_URL: service.url, FLUTTERWAVE_WEBHOOK_HASH: 'flw-webhook-hash' } };

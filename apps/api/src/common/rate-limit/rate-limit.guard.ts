@@ -6,6 +6,7 @@ import { PrismaService } from '../../database/prisma.service.js';
 import { sha256 } from '../crypto.js';
 import { ApiError } from '../errors/api-error.js';
 import { callerScope, type CustomerScopedRequest } from '../idempotency/idempotency.interceptor.js';
+import { clientHeader, signedClientIp } from './client-ip.js';
 
 type Verdict = { success: boolean; limit: number; remaining: number; reset: number };
 
@@ -55,11 +56,13 @@ class MemoryLimiter {
 export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger('RateLimit');
   private readonly limiter: { limitFor(key: string): Promise<Verdict> };
+  private readonly storeServerSecret: string | undefined;
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
     private readonly prisma: PrismaService,
   ) {
+    this.storeServerSecret = config.STORE_SERVER_SECRET;
     if (config.UPSTASH_REDIS_REST_URL && config.UPSTASH_REDIS_REST_TOKEN) {
       const redis = new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN });
       this.limiter = new RedisLimiter(redis, config.RATE_LIMIT_PER_MINUTE);
@@ -72,9 +75,12 @@ export class RateLimitGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
     if (!req.originalUrl.startsWith('/v1/')) return true;
-    if (req.originalUrl.startsWith('/v1/store/')) await this.identifyCustomer(req);
+    const store = req.originalUrl.startsWith('/v1/store/');
+    if (store) await this.identifyCustomer(req);
     const scope = callerScope(req);
-    const key = scope === 'anonymous' ? `ip:${req.ip ?? 'unknown'}` : `caller:${scope}`;
+    // Signed-out shoppers reach the API through their store's server: limit them by the address it vouches for.
+    const shopper = store && scope === 'anonymous' ? signedClientIp(req.get(clientHeader), this.storeServerSecret) : null;
+    const key = scope === 'anonymous' ? `ip:${shopper ?? req.ip ?? 'unknown'}` : `caller:${scope}`;
     let verdict: Verdict;
     try {
       verdict = await this.limiter.limitFor(key);

@@ -87,10 +87,13 @@ export class CustomersService {
 
   async signin(store: Store, input: { email: string; password: string }) {
     const customer = await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email: input.email.trim().toLowerCase() } } });
-    if (customer?.lockedUntil && customer.lockedUntil > new Date()) {
-      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many wrong attempts. Try again in 15 minutes, or reset your password.');
-    }
     const ok = await this.passwords.verify(customer?.passwordHash ?? null, input.password);
+    if (customer?.lockedUntil && customer.lockedUntil > new Date()) {
+      // Only someone who knows the password learns the account is locked (as for resellers), so a lock never reveals
+      // that an account exists.
+      if (ok) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many wrong attempts. Try again in 15 minutes, or reset your password.');
+      throw signInFailed();
+    }
     if (!customer || !ok || customer.status !== 'active') {
       if (customer) await this.recordFailedSignIn(customer.id);
       throw signInFailed();

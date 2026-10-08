@@ -14,6 +14,11 @@ export const configSchema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(600),
+  /**
+   * Shared with the storefront's server, which signs each shopper's address with it (`BitoCard-Client`), so signed-out
+   * shoppers are rate limited one by one instead of sharing the store server's address. Unset: they share it.
+   */
+  STORE_SERVER_SECRET: z.string().min(32).optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
 
   // Browser access. Origins may use a leading wildcard for subdomains, for example https://*.bitocard.com.

@@ -34,6 +34,8 @@ export type OwnGatewayResolver = (connectionId: string, gateway: string) => Prom
 const day = 24 * 60 * 60 * 1000;
 /** A checkout not paid within this time is closed as failed. */
 const checkoutLifetimeMs = day;
+/** Refusals before finance is asked to refund unmatched money by hand. */
+const maxUnmatchedRefundAttempts = 5;
 
 export const testModeOnly = () =>
   new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'livemode_not_allowed', 'Simulations work only in test mode (the sandbox).');
@@ -280,6 +282,13 @@ export class PaymentsService {
         this.logger.warn({ err: error, paymentId: payment.id }, 'Requery failed; will retry');
       }
     }
+    // Money that could not be credited, still to refund (or whose refund is still to confirm).
+    const unmatched = await this.prisma.payment.findMany({
+      where: { unmatchedAt: { not: null }, unmatchedRefundedAt: null, unmatchedRefundAttempts: { lt: maxUnmatchedRefundAttempts } },
+      select: { id: true },
+      take: 50,
+    });
+    for (const payment of unmatched) await this.refundUnmatched(payment.id);
     return { checked: pending.length, settled };
   }
 
@@ -288,8 +297,11 @@ export class PaymentsService {
     if (result.status === 'pending') return payment;
     if (result.status === 'failed') return this.fail(payment, result.failureReason ?? 'The payment failed.');
     if (result.reference !== payment.reference || result.currency !== payment.currency || result.amount !== payment.amountMinor) {
-      this.logger.error({ paymentId: payment.id, result: { ...result, amount: String(result.amount), fee: String(result.fee) } }, 'Payment does not match the top-up; needs review');
-      return this.fail(payment, 'The amount paid did not match. Our team will review it and contact you.');
+      this.logger.error({ paymentId: payment.id, result: { ...result, amount: String(result.amount), fee: String(result.fee) } }, 'Payment does not match the top-up; refunding');
+      await this.fail(payment, 'The amount paid did not match, so it is being refunded.');
+      // Only money paid against this payment's own reference is ours to refund.
+      if (result.reference === payment.reference) await this.unmatched(payment, result, 'mismatch');
+      return this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
     }
     await this.credit(payment, result);
     return this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
@@ -571,8 +583,102 @@ export class PaymentsService {
         ? await this.prisma.payment.findUnique({ where: { reference: by.reference } })
         : null;
     if (!payment || payment.provider !== provider) return { handled: false, reason: 'unknown_payment' };
+    if (payment.status === 'failed') {
+      await this.recheckClosed(payment);
+      return { handled: true, status: payment.status };
+    }
     const settled = await this.requery(payment);
     return { handled: true, status: settled.status };
+  }
+
+  // -- Money that cannot be credited -------------------------------------------------------------------------------
+
+  /**
+   * A notification for a payment already closed as failed: some gateways' pages still take money after BitoCard has
+   * given up on them. Re-read it; money taken now cannot be credited (the checkout or top-up is closed), so it is refunded.
+   */
+  private async recheckClosed(payment: Payment) {
+    if (payment.unmatchedAt || payment.provider === 'sandbox') return;
+    const provider = await this.providerFor(payment);
+    if (!provider) return;
+    const result = await provider.verify(paymentRef(payment));
+    if (result?.status === 'succeeded' && result.reference === payment.reference) await this.unmatched(payment, result, 'late');
+  }
+
+  /** Records money that cannot be credited, tells finance once, and refunds it in full through the same gateway. */
+  private async unmatched(payment: Payment, result: ChargeResult, reason: 'late' | 'mismatch') {
+    const flagged = await this.prisma.payment.updateMany({
+      where: { id: payment.id, unmatchedAt: null },
+      data: {
+        unmatchedReason: reason,
+        unmatchedAmountMinor: result.amount,
+        unmatchedCurrency: result.currency,
+        unmatchedTransactionId: result.providerTransactionId,
+        unmatchedAt: new Date(),
+      },
+    });
+    if (flagged.count === 1) {
+      const where = payment.connectionId ? `the reseller's own ${payment.provider} account` : payment.provider;
+      const paid = formatMoney(result.amount, result.currency);
+      await this.inbox.admins('admin.payment.unmatched', {
+        subject: payment.id,
+        title: 'A payment could not be credited',
+        body:
+          reason === 'late'
+            ? `${paid} was paid through ${where} after the payment had closed. It is being refunded to the payer.`
+            : `${paid} was paid through ${where} for a payment of ${formatMoney(payment.amountMinor, payment.currency)}. It is being refunded to the payer.`,
+        link: '/orders',
+        mode: payment.mode,
+      });
+    }
+    await this.refundUnmatched(payment.id);
+  }
+
+  /**
+   * Refunds unmatched money: the same reference on every retry (a new one only after the gateway refused), so a retry
+   * after a timeout finds the refund already made. Never throws; the payments job retries.
+   */
+  async refundUnmatched(paymentId: string) {
+    const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment?.unmatchedAt || payment.unmatchedRefundedAt || payment.unmatchedAmountMinor === null || !payment.unmatchedCurrency) return;
+    if (payment.unmatchedRefundAttempts >= maxUnmatchedRefundAttempts) return;
+    let refused = false;
+    const provider = await this.providerFor(payment).catch(() => null);
+    if (!provider) {
+      refused = true;
+      this.logger.error({ paymentId, provider: payment.provider }, 'Unmatched payment needs a gateway that is no longer set up');
+    } else {
+      const base = `bc_rf_pay_${payment.id.replaceAll('-', '')}`;
+      const ref = {
+        reference: payment.reference,
+        providerTransactionId: payment.unmatchedTransactionId,
+        amount: payment.unmatchedAmountMinor,
+        currency: payment.unmatchedCurrency,
+        refundReference: payment.unmatchedRefundAttempts > 0 ? `${base}_${payment.unmatchedRefundAttempts}` : base,
+      };
+      try {
+        const result = payment.unmatchedRefundId ? await provider.refundStatus({ ...ref, providerRefundId: payment.unmatchedRefundId }) : await provider.refund(ref);
+        refused = result.status === 'failed';
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: refused ? { unmatchedRefundId: null } : { unmatchedRefundId: result.providerRefundId, ...(result.status === 'refunded' ? { unmatchedRefundedAt: new Date() } : {}) },
+        });
+      } catch (error) {
+        refused = error instanceof ProviderError && error.definite;
+        this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', paymentId }, 'Unmatched payment not refunded yet; the payments job retries');
+      }
+    }
+    if (!refused) return;
+    const after = await this.prisma.payment.update({ where: { id: payment.id }, data: { unmatchedRefundAttempts: { increment: 1 } } });
+    if (after.unmatchedRefundAttempts === maxUnmatchedRefundAttempts) {
+      await this.inbox.admins('admin.payment.unmatched_refund_stuck', {
+        subject: payment.id,
+        title: 'A refund of an uncredited payment needs attention',
+        body: `Refunding ${formatMoney(payment.unmatchedAmountMinor, payment.unmatchedCurrency)} through ${payment.provider} failed ${maxUnmatchedRefundAttempts} times. Refund the payer by hand.`,
+        link: '/orders',
+        mode: payment.mode,
+      });
+    }
   }
 
   async monnifyDeposit(transactionReference: string) {

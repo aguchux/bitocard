@@ -17,7 +17,7 @@ import {
 
 type FlwResponse<T> = { status: string; message?: string; data: T };
 type FlwCharge = { id: number; tx_ref: string; status: string; amount: number; currency: string; app_fee?: number; processor_response?: string };
-type FlwRefund = { id: number; status: string; comments?: string };
+type FlwRefund = { id: number; status: string; comments?: string; tx_id?: number | string };
 type FlwTransfer = { id: number; status: string; fee?: number; complete_message?: string; reference?: string };
 
 /** Countries Flutterwave's payment page takes payments from (cards everywhere; bank and mobile money where local). */
@@ -125,8 +125,21 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
   /** Refunds go against Flutterwave's transaction ID, which the payment holds once it has settled. */
   async refund(payment: PaymentRef & { refundReference: string }): Promise<RefundResult> {
     if (!payment.providerTransactionId) throw new ProviderError(this.name, 'no transaction to refund', true);
+    // Flutterwave's refund takes no reference of ours, so a retry after a timeout could refund twice: look for a refund
+    // of this transaction first (a failed one does not count). If the lookup itself fails, the error is not definite and
+    // the refund is retried later rather than risk sending a second one.
+    const existing = await this.existingRefund(payment.providerTransactionId);
+    if (existing) return this.refundResult(existing);
     const res = await this.call<FlwRefund>(`/transactions/${encodeURIComponent(payment.providerTransactionId)}/refund`, { method: 'POST', body: { amount: Number(toMajor(payment.amount)) } });
     return this.refundResult(res.data);
+  }
+
+  /** The transaction's refund that has not failed, if any (`GET /refunds?id=<transaction id>`). */
+  private async existingRefund(transactionId: string) {
+    const to = new Date(Date.now() + 2 * 24 * 60 * 60_000).toISOString().slice(0, 10);
+    const res = await this.call<FlwRefund[]>(`/refunds?id=${encodeURIComponent(transactionId)}&from=2020-01-01&to=${to}`);
+    const refunds = Array.isArray(res.data) ? res.data : [];
+    return refunds.find(refund => String(refund.tx_id) === transactionId && String(refund.status ?? '').toLowerCase() !== 'failed') ?? null;
   }
 
   async refundStatus(payment: { providerRefundId: string }): Promise<RefundResult> {

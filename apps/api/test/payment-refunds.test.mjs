@@ -1,9 +1,10 @@
 // Refunds through the payment gateways: a retry after a timeout must find the refund already made, never make a second.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { FlutterwaveProvider } from '../dist/payments/flutterwave.provider.js';
 import { MonnifyProvider } from '../dist/payments/monnify.provider.js';
 import { StripeProvider, stripeFee } from '../dist/payments/stripe.provider.js';
-import { fakeMonnify, fakeStripe } from './fakes.mjs';
+import { fakeFlutterwave, fakeMonnify, fakeStripe } from './fakes.mjs';
 
 let stripe;
 let monnify;
@@ -46,6 +47,30 @@ describe('gateway refunds are idempotent', () => {
     const again = await provider.refund(payment);
     assert.deepEqual([first.status, again.status, again.providerRefundId], ['refunded', 'refunded', 'bc_rf_two']);
     assert.equal(Object.keys(monnify.state.refunds).length, 1);
+  });
+});
+
+describe('Flutterwave refunds', () => {
+  test('a refund already made for the transaction is returned instead of refunding again; a failed one does not count', async () => {
+    const flw = await fakeFlutterwave();
+    try {
+      const provider = new FlutterwaveProvider('FLWSECK_TEST-fake', flw.url);
+      const payment = { reference: 'bc_pay_3', providerTransactionId: '777', amount: 50000n, currency: 'NGN', refundReference: 'bc_rf_three' };
+      flw.state.refundStatus = 'failed';
+      const failed = await provider.refund(payment);
+      assert.equal(failed.status, 'failed');
+      flw.state.refundStatus = 'pending';
+      const first = await provider.refund(payment);
+      const again = await provider.refund(payment);
+      assert.deepEqual([first.status, again.providerRefundId], ['pending', first.providerRefundId]);
+      assert.equal(Object.keys(flw.state.refunds).length, 2, 'the failed refund and one more, never a third');
+
+      flw.state.fail = { '/refunds': 500 };
+      await assert.rejects(provider.refund({ ...payment, providerTransactionId: '888' }), error => error.definite === false, 'no lookup, no refund');
+      assert.equal(Object.keys(flw.state.refunds).length, 2);
+    } finally {
+      await flw.close();
+    }
   });
 });
 
