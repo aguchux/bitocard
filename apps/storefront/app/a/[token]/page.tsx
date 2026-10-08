@@ -6,9 +6,10 @@ import { categoryLabels, formatFace, type ProductCategory, type ProductFeature }
 import { brand } from "@bitocard/ui/site";
 import { RefreshWhile } from "@/components/store/order-status";
 import { FeatureIcons } from "@/components/store/features";
-import { type AccessDelivery, type AccessStore, accessApi, type OrderAccess, passPath } from "@/lib/access";
+import { type AccessDelivery, type AccessStore, accessApi, type OrderAccess, type OrderNumber, passPath } from "@/lib/access";
 import { Codes } from "./codes";
 import { EmailCodeGate } from "./gate";
+import { NumberLive } from "./number";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
@@ -48,7 +49,7 @@ function Notice({ tone, icon, children }: { tone: string; icon: React.ReactNode;
   return <div className={`flex items-start gap-3 rounded-2xl p-4 ${tone}`}>{icon}<div className="min-w-0">{children}</div></div>;
 }
 
-/** A virtual number: the number itself (not a secret), what it can do and when it is paid up to. */
+/** A virtual number from the delivery alone (when its live state cannot be loaded): the number, what it can do and when it is paid up to. */
 function NumberPanel({ delivery, features }: { delivery: AccessDelivery; features: string[] }) {
   const number = delivery.details.number ?? delivery.serial;
   const expires = delivery.details.expires_at;
@@ -126,6 +127,9 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
   const codes = order.deliveries.filter(delivery => secretKinds.has(delivery.kind));
   const numbers = order.deliveries.filter(delivery => delivery.kind === "virtual_number");
   const sentTo = order.recipient.phone ?? order.recipient.account_number;
+  // A virtual number's live state (inbox, renewal); the delivery's own details stand in if it cannot be loaded.
+  const live = category === "virtual_numbers" ? await accessApi<OrderNumber>(token, "/number") : null;
+  const liveNumber = live?.ok ? live.data.number : null;
 
   return (
     <Shell store={store}>
@@ -175,16 +179,18 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
             ) : null}
           </Notice>
           {codes.length ? <Codes token={token} deliveries={codes} instructions={order.redeem_instructions} /> : null}
-          {numbers.map((delivery, index) => (
-            <NumberPanel key={index} delivery={delivery} features={order.product.features} />
-          ))}
+          {liveNumber ? (
+            <NumberLive token={token} data={liveNumber} features={order.product.features} />
+          ) : (
+            numbers.map((delivery, index) => <NumberPanel key={index} delivery={delivery} features={order.product.features} />)
+          )}
           {order.deliveries.some(delivery => delivery.kind === "confirmation" && delivery.details.transaction_id) ? (
             <p className="text-sm text-slate-600">Transaction reference: {order.deliveries.find(delivery => delivery.details.transaction_id)?.details.transaction_id}</p>
           ) : null}
         </>
       ) : null}
 
-      <p className="text-center text-xs text-slate-500">Only you can open this order. We email you when its codes are shown.</p>
+      <p className="text-center text-xs text-slate-500">Only you can open this order.{codes.length ? " We email you when its codes are shown." : ""}</p>
     </Shell>
   );
 }

@@ -1,6 +1,6 @@
 import { productFeatureKeys } from '../../catalogue/features.js';
 import { ProductCategory } from '../../generated/prisma/client.js';
-import { eventObjectSchemas } from '../../webhooks/openapi.js';
+import { eventObjectSchemas, exampleNumberMessage, exampleVirtualNumber } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
@@ -372,8 +372,20 @@ const receiptExample = {
   customer_reference: 'cust-1042',
 };
 
+const renewalPrice = objectSchema(
+  'Number renewal price',
+  {
+    object: constant('number_renewal_price'),
+    amount: money('What renewing for a month takes from your wallet now'),
+    currency: str('ISO 4217 currency (your wallet currency).'),
+  },
+  'What renewing a virtual number for a month would cost now, at today’s exchange rate.',
+);
+
+const sentMessage = { ...exampleNumberMessage, id: '5e6f7a8b-9c0d-4e1f-9a2b-3c4d5e6f7a8b', direction: 'out', from: '+442071234567', to: '+447700900123', text: 'Your table is ready.', status: 'queued' };
+
 export const commerceDocs: DocsArea = {
-  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt },
+  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
   responses: {
     'GET /v1/catalogue/products': {
       status: 200,
@@ -425,6 +437,33 @@ export const commerceDocs: DocsArea = {
       description: 'The order’s new access link. The old link stopped working.',
       schema: 'OrderAccessLink',
       example: { ...accessExample, url: 'https://adadigital.bitocard.com/a/bca_Jm5Pq8Rs2Tu6Vw0Xy4Za7Bc1De9Fg3Hi5Jk8Lm2Nn0Op', replaced_at: '2026-10-06T10:02:41.318Z' },
+    },
+    'GET /v1/numbers': {
+      status: 200,
+      description: 'A page of your virtual numbers, newest first.',
+      schema: list(ref('VirtualNumber')),
+      example: listExample([exampleVirtualNumber], false),
+    },
+    'GET /v1/numbers/{id}': { status: 200, description: 'The number.', schema: 'VirtualNumber', example: exampleVirtualNumber },
+    'PATCH /v1/numbers/{id}': { status: 200, description: 'The number with its new settings.', schema: 'VirtualNumber', example: { ...exampleVirtualNumber, customer_sending: true } },
+    'GET /v1/numbers/{id}/renewal-price': { status: 200, description: 'The renewal price now.', schema: 'NumberRenewalPrice', example: { object: 'number_renewal_price', amount: 615_000, currency: 'NGN' } },
+    'POST /v1/numbers/{id}/renew': {
+      status: 200,
+      description: 'The renewed number: a month was taken from your wallet and added.',
+      schema: 'VirtualNumber',
+      example: { ...exampleVirtualNumber, expires_at: '2026-12-06T09:15:04.000Z', delete_at: '2026-12-21T09:15:04.000Z', updated_at: '2026-11-01T10:02:00.000Z' },
+    },
+    'GET /v1/numbers/{id}/messages': {
+      status: 200,
+      description: 'A page of the number’s messages, newest first, with their text.',
+      schema: list(ref('NumberMessage')),
+      example: listExample([{ ...exampleNumberMessage, text: 'Your verification code is 482913.' }, { ...sentMessage, status: 'delivered', charged: 1_500, currency: 'NGN' }], false),
+    },
+    'POST /v1/numbers/{id}/messages': {
+      status: 201,
+      description: 'The message: `queued` until the network reports it, then `sent` (with `charged`) or `failed` (nothing charged).',
+      schema: 'NumberMessage',
+      example: sentMessage,
     },
     'POST /v1/orders/{id}/simulate': {
       status: 200,

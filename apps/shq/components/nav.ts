@@ -14,6 +14,7 @@ import {
   ListOrdered,
   Package,
   Percent,
+  Phone,
   Plug,
   ReceiptText,
   Settings,
@@ -53,7 +54,14 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Notifications", href: "/notifications", icon: Bell },
     ],
   },
-  orders: { title: "Orders", items: [{ label: "All orders", href: "/orders", icon: ListOrdered }, { label: "New order", href: "/orders/new", icon: Sparkles }] },
+  orders: {
+    title: "Orders",
+    items: [
+      { label: "All orders", href: "/orders", icon: ListOrdered },
+      { label: "New order", href: "/orders/new", icon: Sparkles },
+      { label: "Numbers", href: "/numbers", icon: Phone },
+    ],
+  },
   catalogue: {
     title: "Catalogue",
     items: [

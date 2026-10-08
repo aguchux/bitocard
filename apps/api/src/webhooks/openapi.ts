@@ -86,6 +86,45 @@ export const eventObjectSchemas: Record<string, Schema> = {
     created_at: time('When the withdrawal was requested.'),
     completed_at: nullableTime('When it was paid or failed.'),
   }),
+  VirtualNumber: {
+    ...objectSchema('Virtual number', {
+      object: str('Always `virtual_number`.', { const: 'virtual_number' }),
+      id: str('Virtual number ID.', { format: 'uuid' }),
+      order_id: str('The order that bought it.', { format: 'uuid' }),
+      mode,
+      number: str('The number, E.164 (for example `+442071234567`).'),
+      status: str('`active`; `expired`: not renewed by `expires_at`, paused (no SMS in or out) and renewable until `delete_at`; `deleted`: released for good.', { enum: ['active', 'expired', 'deleted'] }),
+      expires_at: time('Paid up to. Renewing adds a month (from now, for an expired number).'),
+      delete_at: time('When an unrenewed number is deleted: 15 days after `expires_at`.'),
+      auto_renew: {
+        type: 'boolean',
+        description: 'Renewed from your wallet 3 days before `expires_at` (retried twice a day while your wallet is short). Off until your customer switches it on on the order’s page, or you do.',
+      },
+      customer_sending: { type: 'boolean', description: 'Your customer may send SMS from the order’s page (charged to your wallet).' },
+      sends_sms: { type: 'boolean', description: 'The number can send SMS (`POST /v1/numbers/{id}/messages`).' },
+      renewal_error: nullableStr('Why the last automatic renewal did not happen, for example `insufficient_funds`.'),
+      created_at: time('When the number was bought.'),
+      updated_at: time('When the number last changed. Use it to ignore an older event that arrives after a newer one.'),
+    }),
+    additionalProperties: false,
+  },
+  NumberMessage: {
+    ...objectSchema('Number message', {
+      object: str('Always `number_message`.', { const: 'number_message' }),
+      id: str('Message ID.', { format: 'uuid' }),
+      number_id: str('The virtual number.', { format: 'uuid' }),
+      direction: str('`in` (received) or `out` (sent).', { enum: ['in', 'out'] }),
+      from: str('Who sent it (E.164).'),
+      to: str('Who it was sent to (E.164).'),
+      text: nullableStr('The message. Never in webhooks (null there): get the messages to read it.'),
+      status: str('`received` (in); `queued`, `sent`, `delivered` or `failed` (out).', { enum: ['received', 'queued', 'sent', 'delivered', 'failed'] }),
+      charged: { type: ['integer', 'null'], description: 'Taken from your wallet for a sent message, in minor units of `currency`; null until the price is known, and for received messages.' },
+      currency: nullableStr('ISO 4217 currency of `charged`.'),
+      failure_reason: nullableStr('Why a sent message failed.'),
+      created_at: time('When it was received or sent.'),
+    }),
+    additionalProperties: false,
+  },
   CustomerVerification: objectSchema('Customer verification', {
     object: str('Always `customer_verification`.', { const: 'customer_verification' }),
     id: str('Verification ID.', { format: 'uuid' }),
@@ -175,6 +214,40 @@ const exampleVerification = (status: string, extra: Schema = {}) => ({
   decided_at: '2026-10-06T09:04:10.000Z',
   ...extra,
 });
+
+const exampleNumber = (status: string, extra: Schema = {}) => ({
+  object: 'virtual_number',
+  id: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+  order_id: '5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f',
+  mode: 'live',
+  number: '+442071234567',
+  status,
+  expires_at: '2026-11-06T09:15:04.000Z',
+  delete_at: '2026-11-21T09:15:04.000Z',
+  auto_renew: false,
+  customer_sending: false,
+  sends_sms: true,
+  renewal_error: null,
+  created_at: '2026-10-06T09:15:04.870Z',
+  updated_at: '2026-10-06T09:15:04.870Z',
+  ...extra,
+});
+
+export const exampleNumberMessage = {
+  object: 'number_message',
+  id: '4d5e6f7a-8b9c-4d0e-8f1a-2b3c4d5e6f7a',
+  number_id: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+  direction: 'in',
+  from: '+447700900123',
+  to: '+442071234567',
+  text: null,
+  status: 'received',
+  charged: null,
+  currency: null,
+  failure_reason: null,
+  created_at: '2026-10-08T12:01:44.000Z',
+};
+export const exampleVirtualNumber = exampleNumber('active');
 
 type EventDoc = { schema: string; summary: string; description: string; example: object };
 
@@ -270,6 +343,46 @@ export const eventDocs: Record<EventType, EventDoc> = {
     ].join('\n\n'),
     example: exampleVerification('declined', { reason: 'name_mismatch' }),
   },
+  'number.renewed': {
+    schema: 'VirtualNumber',
+    summary: 'A virtual number was renewed',
+    description: [
+      'Fires each time a number is renewed for a month: by your customer on the order’s page, automatically (3 days before `expires_at`, when `auto_renew` is on), or by you (`POST /v1/numbers/{id}/renew`). The month was taken from your wallet; an expired number is active again.',
+      'Does not fire when a renewal is refused (for example your wallet is short): the number shows `renewal_error`, and you get a notification.',
+      'Comes after `order.completed` for the number, or `number.expired`. Followed by the next renewal, or `number.expired`.',
+    ].join('\n\n'),
+    example: exampleNumber('active', { expires_at: '2026-12-06T09:15:04.000Z', delete_at: '2026-12-21T09:15:04.000Z', updated_at: '2026-11-03T09:00:12.000Z' }),
+  },
+  'number.expired': {
+    schema: 'VirtualNumber',
+    summary: 'A virtual number expired and is paused',
+    description: [
+      'Fires once when a number reaches `expires_at` without being renewed. It is paused (no SMS in or out) and can be renewed until `delete_at` (15 days later); your customer is emailed on the day and 7 days later.',
+      'Does not fire for renewed numbers.',
+      'Comes after the number’s last renewal or its order. Followed by `number.renewed` (renewed in time) or `number.deleted`.',
+    ].join('\n\n'),
+    example: exampleNumber('expired', { auto_renew: false, renewal_error: 'insufficient_funds', updated_at: '2026-11-06T09:15:30.000Z' }),
+  },
+  'number.deleted': {
+    schema: 'VirtualNumber',
+    summary: 'A virtual number was deleted',
+    description: [
+      'Fires once when an expired number reaches `delete_at` unrenewed: it is released for good and cannot be recovered; its messages are deleted with it.',
+      'Does not fire for active or still-renewable numbers.',
+      'Comes after `number.expired`. Nothing follows it.',
+    ].join('\n\n'),
+    example: exampleNumber('deleted', { auto_renew: false, updated_at: '2026-11-21T09:15:40.000Z' }),
+  },
+  'number.sms_received': {
+    schema: 'NumberMessage',
+    summary: 'A virtual number received an SMS',
+    description: [
+      'Fires once for each SMS a number receives. The text is never in the event: get it with `GET /v1/numbers/{id}/messages`. Your customer also sees it on the order’s page.',
+      'Does not fire for messages sent from the number, or to expired or deleted numbers.',
+      'Comes after `order.completed` for the number. Nothing follows it.',
+    ].join('\n\n'),
+    example: exampleNumberMessage,
+  },
 };
 
 const exampleEventIds: Record<EventType, string> = {
@@ -282,11 +395,15 @@ const exampleEventIds: Record<EventType, string> = {
   'payout.failed': '7d8e9f0a-1b2c-4d3e-8f5a-6b7c8d9e0f1a',
   'customer_verification.approved': '8e9f0a1b-2c3d-4e5f-9a6b-7c8d9e0f1a2b',
   'customer_verification.declined': '9f0a1b2c-3d4e-4f5a-8b7c-8d9e0f1a2b3c',
+  'number.renewed': 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  'number.expired': 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+  'number.deleted': 'c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f',
+  'number.sms_received': 'd4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a',
 };
 
 const exampleTime = (object: object) => {
-  const times = object as { updated_at?: string; completed_at?: string; decided_at?: string };
-  return times.updated_at ?? times.completed_at ?? times.decided_at;
+  const times = object as { updated_at?: string; completed_at?: string; decided_at?: string; created_at?: string };
+  return times.updated_at ?? times.completed_at ?? times.decided_at ?? times.created_at;
 };
 
 function envelope(type: EventType): Schema {

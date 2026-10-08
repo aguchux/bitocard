@@ -187,6 +187,13 @@ export class OrderAccessService {
     };
   }
 
+  /** The order behind a link, for a caller who has proved it is theirs (other parts of its page, such as a number's inbox). */
+  async provenOrder(token: string, proof: AccessProof) {
+    const access = await this.find(token);
+    if (this.method(access.order) === 'none' || !(await this.proven(access, proof))) throw proofRequired();
+    return access.order;
+  }
+
   /** Emails a code that opens the order's page (orders with an email and no store account). */
   async sendCode(token: string) {
     const access = await this.find(token);

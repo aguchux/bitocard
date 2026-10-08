@@ -227,6 +227,31 @@ export class WalletService {
     });
   }
 
+  /**
+   * Takes part of a held amount as BitoCard revenue and returns the rest to where it came from (topped-up funds first,
+   * then earnings): for charges priced only after the fact, such as an SMS. Never takes more than was held. Repeating
+   * it does nothing.
+   */
+  async settleHold(holdId: string, charge: bigint, description: string) {
+    return this.resolveHold(holdId, 'captured', hold => {
+      const taken = charge < 0n ? 0n : charge > hold.amountMinor ? hold.amountMinor : charge;
+      const rest = hold.amountMinor - taken;
+      // Return funding first (it is spent last), then earnings.
+      const toFunding = rest < hold.fromFundingMinor ? rest : hold.fromFundingMinor;
+      const toEarnings = rest - toFunding;
+      return {
+        type: 'hold_capture',
+        description,
+        lines: [
+          { account: this.ref(hold.resellerId, hold.currency, 'reseller_reserved'), debit: hold.amountMinor },
+          ...(taken > 0n ? [{ account: { kind: 'platform_revenue' as const, currency: hold.currency }, credit: taken }] : []),
+          ...(toFunding > 0n ? [{ account: this.ref(hold.resellerId, hold.currency, 'reseller_funding'), credit: toFunding }] : []),
+          ...(toEarnings > 0n ? [{ account: this.ref(hold.resellerId, hold.currency, 'reseller_earnings'), credit: toEarnings }] : []),
+        ],
+      };
+    });
+  }
+
   private async resolveHold(
     holdId: string,
     status: 'released' | 'captured',

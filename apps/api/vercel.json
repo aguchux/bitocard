@@ -45,6 +45,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/v1/cron/numbers",
+      "schedule": "20 * * * *"
+    },
+    {
       "path": "/v1/cron/webhooks",
       "schedule": "*/5 * * * *"
     },

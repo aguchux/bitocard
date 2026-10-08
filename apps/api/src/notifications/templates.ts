@@ -279,6 +279,53 @@ export function deliveryEmail(
 }
 
 /** A storefront customer's code, under the store's name (never BitoCard's, unless the store is BitoCard's own). */
+export type NumberStage = 'expiring' | 'expired' | 'warning' | 'deleted';
+
+/**
+ * A virtual number's renewal reminders, to the customer under the store's name: 7 days before it expires, on the day
+ * (paused), the delete warning 7 days after, and when it is deleted (15 days after). The customer renews on the number's
+ * page (the order page linked here); the store pays for it from its wallet.
+ */
+export function numberReminderEmail(to: string, input: { store: string; number: string; stage: NumberStage; expiresAt: Date; deleteAt: Date; link?: string }): EmailMessage {
+  const day = (date: Date) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+  const content: Record<NumberStage, { subject: string; heading: string; paragraphs: string[] }> = {
+    expiring: {
+      subject: `Your number ${input.number} expires on ${day(input.expiresAt)}`,
+      heading: 'Your number expires soon',
+      paragraphs: [`Your number ${input.number} is paid up to ${day(input.expiresAt)}. Renew it on its page to keep it, or switch on automatic renewal there.`],
+    },
+    expired: {
+      subject: `Your number ${input.number} has expired`,
+      heading: 'Your number has expired',
+      paragraphs: [
+        `Your number ${input.number} expired on ${day(input.expiresAt)} and is paused: it no longer receives messages.`,
+        `Renew it on its page by ${day(input.deleteAt)} to keep it. After that it is deleted and cannot be recovered.`,
+      ],
+    },
+    warning: {
+      subject: `Your number ${input.number} will be deleted on ${day(input.deleteAt)}`,
+      heading: 'Your number will be deleted',
+      paragraphs: [`Your number ${input.number} is still paused. Unless you renew it on its page by ${day(input.deleteAt)}, it will be deleted for good and its messages with it.`],
+    },
+    deleted: {
+      subject: `Your number ${input.number} has been deleted`,
+      heading: 'Your number has been deleted',
+      paragraphs: [`Your number ${input.number} was not renewed, so it has been deleted and can no longer be used or recovered.`],
+    },
+  };
+  const { subject, heading, paragraphs } = content[input.stage];
+  const lines = [...paragraphs, ...(input.link && input.stage !== 'deleted' ? [`See your number: ${input.link}`] : [])];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    ...(input.link && input.stage !== 'deleted' ? [`<p style="font-size:15px"><a href="${escape(input.link)}" style="color:#2477ff">See your number</a></p>`] : []),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject, html, text: [heading, '', ...lines, '', `Sent for ${input.store}.`].join('\n') };
+}
+
 /** The code that opens an order's page, sent to the order's email under the store's name. */
 export function orderAccessCodeEmail(to: string, input: { store: string; product: string; code: string }): EmailMessage {
   const paragraphs = [

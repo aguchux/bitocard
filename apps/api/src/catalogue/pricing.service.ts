@@ -202,6 +202,16 @@ export class PricingService {
     );
   }
 
+  /**
+   * What the reseller pays BitoCard for a supplier cost outside an order (a number's renewal, an SMS): converted to
+   * the reseller currency the conservative way, plus BitoCard's margin for the product (never below cost).
+   */
+  async wholesaleFor(ctx: PricingContext, product: Product, supplierCost: bigint, costCurrency: string) {
+    const { amount: cost } = await this.convert(ctx, supplierCost, costCurrency);
+    const wholesale = addBps(cost, this.rule(ctx, product).marginBps);
+    return { cost, wholesale: wholesale < cost ? cost : wholesale, currency: ctx.currency };
+  }
+
   /** Prices one unit of a face value through the cheapest viable offer, optionally leaving some suppliers out. */
   async price(ctx: PricingContext, product: ProductWithOffers, faceValue: bigint, exclude?: ReadonlySet<string>): Promise<Priced> {
     const rule = this.rule(ctx, product);

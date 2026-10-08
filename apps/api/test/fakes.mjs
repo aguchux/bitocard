@@ -457,9 +457,19 @@ export async function fakeDidww() {
     state.dids.push({ id: `did-${id}`, type: 'dids', attributes: { number: `4420790${String((state.next += 1)).padStart(5, '0')}`, expires_at: '2026-11-03T00:00:00.000Z' }, order: id });
     return order;
   };
+  // Outgoing SMS (the HTTP OUT trunk: Basic sms-user:sms-pass) are kept in `state.sms`; `state.smsReply` is 'ok' or an HTTP status.
+  state.sms = [];
+  state.smsReply = 'ok';
   const service = await fakeService(({ method, url, headers, body }) => {
     const [path, search = ''] = url.split('?');
     const query = new URLSearchParams(search);
+    if (method === 'POST' && path === '/outbound_messages') {
+      if (headers.authorization !== `Basic ${Buffer.from('sms-user:sms-pass').toString('base64')}`) return { status: 401, body: { errors: [{ title: 'Unauthorized' }] } };
+      if (state.smsReply !== 'ok') return { status: state.smsReply, body: { errors: [{ title: 'Refused' }] } };
+      const id = `sms-${(state.next += 1)}`;
+      state.sms.push({ id, ...body.data.attributes });
+      return { status: 202, body: { data: { type: 'outbound_messages', id } } };
+    }
     if (!state.keys.includes(headers['api-key'])) return { status: 401, body: { errors: [{ title: 'Unauthorized', detail: 'Invalid API key' }] } };
     if (state.fail && path.startsWith(state.fail)) return { status: 500, body: { errors: [{ title: 'Simulated outage' }] } };
     if (method === 'GET' && path === '/balance') return { body: { data: { id: 'balance', type: 'balances', attributes: { total_balance: '100.0' } } } };
@@ -511,9 +521,25 @@ export async function fakeDidww() {
       return { body: { data: orders.map(resource) } };
     }
     if (method === 'GET' && path === '/dids') return { body: { data: state.dids.filter(d => d.order === query.get('filter[order.id]')).map(did => ({ id: did.id, type: did.type, attributes: did.attributes })) } };
+    // One number: read it, or change its renewals left (`billing_cycles_count`) and `terminated`.
+    const did = /^\/dids\/([\w-]+)$/.exec(path);
+    if (did) {
+      const found = state.dids.find(item => item.id === did[1]);
+      if (!found) return { status: 404, body: { errors: [{ title: 'Not found' }] } };
+      if (method === 'PATCH') {
+        found.attributes = { ...found.attributes, ...body.data.attributes };
+        found.patches = [...(found.patches ?? []), body.data.attributes];
+      }
+      return { body: { data: { id: found.id, type: 'dids', attributes: { billing_cycles_count: 0, terminated: false, ...found.attributes } } } };
+    }
     return { status: 404, body: { errors: [{ title: `Fake DIDWW has no ${method} ${path}` }] } };
   });
-  return { ...service, state, complete, env: { DIDWW_API_KEY: 'didww-key', DIDWW_API_URL: service.url, DIDWW_COUNTRIES: 'GB' } };
+  return {
+    ...service,
+    state,
+    complete,
+    env: { DIDWW_API_KEY: 'didww-key', DIDWW_API_URL: service.url, DIDWW_COUNTRIES: 'GB', DIDWW_SMS_URL: service.url, DIDWW_SMS_USERNAME: 'sms-user', DIDWW_SMS_PASSWORD: 'sms-pass', DIDWW_SMS_WEBHOOK_TOKEN: 'didww-sms-token-0123456789' },
+  };
 }
 
 /**

@@ -50,15 +50,49 @@ export const accessToken = /^bca_[A-Za-z0-9_-]{40,60}$/;
 export const passCookie = "bc_access";
 export const passPath = (token: string) => `/a/${token}`;
 
+export type NumberMessage = {
+  direction: "in" | "out";
+  from: string;
+  to: string;
+  text: string;
+  status: "received" | "queued" | "sent" | "delivered" | "failed";
+  created_at: string;
+};
+
+/**
+ * A virtual number's live state (`GET /v1/store/access/:token/number`): `null` when the order has no tracked number.
+ * Deleted 15 days after it expires unrenewed (`delete_at`); messages newest first, up to 50.
+ */
+export type OrderNumber = {
+  object: "order_number";
+  number: null | {
+    number: string;
+    status: "active" | "expired" | "deleted";
+    expires_at: string;
+    delete_at: string;
+    can_send: boolean;
+    /** Renewed from the store 3 days before it expires. */
+    auto_renew: boolean;
+    /** The customer can renew it for a month (while active or expired). */
+    can_renew: boolean;
+    messages: NumberMessage[];
+  };
+};
+
+type AccessAction = "" | "/number" | "/reveal" | "/code" | "/verify" | "/messages" | "/number/renew" | "/number/auto-renew";
+/** Reads; everything else changes something and is a POST. */
+const reads = new Set<AccessAction>(["", "/number"]);
+
 /** Calls an order-page endpoint with the customer's proof (their store session, and the pass for this page). Never cached; never throws. */
-export async function accessApi<T>(token: string, action: "" | "/reveal" | "/code" | "/verify" = "", body?: unknown): Promise<AccessResult<T>> {
+export async function accessApi<T>(token: string, action: AccessAction = "", body?: unknown): Promise<AccessResult<T>> {
   if (!accessToken.test(token)) return { ok: false, status: 404, code: "resource_missing", message: "This link is not valid." };
   const jar = await cookies();
   const session = jar.get(customerCookie)?.value;
   const pass = jar.get(passCookie)?.value;
+  const read = reads.has(action);
   try {
     const res = await fetch(apiUrl(`/v1/store/access/${token}${action}`), {
-      method: action ? "POST" : "GET",
+      method: read ? "GET" : "POST",
       cache: "no-store",
       headers: {
         accept: "application/json",
@@ -67,7 +101,7 @@ export async function accessApi<T>(token: string, action: "" | "/reveal" | "/cod
         ...(pass ? { "bitocard-access-pass": pass } : {}),
         ...(await shopperHeader()),
       },
-      body: body !== undefined ? JSON.stringify(body) : action ? "{}" : undefined,
+      body: body !== undefined ? JSON.stringify(body) : read ? undefined : "{}",
     });
     const json = (await res.json().catch(() => null)) as (T & { error?: { code?: string; message?: string } }) | null;
     if (res.ok) return { ok: true, data: json as T };

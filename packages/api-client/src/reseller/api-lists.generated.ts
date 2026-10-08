@@ -25,4 +25,8 @@ export const webhookEventTypes = [
   'payout.failed',
   'customer_verification.approved',
   'customer_verification.declined',
+  'number.renewed',
+  'number.expired',
+  'number.deleted',
+  'number.sms_received',
 ] as const;

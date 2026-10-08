@@ -105,6 +105,7 @@ export const tagTypes = [
   'Fee',
   'FeeRule',
   'Stock',
+  'Number',
   // Both apps
   'Notification',
   'SupplierNotification',

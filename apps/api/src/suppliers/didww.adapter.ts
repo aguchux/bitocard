@@ -1,7 +1,7 @@
 import type { ProductCategory } from '../generated/prisma/client.js';
 import { type FeatureRules, meetsFeatureRules, type ProductFeature, productFeatureKeys } from '../catalogue/features.js';
-import { providerRequest } from '../payments/provider-error.js';
-import { type CatalogueItem, type CatalogueScope, type FulfilmentRequest, type FulfilmentResult, slug, type SupplierAdapter } from './adapter.js';
+import { ProviderError, providerRequest } from '../payments/provider-error.js';
+import { type CatalogueItem, type CatalogueScope, type FulfilmentRequest, type FulfilmentResult, type NumberSupplier, slug, type SupplierAdapter } from './adapter.js';
 
 /** The DIDWW API version the request and response shapes below follow. */
 export const didwwApiVersion = '2026-04-16';
@@ -16,7 +16,15 @@ type DidGroupMeta = { needs_registration?: boolean; is_available?: boolean };
 type SkuAttributes = { setup_price: string; monthly_price: string; channels_included_count: number };
 type TypeAttributes = { name: string };
 type OrderAttributes = { status: string; reference?: string; amount?: string; callback_url?: string | null; created_at?: string };
-type DidAttributes = { number: string; expires_at?: string | null; channels_included_count?: number };
+type DidAttributes = {
+  number: string;
+  expires_at?: string | null;
+  channels_included_count?: number;
+  /** Renewals left before it expires: null renews for ever, 0 none. */
+  billing_cycles_count?: number | null;
+  terminated?: boolean;
+  blocked?: boolean;
+};
 
 /** Number capabilities in product keys, in DIDWW's names (fax shows in a key only on numbers with no calls or SMS). */
 const capabilities = ['voice', 'voice_out', 'sms', 'sms_out'] as const;
@@ -63,6 +71,8 @@ export type DidwwSettings = {
   countries: string[];
   /** BitoCard's public API address, used for DIDWW's order callbacks (`/v1/webhooks/didww`). */
   callbackBase: string;
+  /** Outgoing SMS: DIDWW's HTTP OUT SMS trunk (its own address and Basic credentials, not the API key). */
+  sms?: { url: string; username?: string; password?: string };
   /**
    * A reseller's own DIDWW account: its callbacks go to that connection's own address
    * (`/v1/webhooks/didww/<connection>`), where they are checked with the reseller's own API key.
@@ -267,7 +277,9 @@ export class DidwwAdapter implements SupplierAdapter {
             allow_back_ordering: false,
             callback_url: this.callbackUrl(request.reference),
             callback_method: 'post',
-            items: [{ type: 'did_order_items', attributes: { sku_id: String(request.meta.skuId), qty: 1, billing_cycles_count: 1 } }],
+            // No automatic renewals: DIDWW counts renewals left after the first period, so 0 means only the month paid
+            // for. Each renewal is paid from the reseller's wallet first, then added (`renewNumber`).
+            items: [{ type: 'did_order_items', attributes: { sku_id: String(request.meta.skuId), qty: 1, billing_cycles_count: 0 } }],
           },
         },
       },
@@ -295,10 +307,20 @@ export class DidwwAdapter implements SupplierAdapter {
     // Completed but the number is not listed yet: look again rather than deliver nothing.
     if (!did) return { status: 'pending', supplierTransactionId: order.id, detail: `${detail}, number not listed yet` };
     const meta = request.meta;
+    const number = `+${did.attributes.number.replace(/^\+/, '')}`;
     return {
       status: 'completed',
       supplierTransactionId: order.id,
       detail,
+      numbers: [
+        {
+          supplierNumberId: did.id,
+          number,
+          expiresAt: did.attributes.expires_at ? new Date(did.attributes.expires_at) : null,
+          monthlyCostMinor: BigInt(Number(meta.monthlyMinor ?? 0)),
+          costCurrency: 'USD',
+        },
+      ],
       deliveries: [
         {
           kind: 'virtual_number',
@@ -313,4 +335,47 @@ export class DidwwAdapter implements SupplierAdapter {
       ],
     };
   }
+
+  // -- Numbers already bought ------------------------------------------------------------------------------------------
+
+  readonly numbers: NumberSupplier = {
+    /**
+     * One more paid month: DIDWW renews at `expires_at` once per renewal left (`billing_cycles_count`), charged to the
+     * DIDWW balance then. A paused (expired or cancelled) number is restored with `terminated: false`.
+     */
+    renewNumber: async (didId: string) => {
+      const did = (await this.request<One<DidAttributes>>(`/dids/${encodeURIComponent(didId)}`)).data;
+      const left = did.attributes.billing_cycles_count ?? 0;
+      const updated = await this.request<One<DidAttributes>>(`/dids/${encodeURIComponent(didId)}`, {
+        method: 'PATCH',
+        body: { data: { id: didId, type: 'dids', attributes: { billing_cycles_count: left + 1, ...(did.attributes.terminated || did.attributes.blocked ? { terminated: false } : {}) } } },
+      });
+      const expires = updated.data.attributes.expires_at ?? did.attributes.expires_at;
+      return { expiresAt: expires ? new Date(expires) : null };
+    },
+    /** Cancelled for good: no renewals left, removed from service. */
+    releaseNumber: async (didId: string) => {
+      await this.request(`/dids/${encodeURIComponent(didId)}`, {
+        method: 'PATCH',
+        body: { data: { id: didId, type: 'dids', attributes: { billing_cycles_count: 0, terminated: true } } },
+      });
+    },
+    smsConfigured: () => Boolean(this.settings.sms?.username && this.settings.sms.password),
+    /** DIDWW's outbound SMS API (`POST /outbound_messages`, Basic auth with the HTTP OUT trunk's credentials). */
+    sendSms: async (input: { from: string; to: string; text: string }) => {
+      const sms = this.settings.sms;
+      if (!sms?.username || !sms.password) throw new ProviderError(this.code, 'outgoing SMS is not set up', true);
+      const res = await providerRequest<{ data?: { id?: string } }>(this.code, `${sms.url.replace(/\/+$/, '')}/outbound_messages`, {
+        method: 'POST',
+        body: { data: { type: 'outbound_messages', attributes: { source: input.from.replace(/^\+/, ''), destination: input.to.replace(/^\+/, ''), content: input.text } } },
+        headers: {
+          authorization: `Basic ${Buffer.from(`${sms.username}:${sms.password}`).toString('base64')}`,
+          accept: 'application/vnd.api+json',
+          'content-type': 'application/vnd.api+json',
+        },
+      });
+      if (!res.data?.id) throw new ProviderError(this.code, 'no message ID returned', false);
+      return { supplierMessageId: res.data.id };
+    },
+  };
 }

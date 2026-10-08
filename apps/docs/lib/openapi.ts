@@ -122,7 +122,7 @@ export const operations: Operation[] = Object.entries(document.paths).flatMap(([
  * sections are what SHQ (the reseller dashboard) uses with its own sign-in; `public` needs no sign-in.
  */
 export const sections: Array<{ title: string; kind: "api" | "dashboard" | "public"; tags: string[] }> = [
-  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Wallet", "Payouts", "Customers"] },
+  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "Wallet", "Payouts", "Customers"] },
   { title: "Webhooks and events", kind: "api", tags: ["Webhooks", "Events"] },
   { title: "Stores and markets", kind: "api", tags: ["Stores", "Countries", "Exchange rates", "Plans", "Settings"] },
   { title: "Dashboard (SHQ)", kind: "dashboard", tags: ["Authentication", "API keys", "Team", "Notifications", "Integrations"] },
@@ -147,6 +147,7 @@ export const tagIntros: Record<string, string> = {
   Catalogue: "Every product you can sell, priced for you, and the markups you add. Prices are in your wallet currency; a quote locks the exact price.",
   Quotes: "A quote locks a product's price, your wholesale cost and the recipient check for 10 minutes. Every order is placed from one open quote.",
   Orders: "Place an order from a quote; BitoCard holds the wholesale cost from your wallet, fulfils it and tells you the outcome. Codes and PINs are only on the single order.",
+  Numbers: "Virtual numbers your orders bought: renew them from your wallet (auto-renew is on by default), read their SMS and send SMS. A number not renewed is paused at expiry and deleted 15 days later.",
   Wallet: "Your pre-funded wallet: balances, ledger transactions, top-ups, reserved bank accounts and BitoCard's fees.",
   Payouts: "Withdraw matured earnings to your verified bank account.",
   Customers: "Check your customers' identity by your own customer reference: BVN in Nigeria, ID document and face check elsewhere.",

@@ -13,7 +13,7 @@ import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { resellerNotVerified, testModeOnly } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
-import type { Delivery, FulfilmentRequest, FulfilmentResult } from '../suppliers/adapter.js';
+import type { Delivery, FulfilmentRequest, FulfilmentResult, SuppliedNumber } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
@@ -51,6 +51,17 @@ export function supplierReference(now = new Date()) {
   const lagos = new Date(now.getTime() + 60 * 60 * 1000);
   const stamp = lagos.toISOString().replace(/[^0-9]/g, '').slice(0, 12);
   return `${stamp}BC${randomBytes(8).toString('hex')}`;
+}
+
+/** The same day and time a calendar month later (the last day of a shorter month). */
+export function addMonth(date: Date) {
+  const next = new Date(date);
+  const day = next.getUTCDate();
+  next.setUTCDate(1);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  const last = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(day, last));
+  return next;
 }
 
 export const receiptNumber = (number: number | null) => (number === null ? null : `BC-${String(number).padStart(6, '0')}`);
@@ -434,9 +445,10 @@ export class OrdersService {
   }
 
   /** Records the delivery and takes the held money: wholesale as revenue, tax as tax payable, and the supplier cost. */
-  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[] }) {
+  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[] }) {
     const deliveries = result.deliveries ?? [];
     const encryption = deliveries.some(d => d.code || d.pin) ? this.encryption() : null;
+    const numbers = await this.numbersOf(order, result.numbers, deliveries);
     const claimed = await this.prisma.$transaction(async tx => {
       const [{ nextval }] = order.source === 'own' ? [{ nextval: null }] : await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('order_receipt_number_seq')`;
       const updated = await tx.order.updateMany({
@@ -463,6 +475,22 @@ export class OrdersService {
           },
         });
       }
+      for (const number of numbers) {
+        await tx.virtualNumber.create({
+          data: {
+            orderId: order.id,
+            resellerId: order.resellerId,
+            mode: order.mode,
+            productId: order.productId,
+            supplierCode: order.supplierCode,
+            supplierNumberId: number.supplierNumberId,
+            number: number.number,
+            monthlyCostMinor: number.monthlyCostMinor,
+            costCurrency: number.costCurrency,
+            expiresAt: number.expiresAt ?? addMonth(new Date()),
+          },
+        });
+      }
       await this.recordEvent(tx, 'order.completed', order.id);
       return true;
     });
@@ -472,6 +500,28 @@ export class OrdersService {
       await this.emailDeliveries(order.id);
       await this.tellCheckout(order, 'completed');
     }
+  }
+
+  /**
+   * The virtual numbers an order bought, to keep for renewals and SMS: as the supplier reported them, or in the sandbox
+   * the test number it delivered (priced at the offer's monthly cost). Numbers bought through a reseller's own supplier
+   * account are theirs to manage there.
+   */
+  private async numbersOf(order: Order, reported: SuppliedNumber[] | undefined, deliveries: Delivery[]): Promise<SuppliedNumber[]> {
+    if (order.source === 'own') return [];
+    if (reported?.length) return reported;
+    if (order.mode !== 'test') return [];
+    const delivered = deliveries.filter(delivery => delivery.kind === 'virtual_number' && delivery.serial);
+    if (!delivered.length) return [];
+    const offer = await this.prisma.supplierProduct.findUnique({ where: { id: order.supplierProductId }, select: { meta: true, costCurrency: true } });
+    const monthly = Number((offer?.meta as Record<string, unknown> | null)?.monthlyMinor ?? 0);
+    return delivered.map((delivery, index) => ({
+      supplierNumberId: `sandbox_${order.supplierReference}_${index}`,
+      number: delivery.serial!,
+      expiresAt: null,
+      monthlyCostMinor: BigInt(monthly > 0 ? monthly : 100),
+      costCurrency: offer?.costCurrency ?? order.supplierCurrency,
+    }));
   }
 
   /**

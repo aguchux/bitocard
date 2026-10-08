@@ -13478,7 +13478,11 @@
                 "payout.paid",
                 "payout.failed",
                 "customer_verification.approved",
-                "customer_verification.declined"
+                "customer_verification.declined",
+                "number.renewed",
+                "number.expired",
+                "number.deleted",
+                "number.sms_received"
               ]
             }
           },
@@ -19713,6 +19717,1218 @@
         ],
         "x-bitocard-auth": "session"
       }
+    },
+    "/v1/numbers": {
+      "get": {
+        "description": "The numbers your orders bought, newest first, with when each is paid up to.",
+        "operationId": "NumbersController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "expired",
+                "deleted"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of your virtual numbers, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VirtualNumber"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "virtual_number",
+                      "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                      "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                      "mode": "live",
+                      "number": "+442071234567",
+                      "status": "active",
+                      "expires_at": "2026-11-06T09:15:04.000Z",
+                      "delete_at": "2026-11-21T09:15:04.000Z",
+                      "auto_renew": false,
+                      "customer_sending": false,
+                      "sends_sms": true,
+                      "renewal_error": null,
+                      "created_at": "2026-10-06T09:15:04.870Z",
+                      "updated_at": "2026-10-06T09:15:04.870Z"
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List virtual numbers",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/numbers/{id}": {
+      "get": {
+        "operationId": "NumbersController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VirtualNumber"
+                },
+                "example": {
+                  "object": "virtual_number",
+                  "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                  "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                  "mode": "live",
+                  "number": "+442071234567",
+                  "status": "active",
+                  "expires_at": "2026-11-06T09:15:04.000Z",
+                  "delete_at": "2026-11-21T09:15:04.000Z",
+                  "auto_renew": false,
+                  "customer_sending": false,
+                  "sends_sms": true,
+                  "renewal_error": null,
+                  "created_at": "2026-10-06T09:15:04.870Z",
+                  "updated_at": "2026-10-06T09:15:04.870Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a virtual number",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "patch": {
+        "description": "Auto-renew, and whether your customer may send SMS from the order’s page.",
+        "operationId": "NumbersController_update",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The number with its new settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VirtualNumber"
+                },
+                "example": {
+                  "object": "virtual_number",
+                  "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                  "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                  "mode": "live",
+                  "number": "+442071234567",
+                  "status": "active",
+                  "expires_at": "2026-11-06T09:15:04.000Z",
+                  "delete_at": "2026-11-21T09:15:04.000Z",
+                  "auto_renew": false,
+                  "customer_sending": true,
+                  "sends_sms": true,
+                  "renewal_error": null,
+                  "created_at": "2026-10-06T09:15:04.870Z",
+                  "updated_at": "2026-10-06T09:15:04.870Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a number’s settings",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "developer"
+        ],
+        "x-bitocard-scopes": [
+          "orders:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/numbers/{id}/renewal-price": {
+      "get": {
+        "description": "What renewing for a month would take from your wallet now (at today’s exchange rate).",
+        "operationId": "NumbersController_renewalPrice",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The renewal price now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberRenewalPrice"
+                },
+                "example": {
+                  "object": "number_renewal_price",
+                  "amount": 615000,
+                  "currency": "NGN"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a number’s renewal price",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/numbers/{id}/renew": {
+      "post": {
+        "description": "Takes a month from your wallet and adds it: to the end of the paid month, or from now for an expired (paused) number, which is active again. Deleted numbers cannot be renewed.",
+        "operationId": "NumbersController_renew",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The renewed number: a month was taken from your wallet and added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VirtualNumber"
+                },
+                "example": {
+                  "object": "virtual_number",
+                  "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                  "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                  "mode": "live",
+                  "number": "+442071234567",
+                  "status": "active",
+                  "expires_at": "2026-12-06T09:15:04.000Z",
+                  "delete_at": "2026-12-21T09:15:04.000Z",
+                  "auto_renew": false,
+                  "customer_sending": false,
+                  "sends_sms": true,
+                  "renewal_error": null,
+                  "created_at": "2026-10-06T09:15:04.870Z",
+                  "updated_at": "2026-11-01T10:02:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renew a number for a month",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "developer",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "orders:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/numbers/{id}/messages": {
+      "get": {
+        "description": "SMS received and sent, newest first, with their text. Messages are kept 90 days.",
+        "operationId": "NumbersController_messages",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the number’s messages, newest first, with their text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NumberMessage"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "number_message",
+                      "id": "4d5e6f7a-8b9c-4d0e-8f1a-2b3c4d5e6f7a",
+                      "number_id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                      "direction": "in",
+                      "from": "+447700900123",
+                      "to": "+442071234567",
+                      "text": "Your verification code is 482913.",
+                      "status": "received",
+                      "charged": null,
+                      "currency": null,
+                      "failure_reason": null,
+                      "created_at": "2026-10-08T12:01:44.000Z"
+                    },
+                    {
+                      "object": "number_message",
+                      "id": "5e6f7a8b-9c0d-4e1f-9a2b-3c4d5e6f7a8b",
+                      "number_id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                      "direction": "out",
+                      "from": "+442071234567",
+                      "to": "+447700900123",
+                      "text": "Your table is ready.",
+                      "status": "delivered",
+                      "charged": 1500,
+                      "currency": "NGN",
+                      "failure_reason": null,
+                      "created_at": "2026-10-08T12:01:44.000Z"
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a number’s messages",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "post": {
+        "description": "From a number that sends SMS (`sends_sms`). The most it can cost is held from your wallet; the real price is taken once the network reports it (`charged`), and the rest returned. In the sandbox nothing is sent.",
+        "operationId": "NumbersController_send",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The message: `queued` until the network reports it, then `sent` (with `charged`) or `failed` (nothing charged).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberMessage"
+                },
+                "example": {
+                  "object": "number_message",
+                  "id": "5e6f7a8b-9c0d-4e1f-9a2b-3c4d5e6f7a8b",
+                  "number_id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                  "direction": "out",
+                  "from": "+442071234567",
+                  "to": "+447700900123",
+                  "text": "Your table is ready.",
+                  "status": "queued",
+                  "charged": null,
+                  "currency": null,
+                  "failure_reason": null,
+                  "created_at": "2026-10-08T12:01:44.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send an SMS",
+        "tags": [
+          "Numbers"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "developer",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "orders:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
     }
   },
   "info": {
@@ -20571,7 +21787,11 @@
                 "payout.paid",
                 "payout.failed",
                 "customer_verification.approved",
-                "customer_verification.declined"
+                "customer_verification.declined",
+                "number.renewed",
+                "number.expired",
+                "number.deleted",
+                "number.sms_received"
               ]
             }
           }
@@ -20604,7 +21824,11 @@
                 "payout.paid",
                 "payout.failed",
                 "customer_verification.approved",
-                "customer_verification.declined"
+                "customer_verification.declined",
+                "number.renewed",
+                "number.expired",
+                "number.deleted",
+                "number.sms_received"
               ]
             }
           },
@@ -20780,6 +22004,37 @@
         },
         "required": [
           "outcome"
+        ]
+      },
+      "UpdateNumberDto": {
+        "type": "object",
+        "properties": {
+          "auto_renew": {
+            "type": "boolean",
+            "description": "Renew from your wallet 3 days before `expires_at`. Your customer can also switch this on the order’s page."
+          },
+          "customer_sending": {
+            "type": "boolean",
+            "description": "Let your customer send SMS from the order’s page (charged to your wallet)."
+          }
+        }
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "Who to send to, in international format, for example `+447700900123`.",
+            "example": "+447700900123"
+          },
+          "text": {
+            "type": "string",
+            "description": "The message: up to 160 characters (70 if it needs characters outside the GSM alphabet, such as emoji)."
+          }
+        },
+        "required": [
+          "to",
+          "text"
         ]
       },
       "Order": {
@@ -21166,6 +22421,200 @@
             "format": "date-time"
           }
         }
+      },
+      "VirtualNumber": {
+        "type": "object",
+        "title": "Virtual number",
+        "required": [
+          "object",
+          "id",
+          "order_id",
+          "mode",
+          "number",
+          "status",
+          "expires_at",
+          "delete_at",
+          "auto_renew",
+          "customer_sending",
+          "sends_sms",
+          "renewal_error",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `virtual_number`.",
+            "const": "virtual_number"
+          },
+          "id": {
+            "type": "string",
+            "description": "Virtual number ID.",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "description": "The order that bought it.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "number": {
+            "type": "string",
+            "description": "The number, E.164 (for example `+442071234567`)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active`; `expired`: not renewed by `expires_at`, paused (no SMS in or out) and renewable until `delete_at`; `deleted`: released for good.",
+            "enum": [
+              "active",
+              "expired",
+              "deleted"
+            ]
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "Paid up to. Renewing adds a month (from now, for an expired number).",
+            "format": "date-time"
+          },
+          "delete_at": {
+            "type": "string",
+            "description": "When an unrenewed number is deleted: 15 days after `expires_at`.",
+            "format": "date-time"
+          },
+          "auto_renew": {
+            "type": "boolean",
+            "description": "Renewed from your wallet 3 days before `expires_at` (retried twice a day while your wallet is short). Off until your customer switches it on on the order’s page, or you do."
+          },
+          "customer_sending": {
+            "type": "boolean",
+            "description": "Your customer may send SMS from the order’s page (charged to your wallet)."
+          },
+          "sends_sms": {
+            "type": "boolean",
+            "description": "The number can send SMS (`POST /v1/numbers/{id}/messages`)."
+          },
+          "renewal_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last automatic renewal did not happen, for example `insufficient_funds`."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the number was bought.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When the number last changed. Use it to ignore an older event that arrives after a newer one.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NumberMessage": {
+        "type": "object",
+        "title": "Number message",
+        "required": [
+          "object",
+          "id",
+          "number_id",
+          "direction",
+          "from",
+          "to",
+          "text",
+          "status",
+          "charged",
+          "currency",
+          "failure_reason",
+          "created_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `number_message`.",
+            "const": "number_message"
+          },
+          "id": {
+            "type": "string",
+            "description": "Message ID.",
+            "format": "uuid"
+          },
+          "number_id": {
+            "type": "string",
+            "description": "The virtual number.",
+            "format": "uuid"
+          },
+          "direction": {
+            "type": "string",
+            "description": "`in` (received) or `out` (sent).",
+            "enum": [
+              "in",
+              "out"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "Who sent it (E.164)."
+          },
+          "to": {
+            "type": "string",
+            "description": "Who it was sent to (E.164)."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The message. Never in webhooks (null there): get the messages to read it."
+          },
+          "status": {
+            "type": "string",
+            "description": "`received` (in); `queued`, `sent`, `delivered` or `failed` (out).",
+            "enum": [
+              "received",
+              "queued",
+              "sent",
+              "delivered",
+              "failed"
+            ]
+          },
+          "charged": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Taken from your wallet for a sent message, in minor units of `currency`; null until the price is known, and for received messages."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 4217 currency of `charged`."
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why a sent message failed."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was received or sent.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
       },
       "CustomerVerification": {
         "type": "object",
@@ -21799,6 +23248,242 @@
             "properties": {
               "object": {
                 "$ref": "#/components/schemas/CustomerVerification"
+              }
+            }
+          }
+        }
+      },
+      "NumberRenewedEvent": {
+        "type": "object",
+        "title": "number.renewed event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "number.renewed"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/VirtualNumber"
+              }
+            }
+          }
+        }
+      },
+      "NumberExpiredEvent": {
+        "type": "object",
+        "title": "number.expired event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "number.expired"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/VirtualNumber"
+              }
+            }
+          }
+        }
+      },
+      "NumberDeletedEvent": {
+        "type": "object",
+        "title": "number.deleted event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "number.deleted"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/VirtualNumber"
+              }
+            }
+          }
+        }
+      },
+      "NumberSmsReceivedEvent": {
+        "type": "object",
+        "title": "number.sms_received event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "number.sms_received"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/NumberMessage"
               }
             }
           }
@@ -23737,6 +25422,32 @@
           }
         }
       },
+      "NumberRenewalPrice": {
+        "type": "object",
+        "title": "Number renewal price",
+        "description": "What renewing a virtual number for a month would cost now, at today’s exchange rate.",
+        "required": [
+          "object",
+          "amount",
+          "currency"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `number_renewal_price`.",
+            "const": "number_renewal_price"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "What renewing for a month takes from your wallet now, in minor units of `currency` (for example kobo or cents)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency (your wallet currency)."
+          }
+        }
+      },
       "Wallet": {
         "type": "object",
         "title": "Wallet",
@@ -25157,7 +26868,11 @@
                 "payout.paid",
                 "payout.failed",
                 "customer_verification.approved",
-                "customer_verification.declined"
+                "customer_verification.declined",
+                "number.renewed",
+                "number.expired",
+                "number.deleted",
+                "number.sms_received"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -25270,7 +26985,11 @@
                 "payout.paid",
                 "payout.failed",
                 "customer_verification.approved",
-                "customer_verification.declined"
+                "customer_verification.declined",
+                "number.renewed",
+                "number.expired",
+                "number.deleted",
+                "number.sms_received"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -25385,7 +27104,11 @@
                   "payout.paid",
                   "payout.failed",
                   "customer_verification.approved",
-                  "customer_verification.declined"
+                  "customer_verification.declined",
+                  "number.renewed",
+                  "number.expired",
+                  "number.deleted",
+                  "number.sms_received"
                 ]
               },
               "created_at": {
@@ -25508,7 +27231,11 @@
                   "payout.paid",
                   "payout.failed",
                   "customer_verification.approved",
-                  "customer_verification.declined"
+                  "customer_verification.declined",
+                  "number.renewed",
+                  "number.expired",
+                  "number.deleted",
+                  "number.sms_received"
                 ]
               },
               "created_at": {
@@ -25655,6 +27382,18 @@
           },
           {
             "$ref": "#/components/schemas/CustomerVerificationDeclinedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/NumberRenewedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/NumberExpiredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/NumberDeletedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/NumberSmsReceivedEvent"
           }
         ]
       },
@@ -27945,6 +29684,10 @@
               "order.needs_review",
               "top_up.credited",
               "store.checkout_refused",
+              "number.expiring",
+              "number.renewal_failed",
+              "number.expired",
+              "number.deleted",
               "payout.paid",
               "payout.failed",
               "bank_account.added",
@@ -28114,6 +29857,10 @@
               "order.needs_review",
               "top_up.credited",
               "store.checkout_refused",
+              "number.expiring",
+              "number.renewal_failed",
+              "number.expired",
+              "number.deleted",
               "payout.paid",
               "payout.failed",
               "bank_account.added",
@@ -29496,6 +31243,376 @@
                     "reason": "name_mismatch",
                     "created_at": "2026-10-06T09:00:00.000Z",
                     "decided_at": "2026-10-06T09:04:10.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "number.renewed": {
+      "post": {
+        "operationId": "webhook_number_renewed",
+        "summary": "A virtual number was renewed",
+        "description": "Fires each time a number is renewed for a month: by your customer on the order’s page, automatically (3 days before `expires_at`, when `auto_renew` is on), or by you (`POST /v1/numbers/{id}/renew`). The month was taken from your wallet; an expired number is active again.\n\nDoes not fire when a renewal is refused (for example your wallet is short): the number shows `renewal_error`, and you get a notification.\n\nComes after `order.completed` for the number, or `number.expired`. Followed by the next renewal, or `number.expired`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberRenewedEvent"
+              },
+              "example": {
+                "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                "object": "event",
+                "type": "number.renewed",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-11-03T09:00:12.000Z",
+                "data": {
+                  "object": {
+                    "object": "virtual_number",
+                    "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                    "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                    "mode": "live",
+                    "number": "+442071234567",
+                    "status": "active",
+                    "expires_at": "2026-12-06T09:15:04.000Z",
+                    "delete_at": "2026-12-21T09:15:04.000Z",
+                    "auto_renew": false,
+                    "customer_sending": false,
+                    "sends_sms": true,
+                    "renewal_error": null,
+                    "created_at": "2026-10-06T09:15:04.870Z",
+                    "updated_at": "2026-11-03T09:00:12.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "number.expired": {
+      "post": {
+        "operationId": "webhook_number_expired",
+        "summary": "A virtual number expired and is paused",
+        "description": "Fires once when a number reaches `expires_at` without being renewed. It is paused (no SMS in or out) and can be renewed until `delete_at` (15 days later); your customer is emailed on the day and 7 days later.\n\nDoes not fire for renewed numbers.\n\nComes after the number’s last renewal or its order. Followed by `number.renewed` (renewed in time) or `number.deleted`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberExpiredEvent"
+              },
+              "example": {
+                "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "object": "event",
+                "type": "number.expired",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-11-06T09:15:30.000Z",
+                "data": {
+                  "object": {
+                    "object": "virtual_number",
+                    "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                    "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                    "mode": "live",
+                    "number": "+442071234567",
+                    "status": "expired",
+                    "expires_at": "2026-11-06T09:15:04.000Z",
+                    "delete_at": "2026-11-21T09:15:04.000Z",
+                    "auto_renew": false,
+                    "customer_sending": false,
+                    "sends_sms": true,
+                    "renewal_error": "insufficient_funds",
+                    "created_at": "2026-10-06T09:15:04.870Z",
+                    "updated_at": "2026-11-06T09:15:30.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "number.deleted": {
+      "post": {
+        "operationId": "webhook_number_deleted",
+        "summary": "A virtual number was deleted",
+        "description": "Fires once when an expired number reaches `delete_at` unrenewed: it is released for good and cannot be recovered; its messages are deleted with it.\n\nDoes not fire for active or still-renewable numbers.\n\nComes after `number.expired`. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberDeletedEvent"
+              },
+              "example": {
+                "id": "c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f",
+                "object": "event",
+                "type": "number.deleted",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-11-21T09:15:40.000Z",
+                "data": {
+                  "object": {
+                    "object": "virtual_number",
+                    "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                    "order_id": "5f0c6a8e-3b1d-4c9a-9e2f-7a1b2c3d4e5f",
+                    "mode": "live",
+                    "number": "+442071234567",
+                    "status": "deleted",
+                    "expires_at": "2026-11-06T09:15:04.000Z",
+                    "delete_at": "2026-11-21T09:15:04.000Z",
+                    "auto_renew": false,
+                    "customer_sending": false,
+                    "sends_sms": true,
+                    "renewal_error": null,
+                    "created_at": "2026-10-06T09:15:04.870Z",
+                    "updated_at": "2026-11-21T09:15:40.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "number.sms_received": {
+      "post": {
+        "operationId": "webhook_number_sms_received",
+        "summary": "A virtual number received an SMS",
+        "description": "Fires once for each SMS a number receives. The text is never in the event: get it with `GET /v1/numbers/{id}/messages`. Your customer also sees it on the order’s page.\n\nDoes not fire for messages sent from the number, or to expired or deleted numbers.\n\nComes after `order.completed` for the number. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberSmsReceivedEvent"
+              },
+              "example": {
+                "id": "d4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a",
+                "object": "event",
+                "type": "number.sms_received",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T12:01:44.000Z",
+                "data": {
+                  "object": {
+                    "object": "number_message",
+                    "id": "4d5e6f7a-8b9c-4d0e-8f1a-2b3c4d5e6f7a",
+                    "number_id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                    "direction": "in",
+                    "from": "+447700900123",
+                    "to": "+442071234567",
+                    "text": null,
+                    "status": "received",
+                    "charged": null,
+                    "currency": null,
+                    "failure_reason": null,
+                    "created_at": "2026-10-08T12:01:44.000Z"
                   }
                 }
               }

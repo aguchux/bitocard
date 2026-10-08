@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { adminApi, parseStockCodes, percentToPpb } from '../src/admin';
-import { resellerCatalogueApi, resellerFeesApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi } from '../src/reseller';
+import { resellerCatalogueApi, resellerFeesApi, resellerNumbersApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi, smsLimit } from '../src/reseller';
 import { keepUnusedSeconds, makeStore, notificationsApi, pushApi, readTimeoutMs, revalidateAfterSeconds, setRequestContext, toApiError, uploadMedia } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
@@ -344,6 +344,38 @@ describe('optimistic toggles', () => {
     await listing;
     supplier.unsubscribe();
     catalogue.unsubscribe();
+  });
+
+  test("a number's auto-renew shows at once on the number and its list, and a refusal flips it back", async () => {
+    const store = makeStore();
+    const number = { object: 'virtual_number', id: 'n1', number: '+447700900123', status: 'active', auto_renew: true, customer_sending: false };
+    reply = call => (call.url.includes('/v1/numbers/n1') ? Response.json(number) : Response.json({ object: 'list', data: [number], has_more: false }));
+    const one = store.dispatch(resellerNumbersApi.endpoints.resellerNumber.initiate('n1'));
+    const list = store.dispatch(resellerNumbersApi.endpoints.resellerNumbers.initiate({}));
+    await Promise.all([one, list]);
+    const shown = () => [resellerNumbersApi.endpoints.resellerNumber.select('n1')(store.getState()).data!.auto_renew, resellerNumbersApi.endpoints.resellerNumbers.select({})(store.getState()).data!.pages[0].data[0].auto_renew];
+    let answer = holdNext();
+    let saving = store.dispatch(resellerNumbersApi.endpoints.updateNumber.initiate({ id: 'n1', auto_renew: false }));
+    expect(shown()).toEqual([false, false]);
+    await answer(Response.json({ ...number, auto_renew: false }));
+    await saving;
+    expect(shown()).toEqual([false, false]);
+    answer = holdNext();
+    saving = store.dispatch(resellerNumbersApi.endpoints.updateNumber.initiate({ id: 'n1', auto_renew: true }));
+    expect(shown()).toEqual([true, true]);
+    await answer(Response.json({ error: { type: 'permission_error', code: 'forbidden', message: 'No.' } }, { status: 403 }));
+    await saving;
+    expect(shown()).toEqual([false, false]);
+    one.unsubscribe();
+    list.unsubscribe();
+  });
+});
+
+describe('smsLimit', () => {
+  test('160 characters in the GSM alphabet, 70 with anything else', () => {
+    expect(smsLimit('Hello, £5 off {today}')).toBe(160);
+    expect(smsLimit('Привет')).toBe(70);
+    expect(smsLimit('Thanks 👍')).toBe(70);
   });
 });
 

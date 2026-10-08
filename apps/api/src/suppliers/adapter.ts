@@ -51,7 +51,23 @@ export type FulfilmentResult = {
   deliveries?: Delivery[];
   /** Internal detail for admins; never shown to resellers. */
   detail?: string;
+  /** Virtual numbers bought by the order, with the supplier's own IDs for them (internal: never shown). */
+  numbers?: SuppliedNumber[];
 };
+
+/** A number a supplier sold us: kept to renew, release and route its SMS. */
+export type SuppliedNumber = { supplierNumberId: string; number: string; expiresAt: Date | null; monthlyCostMinor: bigint; costCurrency: string };
+
+/** Managing numbers already bought. A number stays with the supplier that sold it. */
+export interface NumberSupplier {
+  /** Pays one more period with the supplier (restoring a paused number). Returns when it is now paid up to, if known. */
+  renewNumber(supplierNumberId: string): Promise<{ expiresAt: Date | null }>;
+  /** Gives the number up for good. */
+  releaseNumber(supplierNumberId: string): Promise<void>;
+  /** Sends an SMS from one of our numbers; the supplier reports its price later. */
+  sendSms?(input: { from: string; to: string; text: string }): Promise<{ supplierMessageId: string }>;
+  smsConfigured?(): boolean;
+}
 
 export type FulfilmentRequest = {
   /** Our unique reference for this attempt, sent to the supplier so it can be looked up later. */
@@ -91,6 +107,8 @@ export interface SupplierAdapter {
   placeOrder?(request: FulfilmentRequest): Promise<FulfilmentResult>;
   /** The current outcome of an order placed earlier, by our reference (and the supplier ID if known). */
   orderStatus?(request: FulfilmentRequest, supplierTransactionId?: string): Promise<FulfilmentResult>;
+  /** Virtual number suppliers: renewing, releasing and SMS for numbers already bought. */
+  readonly numbers?: NumberSupplier;
 }
 
 /** A supplier whose API access is not confirmed yet: present in the registry, never configured, offers nothing. */

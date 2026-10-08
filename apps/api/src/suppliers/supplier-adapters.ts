@@ -41,7 +41,13 @@ export class SupplierAdapters {
       const adapters: SupplierAdapter[] = [
         reloadly(config, live('reloadly') ? { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET } : {}),
         new VtpassAdapter(live('vtpass') ? { apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY } : {}, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
-        new DidwwAdapter({ apiKey: live('didww') ? config.DIDWW_API_KEY : undefined, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL }),
+        new DidwwAdapter({
+          apiKey: live('didww') ? config.DIDWW_API_KEY : undefined,
+          baseUrl: config.DIDWW_API_URL,
+          countries: config.DIDWW_COUNTRIES,
+          callbackBase: config.DIDWW_CALLBACK_URL,
+          sms: live('didww') ? { url: config.DIDWW_SMS_URL, username: config.DIDWW_SMS_USERNAME, password: config.DIDWW_SMS_PASSWORD } : undefined,
+        }),
         new ZenditAdapter({ apiKey: live('zendit') ? config.ZENDIT_API_KEY : undefined, baseUrl: config.ZENDIT_API_URL }),
         new PawapayAdapter({ apiToken: live('pawapay') ? config.PAWAPAY_API_TOKEN : undefined, baseUrl: config.PAWAPAY_API_URL, feePercent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
         this.stock,

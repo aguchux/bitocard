@@ -1351,6 +1351,7 @@ model Order {
   product               Product         @relation(fields: [productId], references: [id])
   deliveries            OrderDelivery[]
   access                OrderAccess?
+  virtualNumber         VirtualNumber?
   attempts              OrderAttempt[]
 
   @@index([resellerId, createdAt])
@@ -1395,6 +1396,82 @@ model OrderAccess {
   codes          OrderAccessCode[]
 
   @@map("order_access")
+}
+
+/// A virtual number sold through an order: its supplier's ID for it (internal), when it is paid up to, renewal and
+/// reminder state, and its SMS. Numbers stay with their supplier for life.
+model VirtualNumber {
+  id                String          @id @default(uuid()) @db.Uuid
+  orderId           String          @unique @map("order_id") @db.Uuid
+  resellerId        String          @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  productId         String          @map("product_id") @db.Uuid
+  supplierCode      String          @map("supplier_code")
+  /// The supplier's ID for the number (DIDWW's DID ID). Internal: never shown to resellers or customers.
+  supplierNumberId  String          @map("supplier_number_id")
+  /// E.164, for example +442071234567.
+  number            String
+  /// The supplier's monthly cost, in `costCurrency` minor units: what renewals are priced from.
+  monthlyCostMinor  BigInt          @map("monthly_cost_minor")
+  costCurrency      String          @map("cost_currency") @db.Char(3)
+  /// active; expired (paused: in the 15-day grace, renewable); deleted (released, gone for good).
+  status            String          @default("active")
+  /// Paid up to: renewing adds a month.
+  expiresAt         DateTime        @map("expires_at")
+  /// Renew from the reseller's wallet 3 days before expiry: off until the customer (on the order page) or the reseller switches it on.
+  autoRenew         Boolean         @default(false) @map("auto_renew")
+  /// The reseller lets the customer send SMS from the order page (charged to the reseller's wallet).
+  customerSending   Boolean         @default(false) @map("customer_sending")
+  renewedAt         DateTime?       @map("renewed_at")
+  /// Reminders for the current period: 7 days before expiry, on expiry, the delete warning 7 days after.
+  remindedAt        DateTime?       @map("reminded_at")
+  expiredAt         DateTime?       @map("expired_at")
+  warnedAt          DateTime?       @map("warned_at")
+  deletedAt         DateTime?       @map("deleted_at")
+  /// Why the last automatic renewal did not happen (for example the wallet was short), and when it was tried.
+  renewalError      String?         @map("renewal_error")
+  renewalAttemptAt  DateTime?       @map("renewal_attempt_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  messages          NumberMessage[]
+
+  @@unique([supplierCode, supplierNumberId])
+  @@index([number, status])
+  @@index([status, expiresAt])
+  @@index([resellerId, mode, createdAt])
+  @@map("virtual_numbers")
+}
+
+/// An SMS to or from a virtual number. The text is encrypted at rest; messages are kept 90 days.
+model NumberMessage {
+  id                String        @id @default(uuid()) @db.Uuid
+  numberId          String        @map("number_id") @db.Uuid
+  /// in or out.
+  direction         String
+  /// The other party's number (E.164 without +, as the supplier gives it).
+  counterparty      String
+  textEncrypted     String        @map("text_encrypted")
+  /// received (in); queued, sent, delivered or failed (out).
+  status            String
+  /// The supplier's message ID: incoming ones are stored once however often they are delivered.
+  supplierMessageId String?       @map("supplier_message_id")
+  /// Outgoing: SMS parts sent, what the supplier charged (cost currency), and the hold and charge on the wallet.
+  parts             Int           @default(1)
+  costMinor         BigInt?       @map("cost_minor")
+  chargedMinor      BigInt?       @map("charged_minor")
+  holdId            String?       @map("hold_id") @db.Uuid
+  failureReason     String?       @map("failure_reason")
+  /// customer (from the order page) or reseller (API or SHQ).
+  sentBy            String?       @map("sent_by")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  number            VirtualNumber @relation(fields: [numberId], references: [id], onDelete: Cascade)
+
+  @@unique([direction, supplierMessageId])
+  @@index([numberId, createdAt])
+  @@index([createdAt])
+  @@map("number_messages")
 }
 
 /// A 6-digit code emailed to the order's customer (`recipient.email`) to open its page: hashed, single use, 10 minutes,

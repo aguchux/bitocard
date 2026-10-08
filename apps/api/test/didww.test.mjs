@@ -230,14 +230,14 @@ describe('DIDWW catalogue', () => {
 });
 
 describe('DIDWW orders', () => {
-  test('a completed order delivers the number; one billing cycle is ordered, with our reference in the callback address', async () => {
+  test('a completed order delivers the number; it is ordered with no automatic renewals, with our reference in the callback address', async () => {
     const client = await reseller();
     didww.state.orderReply = 'Completed';
     const created = await order(client);
     assert.equal(created.status, 'completed', JSON.stringify(created));
     const sent = placed().request.data.attributes;
     const row = await prisma.order.findUniqueOrThrow({ where: { id: created.id } });
-    assert.deepEqual(sent.items, [{ type: 'did_order_items', attributes: { sku_id: 'sku-london-0', qty: 1, billing_cycles_count: 1 } }]);
+    assert.deepEqual(sent.items, [{ type: 'did_order_items', attributes: { sku_id: 'sku-london-0', qty: 1, billing_cycles_count: 0 } }], 'only the month paid for: renewals are added once paid');
     assert.equal(sent.allow_back_ordering, false);
     assert.equal(sent.callback_url, `${callbackBase}/v1/webhooks/didww?reference=${encodeURIComponent(row.supplierReference)}`);
     const delivery = created.deliveries[0];

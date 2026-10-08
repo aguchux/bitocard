@@ -180,7 +180,20 @@ describe('integration settings', () => {
   test('DIDWW has a built adapter: its settings are integration keys with environment fallback', async () => {
     const didww = (await admin.get('/v1/admin/integrations')).json.data.find(item => item.id === 'didww');
     assert.deepEqual([didww.section, didww.adapter_ready], ['suppliers', true]);
-    assert.deepEqual(didww.fields.map(item => item.key), ['DIDWW_API_KEY', 'DIDWW_SANDBOX', 'DIDWW_API_URL', 'DIDWW_COUNTRIES', 'DIDWW_CALLBACK_URL']);
+    assert.deepEqual(didww.fields.map(item => item.key), [
+      'DIDWW_API_KEY',
+      'DIDWW_SANDBOX',
+      'DIDWW_API_URL',
+      'DIDWW_COUNTRIES',
+      'DIDWW_CALLBACK_URL',
+      'DIDWW_SMS_WEBHOOK_TOKEN',
+      'DIDWW_SMS_USERNAME',
+      'DIDWW_SMS_PASSWORD',
+      'DIDWW_SMS_URL',
+      'DIDWW_SMS_MAX_PRICE_CENTS',
+    ]);
+    // The SMS settings are optional: numbers work without SMS.
+    assert.deepEqual(didww.fields.filter(item => item.required).map(item => item.key), ['DIDWW_API_KEY']);
     const saved = await update('didww', { DIDWW_COUNTRIES: 'GB, US,CA' });
     assert.equal(saved.status, 200, JSON.stringify(saved.json));
     assert.deepEqual(integrations.config.DIDWW_COUNTRIES, ['GB', 'US', 'CA']);
