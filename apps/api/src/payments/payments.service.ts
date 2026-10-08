@@ -252,7 +252,13 @@ export class PaymentsService {
   async requery(payment: Payment) {
     if (payment.status !== 'pending' || payment.provider === 'sandbox') return payment;
     const provider = await this.providerFor(payment);
-    if (!provider) return payment;
+    if (!provider) {
+      // The gateway is no longer usable (a reseller's own connection suspended, rejected or switched off): it can never be
+      // checked, so after its lifetime it is closed instead of holding the checkout and BitoCard's fee open for ever.
+      if (Date.now() - payment.createdAt.getTime() <= checkoutLifetimeMs) return payment;
+      this.logger.error({ paymentId: payment.id, provider: payment.provider, own: Boolean(payment.connectionId) }, 'Pending payment closed: its gateway can no longer be checked');
+      return this.fail(payment, 'The payment could not be confirmed.');
+    }
     const result = await provider.verify(paymentRef(payment));
     if (result && result.status !== 'pending') return this.settle(payment, result);
     if (Date.now() - payment.createdAt.getTime() > checkoutLifetimeMs) return this.fail(payment, 'The payment was not completed in time.');

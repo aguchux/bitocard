@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useActionState, useId, useState } from "react";
 import { Lock } from "lucide-react";
 import { formatFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail } from "@bitocard/api-client/storefront";
-import { type FormState, startCheckout } from "@/app/(store)/account/actions";
+import { type FormState, startCheckout } from "@/lib/account-actions";
 import { FormMessage, Submit, TextField } from "./account-forms";
 
 /** Bought several at a time, each its own code. */

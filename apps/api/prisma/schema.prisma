@@ -651,6 +651,9 @@ model Store {
   status        StoreStatus    @default(draft)
   /// Customer checkout on the store: `test` (sandbox: simulated payments and orders) until the reseller switches it live.
   checkoutMode  LedgerMode     @default(test) @map("checkout_mode")
+  /// The customer account app's menu on desktop: `rail` or `bottom`; null follows BitoCard (the
+  /// `customer_app_bottom_bar_desktop` switch). Phones and tablets always use the bottom bar.
+  desktopNav    String?        @map("desktop_nav")
   logoUrl       String?        @map("logo_url")
   primaryColor  String         @default("#070f4c") @map("primary_color")
   accentColor   String         @default("#ff2382") @map("accent_color")

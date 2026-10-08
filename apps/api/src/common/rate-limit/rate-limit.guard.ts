@@ -2,8 +2,10 @@ import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable, Logger }
 import { Redis } from '@upstash/redis';
 import type { Request, Response } from 'express';
 import { APP_CONFIG, type AppConfig } from '../../config/config.js';
+import { PrismaService } from '../../database/prisma.service.js';
+import { sha256 } from '../crypto.js';
 import { ApiError } from '../errors/api-error.js';
-import { callerScope } from '../idempotency/idempotency.interceptor.js';
+import { callerScope, type CustomerScopedRequest } from '../idempotency/idempotency.interceptor.js';
 
 type Verdict = { success: boolean; limit: number; remaining: number; reset: number };
 
@@ -54,7 +56,10 @@ export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger('RateLimit');
   private readonly limiter: { limitFor(key: string): Promise<Verdict> };
 
-  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+  constructor(
+    @Inject(APP_CONFIG) config: AppConfig,
+    private readonly prisma: PrismaService,
+  ) {
     if (config.UPSTASH_REDIS_REST_URL && config.UPSTASH_REDIS_REST_TOKEN) {
       const redis = new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN });
       this.limiter = new RedisLimiter(redis, config.RATE_LIMIT_PER_MINUTE);
@@ -67,6 +72,7 @@ export class RateLimitGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
     if (!req.originalUrl.startsWith('/v1/')) return true;
+    if (req.originalUrl.startsWith('/v1/store/')) await this.identifyCustomer(req);
     const scope = callerScope(req);
     const key = scope === 'anonymous' ? `ip:${req.ip ?? 'unknown'}` : `caller:${scope}`;
     let verdict: Verdict;
@@ -86,5 +92,20 @@ export class RateLimitGuard implements CanActivate {
 
     res.setHeader('Retry-After', String(Math.max(1, resetSeconds)));
     throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'rate_limited', 'Too many requests. Retry after the time in the Retry-After header.');
+  }
+
+  /**
+   * Store customers' requests come from the store's server, so they are limited per customer session instead of the
+   * server's address. Only a live session counts: a made-up token would otherwise get a fresh limit on every request.
+   */
+  private async identifyCustomer(req: CustomerScopedRequest) {
+    const token = req.get('bitocard-customer-session');
+    if (!token) return;
+    try {
+      const session = await this.prisma.customerSession.findUnique({ where: { tokenHash: sha256(token) }, select: { id: true, revokedAt: true, expiresAt: true } });
+      if (session && !session.revokedAt && session.expiresAt > new Date()) req.customerSessionId = session.id;
+    } catch (error) {
+      this.logger.error({ err: error }, 'Could not check the customer session for rate limiting');
+    }
   }
 }

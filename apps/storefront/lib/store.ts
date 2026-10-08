@@ -19,6 +19,8 @@ export type HostedStore = {
   currency: string | null;
   /** `test` while the store's checkout is the sandbox: orders are simulated and nothing is charged. */
   checkout_mode: "test" | "live";
+  /** The customer account app: its menu on desktop (the store's choice, else BitoCard's default). */
+  app?: { desktop_nav: "rail" | "bottom" };
 };
 
 /** The reseller store this request is for (its subdomain), or null on bitocard.com. Null outside a request (builds). */

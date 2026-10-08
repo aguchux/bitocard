@@ -11,7 +11,7 @@ import { MarketChooser } from "./market-chooser";
 import { DesktopNav, MobileMenu } from "./header-menus";
 
 /** A reseller's store name, with its logo when it has one. */
-function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "lg" | "md" }) {
+export function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "lg" | "md" }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-2.5">
       {store.branding.logo_url ? (

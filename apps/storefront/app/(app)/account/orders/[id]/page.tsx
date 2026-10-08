@@ -5,7 +5,7 @@ import { ChevronLeft, ExternalLink, KeyRound } from "lucide-react";
 import { formatFace, formatPrice, type StoreCheckout } from "@bitocard/api-client/storefront";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
-import { simulateCheckout } from "../../actions";
+import { simulateCheckout } from "@/lib/account-actions";
 
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false } };
 
@@ -22,9 +22,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const deliveries = order.order?.deliveries ?? [];
 
   return (
-    <div className="mx-auto grid max-w-3xl gap-6 py-6 sm:py-10">
+    <div className="mx-auto grid max-w-3xl gap-6">
       <RefreshWhile active={waiting && !(order.mode === "test" && order.status === "awaiting_payment")} />
-      <Link href="/account" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/orders" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
         <ChevronLeft className="size-4" aria-hidden="true" /> Your orders
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">

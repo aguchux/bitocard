@@ -27,6 +27,10 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Resellers connect their own supplier and payment gateway accounts (on plans with own integrations, for integrations offered in their country).",
   },
+  customer_app_bottom_bar_desktop: {
+    scopes: ['global', 'country', 'reseller'],
+    description: "Customers' account app uses the bottom tab bar on desktop too, instead of the side rail. A reseller's own choice for their store (SHQ Store) wins over this.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

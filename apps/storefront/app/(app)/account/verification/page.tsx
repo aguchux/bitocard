@@ -20,8 +20,8 @@ export default async function VerificationPage({ searchParams }: { searchParams:
   const status = country ? await customerApi<Status>("GET", `/v1/store/account/verification?country=${encodeURIComponent(country)}`) : null;
 
   return (
-    <div className="mx-auto grid max-w-xl gap-5 py-6 sm:py-10">
-      <Link href="/account" className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+    <div className="mx-auto grid max-w-xl gap-5">
+      <Link href="/account/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
         <ChevronLeft className="size-4" aria-hidden="true" /> Your account
       </Link>
       <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#070f4c]">Identity check</h1>

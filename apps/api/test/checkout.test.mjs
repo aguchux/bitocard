@@ -262,6 +262,34 @@ describe('store customer accounts', () => {
     assert.equal((await shopper.get('/v1/store/account')).status, 401, 'old sessions end');
     assert.equal((await store().post('/v1/store/account/signin', { email: shopper.email, password: 'a brand new passphrase' })).status, 200);
   });
+
+  test('parallel guesses cannot get past the code or password limits', async () => {
+    const shopper = await customer();
+    await shopper.post('/v1/store/account/password/forgot', { email: shopper.email });
+    const code = await lastEmailCode(server.app, shopper.email);
+    const wrong = code === '000000' ? '111111' : '000000';
+    const guesses = await Promise.all(
+      Array.from({ length: 12 }, () => store().post('/v1/store/account/password/reset', { email: shopper.email, code: wrong, password: 'a brand new passphrase' })),
+    );
+    assert.equal(guesses.filter(g => g.json.error.code === 'code_invalid').length, 5, 'only five guesses are ever compared');
+    const record = await prisma.customerCode.findFirstOrThrow({ where: { customerId: shopper.id, purpose: 'password_reset', consumedAt: null } });
+    assert.equal(record.attempts, 5);
+    assert.equal((await store().post('/v1/store/account/password/reset', { email: shopper.email, code, password: 'a brand new passphrase' })).json.error.code, 'code_attempts_exceeded');
+
+    const target = await customer();
+    await Promise.all(Array.from({ length: 8 }, () => store().post('/v1/store/account/signin', { email: target.email, password: 'wrong password!!' })));
+    const locked = await store().post('/v1/store/account/signin', { email: target.email, password: 'correct horse battery' });
+    assert.equal(locked.json.error.code, 'account_locked', 'parallel wrong passwords all count');
+  });
+
+  test('wrong current passwords count towards the sign-in lockout', async () => {
+    const shopper = await customer();
+    for (let i = 0; i < 5; i += 1) {
+      const res = await shopper.post('/v1/store/account/password/change', { current_password: 'wrong password!!', password: 'another good passphrase' });
+      assert.equal(res.json.error.code, 'password_incorrect');
+    }
+    assert.equal((await store().post('/v1/store/account/signin', { email: shopper.email, password: 'correct horse battery' })).json.error.code, 'account_locked');
+  });
 });
 
 /** Turns bitocard.com's checkout sandbox on or off (Settings > Integrations > Customer checkout). */

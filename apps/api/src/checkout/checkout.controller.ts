@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
@@ -11,7 +11,9 @@ import { StoreKey } from '../customers/store-key.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { paymentGateways } from '../payments/payment-providers.js';
-import { CheckoutService } from './checkout.service.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { desktopNavFor } from '../stores/stores.service.js';
+import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.service.js';
 import { StoreSellers } from './store-sellers.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -66,6 +68,12 @@ class ChangePasswordDto {
 
   @IsString() @Length(passwordLength.min, passwordLength.max)
   password: string;
+}
+
+class CheckoutListDto extends PageDto {
+  /** Only the orders in one group (`checkoutGroups`), paged on the server so every page is full. */
+  @IsOptional() @IsIn(Object.keys(checkoutGroups))
+  show?: CheckoutGroup;
 }
 
 class CountryQueryDto {
@@ -255,7 +263,23 @@ export class CheckoutController {
   constructor(
     private readonly checkout: CheckoutService,
     private readonly stores: StoreSellers,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** How the store's customer account app looks (bitocard.com, or the store named): its desktop menu. */
+  @Get('app')
+  @Header('Cache-Control', 'public, max-age=60')
+  async app(@StoreKey() key: string | null) {
+    const store = await this.stores.resolve(key);
+    return { object: 'store_app' as const, desktop_nav: await desktopNavFor(this.settings, store) };
+  }
+
+  /** The customer's figures for their account home: what they spent, their orders, and deliveries this month. */
+  @UseGuards(CustomerGuard)
+  @Get('account/summary')
+  summary(@CurrentCustomer() caller: CustomerCaller) {
+    return this.checkout.summary(caller.customer);
+  }
 
   /** How customers in a country can pay (no sign-in needed, for showing on product pages). A reseller's store: its own. */
   @Get('payment-methods')
@@ -271,7 +295,7 @@ export class CheckoutController {
 
   @UseGuards(CustomerGuard)
   @Get('checkouts')
-  list(@CurrentCustomer() caller: CustomerCaller, @Query() page: PageDto) {
+  list(@CurrentCustomer() caller: CustomerCaller, @Query() page: CheckoutListDto) {
     return this.checkout.list(caller.customer, page);
   }
 

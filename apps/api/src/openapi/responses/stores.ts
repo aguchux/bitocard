@@ -31,6 +31,7 @@ const store = objectSchema(
       'Customer checkout on the store: `test` (sandbox: simulated payments and orders, for trying the store) until you switch it to `live`, which needs a verified business.',
       ['test', 'live'],
     ),
+    desktop_nav: nullableStr('Your customers’ account app menu on desktop: `rail` (side rail) or `bottom` (bottom bar); null follows BitoCard’s default. Phones and tablets always use the bottom bar.', { enum: ['rail', 'bottom', null] }),
     published_at: nullableTime('When the store was first published; kept when it is unpublished.'),
     created_at: time('When the store was created.'),
   },
@@ -46,6 +47,7 @@ const storeExample = {
   status: 'published',
   branding: { logo_url: 'https://cdn.bitocard.com/bitocard/resellers/2f1e0d9c-8b7a-4c6d-9e5f-4a3b2c1d0e9f/store/logos/6b1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.png', primary_color: '#070f4c', accent_color: '#ff2382' },
   checkout_mode: 'live',
+  desktop_nav: null,
   published_at: '2026-10-02T14:20:00.000Z',
   created_at: '2026-10-01T10:05:12.000Z',
 };
@@ -67,6 +69,7 @@ const storefront = objectSchema(
     country: nullableStr('ISO 3166-1 alpha-2 country of the reseller’s business.'),
     currency: nullableStr('ISO 4217 currency the store sells in.'),
     checkout_mode: oneOf('`live`, or `test` while the store’s checkout is the sandbox (show shoppers that orders are not real).', ['test', 'live']),
+    app: shape({ desktop_nav: oneOf('The customer account app’s menu on desktop: the store’s choice, else BitoCard’s default.', ['rail', 'bottom']) }, 'How the customer account app looks.'),
   },
   'What a published store needs to render: its name, branding, country, currency and checkout mode.',
 );
@@ -455,7 +458,7 @@ export const storesDocs: DocsArea = {
       status: 200,
       description: 'The published store. Drafts, suspended stores and unknown addresses are not found.',
       schema: 'Storefront',
-      example: { object: 'storefront', name: storeExample.name, subdomain: storeExample.subdomain, branding: storeExample.branding, country: 'NG', currency: 'NGN', checkout_mode: 'live' },
+      example: { object: 'storefront', name: storeExample.name, subdomain: storeExample.subdomain, branding: storeExample.branding, country: 'NG', currency: 'NGN', checkout_mode: 'live', app: { desktop_nav: 'rail' } },
     },
     'GET /v1/store/home': { status: 200, description: 'The home page. Until a layout is published, the default layout (`published: false`).', schema: 'StoreHome', example: homeExample },
     'GET /v1/store/products': {

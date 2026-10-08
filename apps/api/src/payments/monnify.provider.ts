@@ -126,16 +126,25 @@ export class MonnifyProvider implements ReservedAccountProvider, CheckoutProvide
 
   async refund(payment: PaymentRef & { refundReference: string }): Promise<RefundResult> {
     if (!payment.providerTransactionId) throw new ProviderError(this.name, 'no transaction to refund', true);
-    const body = await this.call<MonnifyRefund>('/api/v1/refunds/initiate-refund', {
-      method: 'POST',
-      body: {
-        transactionReference: payment.providerTransactionId,
-        refundReference: payment.refundReference,
-        refundAmount: Number(toMajor(payment.amount)),
-        refundReason: 'Order could not be fulfilled',
-        customerNote: 'Refund for an order that could not be fulfilled',
-      },
-    });
+    let body: MonnifyRefund;
+    try {
+      body = await this.call<MonnifyRefund>('/api/v1/refunds/initiate-refund', {
+        method: 'POST',
+        body: {
+          transactionReference: payment.providerTransactionId,
+          refundReference: payment.refundReference,
+          refundAmount: Number(toMajor(payment.amount)),
+          refundReason: 'Order could not be fulfilled',
+          customerNote: 'Refund for an order that could not be fulfilled',
+        },
+      });
+    } catch (error) {
+      // Monnify refuses a reference it has seen: a retry after a timeout finds the refund it already made.
+      if (!(error instanceof ProviderError) || !error.definite) throw error;
+      const existing = await this.refundStatus({ refundReference: payment.refundReference }).catch(() => null);
+      if (!existing) throw error;
+      return existing;
+    }
     return this.refundResult(body);
   }
 

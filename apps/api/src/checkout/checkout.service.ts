@@ -5,7 +5,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
-import type { Checkout, Order, OrderDelivery, Payment, Product, Store } from '../generated/prisma/client.js';
+import type { Checkout, CheckoutStatus, Order, OrderDelivery, Payment, Product, Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
@@ -22,6 +22,14 @@ import { type PaymentOption, StoreSellers } from './store-sellers.js';
 const minute = 60 * 1000;
 /** Refunds that fail this many times are left for an admin (they stay `refund_pending`, and admins are told). */
 const maxRefundAttempts = 5;
+
+/** How customers' orders are grouped in their account (`GET /v1/store/checkouts?show=`, and the summary's "on the way"). */
+export const checkoutGroups = {
+  progress: ['awaiting_payment', 'paid', 'refund_pending'],
+  delivered: ['completed'],
+  refunded: ['refunded'],
+} as const satisfies Record<string, readonly CheckoutStatus[]>;
+export type CheckoutGroup = keyof typeof checkoutGroups;
 
 type CheckoutFull = Checkout & {
   payment: Payment | null;
@@ -275,10 +283,10 @@ export class CheckoutService implements OnModuleInit {
     }
   }
 
-  async list(customer: CustomerWithStore, page: { limit?: number; starting_after?: string }) {
+  async list(customer: CustomerWithStore, page: { limit?: number; starting_after?: string; show?: CheckoutGroup }) {
     const limit = page.limit ?? 25;
     const rows = await this.prisma.checkout.findMany({
-      where: { customerId: customer.id, NOT: { status: 'failed', orderId: null } },
+      where: { customerId: customer.id, NOT: { status: 'failed', orderId: null }, ...(page.show ? { status: { in: [...checkoutGroups[page.show]] } } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(page.starting_after ? { cursor: { id: page.starting_after }, skip: 1 } : {}),
@@ -286,6 +294,35 @@ export class CheckoutService implements OnModuleInit {
     });
     const data = await Promise.all(rows.slice(0, limit).map(async row => this.present((await this.load({ id: row.id }))!)));
     return { object: 'list' as const, data, has_more: rows.length > limit };
+  }
+
+  /**
+   * The customer's figures for their account home: what they spent (delivered orders, by currency; refunds left out),
+   * how many orders they have and how many are on their way, and how many were delivered this calendar month (UTC).
+   */
+  async summary(customer: CustomerWithStore, now = new Date()) {
+    const rows = await this.prisma.checkout.findMany({
+      where: { customerId: customer.id, NOT: { status: 'failed', orderId: null } },
+      select: { status: true, amountMinor: true, currency: true },
+    });
+    const spent = new Map<string, bigint>();
+    const delivered = rows.filter(item => item.status === 'completed');
+    for (const row of delivered) spent.set(row.currency, (spent.get(row.currency) ?? 0n) + row.amountMinor);
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const deliveredThisMonth = await this.prisma.order.count({ where: { customerId: customer.id, status: 'completed', completedAt: { gte: monthStart } } });
+    return {
+      object: 'customer_summary' as const,
+      // Most delivered orders first: amounts in different currencies cannot be compared.
+      orders_total: [...spent]
+        .map(([currency, amount]) => ({ amount: minor(amount), currency, count: delivered.filter(row => row.currency === currency).length }))
+        .sort((a, b) => b.count - a.count || a.currency.localeCompare(b.currency))
+        .map(({ amount, currency }) => ({ amount, currency })),
+      orders: {
+        total: rows.length,
+        in_progress: rows.filter(row => (checkoutGroups.progress as readonly string[]).includes(row.status)).length,
+      },
+      delivered_this_month: deliveredThisMonth,
+    };
   }
 
   /** One checkout, with its codes once delivered. A checkout still waiting for payment is checked with the gateway first. */
@@ -348,6 +385,14 @@ export class CheckoutService implements OnModuleInit {
       if (order.status !== 'processing') await this.orderSettled(order.id, order.status === 'completed' ? 'completed' : 'failed');
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
+      // Another run (the request and the checkout job) may have placed the order with this quote meanwhile: follow
+      // that order instead of refunding a customer whose order is going ahead.
+      const placed = await this.prisma.order.findUnique({ where: { quoteId: checkout.quoteId } });
+      if (placed) {
+        await this.prisma.checkout.updateMany({ where: { id: checkout.id, orderId: null }, data: { orderId: placed.id } });
+        if (placed.status !== 'processing') await this.orderSettled(placed.id, placed.status === 'completed' ? 'completed' : 'failed');
+        return;
+      }
       // Refused before anything was bought (the product is no longer available, or the reseller's wallet is short):
       // the customer gets their money back.
       this.logger.warn({ checkoutId, code: error.code }, 'Paid checkout could not be ordered; refunding');
@@ -428,7 +473,8 @@ export class CheckoutService implements OnModuleInit {
   private async refundDelivered(orderId: string) {
     const checkout = await this.prisma.checkout.findUnique({ where: { orderId } });
     if (!checkout) return;
-    await this.prisma.checkout.updateMany({ where: { id: checkout.id, status: 'completed' }, data: { status: 'refund_pending', refundKind: 'admin', failureReason: null } });
+    // `paid` too: a checkout whose delivery was not recorded (the request stopped after the order completed).
+    await this.prisma.checkout.updateMany({ where: { id: checkout.id, status: { in: ['completed', 'paid'] } }, data: { status: 'refund_pending', refundKind: 'admin', failureReason: null } });
     await this.refund(checkout.id);
   }
 
@@ -445,7 +491,14 @@ export class CheckoutService implements OnModuleInit {
       this.logger.error({ checkoutId, provider: payment.provider, own: Boolean(payment.connectionId) }, 'Refund needs a payment gateway that is no longer set up');
       await this.prisma.checkout.update({ where: { id: checkout.id }, data: { refundAttempts: { increment: 1 } } });
     } else {
-      const ref = { ...paymentRef(payment), refundReference: `bc_rf_${checkout.id.replaceAll('-', '')}` };
+      // Only one run sends or checks a refund at a time: claim the row by its last change (the request that settled the
+      // order and the checkout job can both get here).
+      const claimed = await this.prisma.checkout.updateMany({ where: { id: checkout.id, status: 'refund_pending', updatedAt: checkout.updatedAt }, data: { updatedAt: new Date() } });
+      if (claimed.count === 0) return (await this.prisma.checkout.findUniqueOrThrow({ where: { id: checkout.id } })).status;
+      // The same reference on every retry, so the gateway recognises a refund it already made after a timeout; a new one
+      // only after the gateway refused (`refundAttempts` counts refusals), since a refused reference cannot be reused.
+      const base = `bc_rf_${checkout.id.replaceAll('-', '')}`;
+      const ref = { ...paymentRef(payment), refundReference: checkout.refundAttempts > 0 ? `${base}_${checkout.refundAttempts}` : base };
       try {
         const result = checkout.refundReference ? await provider.refundStatus({ ...ref, providerRefundId: checkout.refundReference }) : await provider.refund(ref);
         if (!checkout.refundReference || result.status === 'failed') {

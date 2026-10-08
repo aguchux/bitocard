@@ -403,5 +403,86 @@ describe('payments into a reseller’s own gateway', () => {
       assert.equal((await admin.put('/v1/admin/integrations/stripe/reseller-access', { enabled: true })).status, 200);
     }
   });
+
+  test('an unpaid payment on a gateway that can no longer be checked is closed, and BitoCard’s fee hold returned', async () => {
+    const store = await ownGatewayStore();
+    const shopper = await customer(store.subdomain);
+    const started = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
+    assert.equal(started.status, 201, JSON.stringify(started.json));
+    const row = await checkoutRow(started.json.id);
+    assert.equal((await prisma.feeCharge.findUniqueOrThrow({ where: { id: row.feeChargeId } })).status, 'held');
+    assert.equal((await admin.put('/v1/admin/integrations/stripe/reseller-access', { enabled: false })).status, 200);
+    try {
+      const cron = () => fetch(`${server.base}/v1/cron/payments`, { headers: { authorization: 'Bearer cron-secret' } });
+      await prisma.payment.update({ where: { id: row.paymentId }, data: { createdAt: new Date(Date.now() - 60 * 60_000) } });
+      assert.equal((await cron()).status, 200);
+      assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: row.paymentId } })).status, 'pending', 'still inside its lifetime');
+      await prisma.payment.update({ where: { id: row.paymentId }, data: { createdAt: new Date(Date.now() - 3 * 24 * 60 * 60_000) } });
+      assert.equal((await cron()).status, 200);
+      assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: row.paymentId } })).status, 'failed');
+      assert.equal((await checkoutRow(started.json.id)).status, 'failed');
+      assert.equal((await prisma.feeCharge.findUniqueOrThrow({ where: { id: row.feeChargeId } })).status, 'released');
+      assert.equal(await balance(store.resellerId, 'live', 'reseller_funding'), 5_000_000n, 'nothing kept');
+    } finally {
+      assert.equal((await admin.put('/v1/admin/integrations/stripe/reseller-access', { enabled: true })).status, 200);
+    }
+  });
 });
 
+
+describe('the customer account app', () => {
+  test('the summary shows what the customer spent, their orders and this month’s deliveries, and only theirs', async () => {
+    const product = await giftCard('Amazon Summary Card', ['SUMMARY-CODE-0001']);
+    const { subdomain } = await resellerStore([product]);
+    const shopper = await customer(subdomain);
+    const empty = await shopper.get('/v1/store/account/summary');
+    assert.deepEqual(empty.json, { object: 'customer_summary', orders_total: [], orders: { total: 0, in_progress: 0 }, delivered_this_month: 0 });
+
+    const start = () => shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
+    const delivered = (await start()).json;
+    await shopper.post(`/v1/store/checkouts/${delivered.id}/simulate`, { outcome: 'succeeded' });
+    const refunded = (await start()).json;
+    await shopper.post(`/v1/store/checkouts/${refunded.id}/simulate`, { outcome: 'succeeded', order: 'failed' });
+    await start(); // waiting for payment
+    const unpaid = (await start()).json;
+    await shopper.post(`/v1/store/checkouts/${unpaid.id}/simulate`, { outcome: 'failed' });
+
+    const summary = (await shopper.get('/v1/store/account/summary')).json;
+    assert.deepEqual(summary.orders_total, [{ amount: delivered.amount, currency: 'NGN' }], 'delivered orders only');
+    assert.deepEqual(summary.orders, { total: 3, in_progress: 1 }, 'unpaid checkouts are not orders');
+    assert.equal(summary.delivered_this_month, 1);
+
+    // The orders list filters on the server, so each page of a filter is full.
+    const shown = async show => (await shopper.get(`/v1/store/checkouts?limit=1${show ? `&show=${show}` : ''}`)).json;
+    assert.deepEqual((await shown('delivered')).data.map(item => item.id), [delivered.id]);
+    assert.deepEqual((await shown('refunded')).data.map(item => item.id), [refunded.id]);
+    assert.equal((await shown('progress')).data[0].status, 'awaiting_payment');
+    assert.equal((await shown()).has_more, true);
+    assert.equal((await shopper.get('/v1/store/checkouts?show=everything')).status, 400);
+
+    assert.equal((await storeServer(subdomain).get('/v1/store/account/summary')).status, 401);
+    assert.equal((await customer(subdomain).then(other => other.get('/v1/store/account/summary'))).json.orders.total, 0);
+  });
+
+  test('the desktop menu: BitoCard’s switch sets the default, a reseller’s choice for their store wins', async () => {
+    const appFor = async store => (await fetch(`${server.base}/v1/store/app${store ? `?store=${store}` : ''}`).then(res => res.json())).desktop_nav;
+    const { subdomain, storeId, browser, resellerId } = await resellerStore([]);
+    assert.deepEqual([await appFor(null), await appFor(subdomain)], ['rail', 'rail'], 'the side rail by default');
+    try {
+      assert.equal((await admin.put('/v1/admin/switches/customer_app_bottom_bar_desktop', { enabled: true })).status, 200);
+      assert.deepEqual([await appFor(null), await appFor(subdomain)], ['bottom', 'bottom']);
+      const chosen = await browser.patch(`/v1/stores/${storeId}`, { desktop_nav: 'rail' });
+      assert.deepEqual([chosen.status, chosen.json.desktop_nav], [200, 'rail']);
+      assert.equal(await appFor(subdomain), 'rail', 'the reseller overrides BitoCard');
+      const lookup = await fetch(`${server.base}/v1/storefronts/${subdomain}`).then(res => res.json());
+      assert.deepEqual(lookup.app, { desktop_nav: 'rail' });
+      assert.equal((await browser.patch(`/v1/stores/${storeId}`, { desktop_nav: null })).json.desktop_nav, null);
+      assert.equal(await appFor(subdomain), 'bottom', 'null follows BitoCard again');
+      assert.equal((await admin.put('/v1/admin/switches/customer_app_bottom_bar_desktop', { reseller_id: resellerId, enabled: false })).status, 200);
+      assert.equal(await appFor(subdomain), 'rail', 'an admin switch for the reseller');
+      assert.equal((await browser.patch(`/v1/stores/${storeId}`, { desktop_nav: 'sideways' })).status, 400);
+    } finally {
+      await admin.put('/v1/admin/switches/customer_app_bottom_bar_desktop', { enabled: null });
+    }
+  });
+});

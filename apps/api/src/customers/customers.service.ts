@@ -92,17 +92,21 @@ export class CustomersService {
     }
     const ok = await this.passwords.verify(customer?.passwordHash ?? null, input.password);
     if (!customer || !ok || customer.status !== 'active') {
-      if (customer) {
-        const failures = customer.failedSignIns + 1;
-        await this.prisma.customer.update({
-          where: { id: customer.id },
-          data: failures >= maxFailedSignIns ? { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockMs) } : { failedSignIns: failures },
-        });
-      }
+      if (customer) await this.recordFailedSignIn(customer.id);
       throw signInFailed();
     }
     await this.prisma.customer.update({ where: { id: customer.id }, data: { failedSignIns: 0, lockedUntil: null, lastSignInAt: new Date() } });
     return { customer: presentCustomer(customer), session: await this.startSession(customer.id) };
+  }
+
+  /** Counts a wrong password atomically (parallel guesses each count) and locks the account at the limit. */
+  private async recordFailedSignIn(customerId: string) {
+    const { failedSignIns } = await this.prisma.customer.update({ where: { id: customerId }, data: { failedSignIns: { increment: 1 } }, select: { failedSignIns: true } });
+    if (failedSignIns < maxFailedSignIns) return;
+    await this.prisma.customer.updateMany({
+      where: { id: customerId, failedSignIns: { gte: maxFailedSignIns } },
+      data: { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockMs) },
+    });
   }
 
   async signout(sessionId: string) {
@@ -114,9 +118,13 @@ export class CustomersService {
     return presentCustomer(await this.prisma.customer.update({ where: { id: customer.id }, data: { name: input.name.trim() } }));
   }
 
-  /** Needs the current password; signs out the customer's other sessions. */
+  /** Needs the current password (wrong ones count towards the sign-in lockout); signs out the customer's other sessions. */
   async changePassword(customer: Customer, sessionId: string, input: { current_password: string; password: string }) {
+    if (customer.lockedUntil && customer.lockedUntil > new Date()) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many wrong attempts. Try again in 15 minutes, or reset your password.');
+    }
     if (!(await this.passwords.verify(customer.passwordHash, input.current_password))) {
+      await this.recordFailedSignIn(customer.id);
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'password_incorrect', 'Your current password is wrong.', 'current_password');
     }
     await this.passwords.assertAcceptable(input.password);
@@ -152,11 +160,13 @@ export class CustomersService {
     const record = await this.prisma.customerCode.findFirst({ where: { customerId: customer.id, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (!record) throw codeInvalid();
     if (record.expiresAt <= new Date()) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_expired', 'That code has expired. Ask for a new one.', 'code');
-    if (record.attempts >= maxCodeAttempts) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
-    if (!sameDigest(record.codeHash, digest(customer.id, purpose, code))) {
-      await this.prisma.customerCode.update({ where: { id: record.id }, data: { attempts: { increment: 1 } } });
-      throw codeInvalid();
-    }
+    // Claim an attempt before comparing, in one statement, so parallel guesses can never get past the limit.
+    const attempt = await this.prisma.customerCode.updateMany({
+      where: { id: record.id, consumedAt: null, attempts: { lt: maxCodeAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (attempt.count === 0) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
+    if (!sameDigest(record.codeHash, digest(customer.id, purpose, code))) throw codeInvalid();
     const consumed = await this.prisma.customerCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
     if (consumed.count === 0) throw codeInvalid();
   }
@@ -188,8 +198,9 @@ export class CustomersService {
   async resetPassword(store: Store, input: { email: string; code: string; password: string }) {
     const customer = await this.prisma.customer.findUnique({ where: { storeId_email: { storeId: store.id, email: input.email.trim().toLowerCase() } } });
     if (!customer || customer.status !== 'active') throw codeInvalid();
-    await this.consumeCode(customer, 'password_reset', input.code);
+    // Check the new password first, so a refused one does not use up the emailed code.
     await this.passwords.assertAcceptable(input.password);
+    await this.consumeCode(customer, 'password_reset', input.code);
     const updated = await this.prisma.$transaction(async tx => {
       await tx.customerSession.updateMany({ where: { customerId: customer.id, revokedAt: null }, data: { revokedAt: new Date() } });
       return tx.customer.update({

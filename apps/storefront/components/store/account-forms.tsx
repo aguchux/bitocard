@@ -14,7 +14,7 @@ import {
   startVerification,
   updateName,
   verifyEmail,
-} from "@/app/(store)/account/actions";
+} from "@/lib/account-actions";
 
 const empty: FormState = {};
 const inputClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-[#070f4c] focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15 aria-[invalid=true]:border-red-400";

@@ -102,8 +102,15 @@ export async function fakeMonnify() {
       });
     }
     if (method === 'POST' && path === '/api/v1/refunds/initiate-refund') {
+      // Like Monnify, a reference already used is refused.
+      if (state.refunds[body.refundReference]) return { status: 400, body: { requestSuccessful: false, responseMessage: 'Duplicate refund reference' } };
       state.refunds[body.refundReference] = { ...body, refundStatus: 'COMPLETED' };
       return ok({ refundReference: body.refundReference, refundStatus: 'COMPLETED' });
+    }
+    const refund = /^\/api\/v1\/refunds\/(.+)$/.exec(path);
+    if (method === 'GET' && refund) {
+      const found = state.refunds[decodeURIComponent(refund[1])];
+      return found ? ok({ refundReference: found.refundReference, refundStatus: found.refundStatus }) : { status: 404, body: { requestSuccessful: false, responseMessage: 'Not found' } };
     }
     const tx = /^\/api\/v2\/transactions\/(.+)$/.exec(path);
     if (method === 'GET' && tx) {
@@ -656,7 +663,9 @@ export async function fakePawapay() {
  * and `status`/`payment_status`, which tests set to simulate payment; `state.refunds` maps refund ID to its fields.
  */
 export async function fakeStripe() {
-  const state = { sessions: {}, refunds: {}, next: 1, fee: 0 };
+  // `feeCurrency` and `exchangeRate` describe the balance transaction (the account's settlement currency); `byKey` maps
+  // idempotency keys to the refund they made, so a repeat returns it, as Stripe does.
+  const state = { sessions: {}, refunds: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null };
   const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
@@ -681,14 +690,23 @@ export async function fakeStripe() {
           amount_total: Number(session.fields['line_items[0][price_data][unit_amount]']),
           currency: session.fields['line_items[0][price_data][currency]'],
           client_reference_id: session.fields.client_reference_id,
-          payment_intent: url.includes('expand') ? { id: session.payment_intent, latest_charge: { balance_transaction: { fee: state.fee } } } : session.payment_intent,
+          payment_intent: url.includes('expand')
+            ? {
+                id: session.payment_intent,
+                latest_charge: {
+                  balance_transaction: { fee: state.fee, currency: state.feeCurrency ?? session.fields['line_items[0][price_data][currency]'], exchange_rate: state.exchangeRate },
+                },
+              }
+            : session.payment_intent,
         },
       };
     }
     if (method === 'POST' && path === '/v1/refunds') {
       const fields = form(body);
-      const id = `re_${(state.next += 1)}`;
-      state.refunds[id] = { ...fields, status: 'succeeded', key: headers.authorization.slice(7) };
+      const key = headers['idempotency-key'];
+      const id = (key && state.byKey[key]) || `re_${(state.next += 1)}`;
+      if (key) state.byKey[key] = id;
+      state.refunds[id] = { ...fields, status: 'succeeded', key: headers.authorization.slice(7), idempotencyKey: key };
       return { body: { id, object: 'refund', status: 'succeeded', amount: Number(fields.amount) } };
     }
     return { status: 404, body: { error: { message: `Fake Stripe has no ${method} ${path}` } } };

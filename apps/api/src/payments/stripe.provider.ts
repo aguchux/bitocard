@@ -10,8 +10,10 @@ type Session = {
   amount_total?: number | null;
   currency?: string | null;
   client_reference_id?: string | null;
-  payment_intent?: string | { id: string; latest_charge?: string | { balance_transaction?: string | { fee?: number } | null } | null } | null;
+  payment_intent?: string | { id: string; latest_charge?: string | { balance_transaction?: string | BalanceTransaction | null } | null } | null;
 };
+/** In the Stripe account's settlement currency, which can differ from the charge's; `exchange_rate` converts charge to settlement. */
+type BalanceTransaction = { fee?: number; currency?: string; exchange_rate?: number | null };
 type Refund = { id: string; status?: string; failure_reason?: string | null };
 
 /** Currencies Stripe counts in whole units (no cents); BitoCard keeps two decimal places for every currency. */
@@ -29,6 +31,19 @@ export function stripeAmount(amount: bigint, currency: string) {
 const fromStripe = (amount: number, currency: string) => (zeroDecimal.has(currency.toUpperCase()) ? BigInt(amount) * 100n : BigInt(amount));
 
 /**
+ * Stripe's fee in the charge's currency. The balance transaction is in the account's settlement currency: when that
+ * differs, the fee is converted back with the transaction's own exchange rate (none given: the fee is not booked).
+ */
+export function stripeFee(balance: BalanceTransaction, chargeCurrency: string) {
+  if (!balance.fee) return 0n;
+  const settlement = (balance.currency ?? chargeCurrency).toUpperCase();
+  const fee = fromStripe(balance.fee, settlement);
+  if (settlement === chargeCurrency.toUpperCase()) return fee;
+  if (!balance.exchange_rate || balance.exchange_rate <= 0) return 0n;
+  return BigInt(Math.round(Number(fee) / balance.exchange_rate));
+}
+
+/**
  * Stripe: card payments on Stripe Checkout, and refunds. The Checkout Session's ID is the payment's provider ID (kept
  * when the page is opened), so checks and notifications find it; the session's `client_reference_id` is our reference.
  * Stripe's fee is read from the charge's balance transaction.
@@ -42,8 +57,11 @@ export class StripeProvider implements CheckoutProvider {
     private readonly webhookSecret?: string,
   ) {}
 
-  private call<T>(path: string, init: { method?: string; form?: Record<string, string> } = {}) {
-    return providerRequest<T>(this.name, `${this.baseUrl.replace(/\/+$/, '')}${path}`, { ...init, headers: { authorization: `Bearer ${this.secretKey}` } });
+  private call<T>(path: string, init: { method?: string; form?: Record<string, string>; idempotencyKey?: string } = {}) {
+    const { idempotencyKey, ...rest } = init;
+    const headers: Record<string, string> = { authorization: `Bearer ${this.secretKey}` };
+    if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
+    return providerRequest<T>(this.name, `${this.baseUrl.replace(/\/+$/, '')}${path}`, { ...rest, headers });
   }
 
   /**
@@ -103,7 +121,7 @@ export class StripeProvider implements CheckoutProvider {
       const intent = typeof session.payment_intent === 'object' ? session.payment_intent : null;
       const charge = intent && typeof intent.latest_charge === 'object' ? intent.latest_charge : null;
       const balance = charge && typeof charge.balance_transaction === 'object' ? charge.balance_transaction : null;
-      return { status: 'succeeded', ...base, fee: balance?.fee ? fromStripe(balance.fee, currency) : 0n };
+      return { status: 'succeeded', ...base, fee: balance ? stripeFee(balance, currency) : 0n };
     }
     if (session.status === 'expired') return { status: 'failed', ...base, fee: 0n, failureReason: 'The payment page expired before it was paid.' };
     // Paid by a method that settles later (bank debits): still waiting. An open page has not been paid yet.
@@ -119,6 +137,8 @@ export class StripeProvider implements CheckoutProvider {
     const refund = await this.call<Refund>('/v1/refunds', {
       method: 'POST',
       form: { payment_intent: intent, amount: String(stripeAmount(payment.amount, payment.currency)), 'metadata[reference]': payment.refundReference },
+      // A retry after a timeout returns the refund already made instead of making a second one.
+      idempotencyKey: payment.refundReference,
     });
     return this.refundResult(refund);
   }

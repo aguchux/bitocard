@@ -212,6 +212,18 @@ export type StoreCheckout = {
   updated_at: string;
 };
 
+/** The customer's figures for their account home (`/v1/store/account/summary`). */
+export type StoreCustomerSummary = {
+  object: 'customer_summary';
+  /** Spent on delivered orders, by currency (the currency with the most delivered orders first). */
+  orders_total: Array<{ amount: number; currency: string }>;
+  orders: { total: number; in_progress: number };
+  delivered_this_month: number;
+};
+
+/** How the store's customer account app looks (`/v1/store/app`): its menu on desktop. */
+export type StoreApp = { object: 'store_app'; desktop_nav: 'rail' | 'bottom' };
+
 /** Money in minor units (two decimal places) in a currency, for prices customers pay. */
 export function formatPrice(minor: number, currency: string) {
   try {

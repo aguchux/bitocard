@@ -1696,6 +1696,7 @@
                     "welcome_bonus": false,
                     "reserved_accounts": true,
                     "own_integrations": false,
+                    "customer_app_bottom_bar_desktop": false,
                     "manual_reseller_approval": false
                   }
                 }
@@ -2419,6 +2420,7 @@
                     "accent_color": "#ff2382"
                   },
                   "checkout_mode": "test",
+                  "desktop_nav": null,
                   "published_at": null,
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -2561,6 +2563,7 @@
                         "accent_color": "#ff2382"
                       },
                       "checkout_mode": "live",
+                      "desktop_nav": null,
                       "published_at": "2026-10-02T14:20:00.000Z",
                       "created_at": "2026-10-01T10:05:12.000Z"
                     }
@@ -2687,6 +2690,7 @@
                     "accent_color": "#ff2382"
                   },
                   "checkout_mode": "live",
+                  "desktop_nav": null,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -2838,6 +2842,7 @@
                     "accent_color": "#ff2382"
                   },
                   "checkout_mode": "live",
+                  "desktop_nav": null,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -2988,6 +2993,7 @@
                     "accent_color": "#ff2382"
                   },
                   "checkout_mode": "live",
+                  "desktop_nav": null,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
                 }
@@ -3136,7 +3142,10 @@
                   },
                   "country": "NG",
                   "currency": "NGN",
-                  "checkout_mode": "live"
+                  "checkout_mode": "live",
+                  "app": {
+                    "desktop_nav": "rail"
+                  }
                 }
               }
             }
@@ -19669,6 +19678,15 @@
               "live"
             ],
             "description": "Customer checkout: `test` (sandbox) or `live` (real payments; needs a verified business)."
+          },
+          "desktop_nav": {
+            "type": "string",
+            "enum": [
+              "rail",
+              "bottom"
+            ],
+            "nullable": true,
+            "description": "Your customers’ account app menu on desktop: a side `rail` or the `bottom` bar; null follows BitoCard’s default. Phones and tablets always use the bottom bar."
           }
         }
       },
@@ -19706,6 +19724,15 @@
               "live"
             ],
             "description": "Customer checkout: `test` (sandbox) or `live` (real payments; needs a verified business)."
+          },
+          "desktop_nav": {
+            "type": "string",
+            "enum": [
+              "rail",
+              "bottom"
+            ],
+            "nullable": true,
+            "description": "Your customers’ account app menu on desktop: a side `rail` or the `bottom` bar; null follows BitoCard’s default. Phones and tablets always use the bottom bar."
           }
         }
       },
@@ -22311,6 +22338,7 @@
               "welcome_bonus",
               "reserved_accounts",
               "own_integrations",
+              "customer_app_bottom_bar_desktop",
               "manual_reseller_approval"
             ],
             "additionalProperties": false,
@@ -22330,6 +22358,10 @@
               "own_integrations": {
                 "type": "boolean",
                 "description": "Resellers connect their own supplier and payment gateway accounts (on plans with own integrations, for integrations offered in their country)."
+              },
+              "customer_app_bottom_bar_desktop": {
+                "type": "boolean",
+                "description": "Customers' account app uses the bottom tab bar on desktop too, instead of the side rail. A reseller's own choice for their store (SHQ Store) wins over this."
               },
               "manual_reseller_approval": {
                 "type": "boolean",
@@ -25426,6 +25458,7 @@
           "status",
           "branding",
           "checkout_mode",
+          "desktop_nav",
           "published_at",
           "created_at"
         ],
@@ -25500,6 +25533,18 @@
               "live"
             ]
           },
+          "desktop_nav": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your customers’ account app menu on desktop: `rail` (side rail) or `bottom` (bottom bar); null follows BitoCard’s default. Phones and tablets always use the bottom bar.",
+            "enum": [
+              "rail",
+              "bottom",
+              null
+            ]
+          },
           "published_at": {
             "type": [
               "string",
@@ -25559,7 +25604,8 @@
           "branding",
           "country",
           "currency",
-          "checkout_mode"
+          "checkout_mode",
+          "app"
         ],
         "additionalProperties": false,
         "properties": {
@@ -25626,6 +25672,24 @@
               "test",
               "live"
             ]
+          },
+          "app": {
+            "type": "object",
+            "description": "How the customer account app looks.",
+            "required": [
+              "desktop_nav"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "desktop_nav": {
+                "type": "string",
+                "description": "The customer account app’s menu on desktop: the store’s choice, else BitoCard’s default.",
+                "enum": [
+                  "rail",
+                  "bottom"
+                ]
+              }
+            }
           }
         }
       },

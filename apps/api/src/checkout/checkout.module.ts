@@ -8,6 +8,7 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { OrdersModule } from '../orders/orders.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { ResellerIntegrationsModule } from '../reseller-integrations/reseller-integrations.module.js';
+import { SettingsModule } from '../settings/settings.module.js';
 import { CheckoutController, CustomerAccountController } from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
 import { HouseService } from './house.service.js';
@@ -15,7 +16,7 @@ import { StoreSellers } from './store-sellers.js';
 
 /** Store customers (accounts and sign-in) and checkout on hosted stores: bitocard.com and resellers' stores. */
 @Module({
-  imports: [AuthModule, CatalogueModule, FeesModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule],
+  imports: [AuthModule, CatalogueModule, FeesModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule],
   controllers: [CustomerAccountController, CheckoutController],
   providers: [CustomersService, CustomerGuard, CheckoutService, HouseService, StoreSellers],
   exports: [CheckoutService, HouseService, CustomersService, StoreSellers],

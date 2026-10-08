@@ -45,6 +45,10 @@ class StoreFieldsDto {
   @ApiPropertyOptional({ enum: ['test', 'live'], description: 'Customer checkout: `test` (sandbox) or `live` (real payments; needs a verified business).' })
   @IsOptional() @IsIn(['test', 'live'])
   checkout_mode?: 'test' | 'live';
+
+  @ApiPropertyOptional({ enum: ['rail', 'bottom'], nullable: true, description: 'Your customers’ account app menu on desktop: a side `rail` or the `bottom` bar; null follows BitoCard’s default. Phones and tablets always use the bottom bar.' })
+  @IsOptional() @ValidateIf((_dto, value) => value !== null) @IsIn(['rail', 'bottom'])
+  desktop_nav?: 'rail' | 'bottom' | null;
 }
 
 class CreateStoreDto extends StoreFieldsDto {

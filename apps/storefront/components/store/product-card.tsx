@@ -6,7 +6,8 @@ import { FeatureIcons } from "./features";
 import { Flag } from "./flag";
 import { categoryTheme } from "./theme";
 
-export const productHref = (product: Pick<StoreProduct, "key">) => `/p/${encodeURIComponent(product.key)}`;
+/** A product's page: `/p/<key>` in the store, `/account/p/<key>` inside the customer's account app. */
+export const productHref = (product: Pick<StoreProduct, "key">, base = "/p") => `${base}/${encodeURIComponent(product.key)}`;
 
 /** "From $10", or "$10" when there is one value. */
 export function priceLabel(product: StoreProduct) {
@@ -68,10 +69,10 @@ export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand
 }
 
 /** A product in a rail or a grid: art, name, what it is, and its face value. */
-export function ProductCard({ product }: { product: StoreProduct }) {
+export function ProductCard({ product, base }: { product: StoreProduct; base?: string }) {
   return (
     <Link
-      href={productHref(product)}
+      href={productHref(product, base)}
       // A container, so the card tightens itself in two-column phone grids and carousels whatever the screen width.
       className="group @container flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-3"
     >
@@ -100,9 +101,9 @@ export function ProductCard({ product }: { product: StoreProduct }) {
 }
 
 /** The same product as a row: compact art on the left. */
-export function ProductRow({ product }: { product: StoreProduct }) {
+export function ProductRow({ product, base }: { product: StoreProduct; base?: string }) {
   return (
-    <Link href={productHref(product)} className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:shadow-md sm:gap-4 sm:p-3">
+    <Link href={productHref(product, base)} className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition hover:shadow-md sm:gap-4 sm:p-3">
       <div className="aspect-[16/10] w-24 shrink-0 overflow-hidden rounded-xl sm:w-36">
         <BrandArt brand={product.brand} product={product} className="text-[13px] sm:text-base" />
       </div>

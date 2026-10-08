@@ -71,5 +71,7 @@ export async function siteOrigin() {
 /** Only paths on this site are followed after signing in, never another site. */
 export function safeNext(value: FormDataEntryValue | string | null | undefined, fallback = "/account") {
   const next = typeof value === "string" ? value : "";
-  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : fallback;
+  // Browsers drop tabs and newlines and read "\" as "/", so "/\t/evil.com" would become "//evil.com": refuse them anywhere.
+  // eslint-disable-next-line no-control-regex
+  return next.startsWith("/") && !next.startsWith("//") && !/[\\\u0000-\u001f\u007f]/.test(next) ? next : fallback;
 }

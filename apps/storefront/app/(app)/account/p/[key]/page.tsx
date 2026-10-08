@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadProduct, ProductDetail, productMetadata } from "@/components/store/product-detail";
 
-export const revalidate = 60;
-
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }): Promise<Metadata> {
-  return productMetadata(decodeURIComponent((await params).key), "/p");
+  return { ...(await productMetadata(decodeURIComponent((await params).key), "/p")), robots: { index: false, follow: false } };
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ key: string }> }) {
+/** A product inside the account app: the same page as the store's, staying in the app. */
+export default async function AppProductPage({ params }: { params: Promise<{ key: string }> }) {
   const result = await loadProduct(decodeURIComponent((await params).key));
   if (!result.ok) notFound();
-  return <ProductDetail product={result.data} />;
+  return <ProductDetail product={result.data} inApp />;
 }

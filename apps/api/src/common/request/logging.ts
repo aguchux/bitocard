@@ -20,7 +20,13 @@ export function loggerParams(config: AppConfig): Params {
       level: config.LOG_LEVEL,
       genReqId: requestId,
       redact: {
-        paths: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["x-api-key"]', 'res.headers["set-cookie"]'],
+        paths: [
+          'req.headers.authorization',
+          'req.headers.cookie',
+          'req.headers["x-api-key"]',
+          'req.headers["bitocard-customer-session"]',
+          'res.headers["set-cookie"]',
+        ],
         censor: '[redacted]',
       },
       autoLogging: { ignore: req => req.url === '/health' },

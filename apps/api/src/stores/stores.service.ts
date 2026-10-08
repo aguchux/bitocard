@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CountriesService } from '../countries/countries.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.js';
 
@@ -38,12 +39,25 @@ export function presentStore(store: Store) {
     status: store.status,
     branding: { logo_url: store.logoUrl, primary_color: store.primaryColor, accent_color: store.accentColor },
     checkout_mode: store.checkoutMode,
+    /** The account app's menu on desktop: `rail`, `bottom`, or null to follow BitoCard's default. */
+    desktop_nav: store.desktopNav,
     published_at: store.publishedAt?.toISOString() ?? null,
     created_at: store.createdAt.toISOString(),
   };
 }
 
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: LedgerMode };
+export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: LedgerMode; desktop_nav?: 'rail' | 'bottom' | null };
+
+export type DesktopNav = 'rail' | 'bottom';
+
+/**
+ * The customer account app's menu on desktop for a store: the store's own choice, else BitoCard's switch for its
+ * reseller (reseller, then country, then global), else the side rail.
+ */
+export async function desktopNavFor(settings: SettingsService, store: Pick<Store, 'desktopNav' | 'resellerId'>): Promise<DesktopNav> {
+  if (store.desktopNav === 'rail' || store.desktopNav === 'bottom') return store.desktopNav;
+  return (await settings.isOn('customer_app_bottom_bar_desktop', store.resellerId)) ? 'bottom' : 'rail';
+}
 
 /** Hosted storefronts on <subdomain>.bitocard.com, and the reseller's business details. */
 @Injectable()
@@ -52,6 +66,7 @@ export class StoresService {
     private readonly prisma: PrismaService,
     private readonly countries: CountriesService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Business name, and the country if it is not yet set (Google sign-ups choose it during onboarding). */
@@ -141,6 +156,7 @@ export class StoresService {
           primaryColor: input.primary_color?.toLowerCase(),
           accentColor: input.accent_color?.toLowerCase(),
           checkoutMode: input.checkout_mode,
+          desktopNav: input.desktop_nav,
         },
       });
       return presentStore(updated);
@@ -186,6 +202,7 @@ export class StoresService {
       country: store.reseller.country,
       currency: store.reseller.countryRef?.currency ?? null,
       checkout_mode: store.checkoutMode,
+      app: { desktop_nav: await desktopNavFor(this.settings, store) },
     };
   }
 

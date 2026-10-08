@@ -196,6 +196,30 @@ describe('rate limit enforcement', () => {
       await limited.close();
     }
   });
+
+  test('a made-up customer session token does not get a fresh limit on store routes', async () => {
+    const limited = await startApp({ env: { RATE_LIMIT_PER_MINUTE: '2', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, database: 'pglite' });
+    try {
+      const statuses = [];
+      for (let n = 0; n < 3; n += 1) {
+        const res = await fetch(`${limited.base}/v1/store/navigation`, { headers: { 'bitocard-customer-session': `bcc_made-up-${n}` } });
+        statuses.push(res.status);
+      }
+      assert.equal(statuses.at(-1), 429, `statuses ${statuses}: unknown tokens share the caller's address limit`);
+    } finally {
+      await limited.close();
+    }
+  });
+});
+
+describe('request logs', () => {
+  test('customer session tokens are redacted like other credentials', async () => {
+    const { loggerParams } = await import('../dist/common/request/logging.js');
+    const paths = loggerParams({ LOG_LEVEL: 'info' }).pinoHttp.redact.paths;
+    for (const header of ['authorization', 'cookie', '["x-api-key"]', '["bitocard-customer-session"]']) {
+      assert.ok(paths.some(path => path.endsWith(header)), `${header} is redacted`);
+    }
+  });
 });
 
 describe('rate limiter outage', () => {
