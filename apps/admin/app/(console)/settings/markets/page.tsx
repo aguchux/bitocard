@@ -24,7 +24,7 @@ export default function MarketsPage() {
 }
 
 /**
- * One country at a time, chosen from the select beside the title (kept in ?country=, so a reload or a shared link
+ * One country at a time, chosen from the select on the far right of the title (kept in ?country=, so a reload or a shared link
  * opens the same one): the page stays one screen however many markets there are.
  */
 function Markets() {
@@ -42,24 +42,25 @@ function Markets() {
 
   return (
     <AdminShell section="settings" current="/settings/markets" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Markets" }]}>
-      <div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {/* The title and description on the left, the country select on the far right (below them on phones). */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 flex-1 basis-80">
           <h1 className="text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Markets</h1>
-          {countries.length ? (
-            <div className="w-60 max-w-full">
-              <Select aria-label="Country" value={country?.code ?? ""} onChange={event => choose(event.target.value)} className="font-semibold">
-                {countries.map(item => (
-                  <option key={item.code} value={item.code}>
-                    {item.name} ({item.code})
-                  </option>
-                ))}
-              </Select>
-            </div>
-          ) : null}
+          <p className="mt-1 text-base text-muted">
+            Product categories sold in each country, where customers must verify their identity first, and how resellers and customers pay there.
+          </p>
         </div>
-        <p className="mt-1 text-base text-muted">
-          Product categories sold in each country, where customers must verify their identity first, and how resellers and customers pay there.
-        </p>
+        {countries.length ? (
+          <div className="w-60 max-w-full">
+            <Select aria-label="Country" value={country?.code ?? ""} onChange={event => choose(event.target.value)} className="font-semibold">
+              {countries.map(item => (
+                <option key={item.code} value={item.code}>
+                  {item.name} ({item.code})
+                </option>
+              ))}
+            </Select>
+          </div>
+        ) : null}
       </div>
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
       {data && error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
