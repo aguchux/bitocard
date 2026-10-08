@@ -1,8 +1,10 @@
-// Creates an admin account (there is no public admin sign-up). Run after `npm run build`, with DATABASE_URL set:
+// Creates an admin account (there is no public admin sign-up) and emails them a one-time link to choose their password.
+// Run after `npm run build`, with DATABASE_URL set (in the environment or apps/api/.env, which the npm script reads):
 //   npm run admin:create -w @bitocard/api -- --email ops@bitocard.com --name "Ops Lead" --roles super_admin
-// A strong temporary password is printed once. The admin sets up their authenticator app at first sign-in.
+// The address must be listed in ADMIN_SETUP_EMAILS (environment only), so the link can only go to an expected inbox.
+// The link opens the admin app's /set-password page (ADMIN_APP_URL) and works once, for 72 hours. No password is ever
+// printed. The admin sets up their authenticator app at first sign-in.
 import { parseArgs } from 'node:util';
-import { randomBytes } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../dist/app.module.js';
 import { AdminAuthService } from '../dist/auth/admin-auth.service.js';
@@ -15,13 +17,13 @@ if (!values.email || !values.name) {
 
 const context = await NestFactory.createApplicationContext(AppModule.register(), { logger: ['error'] });
 try {
-  const password = randomBytes(18).toString('base64url');
-  const admin = await context.get(AdminAuthService).createAdmin({ email: values.email, name: values.name, password, roles: values.roles.split(',') });
+  const { admin, sentWith, expiresAt } = await context.get(AdminAuthService).inviteAdmin({ email: values.email, name: values.name, roles: values.roles.split(',') });
   console.log(`Created admin ${admin.email} (${admin.adminRoles.join(', ')}).`);
-  console.log(`Temporary password (shown once): ${password}`);
+  if (sentWith === 'outbox') console.log('No email provider is set up (Settings > Integrations > Email), so the link was NOT sent. Set one up, then run admin:reset-password for this address.');
+  else console.log(`Emailed them a link to set their password (valid until ${expiresAt.toISOString()}).`);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
 } finally {
   await context.close();
 }
-
-
- 

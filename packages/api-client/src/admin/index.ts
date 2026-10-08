@@ -15,6 +15,8 @@ import type {
   List,
   MfaChallenge,
   MfaSetup,
+  AdminPasswordLink,
+  AdminPasswordSet,
   Mode,
   OrderStatus,
   Overview,
@@ -57,6 +59,10 @@ export const adminApi = bitocardApi.injectEndpoints({
     adminMfaVerify: build.mutation<AdminSession, { challenge_token: string; code: string }>({
       query: body => ({ url: '/v1/admin/auth/mfa/verify', method: 'POST', body }),
       invalidatesTags: ['Session'],
+    }),
+    adminPasswordLink: build.mutation<AdminPasswordLink, { token: string }>({ query: body => ({ url: '/v1/admin/auth/password-link', method: 'POST', body }) }),
+    adminCompletePasswordLink: build.mutation<AdminPasswordSet, { token: string; password: string; reset_authenticator?: boolean }>({
+      query: body => ({ url: '/v1/admin/auth/password-link/complete', method: 'POST', body }),
     }),
     adminSignOut: build.mutation<void, void>({ query: () => ({ url: '/v1/admin/auth/signout', method: 'POST' }), invalidatesTags: ['Session'] }),
 
@@ -331,6 +337,8 @@ export const {
   useAdminMfaSetupMutation,
   useAdminMfaVerifyMutation,
   useAdminSignOutMutation,
+  useAdminPasswordLinkMutation,
+  useAdminCompletePasswordLinkMutation,
   useOverviewQuery,
   useActivityInfiniteQuery,
   useResellersQuery,

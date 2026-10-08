@@ -7,6 +7,9 @@ import { randomToken, sameDigest, sha256 } from '../common/crypto.js';
 import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { Prisma, type User } from '../generated/prisma/client.js';
+import { AuditService } from '../audit/audit.service.js';
+import { EmailService } from '../notifications/email.service.js';
+import { adminPasswordLinkEmail, passwordChangedEmail } from '../notifications/templates.js';
 import { lockout } from './auth.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { SessionsService } from './sessions.service.js';
@@ -14,12 +17,16 @@ import { SessionsService } from './sessions.service.js';
 const challengeLifetimeMs = 5 * 60 * 1000;
 const maxChallengeAttempts = 5;
 const recoveryCodeCount = 10;
+/** How long an emailed set-password link works: a new admin may take a while to open it; a reset should be used soon. */
+const passwordLinkHours = { create: 72, reset: 24 } as const;
 export const adminRoles = ['super_admin', 'operations', 'finance', 'support'] as const;
 
 const invalidCredentials = () =>
   new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'invalid_credentials', 'The email or password is incorrect.');
 const invalidChallenge = () =>
   new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'challenge_invalid', 'This sign-in has expired. Start again.');
+const invalidLink = () =>
+  new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'link_invalid', 'This link has expired or was already used. Ask the BitoCard team for a new one.');
 const invalidCode = () =>
   new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'mfa_code_invalid', 'That code is not valid. Check your authenticator app.', 'code');
 
@@ -38,41 +45,120 @@ export class AdminAuthService {
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordsService,
     private readonly sessions: SessionsService,
+    private readonly email: EmailService,
+    private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  /** Creates an admin. Used by the `admin:create` script; admin invitations come with the admin app. */
-  async createAdmin(input: { email: string; name: string; password: string; roles: string[] }) {
+  /**
+   * Creates an admin. Without a password (the `admin:create` script, through `inviteAdmin`) the account cannot sign in
+   * until its owner sets one with the emailed link.
+   */
+  async createAdmin(input: { email: string; name: string; password?: string; roles: string[] }) {
     const email = input.email.trim().toLowerCase();
     if (!this.allowedDomain(email)) throw new Error(`Admins must use one of: ${this.config.ADMIN_EMAIL_DOMAINS.join(', ')}`);
     const unknown = input.roles.filter(role => !(adminRoles as readonly string[]).includes(role));
     if (unknown.length || input.roles.length === 0) throw new Error(`Roles must be one or more of: ${adminRoles.join(', ')}`);
-    await this.passwords.assertAcceptable(input.password);
+    if (input.password !== undefined) await this.passwords.assertAcceptable(input.password);
     return this.prisma.user.create({
-      data: { realm: 'admin', email, name: input.name, passwordHash: await this.passwords.hash(input.password), adminRoles: input.roles, emailVerifiedAt: new Date() },
+      data: {
+        realm: 'admin',
+        email,
+        name: input.name,
+        passwordHash: input.password === undefined ? null : await this.passwords.hash(input.password),
+        adminRoles: input.roles,
+        emailVerifiedAt: new Date(),
+      },
     });
   }
 
+  /** The `admin:create` script: creates the admin (no password) and emails them the link to set one. */
+  async inviteAdmin(input: { email: string; name: string; roles: string[] }) {
+    this.assertSetupEmail(input.email);
+    await this.createAdmin(input);
+    return this.sendPasswordLink(input.email, 'create');
+  }
+
   /**
-   * Gives an admin a new password (the `admin:reset-password` script; admins have no self-service reset): clears any
-   * lockout, signs out every admin session they have, and with `resetAuthenticator` removes their authenticator so
-   * they set it up again at their next sign-in. Admin accounts only; a reseller account with the same email is
-   * untouched.
+   * Emails an admin a one-time link to set their password (the `admin:create` and `admin:reset-password` scripts;
+   * admins have no self-service reset). Only to addresses in the environment's `ADMIN_SETUP_EMAILS`, so whoever runs
+   * a script can never send a link anywhere else. A new link replaces any earlier one. Nothing changes on the account
+   * until the link is used.
    */
-  async resetPassword(emailInput: string, password: string, options: { resetAuthenticator?: boolean } = {}) {
-    const email = emailInput.trim().toLowerCase();
+  async sendPasswordLink(emailInput: string, kind: 'create' | 'reset') {
+    const email = this.assertSetupEmail(emailInput);
     const user = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'admin', email } } });
     if (!user) throw new Error(`No admin account for ${email}.`);
-    // The request DTOs check the length elsewhere; this path has no DTO.
-    if (password.length < 10 || password.length > 128) throw new Error('Passwords are 10 to 128 characters.');
+    const token = `${user.id}.${randomToken()}`;
+    const hours = passwordLinkHours[kind];
+    const expiresAt = new Date(Date.now() + hours * 3600_000);
+    await this.prisma.$transaction([
+      this.prisma.verificationCode.updateMany({ where: { userId: user.id, purpose: 'admin_password_link', consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.verificationCode.create({ data: { userId: user.id, purpose: 'admin_password_link', target: email, codeHash: sha256(token), expiresAt } }),
+    ]);
+    // In the fragment, so the token never reaches a server log or a Referer header.
+    const link = `${new URL('/set-password', this.config.ADMIN_APP_URL).toString()}#token=${token}`;
+    const sentWith = await this.email.send(adminPasswordLinkEmail(email, { name: user.name, kind, link, hours }));
+    await this.audit.record({
+      actorId: null,
+      action: 'admin.password_link_sent',
+      targetType: 'user',
+      targetId: user.id,
+      after: { email, kind, expires_at: expiresAt.toISOString(), by: `admin:${kind === 'create' ? 'create' : 'reset-password'} script` },
+    });
+    return { admin: user, sentWith, expiresAt };
+  }
+
+  /** What the set-password page shows before the admin chooses a password. */
+  async describePasswordLink(token: string) {
+    const { user, record } = await this.passwordLink(token);
+    return {
+      object: 'admin_password_link' as const,
+      email: user.email,
+      name: user.name,
+      kind: user.passwordHash ? ('reset' as const) : ('create' as const),
+      authenticator_set_up: Boolean(user.totp?.confirmedAt),
+      expires_at: record.expiresAt.toISOString(),
+    };
+  }
+
+  /**
+   * Uses a set-password link: sets the password, clears any lockout, signs out every admin session the person has and,
+   * if they ask, removes their authenticator so they set it up again at their next sign-in. The link works once.
+   * Admin accounts only; a reseller account with the same email is untouched.
+   */
+  async completePasswordLink(token: string, password: string, options: { resetAuthenticator?: boolean } = {}) {
+    const { user, record } = await this.passwordLink(token);
     await this.passwords.assertAcceptable(password);
     const passwordHash = await this.passwords.hash(password);
+    const resetAuthenticator = Boolean(options.resetAuthenticator && user.totp);
     await this.prisma.$transaction(async tx => {
+      const claimed = await tx.verificationCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
+      if (claimed.count === 0) throw invalidLink();
       await tx.user.update({ where: { id: user.id }, data: { passwordHash, failedSignIns: 0, lockedUntil: null } });
       await tx.session.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } });
-      if (options.resetAuthenticator) await tx.totpCredential.deleteMany({ where: { userId: user.id } });
+      if (resetAuthenticator) await tx.totpCredential.deleteMany({ where: { userId: user.id } });
     });
-    return user;
+    await this.audit.record({ actorId: user.id, action: 'admin.password_set', targetType: 'user', targetId: user.id, after: { email: user.email, authenticator_reset: resetAuthenticator } });
+    if (user.passwordHash) await this.email.send(passwordChangedEmail(user.email)).catch(() => undefined);
+    return { object: 'admin_password_set' as const, email: user.email, authenticator_reset: resetAuthenticator };
+  }
+
+  private assertSetupEmail(emailInput: string) {
+    const email = emailInput.trim().toLowerCase();
+    if (!this.config.ADMIN_SETUP_EMAILS.includes(email)) {
+      throw new Error(`${email} is not in ADMIN_SETUP_EMAILS. Only the addresses listed there (in the environment) can be sent a set-password link.`);
+    }
+    return email;
+  }
+
+  private async passwordLink(token: string) {
+    const record = await this.prisma.verificationCode.findFirst({
+      where: { purpose: 'admin_password_link', codeHash: sha256(token), consumedAt: null, expiresAt: { gt: new Date() } },
+      include: { user: { include: { totp: true } } },
+    });
+    if (!record || record.user.realm !== 'admin' || record.user.status !== 'active' || !token.startsWith(`${record.userId}.`)) throw invalidLink();
+    return { user: record.user, record };
   }
 
   /** Step 1: password. Returns a short-lived challenge to complete with an authenticator code. */

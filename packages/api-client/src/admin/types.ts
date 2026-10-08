@@ -21,6 +21,9 @@ export type Admin = { object: 'admin'; id: string; name: string; email: string; 
 export type AdminSession = { object: 'admin_session'; admin: Admin; recovery_codes?: string[] };
 export type MfaChallenge = { object: 'mfa_challenge'; challenge_token: string; mfa_setup_required: boolean; expires_in: number };
 export type MfaSetup = { object: 'mfa_setup'; secret: string; otpauth_uri: string };
+/** An emailed set-password link (admin:create or admin:reset-password), before it is used. */
+export type AdminPasswordLink = { object: 'admin_password_link'; email: string; name: string; kind: 'create' | 'reset'; authenticator_set_up: boolean; expires_at: string };
+export type AdminPasswordSet = { object: 'admin_password_set'; email: string; authenticator_reset: boolean };
 
 // -- Overview and activity ----------------------------------------------------------------------------------------
 

@@ -61,6 +61,13 @@ export const configSchema = z.object({
   // Admins: allowed email domains, and the 32-byte base64 key that encrypts authenticator secrets.
   ADMIN_EMAIL_DOMAINS: list.prefault('bitocard.com,golojan.co.uk'),
   ENCRYPTION_KEY: z.string().optional(),
+  /**
+   * The only addresses the admin:create and admin:reset-password scripts may email a set-password link to (lower case,
+   * comma separated). Environment only: an admin's edit can never widen it. Empty: the scripts send nothing.
+   */
+  ADMIN_SETUP_EMAILS: list.transform(items => items.map(item => item.toLowerCase())).prefault(''),
+  /** The admin app (admin.bitocard.com): set-password links point here. Environment only, like the line above. */
+  ADMIN_APP_URL: z.string().url().default('https://admin.bitocard.com'),
 
   /** Where links in emails point (the reseller dashboard). */
   DASHBOARD_URL: z.string().url().default('https://shq.bitocard.com'),

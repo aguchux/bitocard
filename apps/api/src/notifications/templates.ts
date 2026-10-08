@@ -94,6 +94,25 @@ export function passwordChangedEmail(to: string): EmailMessage {
   };
 }
 
+/** A set-password link for an admin (sent by the admin:create and admin:reset-password scripts). */
+export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number }): EmailMessage {
+  const created = input.kind === 'create';
+  const message = layout(created ? 'Set up your BitoCard admin account' : 'Reset your BitoCard admin password', [
+    `Hello ${input.name},`,
+    created
+      ? 'A BitoCard admin account was created for you. Choose your password with this link, then sign in and set up your authenticator app.'
+      : 'A password reset was started for your BitoCard admin account. Choose a new password with this link. You can also reset your authenticator app there if you no longer have it.',
+    `The link works once, for ${input.hours} hours: ${input.link}`,
+    'If you were not expecting this, do not use the link and tell the BitoCard team at once.',
+  ]);
+  return {
+    to,
+    subject: created ? 'Set up your BitoCard admin account' : 'Reset your BitoCard admin password',
+    text: message.text,
+    html: message.html.replace(escape(input.link), `<a href="${escape(input.link)}">${escape(input.link)}</a>`),
+  };
+}
+
 export function invitationEmail(to: string, resellerName: string, role: string, link: string): EmailMessage {
   const message = layout(`Join ${resellerName} on BitoCard`, [
     `You have been invited to join ${resellerName} on BitoCard as ${role}.`,
