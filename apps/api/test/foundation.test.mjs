@@ -245,7 +245,7 @@ describe('request logs', () => {
   test('customer session tokens are redacted like other credentials', async () => {
     const { loggerParams } = await import('../dist/common/request/logging.js');
     const paths = loggerParams({ LOG_LEVEL: 'info' }).pinoHttp.redact.paths;
-    for (const header of ['authorization', 'cookie', '["x-api-key"]', '["bitocard-customer-session"]']) {
+    for (const header of ['authorization', 'cookie', '["x-api-key"]', '["bitocard-customer-session"]', '["bitocard-access-pass"]']) {
       assert.ok(paths.some(path => path.endsWith(header)), `${header} is redacted`);
     }
   });

@@ -25,6 +25,7 @@ export function loggerParams(config: AppConfig): Params {
           'req.headers.cookie',
           'req.headers["x-api-key"]',
           'req.headers["bitocard-customer-session"]',
+          'req.headers["bitocard-access-pass"]',
           'res.headers["set-cookie"]',
         ],
         censor: '[redacted]',

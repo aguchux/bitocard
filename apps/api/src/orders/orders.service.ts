@@ -23,6 +23,7 @@ import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { deliveryEmail, type EmailedDelivery } from '../notifications/templates.js';
 import { emailedCategories } from '../catalogue/quotes.service.js';
+import { OrderAccessService } from './order-access.service.js';
 import { sellerFor } from './seller.js';
 
 /** When to check an unconfirmed order again, after each check. After the last, it joins the exception queue. */
@@ -78,6 +79,7 @@ export class OrdersService {
     private readonly own: OwnSuppliersService,
     private readonly inbox: InboxService,
     private readonly email: EmailService,
+    private readonly access: OrderAccessService,
   ) {}
 
   /** The checkout service listens for its customers' orders (registered once at start-up). */
@@ -148,6 +150,14 @@ export class OrdersService {
       updated_at: order.updatedAt.toISOString(),
       completed_at: order.completedAt?.toISOString() ?? null,
     };
+  }
+
+  /**
+   * One order for its reseller (`POST /v1/orders`, `GET /v1/orders/:id`): with what was delivered and its access link,
+   * the page to give the customer. Both are secrets: never in lists, webhooks or admin views.
+   */
+  private async detail(order: OrderWithProduct & { deliveries?: OrderDelivery[] }) {
+    return { ...this.present(order, true), access: await this.access.link(order) };
   }
 
   /** The order as the reseller sees it, without delivered codes: webhooks never carry secrets. */
@@ -259,7 +269,7 @@ export class OrdersService {
       throw error;
     }
     const order = await this.attempt(id, 'place');
-    return this.present(order, true);
+    return this.detail(order);
   }
 
   async list(resellerId: string, mode: LedgerMode, filter: { status?: OrderStatus; customer_reference?: string; limit?: number; starting_after?: string }) {
@@ -277,7 +287,7 @@ export class OrdersService {
   async get(resellerId: string, mode: LedgerMode, id: string) {
     const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode }, include: { product: true, deliveries: true } });
     if (!order) throw notFound();
-    return this.present(order, true);
+    return this.detail(order);
   }
 
   /** The customer receipt: BitoCard (the regional Golojan entity) as seller of record, under the reseller's store brand. */
@@ -310,9 +320,9 @@ export class OrdersService {
     if (mode !== 'test') throw testModeOnly();
     const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode: 'test' } });
     if (!order) throw notFound();
-    if (order.status !== 'processing') return this.present(await this.load(id), true);
+    if (order.status !== 'processing') return this.detail(await this.load(id));
     await this.prisma.order.update({ where: { id }, data: { simulate: outcome } });
-    return this.present(await this.attempt(id, 'check'), true);
+    return this.detail(await this.attempt(id, 'check'));
   }
 
   // -- Fulfilment ------------------------------------------------------------------------------------------------
@@ -416,7 +426,7 @@ export class OrdersService {
         await this.inbox.admins('admin.order.needs_review', {
           subject: order.id,
           title: `${product}: in the exception queue`,
-          body: `${order.source === 'own' ? 'A reseller’s own-supplier order' : 'An order'} is still unconfirmed by ${order.supplierCode} after every scheduled check.`,
+          body: `${order.source === 'own' ? 'A resellerâ€™s own-supplier order' : 'An order'} is still unconfirmed by ${order.supplierCode} after every scheduled check.`,
           link: `/orders/${order.id}`,
         });
       }
@@ -490,8 +500,9 @@ export class OrdersService {
         ...(delivery.pinEncrypted ? { pin: encryption.decrypt(delivery.pinEncrypted) } : {}),
         ...(delivery.details ? { details: delivery.details as Record<string, string> } : {}),
       }));
+      const { url } = await this.access.link(order);
       await this.email.send(
-        deliveryEmail(to, { store: store?.name ?? reseller.name, product: order.product.name, deliveries, instructions: order.product.redeemInstructions, sandbox: order.mode === 'test' }),
+        deliveryEmail(to, { store: store?.name ?? reseller.name, product: order.product.name, deliveries, instructions: order.product.redeemInstructions, sandbox: order.mode === 'test', link: url }),
       );
       return true;
     } catch (error) {
@@ -814,7 +825,7 @@ export class OrdersService {
       });
     } catch (error) {
       if (error instanceof ApiError && error.code === 'insufficient_funds') {
-        throw conflict('earnings_withdrawn', 'The store has already withdrawn the profit from this sale, so it cannot be refunded here. Refund the customer from the payment provider’s dashboard and adjust the store’s wallet.');
+        throw conflict('earnings_withdrawn', 'The store has already withdrawn the profit from this sale, so it cannot be refunded here. Refund the customer from the payment providerâ€™s dashboard and adjust the storeâ€™s wallet.');
       }
       throw error;
     }

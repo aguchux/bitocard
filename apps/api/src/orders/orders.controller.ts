@@ -1,12 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Length, ValidateNested } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Length, Matches, ValidateNested } from 'class-validator';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { LedgerMode, OrderStatus } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { type AccessProof, OrderAccessService } from './order-access.service.js';
 import { OrdersService } from './orders.service.js';
 
 const statuses = ['processing', 'completed', 'failed', 'refunded'] as const;
@@ -67,7 +70,10 @@ class RefundOrderDto {
 @modeHeader
 @Controller('orders')
 export class OrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly orders: OrdersService,
+    private readonly access: OrderAccessService,
+  ) {}
 
   @ApiOperation({
     summary: 'Place an order',
@@ -105,6 +111,19 @@ export class OrdersController {
     return this.orders.receipt(resellerOf(caller), mode, id);
   }
 
+  @ApiOperation({
+    summary: 'Replace the order’s access link',
+    description:
+      'Every order has a permanent link to its page (`access.url` on the order), where your customer sees what they bought and reveals codes. Replace it if it was shared by mistake: the old link stops working at once.',
+  })
+  @Roles('admin', 'developer')
+  @Scopes('orders:write')
+  @Post(':id/access/replace')
+  @HttpCode(HttpStatus.OK)
+  replaceAccess(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    return this.access.replace(resellerOf(caller), mode, id);
+  }
+
   @ApiOperation({ summary: 'Simulate the outcome of a processing order (test mode)' })
   @Roles('admin', 'developer')
   @Scopes('orders:write')
@@ -112,6 +131,56 @@ export class OrdersController {
   @HttpCode(HttpStatus.OK)
   simulate(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: SimulateOrderDto) {
     return this.orders.simulate(resellerOf(caller), mode, id, body.outcome);
+  }
+}
+
+class AccessCodeDto {
+  @Matches(/^\d{6}$/, { message: 'code must be the 6 digits we emailed' })
+  code: string;
+}
+
+/** The proof the store's server forwards: the customer's session, and/or the pass from a confirmed emailed code. */
+const proofOf = (req: Request): AccessProof => ({ customerSession: req.get('bitocard-customer-session') ?? undefined, pass: req.get('bitocard-access-pass') ?? undefined });
+
+/**
+ * Order pages, for the store's server (`/a/<token>`). The link only points at the order: it is shown only to the
+ * customer who proves it is theirs (signed in at its store, or a code emailed to the order's address). Answers are
+ * never cached; Reveal and the pass are never stored for replay (they carry secrets).
+ */
+@ApiExcludeController()
+@Public()
+@Controller('store/access')
+export class OrderAccessController {
+  constructor(private readonly access: OrderAccessService) {}
+
+  @Get(':token')
+  @Header('Cache-Control', 'no-store')
+  view(@Param('token') token: string, @Req() req: Request) {
+    return this.access.view(token, proofOf(req));
+  }
+
+  @Post(':token/code')
+  @SkipIdempotency()
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  sendCode(@Param('token') token: string) {
+    return this.access.sendCode(token);
+  }
+
+  @Post(':token/verify')
+  @SkipIdempotency()
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  verify(@Param('token') token: string, @Body() body: AccessCodeDto) {
+    return this.access.verifyCode(token, body.code);
+  }
+
+  @Post(':token/reveal')
+  @SkipIdempotency()
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  reveal(@Param('token') token: string, @Req() req: Request) {
+    return this.access.reveal(token, proofOf(req));
   }
 }
 

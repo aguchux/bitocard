@@ -18483,7 +18483,13 @@
                       "serial": null,
                       "details": {}
                     }
-                  ]
+                  ],
+                  "access": {
+                    "object": "order_access_link",
+                    "url": "https://adadigital.bitocard.com/a/bca_q3Xv9Lk2Rt8Wm4Yp0Zs6Hd1Fj7Gc5Nb3Ve2Ua8Ti0Ow",
+                    "revealed_at": null,
+                    "replaced_at": null
+                  }
                 }
               }
             }
@@ -18904,7 +18910,13 @@
                       "serial": null,
                       "details": {}
                     }
-                  ]
+                  ],
+                  "access": {
+                    "object": "order_access_link",
+                    "url": "https://adadigital.bitocard.com/a/bca_q3Xv9Lk2Rt8Wm4Yp0Zs6Hd1Fj7Gc5Nb3Ve2Ua8Ti0Ow",
+                    "revealed_at": null,
+                    "replaced_at": null
+                  }
                 }
               }
             }
@@ -19183,6 +19195,157 @@
         "x-bitocard-auth": "api_key"
       }
     },
+    "/v1/orders/{id}/access/replace": {
+      "post": {
+        "description": "Every order has a permanent link to its page (`access.url` on the order), where your customer sees what they bought and reveals codes. Replace it if it was shared by mistake: the old link stops working at once.",
+        "operationId": "OrdersController_replaceAccess",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order’s new access link. The old link stopped working.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderAccessLink"
+                },
+                "example": {
+                  "object": "order_access_link",
+                  "url": "https://adadigital.bitocard.com/a/bca_Jm5Pq8Rs2Tu6Vw0Xy4Za7Bc1De9Fg3Hi5Jk8Lm2Nn0Op",
+                  "revealed_at": null,
+                  "replaced_at": "2026-10-06T10:02:41.318Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the order’s access link",
+        "tags": [
+          "Orders"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "developer"
+        ],
+        "x-bitocard-scopes": [
+          "orders:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/orders/{id}/simulate": {
       "post": {
         "operationId": "OrdersController_simulate",
@@ -19262,7 +19425,13 @@
                       "serial": null,
                       "details": {}
                     }
-                  ]
+                  ],
+                  "access": {
+                    "object": "order_access_link",
+                    "url": "https://adadigital.bitocard.com/a/bca_q3Xv9Lk2Rt8Wm4Yp0Zs6Hd1Fj7Gc5Nb3Ve2Ua8Ti0Ow",
+                    "revealed_at": null,
+                    "replaced_at": null
+                  }
                 }
               }
             }
@@ -23091,6 +23260,46 @@
           }
         }
       },
+      "OrderAccessLink": {
+        "type": "object",
+        "title": "OrderAccessLink",
+        "description": "An order’s access link: the page for your customer.",
+        "required": [
+          "object",
+          "url",
+          "revealed_at",
+          "replaced_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `order_access_link`.",
+            "const": "order_access_link"
+          },
+          "url": {
+            "type": "string",
+            "description": "The order’s page on your store’s address (on bitocard.com, unbranded, if you have no hosted store). Give it to your customer: they see what they bought and reveal codes there. The link alone opens nothing: the page first emails a code to the order’s `recipient.email` (orders without one show only your store’s name, so give those customers their codes yourself). Permanent until you replace it.",
+            "format": "uri"
+          },
+          "revealed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When codes, PINs or tokens were first revealed on the page; null if never.",
+            "format": "date-time"
+          },
+          "replaced_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the link was last replaced; null if never.",
+            "format": "date-time"
+          }
+        }
+      },
       "OrderDetail": {
         "type": "object",
         "title": "Order with deliveries",
@@ -23119,7 +23328,8 @@
           "created_at",
           "updated_at",
           "completed_at",
-          "deliveries"
+          "deliveries",
+          "access"
         ],
         "properties": {
           "object": {
@@ -23350,10 +23560,13 @@
               }
             },
             "description": "What was delivered: one item per gift card or licence (the quantity), or one confirmation. Empty while `processing` and for failed orders."
+          },
+          "access": {
+            "$ref": "#/components/schemas/OrderAccessLink"
           }
         },
         "additionalProperties": false,
-        "description": "An order as returned for one order (`POST /v1/orders`, `GET /v1/orders/{id}`): the order plus what was delivered. Codes, PINs and tokens appear only here, never in lists or webhooks."
+        "description": "An order as returned for one order (`POST /v1/orders`, `GET /v1/orders/{id}`): the order plus what was delivered and its access link. Codes, PINs, tokens and the link appear only here, never in lists or webhooks."
       },
       "Receipt": {
         "type": "object",

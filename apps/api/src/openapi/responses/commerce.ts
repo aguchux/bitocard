@@ -1,7 +1,7 @@
 import { productFeatureKeys } from '../../catalogue/features.js';
 import { ProductCategory } from '../../generated/prisma/client.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
-import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableStr, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
+import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 /** Every product category. */
@@ -231,16 +231,39 @@ const delivery = shape(
   'One delivered item.',
 );
 
+const accessLink = objectSchema(
+  'OrderAccessLink',
+  {
+    object: constant('order_access_link'),
+    url: str(
+      'The order’s page on your store’s address (on bitocard.com, unbranded, if you have no hosted store). Give it to your customer: they see what they bought and reveal codes there. The link alone opens nothing: the page first emails a code to the order’s `recipient.email` (orders without one show only your store’s name, so give those customers their codes yourself). Permanent until you replace it.',
+      { format: 'uri' },
+    ),
+    revealed_at: nullableTime('When codes, PINs or tokens were first revealed on the page; null if never.'),
+    replaced_at: nullableTime('When the link was last replaced; null if never.'),
+  },
+  'An order’s access link: the page for your customer.',
+);
+
 const orderDetail: Schema = {
   ...orderSchema,
   title: 'Order with deliveries',
-  description: 'An order as returned for one order (`POST /v1/orders`, `GET /v1/orders/{id}`): the order plus what was delivered. Codes, PINs and tokens appear only here, never in lists or webhooks.',
-  required: [...orderSchema.required, 'deliveries'],
+  description:
+    'An order as returned for one order (`POST /v1/orders`, `GET /v1/orders/{id}`): the order plus what was delivered and its access link. Codes, PINs, tokens and the link appear only here, never in lists or webhooks.',
+  required: [...orderSchema.required, 'deliveries', 'access'],
   additionalProperties: false,
   properties: {
     ...orderSchema.properties,
     deliveries: array(delivery, 'What was delivered: one item per gift card or licence (the quantity), or one confirmation. Empty while `processing` and for failed orders.'),
+    access: ref('OrderAccessLink'),
   },
+};
+
+const accessExample = {
+  object: 'order_access_link',
+  url: 'https://adadigital.bitocard.com/a/bca_q3Xv9Lk2Rt8Wm4Yp0Zs6Hd1Fj7Gc5Nb3Ve2Ua8Ti0Ow',
+  revealed_at: null,
+  replaced_at: null,
 };
 
 const orderBase = {
@@ -288,6 +311,7 @@ const giftCardOrderExample = {
     { kind: 'gift_card', code: 'SANDBOX-3F9A1C7E52B4', pin: '4821', serial: null, details: {} },
     { kind: 'gift_card', code: 'SANDBOX-8D02E6B1A9C3', pin: '1937', serial: null, details: {} },
   ],
+  access: accessExample,
 };
 
 const receipt = objectSchema(
@@ -349,7 +373,7 @@ const receiptExample = {
 };
 
 export const commerceDocs: DocsArea = {
-  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, Quote: quote, OrderDetail: orderDetail, Receipt: receipt },
+  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt },
   responses: {
     'GET /v1/catalogue/products': {
       status: 200,
@@ -396,11 +420,17 @@ export const commerceDocs: DocsArea = {
     },
     'GET /v1/orders/{id}': { status: 200, description: 'The order, with what was delivered.', schema: 'OrderDetail', example: giftCardOrderExample },
     'GET /v1/orders/{id}/receipt': { status: 200, description: 'The receipt.', schema: 'Receipt', example: receiptExample },
+    'POST /v1/orders/{id}/access/replace': {
+      status: 200,
+      description: 'The order’s new access link. The old link stopped working.',
+      schema: 'OrderAccessLink',
+      example: { ...accessExample, url: 'https://adadigital.bitocard.com/a/bca_Jm5Pq8Rs2Tu6Vw0Xy4Za7Bc1De9Fg3Hi5Jk8Lm2Nn0Op', replaced_at: '2026-10-06T10:02:41.318Z' },
+    },
     'POST /v1/orders/{id}/simulate': {
       status: 200,
       description: 'The order after the simulated outcome. An order that is no longer processing is returned unchanged.',
       schema: 'OrderDetail',
-      example: { ...orderBase, mode: 'test', deliveries: [{ kind: 'confirmation', code: null, pin: null, serial: null, details: {} }] },
+      example: { ...orderBase, mode: 'test', deliveries: [{ kind: 'confirmation', code: null, pin: null, serial: null, details: {} }], access: accessExample },
     },
   },
 };

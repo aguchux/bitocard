@@ -43,8 +43,10 @@ export type Order = {
   updated_at: string;
   completed_at: string | null;
 };
-/** The single order, with what was delivered. */
-export type OrderDetail = Order & { deliveries: OrderDelivery[] };
+/** The order's page for the customer: permanent until replaced. Only the customer opens it (a code emailed to `recipient.email`). */
+export type OrderAccessLink = { object: 'order_access_link'; url: string; revealed_at: string | null; replaced_at: string | null };
+/** The single order, with what was delivered and its access link. */
+export type OrderDetail = Order & { deliveries: OrderDelivery[]; access: OrderAccessLink };
 
 export type OrderFilter = { status?: OrderStatus; customer_reference?: string };
 
@@ -82,6 +84,11 @@ export const resellerOrdersApi = bitocardApi.injectEndpoints({
       invalidatesTags: [{ type: 'Order', id: 'LIST' }, 'Wallet', 'Fee'],
     }),
     orderReceipt: build.query<Receipt, string>({ query: id => `/v1/orders/${id}/receipt`, providesTags: (_result, _error, id) => [{ type: 'Order', id }] }),
+    /** A new access link for the order; the old one stops working at once. */
+    replaceOrderAccess: build.mutation<OrderAccessLink, string>({
+      query: id => ({ url: `/v1/orders/${id}/access/replace`, method: 'POST' }),
+      invalidatesTags: (_result, _error, id) => [{ type: 'Order', id }],
+    }),
     /** Sandbox only: completes or fails a processing order. */
     simulateOrder: build.mutation<OrderDetail, { id: string; outcome: 'completed' | 'failed' }>({
       query: ({ id, outcome }) => ({ url: `/v1/orders/${id}/simulate`, method: 'POST', body: { outcome } }),
@@ -90,4 +97,12 @@ export const resellerOrdersApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useResellerOrdersInfiniteQuery, useResellerOrderQuery, usePlaceOrderMutation, useOrderReceiptQuery, useLazyOrderReceiptQuery, useSimulateOrderMutation } = resellerOrdersApi;
+export const {
+  useResellerOrdersInfiniteQuery,
+  useResellerOrderQuery,
+  usePlaceOrderMutation,
+  useOrderReceiptQuery,
+  useLazyOrderReceiptQuery,
+  useReplaceOrderAccessMutation,
+  useSimulateOrderMutation,
+} = resellerOrdersApi;

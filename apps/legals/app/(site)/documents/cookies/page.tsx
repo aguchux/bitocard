@@ -26,6 +26,9 @@ export default function CookieNotice() {
             <strong>bc_customer</strong> (bitocard.com): keeps you signed in to your customer account on our store, so you can buy and see your orders. It is strictly necessary, is set only when you sign in or create an account, holds a random sign-in token that only our servers can read, and lasts up to 30 days or until you sign out.
           </li>
           <li>
+            <strong>bc_access</strong> (bitocard.com and the stores on it): after you confirm the code we email you to open an order&apos;s page, lets that page show your order on this device. It is strictly necessary, is set only when you enter a correct code, works only on that one order&apos;s page, holds a signed pass that only our servers can read, and lasts 30 minutes.
+          </li>
+          <li>
             <strong>bc_session</strong> and <strong>bc_admin_session</strong> (our reseller dashboard and admin console): keep you signed in and protect your account. They are strictly necessary, are set only when you sign in, and end when you sign out or the session expires.
           </li>
         </ul>

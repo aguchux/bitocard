@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useParams } from "next/navigation";
-import { Check, CheckCircle2, Copy, Eye, EyeOff, Printer, ReceiptText, RefreshCw, XCircle } from "lucide-react";
+import { Check, CheckCircle2, Copy, ExternalLink, Eye, EyeOff, Printer, ReceiptText, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 import {
   Button,
   Card,
@@ -24,7 +24,7 @@ import {
   StatusBadge,
 } from "@bitocard/admin-ui";
 import { bitocardApi } from "@bitocard/api-client";
-import { type OrderDelivery, type OrderDetail, useOrderReceiptQuery, useResellerOrderQuery, useSimulateOrderMutation } from "@bitocard/api-client/reseller";
+import { type OrderDelivery, type OrderDetail, useOrderReceiptQuery, useReplaceOrderAccessMutation, useResellerOrderQuery, useSimulateOrderMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -88,6 +88,76 @@ function Delivery({ delivery, index, count }: { delivery: OrderDelivery; index: 
       {details.length ? <KeyValue items={details.map(([key, value]) => ({ label: humanise(key), value }))} /> : null}
       {delivery.kind === "confirmation" && !delivery.code && !details.length ? <p className="text-sm text-muted">Delivered to the recipient. There is no code to pass on.</p> : null}
     </li>
+  );
+}
+
+/** The customer's page for the order: copy the link to send it, open it, or replace it if it was shared by mistake. */
+function AccessCard({ order, canReplace }: { order: OrderDetail; canReplace: boolean }) {
+  const [replace, replaceState] = useReplaceOrderAccessMutation();
+  const [confirming, setConfirming] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(order.access.url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // The link is on screen to copy by hand.
+    }
+  };
+  return (
+    <Card>
+      <CardHeader
+        title="Customer page"
+        description={
+          order.recipient?.email
+            ? "Send this link to your customer. Only they can open it: signed in to their account on your store, or with a code we email to the order's address."
+            : "This order has no customer email, so the page cannot show it: give your customer the codes yourself, or name their email on the quote next time."
+        }
+      />
+      <div className="space-y-4 p-5 sm:p-6">
+        <p className="break-all rounded-xl bg-canvas px-4 py-3 font-mono text-xs text-ink">{order.access.url}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={copy} icon={copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}>
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+          <a href={order.access.url} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-ink hover:bg-canvas">
+            <ExternalLink className="size-4" aria-hidden /> Open
+          </a>
+          {canReplace ? (
+            <Button variant="ghost" size="sm" icon={<RotateCcw className="size-4" aria-hidden />} onClick={() => setConfirming(true)}>
+              Replace link
+            </Button>
+          ) : null}
+        </div>
+        <p className="text-sm text-muted">{order.access.revealed_at ? `Codes first revealed ${formatDateTime(order.access.revealed_at)}.` : "Codes not revealed on the page yet."}</p>
+        {replaceState.error ? <Notice tone="red">{errorMessage(replaceState.error)}</Notice> : null}
+      </div>
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title="Replace the link?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              loading={replaceState.isLoading}
+              onClick={async () => {
+                const result = await replace(order.id);
+                if (!("error" in result)) setConfirming(false);
+              }}
+            >
+              Replace
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">The current link stops working at once. Send the new one to your customer.</p>
+      </Dialog>
+    </Card>
   );
 }
 
@@ -334,6 +404,8 @@ export default function OrderPage() {
               )}
             </div>
           </Card>
+
+          <AccessCard order={order} canReplace={can(membership, "admin", "developer")} />
 
           {order.receipt_number ? <ReceiptDialog order={order} open={receiptOpen} onClose={() => setReceiptOpen(false)} /> : null}
         </>

@@ -94,6 +94,5 @@ export async function siteOrigin() {
 export function safeNext(value: FormDataEntryValue | string | null | undefined, fallback = "/account") {
   const next = typeof value === "string" ? value : "";
   // Browsers drop tabs and newlines and read "\" as "/", so "/\t/evil.com" would become "//evil.com": refuse them anywhere.
-  // eslint-disable-next-line no-control-regex
   return next.startsWith("/") && !next.startsWith("//") && !/[\\\u0000-\u001f\u007f]/.test(next) ? next : fallback;
 }

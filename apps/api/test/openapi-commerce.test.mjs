@@ -124,6 +124,8 @@ describe('catalogue, pricing, quotes and orders', () => {
     const orders = await call(browser, 'GET /v1/orders', 200, 'GET', '/v1/orders', undefined, sandbox);
     assert.deepEqual(new Set(orders.data.map(order => order.status)), new Set(['completed', 'failed']));
     await call(browser, 'GET /v1/orders/{id}', 200, 'GET', `/v1/orders/${gift.id}`, undefined, sandbox);
+    const replaced = await call(browser, 'POST /v1/orders/{id}/access/replace', 200, 'POST', `/v1/orders/${gift.id}/access/replace`, {}, sandbox);
+    assert.ok(replaced.replaced_at && replaced.url !== gift.access.url, 'a new link');
     await call(browser, 'GET /v1/orders/{id}', 200, 'GET', `/v1/orders/${failed.id}`, undefined, sandbox);
     const receipt = await call(browser, 'GET /v1/orders/{id}/receipt', 200, 'GET', `/v1/orders/${gift.id}/receipt`, undefined, sandbox);
     assert.equal(receipt.seller.rc_number, 'RC 1606658');

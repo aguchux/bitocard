@@ -1350,6 +1350,7 @@ model Order {
   reseller              Reseller        @relation(fields: [resellerId], references: [id])
   product               Product         @relation(fields: [productId], references: [id])
   deliveries            OrderDelivery[]
+  access                OrderAccess?
   attempts              OrderAttempt[]
 
   @@index([resellerId, createdAt])
@@ -1373,6 +1374,43 @@ model OrderDelivery {
 
   @@index([orderId])
   @@map("order_deliveries")
+}
+
+/// The order's page link (`/a/<token>` on the store's address): permanent, but the reseller can replace it, which ends
+/// the old one and every access pass. The link only points at the order: the page shows it only to the customer who
+/// proves it is theirs (signed in at the store, or an emailed code). Looked up by the token's hash; the token is also
+/// kept encrypted so the API can show the link again.
+model OrderAccess {
+  orderId        String            @id @map("order_id") @db.Uuid
+  tokenHash      String            @unique @map("token_hash")
+  tokenEncrypted String            @map("token_encrypted")
+  /// When codes or keys were first shown on the page (Reveal), and how many times since.
+  revealedAt     DateTime?         @map("revealed_at")
+  reveals        Int               @default(0)
+  /// When the customer was last emailed that their codes were revealed (at most once a day).
+  alertedAt      DateTime?         @map("alerted_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  replacedAt     DateTime?         @map("replaced_at")
+  order          Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  codes          OrderAccessCode[]
+
+  @@map("order_access")
+}
+
+/// A 6-digit code emailed to the order's customer (`recipient.email`) to open its page: hashed, single use, 10 minutes,
+/// 5 tries. Sends are limited (one a minute, ten a day per order).
+model OrderAccessCode {
+  id         String      @id @default(uuid()) @db.Uuid
+  orderId    String      @map("order_id") @db.Uuid
+  codeHash   String      @map("code_hash")
+  attempts   Int         @default(0)
+  expiresAt  DateTime    @map("expires_at")
+  consumedAt DateTime?   @map("consumed_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  access     OrderAccess @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_access_codes")
 }
 
 /// Each call to a supplier for an order and what came back (internal, for admins tracing an order).

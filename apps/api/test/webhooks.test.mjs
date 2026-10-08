@@ -164,8 +164,9 @@ describe('delivery', () => {
     assert.equal(call.json.data.object.status, 'completed');
     assert.equal(call.json.data.object.deliveries, undefined);
     assert.ok(!call.body.includes('SANDBOX-'), 'codes never travel in webhooks');
-    const { deliveries, ...withoutSecrets } = order;
-    assert.ok(deliveries.length);
+    const { deliveries, access, ...withoutSecrets } = order;
+    assert.ok(deliveries.length && access.url);
+    assert.ok(!call.body.includes(access.url) && !('access' in call.json.data.object), 'the order’s page link never travels in webhooks');
     assert.deepEqual(call.json.data.object, { ...withoutSecrets, updated_at: call.json.data.object.updated_at });
   });
 

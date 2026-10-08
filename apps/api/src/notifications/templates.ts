@@ -224,7 +224,10 @@ const detailLabels: Record<string, string> = { duration: 'Licence term', expires
  * store name. Never names BitoCard's suppliers. Codes are secrets: this email is the one place they are sent, and
  * nothing here is logged (the email service logs only the address and subject).
  */
-export function deliveryEmail(to: string, input: { store: string; product: string; deliveries: EmailedDelivery[]; instructions?: string | null; sandbox: boolean }): EmailMessage {
+export function deliveryEmail(
+  to: string,
+  input: { store: string; product: string; deliveries: EmailedDelivery[]; instructions?: string | null; sandbox: boolean; /** The order's access page. */ link?: string },
+): EmailMessage {
   const what = input.deliveries[0]?.kind === 'licence_key' ? 'licence key' : 'gift card code';
   const plural = input.deliveries.length > 1 ? `${what}s` : what;
   const subject = `${input.sandbox ? '[Sandbox] ' : ''}Your ${input.product} ${plural} from ${input.store}`;
@@ -256,6 +259,9 @@ export function deliveryEmail(to: string, input: { store: string; product: strin
         '</div>',
     ),
     ...(input.instructions ? [`<p style="font-size:15px;line-height:1.5"><strong>How to redeem:</strong> ${escape(input.instructions)}</p>`] : []),
+    ...(input.link
+      ? [`<p style="font-size:15px;line-height:1.5">You can also see your order at any time on its page: <a href="${escape(input.link)}" style="color:#2477ff">view your order</a>. Keep the link private: it opens your order.</p>`]
+      : []),
     `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
     '</div>',
   ].join('');
@@ -266,12 +272,52 @@ export function deliveryEmail(to: string, input: { store: string; product: strin
     '',
     ...rows.flatMap(row => [`${row.label}: ${row.code}`, ...row.extras.map(([name, value]) => `${name}: ${value}`), '']),
     ...(input.instructions ? [`How to redeem: ${input.instructions}`, ''] : []),
+    ...(input.link ? [`See your order at any time (keep this link private): ${input.link}`, ''] : []),
     `Sent for ${input.store}.`,
   ].join('\n');
   return { to, subject, text, html };
 }
 
 /** A storefront customer's code, under the store's name (never BitoCard's, unless the store is BitoCard's own). */
+/** The code that opens an order's page, sent to the order's email under the store's name. */
+export function orderAccessCodeEmail(to: string, input: { store: string; product: string; code: string }): EmailMessage {
+  const paragraphs = [
+    `Enter this code to open your ${input.product} order from ${input.store}. It expires in 10 minutes.`,
+    'If you did not ask for it, someone may have your order link: you can ignore this email, and they cannot open your order without the code.',
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    '<h1 style="font-size:20px">Open your order</h1>',
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} is your ${input.store} order code`,
+    html,
+    text: ['Open your order', '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
+  };
+}
+
+/** Sent when an order's codes are revealed on its page (at most once a day), so the customer notices if it was not them. */
+export function orderRevealedEmail(to: string, input: { store: string; product: string; at: Date }): EmailMessage {
+  const when = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(input.at);
+  const paragraphs = [
+    `The codes for your ${input.product} order from ${input.store} were shown on its page on ${when} (UTC).`,
+    `If that was not you, contact ${input.store} straight away: anyone who has a code can use it.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    '<h1 style="font-size:20px">Your codes were viewed</h1>',
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: `Your ${input.product} codes were viewed`, html, text: ['Your codes were viewed', '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
+}
+
 export function customerCodeEmail(to: string, input: { store: string; code: string; purpose: 'email_verification' | 'password_reset' }): EmailMessage {
   const verify = input.purpose === 'email_verification';
   const heading = verify ? 'Confirm your email' : 'Reset your password';
