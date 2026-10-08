@@ -19,7 +19,8 @@ const maxChallengeAttempts = 5;
 const recoveryCodeCount = 10;
 /** How long an emailed set-password link works: a new admin may take a while to open it; a reset should be used soon. */
 const passwordLinkHours = { create: 72, reset: 24 } as const;
-const passwordLinksPerDay = 5;
+/** The sign-in page's Resend button counts down the same 60 seconds. */
+const passwordLinkGapMs = 60_000;
 
 /** A first name for a new admin from their address (agu.chux@… is "Agu Chux"); they confirm it on the set-password page. */
 function nameFromEmail(email: string) {
@@ -110,25 +111,31 @@ export class AdminAuthService {
    */
   async forgotPassword(emailInput: string) {
     const email = emailInput.trim().toLowerCase();
-    if (this.isSetupEmail(email)) {
+    if (!this.isSetupEmail(email)) {
+      // Never the address itself: only why nothing was sent, so operators can tell a missing ADMIN_SETUP_EMAILS entry.
+      this.logger.log({ listed: this.config.ADMIN_SETUP_EMAILS.length }, 'Admin password reset: address not in ADMIN_SETUP_EMAILS; nothing sent');
+    } else {
       const user = await this.prisma.user.findUnique({ where: { realm_email: { realm: 'admin', email } } });
       if (user?.status === 'active') await this.sendPasswordLink(user, user.passwordHash ? 'reset' : 'create');
+      else this.logger.log({ userId: user?.id ?? null }, 'Admin password reset: no active admin account for this address; nothing sent');
     }
     return { object: 'admin_password_reset_requested' as const };
   }
 
   /**
    * Emails an admin a one-time link to set their password. A new link replaces any earlier one; nothing changes on the
-   * account until it is used. At most one a minute and five a day per admin (others are silently skipped), and a failed
+   * account until it is used. At most one a minute per admin (others are silently skipped), and a failed
    * send is logged, never shown, so the answers stay the same.
    */
   private async sendPasswordLink(user: User, kind: 'create' | 'reset') {
-    const recent = await this.prisma.verificationCode.findMany({
-      where: { userId: user.id, purpose: 'admin_password_link', createdAt: { gt: new Date(Date.now() - 24 * 3600_000) } },
-      select: { createdAt: true },
-      orderBy: { createdAt: 'desc' },
+    const last = await this.prisma.verificationCode.findFirst({
+      where: { userId: user.id, purpose: 'admin_password_link', createdAt: { gt: new Date(Date.now() - passwordLinkGapMs) } },
+      select: { id: true },
     });
-    if (recent.length >= passwordLinksPerDay || (recent[0] && Date.now() - recent[0].createdAt.getTime() < 60_000)) return;
+    if (last) {
+      this.logger.log({ userId: user.id }, 'Admin password link skipped: one a minute');
+      return;
+    }
     const token = `${user.id}.${randomToken()}`;
     const hours = passwordLinkHours[kind];
     const expiresAt = new Date(Date.now() + hours * 3600_000);
@@ -139,7 +146,8 @@ export class AdminAuthService {
     // In the fragment, so the token never reaches a server log or a Referer header.
     const link = `${new URL('/set-password', this.config.ADMIN_APP_URL).toString()}#token=${token}`;
     try {
-      await this.email.send(adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours }));
+      const sentWith = await this.email.send(adminPasswordLinkEmail(user.email, { name: user.name, kind, link, hours }));
+      this.logger.log({ userId: user.id, kind, sentWith }, sentWith === 'outbox' ? 'Admin password link NOT sent: no email provider is set up' : 'Admin password link emailed');
     } catch (error) {
       this.logger.error({ err: error, userId: user.id }, 'Could not email an admin password link');
       return;

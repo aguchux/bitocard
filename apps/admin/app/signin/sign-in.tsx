@@ -58,6 +58,8 @@ export function SignIn() {
   const [code, setCode] = useState("");
   const [useRecovery, setUseRecovery] = useState(false);
   const [qr, setQr] = useState<string | null>(null);
+  // Seconds until the emailed link can be sent again (the API sends at most one a minute).
+  const [resendIn, setResendIn] = useState(0);
   const [start, startState] = useAdminSignInStartMutation();
   const [forgot, forgotState] = useAdminForgotPasswordMutation();
   const [signIn, signInState] = useAdminSignInMutation();
@@ -79,16 +81,31 @@ export function SignIn() {
     };
   }, [step]);
 
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn(value => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+
+  async function resendLink() {
+    if (step.kind !== "emailed" || resendIn > 0) return;
+    const result = step.reason === "setup" ? await start({ email }).unwrap().catch(() => null) : await forgot({ email }).unwrap().catch(() => null);
+    if (result) setResendIn(60);
+  }
+
   async function submitEmail(event: FormEvent) {
     event.preventDefault();
     const result = await start({ email }).unwrap().catch(() => null);
     if (!result) return;
+    if (result.next === "link_sent") setResendIn(60);
     setStep(result.next === "link_sent" ? { kind: "emailed", reason: "setup" } : { kind: "password" });
   }
 
   async function forgotPassword() {
     const result = await forgot({ email }).unwrap().catch(() => null);
-    if (result) setStep({ kind: "emailed", reason: "reset" });
+    if (!result) return;
+    setResendIn(60);
+    setStep({ kind: "emailed", reason: "reset" });
   }
 
   function changeEmail() {
@@ -213,14 +230,18 @@ export function SignIn() {
           <p className="text-muted">
             {step.reason === "setup" ? (
               <>
-                We emailed <span className="font-semibold text-ink">{email}</span> a link to choose your password. It works once, for 72 hours. Then sign in and set up your authenticator app.
+                We emailed <span className="font-semibold text-ink">{email}</span> a link to choose your password. Then sign in and set up your authenticator app.
               </>
             ) : (
               <>
-                If <span className="font-semibold text-ink">{email}</span> can be reset here, we have emailed it a link to choose a new password. It works once, for 24 hours.
+                If <span className="font-semibold text-ink">{email}</span> can be reset here, we have emailed it a link to choose a new password.
               </>
             )}
           </p>
+          <p className="text-sm text-muted">No email? Check your spam folder, then send it again.</p>
+          <Button className="w-full" onClick={() => void resendLink()} disabled={resendIn > 0} loading={startState.isLoading || forgotState.isLoading}>
+            <span aria-live="polite">{resendIn > 0 ? `Resend link in ${resendIn}s` : "Resend link"}</span>
+          </Button>
           <Button variant="secondary" className="w-full" onClick={changeEmail}>
             Back to sign in
           </Button>

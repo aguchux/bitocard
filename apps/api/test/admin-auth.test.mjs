@@ -334,14 +334,15 @@ describe('set-password links', () => {
     assert.equal((await client(server.base).post('/v1/admin/auth/password-link/complete', { token: expired, password: 'never applied passphrase' })).status, 404);
   });
 
-  test('at most five links a day per admin', async () => {
+  test('a link can be sent again every minute, with no daily cap', async () => {
     const email = 'link-other@golojan.co.uk';
     await admins.createAdmin({ email, name: 'Other Admin', password, roles: ['support'] });
     for (let i = 0; i < 7; i += 1) {
       await client(server.base).post('/v1/admin/auth/password/forgot', { email });
+      await client(server.base).post('/v1/admin/auth/password/forgot', { email }); // within the minute: skipped
       await pastLinkLimit(email);
     }
-    assert.equal((await emailsTo(email)).length, 5);
+    assert.equal((await emailsTo(email)).length, 7);
   });
 });
 
