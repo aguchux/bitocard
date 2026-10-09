@@ -378,4 +378,19 @@ describe('browser access (CORS)', () => {
     const other = await fetch(`${base}/v1/auth/session`, { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' } });
     assert.equal(other.headers.get('access-control-allow-origin'), null);
   });
+
+  test('resellers’ hosted stores are never trusted origins, even under a *.bitocard.com rule', async () => {
+    const store = 'https://ada-gifts.bitocard.com';
+    const preflight = await fetch(`${base}/v1/auth/session`, { method: 'OPTIONS', headers: { origin: store, 'access-control-request-method': 'GET' } });
+    assert.equal(preflight.headers.get('access-control-allow-origin'), null);
+    const { browser } = await signUp();
+    const change = await browser.post('/v1/auth/signout', {}, { origin: store });
+    assert.equal(change.status, 403, 'a script on a store cannot act as the signed-in reseller');
+    const { originAllowed } = await import('../dist/auth/auth.guard.js');
+    const rules = ['https://*.bitocard.com'];
+    assert.deepEqual(
+      ['https://shq.bitocard.com', 'https://admin.bitocard.com', 'https://docs.bitocard.com', 'https://ada-gifts.bitocard.com', 'https://x.shq.bitocard.com', 'http://shq.bitocard.com'].map(origin => originAllowed(origin, rules)),
+      [true, true, true, false, false, false],
+    );
+  });
 });

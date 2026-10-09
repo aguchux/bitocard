@@ -732,6 +732,39 @@ enum AccountKind {
   supplier_float
   /// What suppliers charge BitoCard for fulfilled orders (an expense).
   cost_of_sales
+  /// Card disputes BitoCard lost and bore itself: chargeback protection, or more than the reseller's wallet held (an expense).
+  chargebacks
+}
+
+/// A card payment into BitoCard's own gateway disputed by the cardholder (a chargeback): one per gateway dispute.
+model Dispute {
+  id                String     @id @default(uuid()) @db.Uuid
+  paymentId         String     @map("payment_id") @db.Uuid
+  resellerId        String     @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  provider          String
+  providerDisputeId String     @map("provider_dispute_id")
+  amountMinor       BigInt     @map("amount_minor")
+  currency          String     @db.Char(3)
+  /// open, won or lost.
+  status            String     @default("open")
+  /// The reseller's plan has chargeback protection: BitoCard bears it and nothing is held.
+  protected         Boolean    @default(false)
+  /// Held from the reseller's wallet while open, and what the wallet could not cover (BitoCard's loss if lost).
+  holdId            String?    @map("hold_id") @db.Uuid
+  heldMinor         BigInt     @default(0) @map("held_minor")
+  shortfallMinor    BigInt     @default(0) @map("shortfall_minor")
+  reason            String?
+  openedAt          DateTime   @default(now()) @map("opened_at")
+  resolvedAt        DateTime?  @map("resolved_at")
+  /// Finance settled a lost dispute's shortfall with the reseller: withdrawals resume.
+  clearedAt         DateTime?  @map("cleared_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  payment           Payment    @relation(fields: [paymentId], references: [id])
+
+  @@unique([provider, providerDisputeId])
+  @@index([resellerId, mode, status])
+  @@map("disputes")
 }
 
 /// One account per kind, mode, currency and owner. The balance is kept in step with the postings in the same transaction.
@@ -918,6 +951,8 @@ model Payment {
   @@index([resellerId, createdAt])
   @@index([status, createdAt])
   @@index([unmatchedAt, unmatchedRefundedAt])
+  disputes              Dispute[]
+
   @@map("payments")
 }
 
@@ -958,6 +993,8 @@ model BankAccount {
   createdById            String     @map("created_by_id") @db.Uuid
   createdAt              DateTime   @default(now()) @map("created_at")
   removedAt              DateTime?  @map("removed_at")
+  /// Set when the business is renamed after verification: live payouts wait until then (a fresh 24 hours).
+  payoutsFrom            DateTime?  @map("payouts_from")
   reseller               Reseller   @relation(fields: [resellerId], references: [id])
   payouts                Payout[]
 

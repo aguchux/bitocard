@@ -265,5 +265,8 @@ describe('payout accounts', () => {
     assert.equal(accountNameMatches('ADA DIGITAL VENTURES LTD', [null, 'Ada Digital']), true);
     assert.equal(accountNameMatches('GLOBAL SERVICES LTD', ['Global Services Ltd']), false, 'generic business words do not count');
     assert.equal(accountNameMatches('JOHN STRANGER', ['Ada Obi', 'Ada Digital']), false);
+    assert.equal(accountNameMatches('ADA STRANGER', ['Ada Obi', 'Ada Digital']), false, 'one shared word is not enough');
+    assert.equal(accountNameMatches('MALLORY X', ['Ada Obi', 'Mallory Trading']), false, 'a renamed business must still share two words');
+    assert.equal(accountNameMatches('ADAEZE', ['Adaeze']), true, 'a one-word name matches its one word');
   });
 });

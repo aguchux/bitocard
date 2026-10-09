@@ -108,6 +108,22 @@ export class StripeProvider implements CheckoutProvider {
     return { checkoutUrl: session.url, providerTransactionId: session.id };
   }
 
+  /**
+   * A dispute as Stripe has it now, with the Checkout session it belongs to (our payment's provider transaction ID).
+   * `outcome` is set once decided: won (or an inquiry closed without a chargeback) or lost.
+   */
+  async dispute(id: string) {
+    const dispute = await this.call<{ id: string; amount: number; currency: string; status: string; reason?: string | null; payment_intent?: string | null }>(
+      `/v1/disputes/${encodeURIComponent(id)}`,
+    );
+    const currency = dispute.currency.toUpperCase();
+    const sessions = dispute.payment_intent
+      ? await this.call<{ data: Session[] }>(`/v1/checkout/sessions?payment_intent=${encodeURIComponent(dispute.payment_intent)}&limit=1`)
+      : { data: [] };
+    const outcome = dispute.status === 'lost' ? ('lost' as const) : dispute.status === 'won' || dispute.status === 'warning_closed' ? ('won' as const) : null;
+    return { id: dispute.id, amount: fromStripe(dispute.amount, currency), currency, status: dispute.status, reason: dispute.reason ?? null, sessionId: sessions.data[0]?.id ?? null, outcome };
+  }
+
   private session(id: string) {
     return this.call<Session>(`/v1/checkout/sessions/${encodeURIComponent(id)}?expand[]=payment_intent.latest_charge.balance_transaction`);
   }

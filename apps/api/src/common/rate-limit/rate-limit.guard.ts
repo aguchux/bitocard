@@ -48,6 +48,52 @@ class MemoryLimiter {
   }
 }
 
+type Limiter = { limitFor(key: string): Promise<Verdict> };
+
+function limiterFor(config: AppConfig, limit: number): Limiter {
+  if (config.UPSTASH_REDIS_REST_URL && config.UPSTASH_REDIS_REST_TOKEN) {
+    return new RedisLimiter(new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN }), limit);
+  }
+  return new MemoryLimiter(limit);
+}
+
+const rateLimited = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'rate_limited', 'Too many requests. Retry after the time in the Retry-After header.');
+
+/**
+ * A per-address limit on /v1 that runs before the caller is identified (ADDRESS_RATE_LIMIT_PER_MINUTE), so requests
+ * with made-up API keys, docs tokens or session cookies (each answered 401 after database lookups) cannot be sent without
+ * limit. Generous: the per-caller limit below does the fine-grained work. Shoppers behind a store's server count by the
+ * address it signs.
+ */
+@Injectable()
+export class AddressRateLimitGuard implements CanActivate {
+  private readonly logger = new Logger('RateLimit');
+  private readonly limiter: Limiter;
+  private readonly storeServerSecret: string | undefined;
+
+  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+    this.storeServerSecret = config.STORE_SERVER_SECRET;
+    this.limiter = limiterFor(config, config.ADDRESS_RATE_LIMIT_PER_MINUTE);
+  }
+
+  async canActivate(context: ExecutionContext) {
+    const req = context.switchToHttp().getRequest<Request>();
+    const res = context.switchToHttp().getResponse<Response>();
+    if (!req.originalUrl.startsWith('/v1/')) return true;
+    const address = signedClientIp(req.get(clientHeader), this.storeServerSecret) ?? req.ip ?? 'unknown';
+    let verdict: Verdict;
+    try {
+      verdict = await this.limiter.limitFor(`address:${address}`);
+    } catch (error) {
+      this.logger.error({ err: error }, 'Rate limiter unavailable; request allowed');
+      return true;
+    }
+    if (verdict.success) return true;
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((verdict.reset - Date.now()) / 1000))));
+    throw rateLimited();
+  }
+}
+
 /**
  * Per-caller request limit on /v1 (RATE_LIMIT_PER_MINUTE). Uses Upstash Redis when configured so the limit holds
  * across every function instance; if Redis is unreachable requests are allowed and the failure is logged. Callers are identified by API key once sign-in exists, by IP address until then.
@@ -55,7 +101,7 @@ class MemoryLimiter {
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger('RateLimit');
-  private readonly limiter: { limitFor(key: string): Promise<Verdict> };
+  private readonly limiter: Limiter;
   private readonly storeServerSecret: string | undefined;
 
   constructor(
@@ -63,12 +109,7 @@ export class RateLimitGuard implements CanActivate {
     private readonly prisma: PrismaService,
   ) {
     this.storeServerSecret = config.STORE_SERVER_SECRET;
-    if (config.UPSTASH_REDIS_REST_URL && config.UPSTASH_REDIS_REST_TOKEN) {
-      const redis = new Redis({ url: config.UPSTASH_REDIS_REST_URL, token: config.UPSTASH_REDIS_REST_TOKEN });
-      this.limiter = new RedisLimiter(redis, config.RATE_LIMIT_PER_MINUTE);
-    } else {
-      this.limiter = new MemoryLimiter(config.RATE_LIMIT_PER_MINUTE);
-    }
+    this.limiter = limiterFor(config, config.RATE_LIMIT_PER_MINUTE);
   }
 
   async canActivate(context: ExecutionContext) {
@@ -97,7 +138,7 @@ export class RateLimitGuard implements CanActivate {
     if (verdict.success) return true;
 
     res.setHeader('Retry-After', String(Math.max(1, resetSeconds)));
-    throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'rate_limited', 'Too many requests. Retry after the time in the Retry-After header.');
+    throw rateLimited();
   }
 
   /**

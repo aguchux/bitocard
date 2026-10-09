@@ -704,7 +704,8 @@ export async function fakePawapay() {
 export async function fakeStripe() {
   // `feeCurrency` and `exchangeRate` describe the balance transaction (the account's settlement currency); `byKey` maps
   // idempotency keys to the refund they made, so a repeat returns it, as Stripe does.
-  const state = { sessions: {}, refunds: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null };
+  // `disputes` maps a dispute ID to { amount, currency, status, payment_intent, reason }.
+  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null };
   const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
@@ -715,6 +716,15 @@ export async function fakeStripe() {
       const id = `cs_test_${(state.next += 1)}`;
       state.sessions[id] = { fields, status: 'open', payment_status: 'unpaid', payment_intent: `pi_${state.next}`, key: headers.authorization.slice(7) };
       return { body: { id, object: 'checkout.session', url: `https://checkout.stripe.com/c/pay/${id}`, status: 'open', payment_status: 'unpaid' } };
+    }
+    if (method === 'GET' && path === '/v1/checkout/sessions') {
+      const intent = new URLSearchParams(url.split('?')[1] ?? '').get('payment_intent');
+      return { body: { object: 'list', data: Object.entries(state.sessions).filter(([, session]) => session.payment_intent === intent).map(([id]) => ({ id, object: 'checkout.session' })) } };
+    }
+    const dispute = /^\/v1\/disputes\/([\w-]+)$/.exec(path);
+    if (method === 'GET' && dispute) {
+      const found = state.disputes[dispute[1]];
+      return found ? { body: { id: dispute[1], object: 'dispute', ...found } } : { status: 404, body: { error: { message: 'No such dispute' } } };
     }
     const one = /^\/v1\/checkout\/sessions\/([\w-]+)$/.exec(path);
     if (method === 'GET' && one) {

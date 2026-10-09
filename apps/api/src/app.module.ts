@@ -36,7 +36,7 @@ import { StorefrontModule } from './storefront/storefront.module.js';
 import { MediaModule } from './media/media.module.js';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter.js';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor.js';
-import { RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
+import { AddressRateLimitGuard, RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
 import { loggerParams } from './common/request/logging.js';
 import { APP_CONFIG, type AppConfig } from './config/config.js';
 import { ConfigModule } from './config/config.module.js';
@@ -99,7 +99,9 @@ export class AppModule {
       controllers: [AppController],
       providers: [
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
-        // Guards run in this order: identify the caller, then rate-limit per caller.
+        // Guards run in this order: a generous limit per address (before any database lookup), identify the caller,
+        // then rate-limit per caller.
+        { provide: APP_GUARD, useClass: AddressRateLimitGuard },
         { provide: APP_GUARD, useExisting: AuthGuard },
         { provide: APP_GUARD, useClass: RateLimitGuard },
         { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },

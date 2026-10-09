@@ -167,6 +167,17 @@ describe('live payouts through Flutterwave', () => {
     assert.equal(res.json.error.code, 'bank_account_cooling_off');
   });
 
+  test('renaming the business after verification restarts every payout account’s 24-hour wait', async () => {
+    const { browser, account } = await liveAccount();
+    await prisma.bankAccount.update({ where: { id: account.id }, data: { createdAt: new Date(Date.now() - 2 * 24 * 3600_000) } });
+    assert.equal(new Date((await browser.get('/v1/bank-accounts')).json.data[0].payouts_available_from) < new Date(), true, 'past its wait');
+    assert.equal((await browser.patch('/v1/reseller', { name: 'Ada Digital Renamed' })).status, 200);
+    const res = await browser.post('/v1/payouts', { amount: 2_000_000, bank_account_id: account.id });
+    assert.equal(res.json.error.code, 'bank_account_cooling_off', 'a stolen session cannot rename the business and withdraw at once');
+    const from = new Date((await browser.get('/v1/bank-accounts')).json.data[0].payouts_available_from);
+    assert.ok(from > new Date(Date.now() + 23 * 3600_000));
+  });
+
   test('the transfer webhook is re-read from Flutterwave, then paid once with the fee recorded', async () => {
     const { browser, email, account } = await liveAccount();
     await prisma.bankAccount.update({ where: { id: account.id }, data: { createdAt: new Date(Date.now() - 25 * 3600_000) } });

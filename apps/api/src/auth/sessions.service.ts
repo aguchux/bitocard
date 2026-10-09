@@ -36,7 +36,9 @@ export class SessionsService {
         expiresAt: new Date(Date.now() + lifetimeMs),
       },
     });
-    res.cookie(cookie, token, { ...this.cookieOptions(), maxAge: lifetimeMs });
+    // An admin cookie from before it became host-only would be sent alongside the new one: clear it first.
+    if (realm === 'admin' && this.config.SESSION_COOKIE_DOMAIN) res.clearCookie(cookie, this.sharedCookieOptions());
+    res.cookie(cookie, token, { ...this.cookieOptions(realm), maxAge: lifetimeMs });
     return session;
   }
 
@@ -60,10 +62,20 @@ export class SessionsService {
   }
 
   clearCookie(realm: Realm, res: Response) {
-    res.clearCookie(sessionPolicy[realm].cookie, this.cookieOptions());
+    if (realm === 'admin' && this.config.SESSION_COOKIE_DOMAIN) res.clearCookie(sessionPolicy[realm].cookie, this.sharedCookieOptions());
+    res.clearCookie(sessionPolicy[realm].cookie, this.cookieOptions(realm));
   }
 
-  private cookieOptions(): CookieOptions {
+  /**
+   * Resellers' `bc_session` is shared on SESSION_COOKIE_DOMAIN (the docs read it). The admin cookie is host-only and
+   * SameSite=Strict: it only ever goes to the API's own host, never to resellers' `<store>.bitocard.com` or any other
+   * subdomain, and never with a request started from another site.
+   */
+  private cookieOptions(realm: Realm): CookieOptions {
+    return realm === 'admin' ? { httpOnly: true, secure: this.config.cookieSecure, sameSite: 'strict', path: '/' } : this.sharedCookieOptions();
+  }
+
+  private sharedCookieOptions(): CookieOptions {
     return {
       httpOnly: true,
       secure: this.config.cookieSecure,

@@ -91,6 +91,17 @@ describe('step-by-step sign-up', () => {
     assert.equal((await browser.post('/v1/auth/signup/email/verify', { email, code: fresh })).status, 200);
   });
 
+  test('no more than ten codes a day to one address, whoever asks', async () => {
+    const email = unique();
+    const minuteAgo = new Date(Date.now() - 2 * 60 * 1000);
+    await prisma.signupVerification.createMany({
+      data: Array.from({ length: 10 }, () => ({ email, codeHash: 'x', expiresAt: minuteAgo, consumedAt: minuteAgo, createdAt: minuteAgo })),
+    });
+    const capped = await client(server.base).post('/v1/auth/signup/email', { email });
+    assert.deepEqual([capped.status, capped.json.error.code], [429, 'code_daily_limit']);
+    assert.equal(await lastEmailCode(server.app, email), null, 'nothing sent');
+  });
+
   test('an email already in use is refused at the first step, and only hashes are stored', async () => {
     const email = unique();
     await client(server.base).post('/v1/auth/signup', { name: 'Ada', email, password, country: 'NG' });

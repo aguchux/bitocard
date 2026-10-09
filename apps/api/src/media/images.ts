@@ -48,18 +48,36 @@ function webp(bytes: Buffer): ImageInfo | null {
   return null;
 }
 
+/** Removes XML comments in one pass (linear time: no pattern that can backtrack on many comments). */
+function withoutComments(text: string) {
+  let out = '';
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf('<!--', at);
+    if (open === -1) return out + text.slice(at);
+    const close = text.indexOf('-->', open + 4);
+    if (close === -1) return out + text.slice(at, open);
+    out += `${text.slice(at, open)} `;
+    at = close + 3;
+  }
+}
+
 /**
  * SVG is text that browsers can run scripts from, so it is refused unless it is a plain drawing: no scripts, event
- * handlers, embedded HTML, entities or references to anything outside the file (data: images are allowed).
+ * handlers, embedded HTML, entities, character references (which could spell a script link), animations that rewrite
+ * attributes, or references to anything outside the file (data: images are allowed). Every pattern is linear: the
+ * comments are removed first, so a file full of them cannot stall the check.
  */
 export function svgProblem(text: string): string | null {
-  const body = text.replace(/^\uFEFF/, '');
-  if (!/^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE svg[^>[]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(body)) return 'not an SVG image';
+  const body = withoutComments(text.replace(/^\uFEFF/, ''));
+  if (!/^\s*(<\?xml[^>]*>\s*)?(<!DOCTYPE svg[^>[]*>\s*)?<svg[\s>]/i.test(body)) return 'not an SVG image';
   if (/<script/i.test(body)) return 'contains a script';
   if (/<foreignObject/i.test(body)) return 'contains embedded HTML';
   if (/<!ENTITY/i.test(body)) return 'contains entities';
+  if (/&#|&[a-z][a-z0-9]*;/i.test(body.replace(/&(amp|lt|gt|quot|apos);/gi, ''))) return 'contains character references';
+  if (/<(animate|animateMotion|animateTransform|set|discard|handler|listener)[\s/>]/i.test(body) || /attributeName\s*=/i.test(body)) return 'contains animations';
   if (/\son[a-z]+\s*=/i.test(body)) return 'contains event handlers';
-  if (/javascript:/i.test(body)) return 'contains a script link';
+  if (/(javascript|vbscript)\s*:/i.test(body)) return 'contains a script link';
   // Every href must stay inside the file (#id) or be a data: image.
   for (const match of body.matchAll(/(?:xlink:)?href\s*=\s*["']\s*([^"']*)/gi)) {
     if (!match[1].startsWith('#') && !/^data:image\/(png|jpeg|gif|webp);/i.test(match[1])) return 'refers to outside files';

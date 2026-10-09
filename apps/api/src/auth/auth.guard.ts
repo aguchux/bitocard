@@ -17,6 +17,7 @@ import {
   ROUTE_SESSION_ONLY,
 } from './caller.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
+import { reservedSubdomains } from '../stores/reserved.js';
 import { SessionsService, sessionPolicy } from './sessions.service.js';
 
 const apiKeyPattern = /^bc_(test|live)_[A-Za-z0-9_-]{20,}$/;
@@ -27,13 +28,21 @@ const unauthenticated = () =>
   new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'not_authenticated', 'Sign in, or send a valid API key as a Bearer token.');
 const forbidden = (message: string) => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', message);
 
-/** Origin matching, with a leading `*.` wildcard for subdomains. */
+/**
+ * Origin matching. A leading `*.` wildcard matches only BitoCard's own subdomains (the reserved names no store can take,
+ * such as `shq`, `admin` and `docs`), one level deep: never a reseller's hosted store (`<store>.bitocard.com`), whose
+ * pages a reseller controls, so a script on one can never act as a signed-in reseller or admin.
+ */
 export function originAllowed(origin: string, allowed: string[]) {
   return allowed.some(pattern => {
     if (!pattern.includes('*')) return origin === pattern;
     const [scheme, host] = pattern.split('://');
     const suffix = host.replace(/^\*\./, '.');
-    return origin.startsWith(`${scheme}://`) && origin.slice(scheme.length + 3).endsWith(suffix);
+    if (!origin.startsWith(`${scheme}://`)) return false;
+    const originHost = origin.slice(scheme.length + 3);
+    if (!originHost.endsWith(suffix)) return false;
+    const label = originHost.slice(0, -suffix.length);
+    return reservedSubdomains.has(label);
   });
 }
 

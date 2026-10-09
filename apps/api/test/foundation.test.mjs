@@ -117,6 +117,25 @@ describe('idempotency', () => {
     assert.equal(fixtureCalls.count, start + 1);
   });
 
+  test('stored responses are encrypted at rest, and replayed as they were', async () => {
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    const first = await post('/v1/fixtures/things', { name: 'CODE-4829-SECRET', quantity: 1 }, { 'idempotency-key': 'sealed-1' });
+    const row = await prisma.idempotencyKey.findFirstOrThrow({ where: { key: 'sealed-1' } });
+    assert.deepEqual(Object.keys(row.responseBody), ['sealed']);
+    assert.ok(!JSON.stringify(row.responseBody).includes('CODE-4829-SECRET'), 'never readable in the database');
+    const replay = await post('/v1/fixtures/things', { name: 'CODE-4829-SECRET', quantity: 1 }, { 'idempotency-key': 'sealed-1' });
+    assert.equal(replay.headers.get('idempotent-replayed'), 'true');
+    assert.deepEqual(await replay.json(), await first.json());
+  });
+
+  test('a dashboard session’s keys are scoped to the reseller account and mode it acts in', async () => {
+    const { idempotencyScope } = await import('../dist/common/idempotency/idempotency.interceptor.js');
+    const request = (caller, mode) => ({ caller, get: name => (name === 'bitocard-mode' ? mode : undefined) });
+    const session = { kind: 'session', id: 'user-1', resellerId: 'reseller-a' };
+    const scopes = [request(session), request(session, 'test'), request({ ...session, resellerId: 'reseller-b' }), request({ kind: 'api_key', id: 'key-1', resellerId: 'reseller-a' }, 'test')].map(idempotencyScope);
+    assert.deepEqual(scopes, ['user-1:reseller-a:live', 'user-1:reseller-a:test', 'user-1:reseller-b:live', 'key-1']);
+  });
+
   test('the original status code is replayed', async () => {
     await post('/v1/fixtures/things/accept', {}, { 'idempotency-key': 'accept-1' });
     const replay = await post('/v1/fixtures/things/accept', {}, { 'idempotency-key': 'accept-1' });
@@ -206,6 +225,36 @@ describe('rate limit enforcement', () => {
         statuses.push(res.status);
       }
       assert.equal(statuses.at(-1), 429, `statuses ${statuses}: unknown tokens share the caller's address limit`);
+    } finally {
+      await limited.close();
+    }
+  });
+});
+
+describe('limits before the caller is identified', () => {
+  test('made-up API keys are limited per address before any lookup', async () => {
+    const limited = await startApp({ env: { ADDRESS_RATE_LIMIT_PER_MINUTE: '3', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, database: 'pglite' });
+    try {
+      const statuses = [];
+      for (let n = 0; n < 4; n += 1) {
+        const res = await fetch(`${limited.base}/v1/account`, { headers: { authorization: `Bearer bc_live_madeup${n}madeupmadeupmadeup` } });
+        statuses.push(res.status);
+      }
+      assert.deepEqual(statuses, [401, 401, 401, 429]);
+    } finally {
+      await limited.close();
+    }
+  });
+
+  test('only the address the nearest proxy saw counts: changing the left of X-Forwarded-For gets no fresh limit', async () => {
+    const limited = await startApp({ env: { RATE_LIMIT_PER_MINUTE: '2', TRUST_PROXY: '1', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, database: 'pglite' });
+    try {
+      const statuses = [];
+      for (let n = 0; n < 3; n += 1) {
+        const res = await fetch(`${limited.base}/v1/store/navigation`, { headers: { 'x-forwarded-for': `10.0.0.${n}, 203.0.113.50` } });
+        statuses.push(res.status);
+      }
+      assert.equal(statuses.at(-1), 429, `statuses ${statuses}`);
     } finally {
       await limited.close();
     }

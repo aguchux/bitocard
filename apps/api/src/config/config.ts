@@ -14,6 +14,14 @@ export const configSchema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(600),
+  /** Per client address, checked before the caller is identified, so made-up credentials cannot be sent without limit. */
+  ADDRESS_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(1200),
+  /**
+   * How many proxies in front of the API to trust for the client's address (`X-Forwarded-For`): 1 on Vercel (its edge
+   * sets the header) or behind one load balancer; 0 when clients connect directly. Never "all": the client writes the
+   * left end of the header, so trusting every hop lets anyone choose their own address and dodge per-address limits.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
   /**
    * Shared with the storefront's server, which signs each shopper's address with it (`BitoCard-Client`), so signed-out
    * shoppers are rate limited one by one instead of sharing the store server's address. Unset: they share it.
@@ -21,8 +29,13 @@ export const configSchema = z.object({
   STORE_SERVER_SECRET: z.string().min(32).optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
 
-  // Browser access. Origins may use a leading wildcard for subdomains, for example https://*.bitocard.com.
-  ALLOWED_ORIGINS: list.prefault('https://bitocard.com,https://*.bitocard.com'),
+  /**
+   * Browser origins allowed to call the API with cookies (CORS, and the Origin check that stops cross-site changes).
+   * Exact origins only: a wildcard such as `https://*.bitocard.com` would also trust every reseller's hosted store
+   * (`<store>.bitocard.com`), so any script on one could act as a signed-in reseller. The storefront calls the API from
+   * its server and needs no entry.
+   */
+  ALLOWED_ORIGINS: list.prefault('https://shq.bitocard.com,https://admin.bitocard.com,https://docs.bitocard.com'),
   /** Cookie domain shared by the BitoCard apps (.bitocard.com in production); unset means host-only cookies. */
   SESSION_COOKIE_DOMAIN: z.string().optional(),
   /** Secure cookies everywhere except plain-HTTP local development and tests. */

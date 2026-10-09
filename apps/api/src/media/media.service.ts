@@ -101,7 +101,7 @@ export class MediaService {
     const id = randomUUID();
     const folder = purpose.folder(targetId, resellerId);
     const key = this.storage.key(folder, `${id}.${extensions[contentType]}`);
-    const upload = this.storage.presignUpload(key, contentType, input.size);
+    const upload = this.storage.presignUpload(this.storage.stagingKey(`${id}.${extensions[contentType]}`), contentType, input.size);
     const asset = await this.prisma.mediaAsset.create({
       data: {
         id,
@@ -128,9 +128,14 @@ export class MediaService {
     return asset;
   }
 
+  /** The private object the browser uploaded to, before the API copies it to `asset.key`. */
+  private staging(asset: MediaAsset) {
+    return this.storage.stagingKey(asset.key.slice(asset.key.lastIndexOf('/') + 1));
+  }
+
   /** Throws away a file that failed its checks: from storage and from the library. */
   private async discard(asset: MediaAsset, message: string): Promise<never> {
-    await this.storage.remove(asset.key).catch(error => this.logger.warn(`Could not remove ${asset.key}: ${error}`));
+    for (const key of [asset.key, this.staging(asset)]) await this.storage.remove(key).catch(error => this.logger.warn(`Could not remove ${key}: ${error}`));
     await this.prisma.mediaAsset.deleteMany({ where: { id: asset.id, status: 'pending' } });
     throw invalid('upload_invalid', message);
   }
@@ -140,6 +145,13 @@ export class MediaService {
     const asset = await this.owned(actor, id);
     if (asset.status === 'ready') return presentMedia(asset);
     if (actor.realm === 'admin' && asset.resellerId) throw notFound();
+    // The upload is copied to its final key first and only that copy is checked: the upload link can still overwrite the
+    // staging object, but never the final one, so what was checked is what is served. (A repeat after a copy finds it there.)
+    if (!(await this.storage.head(asset.key))) {
+      const copied = await this.storage.publish(this.staging(asset), asset.key, asset.contentType);
+      if (!copied) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'upload_missing', 'The file has not been uploaded yet. Upload it with the signed link, then try again.');
+    }
+    await this.storage.remove(this.staging(asset)).catch(error => this.logger.warn(`Could not remove ${this.staging(asset)}: ${error}`));
     const stored = await this.storage.head(asset.key);
     if (!stored) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'upload_missing', 'The file has not been uploaded yet. Upload it with the signed link, then try again.');
     if (stored.size !== asset.sizeBytes || stored.contentType !== asset.contentType) await this.discard(asset, 'The uploaded file does not match the size or type that was declared.');
@@ -245,7 +257,7 @@ export class MediaService {
     let removed = 0;
     for (const asset of stale) {
       try {
-        if (this.storage.configured()) await this.storage.remove(asset.key);
+        if (this.storage.configured()) for (const key of [asset.key, this.staging(asset)]) await this.storage.remove(key);
         await this.prisma.mediaAsset.deleteMany({ where: { id: asset.id, status: 'pending' } });
         removed += 1;
       } catch (error) {

@@ -39,7 +39,10 @@ export function namesMatch(expected: string, verified: string) {
 /** Business suffixes ignored when matching a payout account name to the reseller. */
 const businessWords = new Set(['ltd', 'limited', 'plc', 'llc', 'inc', 'co', 'company', 'enterprise', 'enterprises', 'ventures', 'global', 'nigeria', 'ng', 'services', 'and', 'the']);
 
-/** A payout account belongs to the reseller when its name shares a distinctive word with the verified owner or the business. */
+/**
+ * A payout account belongs to the reseller when its name shares two distinctive words with the verified owner's or the
+ * business's name (or its only one, when that name has just one), never a single common word.
+ */
 export function accountNameMatches(accountName: string, names: Array<string | null | undefined>) {
   const words = (name: string) =>
     new Set(
@@ -51,5 +54,9 @@ export function accountNameMatches(accountName: string, names: Array<string | nu
         .filter(word => word.length > 2 && !businessWords.has(word)),
     );
   const account = words(accountName);
-  return names.some(name => name && [...words(name)].some(word => account.has(word)));
+  return names.some(name => {
+    if (!name) return false;
+    const wanted = [...words(name)];
+    return wanted.length > 0 && wanted.filter(word => account.has(word)).length >= Math.min(2, wanted.length);
+  });
 }

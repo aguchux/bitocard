@@ -6,6 +6,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { PayoutsService } from '../payouts/payouts.service.js';
+import { DisputesService } from './disputes.service.js';
 import { PaymentProviders } from './payment-providers.js';
 import { PaymentsService } from './payments.service.js';
 
@@ -35,6 +36,7 @@ export class ProviderWebhooksController {
     private readonly payments: PaymentsService,
     private readonly payouts: PayoutsService,
     private readonly identity: IdentityService,
+    private readonly disputes: DisputesService,
   ) {}
 
   @Post('flutterwave')
@@ -73,6 +75,10 @@ export class ProviderWebhooksController {
     const session = body.data?.object;
     if (body.type?.startsWith('checkout.session.') && session?.object === 'checkout.session' && session.id) {
       return { received: true, ...(await this.payments.paymentNotice('stripe', { providerTransactionId: session.id })) };
+    }
+    // A chargeback opened, updated or decided: re-read from Stripe.
+    if (body.type?.startsWith('charge.dispute.') && session?.object === 'dispute' && session.id) {
+      return { received: true, ...(await this.disputes.stripeNotice(session.id)) };
     }
     return { received: true };
   }

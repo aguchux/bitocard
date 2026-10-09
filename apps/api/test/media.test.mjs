@@ -66,6 +66,13 @@ describe('image checks', () => {
     assert.equal(inspectImage(Buffer.from('<html><script>alert(1)</script></html>'), 'image/png'), null);
   });
 
+  test('the SVG check is linear: a file full of comments is answered at once', () => {
+    const started = performance.now();
+    assert.equal(svgProblem(`${'<!---->'.repeat(5000)}x`), 'not an SVG image');
+    assert.equal(svgProblem(`<!-- a -->${'<!---->'.repeat(5000)}<svg viewBox="0 0 1 1"/>`), null, 'comments before the drawing are fine');
+    assert.ok(performance.now() - started < 500, 'answered in well under a second');
+  });
+
   test('accepts plain SVG drawings only', () => {
     const plain = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 24"><path d="M0 0h48v24H0z" fill="url(#g)"/></svg>';
     assert.equal(svgProblem(plain), null);
@@ -79,6 +86,10 @@ describe('image checks', () => {
       ['<svg><rect style="fill:url(https://x.example/a)"/></svg>', 'refers to outside files'],
       ['<!DOCTYPE svg [<!ENTITY x "y">]><svg/>', 'not an SVG image'],
       ['<html><svg/></html>', 'not an SVG image'],
+      ['<svg><a href="&#106;avascript:alert(1)"/></svg>', 'contains character references'],
+      ['<svg><animate attributeName="href" values="javascript:alert(1)"/></svg>', 'contains animations'],
+      ['<svg><set attributeName="onmouseover" to="alert(1)"/></svg>', 'contains animations'],
+      ['<svg><a href="java\tscript:alert(1)"/></svg>', 'refers to outside files'],
     ]) {
       assert.equal(svgProblem(svg), problem, svg);
     }
@@ -101,6 +112,22 @@ async function fakeSpaces(spacesCredentials) {
     calls.push({ method: req.method, key, headers: req.headers, query: url.search, body: body.toString('utf8') });
     if (req.method === 'PUT' && url.searchParams.has('cors')) {
       res.writeHead(String(req.headers.authorization ?? '').startsWith('AWS4-HMAC-SHA256 ') && req.headers['content-md5'] ? 200 : 403).end();
+      return;
+    }
+    // A server-side copy (the API publishing a checked upload): signed with the API's credentials, never a browser link.
+    if (req.method === 'PUT' && req.headers['x-amz-copy-source']) {
+      if (!String(req.headers.authorization ?? '').startsWith(`AWS4-HMAC-SHA256 Credential=${spacesCredentials.accessKey}/`)) {
+        res.writeHead(403).end();
+        return;
+      }
+      const from = decodeURIComponent(String(req.headers['x-amz-copy-source']).split('/').slice(2).join('/'));
+      const source = objects.get(from);
+      if (!source) {
+        res.writeHead(404).end('<Error><Code>NoSuchKey</Code></Error>');
+        return;
+      }
+      objects.set(key, { body: source.body, type: req.headers['content-type'], acl: req.headers['x-amz-acl'], cache: req.headers['cache-control'] });
+      res.writeHead(200).end('<CopyObjectResult></CopyObjectResult>');
       return;
     }
     if (req.method === 'PUT') {
@@ -202,13 +229,14 @@ describe('signed uploads', () => {
     assert.equal(created.json.folder, 'test/platform/brands/amazon/logos');
     assert.equal(created.json.url, `https://media.bitocard.test/test/platform/brands/amazon/logos/${created.json.id}.png`);
     assert.equal(created.json.upload.method, 'PUT');
-    assert.ok(created.json.upload.url.startsWith(`${spaces.url}/bitocard-media/test/platform/brands/amazon/logos/`));
-    assert.match(created.json.upload.url, /X-Amz-SignedHeaders=cache-control%3Bcontent-length%3Bcontent-type%3Bhost%3Bx-amz-acl/);
+    assert.ok(created.json.upload.url.startsWith(`${spaces.url}/bitocard-media/test/uploads/${created.json.id}.png?`), 'the browser uploads to a private staging object');
+    assert.match(created.json.upload.url, /X-Amz-SignedHeaders=content-length%3Bcontent-type%3Bhost%3Bx-amz-acl/);
     assert.equal(put.status, 200);
-    const stored = spaces.objects.get(`test/platform/brands/amazon/logos/${created.json.id}.png`);
-    assert.deepEqual([stored.acl, stored.cache, stored.type], ['public-read', 'public, max-age=31536000, immutable', 'image/png']);
-
     assert.equal(completed.status, 200, JSON.stringify(completed.json));
+    const stored = spaces.objects.get(`test/platform/brands/amazon/logos/${created.json.id}.png`);
+    assert.deepEqual([stored.acl, stored.cache, stored.type], ['public-read', 'public, max-age=31536000, immutable', 'image/png'], 'the API’s checked copy is the public file');
+    assert.ok(!spaces.objects.has(`test/uploads/${created.json.id}.png`), 'the staging object is removed');
+
     assert.deepEqual([completed.json.status, completed.json.width, completed.json.height, completed.json.purpose, completed.json.target_id], ['ready', 256, 256, 'brand_logo', 'amazon']);
     const again = await admin.post(`/v1/admin/media/${created.json.id}/complete`);
     assert.deepEqual([again.status, again.json.status], [200, 'ready'], 'checking again is harmless');
@@ -362,7 +390,17 @@ describe('signed uploads', () => {
     const result = await server.app.get(MediaService).purgeAbandoned();
     assert.ok(result.removed >= 1);
     assert.equal(await prisma.mediaAsset.count({ where: { id: created.json.id } }), 0);
-    assert.ok(!spaces.objects.has(`test/platform/storefront/images/${created.json.id}.png`));
+    assert.ok(!spaces.objects.has(`test/uploads/${created.json.id}.png`));
+  });
+
+  test('re-uploading with the link after the check never changes the public file', async () => {
+    const bytes = png(32, 32);
+    const { created, completed } = await upload(admin, '/v1/admin/media', { purpose: 'storefront_image', filename: 'swap.png' }, bytes);
+    assert.equal(completed.status, 200, JSON.stringify(completed.json));
+    const swapped = Buffer.alloc(bytes.length, 'x');
+    await fetch(created.json.upload.url, { method: 'PUT', headers: created.json.upload.headers, body: swapped });
+    const served = spaces.objects.get(`test/platform/storefront/images/${created.json.id}.png`);
+    assert.ok(served.body.equals(bytes), 'still the checked bytes');
   });
 });
 

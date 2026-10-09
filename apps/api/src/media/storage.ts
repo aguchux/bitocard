@@ -60,6 +60,14 @@ export class MediaStorage {
     return `${this.require().root}/${folder}/${file}`;
   }
 
+  /**
+   * Where the browser uploads: a private staging object. Only the API's copy at the final key is ever public, and the
+   * upload link cannot reach it, so a file cannot be swapped for another after it was checked.
+   */
+  stagingKey(file: string) {
+    return `${this.require().root}/uploads/${file}`;
+  }
+
   publicUrl(key: string) {
     return `${this.require().publicUrl}/${encodeKey(key)}`;
   }
@@ -69,15 +77,31 @@ export class MediaStorage {
   }
 
   /**
-   * A link the browser PUTs the file to. Type, size, public-read and caching are all signed, so the upload must match
-   * what was declared: a different size or type is refused by the storage itself.
+   * A link the browser PUTs the file to (its private staging key). Type, size and access are all signed, so the upload
+   * must match what was declared: a different size or type is refused by the storage itself.
    */
   presignUpload(key: string, contentType: string, size: number) {
     const spaces = this.require();
-    const headers = { 'content-type': contentType, 'content-length': String(size), 'x-amz-acl': 'public-read', 'cache-control': uploadCacheControl };
+    const headers = { 'content-type': contentType, 'content-length': String(size), 'x-amz-acl': 'private' };
     const url = presign({ method: 'PUT', url: this.objectUrl(spaces, key), headers, credentials: spaces.credentials, expiresIn: uploadLinkSeconds });
     // The browser sets Content-Length itself from the file.
-    return { method: 'PUT' as const, url, headers: { 'Content-Type': contentType, 'x-amz-acl': 'public-read', 'Cache-Control': uploadCacheControl } };
+    return { method: 'PUT' as const, url, headers: { 'Content-Type': contentType, 'x-amz-acl': 'private' } };
+  }
+
+  /** Copies the uploaded staging object to its public, immutable final key (a server-side copy: the bytes as they are now). */
+  async publish(from: string, to: string, contentType: string) {
+    const spaces = this.require();
+    const res = await this.send('PUT', to, {
+      'x-amz-copy-source': `/${encodeKey(spaces.bucket)}/${encodeKey(from)}`,
+      'x-amz-metadata-directive': 'REPLACE',
+      'x-amz-acl': 'public-read',
+      'content-type': contentType,
+      'cache-control': uploadCacheControl,
+    });
+    if (res.status === 404) return false;
+    // S3 can answer 200 with an error in the body when a copy fails part-way.
+    if (!res.ok || (await res.text()).includes('<Error>')) throw unavailable();
+    return true;
   }
 
   private async send(method: string, key: string, headers: Record<string, string> = {}) {

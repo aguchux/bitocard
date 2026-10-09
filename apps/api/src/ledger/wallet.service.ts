@@ -227,6 +227,18 @@ export class WalletService {
     });
   }
 
+  /** Takes a held amount into one platform account (for example a gateway's balance, for a lost card dispute). Repeating it does nothing. */
+  async captureHoldTo(holdId: string, description: string, account: AccountRef) {
+    return this.resolveHold(holdId, 'captured', hold => ({
+      type: 'hold_capture',
+      description,
+      lines: [
+        { account: this.ref(hold.resellerId, hold.currency, 'reseller_reserved'), debit: hold.amountMinor },
+        { account, credit: hold.amountMinor },
+      ],
+    }));
+  }
+
   /**
    * Takes part of a held amount as BitoCard revenue and returns the rest to where it came from (topped-up funds first,
    * then earnings): for charges priced only after the fact, such as an SMS. Never takes more than was held. Repeating

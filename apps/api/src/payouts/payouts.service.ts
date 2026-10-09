@@ -25,7 +25,12 @@ const bankListTtlMs = 60 * 60 * 1000;
 
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
 
-const payoutsFrom = (account: BankAccount) => new Date(account.mode === 'test' ? account.createdAt.getTime() : account.createdAt.getTime() + bankAccountCoolingOffMs);
+/** Live payouts start 24 hours after the account was added, or later when a business rename restarted the wait. */
+const payoutsFrom = (account: BankAccount) => {
+  if (account.mode === 'test') return account.createdAt;
+  const added = account.createdAt.getTime() + bankAccountCoolingOffMs;
+  return new Date(Math.max(added, account.payoutsFrom?.getTime() ?? 0));
+};
 
 export function presentBankAccount(account: BankAccount) {
   return {
@@ -209,6 +214,13 @@ export class PayoutsService {
     if (mode === 'live' && reseller.status !== 'active') throw resellerNotVerified();
     const account = await this.prisma.bankAccount.findFirst({ where: { id: input.bank_account_id, resellerId, mode, removedAt: null } });
     if (!account) throw notFound('bank account');
+    // Withdrawals wait while a card dispute is open, or a lost one's shortfall is not settled: the money may be owed back.
+    const disputed = await this.prisma.dispute.count({
+      where: { resellerId, mode, protected: false, OR: [{ status: 'open' }, { status: 'lost', shortfallMinor: { gt: 0n }, clearedAt: null }] },
+    });
+    if (disputed > 0) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'payouts_on_hold', 'Withdrawals wait while a card payment dispute is open or unsettled. Contact support for details.');
+    }
     if (payoutsFrom(account) > new Date()) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'bank_account_cooling_off', `Payouts to this account start at ${payoutsFrom(account).toISOString()}.`, 'bank_account_id');
     }

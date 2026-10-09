@@ -24,7 +24,8 @@ export async function createApp(options: AppOptions = {}) {
   const app = await NestFactory.create<NestExpressApplication>(AppModule.register(options), { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   app.disable('x-powered-by');
-  app.set('trust proxy', true);
+  // Trust exactly the configured number of proxies (Vercel's edge), never every hop: see TRUST_PROXY.
+  app.set('trust proxy', app.get<AppConfig>(APP_CONFIG).TRUST_PROXY);
   app.use(securityHeaders);
   app.use(cookieParser());
   const config = app.get<AppConfig>(APP_CONFIG);

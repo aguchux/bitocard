@@ -99,6 +99,18 @@ describe('later sign-ins', () => {
     assert.equal(verify.json.recovery_codes, undefined, 'recovery codes are shown only once');
   });
 
+  test('the admin session cookie is host-only and SameSite=Strict: it never reaches resellers’ store subdomains', async () => {
+    const email = await createAdmin();
+    const { secret } = await firstSignIn(email);
+    const browser = client(server.base);
+    const step1 = await browser.post('/v1/admin/auth/signin', { email, password });
+    const verify = await browser.post('/v1/admin/auth/mfa/verify', { challenge_token: step1.json.challenge_token, code: codeAt(secret, email, 0) });
+    assert.equal(verify.status, 200, JSON.stringify(verify.json));
+    const cookie = verify.res.headers.getSetCookie().find(line => line.startsWith('bc_admin_session='));
+    assert.match(cookie, /SameSite=Strict/i);
+    assert.doesNotMatch(cookie, /Domain=/i);
+  });
+
   test('the same code cannot be used twice', async () => {
     const email = await createAdmin();
     const { secret } = await firstSignIn(email);

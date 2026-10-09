@@ -4,17 +4,13 @@ import { ApiError } from '../common/errors/api-error.js';
 import { CountriesService } from '../countries/countries.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { bankAccountCoolingOffMs } from '../payouts/payouts.service.js';
 import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.js';
+import { reservedSubdomains } from './reserved.js';
+
+export { reservedSubdomains };
 
 export const maxStoresPerReseller = 1;
-
-/** Names that belong to BitoCard itself and can never be a store's subdomain. */
-export const reservedSubdomains = new Set([
-  'admin', 'api', 'app', 'apps', 'assets', 'auth', 'billing', 'bitocard', 'blog', 'cdn', 'checkout', 'dashboard', 'dev', 'docs',
-  'email', 'ftp', 'golojan', 'help', 'internal', 'legal', 'legals', 'login', 'mail', 'ns1', 'ns2', 'pay', 'payments', 'portal',
-  'preview', 'reseller', 'resellers', 'sandbox', 'secure', 'shop', 'signin', 'signup', 'smtp', 'staging', 'static', 'status',
-  'store', 'stores', 'support', 'test', 'wallet', 'webhooks', 'www',
-]);
 
 const subdomainFormat = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
 
@@ -80,6 +76,14 @@ export class StoresService {
       await this.countries.assertSignupOpen(country);
     }
     const updated = await this.prisma.reseller.update({ where: { id: resellerId }, data: { name: input.name, country: input.country?.toUpperCase() } });
+    // Payout accounts may match the business name, so a rename after verification restarts every account's 24-hour wait:
+    // a stolen session cannot rename the business to match its own account and withdraw at once.
+    if (input.name !== undefined && input.name !== reseller.name && reseller.verifiedAt) {
+      await this.prisma.bankAccount.updateMany({
+        where: { resellerId, mode: 'live', removedAt: null },
+        data: { payoutsFrom: new Date(Date.now() + bankAccountCoolingOffMs) },
+      });
+    }
     return { object: 'reseller' as const, id: updated.id, name: updated.name, country: updated.country, status: updated.status };
   }
 

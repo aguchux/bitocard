@@ -5,7 +5,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { EmailService } from '../notifications/email.service.js';
 import { signupCodeEmail } from '../notifications/templates.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import { maxCodeAttempts } from './codes.service.js';
+import { maxCodeAttempts, maxCodesPerDay } from './codes.service.js';
 
 const codeLifetimeMs = 30 * 60 * 1000;
 const resendAfterMs = 60 * 1000;
@@ -44,6 +44,10 @@ export class SignupVerificationService {
     const latest = await this.prisma.signupVerification.findFirst({ where: { email, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
+    }
+    // A daily cap per address (rows are kept a day), so nobody can flood someone's inbox from many machines.
+    if ((await this.prisma.signupVerification.count({ where: { email } })) >= maxCodesPerDay) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_daily_limit', 'Too many codes were sent to this address today. Try again tomorrow.');
     }
     const code = numericCode();
     const [, created] = await this.prisma.$transaction([
