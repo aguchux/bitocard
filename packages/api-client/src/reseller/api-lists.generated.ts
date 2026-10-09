@@ -31,4 +31,10 @@ export const webhookEventTypes = [
   'number.expired',
   'number.deleted',
   'number.sms_received',
+  'dispute.opened',
+  'dispute.message_received',
+  'dispute.escalated',
+  'dispute.returned',
+  'dispute.contested',
+  'dispute.resolved',
 ] as const;

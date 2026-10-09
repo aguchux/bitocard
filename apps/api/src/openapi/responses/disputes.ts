@@ -1,36 +1,10 @@
-import { disputeActions, disputeKinds, disputeStatuses, disputeTopics, messageVisibilities } from '../../disputes/disputes.service.js';
-import { array, constant, list, listExample, mode, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, objectSchema, oneOf, ref, str, time, uuid } from '../schema.js';
+import { messageVisibilities } from '../../disputes/disputes.service.js';
+import { eventObjectSchemas } from '../../webhooks/openapi.js';
+import { array, list, listExample, nullableStr, objectSchema, oneOf, ref, type Schema, time, uuid, str } from '../schema.js';
 import type { DocsArea } from './index.js';
 
-const outcomes = ['resolved_by_reseller', 'refunded_customer', 'credited_reseller', 'rejected', 'chargeback_won', 'chargeback_lost'] as const;
-
-const summaryFields = {
-  object: constant('dispute'),
-  id: uuid('Dispute ID.'),
-  reference: str('The reference people quote, for example `D-000123`.'),
-  mode,
-  kind: oneOf('`customer` (a customer’s, for you to investigate), `reseller` (yours with BitoCard) or `chargeback` (a card payment disputed with the bank).', disputeKinds),
-  topic: oneOf('What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`.', disputeTopics),
-  status: oneOf('`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.', disputeStatuses),
-  subject: str('A short summary.'),
-  customer_reference: nullableStr('Your own reference for the customer, if any.'),
-  customer_id: nullableUuid('The store customer, for disputes raised on your hosted store.'),
-  order_id: nullableUuid('The order it is about, if any.'),
-  payment_id: nullableUuid('The payment it is about (a top-up or a store payment), if any.'),
-  checkout_id: nullableUuid('The store checkout it is about, if any.'),
-  chargeback_id: nullableUuid('The chargeback, for `kind: chargeback`.'),
-  currency: str('Currency of amounts on the dispute (ISO 4217).'),
-  recommendation: nullable(oneOf('What you recommended when escalating.', disputeActions)),
-  recommended_amount: nullableInt('For `credit_reseller`: the amount you recommended, in minor units of `currency`.'),
-  report: nullableStr('Your report when escalating.'),
-  escalated_at: nullableTime('When it was escalated to BitoCard.'),
-  outcome: nullable(oneOf('What was done, once resolved.', outcomes)),
-  outcome_amount: nullableInt('For `credited_reseller`: the amount credited, in minor units of `currency`.'),
-  outcome_note: nullableStr('The note with the decision.'),
-  resolved_at: nullableTime('When it was resolved.'),
-  created_at: time('When it was opened.'),
-  updated_at: time('When it last changed (a message, an escalation or a decision).'),
-};
+/** The dispute's own fields: defined once with the webhook events (`DisputeSummary`), which carry the same object. */
+const summaryFields = (eventObjectSchemas.DisputeSummary as { properties: Record<string, Schema> }).properties;
 
 const DisputeMessage = objectSchema('DisputeMessage', {
   id: uuid('Message ID.'),
@@ -41,7 +15,6 @@ const DisputeMessage = objectSchema('DisputeMessage', {
   created_at: time('When it was written.'),
 });
 
-const DisputeSummary = objectSchema('DisputeSummary', summaryFields, 'A dispute, without its messages.');
 const Dispute = objectSchema('Dispute', { ...summaryFields, messages: array(ref('DisputeMessage'), 'Every message, oldest first, staff notes included.') }, 'A dispute with its messages.');
 
 const base = {
@@ -109,7 +82,7 @@ const resolved = {
 };
 
 export const disputesDocs: DocsArea = {
-  schemas: { Dispute, DisputeSummary, DisputeMessage },
+  schemas: { Dispute, DisputeMessage },
   responses: {
     'GET /v1/disputes': { status: 200, description: 'Your disputes in this mode, newest first.', schema: list(ref('DisputeSummary')), example: listExample([base]) },
     'POST /v1/disputes': { status: 201, description: 'The new dispute with its first message.', schema: 'Dispute', example: { ...base, messages: [firstMessage] } },

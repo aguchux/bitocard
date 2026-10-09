@@ -13673,7 +13673,13 @@
                 "number.renewed",
                 "number.expired",
                 "number.deleted",
-                "number.sms_received"
+                "number.sms_received",
+                "dispute.opened",
+                "dispute.message_received",
+                "dispute.escalated",
+                "dispute.returned",
+                "dispute.contested",
+                "dispute.resolved"
               ]
             }
           },
@@ -23160,7 +23166,13 @@
                 "number.renewed",
                 "number.expired",
                 "number.deleted",
-                "number.sms_received"
+                "number.sms_received",
+                "dispute.opened",
+                "dispute.message_received",
+                "dispute.escalated",
+                "dispute.returned",
+                "dispute.contested",
+                "dispute.resolved"
               ]
             }
           }
@@ -23197,7 +23209,13 @@
                 "number.renewed",
                 "number.expired",
                 "number.deleted",
-                "number.sms_received"
+                "number.sms_received",
+                "dispute.opened",
+                "dispute.message_received",
+                "dispute.escalated",
+                "dispute.returned",
+                "dispute.contested",
+                "dispute.resolved"
               ]
             }
           },
@@ -24214,6 +24232,233 @@
           }
         }
       },
+      "DisputeSummary": {
+        "type": "object",
+        "title": "Dispute",
+        "required": [
+          "object",
+          "id",
+          "reference",
+          "mode",
+          "kind",
+          "topic",
+          "status",
+          "subject",
+          "customer_reference",
+          "customer_id",
+          "order_id",
+          "payment_id",
+          "checkout_id",
+          "chargeback_id",
+          "currency",
+          "recommendation",
+          "recommended_amount",
+          "report",
+          "escalated_at",
+          "outcome",
+          "outcome_amount",
+          "outcome_note",
+          "resolved_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `dispute`.",
+            "const": "dispute"
+          },
+          "id": {
+            "type": "string",
+            "description": "Dispute ID.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The reference people quote, for example `D-000123`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "`customer` (a customer’s, for you to investigate), `reseller` (yours with BitoCard) or `chargeback` (a card payment disputed with the bank).",
+            "enum": [
+              "customer",
+              "reseller",
+              "chargeback"
+            ]
+          },
+          "topic": {
+            "type": "string",
+            "description": "What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`.",
+            "enum": [
+              "order",
+              "payment",
+              "funding",
+              "trade",
+              "other"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.",
+            "enum": [
+              "open",
+              "escalated",
+              "contested",
+              "resolved"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary."
+          },
+          "customer_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own reference for the customer, if any."
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store customer, for disputes raised on your hosted store.",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order it is about, if any.",
+            "format": "uuid"
+          },
+          "payment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The payment it is about (a top-up or a store payment), if any.",
+            "format": "uuid"
+          },
+          "checkout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store checkout it is about, if any.",
+            "format": "uuid"
+          },
+          "chargeback_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The chargeback, for `kind: chargeback`.",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency of amounts on the dispute (ISO 4217)."
+          },
+          "recommendation": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What you recommended when escalating.",
+            "enum": [
+              "refund_customer",
+              "credit_reseller",
+              "reject",
+              "contest_chargeback",
+              "accept_chargeback",
+              null
+            ]
+          },
+          "recommended_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "For `credit_reseller`: the amount you recommended, in minor units of `currency`."
+          },
+          "report": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your report when escalating."
+          },
+          "escalated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was escalated to BitoCard.",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What was done, once resolved.",
+            "enum": [
+              "resolved_by_reseller",
+              "refunded_customer",
+              "credited_reseller",
+              "rejected",
+              "chargeback_won",
+              "chargeback_lost",
+              null
+            ]
+          },
+          "outcome_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "For `credited_reseller`: the amount credited, in minor units of `currency`."
+          },
+          "outcome_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The note with the decision."
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was resolved.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was opened.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed (a message, an escalation or a decision).",
+            "format": "date-time"
+          }
+        },
+        "description": "A dispute, without its messages (read them with `GET /v1/disputes/{id}`).",
+        "additionalProperties": false
+      },
       "OrderCompletedEvent": {
         "type": "object",
         "title": "order.completed event",
@@ -24976,6 +25221,360 @@
             "properties": {
               "object": {
                 "$ref": "#/components/schemas/NumberMessage"
+              }
+            }
+          }
+        }
+      },
+      "DisputeOpenedEvent": {
+        "type": "object",
+        "title": "dispute.opened event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "dispute.opened"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/DisputeSummary"
+              }
+            }
+          }
+        }
+      },
+      "DisputeMessageReceivedEvent": {
+        "type": "object",
+        "title": "dispute.message_received event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "dispute.message_received"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/DisputeSummary"
+              }
+            }
+          }
+        }
+      },
+      "DisputeEscalatedEvent": {
+        "type": "object",
+        "title": "dispute.escalated event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "dispute.escalated"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/DisputeSummary"
+              }
+            }
+          }
+        }
+      },
+      "DisputeReturnedEvent": {
+        "type": "object",
+        "title": "dispute.returned event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "dispute.returned"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/DisputeSummary"
+              }
+            }
+          }
+        }
+      },
+      "DisputeContestedEvent": {
+        "type": "object",
+        "title": "dispute.contested event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "dispute.contested"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/DisputeSummary"
+              }
+            }
+          }
+        }
+      },
+      "DisputeResolvedEvent": {
+        "type": "object",
+        "title": "dispute.resolved event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "dispute.resolved"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/DisputeSummary"
               }
             }
           }
@@ -28464,7 +29063,13 @@
                 "number.renewed",
                 "number.expired",
                 "number.deleted",
-                "number.sms_received"
+                "number.sms_received",
+                "dispute.opened",
+                "dispute.message_received",
+                "dispute.escalated",
+                "dispute.returned",
+                "dispute.contested",
+                "dispute.resolved"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -28581,7 +29186,13 @@
                 "number.renewed",
                 "number.expired",
                 "number.deleted",
-                "number.sms_received"
+                "number.sms_received",
+                "dispute.opened",
+                "dispute.message_received",
+                "dispute.escalated",
+                "dispute.returned",
+                "dispute.contested",
+                "dispute.resolved"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -28700,7 +29311,13 @@
                   "number.renewed",
                   "number.expired",
                   "number.deleted",
-                  "number.sms_received"
+                  "number.sms_received",
+                  "dispute.opened",
+                  "dispute.message_received",
+                  "dispute.escalated",
+                  "dispute.returned",
+                  "dispute.contested",
+                  "dispute.resolved"
                 ]
               },
               "created_at": {
@@ -28827,7 +29444,13 @@
                   "number.renewed",
                   "number.expired",
                   "number.deleted",
-                  "number.sms_received"
+                  "number.sms_received",
+                  "dispute.opened",
+                  "dispute.message_received",
+                  "dispute.escalated",
+                  "dispute.returned",
+                  "dispute.contested",
+                  "dispute.resolved"
                 ]
               },
               "created_at": {
@@ -28986,6 +29609,24 @@
           },
           {
             "$ref": "#/components/schemas/NumberSmsReceivedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DisputeOpenedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DisputeMessageReceivedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DisputeEscalatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DisputeReturnedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DisputeContestedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DisputeResolvedEvent"
           }
         ]
       },
@@ -32128,21 +32769,18 @@
             "description": "Currency of amounts on the dispute (ISO 4217)."
           },
           "recommendation": {
-            "anyOf": [
-              {
-                "type": "string",
-                "description": "What you recommended when escalating.",
-                "enum": [
-                  "refund_customer",
-                  "credit_reseller",
-                  "reject",
-                  "contest_chargeback",
-                  "accept_chargeback"
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What you recommended when escalating.",
+            "enum": [
+              "refund_customer",
+              "credit_reseller",
+              "reject",
+              "contest_chargeback",
+              "accept_chargeback",
+              null
             ]
           },
           "recommended_amount": {
@@ -32168,22 +32806,19 @@
             "format": "date-time"
           },
           "outcome": {
-            "anyOf": [
-              {
-                "type": "string",
-                "description": "What was done, once resolved.",
-                "enum": [
-                  "resolved_by_reseller",
-                  "refunded_customer",
-                  "credited_reseller",
-                  "rejected",
-                  "chargeback_won",
-                  "chargeback_lost"
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What was done, once resolved.",
+            "enum": [
+              "resolved_by_reseller",
+              "refunded_customer",
+              "credited_reseller",
+              "rejected",
+              "chargeback_won",
+              "chargeback_lost",
+              null
             ]
           },
           "outcome_amount": {
@@ -32224,239 +32859,6 @@
               "$ref": "#/components/schemas/DisputeMessage"
             },
             "description": "Every message, oldest first, staff notes included."
-          }
-        }
-      },
-      "DisputeSummary": {
-        "type": "object",
-        "title": "DisputeSummary",
-        "description": "A dispute, without its messages.",
-        "required": [
-          "object",
-          "id",
-          "reference",
-          "mode",
-          "kind",
-          "topic",
-          "status",
-          "subject",
-          "customer_reference",
-          "customer_id",
-          "order_id",
-          "payment_id",
-          "checkout_id",
-          "chargeback_id",
-          "currency",
-          "recommendation",
-          "recommended_amount",
-          "report",
-          "escalated_at",
-          "outcome",
-          "outcome_amount",
-          "outcome_note",
-          "resolved_at",
-          "created_at",
-          "updated_at"
-        ],
-        "additionalProperties": false,
-        "properties": {
-          "object": {
-            "type": "string",
-            "description": "Always `dispute`.",
-            "const": "dispute"
-          },
-          "id": {
-            "type": "string",
-            "description": "Dispute ID.",
-            "format": "uuid"
-          },
-          "reference": {
-            "type": "string",
-            "description": "The reference people quote, for example `D-000123`."
-          },
-          "mode": {
-            "type": "string",
-            "description": "`test` (sandbox) or `live`.",
-            "enum": [
-              "test",
-              "live"
-            ]
-          },
-          "kind": {
-            "type": "string",
-            "description": "`customer` (a customer’s, for you to investigate), `reseller` (yours with BitoCard) or `chargeback` (a card payment disputed with the bank).",
-            "enum": [
-              "customer",
-              "reseller",
-              "chargeback"
-            ]
-          },
-          "topic": {
-            "type": "string",
-            "description": "What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`.",
-            "enum": [
-              "order",
-              "payment",
-              "funding",
-              "trade",
-              "other"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "description": "`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.",
-            "enum": [
-              "open",
-              "escalated",
-              "contested",
-              "resolved"
-            ]
-          },
-          "subject": {
-            "type": "string",
-            "description": "A short summary."
-          },
-          "customer_reference": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Your own reference for the customer, if any."
-          },
-          "customer_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The store customer, for disputes raised on your hosted store.",
-            "format": "uuid"
-          },
-          "order_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The order it is about, if any.",
-            "format": "uuid"
-          },
-          "payment_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The payment it is about (a top-up or a store payment), if any.",
-            "format": "uuid"
-          },
-          "checkout_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The store checkout it is about, if any.",
-            "format": "uuid"
-          },
-          "chargeback_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The chargeback, for `kind: chargeback`.",
-            "format": "uuid"
-          },
-          "currency": {
-            "type": "string",
-            "description": "Currency of amounts on the dispute (ISO 4217)."
-          },
-          "recommendation": {
-            "anyOf": [
-              {
-                "type": "string",
-                "description": "What you recommended when escalating.",
-                "enum": [
-                  "refund_customer",
-                  "credit_reseller",
-                  "reject",
-                  "contest_chargeback",
-                  "accept_chargeback"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "recommended_amount": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "description": "For `credit_reseller`: the amount you recommended, in minor units of `currency`."
-          },
-          "report": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Your report when escalating."
-          },
-          "escalated_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "When it was escalated to BitoCard.",
-            "format": "date-time"
-          },
-          "outcome": {
-            "anyOf": [
-              {
-                "type": "string",
-                "description": "What was done, once resolved.",
-                "enum": [
-                  "resolved_by_reseller",
-                  "refunded_customer",
-                  "credited_reseller",
-                  "rejected",
-                  "chargeback_won",
-                  "chargeback_lost"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "outcome_amount": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "description": "For `credited_reseller`: the amount credited, in minor units of `currency`."
-          },
-          "outcome_note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The note with the decision."
-          },
-          "resolved_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "When it was resolved.",
-            "format": "date-time"
-          },
-          "created_at": {
-            "type": "string",
-            "description": "When it was opened.",
-            "format": "date-time"
-          },
-          "updated_at": {
-            "type": "string",
-            "description": "When it last changed (a message, an escalation or a decision).",
-            "format": "date-time"
           }
         }
       },
@@ -33743,6 +34145,630 @@
                     "currency": null,
                     "failure_reason": null,
                     "created_at": "2026-10-08T12:01:44.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "dispute.opened": {
+      "post": {
+        "operationId": "webhook_dispute_opened",
+        "summary": "A dispute was opened",
+        "description": "Fires once when a dispute is opened: by a customer on your hosted store (`kind: customer`, `status: open`), by you through SHQ or `POST /v1/disputes`, or by a chargeback on one of your payments (`kind: chargeback`). Your own disputes with BitoCard (`kind: reseller`) start `escalated`.\n\nInvestigate `open` disputes: answer the customer, then resolve them or escalate them to BitoCard with your recommendation. The messages are not in the event: read them with `GET /v1/disputes/{id}`.\n\nDoes not fire again for the same dispute: later changes are their own events.\n\nNothing comes before it. Followed by `dispute.message_received`, `dispute.escalated` or `dispute.resolved`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeOpenedEvent"
+              },
+              "example": {
+                "id": "e5f6a7b8-c9d0-4e1f-8a2b-4c5d6e7f8a9b",
+                "object": "event",
+                "type": "dispute.opened",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T09:14:02.000Z",
+                "data": {
+                  "object": {
+                    "object": "dispute",
+                    "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                    "reference": "D-000123",
+                    "mode": "live",
+                    "kind": "customer",
+                    "topic": "order",
+                    "status": "open",
+                    "subject": "Gift card code says already used",
+                    "customer_reference": null,
+                    "customer_id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                    "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "checkout_id": "8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2918",
+                    "chargeback_id": null,
+                    "currency": "NGN",
+                    "recommendation": null,
+                    "recommended_amount": null,
+                    "report": null,
+                    "escalated_at": null,
+                    "outcome": null,
+                    "outcome_amount": null,
+                    "outcome_note": null,
+                    "resolved_at": null,
+                    "created_at": "2026-10-08T09:14:02.000Z",
+                    "updated_at": "2026-10-08T09:14:02.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "dispute.message_received": {
+      "post": {
+        "operationId": "webhook_dispute_message_received",
+        "summary": "A dispute has a new message",
+        "description": "Fires for each message the customer or BitoCard adds to one of your disputes. Read it with `GET /v1/disputes/{id}`; the text is never in the event.\n\nDoes not fire for your own messages, nor for BitoCard’s note with a decision or a return (`dispute.resolved`, `dispute.contested`, `dispute.returned` carry those).\n\nComes after `dispute.opened`. Can come any number of times before `dispute.resolved`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeMessageReceivedEvent"
+              },
+              "example": {
+                "id": "f6a7b8c9-d0e1-4f2a-9b3c-5d6e7f8a9b0c",
+                "object": "event",
+                "type": "dispute.message_received",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T10:20:11.000Z",
+                "data": {
+                  "object": {
+                    "object": "dispute",
+                    "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                    "reference": "D-000123",
+                    "mode": "live",
+                    "kind": "customer",
+                    "topic": "order",
+                    "status": "open",
+                    "subject": "Gift card code says already used",
+                    "customer_reference": null,
+                    "customer_id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                    "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "checkout_id": "8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2918",
+                    "chargeback_id": null,
+                    "currency": "NGN",
+                    "recommendation": null,
+                    "recommended_amount": null,
+                    "report": null,
+                    "escalated_at": null,
+                    "outcome": null,
+                    "outcome_amount": null,
+                    "outcome_note": null,
+                    "resolved_at": null,
+                    "created_at": "2026-10-08T09:14:02.000Z",
+                    "updated_at": "2026-10-08T10:20:11.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "dispute.escalated": {
+      "post": {
+        "operationId": "webhook_dispute_escalated",
+        "summary": "A dispute was escalated to BitoCard",
+        "description": "Fires once each time you (or a team member) escalate a dispute to BitoCard with a report and a recommendation (`recommendation`, `report`). BitoCard now decides it.\n\nDoes not fire for disputes that start with BitoCard (`kind: reseller`): `dispute.opened` shows them `escalated`.\n\nComes after `dispute.opened` or `dispute.returned`. Followed by `dispute.resolved`, `dispute.contested` or `dispute.returned`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeEscalatedEvent"
+              },
+              "example": {
+                "id": "07b8c9d0-e1f2-4a3b-8c4d-6e7f8a9b0c1d",
+                "object": "event",
+                "type": "dispute.escalated",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T11:02:40.000Z",
+                "data": {
+                  "object": {
+                    "object": "dispute",
+                    "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                    "reference": "D-000123",
+                    "mode": "live",
+                    "kind": "customer",
+                    "topic": "order",
+                    "status": "escalated",
+                    "subject": "Gift card code says already used",
+                    "customer_reference": null,
+                    "customer_id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                    "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "checkout_id": "8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2918",
+                    "chargeback_id": null,
+                    "currency": "NGN",
+                    "recommendation": "refund_customer",
+                    "recommended_amount": null,
+                    "report": "The customer tried the code within the hour; the supplier confirms it was used elsewhere.",
+                    "escalated_at": "2026-10-08T11:02:40.000Z",
+                    "outcome": null,
+                    "outcome_amount": null,
+                    "outcome_note": null,
+                    "resolved_at": null,
+                    "created_at": "2026-10-08T09:14:02.000Z",
+                    "updated_at": "2026-10-08T11:02:40.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "dispute.returned": {
+      "post": {
+        "operationId": "webhook_dispute_returned",
+        "summary": "BitoCard sent a dispute back to you",
+        "description": "Fires when BitoCard sends an escalated dispute back to you to investigate further. It is `open` again; BitoCard’s note on what is missing is its latest message.\n\nDoes not fire for your own disputes with BitoCard, which it always decides itself.\n\nComes after `dispute.escalated`. Followed by `dispute.escalated` again, or `dispute.resolved` if you settle it yourself.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeReturnedEvent"
+              },
+              "example": {
+                "id": "18c9d0e1-f2a3-4b4c-9d5e-7f8a9b0c1d2e",
+                "object": "event",
+                "type": "dispute.returned",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T12:15:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "dispute",
+                    "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                    "reference": "D-000123",
+                    "mode": "live",
+                    "kind": "customer",
+                    "topic": "order",
+                    "status": "open",
+                    "subject": "Gift card code says already used",
+                    "customer_reference": null,
+                    "customer_id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                    "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "checkout_id": "8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2918",
+                    "chargeback_id": null,
+                    "currency": "NGN",
+                    "recommendation": "refund_customer",
+                    "recommended_amount": null,
+                    "report": "The customer tried the code within the hour; the supplier confirms it was used elsewhere.",
+                    "escalated_at": null,
+                    "outcome": null,
+                    "outcome_amount": null,
+                    "outcome_note": null,
+                    "resolved_at": null,
+                    "created_at": "2026-10-08T09:14:02.000Z",
+                    "updated_at": "2026-10-08T12:15:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "dispute.contested": {
+      "post": {
+        "operationId": "webhook_dispute_contested",
+        "summary": "BitoCard is contesting a chargeback",
+        "description": "Fires once when BitoCard decides to contest a chargeback (`kind: chargeback`, `status: contested`). The disputed amount stays held from your wallet until the card network decides.\n\nDoes not fire for accepted chargebacks (`dispute.resolved` with `outcome: chargeback_lost`).\n\nComes after `dispute.escalated`. Followed by `dispute.resolved` with `outcome: chargeback_won` or `chargeback_lost`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeContestedEvent"
+              },
+              "example": {
+                "id": "29d0e1f2-a3b4-4c5d-8e6f-8a9b0c1d2e3f",
+                "object": "event",
+                "type": "dispute.contested",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T13:00:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "dispute",
+                    "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                    "reference": "D-000123",
+                    "mode": "live",
+                    "kind": "chargeback",
+                    "topic": "funding",
+                    "status": "contested",
+                    "subject": "Chargeback of ₦5,000.00",
+                    "customer_reference": null,
+                    "customer_id": null,
+                    "order_id": null,
+                    "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "checkout_id": null,
+                    "chargeback_id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                    "currency": "NGN",
+                    "recommendation": "contest_chargeback",
+                    "recommended_amount": null,
+                    "report": "This was my own card; the payment was mine.",
+                    "escalated_at": "2026-10-08T11:02:40.000Z",
+                    "outcome": null,
+                    "outcome_amount": null,
+                    "outcome_note": "Evidence submitted to the card network.",
+                    "resolved_at": null,
+                    "created_at": "2026-10-08T09:14:02.000Z",
+                    "updated_at": "2026-10-08T13:00:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "dispute.resolved": {
+      "post": {
+        "operationId": "webhook_dispute_resolved",
+        "summary": "A dispute was resolved",
+        "description": "Fires once when a dispute is closed, with `outcome`: `resolved_by_reseller` (you resolved it), `refunded_customer` (BitoCard refunded the customer: `order.refunded` also fires), `credited_reseller` (BitoCard credited your wallet, `outcome_amount`), `rejected`, or for chargebacks `chargeback_won` or `chargeback_lost` (the card network’s decision).\n\nDoes not fire again: a resolved dispute takes no more messages.\n\nComes after `dispute.opened`, `dispute.escalated` or `dispute.contested`. Nothing follows it.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeResolvedEvent"
+              },
+              "example": {
+                "id": "3ae1f2a3-b4c5-4d6e-9f7a-9b0c1d2e3f4a",
+                "object": "event",
+                "type": "dispute.resolved",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-08T14:30:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "dispute",
+                    "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                    "reference": "D-000123",
+                    "mode": "live",
+                    "kind": "customer",
+                    "topic": "order",
+                    "status": "resolved",
+                    "subject": "Gift card code says already used",
+                    "customer_reference": null,
+                    "customer_id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                    "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                    "checkout_id": "8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2918",
+                    "chargeback_id": null,
+                    "currency": "NGN",
+                    "recommendation": "refund_customer",
+                    "recommended_amount": null,
+                    "report": "The customer tried the code within the hour; the supplier confirms it was used elsewhere.",
+                    "escalated_at": "2026-10-08T11:02:40.000Z",
+                    "outcome": "refunded_customer",
+                    "outcome_amount": null,
+                    "outcome_note": "Refunded in full: the code was used before delivery.",
+                    "resolved_at": "2026-10-08T14:30:00.000Z",
+                    "created_at": "2026-10-08T09:14:02.000Z",
+                    "updated_at": "2026-10-08T14:30:00.000Z"
                   }
                 }
               }

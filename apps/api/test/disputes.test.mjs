@@ -212,6 +212,34 @@ describe('a customer’s dispute: the reseller investigates, BitoCard decides', 
     assert.deepEqual([rejected.json.status, rejected.json.outcome], ['resolved', 'rejected']);
   });
 
+  test('every change the reseller did not make sends them an event, recorded with the change and matching its schema', async () => {
+    const store = await resellerStore([product]);
+    const shopper = await customer(store.subdomain);
+    const bought = await boughtAt(shopper, product);
+    const opened = (await shopper.post('/v1/store/account/disputes', { checkout_id: bought.id, subject: 'Wrong card', message: 'I got the wrong card.' })).json;
+    await shopper.post(`/v1/store/account/disputes/${opened.id}/messages`, { body: 'Any news?' });
+    await store.browser.post(`/v1/disputes/${opened.id}/messages`, { body: 'Checking now.' });
+    await store.browser.post(`/v1/disputes/${opened.id}/escalate`, { recommendation: 'reject', report: 'The customer chose this card at checkout.' });
+    await admin.post(`/v1/admin/disputes/${opened.id}/messages`, { body: 'Looking at it.', visibility: 'staff' });
+    await admin.post(`/v1/admin/disputes/${opened.id}/return`, { note: 'Attach the checkout details.' });
+    await store.browser.post(`/v1/disputes/${opened.id}/escalate`, { recommendation: 'reject', report: 'Checkout details: the customer chose this card.' });
+    await admin.post(`/v1/admin/disputes/${opened.id}/execute`, { action: 'reject', note: 'Chosen at checkout.' });
+
+    const events = (await prisma.event.findMany({ where: { resellerId: store.resellerId, type: { startsWith: 'dispute.' } }, orderBy: { createdAt: 'asc' } })).map(row => JSON.parse(row.payload));
+    assert.deepEqual(
+      events.map(event => event.type),
+      ['dispute.opened', 'dispute.message_received', 'dispute.escalated', 'dispute.message_received', 'dispute.returned', 'dispute.escalated', 'dispute.resolved'],
+      'never for the reseller’s own messages',
+    );
+    const validate = check.compile({ $ref: '#/components/schemas/DisputeSummary' });
+    for (const event of events) {
+      assert.ok(validate(event.data.object), `${event.type}: ${JSON.stringify(validate.errors)}`);
+      assert.equal(event.data.object.id, opened.id);
+      assert.ok(!JSON.stringify(event).includes('Any news?'), 'messages are never in events');
+    }
+    assert.deepEqual([events.at(-1).data.object.status, events.at(-1).data.object.outcome], ['resolved', 'rejected']);
+  });
+
   test('at BitoCard’s own store, BitoCard is the store: a dispute goes straight to BitoCard', async () => {
     const shopper = await customer();
     const bought = await boughtAt(shopper, product);
@@ -281,6 +309,8 @@ describe('chargebacks open a dispute for the reseller', () => {
     stripe.state.disputes[disputeId].status = 'won';
     await stripeWebhook({ type: 'charge.dispute.closed', data: { object: { id: disputeId, object: 'dispute' } } });
     const decided = (await reseller.browser.get(`/v1/disputes/${dispute.id}`)).json;
+    const types = (await prisma.event.findMany({ where: { resellerId: reseller.resellerId, type: { startsWith: 'dispute.' } }, orderBy: { createdAt: 'asc' } })).map(row => row.type);
+    assert.deepEqual(types, ['dispute.opened', 'dispute.escalated', 'dispute.contested', 'dispute.resolved']);
     assert.deepEqual([decided.status, decided.outcome], ['resolved', 'chargeback_won']);
     assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 400_000, 'the hold came back');
   });

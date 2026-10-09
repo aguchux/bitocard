@@ -526,7 +526,7 @@ Update the legals app before each of these goes live (full list in `AGENTS.md`):
 - Wallets, reserved accounts and top-ups: take legal advice per country on holding customer balances (e-money or payments licensing, or a licensed partner) before enabling customer wallets.
 - Hosted storefront customers: customer sale terms in BitoCard's name (BitoCard is the seller of record), and an agreement with resellers setting out who is controller of which customer data. As the seller, BitoCard is likely a controller of transaction data, not only a processor for the reseller.
 - Premium plan, startup allowance and welcome bonus terms.
-- Disputes: what a dispute keeps and who sees it (privacy notice), and how disputes and refunds are handled (customer sale terms).
+- Disputes: published on 9 October 2026 in the privacy notice and the terms of use (Problems with an order); still owed in the customer terms of sale and the reseller terms.
 - eSIM terms; software terms (licence pass-through, refunds, activation); virtual number terms and regulatory documents.
 - The Africa-wide waitlist privacy notice (on hold until Legals supplies the text).
 

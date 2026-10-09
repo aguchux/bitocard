@@ -9,6 +9,9 @@ import { WalletService } from '../ledger/wallet.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { OrdersService } from '../orders/orders.service.js';
+import type { Tx } from '../ledger/ledger.service.js';
+import { EventsService } from '../webhooks/events.service.js';
+import type { EventType } from '../webhooks/events.js';
 import { ChargebacksService } from '../payments/chargebacks.service.js';
 
 export const disputeKinds = ['customer', 'reseller', 'chargeback'] as const;
@@ -25,6 +28,8 @@ export type DisputeAction = (typeof disputeActions)[number];
 export type MessageVisibility = (typeof messageVisibilities)[number];
 type Audience = 'customer' | 'reseller' | 'admin';
 type DisputeWithMessages = Dispute & { messages: DisputeMessage[] };
+type DisputeEvent = Extract<EventType, `dispute.${string}`>;
+type NewMessage = { author: Author; body: string; visibility: MessageVisibility };
 
 /** Actions that move money: only BitoCard's finance admins execute them. */
 const moneyActions = new Set<DisputeAction>(['refund_customer', 'credit_reseller', 'contest_chargeback', 'accept_chargeback']);
@@ -103,14 +108,15 @@ export function presentDispute(dispute: DisputeWithMessages, audience: Audience)
   };
 }
 
-/** A dispute in a list: no messages. */
-function presentSummary(dispute: Dispute, audience: Audience) {
+/** A dispute in a list and in its events: no messages. */
+export function presentSummary(dispute: Dispute, audience: Audience) {
   const presented: Partial<ReturnType<typeof presentDispute>> = presentDispute({ ...dispute, messages: [] }, audience);
   delete presented.messages;
   return presented;
 }
 
 type Author = { kind: 'customer' | 'reseller' | 'bitocard' | 'system'; id: string | null; name: string | null };
+const system: Author = { kind: 'system', id: null, name: null };
 
 /**
  * Disputes. A store customer opens one about their order (or the reseller logs one for a customer on their own
@@ -131,6 +137,7 @@ export class DisputesService {
     private readonly chargebacks: ChargebacksService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly events: EventsService,
   ) {
     // Chargebacks open and close their disputes (registered here: chargebacks cannot depend on disputes).
     chargebacks.onDispute({ opened: (chargeback, payment) => this.openForChargeback(chargeback, payment), decided: (chargeback, outcome) => this.chargebackDecided(chargeback, outcome) });
@@ -189,7 +196,7 @@ export class DisputesService {
     const dispute = await this.load({ id, customerId: customer.id });
     if (!dispute) throw notFound();
     if (dispute.status === 'resolved') throw conflict('dispute_resolved', 'This dispute is closed. Open a new one if you still need help.');
-    await this.addMessage(dispute.id, { kind: 'customer', id: customer.id, name: customer.name }, body, 'all');
+    await this.addMessage(dispute.id, { kind: 'customer', id: customer.id, name: customer.name }, body, 'all', true);
     if (dispute.status === 'open') await this.tellReseller(dispute, 'dispute.updated', 'The customer replied', `${disputeReference(dispute.number)}: ${dispute.subject}`);
     else await this.tellAdmins(dispute, 'admin.dispute.updated');
     return presentDispute((await this.load({ id }))!, 'customer');
@@ -268,19 +275,21 @@ export class DisputesService {
     const dispute = await this.owned(resellerId, mode, id);
     if (dispute.status !== 'open') throw conflict('dispute_not_open', 'Only a dispute still with you can be escalated.');
     this.checkAction(dispute, input.recommendation, input.amount, 'recommendation');
-    const claimed = await this.prisma.dispute.updateMany({
-      where: { id, status: 'open' },
-      data: {
+    const claimed = await this.transition(
+      id,
+      { status: 'open' },
+      {
         status: 'escalated',
         escalatedAt: new Date(),
         recommendation: input.recommendation,
         recommendedAmountMinor: input.amount === undefined ? null : BigInt(input.amount),
         report: input.report.trim(),
       },
-    });
-    if (claimed.count === 0) throw conflict('dispute_not_open', 'Only a dispute still with you can be escalated.');
-    await this.addMessage(id, { kind: 'system', id: null, name: null }, `Escalated to BitoCard by ${author.name ?? 'the store'}. Recommendation: ${actionLabel(input.recommendation)}.`, 'staff');
-    if (dispute.customerId) await this.addMessage(id, { kind: 'system', id: null, name: null }, 'The store has passed your dispute to BitoCard to decide.', 'all');
+      'dispute.escalated',
+      { author: system, body: `Escalated to BitoCard by ${author.name ?? 'the store'}. Recommendation: ${actionLabel(input.recommendation)}.`, visibility: 'staff' },
+    );
+    if (!claimed) throw conflict('dispute_not_open', 'Only a dispute still with you can be escalated.');
+    if (dispute.customerId) await this.addMessage(id, system, 'The store has passed your dispute to BitoCard to decide.', 'all');
     const after = (await this.load({ id }))!;
     await this.tellAdmins(after, 'admin.dispute.escalated');
     if (after.customerId) await this.tellCustomer(after, 'Your dispute is with BitoCard');
@@ -291,12 +300,14 @@ export class DisputesService {
   async resolveAsReseller(resellerId: string, mode: LedgerMode, id: string, author: Author, input: { note: string }) {
     const dispute = await this.owned(resellerId, mode, id);
     if (dispute.kind !== 'customer') throw conflict('escalation_required', 'Chargebacks and disputes with BitoCard are decided by BitoCard: escalate them.');
-    const claimed = await this.prisma.dispute.updateMany({
-      where: { id, status: 'open' },
-      data: { status: 'resolved', outcome: 'resolved_by_reseller', outcomeNote: input.note.trim(), resolvedAt: new Date() },
-    });
-    if (claimed.count === 0) throw conflict('dispute_not_open', 'Only a dispute still with you can be resolved by you.');
-    await this.addMessage(id, author, input.note, 'all');
+    const claimed = await this.transition(
+      id,
+      { status: 'open' },
+      { status: 'resolved', outcome: 'resolved_by_reseller', outcomeNote: input.note.trim(), resolvedAt: new Date() },
+      'dispute.resolved',
+      { author, body: input.note, visibility: 'all' },
+    );
+    if (!claimed) throw conflict('dispute_not_open', 'Only a dispute still with you can be resolved by you.');
     const after = (await this.load({ id }))!;
     if (after.customerId) await this.tellCustomer(after, 'Your dispute is resolved');
     return presentDispute(after, 'reseller');
@@ -318,7 +329,7 @@ export class DisputesService {
     const dispute = await this.load({ id });
     if (!dispute) throw notFound();
     const visibility = input.visibility ?? 'all';
-    await this.addMessage(id, author, input.body, visibility);
+    await this.addMessage(id, author, input.body, visibility, true);
     await this.tellReseller(dispute, 'dispute.updated', 'BitoCard replied', `${disputeReference(dispute.number)}: ${dispute.subject}`);
     if (visibility === 'all' && dispute.customerId) await this.tellCustomer(dispute, 'BitoCard replied to your dispute');
     return presentDispute((await this.load({ id }))!, 'admin');
@@ -329,9 +340,8 @@ export class DisputesService {
     const before = await this.load({ id });
     if (!before) throw notFound();
     if (before.kind === 'reseller' || (await this.houseAccount(before.resellerId))) throw conflict('not_returnable', 'This dispute is BitoCard’s to decide.');
-    const claimed = await this.prisma.dispute.updateMany({ where: { id, status: 'escalated' }, data: { status: 'open', escalatedAt: null } });
-    if (claimed.count === 0) throw conflict('dispute_not_escalated', 'Only an escalated dispute can be sent back.');
-    await this.addMessage(id, author, note, 'staff');
+    const claimed = await this.transition(id, { status: 'escalated' }, { status: 'open', escalatedAt: null }, 'dispute.returned', { author, body: note, visibility: 'staff' });
+    if (!claimed) throw conflict('dispute_not_escalated', 'Only an escalated dispute can be sent back.');
     const after = (await this.load({ id }))!;
     await this.audit.record({ actorId, action: 'dispute.returned', targetType: 'dispute', targetId: id, before: presentDispute(before, 'admin'), after: { status: after.status, note } });
     await this.tellReseller(after, 'dispute.updated', 'BitoCard sent a dispute back to you', `${disputeReference(after.number)}: ${note}`);
@@ -374,14 +384,14 @@ export class DisputesService {
       await this.prisma.dispute.updateMany({ where: { id }, data: { status: 'escalated' } });
       throw error;
     }
-    await this.prisma.dispute.update({
-      where: { id },
-      data:
-        input.action === 'contest_chargeback'
-          ? { outcomeNote: note }
-          : { outcome, outcomeAmountMinor: amount, outcomeNote: note, resolvedAt: new Date() },
-    });
-    await this.addMessage(id, { kind: 'bitocard', id: actor.id, name: actor.name }, note, 'all');
+    const contested = input.action === 'contest_chargeback';
+    await this.transition(
+      id,
+      {},
+      contested ? { outcomeNote: note } : { outcome, outcomeAmountMinor: amount, outcomeNote: note, resolvedAt: new Date() },
+      contested ? 'dispute.contested' : 'dispute.resolved',
+      { author: { kind: 'bitocard', id: actor.id, name: actor.name }, body: note, visibility: 'all' },
+    );
     const after = (await this.load({ id }))!;
     await this.audit.record({ actorId: actor.id, action: `dispute.${input.action}`, targetType: 'dispute', targetId: id, before: presentDispute(before, 'admin'), after: presentDispute(after, 'admin') });
     const title = input.action === 'contest_chargeback' ? 'BitoCard is contesting a chargeback' : `BitoCard decided ${disputeReference(after.number)}`;
@@ -439,30 +449,58 @@ export class DisputesService {
   async chargebackDecided(chargeback: Chargeback, outcome: 'won' | 'lost') {
     const dispute = await this.prisma.dispute.findUnique({ where: { chargebackId: chargeback.id } });
     if (!dispute || dispute.status === 'resolved') return;
-    const claimed = await this.prisma.dispute.updateMany({
-      where: { id: dispute.id, status: { not: 'resolved' } },
-      data: { status: 'resolved', outcome: outcome === 'won' ? 'chargeback_won' : 'chargeback_lost', resolvedAt: new Date() },
-    });
-    if (claimed.count === 0) return;
-    await this.addMessage(dispute.id, { kind: 'system', id: null, name: null }, outcome === 'won' ? 'The card network decided for the merchant: the chargeback is won.' : 'The card network decided for the cardholder: the chargeback is lost.', 'staff');
+    const claimed = await this.transition(
+      dispute.id,
+      { status: { not: 'resolved' } },
+      { status: 'resolved', outcome: outcome === 'won' ? 'chargeback_won' : 'chargeback_lost', resolvedAt: new Date() },
+      'dispute.resolved',
+      { author: system, body: outcome === 'won' ? 'The card network decided for the merchant: the chargeback is won.' : 'The card network decided for the cardholder: the chargeback is lost.', visibility: 'staff' },
+    );
+    if (!claimed) return;
     await this.tellReseller(dispute, 'dispute.updated', `Chargeback ${outcome}`, `${disputeReference(dispute.number)}: ${dispute.subject}`);
   }
 
   // -- Shared ------------------------------------------------------------------------------------------------------
 
+  /** A new dispute with its first message, and its `dispute.opened` event, in one transaction. */
   private async create(data: Omit<Prisma.DisputeUncheckedCreateInput, 'subject'> & { subject: string }, author: Author, message: string, visibility: MessageVisibility = 'all') {
-    return this.prisma.$transaction(async tx => {
+    const created = await this.prisma.$transaction(async tx => {
       const dispute = await tx.dispute.create({ data: { ...data, subject: data.subject.trim().slice(0, 200) } });
       await tx.disputeMessage.create({ data: { disputeId: dispute.id, author: author.kind, authorId: author.id, authorName: author.name, body: message.trim(), visibility } });
+      await this.recordEvent(tx, dispute.id, 'dispute.opened');
       return tx.dispute.findUniqueOrThrow({ where: { id: dispute.id }, include: { messages: { orderBy: { createdAt: 'asc' } } } });
     });
+    this.events.committed();
+    return created;
   }
 
-  private async addMessage(disputeId: string, author: Author, body: string, visibility: MessageVisibility) {
-    await this.prisma.$transaction([
-      this.prisma.disputeMessage.create({ data: { disputeId, author: author.kind, authorId: author.id, authorName: author.name, body: body.trim(), visibility } }),
-      this.prisma.dispute.update({ where: { id: disputeId }, data: { updatedAt: new Date() } }),
-    ]);
+  /**
+   * A change of state, claimed on its current state (`where`) so it happens once, with the message that goes with it
+   * and the reseller's event, all in one transaction. False when the dispute was not in that state.
+   */
+  private async transition(id: string, where: Prisma.DisputeWhereInput, data: Prisma.DisputeUpdateManyMutationInput, type: DisputeEvent | null, message?: NewMessage) {
+    const done = await this.prisma.$transaction(async tx => {
+      const claimed = await tx.dispute.updateMany({ where: { id, ...where }, data: { ...data, updatedAt: new Date() } });
+      if (claimed.count === 0) return false;
+      if (message) {
+        await tx.disputeMessage.create({ data: { disputeId: id, author: message.author.kind, authorId: message.author.id, authorName: message.author.name, body: message.body.trim(), visibility: message.visibility } });
+      }
+      if (type) await this.recordEvent(tx, id, type);
+      return true;
+    });
+    if (done && type) this.events.committed();
+    return done;
+  }
+
+  /** A message on its own; `notify` records `dispute.message_received` (messages from the customer or BitoCard). */
+  private async addMessage(disputeId: string, author: Author, body: string, visibility: MessageVisibility, notify = false) {
+    await this.transition(disputeId, {}, {}, notify ? 'dispute.message_received' : null, { author, body, visibility });
+  }
+
+  /** The reseller's event: the dispute as they see it in a list (never the messages). */
+  private async recordEvent(tx: Tx, id: string, type: DisputeEvent) {
+    const dispute = await tx.dispute.findUniqueOrThrow({ where: { id } });
+    await this.events.record(tx, { resellerId: dispute.resellerId, mode: dispute.mode, type, object: presentSummary(dispute, 'reseller') });
   }
 
   private async page(where: Prisma.DisputeWhereInput, page: { limit?: number; starting_after?: string }, audience: Audience, orderBy: Prisma.DisputeOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'desc' }]) {

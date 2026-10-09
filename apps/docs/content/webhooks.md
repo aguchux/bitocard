@@ -316,5 +316,6 @@ Each event has an `api_version` (currently `2026-10-01`).
 
 ## Changelog
 
+- **2026-10-09:** Added `dispute.opened`, `dispute.message_received`, `dispute.escalated`, `dispute.returned`, `dispute.contested` and `dispute.resolved` (new event types; same payload version).
 - **2026-10-07:** Added `customer_verification.approved` and `customer_verification.declined` (new event types; same payload version).
 - **2026-10-01:** First version: `order.completed`, `order.failed`, `order.refunded`, `top_up.succeeded`, `top_up.failed`, `payout.paid`, `payout.failed`, and the `ping` test event.

@@ -16,6 +16,12 @@ export const eventTypes = [
   'number.expired',
   'number.deleted',
   'number.sms_received',
+  'dispute.opened',
+  'dispute.message_received',
+  'dispute.escalated',
+  'dispute.returned',
+  'dispute.contested',
+  'dispute.resolved',
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

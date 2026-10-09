@@ -139,6 +139,75 @@ export const eventObjectSchemas: Record<string, Schema> = {
     created_at: time('When the check started.'),
     decided_at: nullableTime('When it was decided.'),
   }),
+  DisputeSummary: {
+    ...objectSchema('Dispute', {
+      object: str('Always `dispute`.', { const: 'dispute' }),
+      id: str('Dispute ID.', { format: 'uuid' }),
+      reference: str('The reference people quote, for example `D-000123`.'),
+      mode,
+      kind: str('`customer` (a customer’s, for you to investigate), `reseller` (yours with BitoCard) or `chargeback` (a card payment disputed with the bank).', { enum: ['customer', 'reseller', 'chargeback'] }),
+      topic: str('What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`.', { enum: ['order', 'payment', 'funding', 'trade', 'other'] }),
+      status: str('`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.', { enum: ['open', 'escalated', 'contested', 'resolved'] }),
+      subject: str('A short summary.'),
+      customer_reference: nullableStr('Your own reference for the customer, if any.'),
+      customer_id: nullableStr('The store customer, for disputes raised on your hosted store.', { format: 'uuid' }),
+      order_id: nullableStr('The order it is about, if any.', { format: 'uuid' }),
+      payment_id: nullableStr('The payment it is about (a top-up or a store payment), if any.', { format: 'uuid' }),
+      checkout_id: nullableStr('The store checkout it is about, if any.', { format: 'uuid' }),
+      chargeback_id: nullableStr('The chargeback, for `kind: chargeback`.', { format: 'uuid' }),
+      currency: str('Currency of amounts on the dispute (ISO 4217).'),
+      recommendation: nullableStr('What you recommended when escalating.', { enum: ['refund_customer', 'credit_reseller', 'reject', 'contest_chargeback', 'accept_chargeback', null] }),
+      recommended_amount: { type: ['integer', 'null'], description: 'For `credit_reseller`: the amount you recommended, in minor units of `currency`.' },
+      report: nullableStr('Your report when escalating.'),
+      escalated_at: nullableTime('When it was escalated to BitoCard.'),
+      outcome: nullableStr('What was done, once resolved.', { enum: ['resolved_by_reseller', 'refunded_customer', 'credited_reseller', 'rejected', 'chargeback_won', 'chargeback_lost', null] }),
+      outcome_amount: { type: ['integer', 'null'], description: 'For `credited_reseller`: the amount credited, in minor units of `currency`.' },
+      outcome_note: nullableStr('The note with the decision.'),
+      resolved_at: nullableTime('When it was resolved.'),
+      created_at: time('When it was opened.'),
+      updated_at: time('When it last changed (a message, an escalation or a decision).'),
+    }),
+    description: 'A dispute, without its messages (read them with `GET /v1/disputes/{id}`).',
+    additionalProperties: false,
+  },
+};
+
+/** A dispute as events and lists carry it. */
+export const exampleDispute = (extra: Schema = {}) => ({
+  object: 'dispute',
+  id: '3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9',
+  reference: 'D-000123',
+  mode: 'live',
+  kind: 'customer',
+  topic: 'order',
+  status: 'open',
+  subject: 'Gift card code says already used',
+  customer_reference: null,
+  customer_id: '6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d',
+  order_id: '2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21',
+  payment_id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+  checkout_id: '8f7e6d5c-4b3a-4291-8f7e-6d5c4b3a2918',
+  chargeback_id: null,
+  currency: 'NGN',
+  recommendation: null,
+  recommended_amount: null,
+  report: null,
+  escalated_at: null,
+  outcome: null,
+  outcome_amount: null,
+  outcome_note: null,
+  resolved_at: null,
+  created_at: '2026-10-08T09:14:02.000Z',
+  updated_at: '2026-10-08T09:14:02.000Z',
+  ...extra,
+});
+
+const escalatedDispute = {
+  status: 'escalated',
+  recommendation: 'refund_customer',
+  report: 'The customer tried the code within the hour; the supplier confirms it was used elsewhere.',
+  escalated_at: '2026-10-08T11:02:40.000Z',
+  updated_at: '2026-10-08T11:02:40.000Z',
 };
 
 const exampleOrder = (status: string, extra: Schema = {}) => ({
@@ -383,6 +452,88 @@ export const eventDocs: Record<EventType, EventDoc> = {
     ].join('\n\n'),
     example: exampleNumberMessage,
   },
+  'dispute.opened': {
+    schema: 'DisputeSummary',
+    summary: 'A dispute was opened',
+    description: [
+      'Fires once when a dispute is opened: by a customer on your hosted store (`kind: customer`, `status: open`), by you through SHQ or `POST /v1/disputes`, or by a chargeback on one of your payments (`kind: chargeback`). Your own disputes with BitoCard (`kind: reseller`) start `escalated`.',
+      'Investigate `open` disputes: answer the customer, then resolve them or escalate them to BitoCard with your recommendation. The messages are not in the event: read them with `GET /v1/disputes/{id}`.',
+      'Does not fire again for the same dispute: later changes are their own events.',
+      'Nothing comes before it. Followed by `dispute.message_received`, `dispute.escalated` or `dispute.resolved`.',
+    ].join('\n\n'),
+    example: exampleDispute(),
+  },
+  'dispute.message_received': {
+    schema: 'DisputeSummary',
+    summary: 'A dispute has a new message',
+    description: [
+      'Fires for each message the customer or BitoCard adds to one of your disputes. Read it with `GET /v1/disputes/{id}`; the text is never in the event.',
+      'Does not fire for your own messages, nor for BitoCard’s note with a decision or a return (`dispute.resolved`, `dispute.contested`, `dispute.returned` carry those).',
+      'Comes after `dispute.opened`. Can come any number of times before `dispute.resolved`.',
+    ].join('\n\n'),
+    example: exampleDispute({ updated_at: '2026-10-08T10:20:11.000Z' }),
+  },
+  'dispute.escalated': {
+    schema: 'DisputeSummary',
+    summary: 'A dispute was escalated to BitoCard',
+    description: [
+      'Fires once each time you (or a team member) escalate a dispute to BitoCard with a report and a recommendation (`recommendation`, `report`). BitoCard now decides it.',
+      'Does not fire for disputes that start with BitoCard (`kind: reseller`): `dispute.opened` shows them `escalated`.',
+      'Comes after `dispute.opened` or `dispute.returned`. Followed by `dispute.resolved`, `dispute.contested` or `dispute.returned`.',
+    ].join('\n\n'),
+    example: exampleDispute(escalatedDispute),
+  },
+  'dispute.returned': {
+    schema: 'DisputeSummary',
+    summary: 'BitoCard sent a dispute back to you',
+    description: [
+      'Fires when BitoCard sends an escalated dispute back to you to investigate further. It is `open` again; BitoCard’s note on what is missing is its latest message.',
+      'Does not fire for your own disputes with BitoCard, which it always decides itself.',
+      'Comes after `dispute.escalated`. Followed by `dispute.escalated` again, or `dispute.resolved` if you settle it yourself.',
+    ].join('\n\n'),
+    example: exampleDispute({ updated_at: '2026-10-08T12:15:00.000Z', recommendation: 'refund_customer', report: escalatedDispute.report }),
+  },
+  'dispute.contested': {
+    schema: 'DisputeSummary',
+    summary: 'BitoCard is contesting a chargeback',
+    description: [
+      'Fires once when BitoCard decides to contest a chargeback (`kind: chargeback`, `status: contested`). The disputed amount stays held from your wallet until the card network decides.',
+      'Does not fire for accepted chargebacks (`dispute.resolved` with `outcome: chargeback_lost`).',
+      'Comes after `dispute.escalated`. Followed by `dispute.resolved` with `outcome: chargeback_won` or `chargeback_lost`.',
+    ].join('\n\n'),
+    example: exampleDispute({
+      kind: 'chargeback',
+      topic: 'funding',
+      status: 'contested',
+      subject: 'Chargeback of ₦5,000.00',
+      customer_id: null,
+      order_id: null,
+      checkout_id: null,
+      chargeback_id: '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a',
+      recommendation: 'contest_chargeback',
+      report: 'This was my own card; the payment was mine.',
+      escalated_at: '2026-10-08T11:02:40.000Z',
+      outcome_note: 'Evidence submitted to the card network.',
+      updated_at: '2026-10-08T13:00:00.000Z',
+    }),
+  },
+  'dispute.resolved': {
+    schema: 'DisputeSummary',
+    summary: 'A dispute was resolved',
+    description: [
+      'Fires once when a dispute is closed, with `outcome`: `resolved_by_reseller` (you resolved it), `refunded_customer` (BitoCard refunded the customer: `order.refunded` also fires), `credited_reseller` (BitoCard credited your wallet, `outcome_amount`), `rejected`, or for chargebacks `chargeback_won` or `chargeback_lost` (the card network’s decision).',
+      'Does not fire again: a resolved dispute takes no more messages.',
+      'Comes after `dispute.opened`, `dispute.escalated` or `dispute.contested`. Nothing follows it.',
+    ].join('\n\n'),
+    example: exampleDispute({
+      ...escalatedDispute,
+      status: 'resolved',
+      outcome: 'refunded_customer',
+      outcome_note: 'Refunded in full: the code was used before delivery.',
+      resolved_at: '2026-10-08T14:30:00.000Z',
+      updated_at: '2026-10-08T14:30:00.000Z',
+    }),
+  },
 };
 
 const exampleEventIds: Record<EventType, string> = {
@@ -399,6 +550,12 @@ const exampleEventIds: Record<EventType, string> = {
   'number.expired': 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
   'number.deleted': 'c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f',
   'number.sms_received': 'd4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a',
+  'dispute.opened': 'e5f6a7b8-c9d0-4e1f-8a2b-4c5d6e7f8a9b',
+  'dispute.message_received': 'f6a7b8c9-d0e1-4f2a-9b3c-5d6e7f8a9b0c',
+  'dispute.escalated': '07b8c9d0-e1f2-4a3b-8c4d-6e7f8a9b0c1d',
+  'dispute.returned': '18c9d0e1-f2a3-4b4c-9d5e-7f8a9b0c1d2e',
+  'dispute.contested': '29d0e1f2-a3b4-4c5d-8e6f-8a9b0c1d2e3f',
+  'dispute.resolved': '3ae1f2a3-b4c5-4d6e-9f7a-9b0c1d2e3f4a',
 };
 
 const exampleTime = (object: object) => {
