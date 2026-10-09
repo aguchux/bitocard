@@ -357,6 +357,7 @@ export class PaymentsService {
         data: { status: 'succeeded', providerTransactionId: result.providerTransactionId, feeMinor: result.fee, completedAt: new Date() },
       });
       if (claimed.count === 1 && checkout) await this.tellCheckout('paid', payment.id);
+      if (claimed.count === 0) await this.paidAfterClosing(payment.id, result);
       return;
     }
     const entry = await this.ledger.prepare({
@@ -385,6 +386,7 @@ export class PaymentsService {
         this.events.committed();
         await this.toppedUp(payment, 'top-up');
       }
+      if (!credited) await this.paidAfterClosing(payment.id, result);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         this.logger.error({ paymentId: payment.id, providerTransactionId: result.providerTransactionId }, 'Provider transaction already credited elsewhere; needs review');
@@ -392,6 +394,17 @@ export class PaymentsService {
       }
       throw error;
     }
+  }
+
+  /**
+   * A success for a payment that could not be claimed: already credited (nothing to do), or already closed as failed,
+   * for example a declined card retried on the same gateway page. That money can never be credited, so it is refunded.
+   */
+  private async paidAfterClosing(paymentId: string, result: ChargeResult) {
+    const current = await this.prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    if (current.status !== 'failed' || current.mode !== 'live' || result.reference !== current.reference) return;
+    this.logger.error({ paymentId, providerTransactionId: result.providerTransactionId }, 'Payment succeeded after it was closed; refunding');
+    await this.unmatched(current, result, 'late');
   }
 
   async simulateTopUp(resellerId: string, mode: LedgerMode, id: string, outcome: 'succeeded' | 'failed') {

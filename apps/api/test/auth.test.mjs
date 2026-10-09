@@ -132,6 +132,28 @@ describe('email verification', () => {
     assert.equal(locked.json.error.code, 'code_attempts_exceeded');
   });
 
+  test('parallel wrong codes never get more than five tries', async () => {
+    const { browser, email } = await signUp();
+    const code = await lastEmailCode(server.app, email);
+    const wrong = code === '000000' ? '111111' : '000000';
+    const answers = await Promise.all(Array.from({ length: 20 }, () => browser.post('/v1/auth/email/verify', { code: wrong })));
+    assert.equal(answers.filter(answer => answer.json.error?.code === 'code_invalid').length, 5, 'only five guesses are ever compared');
+    const right = await browser.post('/v1/auth/email/verify', { code });
+    assert.equal(right.json.error.code, 'code_attempts_exceeded');
+  });
+
+  test('no more than ten codes a day', async () => {
+    const { browser, json } = await signUp();
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    const hourAgo = new Date(Date.now() - 3600_000);
+    await prisma.verificationCode.updateMany({ where: { userId: json.user.id }, data: { createdAt: hourAgo } });
+    await prisma.verificationCode.createMany({
+      data: Array.from({ length: 9 }, () => ({ userId: json.user.id, purpose: 'email_verification', target: 'x', codeHash: 'x', expiresAt: hourAgo, consumedAt: hourAgo, createdAt: hourAgo })),
+    });
+    const resend = await browser.post('/v1/auth/email/resend');
+    assert.deepEqual([resend.status, resend.json.error.code], [429, 'code_daily_limit']);
+  });
+
   test('a new code cannot be requested within a minute', async () => {
     const { browser } = await signUp();
     const resend = await browser.post('/v1/auth/email/resend');
@@ -170,6 +192,13 @@ describe('sign-in and sessions', () => {
     assert.deepEqual([locked.status, locked.json.error.code], [429, 'account_locked']);
     const wrong = await client(base).post('/v1/auth/signin', { identifier: email, password: 'wrong password here' });
     assert.equal(wrong.json.error.code, 'invalid_credentials', 'a wrong password must not reveal the lock');
+  });
+
+  test('parallel wrong passwords all count towards the lock', async () => {
+    const { email } = await signUp();
+    await Promise.all(Array.from({ length: 6 }, () => client(base).post('/v1/auth/signin', { identifier: email, password: 'wrong password here' })));
+    const locked = await client(base).post('/v1/auth/signin', { identifier: email, password });
+    assert.deepEqual([locked.status, locked.json.error.code], [429, 'account_locked']);
   });
 
   test('without a session, protected endpoints answer 401', async () => {
@@ -317,6 +346,17 @@ describe('password reset', () => {
     const fresh = await client(base).post('/v1/auth/signin', { identifier: email, password: newPassword });
     assert.equal(fresh.status, 200);
     assert.equal(fresh.json.user.email_verified, true, 'receiving the code proves the email address');
+  });
+
+  test('parallel guesses at a reset code get five tries in all', async () => {
+    const { email } = await signUp();
+    await client(base).post('/v1/auth/password/forgot', { email });
+    const code = await lastEmailCode(server.app, email);
+    const guesses = Array.from({ length: 20 }, (_, n) => String((Number(code) + n + 1) % 1_000_000).padStart(6, '0'));
+    const answers = await Promise.all(guesses.map(guess => client(base).post('/v1/auth/password/reset', { email, code: guess, password: 'a brand new passphrase' })));
+    assert.equal(answers.filter(answer => answer.json.error?.code === 'code_invalid').length, 5);
+    const right = await client(base).post('/v1/auth/password/reset', { email, code, password: 'a brand new passphrase' });
+    assert.equal(right.json.error.code, 'code_attempts_exceeded', 'the real code is no use once the tries are spent');
   });
 
   test('a wrong code changes nothing', async () => {

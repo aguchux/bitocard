@@ -1433,6 +1433,10 @@ model VirtualNumber {
   /// Why the last automatic renewal did not happen (for example the wallet was short), and when it was tried.
   renewalError      String?         @map("renewal_error")
   renewalAttemptAt  DateTime?       @map("renewal_attempt_at")
+  /// A renewal the supplier left unclear (a timeout): its period (the hold's reference) and the renewals-left count asked
+  /// for, so it is asked again exactly as before (never a second month) while the hold stays. Cleared once settled.
+  renewalPending    String?         @map("renewal_pending")
+  renewalCycles     Int?            @map("renewal_cycles")
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @updatedAt @map("updated_at")
   order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)

@@ -23,6 +23,12 @@ const day = 24 * 60 * 60 * 1000;
 /** Renewed automatically this long before expiry; a short wallet is tried again after `retryRenewalMs`. */
 const autoRenewBeforeMs = 3 * day;
 const retryRenewalMs = 12 * 60 * 60 * 1000;
+/** One renewal at a time: longer than the supplier's two calls (15 seconds each) so a slow one is never run twice. */
+const renewalLeaseMs = 3 * 60 * 1000;
+/** Renewals left unclear by the supplier are asked again (the same request) this often. */
+const pendingRenewalRetryMs = 15 * 60 * 1000;
+/** The customer can renew only this close to expiry (or once expired), so they cannot buy months ahead on the reseller's wallet. */
+const customerRenewBeforeMs = 7 * day;
 const remindBeforeMs = 7 * day;
 const warnAfterMs = 7 * day;
 const deleteAfterMs = 15 * day;
@@ -35,7 +41,7 @@ export const smsLimit = (text: string) => (gsm.test(text) ? 160 : 70);
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such number.');
 const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
 
-type NumberWithOrder = VirtualNumber & { order: { customerId: string | null; recipient: Prisma.JsonValue; resellerId: string; id: string; product: { features: string[]; name: string } } };
+type NumberWithOrder = VirtualNumber & { order: { status: string; customerId: string | null; recipient: Prisma.JsonValue; resellerId: string; id: string; product: { features: string[]; name: string } } };
 
 /** E.164 with its plus: `447700900123` and `+447700900123` are the same number. */
 export const e164 = (value: string) => `+${value.replace(/[^\d]/g, '')}`;
@@ -92,7 +98,7 @@ export class NumbersService {
     return new Encryption(this.config.ENCRYPTION_KEY);
   }
 
-  private includeOrder = { order: { select: { id: true, resellerId: true, customerId: true, recipient: true, product: { select: { features: true, name: true } } } } } as const;
+  private includeOrder = { order: { select: { id: true, status: true, resellerId: true, customerId: true, recipient: true, product: { select: { features: true, name: true } } } } } as const;
 
   private simulated(number: VirtualNumber) {
     return number.mode === 'test' || number.supplierNumberId.startsWith('sandbox_');
@@ -160,18 +166,22 @@ export class NumbersService {
   /**
    * One month more: the number is claimed (one renewal at a time, so the supplier is never asked twice), the price held
    * from the wallet, the month added with the supplier, then the price taken; an expired number is restored and its
-   * month starts now. A refusal releases the hold.
+   * month starts now. A clear refusal releases the hold. Unclear is not failed: after a timeout the supplier may have
+   * renewed, so the hold and the exact request are kept (`renewalPending`, `renewalCycles`) and asked again, unchanged,
+   * until the supplier answers; asking again for the same renewals-left count never adds a second month.
    */
   private async renew(number: NumberWithOrder): Promise<NumberWithOrder> {
     if (number.status === 'deleted') throw conflict('number_deleted', 'This number has been deleted and cannot be renewed.');
     const started = new Date();
     const claimed = await this.prisma.virtualNumber.updateMany({
-      where: { id: number.id, status: { not: 'deleted' }, OR: [{ renewalAttemptAt: null }, { renewalAttemptAt: { lt: new Date(started.getTime() - 60_000) } }] },
+      where: { id: number.id, status: { not: 'deleted' }, OR: [{ renewalAttemptAt: null }, { renewalAttemptAt: { lt: new Date(started.getTime() - renewalLeaseMs) } }] },
       data: { renewalAttemptAt: started },
     });
-    if (claimed.count === 0) throw conflict('renewal_in_progress', 'This number is being renewed. Try again in a minute.');
+    if (claimed.count === 0) throw conflict('renewal_in_progress', 'This number is being renewed. Try again in a few minutes.');
+    // Re-read: a renewal left unclear by an earlier run is finished, never started again.
+    const current = await this.prisma.virtualNumber.findUniqueOrThrow({ where: { id: number.id } });
+    const period = current.renewalPending ?? `${number.expiresAt.toISOString()}:${started.getTime()}`;
     const price = await this.monthlyPrice(number);
-    const period = `${number.expiresAt.toISOString()}:${started.getTime()}`;
     const hold = await this.wallets.hold({
       resellerId: number.resellerId,
       mode: number.mode,
@@ -179,15 +189,28 @@ export class NumbersService {
       reference: `number_renewal:${number.id}:${period}`,
       description: `Number renewal: ${number.number}`,
     });
+    if (!current.renewalPending) await this.prisma.virtualNumber.update({ where: { id: number.id }, data: { renewalPending: period, renewalCycles: null } });
     try {
       if (!this.simulated(number)) {
         const supplier = this.adapters.get(number.supplierCode).numbers;
         if (!supplier) throw new ProviderError(number.supplierCode, 'numbers cannot be renewed with this supplier', true);
-        await supplier.renewNumber(number.supplierNumberId);
+        let cycles = current.renewalPending ? current.renewalCycles : null;
+        if (cycles === null) {
+          // Saved before asking, so a retry asks for exactly this and never adds another month.
+          cycles = await supplier.nextRenewal(number.supplierNumberId);
+          await this.prisma.virtualNumber.update({ where: { id: number.id }, data: { renewalCycles: cycles } });
+        }
+        await supplier.renewNumber(number.supplierNumberId, cycles);
       }
     } catch (error) {
+      if (!(error instanceof ProviderError && error.definite)) {
+        await this.prisma.virtualNumber.update({ where: { id: number.id }, data: { renewalError: 'renewal_pending' } });
+        this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', numberId: number.id }, 'Number renewal unclear; the amount stays held and it is asked again');
+        throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'renewal_pending', 'The renewal is not confirmed yet. We are checking with the network; nothing more will be taken for it.');
+      }
       await this.wallets.releaseHold(hold.id, `Number renewal not made: ${number.number}`);
-      this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', numberId: number.id }, 'Number renewal refused by the supplier');
+      await this.prisma.virtualNumber.update({ where: { id: number.id }, data: { renewalPending: null, renewalCycles: null } });
+      this.logger.warn({ err: error.message, numberId: number.id }, 'Number renewal refused by the supplier');
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'renewal_failed', 'The number could not be renewed right now. Nothing was taken from your wallet. Try again later.');
     }
     await this.wallets.captureHold(hold.id, `Number renewed: ${number.number}`);
@@ -216,6 +239,8 @@ export class NumbersService {
           renewedAt: now,
           renewalError: null,
           renewalAttemptAt: now,
+          renewalPending: null,
+          renewalCycles: null,
           remindedAt: null,
           expiredAt: null,
           warnedAt: null,
@@ -264,6 +289,20 @@ export class NumbersService {
       }
     }
 
+    // Renewals the supplier left unclear: asked again, unchanged, whether or not auto-renew is on.
+    for (const number of await due({
+      status: { not: 'deleted' },
+      renewalPending: { not: null },
+      renewalAttemptAt: { lt: new Date(now.getTime() - pendingRenewalRetryMs) },
+    })) {
+      try {
+        await this.renew(number);
+        outcome.renewed += 1;
+      } catch (error) {
+        this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', numberId: number.id }, 'Unclear number renewal not settled yet');
+      }
+    }
+
     for (const number of await due({ status: 'active', remindedAt: null, expiresAt: { gt: now, lte: new Date(now.getTime() + remindBeforeMs) } })) {
       if (!(await this.claim(number.id, 'remindedAt', { status: 'active', remindedAt: null }))) continue;
       await this.tell(number, 'expiring');
@@ -290,7 +329,8 @@ export class NumbersService {
       outcome.warned += 1;
     }
 
-    for (const number of await due({ status: 'expired', expiresAt: { lte: new Date(now.getTime() - deleteAfterMs) } })) {
+    // Never while a renewal is unclear: the supplier may have renewed it, and the reseller's money is held for it.
+    for (const number of await due({ status: 'expired', renewalPending: null, expiresAt: { lte: new Date(now.getTime() - deleteAfterMs) } })) {
       try {
         if (!this.simulated(number)) await this.adapters.get(number.supplierCode).numbers?.releaseNumber(number.supplierNumberId);
       } catch (error) {
@@ -299,7 +339,7 @@ export class NumbersService {
         continue;
       }
       const deleted = await this.prisma.$transaction(async tx => {
-        const claimed = await tx.virtualNumber.updateMany({ where: { id: number.id, status: 'expired' }, data: { status: 'deleted', deletedAt: now, autoRenew: false } });
+        const claimed = await tx.virtualNumber.updateMany({ where: { id: number.id, status: 'expired', renewalPending: null }, data: { status: 'deleted', deletedAt: now, autoRenew: false } });
         if (claimed.count === 0) return false;
         await tx.numberMessage.deleteMany({ where: { numberId: number.id } });
         const updated = (await tx.virtualNumber.findUniqueOrThrow({ where: { id: number.id }, include: this.includeOrder })) as NumberWithOrder;
@@ -570,13 +610,25 @@ export class NumbersService {
     return number;
   }
 
+  /** A number the customer acts on from the order page: only while its order stands (never once refunded). */
+  private async customerNumber(orderId: string) {
+    const number = await this.byOrder(orderId);
+    if (number.order.status !== 'completed') throw conflict('order_not_active', 'This order is no longer active. Contact the store.');
+    return number;
+  }
+
   /**
    * The customer renews from the order page; the month is taken from the reseller's wallet (the reseller charges their
    * customer as they agree). A wallet that cannot cover it renews nothing: the customer is asked to contact the store,
    * and the reseller is told.
    */
   async renewForOrder(orderId: string) {
-    const number = await this.byOrder(orderId);
+    const number = await this.customerNumber(orderId);
+    // Only near expiry (or once expired): every renewal is paid from the reseller's wallet, so a customer can never
+    // buy months ahead without limit at the reseller's expense.
+    if (number.status === 'active' && number.expiresAt.getTime() - Date.now() > customerRenewBeforeMs) {
+      throw conflict('renewal_not_due', 'This number can be renewed from 7 days before it expires.');
+    }
     try {
       await this.renew(number);
     } catch (error) {
@@ -597,7 +649,7 @@ export class NumbersService {
 
   /** The customer switches automatic renewal on or off from the order page (each renewal is taken from the reseller's wallet). */
   async setAutoRenewForOrder(orderId: string, enabled: boolean) {
-    const number = await this.byOrder(orderId);
+    const number = await this.customerNumber(orderId);
     if (number.status === 'deleted') throw conflict('number_deleted', 'This number has been deleted.');
     await this.prisma.virtualNumber.update({ where: { id: number.id }, data: { autoRenew: enabled } });
     return this.forOrder(orderId);
@@ -605,8 +657,7 @@ export class NumbersService {
 
   /** The customer sends from the order page, when the reseller allows it (charged to the reseller). */
   async sendForOrder(orderId: string, input: { to: string; text: string }) {
-    const number = (await this.prisma.virtualNumber.findUnique({ where: { orderId }, include: this.includeOrder })) as NumberWithOrder | null;
-    if (!number) throw notFound();
+    const number = await this.customerNumber(orderId);
     if (!number.customerSending) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'sending_not_allowed', 'Sending messages from this number is not switched on. Contact the store.');
     const sent = await this.send(number, input, 'customer');
     return { direction: sent.direction, from: sent.from, to: sent.to, text: sent.text, status: sent.status, created_at: sent.created_at };

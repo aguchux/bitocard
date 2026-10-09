@@ -1,6 +1,6 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
-import { inSandbox, urlsFor } from '../integrations/endpoints.js';
+import { inSandbox, isTestKey, urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { FlutterwaveProvider } from './flutterwave.provider.js';
@@ -29,6 +29,7 @@ export const providerUnavailable = (what: string) =>
  */
 @Injectable()
 export class PaymentProviders {
+  private readonly logger = new Logger('PaymentProviders');
   private readonly clients: () => {
     sandbox: SandboxProvider;
     flutterwave: FlutterwaveProvider | null;
@@ -45,15 +46,22 @@ export class PaymentProviders {
       return {
         sandbox: new SandboxProvider(config.DASHBOARD_URL),
         flutterwave:
-          config.FLUTTERWAVE_SECRET_KEY && !inSandbox(settings, 'flutterwave') ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH) : null,
+          config.FLUTTERWAVE_SECRET_KEY && !inSandbox(settings, 'flutterwave') && this.liveKey('flutterwave', config.FLUTTERWAVE_SECRET_KEY) ? new FlutterwaveProvider(config.FLUTTERWAVE_SECRET_KEY, config.FLUTTERWAVE_API_URL, config.FLUTTERWAVE_WEBHOOK_HASH) : null,
         monnify:
           config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE && !inSandbox(settings, 'monnify')
             ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
             : null,
-        stripe: config.STRIPE_SECRET_KEY && !inSandbox(settings, 'stripe') ? new StripeProvider(config.STRIPE_SECRET_KEY, config.STRIPE_API_URL, config.STRIPE_WEBHOOK_SECRET) : null,
+        stripe: config.STRIPE_SECRET_KEY && !inSandbox(settings, 'stripe') && this.liveKey('stripe', config.STRIPE_SECRET_KEY) ? new StripeProvider(config.STRIPE_SECRET_KEY, config.STRIPE_API_URL, config.STRIPE_WEBHOOK_SECRET) : null,
         pawapay: config.PAWAPAY_API_TOKEN && !inSandbox(settings, 'pawapay') ? new PawapayPaymentsProvider(config.PAWAPAY_API_TOKEN, config.PAWAPAY_API_URL, config.PAWAPAY_CALLBACK_TOKEN) : null,
       };
     });
+  }
+
+  /** A test key with the Sandbox switch off is refused: test cards must never credit real wallets or pay for real orders. */
+  private liveKey(id: string, key: string) {
+    if (!isTestKey(id, key)) return true;
+    this.logger.error({ provider: id }, 'A test key is saved for live payments; the gateway is off until a live key is saved or Sandbox is switched on');
+    return false;
   }
 
   get sandbox() {

@@ -1,5 +1,5 @@
 import type { AppConfig } from '../config/config.js';
-import type { Environment } from '../integrations/endpoints.js';
+import { isTestKey, type Environment } from '../integrations/endpoints.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
 
 export type ConnectableKind = 'supplier' | 'payment_gateway';
@@ -132,7 +132,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     fields: [secret('secret_key', 'Secret key'), secret('webhook_hash', 'Webhook secret hash', { required: false, help: 'From Flutterwave’s Settings > Webhooks.' })],
     check: async (values, urls, environment) => {
       // Flutterwave decides test or live by the key itself (FLWSECK_TEST-… for test), at the same address.
-      if (/^FLWSECK_TEST/i.test(values.secret_key ?? '') !== (environment === 'sandbox')) {
+      if (isTestKey('flutterwave', values.secret_key) !== (environment === 'sandbox')) {
         throw new ProviderError('flutterwave', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
       }
       const result = await providerRequest<{ status?: string }>('flutterwave', `${urls.FLUTTERWAVE_API_URL}/balances`, { headers: { authorization: `Bearer ${values.secret_key}` } });
@@ -151,7 +151,7 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     ],
     check: async (values, urls, environment) => {
       // Stripe decides test or live by the key itself (sk_test_… or rk_test_… for test), at the same address.
-      if (/^(sk|rk)_test_/.test(values.secret_key ?? '') !== (environment === 'sandbox')) {
+      if (isTestKey('stripe', values.secret_key) !== (environment === 'sandbox')) {
         throw new ProviderError('stripe', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
       }
       await providerRequest('stripe', `${urls.STRIPE_API_URL}/v1/balance`, { headers: { authorization: `Bearer ${values.secret_key}` } });

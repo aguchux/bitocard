@@ -10,7 +10,7 @@ import { Prisma, type User } from '../generated/prisma/client.js';
 import { AuditService } from '../audit/audit.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { adminPasswordLinkEmail, passwordChangedEmail } from '../notifications/templates.js';
-import { lockout } from './auth.service.js';
+import { recordFailedSignIn } from './auth.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { SessionsService } from './sessions.service.js';
 
@@ -250,9 +250,17 @@ export class AdminAuthService {
     const credential = user.totp;
     if (!credential) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'mfa_setup_required', 'Set up your authenticator first.');
 
+    // Claim an attempt on the challenge before checking, in one statement, so parallel guesses never get past its limit.
+    const attempt = await this.prisma.verificationCode.updateMany({
+      where: { id: record.id, consumedAt: null, attempts: { lt: maxChallengeAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (attempt.count === 0) throw invalidChallenge();
     const accepted = /^[a-z0-9]{4}-[a-z0-9]{4}$/.test(code) ? await this.useRecoveryCode(user.id, credential.recoveryCodeHashes, code) : await this.useTotp(user, credential, code);
     if (!accepted) {
-      await this.prisma.verificationCode.update({ where: { id: record.id }, data: { attempts: { increment: 1 } } });
+      // Wrong codes also count towards the account's lockout, so signing in again for a fresh challenge cannot be used
+      // to keep guessing.
+      await this.recordFailure(user);
       throw invalidCode();
     }
 
@@ -299,6 +307,10 @@ export class AdminAuthService {
     if (!record || record.expiresAt <= new Date() || record.attempts >= maxChallengeAttempts || !sameDigest(record.codeHash, sha256(token))) throw invalidChallenge();
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { totp: true } });
     if (user.status !== 'active') throw invalidChallenge();
+    // A challenge issued before the account locked stops working with it.
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many failed attempts. Try again in 15 minutes.');
+    }
     return { user, record };
   }
 
@@ -329,12 +341,8 @@ export class AdminAuthService {
     }
   }
 
-  private async recordFailure(user: User) {
-    const failures = user.failedSignIns + 1;
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: failures >= lockout.maxFailures ? { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockout.durationMs) } : { failedSignIns: failures },
-    });
+  private recordFailure(user: User) {
+    return recordFailedSignIn(this.prisma, user.id);
   }
 
   private allowedDomain(email: string) {

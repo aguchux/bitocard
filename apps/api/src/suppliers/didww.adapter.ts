@@ -343,12 +343,16 @@ export class DidwwAdapter implements SupplierAdapter {
      * One more paid month: DIDWW renews at `expires_at` once per renewal left (`billing_cycles_count`), charged to the
      * DIDWW balance then. A paused (expired or cancelled) number is restored with `terminated: false`.
      */
-    renewNumber: async (didId: string) => {
+    nextRenewal: async (didId: string) => {
       const did = (await this.request<One<DidAttributes>>(`/dids/${encodeURIComponent(didId)}`)).data;
-      const left = did.attributes.billing_cycles_count ?? 0;
+      return (did.attributes.billing_cycles_count ?? 0) + 1;
+    },
+    /** Sets the renewals left to `cycles` (an absolute count, not an increment), so repeating it never adds a month. */
+    renewNumber: async (didId: string, cycles: number) => {
+      const did = (await this.request<One<DidAttributes>>(`/dids/${encodeURIComponent(didId)}`)).data;
       const updated = await this.request<One<DidAttributes>>(`/dids/${encodeURIComponent(didId)}`, {
         method: 'PATCH',
-        body: { data: { id: didId, type: 'dids', attributes: { billing_cycles_count: left + 1, ...(did.attributes.terminated || did.attributes.blocked ? { terminated: false } : {}) } } },
+        body: { data: { id: didId, type: 'dids', attributes: { billing_cycles_count: cycles, ...(did.attributes.terminated || did.attributes.blocked ? { terminated: false } : {}) } } },
       });
       const expires = updated.data.attributes.expires_at ?? did.attributes.expires_at;
       return { expiresAt: expires ? new Date(expires) : null };

@@ -60,8 +60,16 @@ export type SuppliedNumber = { supplierNumberId: string; number: string; expires
 
 /** Managing numbers already bought. A number stays with the supplier that sold it. */
 export interface NumberSupplier {
-  /** Pays one more period with the supplier (restoring a paused number). Returns when it is now paid up to, if known. */
-  renewNumber(supplierNumberId: string): Promise<{ expiresAt: Date | null }>;
+  /**
+   * What to ask for to pay one more period (DIDWW: the renewals-left count plus one). Saved before `renewNumber`, so a
+   * retry after an unclear answer asks for exactly the same.
+   */
+  nextRenewal(supplierNumberId: string): Promise<number>;
+  /**
+   * Pays up to `cycles` (from `nextRenewal`), restoring a paused number. Asking twice for the same `cycles` renews once.
+   * Returns when it is now paid up to, if known.
+   */
+  renewNumber(supplierNumberId: string, cycles: number): Promise<{ expiresAt: Date | null }>;
   /** Gives the number up for good. */
   releaseNumber(supplierNumberId: string): Promise<void>;
   /** Sends an SMS from one of our numbers; the supplier reports its price later. */

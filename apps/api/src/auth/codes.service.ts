@@ -7,6 +7,8 @@ import type { CodePurpose } from '../generated/prisma/client.js';
 const lifetimeMs = 30 * 60 * 1000;
 const resendAfterMs = 60 * 1000;
 export const maxCodeAttempts = 5;
+export const maxCodesPerDay = 10;
+const dayMs = 24 * 60 * 60 * 1000;
 
 const digest = (userId: string, purpose: CodePurpose, code: string) => sha256(`${purpose}:${userId}:${code}`);
 
@@ -22,6 +24,11 @@ export class CodesService {
     });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
+    }
+    // A daily cap, so new codes (each with fresh attempts) cannot be requested without end to guess one.
+    const today = await this.prisma.verificationCode.count({ where: { userId, purpose, createdAt: { gt: new Date(Date.now() - dayMs) } } });
+    if (today >= maxCodesPerDay) {
+      throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_daily_limit', 'Too many codes were sent today. Try again tomorrow.');
     }
     const code = numericCode();
     await this.prisma.$transaction([
@@ -49,13 +56,15 @@ export class CodesService {
     if (record.expiresAt <= new Date()) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_expired', 'That code has expired. Ask for a new one.', 'code');
     }
-    if (record.attempts >= maxCodeAttempts) {
+    // Claim an attempt before comparing, in one statement, so parallel guesses can never get past the limit.
+    const attempt = await this.prisma.verificationCode.updateMany({
+      where: { id: record.id, consumedAt: null, attempts: { lt: maxCodeAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (attempt.count === 0) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
     }
-    if (!sameDigest(record.codeHash, digest(userId, purpose, code))) {
-      await this.prisma.verificationCode.update({ where: { id: record.id }, data: { attempts: { increment: 1 } } });
-      throw invalid;
-    }
+    if (!sameDigest(record.codeHash, digest(userId, purpose, code))) throw invalid;
     const consumed = await this.prisma.verificationCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
     if (consumed.count === 0) throw invalid;
     return record.target;

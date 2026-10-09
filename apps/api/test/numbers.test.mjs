@@ -173,6 +173,49 @@ describe('numbers after their order', () => {
     assert.deepEqual(did(number).patches, [{ billing_cycles_count: 1 }]);
   });
 
+  test('an unclear renewal keeps the money held and is asked again unchanged: one month, paid once', async () => {
+    const { browser, number } = await bought();
+    const price = (await browser.get(`/v1/numbers/${number.id}/renewal-price`)).json.amount;
+    const before = await available(browser);
+    didww.state.patchReply = 500;
+    let unclear;
+    try {
+      unclear = await browser.post(`/v1/numbers/${number.id}/renew`, {});
+    } finally {
+      didww.state.patchReply = undefined;
+    }
+    assert.deepEqual([unclear.status, unclear.json.error.code], [502, 'renewal_pending']);
+    assert.equal(before - (await available(browser)), price, 'held, not returned: DIDWW may have renewed it');
+    const pending = await prisma.virtualNumber.findUniqueOrThrow({ where: { id: number.id } });
+    assert.deepEqual([pending.renewalCycles, pending.expiresAt.toISOString()], [1, '2026-11-03T00:00:00.000Z']);
+    assert.ok(pending.renewalPending);
+
+    // The job asks again once the lease has passed: the same request, never a second month.
+    await set(number.id, { renewalAttemptAt: new Date(Date.now() - 20 * 60_000) });
+    assert.ok((await cron()).result.renewed >= 1);
+    assert.deepEqual(did(number).patches, [{ billing_cycles_count: 1 }, { billing_cycles_count: 1 }], 'asked for the same renewals left both times');
+    const renewed = await prisma.virtualNumber.findUniqueOrThrow({ where: { id: number.id } });
+    assert.deepEqual([renewed.expiresAt.toISOString(), renewed.renewalPending, renewed.renewalCycles], ['2026-12-03T00:00:00.000Z', null, null]);
+    assert.equal(before - (await available(browser)), price, 'taken once');
+    const holds = await prisma.hold.findMany({ where: { reference: { startsWith: `number_renewal:${number.id}:` } } });
+    assert.deepEqual(holds.map(hold => hold.status), ['captured'], 'one hold, captured');
+  });
+
+  test('a clear refusal returns the hold at once', async () => {
+    const { browser, number } = await bought();
+    const before = await available(browser);
+    didww.state.patchReply = 422;
+    let refused;
+    try {
+      refused = await browser.post(`/v1/numbers/${number.id}/renew`, {});
+    } finally {
+      didww.state.patchReply = undefined;
+    }
+    assert.deepEqual([refused.status, refused.json.error.code], [502, 'renewal_failed']);
+    assert.equal(await available(browser), before, 'nothing taken');
+    assert.equal((await prisma.virtualNumber.findUniqueOrThrow({ where: { id: number.id } })).renewalPending, null);
+  });
+
   test('settings: auto-renew and customer sending', async () => {
     const { browser, number } = await bought();
     const updated = await browser.patch(`/v1/numbers/${number.id}`, { auto_renew: false, customer_sending: true });
@@ -283,10 +326,17 @@ describe('the number on its order’s page', () => {
     const shown = (await visitor.get(`/v1/store/access/${token}/number`, proof)).json.number;
     assert.deepEqual([shown.auto_renew, shown.can_renew], [false, true]);
     const price = (await browser.get(`/v1/numbers/${number.id}/renewal-price`)).json.amount;
+    const early = await visitor.post(`/v1/store/access/${token}/number/renew`, {}, proof);
+    assert.deepEqual([early.status, early.json.error.code], [409, 'renewal_not_due'], 'not months ahead on the reseller’s wallet');
+    const soon = new Date(Date.now() + 3 * day);
+    await set(number.id, { expiresAt: soon });
     const before = await available(browser);
     const renewed = await visitor.post(`/v1/store/access/${token}/number/renew`, {}, proof);
     assert.equal(renewed.status, 200, JSON.stringify(renewed.json));
-    assert.equal(renewed.json.number.expires_at, '2026-12-03T00:00:00.000Z');
+    const until = new Date(renewed.json.number.expires_at).getTime() - soon.getTime();
+    assert.ok(until >= 28 * day && until <= 31 * day, 'one month more');
+    const again = await visitor.post(`/v1/store/access/${token}/number/renew`, {}, proof);
+    assert.equal(again.json.error.code, 'renewal_not_due', 'renewed once, not again straight away');
     assert.equal(before - (await available(browser)), price, 'taken from the reseller’s wallet');
 
     const switched = await visitor.post(`/v1/store/access/${token}/number/auto-renew`, { enabled: true }, proof);
@@ -294,10 +344,15 @@ describe('the number on its order’s page', () => {
     assert.equal((await browser.get(`/v1/numbers/${number.id}`)).json.auto_renew, true, 'the reseller sees it');
 
     await prisma.ledgerAccount.updateMany({ where: { resellerId, mode: 'live', kind: { in: ['reseller_funding', 'reseller_earnings'] } }, data: { balanceMinor: 0n } });
-    await prisma.virtualNumber.update({ where: { id: number.id }, data: { renewalAttemptAt: null } });
+    await prisma.virtualNumber.update({ where: { id: number.id }, data: { renewalAttemptAt: null, expiresAt: new Date(Date.now() + 3 * day) } });
     const refused = await visitor.post(`/v1/store/access/${token}/number/renew`, {}, proof);
     assert.deepEqual([refused.status, refused.json.error.code], [402, 'store_cannot_renew']);
     assert.match(refused.json.error.message, /cannot renew this number right now/);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'number.renewal_failed', title: { contains: 'Your customer could not renew' } } }), 'the reseller is told');
+
+    // A refunded order's number is no longer the customer's to renew, switch or send from.
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'refunded' } });
+    assert.equal((await visitor.post(`/v1/store/access/${token}/number/renew`, {}, proof)).json.error.code, 'order_not_active');
+    assert.equal((await visitor.post(`/v1/store/access/${token}/number/auto-renew`, { enabled: false }, proof)).json.error.code, 'order_not_active');
   });
 });

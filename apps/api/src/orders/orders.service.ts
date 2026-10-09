@@ -404,15 +404,19 @@ export class OrdersService {
   /** Still pending after an unscheduled check: keep the supplier's transaction ID, change nothing else. */
   private async noteTransaction(order: Order, result: FulfilmentResult) {
     if (result.supplierTransactionId && !order.supplierTransactionId) {
-      await this.prisma.order.updateMany({ where: { id: order.id, status: 'processing' }, data: { supplierTransactionId: result.supplierTransactionId } });
+      await this.prisma.order.updateMany({
+        where: { id: order.id, status: 'processing', supplierReference: order.supplierReference },
+        data: { supplierTransactionId: result.supplierTransactionId },
+      });
     }
   }
 
   private async wait(order: Order, result: FulfilmentResult) {
     const checks = order.checks + 1;
     const review = checks >= checkScheduleMs.length;
-    await this.prisma.order.updateMany({
-      where: { id: order.id, status: 'processing' },
+    // Only while the order is still with the supplier this answer came from: never overwrite a fallback's attempt.
+    const waited = await this.prisma.order.updateMany({
+      where: { id: order.id, status: 'processing', supplierReference: order.supplierReference },
       data: {
         checks,
         needsReview: review,
@@ -420,7 +424,7 @@ export class OrdersService {
         nextCheckAt: new Date(Date.now() + (review ? reviewCheckMs : checkScheduleMs[checks - 1])),
       },
     });
-    if (review && !order.needsReview) {
+    if (waited.count === 1 && review && !order.needsReview) {
       this.logger.warn({ orderId: order.id, supplier: order.supplierCode }, 'Order outcome still unclear; added to the exception queue');
       const product = (await this.prisma.product.findUnique({ where: { id: order.productId }, select: { name: true } }))?.name ?? 'An order';
       await this.inbox.reseller(order.resellerId, 'order.needs_review', {
@@ -451,8 +455,9 @@ export class OrdersService {
     const numbers = await this.numbersOf(order, result.numbers, deliveries);
     const claimed = await this.prisma.$transaction(async tx => {
       const [{ nextval }] = order.source === 'own' ? [{ nextval: null }] : await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('order_receipt_number_seq')`;
+      // Only the supplier attempt this delivery came from can complete the order.
       const updated = await tx.order.updateMany({
-        where: { id: order.id, status: 'processing' },
+        where: { id: order.id, status: 'processing', supplierReference: order.supplierReference },
         data: {
           status: 'completed',
           needsReview: false,
@@ -608,7 +613,7 @@ export class OrdersService {
   /** A confirmed failure: try another supplier that can still honour the quote, or fail the order and release the hold. */
   private async failOrFallBack(order: OrderWithProduct, detail?: string) {
     if (order.source === 'own') {
-      await this.fail(order.id, 'Your supplier could not fulfil the order. BitoCard\'s fee hold has been returned to your wallet.', detail);
+      await this.fail(order.id, 'Your supplier could not fulfil the order. BitoCard\'s fee hold has been returned to your wallet.', detail, order.supplierReference);
       return;
     }
     const failed = await this.prisma.orderAttempt.findMany({ where: { orderId: order.id, outcome: 'failed' }, select: { supplierCode: true } });
@@ -620,7 +625,7 @@ export class OrdersService {
       // The fallback must honour the quote: its cost may not exceed what the reseller is paying.
       if (priced.cost * BigInt(order.quantity) <= order.wholesaleMinor) {
         const moved = await this.prisma.order.updateMany({
-          where: { id: order.id, status: 'processing', supplierCode: order.supplierCode },
+          where: { id: order.id, status: 'processing', supplierReference: order.supplierReference },
           data: {
             supplierCode: priced.offer.supplierCode,
             supplierProductId: priced.offer.id,
@@ -629,25 +634,30 @@ export class OrdersService {
             supplierReference: supplierReference(),
             supplierTransactionId: null,
             checks: 0,
-            nextCheckAt: null,
+            // Scheduled at once, so the order is still checked if this run stops before the new supplier answers.
+            nextCheckAt: new Date(Date.now() + checkScheduleMs[0]),
           },
         });
-        if (moved.count === 1) {
-          this.logger.log({ orderId: order.id, from: order.supplierCode, to: priced.offer.supplierCode }, 'Order moved to another supplier');
-          await this.attempt(order.id, 'place');
-          return;
-        }
+        // Another check already moved, completed or failed the order: it is not this run's to fail.
+        if (moved.count === 0) return;
+        this.logger.log({ orderId: order.id, from: order.supplierCode, to: priced.offer.supplierCode }, 'Order moved to another supplier');
+        await this.attempt(order.id, 'place');
+        return;
       }
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
     }
-    await this.fail(order.id, 'The order could not be fulfilled. The amount held has been returned to your wallet.', detail);
+    await this.fail(order.id, 'The order could not be fulfilled. The amount held has been returned to your wallet.', detail, order.supplierReference);
   }
 
-  private async fail(orderId: string, reason: string, detail?: string) {
+  /**
+   * Fails the order and releases its hold. A supplier's failure passes the attempt's reference, so it can only fail the
+   * order while it is still with that attempt (never one a concurrent check has since moved to another supplier).
+   */
+  private async fail(orderId: string, reason: string, detail?: string, supplierReference?: string) {
     const failed = await this.prisma.$transaction(async tx => {
       const claimed = await tx.order.updateMany({
-        where: { id: orderId, status: 'processing' },
+        where: { id: orderId, status: 'processing', ...(supplierReference ? { supplierReference } : {}) },
         data: { status: 'failed', failureReason: reason, needsReview: false, nextCheckAt: null, completedAt: new Date() },
       });
       if (claimed.count === 1) await this.recordEvent(tx, 'order.failed', orderId);

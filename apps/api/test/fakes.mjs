@@ -74,7 +74,7 @@ export async function fakeFlutterwave() {
     if (method === 'GET' && refund) return state.refunds[refund[1]] ? flwOk(state.refunds[refund[1]]) : flwError(404, 'Not found');
     return { status: 404, body: { status: 'error', message: `Fake Flutterwave has no ${method} ${path}` } };
   });
-  return { ...service, state, env: { FLUTTERWAVE_SECRET_KEY: 'FLWSECK_TEST-fake', FLUTTERWAVE_API_URL: service.url, FLUTTERWAVE_WEBHOOK_HASH: 'flw-webhook-hash' } };
+  return { ...service, state, env: { FLUTTERWAVE_SECRET_KEY: 'FLWSECK-fake', FLUTTERWAVE_API_URL: service.url, FLUTTERWAVE_WEBHOOK_HASH: 'flw-webhook-hash' } };
 }
 
 /** Monnify. `state.transactions` maps transactionReference to a transaction. Set `state.down` to fail everything. */
@@ -527,8 +527,11 @@ export async function fakeDidww() {
       const found = state.dids.find(item => item.id === did[1]);
       if (!found) return { status: 404, body: { errors: [{ title: 'Not found' }] } };
       if (method === 'PATCH') {
+        // `state.patchReply`: an HTTP status to answer with; 500 after applying the change (a reply lost on the way).
+        if (state.patchReply && state.patchReply < 500) return { status: state.patchReply, body: { errors: [{ title: 'Refused' }] } };
         found.attributes = { ...found.attributes, ...body.data.attributes };
         found.patches = [...(found.patches ?? []), body.data.attributes];
+        if (state.patchReply) return { status: state.patchReply, body: { errors: [{ title: 'Internal error' }] } };
       }
       return { body: { data: { id: found.id, type: 'dids', attributes: { billing_cycles_count: 0, terminated: false, ...found.attributes } } } };
     }

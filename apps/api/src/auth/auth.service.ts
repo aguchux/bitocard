@@ -19,6 +19,19 @@ import { InboxService } from '../notifications/inbox.service.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 
+/**
+ * Counts a wrong password or code atomically (parallel guesses each count, never all writing the same stale count) and
+ * locks the account once the limit is reached.
+ */
+export async function recordFailedSignIn(prisma: PrismaService, userId: string) {
+  const { failedSignIns } = await prisma.user.update({ where: { id: userId }, data: { failedSignIns: { increment: 1 } }, select: { failedSignIns: true } });
+  if (failedSignIns < lockout.maxFailures) return;
+  await prisma.user.updateMany({
+    where: { id: userId, failedSignIns: { gte: lockout.maxFailures } },
+    data: { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockout.durationMs) },
+  });
+}
+
 /** Addresses besides the primary one a person can keep. */
 const maxOtherEmails = 4;
 const emailInUse = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'Another account already uses this email.', 'email');
@@ -158,11 +171,7 @@ export class AuthService {
       throw invalidCredentials();
     }
     if (!valid) {
-      const failures = user.failedSignIns + 1;
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: failures >= lockout.maxFailures ? { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockout.durationMs) } : { failedSignIns: failures },
-      });
+      await recordFailedSignIn(this.prisma, user.id);
       throw invalidCredentials();
     }
 
@@ -209,7 +218,7 @@ export class AuthService {
       const code = await this.codes.issue(user.id, 'password_reset', user.email);
       await this.email.send(passwordResetEmail(user.email, code));
     } catch (error) {
-      if (error instanceof ApiError && error.code === 'code_recently_sent') return;
+      if (error instanceof ApiError && (error.code === 'code_recently_sent' || error.code === 'code_daily_limit')) return;
       this.logger.error({ err: error }, 'Could not send password reset email');
     }
   }
@@ -252,11 +261,7 @@ export class AuthService {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many failed attempts. Try again in 15 minutes.');
     }
     if (!(await this.passwords.verify(user.passwordHash, password))) {
-      const failures = user.failedSignIns + 1;
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: failures >= lockout.maxFailures ? { failedSignIns: 0, lockedUntil: new Date(Date.now() + lockout.durationMs) } : { failedSignIns: failures },
-      });
+      await recordFailedSignIn(this.prisma, user.id);
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'password_incorrect', 'Your current password is not right.', param);
     }
     if (user.failedSignIns) await this.prisma.user.update({ where: { id: user.id }, data: { failedSignIns: 0 } });

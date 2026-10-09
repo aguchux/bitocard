@@ -131,6 +131,28 @@ describe('later sign-ins', () => {
     assert.deepEqual([late.status, late.json.error.code], [401, 'challenge_invalid']);
   });
 
+  test('parallel wrong codes get five tries on a challenge', async () => {
+    const email = await createAdmin();
+    await firstSignIn(email);
+    const step1 = await client(server.base).post('/v1/admin/auth/signin', { email, password });
+    const answers = await Promise.all(
+      Array.from({ length: 15 }, () => client(server.base).post('/v1/admin/auth/mfa/verify', { challenge_token: step1.json.challenge_token, code: '000000' })),
+    );
+    assert.equal(answers.filter(answer => answer.json.error?.code === 'mfa_code_invalid').length, 5);
+  });
+
+  test('wrong codes count towards the account lockout, so fresh challenges cannot be used to keep guessing', async () => {
+    const email = await createAdmin();
+    await firstSignIn(email);
+    const first = await client(server.base).post('/v1/admin/auth/signin', { email, password });
+    for (let n = 0; n < 3; n += 1) await client(server.base).post('/v1/admin/auth/mfa/verify', { challenge_token: first.json.challenge_token, code: '000000' });
+    const second = await client(server.base).post('/v1/admin/auth/signin', { email, password });
+    assert.equal(second.status, 200, 'still unlocked after three wrong codes');
+    for (let n = 0; n < 2; n += 1) await client(server.base).post('/v1/admin/auth/mfa/verify', { challenge_token: second.json.challenge_token, code: '000000' });
+    const locked = await client(server.base).post('/v1/admin/auth/signin', { email, password });
+    assert.deepEqual([locked.status, locked.json.error.code], [429, 'account_locked']);
+  });
+
   test('a forged challenge token is refused', async () => {
     const res = await client(server.base).post('/v1/admin/auth/mfa/verify', { challenge_token: `${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}.forgedtokenvalue123456`, code: '123456' });
     assert.equal(res.json.error.code, 'challenge_invalid');

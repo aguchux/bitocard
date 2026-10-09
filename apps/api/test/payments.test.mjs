@@ -125,7 +125,7 @@ describe('live top-ups through Flutterwave', () => {
     assert.equal(created.status, 201);
     assert.match(created.json.checkout_url, /^https:\/\/checkout\.flutterwave\.test\/pay\//);
     const call = flw.calls.findLast(c => c.url === '/payments');
-    assert.deepEqual([call.body.amount, call.body.currency, call.body.redirect_url, call.headers.authorization], ['10000.00', 'NGN', 'https://ada.example/wallet', 'Bearer FLWSECK_TEST-fake']);
+    assert.deepEqual([call.body.amount, call.body.currency, call.body.redirect_url, call.headers.authorization], ['10000.00', 'NGN', 'https://ada.example/wallet', 'Bearer FLWSECK-fake']);
     const reference = call.body.tx_ref;
 
     assert.equal((await browser.get(`/v1/wallet/top-ups/${created.json.id}`)).json.status, 'pending', 'nothing paid yet');
@@ -185,6 +185,25 @@ describe('live top-ups through Flutterwave', () => {
     assert.equal(topUp.status, 'failed');
     assert.match(topUp.failure_reason, /did not match/);
     assert.equal((await browser.get('/v1/wallet')).json.available, 0);
+  });
+
+  test('money taken after the payment was closed as failed is never credited, and is refunded', async () => {
+    const { browser, resellerId } = await verifiedReseller();
+    const { json } = await browser.post('/v1/wallet/top-ups', { amount: 60_000 });
+    const reference = flw.calls.findLast(c => c.url === '/payments').body.tx_ref;
+    flw.state.charges[reference] = { id: 9101, status: 'failed', amount: 600, currency: 'NGN', processor_response: 'Declined' };
+    await flutterwaveWebhook({ event: 'charge.completed', data: { id: 9101 } });
+    assert.equal((await browser.get(`/v1/wallet/top-ups/${json.id}`)).json.status, 'failed');
+
+    // The payer tries again on the same Flutterwave page, and this time the card is charged.
+    flw.state.charges[reference] = { id: 9102, status: 'successful', amount: 600, currency: 'NGN', app_fee: 0 };
+    assert.equal((await flutterwaveWebhook({ event: 'charge.completed', data: { id: 9102 } })).status, 200);
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { id: json.id } });
+    assert.deepEqual([payment.status, payment.unmatchedReason, payment.unmatchedAmountMinor, payment.unmatchedTransactionId], ['failed', 'late', 60_000n, '9102']);
+    assert.ok(flw.calls.some(c => c.url === '/transactions/9102/refund'), 'refunded through Flutterwave');
+    assert.equal((await browser.get('/v1/wallet')).json.available, 0, 'never credited');
+    assert.equal(await prisma.journalEntry.count({ where: { resellerId, type: 'top_up' } }), 0);
+    assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.payment.unmatched' } }), 'finance is told');
   });
 
   test('a failed payment is recorded as failed', async () => {

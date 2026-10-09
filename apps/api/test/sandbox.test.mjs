@@ -110,6 +110,14 @@ describe('Sandbox switch and Test connection', () => {
     assert.deepEqual((({ environment, ok }) => [environment, ok])((await admin.post('/v1/admin/integrations/zendit/test')).json), ['sandbox', true]);
   });
 
+  test('test keys are told apart from live keys', async () => {
+    const { isTestKey } = await import('../dist/integrations/endpoints.js');
+    assert.deepEqual(
+      [isTestKey('flutterwave', 'FLWSECK_TEST-x'), isTestKey('flutterwave', 'FLWSECK-x'), isTestKey('stripe', 'sk_test_x'), isTestKey('stripe', 'rk_test_x'), isTestKey('stripe', 'sk_live_x'), isTestKey('monnify', 'MK_TEST_x')],
+      [true, false, true, true, false, false],
+    );
+  });
+
   test('a payment gateway in its sandbox is never used for live money, and its test key is checked', async () => {
     assert.ok(payments.flutterwave);
     await update('flutterwave', { FLUTTERWAVE_SANDBOX: true });
@@ -119,7 +127,10 @@ describe('Sandbox switch and Test connection', () => {
     assert.match(liveKey.json.message, /live key was given for the sandbox/);
     await update('flutterwave', { FLUTTERWAVE_SECRET_KEY: 'FLWSECK_TEST-sandbox-key' });
     assert.equal((await admin.post('/v1/admin/integrations/flutterwave/test')).json.ok, true);
-    await update('flutterwave', { FLUTTERWAVE_SANDBOX: false, FLUTTERWAVE_SECRET_KEY: 'FLWSECK-live-key' });
+    // Sandbox switched off with the test key still saved: test cards must never credit real money.
+    await update('flutterwave', { FLUTTERWAVE_SANDBOX: false });
+    assert.equal(payments.flutterwave, null, 'a test key is never used for live payments');
+    await update('flutterwave', { FLUTTERWAVE_SECRET_KEY: 'FLWSECK-live-key' });
     assert.ok(payments.flutterwave);
   });
 });

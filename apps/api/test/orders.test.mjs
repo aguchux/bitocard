@@ -319,6 +319,55 @@ describe('live orders', () => {
   });
 });
 
+describe('concurrent checks', () => {
+  /** A live top-up left pending at Reloadly, and a copy of it as a check loaded it before anything else changed. */
+  async function pendingOrder() {
+    reloadly.state.orderReply = { status: 'PENDING' };
+    const { browser } = await funded();
+    const q = await quote(browser, { product_id: await mtn(), face_value: 100_000, recipient: { phone: '08031234567' } });
+    const order = (await browser.post('/v1/orders', { quote_id: q.id })).json;
+    reloadly.state.orderReply = { status: 'SUCCESSFUL' };
+    assert.equal(order.status, 'processing');
+    const stale = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, include: { product: true } });
+    return { browser, order, stale };
+  }
+
+  test('a check holding an old copy cannot fail, complete or reschedule an order another check moved to a new supplier', async () => {
+    const orders = server.app.get((await import('../dist/orders/orders.service.js')).OrdersService);
+    const { browser, order, stale } = await pendingOrder();
+    // Another check has meanwhile moved the order to a new supplier attempt.
+    await prisma.order.update({ where: { id: order.id }, data: { supplierReference: `${stale.supplierReference}X`, supplierTransactionId: 'new-attempt', nextCheckAt: null } });
+
+    await orders.failOrFallBack(stale, 'stale failure');
+    await orders.complete(stale, { deliveries: [] });
+    await orders.wait(stale, { status: 'pending', supplierTransactionId: 'old-attempt' });
+
+    const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(row.status, 'processing', 'the new attempt is still in progress');
+    assert.deepEqual([row.supplierTransactionId, row.nextCheckAt], ['new-attempt', null], 'nothing of the old attempt is written over it');
+    assert.equal((await wallet(browser)).reserved, 100_000, 'the money stays held for the new attempt');
+    await prisma.order.update({ where: { id: order.id }, data: { supplierReference: stale.supplierReference, supplierTransactionId: stale.supplierTransactionId } });
+  });
+
+  test('an order moved to another supplier is scheduled for checks even if the run stops before the new supplier answers', async () => {
+    const orders = server.app.get((await import('../dist/orders/orders.service.js')).OrdersService);
+    const { order, stale } = await pendingOrder();
+    const attempt = orders.attempt;
+    orders.attempt = async () => {
+      throw new Error('function stopped');
+    };
+    try {
+      await assert.rejects(orders.failOrFallBack(stale, 'failed at the supplier'));
+    } finally {
+      orders.attempt = attempt;
+    }
+    const row = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    assert.equal(row.status, 'processing');
+    assert.notEqual(row.supplierReference, stale.supplierReference, 'moved to a new attempt');
+    assert.ok(row.nextCheckAt, 'still checked by the orders job');
+  });
+});
+
 describe('tax, receipts and refunds', () => {
   test('tax is charged to the wallet with the wholesale cost and kept for BitoCard to pay', async () => {
     await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: true });

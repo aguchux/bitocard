@@ -68,13 +68,15 @@ export class SignupVerificationService {
     if (record.expiresAt <= new Date()) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_expired', 'That code has expired. Ask for a new one.', 'code');
     }
-    if (record.attempts >= maxCodeAttempts) {
+    // Claim an attempt before comparing, in one statement, so parallel guesses can never get past the limit.
+    const attempt = await this.prisma.signupVerification.updateMany({
+      where: { id: record.id, consumedAt: null, verifiedAt: null, attempts: { lt: maxCodeAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    if (attempt.count === 0) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
     }
-    if (!sameDigest(record.codeHash, digest(email, code))) {
-      await this.prisma.signupVerification.update({ where: { id: record.id }, data: { attempts: { increment: 1 } } });
-      throw invalid;
-    }
+    if (!sameDigest(record.codeHash, digest(email, code))) throw invalid;
     const token = randomToken();
     const expiresAt = new Date(Date.now() + signupTokenLifetimeMs);
     const claimed = await this.prisma.signupVerification.updateMany({

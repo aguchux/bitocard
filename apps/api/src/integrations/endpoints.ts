@@ -43,6 +43,17 @@ export const sandboxSwitches = {
 
 type Config = Partial<Record<keyof AppConfig, unknown>>;
 
+/**
+ * Gateways that tell test from live by the key itself, at the same address: Flutterwave's FLWSECK_TEST-… and Stripe's
+ * sk_test_…/rk_test_… keys. A test key must never be used for live payments, where test cards would credit real money.
+ */
+const testKeyPatterns: Record<string, RegExp> = { flutterwave: /^FLWSECK_TEST/i, stripe: /^(sk|rk)_test_/ };
+
+/** Whether the key is the gateway's test key (always false for gateways whose sandbox is a separate address). */
+export function isTestKey(id: string, key: string | undefined) {
+  return Boolean(key && testKeyPatterns[id]?.test(key));
+}
+
 /** Whether BitoCard's own account with this integration is switched to the provider's sandbox. */
 export function inSandbox(config: Config, id: string) {
   const key = sandboxSwitches[id as keyof typeof sandboxSwitches];

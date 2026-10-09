@@ -131,7 +131,7 @@ describe('integration settings', () => {
     const identity = server.app.get(IdentityService);
     assert.equal(providers.flutterwave, null);
 
-    const partial = await update('flutterwave', { FLUTTERWAVE_SECRET_KEY: 'FLWSECK_TEST-abcdefgh1234' });
+    const partial = await update('flutterwave', { FLUTTERWAVE_SECRET_KEY: 'FLWSECK-abcdefgh1234' });
     assert.equal(partial.json.status, 'incomplete');
     assert.ok(providers.flutterwave);
     const complete = await update('flutterwave', { FLUTTERWAVE_WEBHOOK_HASH: 'hash-value-5678' });
