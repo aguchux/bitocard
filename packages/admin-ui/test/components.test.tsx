@@ -401,22 +401,23 @@ describe('image field', () => {
     expect(calls.some(call => call.method === 'POST')).toBe(false);
   });
 
-  test('picks a file from the library, removes it, and checks typed addresses', async () => {
+  test('picks a file from the library and removes it; the file address is never shown', async () => {
     render(<Harness initial="https://media.test/current.png" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Library' }));
     fireEvent.click(await screen.findByTitle('old.png'));
     expect(screen.getByTestId('value').textContent).toBe('https://media.test/old.png');
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(screen.getByTestId('value').textContent).toBe('');
-    fireEvent.change(screen.getByLabelText('Logo'), { target: { value: 'http://insecure.test/a.png' } });
-    expect(screen.getByText('Use an https:// address.')).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByDisplayValue(/https:/)).toBeNull();
   });
 
-  test('without file storage only the address can be typed', async () => {
+  test('without file storage it says uploads start once storage is set up, and offers no address box', async () => {
     configured = false;
     render(<Harness />);
-    await waitFor(() => expect(calls.some(call => call.url.endsWith('/settings'))).toBe(true));
+    expect(await screen.findByText(/Uploads start once file storage is set up/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Upload' })).toBeNull();
-    expect(screen.getByLabelText('Logo')).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Logo' })).toBeTruthy();
   });
 });

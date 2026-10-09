@@ -71,9 +71,9 @@ function LibraryDialog({ realm, purpose, onPick, onClose }: { realm: MediaRealm;
 }
 
 /**
- * An image setting: upload a file (button or drag and drop), reuse one from the library, or paste an https:// address.
- * Uploads go straight to storage with a signed link and are checked by the API before their address is used; until
- * storage is set up only the address can be typed.
+ * An image setting: upload a file (button or drag and drop) or reuse one from the library. Uploads go straight to
+ * storage with a signed link and are checked by the API before their address is used. The stored file's address is
+ * never shown or typed here (only the preview); until file storage is set up the field says so.
  */
 export function ImageField({ label, value, onChange, realm, purpose, targetId, hint, error, disabled, shape = 'square' }: ImageFieldProps) {
   const id = useId();
@@ -88,8 +88,8 @@ export function ImageField({ label, value, onChange, realm, purpose, targetId, h
   const rules = settings.data?.purposes.find(item => item.purpose === purpose);
   const canUpload = Boolean(settings.data?.configured && rules) && !disabled;
   const address = value.trim();
-  const invalid = address && !https.test(address) ? 'Use an https:// address.' : undefined;
-  const shown = error ?? problem ?? invalid;
+  const invalid = Boolean(address) && !https.test(address);
+  const shown = error ?? problem;
 
   async function send(file: File | undefined) {
     if (!file || !rules) return;
@@ -122,10 +122,12 @@ export function ImageField({ label, value, onChange, realm, purpose, targetId, h
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={`${id}-url`} className="text-sm font-semibold text-ink">
+      <p id={`${id}-label`} className="text-sm font-semibold text-ink">
         {label}
-      </label>
+      </p>
       <div
+        role="group"
+        aria-labelledby={`${id}-label`}
         className={cn('flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-line p-3', dragging && 'border-brand-500 bg-brand-50')}
         onDragOver={event => {
           if (!canUpload) return;
@@ -173,14 +175,19 @@ export function ImageField({ label, value, onChange, realm, purpose, targetId, h
           ) : null}
         </div>
       </div>
-      <Input id={`${id}-url`} value={value} maxLength={1000} disabled={disabled || busy} onChange={event => onChange(event.target.value)} placeholder="https:// (or upload a file)" aria-invalid={Boolean(shown) || undefined} />
       {shown ? (
         <p className="text-sm text-red-700" role="alert">
           {shown}
         </p>
       ) : (
         <p className="text-xs text-muted">
-          {[hint, rules && canUpload ? `${rules.content_types.map(typeLabel).join(', ')}, up to ${sizeLabel(rules.max_bytes)}.` : null].filter(Boolean).join(' ')}
+          {[
+            hint,
+            rules && canUpload ? `${rules.content_types.map(typeLabel).join(', ')}, up to ${sizeLabel(rules.max_bytes)}.` : null,
+            settings.data && !settings.data.configured && !disabled ? 'Uploads start once file storage is set up (Settings > Integrations > File storage).' : null,
+          ]
+            .filter(Boolean)
+            .join(' ')}
         </p>
       )}
       {library ? (
