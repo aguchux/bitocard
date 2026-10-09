@@ -9,10 +9,6 @@ import { PrismaService } from '../database/prisma.service.js';
  */
 export const optionDefinitions = {
   gift_card_payout: { values: ['wallet', 'bank'], description: 'Where customers receive money from gift cards they sell.' },
-  fixed_price_earning: {
-    values: ['markup', 'discount'],
-    description: "How resellers earn on face-value products: a markup on top, or selling at face value and keeping BitoCard's discount.",
-  },
 } as const;
 
 /** Admin switches for gated features, and the scopes each can be set at. Off unless switched on. */

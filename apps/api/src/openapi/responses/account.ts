@@ -49,7 +49,6 @@ const features = shape(
 
 const exampleOptions = {
   gift_card_payout: { value: 'bank', allowed: ['wallet', 'bank'], source: 'reseller' },
-  fixed_price_earning: { value: 'markup', allowed: ['markup', 'discount'], source: 'country_default' },
 };
 
 const exampleReseller = { object: 'reseller', id: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', name: 'Ada Digital', country: 'NG', status: 'active' };

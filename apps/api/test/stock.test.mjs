@@ -177,7 +177,9 @@ describe('selling stock', () => {
     const margined = await admin.patch(`/v1/admin/stock/${item.id}`, { margin_bps: 2000 });
     assert.equal(margined.json.margin_bps, 2000);
     const after = (await browser.post('/v1/quotes', { product_id: item.product.id, face_value: 4999 })).json;
-    assert.ok(after.wholesale > before.wholesale, 'a higher margin raises the wholesale price');
+    assert.notEqual(after.wholesale, before.wholesale, 'a product margin prices it from cost instead of the general rule');
+    const rule = await prisma.pricingRule.findFirstOrThrow({ where: { productId: item.product.id } });
+    assert.deepEqual([rule.kind, rule.marginBps], ['markup', 2000], 'a stock margin is a markup on what BitoCard paid');
 
     const paused = await admin.patch(`/v1/admin/stock/${item.id}`, { on_sale: false });
     assert.deepEqual([paused.json.on_sale, paused.json.paused, paused.json.codes.available], [false, true, 1]);

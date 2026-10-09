@@ -1681,14 +1681,6 @@
                         "bank"
                       ],
                       "source": "reseller"
-                    },
-                    "fixed_price_earning": {
-                      "value": "markup",
-                      "allowed": [
-                        "markup",
-                        "discount"
-                      ],
-                      "source": "country_default"
                     }
                   },
                   "features": {
@@ -1812,8 +1804,7 @@
                       "type": "object",
                       "description": "Each option: the value in effect, what your country allows, and where the value comes from.",
                       "required": [
-                        "gift_card_payout",
-                        "fixed_price_earning"
+                        "gift_card_payout"
                       ],
                       "additionalProperties": false,
                       "properties": {
@@ -1860,50 +1851,6 @@
                               ]
                             }
                           }
-                        },
-                        "fixed_price_earning": {
-                          "type": "object",
-                          "description": "How resellers earn on face-value products: a markup on top, or selling at face value and keeping BitoCard's discount.",
-                          "required": [
-                            "value",
-                            "allowed",
-                            "source"
-                          ],
-                          "additionalProperties": false,
-                          "properties": {
-                            "value": {
-                              "type": [
-                                "string",
-                                "null"
-                              ],
-                              "description": "The value in effect: your choice if your country still allows it, otherwise your country’s default. Null if the option is not available in your country yet.",
-                              "enum": [
-                                "markup",
-                                "discount",
-                                null
-                              ]
-                            },
-                            "allowed": {
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "description": "A value.",
-                                "enum": [
-                                  "markup",
-                                  "discount"
-                                ]
-                              },
-                              "description": "The values your country allows; empty if none yet."
-                            },
-                            "source": {
-                              "type": "string",
-                              "description": "`reseller` (your choice) or `country_default`.",
-                              "enum": [
-                                "reseller",
-                                "country_default"
-                              ]
-                            }
-                          }
                         }
                       }
                     }
@@ -1919,14 +1866,6 @@
                         "bank"
                       ],
                       "source": "reseller"
-                    },
-                    "fixed_price_earning": {
-                      "value": "markup",
-                      "allowed": [
-                        "markup",
-                        "discount"
-                      ],
-                      "source": "country_default"
                     }
                   }
                 }
@@ -11013,6 +10952,209 @@
         "x-bitocard-auth": "api_key"
       }
     },
+    "/v1/catalogue/products/{id}/price-preview": {
+      "get": {
+        "description": "What one sale of a product earns you: BitoCard’s price, your customer’s price and your profit, under the product’s scheme. `discount` products (airtime, data, bills, gift cards…) sell at face value at most: you earn your discount from BitoCard and may give part of it to your customer (`customer_discount_bps`). `markup` products (numbers, software…) are priced up from BitoCard’s price with your markup or a fixed price. Try settings with the query (nothing is saved); save them with `PUT /v1/pricing/markups`.",
+        "operationId": "CatalogueController_preview",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "face_value",
+            "required": false,
+            "in": "query",
+            "description": "The face value to price, in minor units (default: the product’s first value).",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "markup_bps",
+            "required": false,
+            "in": "query",
+            "description": "Try a markup (basis points) without saving it, instead of any fixed price.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customer_discount_bps",
+            "required": false,
+            "in": "query",
+            "description": "Try a customer discount (basis points) without saving it.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "fixed_price",
+            "required": false,
+            "in": "query",
+            "description": "Try a fixed customer price (minor units) without saving it.",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One sale with your settings, or the ones you are trying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePreview"
+                },
+                "example": {
+                  "object": "price_preview",
+                  "product_id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                  "mode": "live",
+                  "currency": "NGN",
+                  "face_value": 100000,
+                  "scheme": "discount",
+                  "face_price": 100000,
+                  "bitocard_price": 98500,
+                  "your_discount": 1500,
+                  "customer_discount": 500,
+                  "customer_price": 99500,
+                  "your_profit": 1000,
+                  "markup_cap_bps": 10000,
+                  "fixed_below_cost": false,
+                  "settings": {
+                    "customer_discount_bps": 50,
+                    "markup_bps": 0,
+                    "fixed_price": null,
+                    "from": {
+                      "customer_discount": "category",
+                      "markup": "none",
+                      "fixed": "none"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview your price and profit",
+        "tags": [
+          "Catalogue"
+        ],
+        "x-bitocard-scopes": [
+          "catalogue:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/catalogue/listing": {
       "post": {
         "description": "Chooses what your BitoCard-hosted store shows: products are shown there only once you list them. Your own systems can sell every product in your catalogue, listed or not. Only products available to you can be listed.",
@@ -11481,7 +11623,7 @@
     },
     "/v1/pricing": {
       "get": {
-        "description": "How you earn on face-value products, the markup cap, and your markups (with the product name for product markups).",
+        "description": "The markup cap and your pricing settings: general (no category), per category and per product (with the product name). Each setting holds a markup (markup products), a customer discount (discount products) or, per product, a fixed price.",
         "operationId": "PricingController_get",
         "parameters": [],
         "responses": {
@@ -11495,20 +11637,31 @@
                 "example": {
                   "object": "pricing",
                   "currency": "NGN",
-                  "earning": "markup",
-                  "markup_cap_percent": 50,
+                  "markup_cap_percent": 100,
                   "markups": [
                     {
+                      "fixed_price": null,
+                      "category": null,
+                      "product_id": null,
+                      "product_name": null,
+                      "markup_bps": 2000,
+                      "customer_discount_bps": 0
+                    },
+                    {
+                      "fixed_price": null,
                       "category": "airtime",
                       "product_id": null,
                       "product_name": null,
-                      "markup_bps": 500
+                      "markup_bps": null,
+                      "customer_discount_bps": 50
                     },
                     {
-                      "category": "gift_cards",
+                      "fixed_price": 1200000,
+                      "category": "virtual_numbers",
                       "product_id": "a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d",
-                      "product_name": "Amazon US",
-                      "markup_bps": 1000
+                      "product_name": "London number",
+                      "markup_bps": null,
+                      "customer_discount_bps": null
                     }
                   ]
                 }
@@ -11587,7 +11740,7 @@
     },
     "/v1/pricing/markups": {
       "put": {
-        "description": "For a whole category, or one product (which overrides its category). Capped by the Markup Protection Scheme.",
+        "description": "For everything (no category or product), a category, or one product (the most specific wins, setting by setting). Only the fields you send change; `null` clears one. Markups are capped by the Markup Protection Scheme; a customer discount never exceeds your own discount.",
         "operationId": "PricingController_setMarkup",
         "parameters": [],
         "requestBody": {
@@ -11602,7 +11755,7 @@
         },
         "responses": {
           "200": {
-            "description": "The markup was set. Returns your pricing.",
+            "description": "The setting was saved. Returns your pricing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11611,20 +11764,31 @@
                 "example": {
                   "object": "pricing",
                   "currency": "NGN",
-                  "earning": "markup",
-                  "markup_cap_percent": 50,
+                  "markup_cap_percent": 100,
                   "markups": [
                     {
+                      "fixed_price": null,
+                      "category": null,
+                      "product_id": null,
+                      "product_name": null,
+                      "markup_bps": 2000,
+                      "customer_discount_bps": 0
+                    },
+                    {
+                      "fixed_price": null,
                       "category": "airtime",
                       "product_id": null,
                       "product_name": null,
-                      "markup_bps": 500
+                      "markup_bps": null,
+                      "customer_discount_bps": 50
                     },
                     {
-                      "category": "gift_cards",
+                      "fixed_price": 1200000,
+                      "category": "virtual_numbers",
                       "product_id": "a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d",
-                      "product_name": "Amazon US",
-                      "markup_bps": 1000
+                      "product_name": "London number",
+                      "markup_bps": null,
+                      "customer_discount_bps": null
                     }
                   ]
                 }
@@ -11710,7 +11874,7 @@
             "bearer": []
           }
         ],
-        "summary": "Set a markup",
+        "summary": "Set your pricing",
         "tags": [
           "Catalogue"
         ],
@@ -11723,12 +11887,14 @@
         "x-bitocard-auth": "api_key"
       },
       "delete": {
+        "description": "Removes your general, category or product setting; the next level up applies again.",
         "operationId": "PricingController_removeMarkup",
         "parameters": [
           {
             "name": "category",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "The category rule to remove; leave out (with no product) for your general rule.",
             "schema": {
               "type": "string",
               "enum": [
@@ -11756,7 +11922,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The markup was removed (or there was none). Returns your pricing.",
+            "description": "The setting was removed (or there was none). Returns your pricing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11765,14 +11931,15 @@
                 "example": {
                   "object": "pricing",
                   "currency": "NGN",
-                  "earning": "markup",
-                  "markup_cap_percent": 50,
+                  "markup_cap_percent": 100,
                   "markups": [
                     {
-                      "category": "airtime",
+                      "fixed_price": null,
+                      "category": null,
                       "product_id": null,
                       "product_name": null,
-                      "markup_bps": 500
+                      "markup_bps": 2000,
+                      "customer_discount_bps": 0
                     }
                   ]
                 }
@@ -11858,7 +12025,7 @@
             "bearer": []
           }
         ],
-        "summary": "Remove a markup",
+        "summary": "Remove a pricing setting",
         "tags": [
           "Catalogue"
         ],
@@ -23115,22 +23282,32 @@
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
-            ]
+            ],
+            "description": "Set for a whole category; leave out (with no product) for everything."
           },
           "product_id": {
             "type": "string",
-            "description": "Set for one product; leave out for the whole category."
+            "description": "Set for one product, which overrides its category and your general settings."
           },
           "markup_bps": {
-            "type": "number",
-            "description": "Markup over wholesale price in basis points (1500 = 15%). At most the Markup Protection Scheme cap.",
-            "example": 1500
+            "type": "object",
+            "description": "Markup products: your markup over BitoCard’s price in basis points (1500 = 15%), at most the Markup Protection Scheme cap (100% or lower). `null` clears it.",
+            "example": 1500,
+            "nullable": true
+          },
+          "customer_discount_bps": {
+            "type": "object",
+            "description": "Discount products: how much of face value you give your customers, in basis points (100 = 1%). Never more than your own discount: the rest is your profit. `null` clears it.",
+            "example": 50,
+            "nullable": true
+          },
+          "fixed_price": {
+            "type": "object",
+            "description": "Markup products, one product only: your customer price in minor units of your currency, instead of a markup. Never below BitoCard’s price (customers then pay BitoCard’s price). `null` clears it.",
+            "example": 950000,
+            "nullable": true
           }
-        },
-        "required": [
-          "category",
-          "markup_bps"
-        ]
+        }
       },
       "CreateEndpointDto": {
         "type": "object",
@@ -26184,8 +26361,7 @@
             "type": "object",
             "description": "Each option: the value in effect, what your country allows, and where the value comes from.",
             "required": [
-              "gift_card_payout",
-              "fixed_price_earning"
+              "gift_card_payout"
             ],
             "additionalProperties": false,
             "properties": {
@@ -26219,50 +26395,6 @@
                       "enum": [
                         "wallet",
                         "bank"
-                      ]
-                    },
-                    "description": "The values your country allows; empty if none yet."
-                  },
-                  "source": {
-                    "type": "string",
-                    "description": "`reseller` (your choice) or `country_default`.",
-                    "enum": [
-                      "reseller",
-                      "country_default"
-                    ]
-                  }
-                }
-              },
-              "fixed_price_earning": {
-                "type": "object",
-                "description": "How resellers earn on face-value products: a markup on top, or selling at face value and keeping BitoCard's discount.",
-                "required": [
-                  "value",
-                  "allowed",
-                  "source"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "value": {
-                    "type": [
-                      "string",
-                      "null"
-                    ],
-                    "description": "The value in effect: your choice if your country still allows it, otherwise your country’s default. Null if the option is not available in your country yet.",
-                    "enum": [
-                      "markup",
-                      "discount",
-                      null
-                    ]
-                  },
-                  "allowed": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "description": "A value.",
-                      "enum": [
-                        "markup",
-                        "discount"
                       ]
                     },
                     "description": "The values your country allows; empty if none yet."
@@ -26711,11 +26843,10 @@
       "Pricing": {
         "type": "object",
         "title": "Pricing",
-        "description": "How you price: your markups, the cap on them, and how you earn on face-value products.",
+        "description": "How you price. Every product sells under one scheme, set by BitoCard: `discount` (face value at most; you earn BitoCard’s discount and may pass part of it on) or `markup` (priced up from BitoCard’s price).",
         "required": [
           "object",
           "currency",
-          "earning",
           "markup_cap_percent",
           "markups"
         ],
@@ -26730,17 +26861,9 @@
             "type": "string",
             "description": "ISO 4217 currency you sell in."
           },
-          "earning": {
-            "type": "string",
-            "description": "How you earn on face-value products (airtime, data, pay-TV and bills in your currency): `markup` (you sell above face value) or `discount` (you sell at face value and earn BitoCard’s discount). Set by your country’s options.",
-            "enum": [
-              "markup",
-              "discount"
-            ]
-          },
           "markup_cap_percent": {
             "type": "integer",
-            "description": "The Markup Protection Scheme cap: your price can be at most this percentage above wholesale price."
+            "description": "The Markup Protection Scheme cap: on markup products, your price can be at most this percentage above BitoCard’s price (100% or lower)."
           },
           "markups": {
             "type": "array",
@@ -26750,24 +26873,33 @@
                 "category",
                 "product_id",
                 "product_name",
-                "markup_bps"
+                "markup_bps",
+                "customer_discount_bps",
+                "fixed_price"
               ],
               "additionalProperties": false,
               "properties": {
                 "category": {
-                  "type": "string",
-                  "description": "The category the markup applies to.",
-                  "enum": [
-                    "gift_cards",
-                    "airtime",
-                    "data",
-                    "bills",
-                    "pay_tv",
-                    "esim",
-                    "software",
-                    "virtual_numbers",
-                    "virtual_cards",
-                    "mobile_money"
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "The category it applies to; null for your general setting (everything).",
+                      "enum": [
+                        "gift_cards",
+                        "airtime",
+                        "data",
+                        "bills",
+                        "pay_tv",
+                        "esim",
+                        "software",
+                        "virtual_numbers",
+                        "virtual_cards",
+                        "mobile_money"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "product_id": {
@@ -26775,7 +26907,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "The product, for a product markup (which overrides its category’s); null for the whole category.",
+                  "description": "The product, for a product setting (which overrides its category’s and your general one).",
                   "format": "uuid"
                 },
                 "product_name": {
@@ -26783,15 +26915,200 @@
                     "string",
                     "null"
                   ],
-                  "description": "The product’s name, for a product markup."
+                  "description": "The product’s name, for a product setting."
                 },
                 "markup_bps": {
-                  "type": "integer",
-                  "description": "Markup over wholesale price in basis points (1500 = 15%)."
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Markup products: your markup over BitoCard’s price in basis points (1500 = 15%). Null: the next level up applies."
+                },
+                "customer_discount_bps": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Discount products: how much of face value you give your customers, in basis points. Null: the next level up applies."
+                },
+                "fixed_price": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Markup products, one product: your fixed customer price, in minor units of `currency`."
                 }
               }
             },
-            "description": "Your markups. Categories and products without one sell at wholesale price (face value for face-value products)."
+            "description": "Your settings: general, per category and per product. A product takes each setting from its own row, else its category’s, else your general one; with none, discount products sell at face value and markup products at BitoCard’s price."
+          }
+        }
+      },
+      "PricePreview": {
+        "type": "object",
+        "title": "PricePreview",
+        "description": "One sale of a product, as you would make it.",
+        "required": [
+          "object",
+          "product_id",
+          "mode",
+          "currency",
+          "face_value",
+          "scheme",
+          "face_price",
+          "bitocard_price",
+          "your_discount",
+          "customer_discount",
+          "customer_price",
+          "your_profit",
+          "markup_cap_bps",
+          "fixed_below_cost",
+          "settings"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `price_preview`.",
+            "const": "price_preview"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "Product ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency of the amounts."
+          },
+          "face_value": {
+            "type": "integer",
+            "description": "The face value priced, in the product’s face currency, in minor units of `currency` (for example kobo or cents)."
+          },
+          "scheme": {
+            "type": "string",
+            "description": "`discount`: sold at face value at most, BitoCard’s discount shared. `markup`: priced up from BitoCard’s price.",
+            "enum": [
+              "discount",
+              "markup"
+            ]
+          },
+          "face_price": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Discount products: the face value in your currency, the most a customer pays."
+          },
+          "bitocard_price": {
+            "type": "integer",
+            "description": "What BitoCard charges you per sale, in minor units of `currency` (for example kobo or cents)."
+          },
+          "your_discount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Discount products: your discount off face value, in minor units."
+          },
+          "customer_discount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Discount products: what you give your customer off face value, in minor units."
+          },
+          "customer_price": {
+            "type": "integer",
+            "description": "What your customer pays (before any tax added at checkout), in minor units of `currency` (for example kobo or cents)."
+          },
+          "your_profit": {
+            "type": "integer",
+            "description": "What you make per sale, in minor units of `currency` (for example kobo or cents)."
+          },
+          "markup_cap_bps": {
+            "type": "integer",
+            "description": "The most you can mark up markup products, in basis points."
+          },
+          "fixed_below_cost": {
+            "type": "boolean",
+            "description": "Your fixed price is below BitoCard’s price, so customers pay BitoCard’s price and you make nothing. Raise it."
+          },
+          "settings": {
+            "type": "object",
+            "description": "Your settings for this product, as used.",
+            "required": [
+              "customer_discount_bps",
+              "markup_bps",
+              "fixed_price",
+              "from"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "customer_discount_bps": {
+                "type": "integer",
+                "description": "The customer discount that applied, in basis points."
+              },
+              "markup_bps": {
+                "type": "integer",
+                "description": "The markup that applied, in basis points."
+              },
+              "fixed_price": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The fixed customer price that applied, in minor units."
+              },
+              "from": {
+                "type": "object",
+                "description": "Which of your settings applied.",
+                "required": [
+                  "customer_discount",
+                  "markup",
+                  "fixed"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "customer_discount": {
+                    "type": "string",
+                    "description": "Where the customer discount came from.",
+                    "enum": [
+                      "product",
+                      "category",
+                      "general",
+                      "none"
+                    ]
+                  },
+                  "markup": {
+                    "type": "string",
+                    "description": "Where the markup came from.",
+                    "enum": [
+                      "product",
+                      "category",
+                      "general",
+                      "none"
+                    ]
+                  },
+                  "fixed": {
+                    "type": "string",
+                    "description": "Where the fixed price came from.",
+                    "enum": [
+                      "product",
+                      "none"
+                    ]
+                  }
+                }
+              }
+            }
           }
         }
       },

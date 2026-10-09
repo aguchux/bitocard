@@ -18,7 +18,7 @@ import {
   type SupplierProduct,
 } from '../generated/prisma/client.js';
 import { exactFeeNano, maxFeeMinor, pickFeeRule } from '../fees/platform-fees.service.js';
-import { SettingsService } from '../settings/settings.service.js';
+import { minor } from '../ledger/mode.js';
 import { stockSupplier } from '../suppliers/stock.adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 
@@ -45,7 +45,6 @@ export type PricingContext = {
   mode: LedgerMode;
   country: Country & { categories: CountryCategory[] };
   currency: string;
-  earning: 'markup' | 'discount';
   international: boolean;
   capBps: number;
   markups: ResellerMarkup[];
@@ -77,8 +76,47 @@ export type Priced = {
   wholesale: bigint;
   /** The reseller price before tax handling. */
   price: bigint;
-  basis: 'markup' | 'discount' | 'cost';
+  /** `discount`: sold at face value with the supplier's discount shared; `cost`: priced up from cost (markup or fixed). */
+  basis: 'discount' | 'cost';
+  /** The face value in the reseller currency (what a discount product's customer pays at most). */
+  face: bigint;
+  /** BitoCard's rule that priced it (own-supplier offers: the scheme only). */
+  rule: ResolvedRule;
+  /** The reseller's settings that applied. */
+  terms: ResellerTerms;
+  /** A fixed customer price below BitoCard's price: the customer pays BitoCard's price instead. */
+  fixedBelowCost: boolean;
 };
+
+export const priceKinds = ['auto', 'discount', 'markup', 'fixed'] as const;
+export type PriceKind = (typeof priceKinds)[number];
+type Level = 'product' | 'supplier' | 'category' | 'country' | 'general' | 'default';
+
+/** BitoCard's rule for one offer, and the level it came from. */
+export type ResolvedRule = {
+  kind: PriceKind;
+  marginBps: number;
+  resellerDiscountBps: number;
+  fixedMinor: bigint | null;
+  fixedCurrency: string | null;
+  ruleId: string | null;
+  level: Level;
+};
+
+/** The reseller's settings for one product, each with the level it came from. */
+export type ResellerTerms = {
+  customerDiscountBps: number;
+  markupBps: number;
+  fixedMinor: bigint | null;
+  from: { customerDiscount: 'product' | 'category' | 'general' | 'none'; markup: 'product' | 'category' | 'general' | 'none'; fixed: 'product' | 'none' };
+};
+
+/** Maximum BitoCard markup (200%) and reseller markup (100%), in basis points. */
+export const maxMarginBps = 20_000;
+export const maxResellerMarkupBps = 10_000;
+
+/** Single-value products can take a fixed price; a fixed price on a range or a list of values would be one price for all. */
+export const singleValue = (product: Pick<Product, 'denominationType' | 'fixedValues'>) => product.denominationType === 'fixed' && product.fixedValues.length === 1;
 
 /** Offers for one face value only (a supplier listing each value as its own offer) carry it as `meta.face_value`. */
 export const offerCovers = (offer: { meta: Prisma.JsonValue | null }, faceValue: bigint) => {
@@ -87,6 +125,9 @@ export const offerCovers = (offer: { meta: Prisma.JsonValue | null }, faceValue:
 };
 
 const mulBps = (amount: bigint, bps: number) => amount * BigInt(bps);
+/** amount x bps/10000, rounded down (a discount is never more than its rate). */
+const shareBps = (amount: bigint, bps: number) => mulBps(amount, bps) / 10_000n;
+const min = (a: bigint, b: bigint) => (a < b ? a : b);
 const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
 /** amount x (1 + bps/10000), rounded up. */
 const addBps = (amount: bigint, bps: number) => ceilDiv(mulBps(amount, 10_000 + bps), 10_000n);
@@ -103,7 +144,6 @@ export class PricingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fx: FxService,
-    private readonly settings: SettingsService,
     private readonly adapters: SupplierAdapters,
   ) {}
 
@@ -112,7 +152,6 @@ export class PricingService {
     if (!reseller.countryRef) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'Set your business country before using the catalogue.');
     }
-    const options = await this.settings.effectiveOptions(resellerId);
     const markets = await this.prisma.supplierMarket.findMany({ where: { countryCode: reseller.countryRef.code, enabled: true } });
     const own = await this.prisma.resellerOffer.findMany({
       where: { resellerId, mode, available: true, connection: { status: 'active', routing: { not: 'off' } } },
@@ -125,7 +164,6 @@ export class PricingService {
       mode,
       country: reseller.countryRef,
       currency: reseller.countryRef.currency,
-      earning: options.fixed_price_earning?.value === 'discount' ? 'discount' : 'markup',
       international: reseller.plan.features.includes('international_selling'),
       capBps: reseller.countryRef.markupCapPercent * 100,
       markups: await this.prisma.resellerMarkup.findMany({ where: { resellerId } }),
@@ -150,24 +188,57 @@ export class PricingService {
     return null;
   }
 
-  /** The most specific BitoCard pricing rule for a product in the reseller market. */
-  rule(ctx: PricingContext, product: Product) {
+  /**
+   * BitoCard's rule for an offer: the most specific of product, supplier, category and country (in that order of
+   * weight), else the general rule. Fixed prices only apply to single-value products (`skipFixed` leaves them out
+   * entirely, for renewals priced from a monthly cost).
+   */
+  rule(ctx: PricingContext, product: Product, supplierCode: string | null, options: { skipFixed?: boolean } = {}): ResolvedRule {
     let best: PricingRule | null = null;
     let bestScore = -1;
     for (const rule of ctx.rules) {
       if (rule.productId && rule.productId !== product.id) continue;
+      if (rule.supplierCode && rule.supplierCode !== supplierCode) continue;
       if (rule.category && rule.category !== product.category) continue;
       if (rule.countryCode && rule.countryCode !== ctx.country.code) continue;
-      const score = (rule.productId ? 4 : 0) + (rule.category ? 2 : 0) + (rule.countryCode ? 1 : 0);
+      if (rule.kind === 'fixed' && (options.skipFixed || !singleValue(product) || rule.fixedMinor === null || !rule.fixedCurrency)) continue;
+      const score = (rule.productId ? 8 : 0) + (rule.supplierCode ? 4 : 0) + (rule.category ? 2 : 0) + (rule.countryCode ? 1 : 0);
       if (score > bestScore) [best, bestScore] = [rule, score];
     }
-    return { marginBps: best?.marginBps ?? 0, resellerDiscountBps: best?.resellerDiscountBps ?? 0 };
+    if (!best) return { kind: 'auto', marginBps: 0, resellerDiscountBps: 0, fixedMinor: null, fixedCurrency: null, ruleId: null, level: 'default' };
+    const level: Level = best.productId ? 'product' : best.supplierCode ? 'supplier' : best.category ? 'category' : best.countryCode ? 'country' : 'general';
+    return {
+      kind: best.kind as PriceKind,
+      marginBps: best.marginBps,
+      resellerDiscountBps: best.resellerDiscountBps,
+      fixedMinor: best.fixedMinor,
+      fixedCurrency: best.fixedCurrency,
+      ruleId: best.id,
+      level,
+    };
   }
 
-  /** The reseller markup for a product (its own override, else the category one), never above the cap. */
-  markupBps(ctx: PricingContext, product: Product) {
-    const own = ctx.markups.find(m => m.productId === product.id) ?? ctx.markups.find(m => m.category === product.category && m.productId === null);
-    return Math.min(own?.markupBps ?? 0, ctx.capBps);
+  /** The reseller's settings for a product: each field from their product rule, else category rule, else general rule. */
+  terms(ctx: PricingContext, product: Product): ResellerTerms {
+    const ofProduct = ctx.markups.find(m => m.productId === product.id);
+    const ofCategory = ctx.markups.find(m => m.productId === null && m.category === product.category);
+    const general = ctx.markups.find(m => m.productId === null && m.category === null);
+    const pick = <K extends 'markupBps' | 'customerDiscountBps'>(key: K) => {
+      for (const [row, from] of [[ofProduct, 'product'], [ofCategory, 'category'], [general, 'general']] as const) {
+        const value = row?.[key];
+        if (value !== null && value !== undefined) return { value, from };
+      }
+      return { value: 0, from: 'none' as const };
+    };
+    const markup = pick('markupBps');
+    const discount = pick('customerDiscountBps');
+    const fixed = ofProduct?.fixedMinor ?? null;
+    return {
+      customerDiscountBps: discount.value,
+      markupBps: Math.min(markup.value, ctx.capBps),
+      fixedMinor: fixed,
+      from: { customerDiscount: discount.from, markup: markup.from, fixed: fixed === null ? 'none' : 'product' },
+    };
   }
 
   private async rate(ctx: PricingContext, currency: string) {
@@ -206,38 +277,76 @@ export class PricingService {
    * What the reseller pays BitoCard for a supplier cost outside an order (a number's renewal, an SMS): converted to
    * the reseller currency the conservative way, plus BitoCard's margin for the product (never below cost).
    */
-  async wholesaleFor(ctx: PricingContext, product: Product, supplierCost: bigint, costCurrency: string) {
+  async wholesaleFor(ctx: PricingContext, product: Product, supplierCost: bigint, costCurrency: string, supplierCode: string | null = null) {
     const { amount: cost } = await this.convert(ctx, supplierCost, costCurrency);
-    const wholesale = addBps(cost, this.rule(ctx, product).marginBps);
+    const rule = this.rule(ctx, product, supplierCode, { skipFixed: true });
+    const wholesale = rule.kind === 'markup' || rule.kind === 'auto' ? addBps(cost, rule.marginBps) : cost;
     return { cost, wholesale: wholesale < cost ? cost : wholesale, currency: ctx.currency };
+  }
+
+  /**
+   * One unit through one source, given its cost in the reseller currency. Discount: the customer pays face value at
+   * most; BitoCard's discount is face value minus cost; the reseller gets their share of it (never more), and gives
+   * their customers their share of theirs. Markup and fixed: BitoCard's price on cost, then the reseller's markup or
+   * fixed price on that. Null when it cannot be sold without loss (cost above face value, or a fixed price below cost).
+   */
+  private settle(ctx: PricingContext, product: Product, face: bigint, cost: bigint, given: ResolvedRule, fixedWholesale: bigint | null, ownFee: bigint | null) {
+    const terms = this.terms(ctx, product);
+    // Automatic: local airtime, data, bills and pay-TV always sell at face value at most (discount); anything else is
+    // discount where the supplier gives one (cost, with any fee, below face value), else markup.
+    const local = faceValueCategories.has(product.category) && product.faceCurrency === ctx.currency;
+    const rule: ResolvedRule = given.kind === 'auto' ? { ...given, kind: local || cost + (ownFee ?? 0n) < face ? 'discount' : 'markup' } : given;
+    let wholesale: bigint;
+    let price: bigint;
+    let fixedBelowCost = false;
+    if (rule.kind === 'discount') {
+      const floor = ownFee === null ? cost : cost + ownFee;
+      if (floor > face) return null;
+      // BitoCard's own offers: the reseller's discount, at most what the supplier gives. Own supplier: their cost plus BitoCard's fee.
+      wholesale = ownFee === null ? face - min(shareBps(face, rule.resellerDiscountBps), face - cost) : floor;
+      price = face - min(shareBps(face, terms.customerDiscountBps), face - wholesale);
+    } else {
+      wholesale = ownFee !== null ? cost + ownFee : rule.kind === 'fixed' ? fixedWholesale! : addBps(cost, rule.marginBps);
+      if (wholesale < cost) return null;
+      if (terms.fixedMinor !== null) {
+        fixedBelowCost = terms.fixedMinor < wholesale;
+        price = fixedBelowCost ? wholesale : terms.fixedMinor;
+      } else {
+        price = addBps(wholesale, terms.markupBps);
+      }
+    }
+    return { wholesale, price, terms, fixedBelowCost, rule, basis: rule.kind === 'discount' ? ('discount' as const) : ('cost' as const) };
+  }
+
+  /** The face value in the reseller currency (converted the same conservative way as costs). */
+  private async faceIn(ctx: PricingContext, product: Product, faceValue: bigint) {
+    return (await this.convert(ctx, faceValue, product.faceCurrency)).amount;
   }
 
   /** Prices one unit of a face value through the cheapest viable offer, optionally leaving some suppliers out. */
   async price(ctx: PricingContext, product: ProductWithOffers, faceValue: bigint, exclude?: ReadonlySet<string>): Promise<Priced> {
-    const rule = this.rule(ctx, product);
-    const markup = this.markupBps(ctx, product);
-    const faceValueProduct = product.faceCurrency === ctx.currency && faceValueCategories.has(product.category);
+    const face = await this.faceIn(ctx, product, faceValue);
     let best: (Priced & { offer: Offer }) | null = null;
     for (const offer of this.eligibleOffers(ctx, product, exclude)) {
-      if (!offerCovers(offer, faceValue)) continue;
-      const discounted = new Decimal(faceValue.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
-      const supplierCost = BigInt(discounted.toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
-      const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
-      let priced: Priced & { offer: Offer };
-      if (faceValueProduct && ctx.earning === 'discount') {
-        priced = { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, wholesale: faceValue - mulBps(faceValue, rule.resellerDiscountBps) / 10_000n, price: faceValue, basis: 'discount' };
-      } else if (faceValueProduct) {
-        priced = { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, wholesale: faceValue, price: addBps(faceValue, markup), basis: 'markup' };
-      } else {
-        const wholesale = addBps(cost, rule.marginBps);
-        priced = { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, wholesale, price: addBps(wholesale, markup), basis: 'cost' };
-      }
-      // BitoCard never sells below its own cost.
-      if (priced.wholesale < cost) continue;
-      if (!best || cost < best.cost || (cost === best.cost && offer.priority < best.offer.priority)) best = priced;
+      const priced = await this.priceOffer(ctx, product, faceValue, face, offer);
+      if (!priced) continue;
+      if (!best || priced.cost < best.cost || (priced.cost === best.cost && offer.priority < best.offer.priority)) best = priced;
     }
     if (!best) throw unavailable('product_unavailable', 'This product is not available right now.');
     return best;
+  }
+
+  /** One unit through one of BitoCard's offers under its rule, or null if that offer cannot be sold without loss. */
+  async priceOffer(ctx: PricingContext, product: Product, faceValue: bigint, face: bigint, offer: Offer): Promise<(Priced & { offer: Offer }) | null> {
+    if (!offerCovers(offer, faceValue)) return null;
+    const discounted = new Decimal(faceValue.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
+    const supplierCost = BigInt(discounted.toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
+    const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
+    const rule = this.rule(ctx, product, offer.supplierCode);
+    const fixed = rule.kind === 'fixed' ? (await this.convert(ctx, rule.fixedMinor!, rule.fixedCurrency!)).amount : null;
+    const settled = this.settle(ctx, product, face, cost, rule, fixed, null);
+    if (!settled) return null;
+    return { offer, source: 'bitocard', supplierCost, fxRate: rate, cost, face, ...settled };
   }
 
   /**
@@ -246,31 +355,32 @@ export class PricingService {
    * products keep their face-value price; offers that would sell below cost plus fee are skipped.
    */
   async priceOwn(ctx: PricingContext, product: Product, faceValue: bigint): Promise<Priced | null> {
-    const markup = this.markupBps(ctx, product);
-    const faceValueProduct = product.faceCurrency === ctx.currency && faceValueCategories.has(product.category);
-    const rule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category, planCode: ctx.planCode });
+    const feeRule = pickFeeRule(ctx.feeRules, { kind: 'supplier_order', countryCode: ctx.country.code, category: product.category, planCode: ctx.planCode });
+    const face = await this.faceIn(ctx, product, faceValue);
     let best: Priced | null = null;
     for (const offer of ctx.own.get(product.id) ?? []) {
       if (!offerCovers(offer, faceValue)) continue;
       const supplierCost = BigInt(new Decimal(faceValue.toString()).mul(offer.costRatio).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
       const { amount: cost, rate } = await this.convert(ctx, supplierCost, offer.costCurrency);
-      const base = faceValueProduct ? faceValue : cost;
-      const fee = maxFeeMinor(exactFeeNano(base, rule?.ratePpb ?? 0), rule?.minFeeMinor ?? null);
-      const wholesale = cost + fee;
-      const price = faceValueProduct ? (ctx.earning === 'discount' ? faceValue : addBps(faceValue, markup)) : addBps(wholesale, markup);
-      if (price < wholesale) continue;
+      // The scheme follows BitoCard's rule for the product; BitoCard's fee replaces its margin or discount share.
+      const given = this.rule(ctx, product, offer.supplierCode);
+      const local = faceValueCategories.has(product.category) && product.faceCurrency === ctx.currency;
+      const discount = given.kind === 'discount' || (given.kind === 'auto' && (local || cost < face));
+      const base = discount ? face : cost;
+      const fee = maxFeeMinor(exactFeeNano(base, feeRule?.ratePpb ?? 0), feeRule?.minFeeMinor ?? null);
+      const settled = this.settle(ctx, product, face, cost, { ...given, kind: discount ? 'discount' : 'markup' }, null, fee);
+      if (!settled) continue;
       const priced: Priced = {
         offer,
         source: 'own',
         connectionId: offer.connectionId,
         routing: offer.connection.routing,
-        fee: { ruleId: rule?.id ?? null, ratePpb: rule?.ratePpb ?? 0, baseMinor: base, minFeeMinor: rule?.minFeeMinor ?? null },
+        fee: { ruleId: feeRule?.id ?? null, ratePpb: feeRule?.ratePpb ?? 0, baseMinor: base, minFeeMinor: feeRule?.minFeeMinor ?? null },
         supplierCost,
         fxRate: rate,
         cost,
-        wholesale,
-        price,
-        basis: faceValueProduct ? (ctx.earning === 'discount' ? 'discount' : 'markup') : 'cost',
+        face,
+        ...settled,
       };
       // Preferred accounts first, then the cheapest.
       const rank = (item: Priced) => (item.routing === 'preferred' ? 0 : 1);
@@ -294,7 +404,7 @@ export class PricingService {
     }
   }
 
-  // -- Reseller markups ------------------------------------------------------------------------------------------
+  // -- Reseller pricing --------------------------------------------------------------------------------------------
 
   async pricingSettings(resellerId: string) {
     const ctx = await this.context(resellerId, 'live');
@@ -303,52 +413,164 @@ export class PricingService {
     return {
       object: 'pricing' as const,
       currency: ctx.currency,
-      earning: ctx.earning,
-      markup_cap_percent: ctx.country.markupCapPercent,
-      markups: ctx.markups.map(m => ({ category: m.category, product_id: m.productId, product_name: m.productId ? (names.get(m.productId) ?? null) : null, markup_bps: m.markupBps })),
+      markup_cap_percent: Math.min(ctx.country.markupCapPercent, maxResellerMarkupBps / 100),
+      markups: ctx.markups.map(m => ({
+        category: m.category,
+        product_id: m.productId,
+        product_name: m.productId ? (names.get(m.productId) ?? null) : null,
+        markup_bps: m.markupBps,
+        customer_discount_bps: m.customerDiscountBps,
+        fixed_price: m.fixedMinor === null ? null : Number(m.fixedMinor),
+      })),
     };
   }
 
-  async setMarkup(resellerId: string, input: { category: ProductCategory; product_id?: string; markup_bps: number }) {
+  /**
+   * Sets the reseller's pricing for everything (no category), a category, or one product. Only the fields sent change;
+   * `null` clears one. `markup_bps` is for markup products (capped by the Markup Protection Scheme), `customer_discount_bps`
+   * for discount products, `fixed_price` (a customer price in the reseller currency) for one product.
+   */
+  async setMarkup(
+    resellerId: string,
+    input: { category?: ProductCategory | null; product_id?: string | null; markup_bps?: number | null; customer_discount_bps?: number | null; fixed_price?: number | null },
+  ) {
     const ctx = await this.context(resellerId, 'live');
-    if (input.markup_bps > ctx.capBps) {
-      throw new ApiError(
-        HttpStatus.BAD_REQUEST,
-        'invalid_request_error',
-        'markup_above_cap',
-        `The Markup Protection Scheme allows at most ${ctx.country.markupCapPercent}% above wholesale price.`,
-        'markup_bps',
-      );
+    const cap = Math.min(ctx.capBps, maxResellerMarkupBps);
+    if (input.markup_bps !== undefined && input.markup_bps !== null && input.markup_bps > cap) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'markup_above_cap', `The Markup Protection Scheme allows at most ${cap / 100}% above BitoCard's price.`, 'markup_bps');
     }
+    let category = input.category ?? null;
     if (input.product_id) {
       const product = await this.prisma.product.findUnique({ where: { id: input.product_id } });
-      if (!product || product.category !== input.category) {
+      if (!product || (category && product.category !== category)) {
         throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such product in this category.', 'product_id');
       }
+      category = product.category;
+    } else if (input.fixed_price !== undefined && input.fixed_price !== null) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A fixed price is set for one product.', 'fixed_price');
     }
     const productId = input.product_id ?? null;
-    const existing = await this.prisma.resellerMarkup.findFirst({ where: { resellerId, category: input.category, productId } });
-    if (existing) await this.prisma.resellerMarkup.update({ where: { id: existing.id }, data: { markupBps: input.markup_bps } });
-    else await this.prisma.resellerMarkup.create({ data: { resellerId, category: input.category, productId, markupBps: input.markup_bps } });
+    const data = {
+      ...(input.markup_bps !== undefined ? { markupBps: input.markup_bps } : {}),
+      ...(input.customer_discount_bps !== undefined ? { customerDiscountBps: input.customer_discount_bps } : {}),
+      ...(input.fixed_price !== undefined ? { fixedMinor: input.fixed_price === null ? null : BigInt(input.fixed_price) } : {}),
+    };
+    const existing = await this.prisma.resellerMarkup.findFirst({ where: { resellerId, category: productId ? undefined : category, productId } });
+    if (existing) await this.prisma.resellerMarkup.update({ where: { id: existing.id }, data });
+    else await this.prisma.resellerMarkup.create({ data: { resellerId, category, productId, ...data } });
     return this.pricingSettings(resellerId);
   }
 
-  async removeMarkup(resellerId: string, category: ProductCategory, productId: string | null) {
-    await this.prisma.resellerMarkup.deleteMany({ where: { resellerId, category, productId } });
+  async removeMarkup(resellerId: string, category: ProductCategory | null, productId: string | null) {
+    await this.prisma.resellerMarkup.deleteMany({ where: productId ? { resellerId, productId } : { resellerId, category, productId: null } });
     return this.pricingSettings(resellerId);
+  }
+
+  /**
+   * What one sale of a product earns the reseller, with their settings or ones they are trying (`trial`, nothing saved):
+   * BitoCard's price, the customer's price and their profit, under the product's scheme.
+   */
+  async preview(
+    resellerId: string,
+    mode: LedgerMode,
+    product: ProductWithOffers,
+    faceValue: bigint | null,
+    trial: { markup_bps?: number; customer_discount_bps?: number; fixed_price?: number | null },
+  ) {
+    const ctx = await this.context(resellerId, mode);
+    const reason = this.unavailableReason(ctx, product);
+    if (reason) throw reason;
+    if (trial.markup_bps !== undefined || trial.customer_discount_bps !== undefined || trial.fixed_price !== undefined) {
+      const current = ctx.markups.find(m => m.productId === product.id);
+      const row: ResellerMarkup = {
+        id: current?.id ?? 'trial',
+        resellerId,
+        category: product.category,
+        productId: product.id,
+        markupBps: trial.markup_bps ?? current?.markupBps ?? null,
+        customerDiscountBps: trial.customer_discount_bps ?? current?.customerDiscountBps ?? null,
+        // Trying a markup tries it instead of a saved fixed price.
+        fixedMinor:
+          trial.fixed_price !== undefined && trial.fixed_price !== null
+            ? BigInt(trial.fixed_price)
+            : trial.fixed_price === null || trial.markup_bps !== undefined
+              ? null
+              : (current?.fixedMinor ?? null),
+        updatedAt: new Date(),
+      };
+      ctx.markups = [...ctx.markups.filter(m => m.productId !== product.id), row];
+    }
+    const face = faceValue ?? product.fixedValues[0] ?? product.minValueMinor ?? null;
+    if (face === null || face <= 0n) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Say which face value to price.', 'face_value');
+    const priced = await this.choose(ctx, product, face);
+    const discount = priced.basis === 'discount';
+    return {
+      object: 'price_preview' as const,
+      product_id: product.id,
+      mode,
+      currency: ctx.currency,
+      face_value: minor(face),
+      scheme: discount ? ('discount' as const) : ('markup' as const),
+      /** Discount products: the most a customer pays, in your currency. */
+      face_price: discount ? minor(priced.face) : null,
+      /** What BitoCard charges you per sale. */
+      bitocard_price: minor(priced.wholesale),
+      /** Discount products: your discount off face value. */
+      your_discount: discount ? minor(priced.face - priced.wholesale) : null,
+      /** Discount products: what you give your customer off face value. */
+      customer_discount: discount ? minor(priced.face - priced.price) : null,
+      customer_price: minor(priced.price),
+      your_profit: minor(priced.price - priced.wholesale),
+      markup_cap_bps: Math.min(ctx.capBps, maxResellerMarkupBps),
+      fixed_below_cost: priced.fixedBelowCost,
+      settings: {
+        customer_discount_bps: priced.terms.customerDiscountBps,
+        markup_bps: priced.terms.markupBps,
+        fixed_price: priced.terms.fixedMinor === null ? null : minor(priced.terms.fixedMinor),
+        from: { customer_discount: priced.terms.from.customerDiscount, markup: priced.terms.from.markup, fixed: priced.terms.from.fixed },
+      },
+    };
   }
 
   // -- BitoCard pricing rules (admin) ----------------------------------------------------------------------------
 
   async listRules() {
-    const rules = await this.prisma.pricingRule.findMany({ orderBy: [{ category: 'asc' }, { countryCode: 'asc' }] });
+    const rules = await this.prisma.pricingRule.findMany({ orderBy: [{ category: 'asc' }, { countryCode: 'asc' }, { supplierCode: 'asc' }] });
     return { object: 'list' as const, data: rules.map(presentRule) };
   }
 
-  async setRule(input: { category?: ProductCategory; country?: string; product_id?: string; margin_bps: number; reseller_discount_bps?: number }) {
-    const scope = { category: input.category ?? null, countryCode: input.country?.toUpperCase() ?? null, productId: input.product_id ?? null };
+  async setRule(input: {
+    category?: ProductCategory;
+    country?: string;
+    supplier_code?: string;
+    product_id?: string;
+    kind?: PriceKind;
+    margin_bps?: number;
+    reseller_discount_bps?: number;
+    fixed_price?: number;
+    fixed_currency?: string;
+  }) {
+    const kind: PriceKind = input.kind ?? 'auto';
+    const invalid = (message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', message, param);
+    if (kind === 'fixed') {
+      if (!input.product_id && !input.supplier_code) throw invalid('A fixed price is set for a supplier or a product.', 'kind');
+      if (!input.fixed_price || !input.fixed_currency) throw invalid('Give the fixed price and its currency.', 'fixed_price');
+      if (input.product_id) {
+        const product = await this.prisma.product.findUnique({ where: { id: input.product_id } });
+        if (!product) throw invalid('No such product.', 'product_id');
+        if (!singleValue(product)) throw invalid('A fixed price fits a product with one value only; use a markup or a discount for this one.', 'kind');
+      }
+    }
+    if (input.supplier_code && !(await this.prisma.supplier.findUnique({ where: { code: input.supplier_code } }))) throw invalid('No such supplier.', 'supplier_code');
+    const scope = { category: input.category ?? null, countryCode: input.country?.toUpperCase() ?? null, supplierCode: input.supplier_code ?? null, productId: input.product_id ?? null };
     const existing = await this.prisma.pricingRule.findFirst({ where: scope });
-    const data = { marginBps: input.margin_bps, resellerDiscountBps: input.reseller_discount_bps ?? 0 };
+    const data = {
+      kind,
+      marginBps: input.margin_bps ?? existing?.marginBps ?? 0,
+      resellerDiscountBps: input.reseller_discount_bps ?? existing?.resellerDiscountBps ?? 0,
+      fixedMinor: kind === 'fixed' ? BigInt(input.fixed_price!) : null,
+      fixedCurrency: kind === 'fixed' ? input.fixed_currency!.toUpperCase() : null,
+    };
     const rule = existing ? await this.prisma.pricingRule.update({ where: { id: existing.id }, data }) : await this.prisma.pricingRule.create({ data: { ...scope, ...data } });
     return { before: existing, after: rule, presented: presentRule(rule) };
   }
@@ -356,12 +578,117 @@ export class PricingService {
   async deleteRule(id: string) {
     const rule = await this.prisma.pricingRule.findUnique({ where: { id } });
     if (!rule) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such pricing rule.');
-    if (!rule.category && !rule.countryCode && !rule.productId) {
+    if (!rule.category && !rule.countryCode && !rule.productId && !rule.supplierCode) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'The default rule can be changed but not removed.');
     }
     await this.prisma.pricingRule.delete({ where: { id } });
     return rule;
   }
+
+  /**
+   * An admin's view of how one product sells in a market: every supplier offer with its cost, BitoCard's discount from
+   * it, the rule that applies and what BitoCard makes per sale, with the current rules or a trial product rule (nothing saved).
+   */
+  async adminPreview(
+    countryCode: string,
+    product: ProductWithOffers,
+    faceValue: bigint | null,
+    trial: { kind?: PriceKind; margin_bps?: number; reseller_discount_bps?: number; fixed_price?: number; fixed_currency?: string } | null,
+  ) {
+    const country = await this.prisma.country.findUnique({ where: { code: countryCode.toUpperCase() }, include: { categories: true } });
+    if (!country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such market.', 'country');
+    const markets = await this.prisma.supplierMarket.findMany({ where: { countryCode: country.code, enabled: true } });
+    const ctx: PricingContext = {
+      resellerId: '',
+      mode: 'live',
+      country,
+      currency: country.currency,
+      international: true,
+      capBps: country.markupCapPercent * 100,
+      markups: [],
+      rules: await this.prisma.pricingRule.findMany(),
+      markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
+      rates: new Map(),
+      planCode: 'standard',
+      feeRules: [],
+      own: new Map(),
+    };
+    const current = this.rule(ctx, product, null);
+    if (trial?.kind) {
+      const row: PricingRule = {
+        id: 'trial',
+        category: null,
+        countryCode: null,
+        supplierCode: null,
+        productId: product.id,
+        kind: trial.kind,
+        marginBps: trial.margin_bps ?? 0,
+        resellerDiscountBps: trial.reseller_discount_bps ?? 0,
+        fixedMinor: trial.kind === 'fixed' && trial.fixed_price ? BigInt(trial.fixed_price) : null,
+        fixedCurrency: trial.kind === 'fixed' ? (trial.fixed_currency ?? country.currency).toUpperCase() : null,
+        updatedAt: new Date(),
+      };
+      ctx.rules = [...ctx.rules.filter(rule => rule.productId !== product.id || rule.supplierCode || rule.category || rule.countryCode), row];
+    }
+    const face = faceValue ?? product.fixedValues[0] ?? product.minValueMinor ?? null;
+    if (face === null || face <= 0n) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Say which face value to price.', 'face_value');
+    const faceLocal = await this.faceIn(ctx, product, face);
+    const offers = [];
+    let chosen: string | null = null;
+    let cheapest: bigint | null = null;
+    for (const offer of product.supplierProducts) {
+      const eligible = this.eligibleOffers(ctx, { ...product, supplierProducts: [offer] }).length === 1;
+      const priced = eligible ? await this.priceOffer(ctx, product, face, faceLocal, offer).catch(() => null) : null;
+      const rule = this.rule(ctx, product, offer.supplierCode);
+      const discounted = new Decimal(face.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
+      const supplierCost = BigInt(discounted.toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
+      const cost = priced?.cost ?? (await this.convert(ctx, supplierCost, offer.costCurrency).catch(() => ({ amount: null }))).amount;
+      if (priced && (cheapest === null || priced.cost < cheapest)) [cheapest, chosen] = [priced.cost, offer.id];
+      offers.push({
+        offer_id: offer.id,
+        supplier_code: offer.supplierCode,
+        supplier_name: offer.supplier.name,
+        supplier_cost: cost === null ? null : minor(cost),
+        supplier_discount_bps: cost === null || faceLocal <= 0n ? null : Number(((faceLocal - cost) * 10_000n) / faceLocal),
+        rule: presentResolved(priced?.rule ?? rule),
+        scheme: priced ? (priced.basis === 'discount' ? 'discount' : 'markup') : null,
+        sellable: Boolean(priced),
+        reason: priced ? null : !eligible ? 'not_offered' : rule.kind === 'discount' ? 'cost_above_face_value' : rule.kind === 'fixed' ? 'price_below_cost' : 'not_priced',
+        wholesale: priced ? minor(priced.wholesale) : null,
+        bitocard_profit: priced ? minor(priced.wholesale - priced.cost) : null,
+        reseller_discount: priced && priced.basis === 'discount' ? minor(priced.face - priced.wholesale) : null,
+        chosen: false,
+      });
+    }
+    for (const item of offers) item.chosen = item.offer_id === chosen;
+    // What sells now: the chosen offer's rule (else the rule without a supplier).
+    const chosenOffer = product.supplierProducts.find(offer => offer.id === chosen);
+    const now = chosenOffer ? this.rule(ctx, product, chosenOffer.supplierCode) : current;
+    return {
+      object: 'admin_price_preview' as const,
+      product_id: product.id,
+      country: country.code,
+      currency: country.currency,
+      face_value: minor(face),
+      face_price: minor(faceLocal),
+      single_value: singleValue(product),
+      current: presentResolved(trial?.kind ? current : now),
+      trial: trial?.kind ? presentResolved(now) : null,
+      offers,
+    };
+  }
+}
+
+function presentResolved(rule: ResolvedRule) {
+  return {
+    kind: rule.kind,
+    level: rule.level,
+    rule_id: rule.ruleId,
+    margin_bps: rule.marginBps,
+    reseller_discount_bps: rule.resellerDiscountBps,
+    fixed_price: rule.fixedMinor === null ? null : Number(rule.fixedMinor),
+    fixed_currency: rule.fixedCurrency,
+  };
 }
 
 export function presentRule(rule: PricingRule) {
@@ -370,9 +697,13 @@ export function presentRule(rule: PricingRule) {
     id: rule.id,
     category: rule.category,
     country: rule.countryCode,
+    supplier_code: rule.supplierCode,
     product_id: rule.productId,
+    kind: rule.kind as PriceKind,
     margin_bps: rule.marginBps,
     reseller_discount_bps: rule.resellerDiscountBps,
+    fixed_price: rule.fixedMinor === null ? null : Number(rule.fixedMinor),
+    fixed_currency: rule.fixedCurrency,
     updated_at: rule.updatedAt.toISOString(),
   };
 }

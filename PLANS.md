@@ -280,7 +280,7 @@ Rules resolve like feature switches: **reseller, then country, then global**. At
 ### Pricing (Decided, starting values admins can change)
 
 - BitoCard margin on cost-priced products (gift cards and anything bought in another currency): **3%** by default, settable per category, market or product.
-- Local face-value products (airtime, data, pay-TV, bills): resellers pay face value and add their markup, or (where admins enable the discount option) sell at face value and keep the discount admins set. BitoCard keeps the supplier commission minus any reseller discount.
+- **One scheme per product, discount by default.** Discount products (airtime, data, pay-TV, bills, and anything a supplier sells below face value) never sell above face value: BitoCard passes part of the supplier's discount to resellers (for example 1.5% of a 2% discount) and keeps the rest; resellers may pass part of theirs to customers. Markup products (numbers, software, mobile money, gift cards costing face value or more) are priced up from cost: BitoCard's markup (up to 200%) or a fixed price per supplier or product, then the reseller's markup or fixed price per product. BitoCard's rules are general, market, category, supplier and product; the reseller's general, category and product; the most specific wins. Listing a product shows its cost, the price and the profit per sale live. Each order records what the supplier reports it charged, and differences are flagged for finance. **Decided**
 - A product is never offered if BitoCard would pay its supplier more than its wholesale price (for example when the supplier exchange rate is better than BitoCard conversion rate).
 - Quotes hold their price for **10 minutes**, for up to 10 items.
 - Tax is collected only on categories admins mark taxable in a country, after tax advice.
@@ -379,8 +379,8 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 
 - Hosted storefront per reseller: its own tenant with branding, products, customer-facing prices, customers, orders and reports. **Decided**
 - Resellers choose products, set retail prices, and see their profit, never supplier costs. **Decided**
-- **Markup Protection Scheme:** reseller prices may be at most **50% above BitoCard's wholesale price**, so customers are protected from excessive prices. Admins control the scheme and its cap. **Decided**
-- **Fixed-price products** (airtime, data, pay-TV, electricity and other face-value items): resellers can add a markup on top of face value, within the cap. Where admins enable it, they can instead sell at face value and earn the discount BitoCard gives them. **Decided**
+- **Markup Protection Scheme:** reseller prices may be at most **100% above BitoCard's wholesale price** (admins can lower it per country), so customers are protected from excessive prices. Admins control the scheme and its cap. **Decided**
+- **Face-value products** (airtime, data, pay-TV, electricity and other face-value items) sell at face value at most: resellers earn the discount BitoCard gives them and may pass part of it to their customers. There is no markup on them. **Decided**
 - **Gift-card sales by customers:** the reseller can take a spread on the payout rate, capped by admins. **Decided**
 - Dashboard: **SHQ (Seller Head Quarters)** at `shq.bitocard.com`: store settings, balances, top-ups and withdrawals, orders, catalogue and pricing, API keys, webhook endpoints and delivery logs, team and settings. All reseller authentication (sign-up, sign-in, password reset, team invitations) is on SHQ, so the main site, `bitocard.com`, stays for BitoCard's retail customers. **Decided**
 - Hosted storefronts are **clones of BitoCard's parent store** (the main site's store at `bitocard.com/catalogs`) under the reseller's brand, prices and domain. **Decided**

@@ -538,7 +538,7 @@ model Country {
   /// Reserved (dedicated) bank accounts for wallet funding; customer wallets exist only where this is on.
   reservedAccounts   Boolean           @default(false) @map("reserved_accounts")
   /// Markup Protection Scheme: highest markup over BitoCard's wholesale price, in percent.
-  markupCapPercent   Int               @default(50) @map("markup_cap_percent")
+  markupCapPercent   Int               @default(100) @map("markup_cap_percent")
   /// Days before a sale's profit can be withdrawn.
   payoutHoldDays     Int               @default(15) @map("payout_hold_days")
   /// Smallest withdrawal, in the currency's minor units (for example kobo).
@@ -1240,33 +1240,46 @@ model StockCode {
 }
 
 /// BitoCard pricing. The most specific rule wins: product, then category in a market, then category, then the default.
+/// BitoCard's pricing: the most specific rule for an offer (product, then supplier, then category, then country) decides
+/// how it sells. `discount`: the customer pays face value and the reseller gets `resellerDiscountBps` of it off (never
+/// more than the supplier's discount to BitoCard). `markup`: `marginBps` on supplier cost. `fixed`: the wholesale price
+/// itself (`fixedMinor` in `fixedCurrency`), for single-value products. `auto` (the default): discount where the supplier
+/// gives one (cost below face value), else markup, each with this rule's value. Unique per scope (nulls not distinct).
 model PricingRule {
   id                  String           @id @default(uuid()) @db.Uuid
   category            ProductCategory?
   /// The reseller country (market).
   countryCode         String?          @map("country_code") @db.Char(2)
+  supplierCode        String?          @map("supplier_code")
   productId           String?          @map("product_id") @db.Uuid
-  /// BitoCard margin on supplier cost, for products priced from cost (gift cards, other currencies).
+  /// auto, discount, markup or fixed.
+  kind                String           @default("auto")
+  /// Markup: BitoCard's markup on supplier cost (up to 200%).
   marginBps           Int              @map("margin_bps")
-  /// Face-value products: the discount resellers keep when they sell at face value (the discount earning option).
+  /// Discount: what the reseller gets off face value.
   resellerDiscountBps Int              @default(0) @map("reseller_discount_bps")
+  fixedMinor          BigInt?          @map("fixed_minor")
+  fixedCurrency       String?          @map("fixed_currency") @db.Char(3)
   updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  @@unique([category, countryCode, productId])
   @@map("pricing_rules")
 }
 
-/// A reseller markup over BitoCard wholesale price, per category, optionally overridden per product. Capped by the Markup Protection Scheme.
+/// A reseller's pricing: general (no category), per category, or per product (the most specific wins, field by field).
+/// On discount products, `customerDiscountBps` of face value goes to their customers (never more than their own
+/// discount). On markup products, `markupBps` over BitoCard's price (capped by the country's Markup Protection Scheme),
+/// or a fixed customer price per product (`fixedMinor`, in the reseller's currency).
 model ResellerMarkup {
-  id         String          @id @default(uuid()) @db.Uuid
-  resellerId String          @map("reseller_id") @db.Uuid
-  category   ProductCategory
-  productId  String?         @map("product_id") @db.Uuid
-  markupBps  Int             @map("markup_bps")
-  updatedAt  DateTime        @updatedAt @map("updated_at")
-  reseller   Reseller        @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  id                  String           @id @default(uuid()) @db.Uuid
+  resellerId          String           @map("reseller_id") @db.Uuid
+  category            ProductCategory?
+  productId           String?          @map("product_id") @db.Uuid
+  markupBps           Int?             @map("markup_bps")
+  customerDiscountBps Int?             @map("customer_discount_bps")
+  fixedMinor          BigInt?          @map("fixed_minor")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  reseller            Reseller         @relation(fields: [resellerId], references: [id], onDelete: Cascade)
 
-  @@unique([resellerId, category, productId])
   @@map("reseller_markups")
 }
 
@@ -1361,6 +1374,9 @@ model Order {
   supplierCode          String          @map("supplier_code")
   supplierProductId     String          @map("supplier_product_id") @db.Uuid
   supplierCostMinor     BigInt          @map("supplier_cost_minor")
+  /// What the supplier said it charged (Reloadly `balanceInfo.cost`, VTpass `total_amount`), and whether that differs from the expected cost.
+  supplierReportedCostMinor BigInt?     @map("supplier_reported_cost_minor")
+  costMismatch          Boolean         @default(false) @map("cost_mismatch")
   supplierCurrency      String          @map("supplier_currency") @db.Char(3)
   /// Our reference for the current attempt, sent to the supplier so a status check can find it.
   supplierReference     String          @unique @map("supplier_reference")

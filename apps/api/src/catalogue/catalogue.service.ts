@@ -107,6 +107,13 @@ export class CatalogueService {
     return { object: 'list' as const, data, has_more: products.length > limit, next_cursor: products.length > limit ? products[limit - 1].id : null };
   }
 
+  /** What one sale earns the reseller, with their settings or ones they are trying. */
+  async preview(resellerId: string, mode: LedgerMode, id: string, query: { face_value?: number; markup_bps?: number; customer_discount_bps?: number; fixed_price?: number }) {
+    const product = await this.prisma.product.findUnique({ where: { id }, include: offersInclude });
+    if (!product) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such product.');
+    return this.pricing.preview(resellerId, mode, product, query.face_value === undefined ? null : BigInt(query.face_value), query);
+  }
+
   async get(resellerId: string, mode: LedgerMode, id: string) {
     const ctx = await this.pricing.context(resellerId, mode);
     const product = await this.prisma.product.findUnique({ where: { id }, include: offersInclude });

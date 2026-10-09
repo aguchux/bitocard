@@ -202,6 +202,38 @@ describe('live orders', () => {
     assert.equal((await wallet(browser)).reserved, 0);
   });
 
+  test('reconciliation: what the supplier says it charged is recorded, and a difference is flagged for finance', async () => {
+    const { browser } = await funded();
+    const order = async () => {
+      const q = await quote(browser, { product_id: await mtn(), face_value: 100_000, recipient: { phone: '08031234567' } });
+      return prisma.order.findUniqueOrThrow({ where: { id: (await browser.post('/v1/orders', { quote_id: q.id })).json.id } });
+    };
+    try {
+      reloadly.state.balanceCost = 970;
+      const matched = await order();
+      assert.deepEqual([matched.supplierCostMinor, matched.supplierReportedCostMinor, matched.costMismatch], [97_000n, 97_000n, false], 'Reloadly took the 97% it promised');
+
+      reloadly.state.balanceCost = 990;
+      const differs = await order();
+      assert.deepEqual([differs.supplierReportedCostMinor, differs.costMismatch], [99_000n, true], 'Reloadly cut its discount');
+      assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.order.cost_mismatch' } }), 'finance is told');
+      const view = (await admin.get(`/v1/admin/orders/${differs.id}`)).json;
+      assert.deepEqual([view.supplier.reported_cost, view.supplier.cost_mismatch], [99_000, true]);
+    } finally {
+      reloadly.state.balanceCost = undefined;
+    }
+
+    // VTpass reports what it charged after its commission.
+    vtpass.state.totalAmount = 3600;
+    try {
+      const q = await quote(browser, { product_id: await padi(), face_value: 360_000, recipient: { account_number: '1212121212' } });
+      const placed = await prisma.order.findUniqueOrThrow({ where: { id: (await browser.post('/v1/orders', { quote_id: q.id })).json.id } });
+      assert.deepEqual([placed.supplierCode, placed.supplierCostMinor, placed.supplierReportedCostMinor, placed.costMismatch], ['vtpass', 360_000n, 360_000n, false], 'no commission agreed here: full face value, as charged');
+    } finally {
+      vtpass.state.totalAmount = undefined;
+    }
+  });
+
   test('an unclear reply is never retried elsewhere: the same supplier is asked, and it had completed the order', async () => {
     reloadly.state.orderReply = { http: 500, recorded: 'SUCCESSFUL' };
     const { browser } = await funded();
@@ -370,18 +402,21 @@ describe('concurrent checks', () => {
 
 describe('tax, receipts and refunds', () => {
   test('tax is charged to the wallet with the wholesale cost and kept for BitoCard to pay', async () => {
-    await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: true });
+    await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: true });
     try {
       const { browser } = await funded();
-      await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 1000 });
-      const q = await quote(browser, { product_id: await mtn(), face_value: 100_000, recipient: { phone: '08031234567' } }, sandbox);
+      // Amazon costs BitoCard more than face value (no supplier discount): a markup product, so the markup covers VAT.
+      await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 1000 });
+      const q = await quote(browser, { product_id: await amazon(), face_value: 1000 }, sandbox);
       const order = (await browser.post('/v1/orders', { quote_id: q.id }, sandbox)).json;
-      assert.deepEqual([order.wholesale, order.tax, order.charged, order.price], [100_000, 7674, 107_674, 110_000]);
-      assert.equal((await wallet(browser, sandbox)).available, 50_000_000 - 107_674);
+      const vat = Math.round((q.price * 7.5) / 107.5);
+      assert.deepEqual([order.wholesale, order.tax, order.charged, order.price], [q.wholesale, vat, q.wholesale + vat, q.price]);
+      assert.equal(q.price, Math.ceil(q.wholesale * 1.1));
+      assert.equal((await wallet(browser, sandbox)).available, 50_000_000 - (q.wholesale + vat));
       const receipt = (await browser.get(`/v1/orders/${order.id}/receipt`, sandbox)).json;
-      assert.deepEqual([receipt.subtotal, receipt.tax, receipt.total], [102_326, { name: 'VAT', rate_percent: 7.5, amount: 7674 }, 110_000]);
+      assert.deepEqual([receipt.subtotal, receipt.tax, receipt.total], [q.price - vat, { name: 'VAT', rate_percent: 7.5, amount: vat }, q.price]);
     } finally {
-      await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: false });
+      await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: false });
     }
   });
 

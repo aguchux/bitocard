@@ -20,7 +20,7 @@ describe('settings chain', () => {
     const { status, json } = await browser.get('/v1/settings');
     assert.equal(status, 200);
     assert.deepEqual(json.options.gift_card_payout, { value: 'wallet', allowed: ['wallet', 'bank'], source: 'country_default' });
-    assert.deepEqual(json.options.fixed_price_earning, { value: 'markup', allowed: ['markup'], source: 'country_default' });
+    assert.equal(json.options.fixed_price_earning, undefined, 'discount products always sell at face value at most');
     assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, reserved_accounts: false, own_integrations: false, customer_app_bottom_bar_desktop: false, manual_reseller_approval: false });
   });
 
@@ -37,18 +37,18 @@ describe('settings chain', () => {
   });
 
   test("an admin can allow more, and a reseller's choice falls back when it is withdrawn", async () => {
-    const gh = await resellerClient(server, { country: 'GH' });
-    const before = await gh.browser.put('/v1/settings/options/fixed_price_earning', { value: 'discount' });
+    const ke = await resellerClient(server, { country: 'KE' });
+    const before = await ke.browser.put('/v1/settings/options/gift_card_payout', { value: 'wallet' });
     assert.equal(before.json.error.code, 'option_not_allowed');
 
-    const allowed = await admin.put('/v1/admin/countries/GH/options/fixed_price_earning', { allowed: ['markup', 'discount'], default: 'markup' });
+    const allowed = await admin.put('/v1/admin/countries/KE/options/gift_card_payout', { allowed: ['bank', 'wallet'], default: 'bank' });
     assert.equal(allowed.status, 200);
-    const chosen = await gh.browser.put('/v1/settings/options/fixed_price_earning', { value: 'discount' });
-    assert.equal(chosen.json.options.fixed_price_earning.value, 'discount');
+    const chosen = await ke.browser.put('/v1/settings/options/gift_card_payout', { value: 'wallet' });
+    assert.equal(chosen.json.options.gift_card_payout.value, 'wallet');
 
-    await admin.put('/v1/admin/countries/GH/options/fixed_price_earning', { allowed: ['markup'], default: 'markup' });
-    const after = await gh.browser.get('/v1/settings');
-    assert.deepEqual([after.json.options.fixed_price_earning.value, after.json.options.fixed_price_earning.source], ['markup', 'country_default']);
+    await admin.put('/v1/admin/countries/KE/options/gift_card_payout', { allowed: ['bank'], default: 'bank' });
+    const after = await ke.browser.get('/v1/settings');
+    assert.deepEqual([after.json.options.gift_card_payout.value, after.json.options.gift_card_payout.source], ['bank', 'country_default']);
   });
 
   test('admins cannot allow unknown values or a default outside the list', async () => {

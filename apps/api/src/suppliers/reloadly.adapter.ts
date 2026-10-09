@@ -51,7 +51,15 @@ const maxPages = 25;
 const giftCardsAccept = 'application/com.reloadly.giftcards-v1+json';
 const topupsAccept = 'application/com.reloadly.topups-v1+json';
 
-type ReloadlyTransaction = { transactionId: number; status: string; customIdentifier?: string };
+type ReloadlyTransaction = { transactionId: number; status: string; customIdentifier?: string; balanceInfo?: { cost?: number; currencyCode?: string } | null };
+
+/** What Reloadly took from the balance for a top-up (`balanceInfo.cost`, in the account currency), when it says. */
+function reportedCost(transaction: ReloadlyTransaction): FulfilmentResult['reportedCost'] {
+  const cost = transaction.balanceInfo?.cost;
+  const currency = transaction.balanceInfo?.currencyCode;
+  if (typeof cost !== 'number' || !Number.isFinite(cost) || !currency) return undefined;
+  return { amountMinor: BigInt(Math.round(cost * 100)), currency: currency.toUpperCase() };
+}
 
 /** Reloadly transaction statuses to BitoCard outcomes. Anything unknown is treated as not yet confirmed. */
 function outcome(status: string | undefined): FulfilmentResult['status'] {
@@ -124,7 +132,13 @@ export class ReloadlyAdapter implements SupplierAdapter {
       customIdentifier: request.reference,
       recipientPhone: { countryCode: request.country, number: request.recipient.phone },
     });
-    return { status: outcome(res.status), supplierTransactionId: String(res.transactionId), deliveries: outcome(res.status) === 'completed' ? [topupConfirmation()] : [], detail: res.status };
+    return {
+      status: outcome(res.status),
+      supplierTransactionId: String(res.transactionId),
+      deliveries: outcome(res.status) === 'completed' ? [topupConfirmation()] : [],
+      detail: res.status,
+      reportedCost: reportedCost(res),
+    };
   }
 
   async orderStatus(request: FulfilmentRequest, supplierTransactionId?: string): Promise<FulfilmentResult> {
@@ -147,7 +161,13 @@ export class ReloadlyAdapter implements SupplierAdapter {
     // No record of our reference: not confirmed either way, so it keeps waiting for a later check or an admin.
     if (!transaction) return { status: 'pending', detail: 'No transaction found for the reference yet' };
     if (gift) return this.giftCardResult(transaction);
-    return { status: outcome(transaction.status), supplierTransactionId: String(transaction.transactionId), deliveries: outcome(transaction.status) === 'completed' ? [topupConfirmation()] : [], detail: transaction.status };
+    return {
+      status: outcome(transaction.status),
+      supplierTransactionId: String(transaction.transactionId),
+      deliveries: outcome(transaction.status) === 'completed' ? [topupConfirmation()] : [],
+      detail: transaction.status,
+      reportedCost: reportedCost(transaction),
+    };
   }
 
   /** A successful gift card order still needs its codes; failing to fetch them leaves the order pending. */

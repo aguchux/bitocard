@@ -23,6 +23,9 @@ import type {
   Overview,
   Plan,
   PricingRule,
+  PricingRuleInput,
+  AdminPricePreview,
+  AdminPricePreviewArgs,
   ProductFeature,
   ProductCategory,
   ResellerDetail,
@@ -229,7 +232,11 @@ export const adminApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Activity'],
     }),
     pricingRules: build.query<List<PricingRule>, void>({ query: () => '/v1/admin/pricing-rules', providesTags: [{ type: 'PricingRule', id: 'LIST' }] }),
-    setPricingRule: build.mutation<PricingRule, { category?: ProductCategory; country?: string; product_id?: string; margin_bps: number; reseller_discount_bps?: number }>({
+    adminPricePreview: build.query<AdminPricePreview, AdminPricePreviewArgs>({
+      query: params => ({ url: '/v1/admin/pricing-rules/preview', params }),
+      providesTags: [{ type: 'PricingRule', id: 'LIST' }],
+    }),
+    setPricingRule: build.mutation<PricingRule, PricingRuleInput>({
       query: body => ({ url: '/v1/admin/pricing-rules', method: 'PUT', body }),
       invalidatesTags: [{ type: 'PricingRule', id: 'LIST' }, 'Activity'],
     }),
@@ -370,6 +377,7 @@ export const {
   useSetProductListingMutation,
   useUpdateOfferMutation,
   usePricingRulesQuery,
+  useAdminPricePreviewQuery,
   useSetPricingRuleMutation,
   useDeletePricingRuleMutation,
   useSwitchesQuery,

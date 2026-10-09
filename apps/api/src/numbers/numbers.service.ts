@@ -154,7 +154,7 @@ export class NumbersService {
   /** What a month costs the reseller now. */
   private async monthlyPrice(number: VirtualNumber) {
     const [ctx, product] = await Promise.all([this.pricing.context(number.resellerId, number.mode), this.prisma.product.findUniqueOrThrow({ where: { id: number.productId } })]);
-    return this.pricing.wholesaleFor(ctx, product, number.monthlyCostMinor, number.costCurrency);
+    return this.pricing.wholesaleFor(ctx, product, number.monthlyCostMinor, number.costCurrency, number.supplierCode);
   }
 
   /** The reseller renews a number for a month from their wallet (also an expired one, until it is deleted). */
@@ -486,7 +486,7 @@ export class NumbersService {
 
   private async smsPrice(number: VirtualNumber, costMinor: bigint) {
     const [ctx, product] = await Promise.all([this.pricing.context(number.resellerId, number.mode), this.prisma.product.findUniqueOrThrow({ where: { id: number.productId } })]);
-    return this.pricing.wholesaleFor(ctx, product, costMinor, 'USD');
+    return this.pricing.wholesaleFor(ctx, product, costMinor, 'USD', number.supplierCode);
   }
 
   /**

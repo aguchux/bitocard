@@ -158,7 +158,8 @@ export type AdminOrder = Order & { reseller_id: string; needs_review: boolean; s
 export type AdminOrderDetail = Order & {
   reseller_id: string;
   needs_review: boolean;
-  supplier: { code: string; reference: string; transaction_id: string | null; cost: number; currency: string };
+  /** `reported_cost`: what the supplier said it charged; `cost_mismatch`: it differs from `cost` (a changed discount or commission). */
+  supplier: { code: string; reference: string; transaction_id: string | null; cost: number; currency: string; reported_cost: number | null; cost_mismatch: boolean };
   checks: number;
   next_check_at: string | null;
   /** A store customer paid for it at checkout: refunds go back to them, through how they paid. */
@@ -254,15 +255,83 @@ export type AdminProduct = {
 export type AdminProductFilter = { category?: ProductCategory; country?: string; q?: string; supplier?: string; listed?: boolean };
 /** Products, with how many match the filters and how many of those are listed. */
 export type AdminProductList = List<AdminProduct> & { total: number; listed: number };
+/**
+ * How BitoCard prices: `auto` (discount where the supplier gives one, else markup; local airtime, data, bills and
+ * pay-TV are always discount), `discount` (resellers get `reseller_discount_bps` off face value), `markup`
+ * (`margin_bps` on supplier cost) or `fixed` (a wholesale price, for single-value products).
+ */
+export type PriceKind = 'auto' | 'discount' | 'markup' | 'fixed';
 export type PricingRule = {
   object: 'pricing_rule';
   id: string;
   category: ProductCategory | null;
   country: string | null;
+  supplier_code: string | null;
   product_id: string | null;
+  kind: PriceKind;
   margin_bps: number;
-  reseller_discount_bps: number | null;
+  reseller_discount_bps: number;
+  fixed_price: number | null;
+  fixed_currency: string | null;
   updated_at: string;
+};
+export type PricingRuleInput = {
+  category?: ProductCategory;
+  country?: string;
+  supplier_code?: string;
+  product_id?: string;
+  kind: PriceKind;
+  margin_bps?: number;
+  reseller_discount_bps?: number;
+  fixed_price?: number;
+  fixed_currency?: string;
+};
+/** The rule an offer resolved to, and its level. */
+export type ResolvedPriceRule = {
+  kind: PriceKind;
+  level: 'product' | 'supplier' | 'category' | 'country' | 'general' | 'default';
+  rule_id: string | null;
+  margin_bps: number;
+  reseller_discount_bps: number;
+  fixed_price: number | null;
+  fixed_currency: string | null;
+};
+/** How a product sells in a market: every supplier offer, BitoCard's discount from it and its profit per sale. */
+export type AdminPricePreview = {
+  object: 'admin_price_preview';
+  product_id: string;
+  country: string;
+  currency: string;
+  face_value: number;
+  face_price: number;
+  single_value: boolean;
+  current: ResolvedPriceRule;
+  trial: ResolvedPriceRule | null;
+  offers: Array<{
+    offer_id: string;
+    supplier_code: string;
+    supplier_name: string;
+    supplier_cost: number | null;
+    supplier_discount_bps: number | null;
+    rule: ResolvedPriceRule;
+    scheme: 'discount' | 'markup' | null;
+    sellable: boolean;
+    reason: 'not_offered' | 'cost_above_face_value' | 'price_below_cost' | 'not_priced' | null;
+    wholesale: number | null;
+    bitocard_profit: number | null;
+    reseller_discount: number | null;
+    chosen: boolean;
+  }>;
+};
+export type AdminPricePreviewArgs = {
+  product_id: string;
+  country: string;
+  face_value?: number;
+  kind?: PriceKind;
+  margin_bps?: number;
+  reseller_discount_bps?: number;
+  fixed_price?: number;
+  fixed_currency?: string;
 };
 
 // -- Settings -----------------------------------------------------------------------------------------------------

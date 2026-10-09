@@ -151,12 +151,14 @@ describe('refunding delivered checkout orders', () => {
 
   test('the store’s margin is taken back: from held earnings, and once released from withdrawable earnings', async () => {
     const product = await giftCard('Amazon Released Card', ['RELEASED-CODE-0001', 'RELEASED-CODE-0002']);
-    const store = await resellerStore([product], { live: true, markup: 1000 });
+    // BitoCard's stock costs less than face value: a discount product. BitoCard passes 10% of face value to the store.
+    await prisma.pricingRule.create({ data: { productId: product.id, kind: 'discount', marginBps: 0, resellerDiscountBps: 1000 } });
+    const store = await resellerStore([product], { live: true });
     const held = await customer(store.subdomain);
     const first = await held.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
     const delivered = await payOnStripe(held, first.json.id);
     const sale = await prisma.order.findUniqueOrThrow({ where: { id: delivered.order.id } });
-    assert.ok(sale.resellerProfitMinor > 0n, 'the reseller earned their markup');
+    assert.ok(sale.resellerProfitMinor > 0n, 'the store earned its share of the discount');
     assert.equal(await balance(store.resellerId, 'live', 'reseller_earnings_held'), sale.resellerProfitMinor);
     assert.equal((await admin.post(`/v1/admin/orders/${sale.id}/refund`, { reason: 'Customer complaint', supplier_refunded: false })).status, 200);
     assert.equal(await balance(store.resellerId, 'live', 'reseller_earnings_held'), 0n, 'the margin is taken back');
@@ -180,6 +182,7 @@ describe('refunding delivered checkout orders', () => {
     // Withdrawn already: refused, so finance refunds by hand instead of the wallet going negative.
     const third = await customer(store.subdomain);
     const product2 = await giftCard('Amazon Withdrawn Card', ['WITHDRAWN-CODE-0001']);
+    await prisma.pricingRule.create({ data: { productId: product2.id, kind: 'discount', marginBps: 0, resellerDiscountBps: 1000 } });
     await store.browser.post('/v1/catalogue/listing', { listed: true, product_ids: [product2.id] });
     const last = await third.post('/v1/store/checkouts', { product_id: product2.id, face_value: 2500, country: 'NG', return_url: returnUrl });
     const sold = await prisma.order.findUniqueOrThrow({ where: { id: (await payOnStripe(third, last.json.id)).order.id } });

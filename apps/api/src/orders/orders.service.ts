@@ -21,7 +21,7 @@ import { connectable } from '../reseller-integrations/connectable.js';
 import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
-import { deliveryEmail, type EmailedDelivery } from '../notifications/templates.js';
+import { deliveryEmail, type EmailedDelivery, formatMoney } from '../notifications/templates.js';
 import { emailedCategories } from '../catalogue/quotes.service.js';
 import { OrderAccessService } from './order-access.service.js';
 import { sellerFor } from './seller.js';
@@ -449,8 +449,9 @@ export class OrdersService {
   }
 
   /** Records the delivery and takes the held money: wholesale as revenue, tax as tax payable, and the supplier cost. */
-  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[] }) {
+  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[]; reportedCost?: FulfilmentResult['reportedCost'] }) {
     const deliveries = result.deliveries ?? [];
+    const reconciled = reconcile(order, result.reportedCost);
     const encryption = deliveries.some(d => d.code || d.pin) ? this.encryption() : null;
     const numbers = await this.numbersOf(order, result.numbers, deliveries);
     const claimed = await this.prisma.$transaction(async tx => {
@@ -465,6 +466,7 @@ export class OrdersService {
           completedAt: new Date(),
           receiptNumber: nextval === null ? null : Number(nextval),
           supplierTransactionId: result.supplierTransactionId ?? order.supplierTransactionId,
+          ...(reconciled ? { supplierReportedCostMinor: reconciled.reported, costMismatch: reconciled.mismatch } : {}),
         },
       });
       if (updated.count === 0) return false;
@@ -501,6 +503,16 @@ export class OrdersService {
     });
     if (claimed) {
       this.events.committed();
+      if (reconciled?.mismatch) {
+        this.logger.warn({ orderId: order.id, supplier: order.supplierCode, expected: String(order.supplierCostMinor), reported: String(reconciled.reported) }, 'Supplier charged a different amount than expected');
+        await this.inbox.admins('admin.order.cost_mismatch', {
+          subject: order.id,
+          title: 'A supplier charged a different amount',
+          body: `${order.supplierCode} charged ${formatMoney(reconciled.reported, order.supplierCurrency)} for an order expected to cost ${formatMoney(order.supplierCostMinor, order.supplierCurrency)}. Check its discount or commission.`,
+          link: `/orders/${order.id}`,
+          mode: order.mode,
+        });
+      }
       await this.settle(order.id);
       await this.emailDeliveries(order.id);
       await this.tellCheckout(order, 'completed');
@@ -753,7 +765,16 @@ export class OrdersService {
       ...this.present(order),
       reseller_id: order.resellerId,
       needs_review: order.needsReview,
-      supplier: { code: order.supplierCode, reference: order.supplierReference, transaction_id: order.supplierTransactionId, cost: minor(order.supplierCostMinor), currency: order.supplierCurrency },
+      supplier: {
+        code: order.supplierCode,
+        reference: order.supplierReference,
+        transaction_id: order.supplierTransactionId,
+        cost: minor(order.supplierCostMinor),
+        currency: order.supplierCurrency,
+        // What the supplier said it charged, and whether that differs from the cost the order was priced from.
+        reported_cost: order.supplierReportedCostMinor === null ? null : minor(order.supplierReportedCostMinor),
+        cost_mismatch: order.costMismatch,
+      },
       checks: order.checks,
       next_check_at: order.nextCheckAt?.toISOString() ?? null,
       /** A store customer paid for it at checkout: refunds go back to them, through how they paid. */
@@ -950,4 +971,16 @@ function sandboxDeliveries(category: ProductCategory, quantity: number): Deliver
     return [{ kind: 'virtual_number', serial: number, details: { number, sandbox: 'true' } }];
   }
   return [{ kind: 'confirmation' }];
+}
+
+/**
+ * What the supplier said it charged, against the cost the order was priced from (both for the whole order, in the
+ * supplier currency): a difference of more than half a percent (and one minor unit) is a mismatch for admins to check,
+ * usually a changed discount or commission. Null when the supplier did not say, or said in another currency.
+ */
+export function reconcile(order: Pick<Order, 'supplierCostMinor' | 'supplierCurrency'>, reported: FulfilmentResult['reportedCost']) {
+  if (!reported || reported.currency !== order.supplierCurrency) return null;
+  const difference = reported.amountMinor > order.supplierCostMinor ? reported.amountMinor - order.supplierCostMinor : order.supplierCostMinor - reported.amountMinor;
+  const tolerance = order.supplierCostMinor / 200n > 1n ? order.supplierCostMinor / 200n : 1n;
+  return { reported: reported.amountMinor, mismatch: difference > tolerance };
 }

@@ -221,14 +221,14 @@ export class StockService {
 
   /** A product-only pricing rule (null removes it, so the category or default rule applies again). */
   private async setMargin(tx: Prisma.TransactionClient, productId: string, marginBps: number | null) {
-    const scope = { productId, category: null, countryCode: null };
+    const scope = { productId, category: null, countryCode: null, supplierCode: null };
     const rule = await tx.pricingRule.findFirst({ where: scope });
     if (marginBps === null) {
       if (rule) await tx.pricingRule.delete({ where: { id: rule.id } });
     } else if (rule) {
-      await tx.pricingRule.update({ where: { id: rule.id }, data: { marginBps } });
+      await tx.pricingRule.update({ where: { id: rule.id }, data: { kind: 'markup', marginBps, fixedMinor: null, fixedCurrency: null } });
     } else {
-      await tx.pricingRule.create({ data: { ...scope, marginBps } });
+      await tx.pricingRule.create({ data: { ...scope, kind: 'markup', marginBps } });
     }
   }
 

@@ -14,14 +14,6 @@ const definitions: Record<SettingsOptionKey, { title: string; description: strin
       bank: { label: "To the customer's bank account", help: "Paid out to a bank account in their name." },
     },
   },
-  fixed_price_earning: {
-    title: "Earning on face-value products",
-    description: "How you earn on airtime, data, pay-TV and bills sold at their face value in your currency.",
-    values: {
-      markup: { label: "Add a markup", help: "Customers pay face value plus your markup." },
-      discount: { label: "Sell at face value", help: "Customers pay face value and you keep BitoCard's discount." },
-    },
-  },
 };
 
 function OptionCard({ optionKey, option, editable }: { optionKey: SettingsOptionKey; option: SettingsOption; editable: boolean }) {

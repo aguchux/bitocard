@@ -217,23 +217,45 @@ describe('catalogue', () => {
 });
 
 describe('pricing', () => {
-  test('markups apply per category and per product, within the 50% cap', async () => {
+  test('markups price markup products (general, category, product) within the 100% cap; airtime stays at face value', async () => {
     const { browser } = await resellerClient(server);
     const mtn = await productId('airtime:NG:mtn:topup');
-    assert.equal((await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 5001 })).json.error.code, 'markup_above_cap');
+    const steam = await productId('gift_cards:US:steam-global');
+    const first = async id => (await browser.get(`/v1/catalogue/products/${id}`)).json.pricing.denominations[0];
+    assert.equal((await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 10_001 })).status, 400, 'never more than 100%');
+    await browser.put('/v1/pricing/markups', { markup_bps: 1000 });
     await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 1000 });
-    let price = (await browser.get(`/v1/catalogue/products/${mtn}`)).json.pricing.denominations[0];
-    assert.deepEqual(price, { face_value: 5000, wholesale: 5000, price: 5500 });
+    let price = await first(steam);
+    assert.equal(price.price, Math.ceil(price.wholesale * 1.1), 'Steam has no supplier discount: a markup product, priced with the general markup');
+    assert.deepEqual(await first(mtn), { face_value: 5000, wholesale: 5000, price: 5000 }, 'airtime sells at face value: markups never apply');
 
-    await browser.put('/v1/pricing/markups', { category: 'airtime', product_id: mtn, markup_bps: 2500 });
-    price = (await browser.get(`/v1/catalogue/products/${mtn}`)).json.pricing.denominations[0];
-    assert.equal(price.price, 6250, 'the product markup overrides the category');
+    await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 2500 });
+    price = await first(steam);
+    assert.equal(price.price, Math.ceil(price.wholesale * 1.25), 'the category overrides the general markup');
+    await browser.put('/v1/pricing/markups', { product_id: steam, markup_bps: 4000 });
+    assert.equal((await first(steam)).price, Math.ceil(price.wholesale * 1.4), 'the product overrides its category');
 
     const settings = (await browser.get('/v1/pricing')).json;
-    assert.deepEqual([settings.earning, settings.markup_cap_percent, settings.markups.length], ['markup', 50, 2]);
-    await browser.delete(`/v1/pricing/markups?category=airtime&product_id=${mtn}`);
-    assert.equal((await browser.get(`/v1/catalogue/products/${mtn}`)).json.pricing.denominations[0].price, 5500);
+    assert.deepEqual([settings.markup_cap_percent, settings.markups.length, settings.earning], [100, 4, undefined]);
+    assert.equal(settings.markups.find(row => row.product_id === steam).product_name, 'Steam Global');
+    await browser.delete(`/v1/pricing/markups?product_id=${steam}`);
+    assert.equal((await first(steam)).price, Math.ceil(price.wholesale * 1.25));
     assert.equal((await browser.put('/v1/pricing/markups', { category: 'pay_tv', product_id: mtn, markup_bps: 100 })).json.error.param, 'product_id');
+    assert.equal((await browser.put('/v1/pricing/markups', { category: 'gift_cards', fixed_price: 500 })).json.error.param, 'fixed_price', 'a fixed price is for one product');
+  });
+
+  test('a fixed customer price per product, never below BitoCard’s price', async () => {
+    const { browser } = await resellerClient(server);
+    const steam = await productId('gift_cards:US:steam-global');
+    const before = (await browser.get(`/v1/catalogue/products/${steam}`)).json.pricing.denominations[0];
+    await browser.put('/v1/pricing/markups', { product_id: steam, fixed_price: before.wholesale + 12_345 });
+    const fixed = (await browser.get(`/v1/catalogue/products/${steam}/price-preview?face_value=${before.face_value}`)).json;
+    assert.deepEqual([fixed.scheme, fixed.customer_price, fixed.your_profit, fixed.fixed_below_cost, fixed.settings.from.fixed], ['markup', before.wholesale + 12_345, 12_345, false, 'product']);
+    const below = (await browser.get(`/v1/catalogue/products/${steam}/price-preview?face_value=${before.face_value}&fixed_price=100`)).json;
+    assert.deepEqual([below.customer_price, below.your_profit, below.fixed_below_cost], [before.wholesale, 0, true], 'customers pay BitoCard’s price; the reseller is warned');
+    assert.equal((await browser.get(`/v1/catalogue/products/${steam}`)).json.pricing.denominations[0].price, before.wholesale + 12_345, 'trying a price saves nothing');
+    const markup = (await browser.get(`/v1/catalogue/products/${steam}/price-preview?face_value=${before.face_value}&markup_bps=1000`)).json;
+    assert.deepEqual([markup.settings.fixed_price, markup.customer_price], [null, Math.ceil(before.wholesale * 1.1)], 'trying a markup tries it instead of the fixed price');
   });
 
   test('a lowered cap limits existing markups', async () => {
@@ -244,7 +266,7 @@ describe('pricing', () => {
       const steam = (await byKey(browser, 'gift_cards:US:steam-global')).pricing.denominations[0];
       assert.equal(steam.price, Math.ceil(steam.wholesale * 1.1));
     } finally {
-      await admin.patch('/v1/admin/countries/KE', { markup_cap_percent: 50 });
+      await admin.patch('/v1/admin/countries/KE', { markup_cap_percent: 100 });
     }
   });
 
@@ -263,23 +285,52 @@ describe('pricing', () => {
     assert.equal((await finance.delete(`/v1/admin/pricing-rules/${global.id}`)).status, 400, 'the default cannot be removed');
   });
 
-  test('the discount option: sell at face value and keep BitoCard’s discount, never below BitoCard’s cost', async () => {
-    await admin.put('/v1/admin/countries/NG/options/fixed_price_earning', { allowed: ['markup', 'discount'], default: 'markup' });
+  test('discount products: BitoCard passes part of its discount to resellers, who may pass part to customers; never below cost', async () => {
     const finance = await adminClient(server, ['finance']);
-    const rule = (await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', margin_bps: 0, reseller_discount_bps: 200 })).json;
+    const rule = (await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 200 })).json;
     try {
       const { browser } = await resellerClient(server);
-      await browser.put('/v1/settings/options/fixed_price_earning', { value: 'discount' });
-      await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 1000 });
-      const mtn = (await byKey(browser, 'airtime:NG:mtn:topup')).pricing.denominations[1];
-      assert.deepEqual(mtn, { face_value: 5_000_000, wholesale: 4_900_000, price: 5_000_000 }, 'markups do not apply; 2% discount kept');
+      const mtn = await productId('airtime:NG:mtn:topup');
+      const second = async () => (await browser.get(`/v1/catalogue/products/${mtn}`)).json.pricing.denominations[1];
+      assert.deepEqual(await second(), { face_value: 5_000_000, wholesale: 4_900_000, price: 5_000_000 }, 'the reseller keeps the 2% BitoCard gives them');
 
-      // A 4% discount would put wholesale (96%) below what the supplier charges BitoCard (97%): not offered.
-      await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', margin_bps: 0, reseller_discount_bps: 400 });
-      assert.equal((await byKey(browser, 'airtime:NG:mtn:topup')).error.code, 'resource_missing');
+      await browser.put('/v1/pricing/markups', { category: 'airtime', customer_discount_bps: 50 });
+      assert.deepEqual(await second(), { face_value: 5_000_000, wholesale: 4_900_000, price: 4_975_000 }, 'they give their customers 0.5%');
+      const preview = (await browser.get(`/v1/catalogue/products/${mtn}/price-preview?face_value=5000000&customer_discount_bps=300`)).json;
+      assert.deepEqual(
+        [preview.scheme, preview.face_price, preview.bitocard_price, preview.your_discount, preview.customer_discount, preview.customer_price, preview.your_profit],
+        ['discount', 5_000_000, 4_900_000, 100_000, 100_000, 4_900_000, 0],
+        'a customer discount can never exceed their own',
+      );
+
+      // More than the supplier's 3% to BitoCard: capped at what BitoCard gets, so it never sells below cost.
+      await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 400 });
+      assert.equal((await second()).wholesale, 4_850_000);
     } finally {
       await finance.delete(`/v1/admin/pricing-rules/${rule.id}`);
-      await admin.put('/v1/admin/countries/NG/options/fixed_price_earning', { allowed: ['markup'], default: 'markup' });
+    }
+  });
+
+  test('supplier and product rules override the general one; a fixed price fits single-value products only', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const { browser } = await resellerClient(server);
+    const steam = await productId('gift_cards:US:steam-global');
+    const wholesale = async () => (await browser.get(`/v1/catalogue/products/${steam}`)).json.pricing.denominations[0].wholesale;
+    const general = await wholesale();
+    const supplier = (await finance.put('/v1/admin/pricing-rules', { supplier_code: 'reloadly', kind: 'markup', margin_bps: 2000 })).json;
+    try {
+      const marked = await wholesale();
+      assert.ok(marked > general, 'Reloadly’s 20% markup overrides the general 3%');
+      assert.equal(Math.ceil((general / 1.03) * 1.2) - marked <= 1, true);
+      const refused = await finance.put('/v1/admin/pricing-rules', { product_id: steam, kind: 'fixed', fixed_price: 999, fixed_currency: 'USD' });
+      assert.deepEqual([refused.status, refused.json.error.param], [400, 'kind'], 'Steam is any amount from $5 to $100');
+      const preview = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${steam}&country=NG&face_value=500`)).json;
+      assert.deepEqual([preview.current.kind, preview.current.level, preview.offers[0].supplier_code, preview.offers[0].chosen], ['markup', 'supplier', 'reloadly', true]);
+      assert.ok(preview.offers[0].bitocard_profit > 0);
+      const trial = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${steam}&country=NG&face_value=500&kind=markup&margin_bps=0`)).json;
+      assert.deepEqual([trial.trial.level, trial.offers[0].bitocard_profit], ['product', 0], 'a trial product rule, nothing saved');
+    } finally {
+      await finance.delete(`/v1/admin/pricing-rules/${supplier.id}`);
     }
   });
 
@@ -311,6 +362,7 @@ describe('quotes', () => {
     const { browser } = await resellerClient(server);
     await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 500 });
     const product_id = await productId('airtime:NG:mtn:topup');
+    // Airtime sells at face value: the markup does not apply.
     assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 100_000 })).json.error.param, 'recipient.phone');
     assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 100_000, recipient: { phone: '+233241234567' } })).json.error.param, 'recipient.phone');
     assert.equal((await browser.post('/v1/quotes', { product_id, face_value: 4999, recipient: { phone: '08031234567' } })).json.error.param, 'face_value');
@@ -324,7 +376,7 @@ describe('quotes', () => {
     const quote = created.json;
     assert.deepEqual(
       [quote.status, quote.currency, quote.quantity, quote.unit_wholesale, quote.wholesale, quote.price, quote.tax, quote.reseller_profit, quote.recipient.phone, quote.customer_reference],
-      ['open', 'NGN', 1, 100_000, 100_000, 105_000, null, 5000, '+2348031234567', 'cust-42'],
+      ['open', 'NGN', 1, 100_000, 100_000, 100_000, null, 0, '+2348031234567', 'cust-42'],
     );
     const minutes = (new Date(quote.expires_at) - Date.now()) / 60_000;
     assert.ok(minutes > 9.9 && minutes <= 10);
@@ -408,20 +460,21 @@ describe('quotes', () => {
   });
 
   test('taxable categories: tax is shown and must be covered; live sales need a confirmed rate', async () => {
-    await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: true });
+    await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: true });
     try {
       const { browser } = await resellerClient(server);
-      const product_id = await productId('airtime:NG:mtn:topup');
-      const body = { product_id, face_value: 100_000, recipient: { phone: '08031234567' } };
-      assert.equal((await browser.post('/v1/quotes', body, sandbox)).json.error.code, 'price_below_cost', 'face value alone cannot cover tax');
+      const product_id = await productId('gift_cards:US:steam-global');
+      const body = { product_id, face_value: 1000 };
+      assert.equal((await browser.post('/v1/quotes', body, sandbox)).json.error.code, 'price_below_cost', 'BitoCard’s price alone cannot cover tax');
 
-      await browser.put('/v1/pricing/markups', { category: 'airtime', markup_bps: 1000 });
+      await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 1000 });
       const quote = (await browser.post('/v1/quotes', body, sandbox)).json;
-      // NGN 1,100 including 7.5% VAT: VAT NGN 76.74; profit NGN 1,100 - 76.74 - 1,000.
-      assert.deepEqual([quote.price, quote.tax, quote.reseller_profit], [110_000, { name: 'VAT', rate_percent: 7.5, amount: 7674 }, 2326]);
+      // The price includes 7.5% VAT: VAT is 7.5/107.5 of it; profit is what is left above wholesale.
+      const vat = Math.round((quote.price * 7.5) / 107.5);
+      assert.deepEqual([quote.price, quote.tax.name, quote.tax.amount, quote.reseller_profit], [Math.ceil(quote.wholesale * 1.1), 'VAT', vat, quote.price - quote.wholesale - vat]);
       assert.equal((await browser.post('/v1/quotes', body)).json.error.code, 'tax_not_configured', 'Nigeria VAT is not confirmed yet');
     } finally {
-      await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: false });
+      await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: false });
     }
   });
 });

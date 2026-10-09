@@ -4,13 +4,15 @@ import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
+import { ApiError } from '../common/errors/api-error.js';
+import { PrismaService } from '../database/prisma.service.js';
 import { adminId } from '../countries/countries.controller.js';
 import { productCategories } from '../countries/countries.service.js';
 import type { LedgerMode, ProductCategory } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { CatalogueService } from './catalogue.service.js';
-import { PricingService } from './pricing.service.js';
+import { maxMarginBps, type PriceKind, priceKinds, PricingService } from './pricing.service.js';
 import { maxQuantity, QuotesService } from './quotes.service.js';
 
 class CatalogueFilterDto extends PageDto {
@@ -90,27 +92,91 @@ class CreateQuoteDto {
 }
 
 class MarkupDto {
-  @ApiProperty({ enum: productCategories })
-  @IsIn(productCategories)
-  category: ProductCategory;
+  @ApiPropertyOptional({ enum: productCategories, description: 'Set for a whole category; leave out (with no product) for everything.' })
+  @IsOptional() @IsIn(productCategories)
+  category?: ProductCategory;
 
-  @ApiPropertyOptional({ description: 'Set for one product; leave out for the whole category.' })
+  @ApiPropertyOptional({ description: 'Set for one product, which overrides its category and your general settings.' })
   @IsOptional() @IsUUID()
   product_id?: string;
 
-  @ApiProperty({ description: 'Markup over wholesale price in basis points (1500 = 15%). At most the Markup Protection Scheme cap.', example: 1500 })
-  @IsInt() @Min(0) @Max(10_000)
-  markup_bps: number;
+  @ApiPropertyOptional({
+    description: 'Markup products: your markup over BitoCard’s price in basis points (1500 = 15%), at most the Markup Protection Scheme cap (100% or lower). `null` clears it.',
+    example: 1500,
+    nullable: true,
+  })
+  @IsOptional() @IsInt() @Min(0) @Max(10_000)
+  markup_bps?: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Discount products: how much of face value you give your customers, in basis points (100 = 1%). Never more than your own discount: the rest is your profit. `null` clears it.',
+    example: 50,
+    nullable: true,
+  })
+  @IsOptional() @IsInt() @Min(0) @Max(10_000)
+  customer_discount_bps?: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Markup products, one product only: your customer price in minor units of your currency, instead of a markup. Never below BitoCard’s price (customers then pay BitoCard’s price). `null` clears it.',
+    example: 950000,
+    nullable: true,
+  })
+  @IsOptional() @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  fixed_price?: number | null;
 }
 
 class RemoveMarkupDto {
-  @ApiProperty({ enum: productCategories })
-  @IsIn(productCategories)
-  category: ProductCategory;
+  @ApiPropertyOptional({ enum: productCategories, description: 'The category rule to remove; leave out (with no product) for your general rule.' })
+  @IsOptional() @IsIn(productCategories)
+  category?: ProductCategory;
 
   @ApiPropertyOptional()
   @IsOptional() @IsUUID()
   product_id?: string;
+}
+
+class PricePreviewDto {
+  @ApiPropertyOptional({ description: 'The face value to price, in minor units (default: the product’s first value).' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  face_value?: number;
+
+  @ApiPropertyOptional({ description: 'Try a markup (basis points) without saving it, instead of any fixed price.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10_000)
+  markup_bps?: number;
+
+  @ApiPropertyOptional({ description: 'Try a customer discount (basis points) without saving it.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10_000)
+  customer_discount_bps?: number;
+
+  @ApiPropertyOptional({ description: 'Try a fixed customer price (minor units) without saving it.' })
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  fixed_price?: number;
+}
+
+class AdminPreviewDto {
+  @IsUUID()
+  product_id: string;
+
+  @Matches(/^[A-Za-z]{2}$/)
+  country: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  face_value?: number;
+
+  @IsOptional() @IsIn(priceKinds)
+  kind?: PriceKind;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(maxMarginBps)
+  margin_bps?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(10_000)
+  reseller_discount_bps?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  fixed_price?: number;
+
+  @IsOptional() @Matches(/^[A-Za-z]{3}$/)
+  fixed_currency?: string;
 }
 
 class PricingRuleDto {
@@ -120,14 +186,27 @@ class PricingRuleDto {
   @IsOptional() @Matches(/^[A-Za-z]{2}$/)
   country?: string;
 
+  @IsOptional() @Matches(/^[a-z0-9_-]{2,40}$/)
+  supplier_code?: string;
+
   @IsOptional() @IsUUID()
   product_id?: string;
 
-  @IsInt() @Min(0) @Max(5000)
-  margin_bps: number;
+  /** discount (the default scheme), markup (on supplier cost) or fixed (a wholesale price, for a supplier's or one product's single-value items). */
+  @IsOptional() @IsIn(priceKinds)
+  kind?: PriceKind;
 
-  @IsOptional() @IsInt() @Min(0) @Max(3000)
+  @IsOptional() @IsInt() @Min(0) @Max(maxMarginBps)
+  margin_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10_000)
   reseller_discount_bps?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(Number.MAX_SAFE_INTEGER)
+  fixed_price?: number;
+
+  @IsOptional() @Matches(/^[A-Za-z]{3}$/)
+  fixed_currency?: string;
 }
 
 @ApiTags('Catalogue')
@@ -152,6 +231,16 @@ export class CatalogueController {
   @Get('products/:id')
   get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
     return this.catalogue.get(resellerOf(caller), mode, id);
+  }
+
+  @ApiOperation({
+    summary: 'Preview your price and profit',
+    description:
+      'What one sale of a product earns you: BitoCard’s price, your customer’s price and your profit, under the product’s scheme. `discount` products (airtime, data, bills, gift cards…) sell at face value at most: you earn your discount from BitoCard and may give part of it to your customer (`customer_discount_bps`). `markup` products (numbers, software…) are priced up from BitoCard’s price with your markup or a fixed price. Try settings with the query (nothing is saved); save them with `PUT /v1/pricing/markups`.',
+  })
+  @Get('products/:id/price-preview')
+  async preview(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Query() query: PricePreviewDto) {
+    return this.catalogue.preview(resellerOf(caller), mode, id, query);
   }
 
   @ApiOperation({
@@ -201,14 +290,21 @@ export class PricingController {
   constructor(private readonly pricing: PricingService) {}
 
   /** Readable by every team member; only owners and admins change markups. */
-  @ApiOperation({ summary: 'Get your pricing', description: 'How you earn on face-value products, the markup cap, and your markups (with the product name for product markups).' })
+  @ApiOperation({
+    summary: 'Get your pricing',
+    description: 'The markup cap and your pricing settings: general (no category), per category and per product (with the product name). Each setting holds a markup (markup products), a customer discount (discount products) or, per product, a fixed price.',
+  })
   @Scopes('catalogue:read')
   @Get()
   get(@CurrentCaller() caller: Caller) {
     return this.pricing.pricingSettings(resellerOf(caller));
   }
 
-  @ApiOperation({ summary: 'Set a markup', description: 'For a whole category, or one product (which overrides its category). Capped by the Markup Protection Scheme.' })
+  @ApiOperation({
+    summary: 'Set your pricing',
+    description:
+      'For everything (no category or product), a category, or one product (the most specific wins, setting by setting). Only the fields you send change; `null` clears one. Markups are capped by the Markup Protection Scheme; a customer discount never exceeds your own discount.',
+  })
   @Roles('admin')
   @Scopes('stores:manage')
   @Put('markups')
@@ -216,12 +312,12 @@ export class PricingController {
     return this.pricing.setMarkup(resellerOf(caller), body);
   }
 
-  @ApiOperation({ summary: 'Remove a markup' })
+  @ApiOperation({ summary: 'Remove a pricing setting', description: 'Removes your general, category or product setting; the next level up applies again.' })
   @Roles('admin')
   @Scopes('stores:manage')
   @Delete('markups')
   removeMarkup(@CurrentCaller() caller: Caller, @Query() query: RemoveMarkupDto) {
-    return this.pricing.removeMarkup(resellerOf(caller), query.category, query.product_id ?? null);
+    return this.pricing.removeMarkup(resellerOf(caller), query.category ?? null, query.product_id ?? null);
   }
 }
 
@@ -232,12 +328,22 @@ export class AdminPricingController {
   constructor(
     private readonly pricing: PricingService,
     private readonly audit: AuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @AdminRoles('finance', 'operations')
   @Get()
   list() {
     return this.pricing.listRules();
+  }
+
+  /** How a product sells in a market under the current rules, or under a trial product rule (nothing saved). */
+  @AdminRoles('finance', 'operations')
+  @Get('preview')
+  async preview(@Query() query: AdminPreviewDto) {
+    const product = await this.prisma.product.findUnique({ where: { id: query.product_id }, include: { supplierProducts: { include: { supplier: true } } } });
+    if (!product) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such product.', 'product_id');
+    return this.pricing.adminPreview(query.country, product, query.face_value === undefined ? null : BigInt(query.face_value), query.kind ? query : null);
   }
 
   @AdminRoles('finance')

@@ -250,7 +250,9 @@ export async function fakeReloadly() {
       if (reply.recorded) state.transactions[transaction.transactionId] = { ...transaction, status: reply.recorded };
       return { status: reply.http, body: { message: 'Simulated error', errorCode: 'SIMULATED' } };
     }
-    state.transactions[transaction.transactionId] = { ...transaction, status: reply.status };
+    // `state.balanceCost` (major units, the account currency): what a top-up reply says it took from the balance.
+    const balanceInfo = kind === 'topup' && state.balanceCost !== undefined ? { balanceInfo: { cost: state.balanceCost, currencyCode: 'NGN' } } : {};
+    state.transactions[transaction.transactionId] = { ...transaction, ...balanceInfo, status: reply.status };
     return { body: state.transactions[transaction.transactionId] };
   }
   const service = await fakeService(({ method, url, body }) => {
@@ -329,7 +331,8 @@ export async function fakeVtpass() {
       const record = {
         code: reply.code,
         response_description: reply.code === '000' ? 'TRANSACTION SUCCESSFUL' : 'TRANSACTION FAILED',
-        content: { transactions: { status: reply.status, transactionId: `VT${(state.nextId += 1)}` } },
+        // `state.totalAmount` (naira): what VTpass says it charged after its commission.
+        content: { transactions: { status: reply.status, transactionId: `VT${(state.nextId += 1)}`, ...(state.totalAmount === undefined ? {} : { total_amount: state.totalAmount }) } },
         ...(electric && reply.status === 'delivered' ? { purchased_code: 'Token : 1234-5678-9012-3456-7890', units: '79.9' } : {}),
         request: body,
       };

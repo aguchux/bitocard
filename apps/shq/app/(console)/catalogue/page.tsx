@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, ShoppingCart, Store } from "lucide-react";
 import { Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatMoney, Input, LoadMore, Notice, PageHeader, useDebouncedValue } from "@bitocard/admin-ui";
 import { type CatalogueCategory, catalogueCategories, type Product, useCatalogueProductsInfiniteQuery, useSetListingMutation } from "@bitocard/api-client/reseller";
+import { ProductPricingDialog } from "@/components/product-pricing";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -24,8 +25,11 @@ const priceRange = (product: Product) => {
   return low === high ? formatMoney(low, currency) : `${formatMoney(low, currency)} – ${formatMoney(high, currency)}`;
 };
 
-/** Lists or unlists one product on the reseller's store (from its row, without opening it). */
-function ListingButton({ product, manage }: { product: Product; manage: boolean }) {
+/**
+ * Lists or unlists one product on the reseller's store (from its row, without opening it). Listing opens its pricing
+ * first, so the reseller sees what they make per sale; unlisting is immediate.
+ */
+function ListingButton({ product, manage, onPrice }: { product: Product; manage: boolean; onPrice: (product: Product) => void }) {
   const [setListing, state] = useSetListingMutation();
   if (!manage) return product.listed ? <Badge tone="green" dot={false}>Listed</Badge> : <span className="text-xs text-muted">Not listed</span>;
   // The button flips at once (optimistic); if the API refuses, it flips back and says so.
@@ -36,7 +40,8 @@ function ListingButton({ product, manage }: { product: Product; manage: boolean 
         variant={product.listed ? "secondary" : "primary"}
         onClick={event => {
           event.stopPropagation();
-          void setListing({ listed: !product.listed, product_ids: [product.id] });
+          if (product.listed) void setListing({ listed: false, product_ids: [product.id] });
+          else onPrice(product);
         }}
         aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on your store`}
       >
@@ -51,7 +56,7 @@ function ListingButton({ product, manage }: { product: Product; manage: boolean 
   );
 }
 
-function ProductDialog({ product, manage, onClose }: { product: Product | null; manage: boolean; onClose: () => void }) {
+function ProductDialog({ product, manage, onClose, onPrice }: { product: Product | null; manage: boolean; onClose: () => void; onPrice: (product: Product) => void }) {
   return (
     <Dialog
       open={product !== null}
@@ -61,7 +66,10 @@ function ProductDialog({ product, manage, onClose }: { product: Product | null; 
       footer={
         product ? (
           <span className="flex flex-wrap items-center gap-2">
-            <ListingButton product={product} manage={manage} />
+            <ListingButton product={product} manage={manage} onPrice={onPrice} />
+            <Button variant="secondary" onClick={() => onPrice(product)}>
+              Pricing and profit
+            </Button>
             <Link href={`/orders/new?product=${product.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-600">
               <ShoppingCart className="size-4" aria-hidden />
               Sell this
@@ -129,6 +137,11 @@ export default function CataloguePage() {
   const query = useCatalogueProductsInfiniteQuery({ category: category || undefined, country: country || undefined, q: q || undefined, listed: listing === "" ? undefined : listing === "listed" });
   const rows = query.data?.pages.flatMap(page => page.data);
   const [opened, setOpen] = useState<Product | null>(null);
+  const [pricing, setPricing] = useState<Product | null>(null);
+  const onPrice = (product: Product) => {
+    setOpen(null);
+    setPricing(product);
+  };
   // The open product, refreshed from the list after it is listed or unlisted.
   const open = opened ? (rows?.find(row => row.id === opened.id) ?? opened) : null;
   const [setListing, bulkState] = useSetListingMutation();
@@ -225,12 +238,13 @@ export default function CataloguePage() {
             { key: "country", header: "Used in", cell: product => <Badge dot={false}>{product.country}</Badge> },
             { key: "values", header: "Face values", cell: product => <span className="text-muted">{faceValues(product)}</span>, hideOnMobile: true },
             { key: "price", header: "Your price", align: "right", cell: product => <span className="font-semibold">{priceRange(product)}</span> },
-            { key: "store", header: "Your store", align: "right", cell: product => <ListingButton product={product} manage={manage} /> },
+            { key: "store", header: "Your store", align: "right", cell: product => <ListingButton product={product} manage={manage} onPrice={onPrice} /> },
           ]}
         />
         <LoadMore hasMore={query.hasNextPage} loading={query.isFetchingNextPage} onClick={() => query.fetchNextPage()} />
       </Card>
-      <ProductDialog product={open} manage={manage} onClose={() => setOpen(null)} />
+      <ProductDialog product={open} manage={manage} onClose={() => setOpen(null)} onPrice={onPrice} />
+      {pricing ? <ProductPricingDialog key={pricing.id} product={pricing} open manage={manage} onClose={() => setPricing(null)} /> : null}
     </ShqShell>
   );
 }

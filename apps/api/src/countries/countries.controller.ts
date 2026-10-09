@@ -31,7 +31,7 @@ class UpdateCountryDto {
   @IsOptional() @IsString() @Length(2, 80) name?: string;
   @IsOptional() @IsBoolean() reseller_signup?: boolean;
   @IsOptional() @IsBoolean() reserved_accounts?: boolean;
-  @IsOptional() @IsInt() @Min(0) @Max(500) markup_cap_percent?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(100) markup_cap_percent?: number;
   @IsOptional() @IsInt() @Min(0) @Max(90) payout_hold_days?: number;
   @IsOptional() @IsInt() @Min(0) min_withdrawal_minor?: number;
 }

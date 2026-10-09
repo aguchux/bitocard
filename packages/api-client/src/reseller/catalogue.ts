@@ -85,15 +85,55 @@ export type CreateQuote = {
   customer_reference?: string;
 };
 
-/** A markup over wholesale price, for a whole category (`product_id` null) or one product, in basis points (1500 = 15%). */
-/** `product_name` is set for a product markup (null if the product no longer exists). */
-export type Markup = { category: CatalogueCategory; product_id: string | null; product_name: string | null; markup_bps: number };
-
 /**
- * How you earn (`/v1/pricing`): `markup` adds your markup to face-value products; `discount` sells them at face value and
- * you earn BitoCard's discount. Markups are capped by the Markup Protection Scheme (`markup_cap_percent`).
+ * One of your pricing settings: general (`category` and `product_id` null), per category, or per product. On markup
+ * products: `markup_bps` over BitoCard's price, or (per product) `fixed_price`. On discount products:
+ * `customer_discount_bps`, the part of face value you give your customers. Null fields fall back to the next level up.
  */
-export type Pricing = { object: 'pricing'; currency: string; earning: 'markup' | 'discount'; markup_cap_percent: number; markups: Markup[] };
+export type Markup = {
+  category: CatalogueCategory | null;
+  product_id: string | null;
+  product_name: string | null;
+  markup_bps: number | null;
+  customer_discount_bps: number | null;
+  fixed_price: number | null;
+};
+
+/** Your pricing (`/v1/pricing`): your settings and the Markup Protection Scheme cap on markups. */
+export type Pricing = { object: 'pricing'; currency: string; markup_cap_percent: number; markups: Markup[] };
+
+export type MarkupInput = {
+  category?: CatalogueCategory | null;
+  product_id?: string | null;
+  markup_bps?: number | null;
+  customer_discount_bps?: number | null;
+  fixed_price?: number | null;
+};
+
+/** One sale of a product as you would make it (`/v1/catalogue/products/{id}/price-preview`). Amounts in minor units of `currency`. */
+export type PricePreview = {
+  object: 'price_preview';
+  product_id: string;
+  mode: Mode;
+  currency: string;
+  face_value: number;
+  scheme: 'discount' | 'markup';
+  face_price: number | null;
+  bitocard_price: number;
+  your_discount: number | null;
+  customer_discount: number | null;
+  customer_price: number;
+  your_profit: number;
+  markup_cap_bps: number;
+  fixed_below_cost: boolean;
+  settings: {
+    customer_discount_bps: number;
+    markup_bps: number;
+    fixed_price: number | null;
+    from: { customer_discount: 'product' | 'category' | 'general' | 'none'; markup: 'product' | 'category' | 'general' | 'none'; fixed: 'product' | 'none' };
+  };
+};
+export type PricePreviewArgs = { id: string; face_value?: number; markup_bps?: number; customer_discount_bps?: number; fixed_price?: number };
 
 /** The catalogue, quotes and your markups. Quotes and products follow live or sandbox mode; pricing settings are the same in both. */
 export const resellerCatalogueApi = bitocardApi.injectEndpoints({
@@ -135,11 +175,15 @@ export const resellerCatalogueApi = bitocardApi.injectEndpoints({
     quote: build.query<Quote, string>({ query: id => `/v1/quotes/${id}` }),
 
     resellerPricing: build.query<Pricing, void>({ query: () => '/v1/pricing', providesTags: ['Pricing'] }),
-    setMarkup: build.mutation<Pricing, { category: CatalogueCategory; product_id?: string; markup_bps: number }>({
+    pricePreview: build.query<PricePreview, PricePreviewArgs>({
+      query: ({ id, ...rest }) => ({ url: `/v1/catalogue/products/${id}/price-preview`, params: params(rest) }),
+      providesTags: ['Pricing', 'Catalogue'],
+    }),
+    setMarkup: build.mutation<Pricing, MarkupInput>({
       query: body => ({ url: '/v1/pricing/markups', method: 'PUT', body }),
       invalidatesTags: ['Pricing', 'Catalogue'],
     }),
-    removeMarkup: build.mutation<Pricing, { category: CatalogueCategory; product_id?: string }>({
+    removeMarkup: build.mutation<Pricing, { category?: CatalogueCategory | null; product_id?: string | null }>({
       query: args => ({ url: '/v1/pricing/markups', method: 'DELETE', params: params(args) }),
       invalidatesTags: ['Pricing', 'Catalogue'],
     }),
@@ -154,5 +198,6 @@ export const {
   useQuoteQuery,
   useResellerPricingQuery,
   useSetMarkupMutation,
+  usePricePreviewQuery,
   useRemoveMarkupMutation,
 } = resellerCatalogueApi;

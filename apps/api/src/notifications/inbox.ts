@@ -88,6 +88,7 @@ export const notificationTypes = {
   'admin.supplier_notification.failed': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Supplier notification not processed' },
   'admin.payout.failed': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Withdrawal failed' },
   'admin.checkout.refund_stuck': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Customer refund refused' },
+  'admin.order.cost_mismatch': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Supplier charged a different amount' },
   'admin.dispute.escalated': { realm: 'admin', roles: ['support', 'operations', 'finance'], severity: 'warning', label: 'Dispute escalated' },
   'admin.dispute.updated': { realm: 'admin', roles: ['support', 'operations', 'finance'], severity: 'info', label: 'Dispute updated' },
   'admin.chargeback.opened': { realm: 'admin', roles: ['finance'], severity: 'warning', label: 'Chargeback opened' },

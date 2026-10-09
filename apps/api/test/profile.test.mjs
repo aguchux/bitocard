@@ -198,8 +198,8 @@ describe('what every team member can read', () => {
     const support = await member(owner.resellerId, 'support');
     const read = await support.get('/v1/pricing');
     assert.equal(read.status, 200, JSON.stringify(read.json));
-    assert.equal(read.json.markup_cap_percent, 50);
-    assert.deepEqual(read.json.markups.find(m => m.product_id === product.id), { category: 'gift_cards', product_id: product.id, product_name: 'Test Card US', markup_bps: 500 });
+    assert.equal(read.json.markup_cap_percent, 100);
+    assert.deepEqual(read.json.markups.find(m => m.product_id === product.id), { category: 'gift_cards', product_id: product.id, product_name: 'Test Card US', markup_bps: 500, customer_discount_bps: null, fixed_price: null });
     assert.equal((await support.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 100 })).status, 403);
   });
 
@@ -207,7 +207,7 @@ describe('what every team member can read', () => {
     const { json } = await client(server.base).get('/v1/countries/NG');
     assert.deepEqual(
       [typeof json.reserved_accounts, json.markup_cap_percent, typeof json.payout_hold_days, typeof json.min_withdrawal_minor],
-      ['boolean', 50, 'number', 'number'],
+      ['boolean', 100, 'number', 'number'],
     );
     assert.ok(json.categories.every(category => !('taxable' in category)), 'admin-only fields stay private');
   });

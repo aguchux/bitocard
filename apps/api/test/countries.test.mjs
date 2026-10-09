@@ -25,7 +25,7 @@ describe('public listing', () => {
     assert.equal(ng.categories.find(c => c.category === 'gift_cards').customer_verification, true);
     assert.equal(ng.categories.find(c => c.category === 'airtime').customer_verification, false);
     // Resellers see the money rules they work under; tax settings stay admin-only.
-    assert.equal(ng.markup_cap_percent, 50);
+    assert.equal(ng.markup_cap_percent, 100);
     assert.ok(ng.categories.every(c => !('taxable' in c)));
   });
 
@@ -39,7 +39,7 @@ describe('admin management', () => {
   test('admins see every setting, including money rules', async () => {
     const { json } = await admin.get('/v1/admin/countries');
     const ng = json.data.find(c => c.code === 'NG');
-    assert.deepEqual([ng.markup_cap_percent, ng.payout_hold_days, ng.min_withdrawal_minor, ng.reserved_accounts], [50, 15, 1500000, true]);
+    assert.deepEqual([ng.markup_cap_percent, ng.payout_hold_days, ng.min_withdrawal_minor, ng.reserved_accounts], [100, 15, 1500000, true]);
     assert.equal(ng.categories.length, 10, 'every category, on or off');
     assert.deepEqual([ng.categories.find(c => c.category === 'mobile_money')?.enabled, ng.categories.find(c => c.category === 'mobile_money')?.customer_verification], [false, true], 'mobile money: off, customers verify');
   });

@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Database, Globe2, Package, Search, Store } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, categoryName, DataTable, Dialog, errorMessage, FilterSelect, formatRelative, summariseOffers, ImageField, Input, LoadMore, Notice, PageHeader, StatCard, StatusBadge, Toggle, useDebouncedValue } from "@bitocard/admin-ui";
+import { ProductPricingDialog } from "./product-pricing";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type AdminProduct,
@@ -81,8 +82,11 @@ function OfferRow({ offer, editable }: { offer: SupplierOffer; editable: boolean
   );
 }
 
-/** Lists or unlists one product on bitocard.com, from its row (without opening the product). */
-function ListingButton({ product, editable }: { product: AdminProduct; editable: boolean }) {
+/**
+ * Lists or unlists one product on bitocard.com, from its row (without opening the product). Listing opens its pricing
+ * first, so whoever lists sees what it costs and what BitoCard makes; unlisting is immediate.
+ */
+function ListingButton({ product, editable, onPrice }: { product: AdminProduct; editable: boolean; onPrice: (product: AdminProduct) => void }) {
   const [update, state] = useUpdateProductMutation();
   // The button flips at once (optimistic); if the API refuses, it flips back and says so.
   return (
@@ -93,7 +97,8 @@ function ListingButton({ product, editable }: { product: AdminProduct; editable:
         disabled={!editable}
         onClick={event => {
           event.stopPropagation();
-          void update({ id: product.id, listed: !product.listed });
+          if (product.listed) void update({ id: product.id, listed: false });
+          else onPrice(product);
         }}
         aria-label={`${product.listed ? "Unlist" : "List"} ${product.name} on bitocard.com`}
       >
@@ -129,6 +134,7 @@ function Products() {
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim());
   const [open, setOpen] = useState<AdminProduct | null>(null);
+  const [pricing, setPricing] = useState<AdminProduct | null>(null);
   const [bulk, setBulk] = useState<"list" | "unlist" | null>(null);
   const [setProductListing] = useSetProductListingMutation();
   const filter = {
@@ -277,7 +283,7 @@ function Products() {
                   cell: product => (
                     <span className="flex flex-col items-start gap-1">
                       {product.listed ? <Badge tone="green" dot={false}>Listed</Badge> : null}
-                      <ListingButton product={product} editable={operator} />
+                      <ListingButton product={product} editable={operator} onPrice={setPricing} />
                     </span>
                   ),
                 },
@@ -305,6 +311,15 @@ function Products() {
                 <span className="block text-xs text-muted">BitoCard&apos;s store shows only listed products. Resellers list for their own stores.</span>
               </span>
               <Toggle label="Listed on bitocard.com" checked={current.listed} disabled={!operator || productState.isLoading} onChange={listed => updateProduct({ id: current.id, listed })} />
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-canvas px-4 py-3">
+              <span className="text-sm">
+                <span className="font-semibold">Pricing</span>
+                <span className="block text-xs text-muted">What each supplier charges, the rule that applies and what BitoCard makes per sale.</span>
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => setPricing(current)}>
+                Price
+              </Button>
             </div>
             <ProductImage key={`${current.id}:${current.image_url ?? ""}`} product={current} editable={operator} />
             <ul className="space-y-3">
@@ -336,6 +351,7 @@ function Products() {
           }}
         />
       ) : null}
+      {pricing ? <ProductPricingDialog key={pricing.id} product={pricing} open onClose={() => setPricing(null)} finance={can(admin, "finance")} operator={operator} /> : null}
     </AdminShell>
   );
 }

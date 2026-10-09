@@ -8,7 +8,7 @@ type VariationsResponse = { response_description?: string; content?: { ServiceNa
 type PayResponse = {
   code?: string;
   response_description?: string;
-  content?: { transactions?: { status?: string; transactionId?: string | number } };
+  content?: { transactions?: { status?: string; transactionId?: string | number; total_amount?: string | number; commission?: string | number } };
   purchased_code?: string;
   token?: string;
   mainToken?: string;
@@ -161,10 +161,17 @@ export class VtpassAdapter implements SupplierAdapter {
     const status = (res.content?.transactions?.status ?? '').toLowerCase();
     const supplierTransactionId = res.content?.transactions?.transactionId === undefined ? undefined : String(res.content.transactions.transactionId);
     const detail = `${code} ${res.response_description ?? ''} ${status}`.trim();
-    if (code === '000' && status === 'delivered') return { status: 'completed', supplierTransactionId, deliveries: [delivery(res)], detail };
+    if (code === '000' && status === 'delivered') return { status: 'completed', supplierTransactionId, deliveries: [delivery(res)], detail, reportedCost: reportedCost(res) };
     if (code === '016' || status === 'failed' || (placing && refusedCodes.has(code))) return { status: 'failed', supplierTransactionId, detail };
     return { status: 'pending', supplierTransactionId, detail };
   }
+}
+
+/** What VTpass charged after its commission (`total_amount`, naira), when its reply says. */
+function reportedCost(res: PayResponse): FulfilmentResult['reportedCost'] {
+  const total = Number(res.content?.transactions?.total_amount);
+  if (res.content?.transactions?.total_amount === undefined || !Number.isFinite(total)) return undefined;
+  return { amountMinor: BigInt(Math.round(total * 100)), currency: 'NGN' };
 }
 
 /** Electricity returns a token to hand to the customer; TV subscriptions return only a confirmation. */

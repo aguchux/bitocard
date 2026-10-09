@@ -78,6 +78,10 @@ describe('catalogue, pricing, quotes and orders', () => {
     const pricing = await call(browser, 'PUT /v1/pricing/markups', 200, 'PUT', '/v1/pricing/markups', { category: 'gift_cards', product_id: amazon, markup_bps: 1000 });
     assert.equal(pricing.markups.find(item => item.product_id === amazon).product_name, 'Amazon US');
     await call(browser, 'DELETE /v1/pricing/markups', 200, 'DELETE', `/v1/pricing/markups?category=gift_cards&product_id=${amazon}`);
+    const discounted = await call(browser, 'GET /v1/catalogue/products/{id}/price-preview', 200, 'GET', `/v1/catalogue/products/${mtn}/price-preview?face_value=100000&customer_discount_bps=50`);
+    assert.equal(discounted.scheme, 'discount');
+    const marked = await call(browser, 'GET /v1/catalogue/products/{id}/price-preview', 200, 'GET', `/v1/catalogue/products/${amazon}/price-preview?face_value=1000&markup_bps=1500`);
+    assert.equal(marked.scheme, 'markup');
 
     // Quotes: a gift card, airtime (phone), pay-TV (checked smartcard) and electricity (meter), one with tax.
     const giftQuote = await call(browser, 'POST /v1/quotes', 201, 'POST', '/v1/quotes', { product_id: amazon, face_value: 1000, quantity: 2, customer_reference: 'cust-1042' }, sandbox);
@@ -94,13 +98,15 @@ describe('catalogue, pricing, quotes and orders', () => {
     assert.equal(tvQuote.recipient.account_name, 'SANDBOX CUSTOMER');
     const meterQuote = await call(browser, 'POST /v1/quotes', 201, 'POST', '/v1/quotes', { product_id: await productId('bills:NG:ikeja-electric:prepaid'), face_value: 500_000, recipient: { account_number: '45012345678' } }, sandbox);
 
-    await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: true });
+    // Tax on a markup product (a marked-up gift card covers it; airtime at face value would not).
+    await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: true });
+    await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 1000 });
     let taxedQuote;
     try {
-      taxedQuote = await call(browser, 'POST /v1/quotes', 201, 'POST', '/v1/quotes', { product_id: mtn, face_value: 100_000, recipient: { phone: '08031234567' } }, sandbox);
+      taxedQuote = await call(browser, 'POST /v1/quotes', 201, 'POST', '/v1/quotes', { product_id: amazon, face_value: 1000 }, sandbox);
       assert.equal(taxedQuote.tax.name, 'VAT');
     } finally {
-      await admin.put('/v1/admin/countries/NG/categories/airtime', { taxable: false });
+      await admin.put('/v1/admin/countries/NG/categories/gift_cards', { taxable: false });
     }
 
     // Orders: completed (codes), failed, pending then simulated, electricity token, pay-TV confirmation, taxed airtime.

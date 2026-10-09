@@ -27,7 +27,7 @@ export type StoreInput = { name?: string; subdomain?: string; logo_url?: string 
 export type ResellerProfile = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus };
 
 /** Settings chain: what the country allows and the reseller's effective choice. */
-export type SettingsOptionKey = 'gift_card_payout' | 'fixed_price_earning';
+export type SettingsOptionKey = 'gift_card_payout';
 export type SettingsOption = { value: string | null; allowed: string[]; source: 'reseller' | 'country_default' };
 export type SettingsOptions = Record<SettingsOptionKey, SettingsOption>;
 export type ResellerSettings = { object: 'settings'; options: SettingsOptions; features: Record<string, boolean> };

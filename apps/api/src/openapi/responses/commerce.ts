@@ -1,7 +1,7 @@
 import { productFeatureKeys } from '../../catalogue/features.js';
 import { ProductCategory } from '../../generated/prisma/client.js';
 import { eventObjectSchemas, exampleNumberMessage, exampleVirtualNumber } from '../../webhooks/openapi.js';
-import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
+import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 /** Every product category. */
@@ -114,33 +114,86 @@ const pricing = objectSchema(
   {
     object: constant('pricing'),
     currency: str('ISO 4217 currency you sell in.'),
-    earning: oneOf(
-      'How you earn on face-value products (airtime, data, pay-TV and bills in your currency): `markup` (you sell above face value) or `discount` (you sell at face value and earn BitoCard’s discount). Set by your country’s options.',
-      ['markup', 'discount'],
-    ),
-    markup_cap_percent: int('The Markup Protection Scheme cap: your price can be at most this percentage above wholesale price.'),
+    markup_cap_percent: int('The Markup Protection Scheme cap: on markup products, your price can be at most this percentage above BitoCard’s price (100% or lower).'),
     markups: array(
       shape({
-        category: category('The category the markup applies to.'),
-        product_id: nullableUuid('The product, for a product markup (which overrides its category’s); null for the whole category.'),
-        product_name: nullableStr('The product’s name, for a product markup.'),
-        markup_bps: int('Markup over wholesale price in basis points (1500 = 15%).'),
+        category: nullable(category('The category it applies to; null for your general setting (everything).')),
+        product_id: nullableUuid('The product, for a product setting (which overrides its category’s and your general one).'),
+        product_name: nullableStr('The product’s name, for a product setting.'),
+        markup_bps: nullableInt('Markup products: your markup over BitoCard’s price in basis points (1500 = 15%). Null: the next level up applies.'),
+        customer_discount_bps: nullableInt('Discount products: how much of face value you give your customers, in basis points. Null: the next level up applies.'),
+        fixed_price: nullableInt('Markup products, one product: your fixed customer price, in minor units of `currency`.'),
       }),
-      'Your markups. Categories and products without one sell at wholesale price (face value for face-value products).',
+      'Your settings: general, per category and per product. A product takes each setting from its own row, else its category’s, else your general one; with none, discount products sell at face value and markup products at BitoCard’s price.',
     ),
   },
-  'How you price: your markups, the cap on them, and how you earn on face-value products.',
+  'How you price. Every product sells under one scheme, set by BitoCard: `discount` (face value at most; you earn BitoCard’s discount and may pass part of it on) or `markup` (priced up from BitoCard’s price).',
 );
 
 const pricingExample = {
   object: 'pricing',
   currency: 'NGN',
-  earning: 'markup',
-  markup_cap_percent: 50,
+  markup_cap_percent: 100,
   markups: [
-    { category: 'airtime', product_id: null, product_name: null, markup_bps: 500 },
-    { category: 'gift_cards', product_id: 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d', product_name: 'Amazon US', markup_bps: 1000 },
-  ],
+    { category: null, product_id: null, product_name: null, markup_bps: 2000, customer_discount_bps: 0 },
+    { category: 'airtime', product_id: null, product_name: null, markup_bps: null, customer_discount_bps: 50 },
+    { category: 'virtual_numbers', product_id: 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d', product_name: 'London number', markup_bps: null, customer_discount_bps: null, fixed_price: 1200000 },
+  ].map(row => ({ fixed_price: null, ...row })),
+};
+
+const pricePreview = objectSchema(
+  'PricePreview',
+  {
+    object: constant('price_preview'),
+    product_id: uuid('Product ID.'),
+    mode,
+    currency: str('ISO 4217 currency of the amounts.'),
+    face_value: money('The face value priced, in the product’s face currency'),
+    scheme: oneOf('`discount`: sold at face value at most, BitoCard’s discount shared. `markup`: priced up from BitoCard’s price.', ['discount', 'markup']),
+    face_price: nullableInt('Discount products: the face value in your currency, the most a customer pays.'),
+    bitocard_price: money('What BitoCard charges you per sale'),
+    your_discount: nullableInt('Discount products: your discount off face value, in minor units.'),
+    customer_discount: nullableInt('Discount products: what you give your customer off face value, in minor units.'),
+    customer_price: money('What your customer pays (before any tax added at checkout)'),
+    your_profit: money('What you make per sale'),
+    markup_cap_bps: int('The most you can mark up markup products, in basis points.'),
+    fixed_below_cost: bool('Your fixed price is below BitoCard’s price, so customers pay BitoCard’s price and you make nothing. Raise it.'),
+    settings: shape(
+      {
+        customer_discount_bps: int('The customer discount that applied, in basis points.'),
+        markup_bps: int('The markup that applied, in basis points.'),
+        fixed_price: nullableInt('The fixed customer price that applied, in minor units.'),
+        from: shape(
+          {
+            customer_discount: oneOf('Where the customer discount came from.', ['product', 'category', 'general', 'none']),
+            markup: oneOf('Where the markup came from.', ['product', 'category', 'general', 'none']),
+            fixed: oneOf('Where the fixed price came from.', ['product', 'none']),
+          },
+          'Which of your settings applied.',
+        ),
+      },
+      'Your settings for this product, as used.',
+    ),
+  },
+  'One sale of a product, as you would make it.',
+);
+
+const pricePreviewExample = {
+  object: 'price_preview',
+  product_id: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+  mode: 'live',
+  currency: 'NGN',
+  face_value: 100000,
+  scheme: 'discount',
+  face_price: 100000,
+  bitocard_price: 98500,
+  your_discount: 1500,
+  customer_discount: 500,
+  customer_price: 99500,
+  your_profit: 1000,
+  markup_cap_bps: 10000,
+  fixed_below_cost: false,
+  settings: { customer_discount_bps: 50, markup_bps: 0, fixed_price: null, from: { customer_discount: 'category', markup: 'none', fixed: 'none' } },
 };
 
 const orderProduct = shape({ id: uuid('Product ID.'), name: str('Product name.'), category: category() }, 'The product.');
@@ -385,7 +438,7 @@ const renewalPrice = objectSchema(
 const sentMessage = { ...exampleNumberMessage, id: '5e6f7a8b-9c0d-4e1f-9a2b-3c4d5e6f7a8b', direction: 'out', from: '+442071234567', to: '+447700900123', text: 'Your table is ready.', status: 'queued' };
 
 export const commerceDocs: DocsArea = {
-  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
+  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
   responses: {
     'GET /v1/catalogue/products': {
       status: 200,
@@ -401,8 +454,9 @@ export const commerceDocs: DocsArea = {
       example: { object: 'listing_update', listed: true, product_ids: ['c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f', 'a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d'], updated: 2 },
     },
     'GET /v1/pricing': { status: 200, description: 'Your pricing.', schema: 'Pricing', example: pricingExample },
-    'PUT /v1/pricing/markups': { status: 200, description: 'The markup was set. Returns your pricing.', schema: 'Pricing', example: pricingExample },
-    'DELETE /v1/pricing/markups': { status: 200, description: 'The markup was removed (or there was none). Returns your pricing.', schema: 'Pricing', example: { ...pricingExample, markups: [pricingExample.markups[0]] } },
+    'PUT /v1/pricing/markups': { status: 200, description: 'The setting was saved. Returns your pricing.', schema: 'Pricing', example: pricingExample },
+    'DELETE /v1/pricing/markups': { status: 200, description: 'The setting was removed (or there was none). Returns your pricing.', schema: 'Pricing', example: { ...pricingExample, markups: [pricingExample.markups[0]] } },
+    'GET /v1/catalogue/products/{id}/price-preview': { status: 200, description: 'One sale with your settings, or the ones you are trying.', schema: 'PricePreview', example: pricePreviewExample },
     'POST /v1/quotes': { status: 201, description: 'The quote, with its price locked for 10 minutes.', schema: 'Quote', example: quoteExample },
     'GET /v1/quotes/{id}': { status: 200, description: 'The quote.', schema: 'Quote', example: { ...quoteExample, status: 'used' } },
     'POST /v1/orders': {

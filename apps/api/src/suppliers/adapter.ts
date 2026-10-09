@@ -53,6 +53,8 @@ export type FulfilmentResult = {
   detail?: string;
   /** Virtual numbers bought by the order, with the supplier's own IDs for them (internal: never shown). */
   numbers?: SuppliedNumber[];
+  /** What the supplier says it charged for the whole order, when its reply says (for reconciliation; internal). */
+  reportedCost?: { amountMinor: bigint; currency: string };
 };
 
 /** A number a supplier sold us: kept to renew, release and route its SMS. */
