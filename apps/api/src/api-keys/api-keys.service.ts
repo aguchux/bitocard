@@ -16,6 +16,8 @@ export const apiKeyScopes = [
   'events:read',
   'stores:manage',
   'customers:verify',
+  'disputes:read',
+  'disputes:write',
 ] as const;
 
 export const maxActiveKeys = 20;

@@ -12,6 +12,7 @@ import {
   KeyRound,
   Landmark,
   ListOrdered,
+  MessageSquareWarning,
   Package,
   Percent,
   Phone,
@@ -60,6 +61,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "All orders", href: "/orders", icon: ListOrdered },
       { label: "New order", href: "/orders/new", icon: Sparkles },
       { label: "Numbers", href: "/numbers", icon: Phone },
+      { label: "Disputes", href: "/disputes", icon: MessageSquareWarning },
     ],
   },
   catalogue: {

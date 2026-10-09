@@ -3906,7 +3906,9 @@
                     "webhooks:manage",
                     "events:read",
                     "stores:manage",
-                    "customers:verify"
+                    "customers:verify",
+                    "disputes:read",
+                    "disputes:write"
                   ],
                   "reseller": {
                     "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
@@ -5690,7 +5692,9 @@
                     "webhooks:manage",
                     "events:read",
                     "stores:manage",
-                    "customers:verify"
+                    "customers:verify",
+                    "disputes:read",
+                    "disputes:write"
                   ],
                   "created_at": "2026-10-06T09:00:00.000Z",
                   "last_used_at": null,
@@ -5834,7 +5838,9 @@
                         "webhooks:manage",
                         "events:read",
                         "stores:manage",
-                        "customers:verify"
+                        "customers:verify",
+                        "disputes:read",
+                        "disputes:write"
                       ],
                       "created_at": "2026-10-06T09:00:00.000Z",
                       "last_used_at": "2026-10-06T09:12:41.000Z",
@@ -5977,7 +5983,9 @@
                     "webhooks:manage",
                     "events:read",
                     "stores:manage",
-                    "customers:verify"
+                    "customers:verify",
+                    "disputes:read",
+                    "disputes:write"
                   ],
                   "created_at": "2026-10-06T11:00:00.000Z",
                   "last_used_at": null,
@@ -6128,7 +6136,9 @@
                     "webhooks:manage",
                     "events:read",
                     "stores:manage",
-                    "customers:verify"
+                    "customers:verify",
+                    "disputes:read",
+                    "disputes:write"
                   ],
                   "created_at": "2026-10-06T09:00:00.000Z",
                   "last_used_at": "2026-10-06T09:12:41.000Z",
@@ -7560,6 +7570,189 @@
           "Exchange rates"
         ],
         "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/wallet/chargebacks": {
+      "get": {
+        "description": "Card payments into your wallet or your store that the cardholder disputed (chargebacks), newest first. While one is `open` its amount is held from your wallet (`held`; what the wallet could not cover is `shortfall`) and withdrawals wait (`payouts_on_hold`). Won: the hold comes back. Lost: it is returned to the cardholder. With chargeback protection (`protected`, the Premium plan) nothing is held and BitoCard bears a loss.",
+        "operationId": "PaymentsController_listChargebacks",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your chargebacks in this mode, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Chargeback"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "chargeback",
+                      "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                      "mode": "live",
+                      "payment_id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+                      "amount": 500000,
+                      "currency": "NGN",
+                      "status": "open",
+                      "protected": false,
+                      "held": 500000,
+                      "shortfall": 0,
+                      "payouts_on_hold": true,
+                      "opened_at": "2026-10-07T09:12:44.000Z",
+                      "resolved_at": null
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List chargebacks",
+        "tags": [
+          "Wallet"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
       }
     },
     "/v1/wallet/payment-methods": {
@@ -9072,7 +9265,7 @@
         "x-bitocard-auth": "api_key"
       },
       "post": {
-        "description": "Dashboard only. The bank confirms the account and supplies its name. Live payouts to a new account start 24 hours after it is added.",
+        "description": "Dashboard only, and only the account owner. The bank confirms the account and supplies its name. Live payouts to a new account start 24 hours after it is added.",
         "operationId": "PayoutsController_addBankAccount",
         "parameters": [
           {
@@ -9203,9 +9396,7 @@
           "Payouts"
         ],
         "x-bitocard-auth": "session",
-        "x-bitocard-roles": [
-          "finance"
-        ],
+        "x-bitocard-roles": [],
         "x-bitocard-scopes": [
           "wallet:read"
         ]
@@ -19718,6 +19909,1182 @@
         "x-bitocard-auth": "session"
       }
     },
+    "/v1/disputes": {
+      "get": {
+        "description": "Your customers’ disputes, your own disputes with BitoCard and chargebacks, newest first.",
+        "operationId": "DisputesController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "escalated",
+                "contested",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "`customer`, `reseller` (yours with BitoCard) or `chargeback`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customer",
+                "reseller",
+                "chargeback"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your disputes in this mode, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DisputeSummary"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "dispute",
+                      "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                      "reference": "D-000123",
+                      "mode": "live",
+                      "kind": "customer",
+                      "topic": "order",
+                      "status": "open",
+                      "subject": "Gift card code says already used",
+                      "customer_reference": "cust_8812",
+                      "customer_id": null,
+                      "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                      "payment_id": null,
+                      "checkout_id": null,
+                      "chargeback_id": null,
+                      "currency": "NGN",
+                      "recommendation": null,
+                      "recommended_amount": null,
+                      "report": null,
+                      "escalated_at": null,
+                      "outcome": null,
+                      "outcome_amount": null,
+                      "outcome_note": null,
+                      "resolved_at": null,
+                      "created_at": "2026-10-08T09:14:02.000Z",
+                      "updated_at": "2026-10-08T09:14:02.000Z"
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List disputes",
+        "tags": [
+          "Disputes"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "disputes:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "post": {
+        "description": "Log a customer’s dispute to investigate (for example one raised with you on your own systems), or open your own dispute with BitoCard (`kind: reseller`), which goes to BitoCard at once. Disputes about funding, payments and trades are investigated by you first and escalated to BitoCard with your report and recommendation.",
+        "operationId": "DisputesController_open",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenDisputeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new dispute with its first message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispute"
+                },
+                "example": {
+                  "object": "dispute",
+                  "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                  "reference": "D-000123",
+                  "mode": "live",
+                  "kind": "customer",
+                  "topic": "order",
+                  "status": "open",
+                  "subject": "Gift card code says already used",
+                  "customer_reference": "cust_8812",
+                  "customer_id": null,
+                  "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                  "payment_id": null,
+                  "checkout_id": null,
+                  "chargeback_id": null,
+                  "currency": "NGN",
+                  "recommendation": null,
+                  "recommended_amount": null,
+                  "report": null,
+                  "escalated_at": null,
+                  "outcome": null,
+                  "outcome_amount": null,
+                  "outcome_note": null,
+                  "resolved_at": null,
+                  "created_at": "2026-10-08T09:14:02.000Z",
+                  "updated_at": "2026-10-08T09:14:02.000Z",
+                  "messages": [
+                    {
+                      "id": "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "staff",
+                      "body": "The customer says the Amazon code was already redeemed when they tried it.",
+                      "created_at": "2026-10-08T09:14:02.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open a dispute",
+        "tags": [
+          "Disputes"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "disputes:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/disputes/{id}": {
+      "get": {
+        "description": "With every message, staff notes included.",
+        "operationId": "DisputesController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The dispute with every message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispute"
+                },
+                "example": {
+                  "object": "dispute",
+                  "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                  "reference": "D-000123",
+                  "mode": "live",
+                  "kind": "customer",
+                  "topic": "order",
+                  "status": "open",
+                  "subject": "Gift card code says already used",
+                  "customer_reference": "cust_8812",
+                  "customer_id": null,
+                  "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                  "payment_id": null,
+                  "checkout_id": null,
+                  "chargeback_id": null,
+                  "currency": "NGN",
+                  "recommendation": null,
+                  "recommended_amount": null,
+                  "report": null,
+                  "escalated_at": null,
+                  "outcome": null,
+                  "outcome_amount": null,
+                  "outcome_note": null,
+                  "resolved_at": null,
+                  "created_at": "2026-10-08T09:14:02.000Z",
+                  "updated_at": "2026-10-08T09:14:02.000Z",
+                  "messages": [
+                    {
+                      "id": "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "staff",
+                      "body": "The customer says the Amazon code was already redeemed when they tried it.",
+                      "created_at": "2026-10-08T09:14:02.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a dispute",
+        "tags": [
+          "Disputes"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "disputes:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/disputes/{id}/messages": {
+      "post": {
+        "description": "Answer the customer (`visibility: all`) or add a note only you and BitoCard see (`staff`).",
+        "operationId": "DisputesController_reply",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The dispute with your message added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispute"
+                },
+                "example": {
+                  "object": "dispute",
+                  "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                  "reference": "D-000123",
+                  "mode": "live",
+                  "kind": "customer",
+                  "topic": "order",
+                  "status": "open",
+                  "subject": "Gift card code says already used",
+                  "customer_reference": "cust_8812",
+                  "customer_id": null,
+                  "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                  "payment_id": null,
+                  "checkout_id": null,
+                  "chargeback_id": null,
+                  "currency": "NGN",
+                  "recommendation": null,
+                  "recommended_amount": null,
+                  "report": null,
+                  "escalated_at": null,
+                  "outcome": null,
+                  "outcome_amount": null,
+                  "outcome_note": null,
+                  "resolved_at": null,
+                  "created_at": "2026-10-08T09:14:02.000Z",
+                  "updated_at": "2026-10-08T10:01:12.000Z",
+                  "messages": [
+                    {
+                      "id": "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "staff",
+                      "body": "The customer says the Amazon code was already redeemed when they tried it.",
+                      "created_at": "2026-10-08T09:14:02.000Z"
+                    },
+                    {
+                      "id": "7c6b5a49-3827-4615-a4b3-c2d1e0f9a8b7",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "all",
+                      "body": "Thanks, we are checking with our supplier.",
+                      "created_at": "2026-10-08T10:01:12.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a message",
+        "tags": [
+          "Disputes"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "disputes:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/disputes/{id}/escalate": {
+      "post": {
+        "description": "Hand a dispute you have investigated to BitoCard with your report and what you recommend it does. BitoCard decides and executes; it may send it back to you for more.",
+        "operationId": "DisputesController_escalate",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The dispute, now with BitoCard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispute"
+                },
+                "example": {
+                  "object": "dispute",
+                  "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                  "reference": "D-000123",
+                  "mode": "live",
+                  "kind": "customer",
+                  "topic": "order",
+                  "status": "escalated",
+                  "subject": "Gift card code says already used",
+                  "customer_reference": "cust_8812",
+                  "customer_id": null,
+                  "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                  "payment_id": null,
+                  "checkout_id": null,
+                  "chargeback_id": null,
+                  "currency": "NGN",
+                  "recommendation": "refund_customer",
+                  "recommended_amount": null,
+                  "report": "The customer tried the code within an hour of delivery and sent a screenshot of the redemption error. Recommend a refund.",
+                  "escalated_at": "2026-10-08T11:02:40.000Z",
+                  "outcome": null,
+                  "outcome_amount": null,
+                  "outcome_note": null,
+                  "resolved_at": null,
+                  "created_at": "2026-10-08T09:14:02.000Z",
+                  "updated_at": "2026-10-08T11:02:40.000Z",
+                  "messages": [
+                    {
+                      "id": "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "staff",
+                      "body": "The customer says the Amazon code was already redeemed when they tried it.",
+                      "created_at": "2026-10-08T09:14:02.000Z"
+                    },
+                    {
+                      "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+                      "author": "system",
+                      "author_name": null,
+                      "visibility": "staff",
+                      "body": "Escalated to BitoCard by Ada Obi. Recommendation: refund the customer.",
+                      "created_at": "2026-10-08T11:02:40.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Escalate a dispute to BitoCard",
+        "tags": [
+          "Disputes"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "disputes:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/disputes/{id}/resolve": {
+      "post": {
+        "description": "Close a customer’s dispute you settled yourself, with a note to the customer. Nothing moves money: anything BitoCard must execute (a refund, a credit) is escalated instead. Chargebacks and your own disputes are BitoCard’s to decide.",
+        "operationId": "DisputesController_resolve",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The dispute, resolved by you.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dispute"
+                },
+                "example": {
+                  "object": "dispute",
+                  "id": "3e2d1c0b-9a8f-4e7d-a6c5-b4a3f2e1d0c9",
+                  "reference": "D-000123",
+                  "mode": "live",
+                  "kind": "customer",
+                  "topic": "order",
+                  "status": "resolved",
+                  "subject": "Gift card code says already used",
+                  "customer_reference": "cust_8812",
+                  "customer_id": null,
+                  "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                  "payment_id": null,
+                  "checkout_id": null,
+                  "chargeback_id": null,
+                  "currency": "NGN",
+                  "recommendation": null,
+                  "recommended_amount": null,
+                  "report": null,
+                  "escalated_at": null,
+                  "outcome": "resolved_by_reseller",
+                  "outcome_amount": null,
+                  "outcome_note": "We sent a replacement code; the customer confirmed it worked.",
+                  "resolved_at": "2026-10-08T12:30:00.000Z",
+                  "created_at": "2026-10-08T09:14:02.000Z",
+                  "updated_at": "2026-10-08T12:30:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9f8e7d6c-5b4a-4392-8170-6f5e4d3c2b1a",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "staff",
+                      "body": "The customer says the Amazon code was already redeemed when they tried it.",
+                      "created_at": "2026-10-08T09:14:02.000Z"
+                    },
+                    {
+                      "id": "6b5a4938-2716-4504-93a2-b1c0d9e8f7a6",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "all",
+                      "body": "We sent a replacement code; the customer confirmed it worked.",
+                      "created_at": "2026-10-08T12:30:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve a customer dispute",
+        "tags": [
+          "Disputes"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "disputes:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/numbers": {
       "get": {
         "description": "The numbers your orders bought, newest first, with when each is paid up to.",
@@ -21452,7 +22819,9 @@
                 "webhooks:manage",
                 "events:read",
                 "stores:manage",
-                "customers:verify"
+                "customers:verify",
+                "disputes:read",
+                "disputes:write"
               ]
             }
           }
@@ -22004,6 +23373,129 @@
         },
         "required": [
           "outcome"
+        ]
+      },
+      "OpenDisputeDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "customer",
+              "reseller"
+            ],
+            "description": "`customer`: a customer’s dispute for you to investigate. `reseller`: your own dispute with BitoCard (it goes to BitoCard at once)."
+          },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "order",
+              "payment",
+              "funding",
+              "trade",
+              "other"
+            ],
+            "description": "What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`."
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary.",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "message": {
+            "type": "string",
+            "description": "What happened: the first message on the dispute.",
+            "minLength": 3,
+            "maxLength": 5000
+          },
+          "order_id": {
+            "type": "string",
+            "description": "The order it is about."
+          },
+          "top_up_id": {
+            "type": "string",
+            "description": "The wallet top-up it is about."
+          },
+          "customer_reference": {
+            "type": "string",
+            "description": "Your own reference for the customer (customer disputes).",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "kind",
+          "topic",
+          "subject",
+          "message"
+        ]
+      },
+      "MessageDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The message.",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "all",
+              "staff"
+            ],
+            "default": "all",
+            "description": "`all`: everyone on the dispute, the customer too. `staff`: you and BitoCard only."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "EscalateDto": {
+        "type": "object",
+        "properties": {
+          "recommendation": {
+            "type": "string",
+            "enum": [
+              "refund_customer",
+              "credit_reseller",
+              "reject",
+              "contest_chargeback",
+              "accept_chargeback"
+            ],
+            "description": "What you recommend BitoCard does: `refund_customer`, `credit_reseller`, `reject`, `contest_chargeback` or `accept_chargeback`."
+          },
+          "amount": {
+            "type": "number",
+            "description": "For `credit_reseller`: how much, in minor units of the dispute currency.",
+            "minimum": 1
+          },
+          "report": {
+            "type": "string",
+            "description": "Your report: what you found and why you recommend it.",
+            "minLength": 10,
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "recommendation",
+          "report"
+        ]
+      },
+      "ResolveDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "How you resolved it: sent to the customer as the last message.",
+            "minLength": 3,
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "note"
         ]
       },
       "UpdateNumberDto": {
@@ -23721,7 +25213,9 @@
                         "webhooks:manage",
                         "events:read",
                         "stores:manage",
-                        "customers:verify"
+                        "customers:verify",
+                        "disputes:read",
+                        "disputes:write"
                       ]
                     },
                     "description": "What the credentials may do."
@@ -23767,7 +25261,9 @@
                         "webhooks:manage",
                         "events:read",
                         "stores:manage",
-                        "customers:verify"
+                        "customers:verify",
+                        "disputes:read",
+                        "disputes:write"
                       ]
                     },
                     "description": "What the credentials may do."
@@ -25842,6 +27338,98 @@
           }
         }
       },
+      "Chargeback": {
+        "type": "object",
+        "title": "Chargeback",
+        "description": "A card payment the cardholder disputed with their bank (a chargeback).",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "payment_id",
+          "amount",
+          "currency",
+          "status",
+          "protected",
+          "held",
+          "shortfall",
+          "payouts_on_hold",
+          "opened_at",
+          "resolved_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `chargeback`.",
+            "const": "chargeback"
+          },
+          "id": {
+            "type": "string",
+            "description": "Chargeback ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "payment_id": {
+            "type": "string",
+            "description": "The top-up or store payment that was disputed.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "The disputed amount, in minor units of `currency` (for example kobo or cents)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency of the payment (ISO 4217)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` while the card network decides, then `won` (the hold comes back) or `lost` (returned to the cardholder).",
+            "enum": [
+              "open",
+              "won",
+              "lost"
+            ]
+          },
+          "protected": {
+            "type": "boolean",
+            "description": "Your plan has chargeback protection: nothing is held and BitoCard bears a loss."
+          },
+          "held": {
+            "type": "integer",
+            "description": "Held from your wallet for it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "shortfall": {
+            "type": "integer",
+            "description": "What your wallet could not cover when it was opened, in minor units of `currency` (for example kobo or cents)."
+          },
+          "payouts_on_hold": {
+            "type": "boolean",
+            "description": "Whether it is holding up your withdrawals: open, or lost with a shortfall BitoCard has not yet settled with you."
+          },
+          "opened_at": {
+            "type": "string",
+            "description": "When the chargeback was opened.",
+            "format": "date-time"
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was decided.",
+            "format": "date-time"
+          }
+        }
+      },
       "FeeCharge": {
         "type": "object",
         "title": "FeeCharge",
@@ -26667,7 +28255,9 @@
                 "webhooks:manage",
                 "events:read",
                 "stores:manage",
-                "customers:verify"
+                "customers:verify",
+                "disputes:read",
+                "disputes:write"
               ]
             },
             "description": "What the key may do."
@@ -26763,7 +28353,9 @@
                 "webhooks:manage",
                 "events:read",
                 "stores:manage",
-                "customers:verify"
+                "customers:verify",
+                "disputes:read",
+                "disputes:write"
               ]
             },
             "description": "What the key may do."
@@ -29572,7 +31164,9 @@
                 "webhooks:manage",
                 "events:read",
                 "stores:manage",
-                "customers:verify"
+                "customers:verify",
+                "disputes:read",
+                "disputes:write"
               ]
             },
             "description": "What the token may do: every scope, or only the `:read` ones when read-only."
@@ -29692,7 +31286,9 @@
               "payout.failed",
               "bank_account.added",
               "dispute.opened",
-              "dispute.closed",
+              "dispute.updated",
+              "chargeback.opened",
+              "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
               "webhook_endpoint.disabled",
@@ -29867,7 +31463,9 @@
               "payout.failed",
               "bank_account.added",
               "dispute.opened",
-              "dispute.closed",
+              "dispute.updated",
+              "chargeback.opened",
+              "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
               "webhook_endpoint.disabled",
@@ -30384,6 +31982,534 @@
               "null"
             ],
             "description": "When it was processed, or null.",
+            "format": "date-time"
+          }
+        }
+      },
+      "Dispute": {
+        "type": "object",
+        "title": "Dispute",
+        "description": "A dispute with its messages.",
+        "required": [
+          "object",
+          "id",
+          "reference",
+          "mode",
+          "kind",
+          "topic",
+          "status",
+          "subject",
+          "customer_reference",
+          "customer_id",
+          "order_id",
+          "payment_id",
+          "checkout_id",
+          "chargeback_id",
+          "currency",
+          "recommendation",
+          "recommended_amount",
+          "report",
+          "escalated_at",
+          "outcome",
+          "outcome_amount",
+          "outcome_note",
+          "resolved_at",
+          "created_at",
+          "updated_at",
+          "messages"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `dispute`.",
+            "const": "dispute"
+          },
+          "id": {
+            "type": "string",
+            "description": "Dispute ID.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The reference people quote, for example `D-000123`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "`customer` (a customer’s, for you to investigate), `reseller` (yours with BitoCard) or `chargeback` (a card payment disputed with the bank).",
+            "enum": [
+              "customer",
+              "reseller",
+              "chargeback"
+            ]
+          },
+          "topic": {
+            "type": "string",
+            "description": "What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`.",
+            "enum": [
+              "order",
+              "payment",
+              "funding",
+              "trade",
+              "other"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.",
+            "enum": [
+              "open",
+              "escalated",
+              "contested",
+              "resolved"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary."
+          },
+          "customer_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own reference for the customer, if any."
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store customer, for disputes raised on your hosted store.",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order it is about, if any.",
+            "format": "uuid"
+          },
+          "payment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The payment it is about (a top-up or a store payment), if any.",
+            "format": "uuid"
+          },
+          "checkout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store checkout it is about, if any.",
+            "format": "uuid"
+          },
+          "chargeback_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The chargeback, for `kind: chargeback`.",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency of amounts on the dispute (ISO 4217)."
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "What you recommended when escalating.",
+                "enum": [
+                  "refund_customer",
+                  "credit_reseller",
+                  "reject",
+                  "contest_chargeback",
+                  "accept_chargeback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recommended_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "For `credit_reseller`: the amount you recommended, in minor units of `currency`."
+          },
+          "report": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your report when escalating."
+          },
+          "escalated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was escalated to BitoCard.",
+            "format": "date-time"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "What was done, once resolved.",
+                "enum": [
+                  "resolved_by_reseller",
+                  "refunded_customer",
+                  "credited_reseller",
+                  "rejected",
+                  "chargeback_won",
+                  "chargeback_lost"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "For `credited_reseller`: the amount credited, in minor units of `currency`."
+          },
+          "outcome_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The note with the decision."
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was resolved.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was opened.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed (a message, an escalation or a decision).",
+            "format": "date-time"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisputeMessage"
+            },
+            "description": "Every message, oldest first, staff notes included."
+          }
+        }
+      },
+      "DisputeSummary": {
+        "type": "object",
+        "title": "DisputeSummary",
+        "description": "A dispute, without its messages.",
+        "required": [
+          "object",
+          "id",
+          "reference",
+          "mode",
+          "kind",
+          "topic",
+          "status",
+          "subject",
+          "customer_reference",
+          "customer_id",
+          "order_id",
+          "payment_id",
+          "checkout_id",
+          "chargeback_id",
+          "currency",
+          "recommendation",
+          "recommended_amount",
+          "report",
+          "escalated_at",
+          "outcome",
+          "outcome_amount",
+          "outcome_note",
+          "resolved_at",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `dispute`.",
+            "const": "dispute"
+          },
+          "id": {
+            "type": "string",
+            "description": "Dispute ID.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The reference people quote, for example `D-000123`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "`customer` (a customer’s, for you to investigate), `reseller` (yours with BitoCard) or `chargeback` (a card payment disputed with the bank).",
+            "enum": [
+              "customer",
+              "reseller",
+              "chargeback"
+            ]
+          },
+          "topic": {
+            "type": "string",
+            "description": "What it is about: `order`, `payment`, `funding` (a wallet top-up), `trade` or `other`.",
+            "enum": [
+              "order",
+              "payment",
+              "funding",
+              "trade",
+              "other"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` (with you), `escalated` (with BitoCard), `contested` (BitoCard is contesting a chargeback) or `resolved`.",
+            "enum": [
+              "open",
+              "escalated",
+              "contested",
+              "resolved"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary."
+          },
+          "customer_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own reference for the customer, if any."
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store customer, for disputes raised on your hosted store.",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order it is about, if any.",
+            "format": "uuid"
+          },
+          "payment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The payment it is about (a top-up or a store payment), if any.",
+            "format": "uuid"
+          },
+          "checkout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store checkout it is about, if any.",
+            "format": "uuid"
+          },
+          "chargeback_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The chargeback, for `kind: chargeback`.",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency of amounts on the dispute (ISO 4217)."
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "What you recommended when escalating.",
+                "enum": [
+                  "refund_customer",
+                  "credit_reseller",
+                  "reject",
+                  "contest_chargeback",
+                  "accept_chargeback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recommended_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "For `credit_reseller`: the amount you recommended, in minor units of `currency`."
+          },
+          "report": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your report when escalating."
+          },
+          "escalated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was escalated to BitoCard.",
+            "format": "date-time"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "What was done, once resolved.",
+                "enum": [
+                  "resolved_by_reseller",
+                  "refunded_customer",
+                  "credited_reseller",
+                  "rejected",
+                  "chargeback_won",
+                  "chargeback_lost"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "For `credited_reseller`: the amount credited, in minor units of `currency`."
+          },
+          "outcome_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The note with the decision."
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was resolved.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was opened.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed (a message, an escalation or a decision).",
+            "format": "date-time"
+          }
+        }
+      },
+      "DisputeMessage": {
+        "type": "object",
+        "title": "DisputeMessage",
+        "required": [
+          "id",
+          "author",
+          "author_name",
+          "visibility",
+          "body",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Message ID.",
+            "format": "uuid"
+          },
+          "author": {
+            "type": "string",
+            "description": "Who wrote it: `customer`, `reseller` (you), `bitocard` or `system`.",
+            "enum": [
+              "customer",
+              "reseller",
+              "bitocard",
+              "system"
+            ]
+          },
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person’s name, when known."
+          },
+          "visibility": {
+            "type": "string",
+            "description": "`all` (the customer sees it too) or `staff` (you and BitoCard only).",
+            "enum": [
+              "all",
+              "staff"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "The message."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was written.",
             "format": "date-time"
           }
         }

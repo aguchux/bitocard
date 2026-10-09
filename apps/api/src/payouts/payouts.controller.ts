@@ -60,9 +60,11 @@ export class PayoutsController {
 
   @ApiOperation({
     summary: 'Add a payout bank account',
-    description: 'Dashboard only. The bank confirms the account and supplies its name. Live payouts to a new account start 24 hours after it is added.',
+    description: 'Dashboard only, and only the account owner. The bank confirms the account and supplies its name. Live payouts to a new account start 24 hours after it is added.',
   })
   @SessionOnly()
+  // Owners only (no staff role passes): where withdrawals go is the owner's decision, so a finance member's session cannot redirect them.
+  @Roles()
   @Post('bank-accounts')
   addBankAccount(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: AddBankAccountDto) {
     return this.payouts.addBankAccount(resellerOf(caller), mode, personOf(caller), body);

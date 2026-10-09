@@ -30,7 +30,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-5">
-      <h1 className="text-3xl font-extrabold tracking-tight">Orders</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-3xl font-extrabold tracking-tight">Orders</h1>
+        <Link href="/account/disputes" className="text-sm font-semibold text-[#ff2382] hover:underline">
+          Your disputes
+        </Link>
+      </div>
       <nav aria-label="Show" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         {(Object.keys(filters) as Filter[]).map(key => (
           <Link

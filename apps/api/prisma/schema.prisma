@@ -736,8 +736,8 @@ enum AccountKind {
   chargebacks
 }
 
-/// A card payment into BitoCard's own gateway disputed by the cardholder (a chargeback): one per gateway dispute.
-model Dispute {
+/// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
+model Chargeback {
   id                String     @id @default(uuid()) @db.Uuid
   paymentId         String     @map("payment_id") @db.Uuid
   resellerId        String     @map("reseller_id") @db.Uuid
@@ -764,7 +764,7 @@ model Dispute {
 
   @@unique([provider, providerDisputeId])
   @@index([resellerId, mode, status])
-  @@map("disputes")
+  @@map("chargebacks")
 }
 
 /// One account per kind, mode, currency and owner. The balance is kept in step with the postings in the same transaction.
@@ -951,7 +951,7 @@ model Payment {
   @@index([resellerId, createdAt])
   @@index([status, createdAt])
   @@index([unmatchedAt, unmatchedRefundedAt])
-  disputes              Dispute[]
+  chargebacks           Chargeback[]
 
   @@map("payments")
 }
@@ -2215,4 +2215,69 @@ model Checkout {
   @@index([customerId, createdAt])
   @@index([status, updatedAt])
   @@map("checkouts")
+}
+
+/// A dispute: a store customer's complaint about an order or payment (raised on the store, or logged by the reseller for
+/// their own systems' customers), a reseller's own dispute with BitoCard, or a chargeback. The reseller investigates
+/// customer disputes and chargebacks first, then resolves them or escalates them to BitoCard with a report and a
+/// recommendation; a reseller's own disputes, and those at BitoCard's own store, go to BitoCard at once. Only BitoCard
+/// executes what moves money (refunds, wallet credits, chargeback decisions).
+model Dispute {
+  id                     String           @id @default(uuid()) @db.Uuid
+  /// Shown to people as D-000123.
+  number                 Int              @unique @default(autoincrement())
+  resellerId             String           @map("reseller_id") @db.Uuid
+  mode                   LedgerMode
+  /// customer, reseller or chargeback.
+  kind                   String
+  /// order, payment, funding, trade or other.
+  topic                  String
+  /// open (with the reseller), escalated (with BitoCard), contested (BitoCard is contesting a chargeback), resolved.
+  status                 String           @default("open")
+  subject                String
+  storeId                String?          @map("store_id") @db.Uuid
+  customerId             String?          @map("customer_id") @db.Uuid
+  /// The reseller's own reference for a customer on their own systems.
+  customerReference      String?          @map("customer_reference")
+  orderId                String?          @map("order_id") @db.Uuid
+  paymentId              String?          @map("payment_id") @db.Uuid
+  checkoutId             String?          @map("checkout_id") @db.Uuid
+  chargebackId           String?          @unique @map("chargeback_id") @db.Uuid
+  currency               String           @db.Char(3)
+  /// What the reseller recommends when escalating: refund_customer, credit_reseller, reject, contest_chargeback or accept_chargeback.
+  recommendation         String?
+  recommendedAmountMinor BigInt?          @map("recommended_amount_minor")
+  report                 String?
+  escalatedAt            DateTime?        @map("escalated_at")
+  /// What was done: resolved_by_reseller, refunded_customer, credited_reseller, rejected, chargeback_won or chargeback_lost.
+  outcome                String?
+  outcomeAmountMinor     BigInt?          @map("outcome_amount_minor")
+  outcomeNote            String?          @map("outcome_note")
+  resolvedAt             DateTime?        @map("resolved_at")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+  messages               DisputeMessage[]
+
+  @@index([resellerId, mode, status])
+  @@index([status, escalatedAt])
+  @@index([customerId, createdAt])
+  @@map("disputes")
+}
+
+/// One message on a dispute.
+model DisputeMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  disputeId  String   @map("dispute_id") @db.Uuid
+  /// customer, reseller, bitocard or system.
+  author     String
+  authorId   String?  @map("author_id") @db.Uuid
+  authorName String?  @map("author_name")
+  /// all: everyone on the dispute, the customer too; staff: the reseller and BitoCard only.
+  visibility String   @default("all")
+  body       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  dispute    Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+  @@map("dispute_messages")
 }

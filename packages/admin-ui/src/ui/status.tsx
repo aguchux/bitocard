@@ -46,6 +46,10 @@ const statusTones: Record<string, Tone> = {
   declined: 'red',
   suspended: 'red',
   rejected: 'red',
+  // Chargebacks and disputes.
+  open: 'amber',
+  won: 'green',
+  lost: 'red',
 };
 
 export function Badge({ tone = 'grey', children, dot = true, className }: { tone?: Tone; children: ReactNode; dot?: boolean; className?: string }) {

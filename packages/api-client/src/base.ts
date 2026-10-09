@@ -104,6 +104,8 @@ export const tagTypes = [
   'ResellerIntegration',
   'Fee',
   'FeeRule',
+  'Chargeback',
+  'Dispute',
   'Stock',
   'Number',
   // Both apps

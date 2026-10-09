@@ -17,6 +17,11 @@ export const configSchema = z.object({
   /** Per client address, checked before the caller is identified, so made-up credentials cannot be sent without limit. */
   ADDRESS_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(1200),
   /**
+   * Per client address on sign-in, password and code routes (POST). Kept even while Redis is unreachable (counted in
+   * memory per instance), so passwords and codes can never be guessed, nor emails and SMS sent, without limit.
+   */
+  AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
+  /**
    * How many proxies in front of the API to trust for the client's address (`X-Forwarded-For`): 1 on Vercel (its edge
    * sets the header) or behind one load balancer; 0 when clients connect directly. Never "all": the client writes the
    * left end of the header, so trusting every hop lets anyone choose their own address and dodge per-address limits.

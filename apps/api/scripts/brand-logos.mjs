@@ -70,7 +70,8 @@ for (const file of readdirSync(folder).sort()) {
   const headers = signRequest({
     method: 'PUT',
     url,
-    headers: { 'content-type': type, 'x-amz-acl': 'public-read', 'cache-control': 'public, max-age=86400' },
+    // SVG is served as a download (an <img> still shows it): opened on its own, a browser never runs it as a page.
+    headers: { 'content-type': type, 'x-amz-acl': 'public-read', 'cache-control': 'public, max-age=86400', ...(type === 'image/svg+xml' ? { 'content-disposition': 'attachment' } : {}) },
     credentials,
     payloadHash: createHash('sha256').update(body).digest('hex'),
   });

@@ -6,6 +6,7 @@ import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/c
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { ChargebacksService } from './chargebacks.service.js';
 import { PaymentsService } from './payments.service.js';
 
 /** Largest single top-up or deposit simulation, in minor units. */
@@ -43,7 +44,21 @@ class SimulateDepositDto {
 @Roles('admin', 'finance')
 @Controller('wallet')
 export class PaymentsController {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly payments: PaymentsService,
+    private readonly chargebacks: ChargebacksService,
+  ) {}
+
+  @ApiOperation({
+    summary: 'List chargebacks',
+    description:
+      'Card payments into your wallet or your store that the cardholder disputed (chargebacks), newest first. While one is `open` its amount is held from your wallet (`held`; what the wallet could not cover is `shortfall`) and withdrawals wait (`payouts_on_hold`). Won: the hold comes back. Lost: it is returned to the cardholder. With chargeback protection (`protected`, the Premium plan) nothing is held and BitoCard bears a loss.',
+  })
+  @Scopes('wallet:read')
+  @Get('chargebacks')
+  listChargebacks(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() page: PageDto) {
+    return this.chargebacks.forReseller(resellerOf(caller), mode, page);
+  }
 
   @ApiOperation({
     summary: 'List top-up payment methods',

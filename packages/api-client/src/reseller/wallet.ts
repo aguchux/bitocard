@@ -131,9 +131,28 @@ export type ReservedAccount = {
 
 export type SimulatedDeposit = { object: 'simulated_deposit'; credited: boolean; amount: number; currency: string };
 
+/** A card payment the cardholder disputed with their bank (a chargeback). Its amount is held while open, and withdrawals wait. */
+export type Chargeback = {
+  object: 'chargeback';
+  id: string;
+  mode: Mode;
+  payment_id: string;
+  amount: number;
+  currency: string;
+  status: 'open' | 'won' | 'lost';
+  /** Chargeback protection (Premium): nothing held, BitoCard bears a loss. */
+  protected: boolean;
+  held: number;
+  shortfall: number;
+  payouts_on_hold: boolean;
+  opened_at: string;
+  resolved_at: string | null;
+};
+
 export const resellerWalletApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     wallet: build.query<Wallet, void>({ query: () => '/v1/wallet', providesTags: ['Wallet'] }),
+    walletChargebacks: build.query<List<Chargeback>, void>({ query: () => ({ url: '/v1/wallet/chargebacks', params: { limit: 50 } }), providesTags: ['Wallet'] }),
     walletTransactions: build.infiniteQuery<List<WalletTransaction>, void, string>({
       infiniteQueryOptions: cursorPages,
       query: ({ pageParam }) => ({ url: '/v1/wallet/transactions', params: params({ limit: 25, starting_after: pageParam }) }),
@@ -177,6 +196,7 @@ export const resellerWalletApi = bitocardApi.injectEndpoints({
 
 export const {
   useWalletQuery,
+  useWalletChargebacksQuery,
   useWalletTransactionsInfiniteQuery,
   useExchangeRatesQuery,
   useTopUpsInfiniteQuery,

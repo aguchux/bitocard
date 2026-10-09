@@ -38,6 +38,8 @@ const scopeLabels: Record<ApiKeyScope, string> = {
   "events:read": "Read events",
   "stores:manage": "Manage the store",
   "customers:verify": "Verify customers",
+  "disputes:read": "See disputes",
+  "disputes:write": "Handle disputes",
 };
 
 const isPast = (iso: string | null) => Boolean(iso && new Date(iso).getTime() <= Date.now());

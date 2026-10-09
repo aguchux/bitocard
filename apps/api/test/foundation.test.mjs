@@ -261,6 +261,36 @@ describe('limits before the caller is identified', () => {
   });
 });
 
+describe('sign-in and code routes', () => {
+  test('are held to a strict limit per address; other routes are not', async () => {
+    const { isSensitive } = await import('../dist/common/rate-limit/rate-limit.guard.js');
+    for (const path of ['/v1/auth/signin', '/v1/auth/password/reset', '/v1/auth/signup/email', '/v1/admin/auth/mfa/verify', '/v1/store/account/signin', '/v1/store/access/bca_x/verify', '/v1/auth/phone/verify']) {
+      assert.equal(isSensitive('POST', path), true, path);
+    }
+    for (const [method, path] of [['GET', '/v1/auth/session'], ['POST', '/v1/orders'], ['POST', '/v1/auth/signout'], ['POST', '/v1/store/access/bca_x/reveal'], ['POST', '/v1/auth/signinx']]) {
+      assert.equal(isSensitive(method, path), false, `${method} ${path}`);
+    }
+    const limited = await startApp({ env: { AUTH_RATE_LIMIT_PER_MINUTE: '2', UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '' }, database: 'pglite' });
+    try {
+      const signIn = () => fetch(`${limited.base}/v1/auth/signin`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifier: 'nobody@example.com', password: 'wrong password here' }) }).then(res => res.status);
+      assert.deepEqual([await signIn(), await signIn(), await signIn()], [401, 401, 429]);
+      assert.equal((await fetch(`${limited.base}/v1/store/navigation`)).status, 200, 'other routes keep their own limit');
+    } finally {
+      await limited.close();
+    }
+  });
+
+  test('stay limited while Redis is unreachable, counted in memory', async () => {
+    const outage = await startApp({ env: { AUTH_RATE_LIMIT_PER_MINUTE: '2', UPSTASH_REDIS_REST_URL: 'http://127.0.0.1:9', UPSTASH_REDIS_REST_TOKEN: 'unreachable' }, database: 'pglite' });
+    try {
+      const signIn = () => fetch(`${outage.base}/v1/auth/signin`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifier: 'nobody@example.com', password: 'wrong password here' }) }).then(res => res.status);
+      assert.deepEqual([await signIn(), await signIn(), await signIn()], [401, 401, 429]);
+    } finally {
+      await outage.close();
+    }
+  });
+});
+
 describe('shoppers behind a store server', () => {
   const secret = 'store-server-secret-for-tests-0123456789';
 

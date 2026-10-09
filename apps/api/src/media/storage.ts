@@ -88,7 +88,12 @@ export class MediaStorage {
     return { method: 'PUT' as const, url, headers: { 'Content-Type': contentType, 'x-amz-acl': 'private' } };
   }
 
-  /** Copies the uploaded staging object to its public, immutable final key (a server-side copy: the bytes as they are now). */
+  /**
+   * Copies the uploaded staging object to its public, immutable final key (a server-side copy: the bytes as they are now).
+   * SVG is published as a download (`Content-Disposition: attachment`): `<img>` tags still show it, but a browser that
+   * opens its address on its own never renders it as a page, so even a public address on a BitoCard subdomain
+   * (SPACES_PUBLIC_URL) can never run anything there.
+   */
   async publish(from: string, to: string, contentType: string) {
     const spaces = this.require();
     const res = await this.send('PUT', to, {
@@ -97,6 +102,7 @@ export class MediaStorage {
       'x-amz-acl': 'public-read',
       'content-type': contentType,
       'cache-control': uploadCacheControl,
+      ...(contentType === 'image/svg+xml' ? { 'content-disposition': 'attachment' } : {}),
     });
     if (res.status === 404) return false;
     // S3 can answer 200 with an error in the body when a copy fails part-way.

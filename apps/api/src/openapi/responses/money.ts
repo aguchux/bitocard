@@ -257,6 +257,26 @@ const bankAccountFields: Record<string, Schema> = {
   created_at: time('When it was added.'),
 };
 
+const Chargeback = objectSchema(
+  'Chargeback',
+  {
+    object: constant('chargeback'),
+    id: uuid('Chargeback ID.'),
+    mode,
+    payment_id: uuid('The top-up or store payment that was disputed.'),
+    amount: money('The disputed amount'),
+    currency: str('Currency of the payment (ISO 4217).'),
+    status: oneOf('`open` while the card network decides, then `won` (the hold comes back) or `lost` (returned to the cardholder).', ['open', 'won', 'lost']),
+    protected: bool('Your plan has chargeback protection: nothing is held and BitoCard bears a loss.'),
+    held: money('Held from your wallet for it'),
+    shortfall: money('What your wallet could not cover when it was opened'),
+    payouts_on_hold: bool('Whether it is holding up your withdrawals: open, or lost with a shortfall BitoCard has not yet settled with you.'),
+    opened_at: time('When the chargeback was opened.'),
+    resolved_at: nullableTime('When it was decided.'),
+  },
+  'A card payment the cardholder disputed with their bank (a chargeback).',
+);
+
 const BankAccount = objectSchema('BankAccount', bankAccountFields, 'A bank account your earnings are paid out to. The bank confirms the account and supplies its name.');
 
 const removedBankAccount = objectSchema(
@@ -455,7 +475,7 @@ const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '20
 const noMore = (item: Schema) => list(item, {}, false);
 
 export const moneyDocs: DocsArea = {
-  schemas: { Wallet, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
+  schemas: { Wallet, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
   responses: {
     'GET /v1/wallet': { status: 200, description: 'Your wallet in the mode of the key or session.', schema: 'Wallet', example: wallet },
     'GET /v1/wallet/transactions': { status: 200, description: 'Wallet transactions, newest first.', schema: list(ref('WalletTransaction')), example: listExample(transactions, true) },
@@ -499,6 +519,28 @@ export const moneyDocs: DocsArea = {
       description: 'Whether the simulated transfer was credited to your sandbox wallet.',
       schema: 'SimulatedDeposit',
       example: { object: 'simulated_deposit', credited: true, amount: 70_000_00, currency: 'NGN' },
+    },
+    'GET /v1/wallet/chargebacks': {
+      status: 200,
+      description: 'Your chargebacks in this mode, newest first.',
+      schema: list(ref('Chargeback')),
+      example: listExample([
+        {
+          object: 'chargeback',
+          id: '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a',
+          mode: 'live',
+          payment_id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+          amount: 500_000,
+          currency: 'NGN',
+          status: 'open',
+          protected: false,
+          held: 500_000,
+          shortfall: 0,
+          payouts_on_hold: true,
+          opened_at: '2026-10-07T09:12:44.000Z',
+          resolved_at: null,
+        },
+      ]),
     },
     'GET /v1/wallet/fees': { status: 200, description: 'BitoCard fees on your own-integration transactions, newest first.', schema: list(ref('FeeCharge')), example: listExample([feeCharge]) },
     'GET /v1/wallet/fees/statement': {

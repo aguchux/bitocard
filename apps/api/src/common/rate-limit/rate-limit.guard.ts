@@ -57,6 +57,16 @@ function limiterFor(config: AppConfig, limit: number): Limiter {
   return new MemoryLimiter(limit);
 }
 
+/**
+ * Sign-in, password and code routes (guessing targets, and senders of email and SMS): POSTs held to a strict limit per
+ * address (AUTH_RATE_LIMIT_PER_MINUTE). Unlike every other limit, a Redis outage does not switch it off: each instance
+ * keeps counting in memory instead.
+ */
+const sensitivePath =
+  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?)|admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|store\/account\/(signup|signin|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify))(\?|$)/;
+
+export const isSensitive = (method: string, url: string) => method === 'POST' && sensitivePath.test(url);
+
 const rateLimited = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'rate_limited', 'Too many requests. Retry after the time in the Retry-After header.');
 
 /**
@@ -69,11 +79,16 @@ const rateLimited = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit
 export class AddressRateLimitGuard implements CanActivate {
   private readonly logger = new Logger('RateLimit');
   private readonly limiter: Limiter;
+  private readonly sensitive: Limiter;
+  /** Counts sign-in and code routes on this instance while Redis is unreachable. */
+  private readonly sensitiveFallback: Limiter;
   private readonly storeServerSecret: string | undefined;
 
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
     this.storeServerSecret = config.STORE_SERVER_SECRET;
     this.limiter = limiterFor(config, config.ADDRESS_RATE_LIMIT_PER_MINUTE);
+    this.sensitive = limiterFor(config, config.AUTH_RATE_LIMIT_PER_MINUTE);
+    this.sensitiveFallback = new MemoryLimiter(config.AUTH_RATE_LIMIT_PER_MINUTE);
   }
 
   async canActivate(context: ExecutionContext) {
@@ -81,6 +96,17 @@ export class AddressRateLimitGuard implements CanActivate {
     const res = context.switchToHttp().getResponse<Response>();
     if (!req.originalUrl.startsWith('/v1/')) return true;
     const address = signedClientIp(req.get(clientHeader), this.storeServerSecret) ?? req.ip ?? 'unknown';
+    if (isSensitive(req.method, req.originalUrl)) {
+      let verdict: Verdict;
+      try {
+        verdict = await this.sensitive.limitFor(`auth:${address}`);
+      } catch (error) {
+        // Never open: a Redis outage must not let anyone guess passwords and codes without limit.
+        this.logger.error({ err: error }, 'Rate limiter unavailable; sign-in and code routes counted in memory');
+        verdict = await this.sensitiveFallback.limitFor(`auth:${address}`);
+      }
+      this.refuse(verdict, res);
+    }
     let verdict: Verdict;
     try {
       verdict = await this.limiter.limitFor(`address:${address}`);
@@ -88,7 +114,12 @@ export class AddressRateLimitGuard implements CanActivate {
       this.logger.error({ err: error }, 'Rate limiter unavailable; request allowed');
       return true;
     }
-    if (verdict.success) return true;
+    this.refuse(verdict, res);
+    return true;
+  }
+
+  private refuse(verdict: Verdict, res: Response) {
+    if (verdict.success) return;
     res.setHeader('Retry-After', String(Math.max(1, Math.ceil((verdict.reset - Date.now()) / 1000))));
     throw rateLimited();
   }

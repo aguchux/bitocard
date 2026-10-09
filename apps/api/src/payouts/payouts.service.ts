@@ -214,12 +214,12 @@ export class PayoutsService {
     if (mode === 'live' && reseller.status !== 'active') throw resellerNotVerified();
     const account = await this.prisma.bankAccount.findFirst({ where: { id: input.bank_account_id, resellerId, mode, removedAt: null } });
     if (!account) throw notFound('bank account');
-    // Withdrawals wait while a card dispute is open, or a lost one's shortfall is not settled: the money may be owed back.
-    const disputed = await this.prisma.dispute.count({
+    // Withdrawals wait while a chargeback is open, or a lost one's shortfall is not settled: the money may be owed back.
+    const charged = await this.prisma.chargeback.count({
       where: { resellerId, mode, protected: false, OR: [{ status: 'open' }, { status: 'lost', shortfallMinor: { gt: 0n }, clearedAt: null }] },
     });
-    if (disputed > 0) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'payouts_on_hold', 'Withdrawals wait while a card payment dispute is open or unsettled. Contact support for details.');
+    if (charged > 0) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'payouts_on_hold', 'Withdrawals wait while a chargeback is open or unsettled. Contact support for details.');
     }
     if (payoutsFrom(account) > new Date()) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'bank_account_cooling_off', `Payouts to this account start at ${payoutsFrom(account).toISOString()}.`, 'bank_account_id');

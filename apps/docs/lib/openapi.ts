@@ -122,7 +122,7 @@ export const operations: Operation[] = Object.entries(document.paths).flatMap(([
  * sections are what SHQ (the reseller dashboard) uses with its own sign-in; `public` needs no sign-in.
  */
 export const sections: Array<{ title: string; kind: "api" | "dashboard" | "public"; tags: string[] }> = [
-  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "Wallet", "Payouts", "Customers"] },
+  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "Wallet", "Payouts", "Customers", "Disputes"] },
   { title: "Webhooks and events", kind: "api", tags: ["Webhooks", "Events"] },
   { title: "Stores and markets", kind: "api", tags: ["Stores", "Countries", "Exchange rates", "Plans", "Settings"] },
   { title: "Dashboard (SHQ)", kind: "dashboard", tags: ["Authentication", "API keys", "Team", "Notifications", "Integrations"] },
@@ -151,6 +151,8 @@ export const tagIntros: Record<string, string> = {
   Wallet: "Your pre-funded wallet: balances, ledger transactions, top-ups, reserved bank accounts and BitoCard's fees.",
   Payouts: "Withdraw matured earnings to your verified bank account.",
   Customers: "Check your customers' identity by your own customer reference: BVN in Nigeria, ID document and face check elsewhere.",
+  Disputes:
+    "Your customers' disputes, your own disputes with BitoCard and chargebacks. You investigate customers' disputes and chargebacks first: resolve them yourself, or escalate them to BitoCard with a report and a recommendation. BitoCard decides and executes anything that moves money.",
   Webhooks: "Endpoints that receive signed events, their delivery logs, resends and test events.",
   Events: "Every event, oldest first. The source of truth when a webhook was missed.",
   Stores: "Your BitoCard-hosted storefront: subdomain, branding and publishing.",

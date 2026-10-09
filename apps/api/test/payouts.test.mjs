@@ -144,6 +144,18 @@ describe('sandbox payouts', () => {
     assert.equal((await browser.get('/v1/wallet', sandbox)).json.earnings.withdrawable, 1_000_000);
   });
 
+  test('only the owner adds payout accounts; finance members can still list and remove them', async () => {
+    const { browser, resellerId } = await earner();
+    const finance = await resellerClient(server);
+    await prisma.resellerMember.deleteMany({ where: { userId: finance.userId } });
+    await prisma.resellerMember.create({ data: { resellerId, userId: finance.userId, role: 'finance' } });
+    const refused = await finance.browser.post('/v1/bank-accounts', { bank_code: 'SBX001', account_number: '1234567890' }, sandbox);
+    assert.equal(refused.status, 403, 'a finance member cannot redirect withdrawals');
+    const account = (await browser.post('/v1/bank-accounts', { bank_code: 'SBX001', account_number: '1234567890' }, sandbox)).json;
+    assert.equal((await finance.browser.get('/v1/bank-accounts', sandbox)).json.data.length, 1);
+    assert.equal((await finance.browser.delete(`/v1/bank-accounts/${account.id}`, sandbox)).status, 200);
+  });
+
   test('support staff cannot withdraw', async () => {
     const { browser, resellerId } = await earner();
     const staff = await resellerClient(server);

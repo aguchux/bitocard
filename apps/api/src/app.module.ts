@@ -36,6 +36,7 @@ import { StorefrontModule } from './storefront/storefront.module.js';
 import { MediaModule } from './media/media.module.js';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter.js';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor.js';
+import { DisputesModule } from './disputes/disputes.module.js';
 import { AddressRateLimitGuard, RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
 import { loggerParams } from './common/request/logging.js';
 import { APP_CONFIG, type AppConfig } from './config/config.js';
@@ -91,6 +92,7 @@ export class AppModule {
         StorefrontModule,
         MediaModule,
         OrdersModule,
+        DisputesModule,
         NumbersModule,
         CheckoutModule,
         CronModule,

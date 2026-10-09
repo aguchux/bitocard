@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { adminApi, parseStockCodes, percentToPpb } from '../src/admin';
-import { resellerCatalogueApi, resellerFeesApi, resellerNumbersApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi, smsLimit } from '../src/reseller';
+import { adminApi, adminChargebacksApi, parseStockCodes, percentToPpb } from '../src/admin';
+import { resellerCatalogueApi, resellerFeesApi, resellerWalletApi, resellerNumbersApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi, smsLimit } from '../src/reseller';
 import { keepUnusedSeconds, makeStore, notificationsApi, pushApi, readTimeoutMs, revalidateAfterSeconds, setRequestContext, toApiError, uploadMedia } from '../src';
 
 type Call = { url: string; method: string; headers: Headers; credentials: RequestCredentials | undefined; body: string | null };
@@ -150,6 +150,30 @@ describe('base query', () => {
     await store.dispatch(adminApi.endpoints.decideVerification.initiate({ id: 'v1', decision: 'approved', reason: 'Checked by hand' }));
     await vi.waitFor(() => expect(calls.filter(call => call.url.includes('/v1/admin/verifications?')).length).toBe(2));
     subscription.unsubscribe();
+  });
+});
+
+describe('chargebacks', () => {
+  test('finance records, decides and clears chargebacks at their admin endpoints; each refetches the list', async () => {
+    const store = makeStore();
+    reply = call => (call.method === 'POST' ? Response.json({ object: 'chargeback', id: 'd1', status: 'won' }) : Response.json({ object: 'list', data: [] }));
+    const subscription = store.dispatch(adminChargebacksApi.endpoints.chargebacks.initiate({ status: 'open' }));
+    await subscription;
+    await store.dispatch(adminChargebacksApi.endpoints.recordChargeback.initiate({ payment_id: 'p1', provider_dispute_id: 'FLW-1', reason: 'Seen in the dashboard' }));
+    await store.dispatch(adminChargebacksApi.endpoints.resolveChargeback.initiate({ id: 'd1', outcome: 'won', reason: 'Ruled for the merchant' }));
+    await store.dispatch(adminChargebacksApi.endpoints.clearChargeback.initiate({ id: 'd1', reason: 'Settled with the reseller' }));
+    const posts = calls.filter(call => call.method === 'POST');
+    expect(posts.map(call => call.url)).toEqual(['http://api.test/v1/admin/chargebacks', 'http://api.test/v1/admin/chargebacks/d1/resolve', 'http://api.test/v1/admin/chargebacks/d1/clear']);
+    expect(JSON.parse(posts[1].body ?? '{}')).toEqual({ outcome: 'won', reason: 'Ruled for the merchant' });
+    await vi.waitFor(() => expect(calls.filter(call => call.url.includes('/v1/admin/chargebacks?status=open')).length).toBe(4));
+    subscription.unsubscribe();
+  });
+
+  test('SHQ reads the reseller’s own chargebacks from the wallet', async () => {
+    const store = makeStore();
+    reply = () => Response.json({ object: 'list', data: [], has_more: false });
+    await store.dispatch(resellerWalletApi.endpoints.walletChargebacks.initiate());
+    expect(calls.map(call => [call.method, call.url])).toEqual([['GET', 'http://api.test/v1/wallet/chargebacks?limit=50']]);
   });
 });
 

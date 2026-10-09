@@ -25,6 +25,7 @@ const baseEnv = {
   LOG_LEVEL: dockerUrl ? 'error' : 'silent',
   RATE_LIMIT_PER_MINUTE: '1000',
   ADDRESS_RATE_LIMIT_PER_MINUTE: '100000',
+  AUTH_RATE_LIMIT_PER_MINUTE: '100000',
   PASSWORD_BREACH_CHECK: 'off',
   ALLOWED_ORIGINS: `${appOrigin},https://*.bitocard.com`,
   COOKIE_SECURE: 'off',

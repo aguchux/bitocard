@@ -102,6 +102,8 @@ function AddBankAccount({ open, onClose, sandbox }: { open: boolean; onClose: ()
 export default function BankAccountsPage() {
   const { membership, mode } = useReseller();
   const allowed = can(membership, "finance");
+  // Only the owner adds where withdrawals go; finance members can see and remove accounts.
+  const canAdd = can(membership);
   const sandbox = mode === "test";
   const accounts = useBankAccountsQuery(undefined, { skip: !allowed });
   const [remove] = useRemoveBankAccountMutation();
@@ -122,7 +124,7 @@ export default function BankAccountsPage() {
         title="Payout bank accounts"
         description={`Where your withdrawn earnings are paid. Up to ${maxAccounts} accounts.`}
         actions={
-          allowed ? (
+          canAdd ? (
             <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setAdding(true)} disabled={!list || full}>
               Add account
             </Button>
@@ -135,6 +137,11 @@ export default function BankAccountsPage() {
         </Notice>
       ) : (
         <>
+          {!canAdd ? (
+            <Notice tone="grey" title="Only the owner adds payout accounts">
+              Where withdrawals are paid is the owner&apos;s decision. You can see and remove accounts.
+            </Notice>
+          ) : null}
           {!sandbox ? (
             <Notice tone="blue">
               Accounts must be in your verified name or your business name, and your business must be verified first. Withdrawals to a newly added account start 24 hours after it is added.

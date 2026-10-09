@@ -126,7 +126,7 @@ async function fakeSpaces(spacesCredentials) {
         res.writeHead(404).end('<Error><Code>NoSuchKey</Code></Error>');
         return;
       }
-      objects.set(key, { body: source.body, type: req.headers['content-type'], acl: req.headers['x-amz-acl'], cache: req.headers['cache-control'] });
+      objects.set(key, { body: source.body, type: req.headers['content-type'], acl: req.headers['x-amz-acl'], cache: req.headers['cache-control'], disposition: req.headers['content-disposition'] });
       res.writeHead(200).end('<CopyObjectResult></CopyObjectResult>');
       return;
     }
@@ -307,6 +307,8 @@ describe('signed uploads', () => {
     assert.equal(ok.completed.status, 200, JSON.stringify(ok.completed.json));
     assert.equal(ok.created.json.folder, 'test/platform/suppliers/reloadly/logos');
     assert.deepEqual([ok.completed.json.width, ok.completed.json.height], [64, 64]);
+    const served = spaces.objects.get(`test/platform/suppliers/reloadly/logos/${ok.created.json.id}.svg`);
+    assert.equal(served.disposition, 'attachment', 'opened on its own, an SVG downloads instead of running as a page');
     const patched = await admin.patch('/v1/admin/suppliers/reloadly', { logo_url: ok.completed.json.url });
     assert.equal(patched.json.logo_url, ok.completed.json.url);
 

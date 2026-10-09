@@ -34,7 +34,7 @@ describe('issuing', () => {
     assert.equal(issued.status, 200);
     assert.match(issued.json.token, /^bc_docs_/);
     assert.deepEqual([issued.json.mode, issued.json.read_only, issued.json.reseller.id], ['test', false, resellerId]);
-    assert.equal(issued.json.scopes.length, 10);
+    assert.equal(issued.json.scopes.length, 12);
     const minutes = (Date.parse(issued.json.expires_at) - Date.now()) / 60_000;
     assert.ok(minutes > 14 && minutes <= 15, `valid for 15 minutes, got ${minutes}`);
 

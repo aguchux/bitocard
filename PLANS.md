@@ -495,6 +495,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - Recurring items (number rentals, eSIM top-ups, software subscriptions, domain renewals, Premium plans) managed separately from one-time purchases.
 - Supplier health, rate changes, low supplier balances and fulfilment exceptions monitored with alerts.
 - Role-based administration, full audit history and controlled manual adjustments with a recorded reason.
+- **Disputes (Decided):** disputes about funding, payments, orders and trades are investigated by the reseller first. Store customers raise them from their order; resellers log their customers' disputes from their own systems, and every chargeback opens one. The reseller answers the customer and either resolves it (when nothing needs BitoCard) or escalates it with a report and a recommendation: refund the customer, credit the reseller, reject, or contest or accept a chargeback. A reseller's own disputes with BitoCard, and disputes at BitoCard's own store, go to BitoCard directly. Only BitoCard executes what moves money (finance), and it may send a dispute back to the reseller for more.
 - Metrics: time to activation, active resellers, paid orders, fulfilment success, delivery time, net margin, funding exceptions, allowance exposure and bonus spend.
 
 ## 9. Platform (Decided)
@@ -525,6 +526,7 @@ Update the legals app before each of these goes live (full list in `AGENTS.md`):
 - Wallets, reserved accounts and top-ups: take legal advice per country on holding customer balances (e-money or payments licensing, or a licensed partner) before enabling customer wallets.
 - Hosted storefront customers: customer sale terms in BitoCard's name (BitoCard is the seller of record), and an agreement with resellers setting out who is controller of which customer data. As the seller, BitoCard is likely a controller of transaction data, not only a processor for the reseller.
 - Premium plan, startup allowance and welcome bonus terms.
+- Disputes: what a dispute keeps and who sees it (privacy notice), and how disputes and refunds are handled (customer sale terms).
 - eSIM terms; software terms (licence pass-through, refunds, activation); virtual number terms and regulatory documents.
 - The Africa-wide waitlist privacy notice (on hold until Legals supplies the text).
 

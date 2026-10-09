@@ -8,4 +8,5 @@ export { Badge, EmptyState, ErrorState, Notice, QueryView, RefreshFailed, Status
 export { Wordmark } from './ui/wordmark';
 export { ImageField, type ImageFieldProps } from './ui/image-field';
 export { ExternalLinks } from './ui/external-links';
+export { DisputeReply, DisputeThread, disputeActionLabels, disputeKindLabels, disputeOutcomeLabels, disputeTopicLabels, type DisputeThreadMessage } from './ui/disputes';
 export { searchDelayMs, useDebouncedValue } from './ui/hooks';

@@ -3,13 +3,13 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
-import { disputeOutcomes, DisputesService, type DisputeOutcome } from './disputes.service.js';
+import { chargebackOutcomes, ChargebacksService, type ChargebackOutcome } from './chargebacks.service.js';
 
-class RecordDisputeDto {
+class RecordChargebackDto {
   @IsUUID()
   payment_id: string;
 
-  /** The dispute's ID in the gateway's dashboard, so it is recorded once. */
+  /** The chargeback's ID in the gateway's dashboard, so it is recorded once. */
   @IsString() @Length(1, 200)
   provider_dispute_id: string;
 
@@ -21,9 +21,9 @@ class RecordDisputeDto {
   reason: string;
 }
 
-class ResolveDisputeDto {
-  @IsIn(disputeOutcomes)
-  outcome: DisputeOutcome;
+class ResolveChargebackDto {
+  @IsIn(chargebackOutcomes)
+  outcome: ChargebackOutcome;
 
   @IsString() @Length(3, 500)
   reason: string;
@@ -34,7 +34,7 @@ class ReasonDto {
   reason: string;
 }
 
-class DisputeFilterDto {
+class ChargebackFilterDto {
   @IsOptional() @IsIn(['open', 'won', 'lost'])
   status?: string;
 
@@ -43,35 +43,35 @@ class DisputeFilterDto {
 }
 
 /**
- * Admin (finance): card payment disputes. Stripe's arrive by webhook; other gateways' are recorded here from their
+ * Admin (finance): card payment chargebacks. Stripe's arrive by webhook; other gateways' are recorded here from their
  * dashboards and decided here. Every change is audited.
  */
 @ApiExcludeController()
 @RealmOnly('admin')
 @AdminRoles('finance')
-@Controller('admin/disputes')
-export class AdminDisputesController {
-  constructor(private readonly disputes: DisputesService) {}
+@Controller('admin/chargebacks')
+export class AdminChargebacksController {
+  constructor(private readonly chargebacks: ChargebacksService) {}
 
   @Get()
-  list(@Query() filter: DisputeFilterDto) {
-    return this.disputes.list(filter);
+  list(@Query() filter: ChargebackFilterDto) {
+    return this.chargebacks.list(filter);
   }
 
   @Post()
-  record(@CurrentCaller() caller: Caller, @Body() body: RecordDisputeDto) {
-    return this.disputes.record(adminId(caller), body);
+  record(@CurrentCaller() caller: Caller, @Body() body: RecordChargebackDto) {
+    return this.chargebacks.record(adminId(caller), body);
   }
 
   @Post(':id/resolve')
   @HttpCode(HttpStatus.OK)
-  resolve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDisputeDto) {
-    return this.disputes.resolve(id, body.outcome, adminId(caller), body.reason);
+  resolve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveChargebackDto) {
+    return this.chargebacks.resolve(id, body.outcome, adminId(caller), body.reason);
   }
 
   @Post(':id/clear')
   @HttpCode(HttpStatus.OK)
   clear(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
-    return this.disputes.clear(adminId(caller), id, body.reason);
+    return this.chargebacks.clear(adminId(caller), id, body.reason);
   }
 }

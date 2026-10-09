@@ -3,9 +3,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownToLine, Banknote, CircleDollarSign, Clock, Gift, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
+import { ArrowDownToLine, Banknote, CircleDollarSign, Clock, CreditCard, Gift, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
 import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, formatDateTime, formatMoney, formatRelative, humanise, LoadMore, Notice, PageHeader, RefreshFailed, StatCard, StatusBadge } from "@bitocard/admin-ui";
-import { type WalletTransaction, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
+import { type Chargeback, type WalletTransaction, useWalletChargebacksQuery, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -57,6 +57,9 @@ export default function WalletPage() {
   const { membership, mode } = useReseller();
   const allowed = can(membership, "admin", "finance", "developer");
   const wallet = useWalletQuery(undefined, { skip: !allowed });
+  const chargebacks = useWalletChargebacksQuery(undefined, { skip: !allowed });
+  const chargebackRows = chargebacks.data?.data ?? [];
+  const holding = chargebackRows.some(row => row.payouts_on_hold);
   const transactions = useWalletTransactionsInfiniteQuery(undefined, { skip: !allowed });
   const rows = transactions.data?.pages.flatMap(page => page.data);
   const data = wallet.data;
@@ -156,6 +159,63 @@ export default function WalletPage() {
               footer={<p className="text-xs text-muted">On their way to your bank account.</p>}
             />
           </div>
+
+          {chargebackRows.length ? (
+            <Card>
+              <CardHeader
+                title="Chargebacks"
+                description={
+                  holding
+                    ? "A cardholder disputed a card payment with their bank. Its amount is held from your wallet and withdrawals wait until the card network decides."
+                    : "Card payments cardholders disputed (chargebacks)."
+                }
+                className="pb-4"
+              />
+              <DataTable<Chargeback>
+                caption="Chargebacks"
+                rows={chargebackRows}
+                rowKey={row => row.id}
+                empty="No chargebacks."
+                columns={[
+                  {
+                    key: "dispute",
+                    header: "Chargeback",
+                    cell: row => (
+                      <span className="inline-flex items-center gap-2">
+                        <CreditCard className="size-4 text-muted" aria-hidden />
+                        <span title={formatDateTime(row.opened_at)}>{`Opened ${formatRelative(row.opened_at)}`}</span>
+                      </span>
+                    ),
+                  },
+                  { key: "amount", header: "Amount", align: "right", cell: row => <span className="font-semibold">{formatMoney(row.amount, row.currency)}</span> },
+                  {
+                    key: "held",
+                    header: "Your wallet",
+                    cell: row => (
+                      <span className="text-xs text-muted">
+                        {row.protected
+                          ? "Covered by chargeback protection"
+                          : row.status === "won"
+                            ? "Hold returned"
+                            : `${row.status === "lost" ? "Returned to the cardholder" : "Held"}: ${formatMoney(row.held, row.currency)}${row.shortfall ? ` (short ${formatMoney(row.shortfall, row.currency)})` : ""}`}
+                      </span>
+                    ),
+                    hideOnMobile: true,
+                  },
+                  {
+                    key: "status",
+                    header: "Status",
+                    cell: row => (
+                      <div className="space-y-0.5">
+                        <StatusBadge status={row.status} />
+                        {row.payouts_on_hold ? <p className="text-xs text-muted">Withdrawals wait</p> : null}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          ) : null}
 
           {data?.startup_allowance ? (
             <Card className="flex flex-wrap items-center gap-4 p-5 sm:p-6">

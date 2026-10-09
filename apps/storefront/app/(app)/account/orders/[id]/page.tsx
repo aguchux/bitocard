@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, ExternalLink, KeyRound } from "lucide-react";
+import { ChevronLeft, ExternalLink, KeyRound, MessageSquareWarning } from "lucide-react";
 import { formatFace, formatPrice, type StoreCheckout } from "@bitocard/api-client/storefront";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { simulateCheckout } from "@/lib/account-actions";
+import { canDispute } from "@/lib/disputes";
 
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false } };
 
@@ -112,6 +113,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </section>
       ) : order.status === "completed" ? (
         <p className="rounded-2xl bg-emerald-50 p-4 text-emerald-900">Delivered{order.recipient?.phone ? ` to ${order.recipient.phone}` : order.recipient?.account_number ? ` to ${order.recipient.account_number}` : ""}.</p>
+      ) : null}
+
+      {canDispute(order.status) ? (
+        <Link
+          href={`/account/disputes/new?order=${order.id}`}
+          className="inline-flex min-h-11 items-center gap-2 justify-self-start rounded-xl border border-slate-200 px-4 text-sm font-semibold text-[#070f4c] hover:border-slate-300"
+        >
+          <MessageSquareWarning className="size-4" aria-hidden="true" /> Report a problem with this order
+        </Link>
       ) : null}
     </div>
   );

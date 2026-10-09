@@ -183,6 +183,24 @@ export type CheckoutStatus = 'awaiting_payment' | 'paid' | 'completed' | 'failed
 export type StoreDelivery = { kind: string; code: string | null; pin: string | null; serial: string | null; details: Record<string, string> };
 
 /** A customer's purchase: the payment, then the order placed once it is paid. Never shows costs or suppliers. */
+/**
+ * A customer's dispute about one of their orders, as the customer sees it: never staff notes, the store's report or its
+ * recommendation. `escalated` means BitoCard is deciding it.
+ */
+export type StoreDispute = {
+  object: 'dispute';
+  id: string;
+  reference: string;
+  subject: string;
+  topic: 'order' | 'payment' | 'funding' | 'trade' | 'other';
+  status: 'open' | 'escalated' | 'resolved';
+  checkout_id: string | null;
+  outcome: 'resolved_by_reseller' | 'refunded_customer' | 'credited_reseller' | 'rejected' | 'chargeback_won' | 'chargeback_lost' | null;
+  created_at: string;
+  resolved_at: string | null;
+  messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'system'; author_name: string | null; visibility: 'all'; body: string; created_at: string }>;
+};
+
 export type StoreCheckout = {
   object: 'checkout';
   id: string;
