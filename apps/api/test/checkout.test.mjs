@@ -149,6 +149,52 @@ describe('wallet top-ups through each gateway', () => {
     assert.deepEqual([checked.status, checked.failure_reason], ['failed', 'The payer declined']);
   });
 
+  test('pawaPay is offered only where its account takes deposits, read from pawaPay', async () => {
+    const { forgetDepositConfigs } = await import('../dist/payments/pawapay.provider.js');
+    await setMethods('GH', 'wallet_top_up', ['pawapay']);
+    await setMethods('NG', 'checkout', ['pawapay']);
+    forgetDepositConfigs();
+    const supported = async code => (await admin.get(`/v1/admin/countries/${code}/payment-methods`)).json.checkout.find(item => item.gateway === 'pawapay').supported;
+    assert.deepEqual([await supported('GH'), await supported('NG')], [true, false], 'Ghana takes deposits on the account; Nigeria is not in its configuration');
+    const reseller = await verifiedReseller({ country: 'GH' });
+    const [method] = (await reseller.browser.get('/v1/wallet/payment-methods')).json.data;
+    assert.deepEqual([method.id, method.networks], ['pawapay', ['MTN']], 'the networks open for deposits there (Telecel is closed)');
+    await setMethods('GH', 'checkout', ['stripe', 'pawapay']);
+    const store = (await fetch(`${server.base}/v1/store/payment-methods?country=GH`).then(res => res.json())).data;
+    assert.deepEqual(store.map(item => [item.id, item.networks]), [['stripe', []], ['pawapay', ['MTN']]], 'bitocard.com customers see card and mobile money, with its networks');
+    await setMethods('GH', 'checkout', []);
+
+    pawapay.state.noDeposits.add('GHA');
+    forgetDepositConfigs();
+    try {
+      assert.equal(await supported('GH'), false, 'switched off in pawaPay: no longer offered');
+      assert.deepEqual((await reseller.browser.get('/v1/wallet/payment-methods')).json.data, []);
+    } finally {
+      pawapay.state.noDeposits.delete('GHA');
+      forgetDepositConfigs();
+      await setMethods('NG', 'checkout', []);
+    }
+  });
+
+  test('a gateway that refuses to open a payment says why in the logs and tells admins once a day', async () => {
+    await setMethods('GH', 'wallet_top_up', ['pawapay']);
+    const reseller = await verifiedReseller({ country: 'GH' });
+    pawapay.state.refusePaymentPage = true;
+    try {
+      const refused = await reseller.browser.post('/v1/wallet/top-ups', { amount: 25000 });
+      assert.deepEqual([refused.status, refused.json.error.code], [502, 'provider_error']);
+      assert.doesNotMatch(refused.json.error.message, /pawapay|403|enabled/i, 'the payer is told only to try again or pay another way');
+      await reseller.browser.post('/v1/wallet/top-ups', { amount: 25000 });
+      const notices = await prisma.notification.findMany({ where: { type: 'admin.payment.gateway_refused' } });
+      assert.ok(notices.length > 0, 'admins are told');
+      assert.equal(new Set(notices.map(row => row.userId)).size, notices.length, 'once per admin a day');
+      assert.match(notices[0].body, /AUTHORISATION_ERROR: Payment page is not enabled for this account\. pawaPay refused the request \(HTTP 403\) at .*deposits and the Payment Page are enabled/);
+      assert.equal(notices[0].title, 'pawaPay refused to open a payment');
+    } finally {
+      pawapay.state.refusePaymentPage = false;
+    }
+  });
+
   test('Monnify: its payment page, settled from a notification or by the scheduled check', async () => {
     const reseller = await verifiedReseller();
     const created = await reseller.browser.post('/v1/wallet/top-ups', { amount: 1_000_000, method: 'monnify' });

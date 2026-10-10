@@ -3,12 +3,13 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode, PaymentMethodPurpose } from '../generated/prisma/client.js';
+import { PawapayPaymentsProvider } from './pawapay.provider.js';
 import { isPaymentGateway, type PaymentGateway, paymentGateways, PaymentProviders } from './payment-providers.js';
 
 export const paymentMethodPurposes = ['wallet_top_up', 'checkout'] as const satisfies readonly PaymentMethodPurpose[];
 
-export function presentMethod(gateway: PaymentGateway) {
-  return { object: 'payment_method' as const, id: gateway, label: paymentGateways[gateway].label, description: paymentGateways[gateway].description };
+export function presentMethod(gateway: PaymentGateway, networks: string[] = []) {
+  return { object: 'payment_method' as const, id: gateway, label: paymentGateways[gateway].label, description: paymentGateways[gateway].description, networks };
 }
 
 const unknownCountry = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such market.');
@@ -27,13 +28,21 @@ export class PaymentMethodsService {
     private readonly audit: AuditService,
   ) {}
 
+  /** A method as payers see it, with the mobile money networks they can pay from in this country (pawaPay's, from its API). */
+  async describe(gateway: PaymentGateway, country: { code: string; currency: string }) {
+    const provider = gateway === 'pawapay' ? this.providers.live(gateway) : null;
+    const networks = provider instanceof PawapayPaymentsProvider ? await provider.networks(country.code, country.currency) : [];
+    return presentMethod(gateway, networks);
+  }
+
   /** The gateways a payer in this country can use now, best first. */
   async offered(purpose: PaymentMethodPurpose, country: { code: string; currency: string }, mode: LedgerMode): Promise<PaymentGateway[]> {
     const rows = await this.prisma.paymentMethod.findMany({ where: { countryCode: country.code, purpose, enabled: true }, orderBy: [{ position: 'asc' }, { gateway: 'asc' }] });
-    return rows
-      .map(row => row.gateway)
-      .filter(isPaymentGateway)
-      .filter(gateway => mode === 'test' || Boolean(this.providers.live(gateway)?.supportsCheckout(country.code, country.currency)));
+    const offered: PaymentGateway[] = [];
+    for (const gateway of rows.map(row => row.gateway).filter(isPaymentGateway)) {
+      if (mode === 'test' || (await this.providers.live(gateway)?.supportsCheckout(country.code, country.currency))) offered.push(gateway);
+    }
+    return offered;
   }
 
   /**
@@ -63,6 +72,12 @@ export class PaymentMethodsService {
     const country = await this.prisma.country.findUnique({ where: { code: code.toUpperCase() } });
     if (!country) throw unknownCountry();
     const rows = await this.prisma.paymentMethod.findMany({ where: { countryCode: country.code } });
+    // Whether each set-up gateway takes this country and currency (pawaPay asks its API).
+    const supported = new Map<PaymentGateway, boolean>();
+    for (const gateway of Object.keys(paymentGateways) as PaymentGateway[]) {
+      const provider = this.providers.live(gateway);
+      if (provider) supported.set(gateway, await provider.supportsCheckout(country.code, country.currency));
+    }
     const purposes = Object.fromEntries(
       paymentMethodPurposes.map(purpose => {
         const set = rows.filter(row => row.purpose === purpose);
@@ -79,7 +94,7 @@ export class PaymentMethodsService {
               /** Credentials saved and not in its sandbox. */
               configured: Boolean(provider),
               /** Can take payments from this country in its currency. */
-              supported: provider ? provider.supportsCheckout(country.code, country.currency) : null,
+              supported: provider ? (supported.get(gateway) ?? false) : null,
             };
           })
           .sort((a, b) => Number(b.enabled) - Number(a.enabled) || a.position - b.position || a.gateway.localeCompare(b.gateway));

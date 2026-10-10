@@ -96,6 +96,7 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
                   <span>
                     <span className="block text-sm font-semibold text-ink">{item.label}</span>
                     <span className="block text-xs text-muted">{item.description}</span>
+                    {item.networks?.length ? <span className="mt-1 block text-xs font-semibold text-ink">{item.networks.join(" · ")}</span> : null}
                   </span>
                 </label>
               ))}

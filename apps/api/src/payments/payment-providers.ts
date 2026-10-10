@@ -111,10 +111,10 @@ export class PaymentProviders {
   }
 
   /** The payment page for a gateway the market offers. Test mode always uses the sandbox. */
-  checkout(mode: LedgerMode, gateway: string, country: string, currency: string): CheckoutProvider {
+  async checkout(mode: LedgerMode, gateway: string, country: string, currency: string): Promise<CheckoutProvider> {
     if (mode === 'test') return this.sandbox;
     const provider = this.live(gateway);
-    if (!provider?.supportsCheckout(country, currency)) throw providerUnavailable(`${isPaymentGateway(gateway) ? paymentGateways[gateway].label : 'This payment method'}`);
+    if (!provider || !(await provider.supportsCheckout(country, currency))) throw providerUnavailable(`${isPaymentGateway(gateway) ? paymentGateways[gateway].label : 'This payment method'}`);
     return provider;
   }
 

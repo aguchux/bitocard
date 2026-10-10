@@ -618,7 +618,7 @@ export async function fakePawapay() {
     provider: code,
     displayName: name,
     logo: `https://static-content.pawapay.io/company_logos/${name.toLowerCase()}.png`,
-    currencies: [{ currency, displayName: currency, operationTypes: { PAYOUT: { minAmount: min, maxAmount: max, decimalsInAmount: decimals, status } } }],
+    currencies: [{ currency, displayName: currency, operationTypes: { PAYOUT: { minAmount: min, maxAmount: max, decimalsInAmount: decimals, status }, DEPOSIT: { minAmount: min, maxAmount: max, decimalsInAmount: decimals, status } } }],
   });
   const state = {
     countries: [
@@ -631,14 +631,18 @@ export async function fakePawapay() {
     // Payment page deposits by depositId ({ body, status }), and refunds by refundId.
     deposits: {},
     refunds: {},
+    noDeposits: new Set(),
   };
   const service = await fakeService(({ method, url, headers, body }) => {
     const [path, search = ''] = url.split('?');
     const query = new URLSearchParams(search);
     if (headers.authorization !== 'Bearer pawapay-token') return { status: 401, body: { failureReason: { failureCode: 'AUTHENTICATION_ERROR', failureMessage: 'Invalid token' } } };
     if (method === 'GET' && path === '/v2/active-conf') {
-      if (query.get('operationType') !== 'PAYOUT') return { status: 400, body: {} };
-      return { body: { companyName: 'BitoCard', countries: state.countries } };
+      const type = query.get('operationType');
+      if (type === 'PAYOUT') return { body: { companyName: 'BitoCard', countries: state.countries } };
+      // Deposits: every country unless switched off here (alpha-3 codes), as in pawaPay's dashboard.
+      if (type === 'DEPOSIT') return { body: { companyName: 'BitoCard', countries: state.countries.filter(country => !state.noDeposits.has(country.country)) } };
+      return { status: 400, body: {} };
     }
     if (method === 'POST' && path === '/v2/payouts') {
       if (state.payouts[body.payoutId]) return { body: { payoutId: body.payoutId, status: 'DUPLICATE_IGNORED' } };
@@ -647,6 +651,7 @@ export async function fakePawapay() {
       return { body: { payoutId: body.payoutId, status: 'ACCEPTED', created: new Date().toISOString() } };
     }
     if (method === 'POST' && path === '/v2/paymentpage') {
+      if (state.refusePaymentPage) return { status: 403, body: { failureReason: { failureCode: 'AUTHORISATION_ERROR', failureMessage: 'Payment page is not enabled for this account' } } };
       state.deposits[body.depositId] = { body, status: null };
       return { body: { redirectUrl: `https://paywith.pawapay.io/?token=${body.depositId}` } };
     }

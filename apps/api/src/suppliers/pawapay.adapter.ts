@@ -15,6 +15,11 @@ const alpha2: Record<string, string> = {
   ZMB: 'ZM', ZWE: 'ZW',
 };
 
+/** BitoCard's alpha-2 code for one of pawaPay's alpha-3 countries, or null for one it does not know. */
+export function pawapayAlpha2(code: string) {
+  return alpha2[code.toUpperCase()] ?? null;
+}
+
 /** pawaPay's alpha-3 code for one of BitoCard's alpha-2 countries, or null where pawaPay does not work. */
 export function pawapayCountry(code: string) {
   return Object.entries(alpha2).find(([, two]) => two === code.toUpperCase())?.[0] ?? null;

@@ -98,7 +98,8 @@ export type TopUpStatus = 'pending' | 'succeeded' | 'failed';
 export type PaymentGateway = 'stripe' | 'flutterwave' | 'monnify' | 'pawapay';
 
 /** A way to pay that BitoCard offers in the reseller's market (`GET /v1/wallet/payment-methods`). */
-export type PaymentMethod = { object: 'payment_method'; id: PaymentGateway; label: string; description: string };
+/** `networks`: the mobile money networks payers can pay from (MTN, Telecel…); empty for cards and bank. */
+export type PaymentMethod = { object: 'payment_method'; id: PaymentGateway; label: string; description: string; networks: string[] };
 
 export type TopUp = {
   object: 'top_up';

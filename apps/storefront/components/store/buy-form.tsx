@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useId, useState } from "react";
+import { useActionState, useId, useState, useTransition } from "react";
 import { Lock } from "lucide-react";
 import { formatFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail } from "@bitocard/api-client/storefront";
 import { type FormState, startCheckout } from "@/lib/account-actions";
+import { paymentMethodsFor } from "@/lib/payment-methods";
 import { FormMessage, Submit, TextField } from "./account-forms";
 
 /** Bought several at a time, each its own code. */
@@ -45,6 +46,15 @@ export function BuyForm({
   const [market, setMarket] = useState(country ?? (product.global ? "" : product.country));
   // The country the last attempt was for: its error is hidden once the shopper picks another country.
   const [tried, setTried] = useState(market);
+  // The payment methods for the country chosen: the page's own country comes with the page; another is asked for.
+  const [shown, setShown] = useState<{ country: string | null; methods: StorePaymentMethod[] }>({ country, methods });
+  const [loadingMethods, startLoading] = useTransition();
+  const chooseMarket = (next: string) => {
+    setMarket(next);
+    if (next === shown.country) return;
+    if (next === country) return setShown({ country, methods });
+    startLoading(async () => setShown({ country: next, methods: await paymentMethodsFor(next) }));
+  };
 
   if (!signedIn) {
     return (
@@ -136,7 +146,7 @@ export function BuyForm({
           name="country"
           required
           value={market}
-          onChange={event => setMarket(event.target.value)}
+          onChange={event => chooseMarket(event.target.value)}
           className="min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-[15px] sm:w-72"
           aria-invalid={state.field === "country" || undefined}
         >
@@ -153,16 +163,29 @@ export function BuyForm({
       </div>
       )}
 
-      {methods.length && market === country ? (
+      {loadingMethods ? (
+        <p className="text-sm text-slate-500" aria-live="polite">
+          Finding how you can pay from there…
+        </p>
+      ) : shown.methods.length && market === shown.country ? (
         <fieldset>
           <legend className="text-sm font-semibold">Pay with</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {methods.map((method, index) => (
+            {shown.methods.map((method, index) => (
               <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50">
                 <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-[#ff2382]" />
                 <span>
                   <span className="block text-sm font-semibold">{method.label}</span>
                   <span className="block text-xs text-slate-500">{method.description}</span>
+                  {method.networks?.length ? (
+                    <span className="mt-1.5 flex flex-wrap gap-1" aria-label={`Networks: ${method.networks.join(", ")}`}>
+                      {method.networks.map(network => (
+                        <span key={network} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                          {network}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </span>
               </label>
             ))}

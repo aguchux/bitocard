@@ -115,6 +115,7 @@ const PaymentMethod = objectSchema(
     id: oneOf('Pass it as `method` when topping up.', ['stripe', 'flutterwave', 'monnify', 'pawapay']),
     label: str('What payers see, for example `Card` or `Mobile money`.'),
     description: str('A line explaining it.'),
+    networks: array(str('A mobile money network, as payers know it.'), 'Mobile money methods: the networks payers in your country can pay from (for example `MTN` or `Telecel`), from the payment provider. Empty for cards and bank transfer.'),
   },
   'A way to pay that BitoCard offers in your market.',
 );
@@ -484,8 +485,8 @@ export const moneyDocs: DocsArea = {
       description: 'The ways to top up in your country, best first. Pass an `id` as `method` when creating a top-up.',
       schema: list(ref('PaymentMethod'), {}, false),
       example: ({ object: 'list', data: [
-        { object: 'payment_method', id: 'flutterwave', label: 'Card, bank or mobile money', description: 'Cards, bank transfer, USSD and mobile money where available' },
-        { object: 'payment_method', id: 'monnify', label: 'Bank transfer or card', description: 'Nigerian bank transfer, USSD or card' },
+        { object: 'payment_method', id: 'flutterwave', label: 'Card, bank or mobile money', description: 'Cards, bank transfer, USSD and mobile money where available', networks: [] },
+        { object: 'payment_method', id: 'monnify', label: 'Bank transfer or card', description: 'Nigerian bank transfer, USSD or card', networks: [] },
       ] }),
     },
     'POST /v1/wallet/top-ups': {

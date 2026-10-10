@@ -174,7 +174,8 @@ export function formatFace(minor: number, currency: string) {
 // -- Customers and checkout (M10b) -------------------------------------------------------------------------------
 
 /** A way customers in a market can pay (`/v1/store/payment-methods?country=`). */
-export type StorePaymentMethod = { object: 'payment_method'; id: string; label: string; description: string };
+/** `networks`: the mobile money networks payers in the country can pay from (MTN, Telecel…); empty for cards and bank. */
+export type StorePaymentMethod = { object: 'payment_method'; id: string; label: string; description: string; networks: string[] };
 export type StorePaymentMethods = { object: 'list'; mode: 'live' | 'test'; data: StorePaymentMethod[] };
 
 export type CheckoutStatus = 'awaiting_payment' | 'paid' | 'completed' | 'failed' | 'refund_pending' | 'refunded';

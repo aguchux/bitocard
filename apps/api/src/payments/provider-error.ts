@@ -16,6 +16,29 @@ export class ProviderError extends Error {
 
 const timeoutMs = 15_000;
 
+type ErrorReply = {
+  message?: string;
+  responseMessage?: string;
+  errorMessage?: string;
+  errorCode?: string;
+  error?: { message?: string } | string;
+  failureReason?: { failureCode?: string; failureMessage?: string };
+};
+
+/**
+ * What a provider said when it refused a request: the usual message fields (Stripe, Flutterwave, Monnify, pawaPay's
+ * `failureReason` and `errorMessage`), else a short excerpt of the body, else the status. Never the request itself.
+ */
+export function errorText(body: unknown, text: string, status: number) {
+  const reply = (body && typeof body === 'object' ? body : {}) as ErrorReply;
+  const failure = reply.failureReason ? [reply.failureReason.failureCode, reply.failureReason.failureMessage].filter(Boolean).join(': ') : '';
+  const found =
+    reply.message ?? reply.responseMessage ?? reply.errorMessage ?? (typeof reply.error === 'string' ? reply.error : reply.error?.message) ?? (failure || reply.errorCode);
+  if (found) return found.slice(0, 300);
+  const excerpt = text.replace(/\s+/g, ' ').trim().slice(0, 200);
+  return excerpt ? `HTTP ${status}: ${excerpt}` : `HTTP ${status}`;
+}
+
 /**
  * Request to a provider with a JSON body (or a form body, `form`, as Stripe takes), classifying failures as definite
  * (4xx) or unclear (everything else).
@@ -45,8 +68,7 @@ export async function providerRequest<T>(
     throw new ProviderError(provider, `unreadable response (HTTP ${res.status})`, false, res.status);
   }
   if (!res.ok) {
-    const reply = body as { message?: string; responseMessage?: string; error?: { message?: string } } | null;
-    const message = reply?.message ?? reply?.responseMessage ?? reply?.error?.message ?? `HTTP ${res.status}`;
+    const message = errorText(body, text, res.status);
     throw new ProviderError(provider, message, res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429, res.status);
   }
   return body as T;

@@ -7747,13 +7747,15 @@
                       "object": "payment_method",
                       "id": "flutterwave",
                       "label": "Card, bank or mobile money",
-                      "description": "Cards, bank transfer, USSD and mobile money where available"
+                      "description": "Cards, bank transfer, USSD and mobile money where available",
+                      "networks": []
                     },
                     {
                       "object": "payment_method",
                       "id": "monnify",
                       "label": "Bank transfer or card",
-                      "description": "Nigerian bank transfer, USSD or card"
+                      "description": "Nigerian bank transfer, USSD or card",
+                      "networks": []
                     }
                   ]
                 }
@@ -28151,7 +28153,8 @@
           "object",
           "id",
           "label",
-          "description"
+          "description",
+          "networks"
         ],
         "additionalProperties": false,
         "properties": {
@@ -28177,6 +28180,14 @@
           "description": {
             "type": "string",
             "description": "A line explaining it."
+          },
+          "networks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A mobile money network, as payers know it."
+            },
+            "description": "Mobile money methods: the networks payers in your country can pay from (for example `MTN` or `Telecel`), from the payment provider. Empty for cards and bank transfer."
           }
         }
       },

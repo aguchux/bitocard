@@ -14,7 +14,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { OrdersService, receiptNumber } from '../orders/orders.service.js';
 import { presentMethod } from '../payments/payment-methods.service.js';
-import { isPaymentGateway, paymentGateways } from '../payments/payment-providers.js';
+import { isPaymentGateway } from '../payments/payment-providers.js';
 import { paymentRef, PaymentsService } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { type PaymentOption, StoreSellers } from './store-sellers.js';
@@ -153,7 +153,9 @@ export class CheckoutService implements OnModuleInit {
     const mode = this.stores.mode(store);
     const seller = await this.sellerOrNull(store, countryCode);
     const options = seller ? await this.stores.paymentOptions(store, seller, mode) : [];
-    return { object: 'list' as const, mode, data: options.filter(option => option.gateway !== 'sandbox').map(option => presentMethod(option.gateway as keyof typeof paymentGateways)) };
+    const country = seller?.country ? await this.prisma.country.findUnique({ where: { code: seller.country } }) : null;
+    const shown = options.filter(option => option.gateway !== 'sandbox');
+    return { object: 'list' as const, mode, data: country ? await Promise.all(shown.map(option => this.stores.describe(option, country))) : [] };
   }
 
   private async sellerOrNull(store: Store, countryCode: string) {

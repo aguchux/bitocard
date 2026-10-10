@@ -9,8 +9,8 @@ import { type LedgerMode, type Payment, Prisma, type ReservedAccount } from '../
 import { type Line, LedgerService, type Tx } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
-import { PaymentMethodsService, presentMethod } from './payment-methods.service.js';
-import { PaymentProviders } from './payment-providers.js';
+import { PaymentMethodsService } from './payment-methods.service.js';
+import { type PaymentGateway, paymentGateways, PaymentProviders } from './payment-providers.js';
 import { ProviderError } from './provider-error.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
@@ -149,7 +149,7 @@ export class PaymentsService {
   async topUpMethods(resellerId: string, mode: LedgerMode) {
     const { country } = await this.wallets.currencyOf(resellerId);
     const offered = await this.methods.offered('wallet_top_up', country, mode);
-    return { object: 'list' as const, data: offered.map(presentMethod) };
+    return { object: 'list' as const, data: await Promise.all(offered.map(gateway => this.methods.describe(gateway, country))) };
   }
 
   async createTopUp(resellerId: string, mode: LedgerMode, payer: { email: string; name: string }, input: { amount: number; method?: string; return_url?: string }) {
@@ -193,7 +193,7 @@ export class PaymentsService {
     id?: string;
   }) {
     const provider: CheckoutProvider =
-      input.mode === 'test' || input.gateway === 'sandbox' ? this.providers.sandbox : (input.own?.provider ?? this.providers.checkout(input.mode, input.gateway, input.country, input.currency));
+      input.mode === 'test' || input.gateway === 'sandbox' ? this.providers.sandbox : (input.own?.provider ?? (await this.providers.checkout(input.mode, input.gateway, input.country, input.currency)));
     const payment = await this.prisma.payment.create({
       data: {
         id: input.id,
@@ -223,6 +223,16 @@ export class PaymentsService {
     } catch (error) {
       this.logger.warn({ err: error, paymentId: payment.id, provider: provider.name }, 'Could not start a payment');
       await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed', failureReason: 'The payment could not be started.', completedAt: new Date() } });
+      // A clear refusal (bad credentials, a disabled product) needs an admin: say why, once a day per gateway and mode.
+      if (error instanceof ProviderError && error.definite && !input.own) {
+        await this.inbox.admins('admin.payment.gateway_refused', {
+          subject: `${provider.name}:${input.mode}:${new Date().toISOString().slice(0, 10)}`,
+          title: `${paymentGateways[provider.name as PaymentGateway]?.name ?? provider.name} refused to open a payment`,
+          body: `${error.message} Customers and resellers paying with it see "The payment could not be started" until this is fixed.`,
+          link: '/settings/integrations',
+          mode: input.mode,
+        });
+      }
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The payment could not be started. Try again shortly, or choose another payment method.');
     }
   }

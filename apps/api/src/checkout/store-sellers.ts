@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode, Reseller, Store } from '../generated/prisma/client.js';
-import { PaymentMethodsService } from '../payments/payment-methods.service.js';
+import { PaymentMethodsService, presentMethod } from '../payments/payment-methods.service.js';
 import { isPaymentGateway, type PaymentGateway, PaymentProviders } from '../payments/payment-providers.js';
 import type { CheckoutProvider } from '../payments/providers.js';
 import { connectable } from '../reseller-integrations/connectable.js';
@@ -29,6 +29,11 @@ export class StoreSellers {
     private readonly providers: PaymentProviders,
     private readonly integrations: ResellerIntegrationsService,
   ) {}
+
+  /** A payment option as payers see it, with its mobile money networks in the country. Own gateways are BitoCard's labels. */
+  async describe(option: PaymentOption, country: { code: string; currency: string }) {
+    return option.own ? presentMethod(option.gateway as PaymentGateway) : this.methods.describe(option.gateway as PaymentGateway, country);
+  }
 
   isHouse(store: Pick<Store, 'id'>) {
     return store.id === houseStoreId;
@@ -85,7 +90,7 @@ export class StoreSellers {
     for (const row of rows) {
       if (connectable(row.integrationId)?.kind !== 'payment_gateway' || !isPaymentGateway(row.integrationId)) continue;
       const provider = await this.ownProvider(row.id, row.integrationId);
-      if (!provider || (mode === 'live' && !provider.supportsCheckout(country.code, country.currency))) continue;
+      if (!provider || (mode === 'live' && !(await provider.supportsCheckout(country.code, country.currency)))) continue;
       options.push({ routing: row.routing === 'fallback' ? 'fallback' : 'preferred', option: { gateway: row.integrationId, own: { connectionId: row.id, provider } } });
     }
     return options;

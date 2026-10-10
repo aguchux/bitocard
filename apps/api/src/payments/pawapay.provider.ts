@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
-import { pawapayCountry } from '../suppliers/pawapay.adapter.js';
+import { createHash } from 'node:crypto';
+import { pawapayAlpha2, pawapayCountry } from '../suppliers/pawapay.adapter.js';
 import { ProviderError, providerRequest } from './provider-error.js';
 import { type ChargeResult, type CheckoutInput, type CheckoutProvider, fromMajor, type PaymentRef, type RefundResult, toMajor, uuidFor } from './providers.js';
 
@@ -14,6 +15,47 @@ type Deposit = {
   failureReason?: { failureCode?: string; failureMessage?: string };
 };
 type Refund = { refundId: string; status?: string; failureReason?: { failureCode?: string; failureMessage?: string } };
+
+type OperationConfig = { operationType?: string; status?: string };
+type ActiveConf = {
+  countries?: Array<{
+    country: string;
+    providers?: Array<{ provider?: string; displayName?: string; currencies?: Array<{ currency: string; operationTypes?: OperationConfig[] | Record<string, OperationConfig> }> }>;
+  }>;
+};
+
+/** Each country's (alpha-2) currencies and, per currency, the mobile money networks taking deposits, from pawaPay's active configuration. */
+export function depositCountries(conf: ActiveConf) {
+  const countries = new Map<string, Map<string, string[]>>();
+  for (const country of conf.countries ?? []) {
+    const code = pawapayAlpha2(country.country);
+    if (!code) continue;
+    for (const provider of country.providers ?? []) {
+      for (const currency of provider.currencies ?? []) {
+        const types = currency.operationTypes ?? [];
+        const deposit = Array.isArray(types) ? types.find(item => item.operationType === 'DEPOSIT') : types.DEPOSIT;
+        if (!deposit || deposit.status === 'CLOSED') continue;
+        const currencies = countries.get(code) ?? new Map<string, string[]>();
+        const name = provider.displayName || provider.provider;
+        const networks = currencies.get(currency.currency.toUpperCase()) ?? [];
+        if (name && !networks.includes(name)) networks.push(name);
+        currencies.set(currency.currency.toUpperCase(), networks);
+        countries.set(code, currencies);
+      }
+    }
+  }
+  return countries;
+}
+
+/** Deposit configurations by account (address and a hash of the token), kept 10 minutes; a failed read 1 minute. */
+const depositConfigs = new Map<string, { until: number; countries: Map<string, Map<string, string[]>> }>();
+const configMs = 10 * 60_000;
+const failedConfigMs = 60_000;
+
+/** Forgets every cached deposit configuration (tests, or after an admin changes pawaPay's settings). */
+export function forgetDepositConfigs() {
+  depositConfigs.clear();
+}
 
 /** pawaPay's amount: whole when there are no cents (some currencies take no decimals), otherwise two places. */
 const amountOf = (amount: bigint) => (amount % 100n === 0n ? String(amount / 100n) : toMajor(amount));
@@ -32,9 +74,23 @@ export class PawapayPaymentsProvider implements CheckoutProvider {
     private readonly callbackToken?: string,
   ) {}
 
-  private call<T>(path: string, init: { method?: string; body?: unknown } = {}) {
+  private async call<T>(path: string, init: { method?: string; body?: unknown } = {}) {
     const token = this.apiToken.trim().replace(/^bearer\s+/i, '');
-    return providerRequest<T>(this.name, `${this.baseUrl.replace(/\/+$/, '')}${path}`, { ...init, headers: { authorization: `Bearer ${token}` } });
+    const base = this.baseUrl.replace(/\/+$/, '');
+    try {
+      return await providerRequest<T>(this.name, `${base}${path}`, { ...init, headers: { authorization: `Bearer ${token}` } });
+    } catch (error) {
+      if (error instanceof ProviderError && (error.status === 401 || error.status === 403)) {
+        // Refused before anything happened: say what to check, never the token.
+        throw new ProviderError(
+          this.name,
+          `${error.message.replace(/^pawapay: /, '')}. pawaPay refused the request (HTTP ${error.status}) at ${base}: check that the API token is ${/sandbox/i.test(base) ? 'a sandbox' : 'a production'} token, that deposits and the Payment Page are enabled on the account for this country, and that any IP allowlist on the token allows BitoCard's servers (pawaPay dashboard; Settings > Integrations > pawaPay).`,
+          true,
+          error.status,
+        );
+      }
+      throw error;
+    }
   }
 
   /** Deposit callbacks carry the token set in the callback address (`?token=`). */
@@ -45,8 +101,34 @@ export class PawapayPaymentsProvider implements CheckoutProvider {
     return expected.length === given.length && timingSafeEqual(expected, given);
   }
 
-  supportsCheckout(country: string) {
-    return pawapayCountry(country) !== null;
+  /**
+   * Only countries and currencies the account takes deposits in (pawaPay's active configuration, enabled per country
+   * in the pawaPay dashboard), so the method is never offered where the payment page would be refused. While pawaPay
+   * cannot be reached the last answer is used; with none, the method is not offered.
+   */
+  async supportsCheckout(country: string, currency: string) {
+    return (await this.depositCountries()).get(country.toUpperCase())?.has(currency.toUpperCase()) ?? false;
+  }
+
+  /** The mobile money networks payers in this country can pay from in this currency (MTN, Telecel…). */
+  async networks(country: string, currency: string) {
+    return (await this.depositCountries()).get(country.toUpperCase())?.get(currency.toUpperCase()) ?? [];
+  }
+
+  /** Every country (alpha-2) and currency this account takes deposits in. */
+  async depositCountries() {
+    const key = `${this.baseUrl}|${createHash('sha256').update(this.apiToken.trim()).digest('hex').slice(0, 16)}`;
+    const cached = depositConfigs.get(key);
+    if (cached && cached.until > Date.now()) return cached.countries;
+    try {
+      const countries = depositCountries(await this.call<ActiveConf>('/v2/active-conf?operationType=DEPOSIT'));
+      depositConfigs.set(key, { until: Date.now() + configMs, countries });
+      return countries;
+    } catch {
+      const countries = cached?.countries ?? new Map<string, Map<string, string[]>>();
+      depositConfigs.set(key, { until: Date.now() + failedConfigMs, countries });
+      return countries;
+    }
   }
 
   async createCheckout(input: CheckoutInput) {
