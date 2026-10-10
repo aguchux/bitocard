@@ -36,6 +36,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </h1>
           <p className="mt-1 text-slate-600">
             {formatFace(order.face_value, order.face_currency)} each · {order.status === "awaiting_payment" || order.status === "failed" ? "price" : "paid"} {formatPrice(order.amount, order.currency)} with {order.method.label.toLowerCase()}
+            {order.charged ? ` (charged as ${formatPrice(order.charged.amount, order.charged.currency)}, as your card is charged in ${order.charged.currency})` : ""}
             {order.order?.receipt_number ? ` · Receipt ${order.order.receipt_number}` : ""}
           </p>
         </div>

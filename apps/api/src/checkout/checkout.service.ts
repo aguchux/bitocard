@@ -126,6 +126,8 @@ export class CheckoutService implements OnModuleInit {
       quantity: checkout.quote.quantity,
       amount: minor(checkout.amountMinor),
       currency: checkout.currency,
+      /** Charged by the gateway in another currency (cards in US dollars where Stripe cannot take this one); null otherwise. */
+      charged: checkout.payment?.chargeCurrency && checkout.payment.chargeAmountMinor ? { amount: minor(checkout.payment.chargeAmountMinor), currency: checkout.payment.chargeCurrency } : null,
       tax: checkout.quote.taxName ? { name: checkout.quote.taxName, amount: minor(checkout.quote.taxMinor) } : null,
       method: isPaymentGateway(checkout.gateway) ? presentMethod(checkout.gateway) : { object: 'payment_method' as const, id: checkout.gateway, label: 'Sandbox', description: 'Simulated payment' },
       checkout_url: checkout.status === 'awaiting_payment' && checkout.payment?.status === 'pending' ? checkout.payment.checkoutUrl : null,

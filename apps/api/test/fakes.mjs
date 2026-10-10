@@ -713,7 +713,8 @@ export async function fakeStripe() {
   // `feeCurrency` and `exchangeRate` describe the balance transaction (the account's settlement currency); `byKey` maps
   // idempotency keys to the refund they made, so a repeat returns it, as Stripe does.
   // `disputes` maps a dispute ID to { amount, currency, status, payment_intent, reason }.
-  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null };
+  // `refuseCurrencies`: currencies the account cannot take (lower case), refused as Stripe does; `attempts` every session asked for.
+  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), attempts: [] };
   const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
@@ -721,6 +722,11 @@ export async function fakeStripe() {
     if (method === 'GET' && path === '/v1/balance') return { body: { object: 'balance', available: [] } };
     if (method === 'POST' && path === '/v1/checkout/sessions') {
       const fields = form(body);
+      state.attempts.push(fields['line_items[0][price_data][currency]']);
+      if (state.refuseCurrencies.has(fields['line_items[0][price_data][currency]'])) {
+        const currency = fields['line_items[0][price_data][currency]'];
+        return { status: 400, body: { error: { type: 'invalid_request_error', message: `Invalid currency: ${currency}. You can change your account to process transactions in ${currency} by adding a bank account for this currency at https://dashboard.stripe.com/account. Your account currently supports these currencies: usd, ngn.` } } };
+      }
       const id = `cs_test_${(state.next += 1)}`;
       state.sessions[id] = { fields, status: 'open', payment_status: 'unpaid', payment_intent: `pi_${state.next}`, key: headers.authorization.slice(7) };
       return { body: { id, object: 'checkout.session', url: `https://checkout.stripe.com/c/pay/${id}`, status: 'open', payment_status: 'unpaid' } };

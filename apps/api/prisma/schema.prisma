@@ -927,6 +927,10 @@ model Payment {
   providerTransactionId   String?          @map("provider_transaction_id")
   amountMinor             BigInt           @map("amount_minor")
   currency                String           @db.Char(3)
+  /// Charged by the gateway in another currency (Stripe in USD where the account cannot take this one): what was
+  /// charged. `amountMinor`/`currency` stay what the payer owed, as booked.
+  chargeAmountMinor       BigInt?          @map("charge_amount_minor")
+  chargeCurrency          String?          @map("charge_currency") @db.Char(3)
   feeMinor                BigInt           @default(0) @map("fee_minor")
   status                  PaymentStatus    @default(pending)
   checkoutUrl             String?          @map("checkout_url")

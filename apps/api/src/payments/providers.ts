@@ -49,6 +49,13 @@ export interface CheckoutProvider {
   /** Whether it takes payments from this country in this currency (pawaPay asks its API, so this may be async). */
   supportsCheckout(country: string, currency: string): boolean | Promise<boolean>;
   /**
+   * Where the gateway cannot take a currency (it refuses with `currency_unsupported`, or `takesCurrency` says so), the
+   * payment is charged in this one instead, converted at the rate that never leaves BitoCard short.
+   */
+  readonly fallbackCurrency?: string;
+  /** False once the gateway has refused this currency. */
+  takesCurrency?(currency: string): boolean;
+  /**
    * Opens a payment page. `providerTransactionId` is the provider's own ID for it when the provider gives one up front
    * (Stripe's session, pawaPay's deposit, Monnify's transaction), stored so checks and notifications find the payment.
    */

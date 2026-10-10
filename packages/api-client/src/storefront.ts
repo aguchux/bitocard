@@ -213,6 +213,8 @@ export type StoreCheckout = {
   quantity: number;
   amount: number;
   currency: string;
+  /** Charged by the gateway in another currency (cards in US dollars where Stripe cannot take this one); null otherwise. */
+  charged: { amount: number; currency: string } | null;
   tax: { name: string; amount: number } | null;
   method: StorePaymentMethod;
   checkout_url: string | null;

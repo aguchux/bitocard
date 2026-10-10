@@ -18,6 +18,14 @@ type Refund = { id: string; status?: string; failure_reason?: string | null };
 
 /** Currencies Stripe counts in whole units (no cents); BitoCard keeps two decimal places for every currency. */
 const zeroDecimal = new Set(['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF']);
+/** Currencies a Stripe account refused (by a hash of its key), so later payments go straight to US dollars. */
+const refusedCurrencies = new Map<string, Set<string>>();
+
+/** Forgets the currencies Stripe refused (tests, or after the account adds a currency). */
+export function forgetStripeCurrencies() {
+  refusedCurrencies.clear();
+}
+
 /** How far a webhook's signed time may be from ours. */
 const toleranceSeconds = 300;
 
@@ -50,6 +58,8 @@ export function stripeFee(balance: BalanceTransaction, chargeCurrency: string) {
  */
 export class StripeProvider implements CheckoutProvider {
   readonly name = 'stripe';
+  /** Cards are charged in US dollars where the account cannot take the local currency. */
+  readonly fallbackCurrency = 'USD';
 
   constructor(
     private readonly secretKey: string,
@@ -87,7 +97,31 @@ export class StripeProvider implements CheckoutProvider {
     return /^[A-Z]{3}$/.test(currency);
   }
 
+  private get accountKey() {
+    return createHmac('sha256', 'stripe-account').update(this.secretKey).digest('hex').slice(0, 16);
+  }
+
+  takesCurrency(currency: string) {
+    return !refusedCurrencies.get(this.accountKey)?.has(currency.toUpperCase());
+  }
+
   async createCheckout(input: CheckoutInput) {
+    try {
+      return await this.openSession(input);
+    } catch (error) {
+      // "Invalid currency: ghs ... Your account currently supports these currencies: usd, ...": remembered, so the
+      // payment (and later ones) can be charged in US dollars instead.
+      if (error instanceof ProviderError && error.status === 400 && /invalid currency/i.test(error.message)) {
+        const refused = refusedCurrencies.get(this.accountKey) ?? new Set<string>();
+        refused.add(input.currency.toUpperCase());
+        refusedCurrencies.set(this.accountKey, refused);
+        throw new ProviderError(this.name, `the Stripe account cannot take ${input.currency.toUpperCase()}`, true, 400, 'currency_unsupported');
+      }
+      throw error;
+    }
+  }
+
+  private async openSession(input: CheckoutInput) {
     const session = await this.call<Session>('/v1/checkout/sessions', {
       method: 'POST',
       form: {

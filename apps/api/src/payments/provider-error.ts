@@ -9,6 +9,8 @@ export class ProviderError extends Error {
     message: string,
     readonly definite: boolean,
     readonly status?: number,
+    /** `currency_unsupported`: the gateway cannot take this currency (its `fallbackCurrency` can be used instead). */
+    readonly code?: string,
   ) {
     super(`${provider}: ${message}`);
   }

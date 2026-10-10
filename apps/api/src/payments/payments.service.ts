@@ -6,9 +6,12 @@ import { ApiError } from '../common/errors/api-error.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { type LedgerMode, type Payment, Prisma, type ReservedAccount } from '../generated/prisma/client.js';
+
+const Decimal = Prisma.Decimal;
 import { type Line, LedgerService, type Tx } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
+import { FxService } from '../fx/fx.service.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
 import { type PaymentGateway, paymentGateways, PaymentProviders } from './payment-providers.js';
 import { ProviderError } from './provider-error.js';
@@ -17,13 +20,19 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import type { ChargeResult, CheckoutProvider, PaymentRef } from './providers.js';
 
-/** What a payment record gives its provider to look it up. */
+/** What a payment record gives its provider to look it up: what the gateway charged (another currency, if it did). */
 export const paymentRef = (payment: Payment): PaymentRef => ({
   reference: payment.reference,
   providerTransactionId: payment.providerTransactionId,
-  amount: payment.amountMinor,
-  currency: payment.currency,
+  amount: payment.chargeAmountMinor ?? payment.amountMinor,
+  currency: payment.chargeCurrency ?? payment.currency,
 });
+
+/** An amount the gateway reported in the payment's charge currency, in the payment's own currency (proportionally). */
+export function inPaymentCurrency(payment: Pick<Payment, 'amountMinor' | 'chargeAmountMinor'>, charged: bigint) {
+  if (!payment.chargeAmountMinor) return charged;
+  return (charged * payment.amountMinor) / payment.chargeAmountMinor;
+}
 
 /** Told when a checkout payment is confirmed or fails (the checkout then places the order or closes). */
 export type CheckoutListener = { paid(paymentId: string): Promise<void>; failed(paymentId: string): Promise<void> };
@@ -102,6 +111,7 @@ export class PaymentsService {
     private readonly settings: SettingsService,
     private readonly inbox: InboxService,
     private readonly methods: PaymentMethodsService,
+    private readonly fx: FxService,
   ) {}
 
   /** The checkout service listens for its payments (registered once at start-up). */
@@ -208,18 +218,37 @@ export class PaymentsService {
         returnUrl: input.returnUrl,
       },
     });
-    try {
-      const page = await provider.createCheckout({
+    const open = (charge: { amount: bigint; currency: string }) =>
+      provider.createCheckout({
         reference: payment.reference,
-        amount: payment.amountMinor,
-        currency: input.currency,
+        amount: charge.amount,
+        currency: charge.currency,
         country: input.country,
         email: input.payer.email,
         name: input.payer.name,
         returnUrl: input.returnUrl,
         description: input.description,
       });
-      return await this.prisma.payment.update({ where: { id: payment.id }, data: { checkoutUrl: page.checkoutUrl, providerTransactionId: page.providerTransactionId ?? null } });
+    try {
+      const fallback = provider.fallbackCurrency && provider.fallbackCurrency !== input.currency.toUpperCase() ? provider.fallbackCurrency : null;
+      let charge: { amount: bigint; currency: string } | null = fallback && provider.takesCurrency?.(input.currency) === false ? await this.convertCharge(input.amount, input.currency, fallback) : null;
+      let page;
+      try {
+        page = await open(charge ?? { amount: input.amount, currency: input.currency });
+      } catch (error) {
+        // The gateway cannot take the local currency: charge its fallback (Stripe: US dollars) instead.
+        if (charge || !fallback || !(error instanceof ProviderError) || error.code !== 'currency_unsupported') throw error;
+        charge = await this.convertCharge(input.amount, input.currency, fallback);
+        page = await open(charge);
+      }
+      return await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          checkoutUrl: page.checkoutUrl,
+          providerTransactionId: page.providerTransactionId ?? null,
+          ...(charge ? { chargeAmountMinor: charge.amount, chargeCurrency: charge.currency } : {}),
+        },
+      });
     } catch (error) {
       this.logger.warn({ err: error, paymentId: payment.id, provider: provider.name }, 'Could not start a payment');
       await this.prisma.payment.update({ where: { id: payment.id }, data: { status: 'failed', failureReason: 'The payment could not be started.', completedAt: new Date() } });
@@ -235,6 +264,17 @@ export class PaymentsService {
       }
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The payment could not be started. Try again shortly, or choose another payment method.');
     }
+  }
+
+  /**
+   * The amount to charge in another currency for an amount owed: converted at the `receive` rate (what BitoCard gets
+   * when converting the charge back), rounded up, so the charge always covers what is owed. Only US dollars for now.
+   */
+  private async convertCharge(amount: bigint, currency: string, to: string) {
+    if (to !== 'USD') throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'This payment method cannot take your currency.');
+    const rate = await this.fx.rate(currency.toUpperCase());
+    const usd = new Decimal(amount.toString()).div(rate.receive).toDecimalPlaces(0, Decimal.ROUND_UP);
+    return { amount: BigInt(usd.toFixed(0)) > 0n ? BigInt(usd.toFixed(0)) : 1n, currency: to };
   }
 
   async listTopUps(resellerId: string, mode: LedgerMode, page: { limit?: number; starting_after?: string }) {
@@ -306,7 +346,9 @@ export class PaymentsService {
   async settle(payment: Payment, result: ChargeResult) {
     if (result.status === 'pending') return payment;
     if (result.status === 'failed') return this.fail(payment, result.failureReason ?? 'The payment failed.');
-    if (result.reference !== payment.reference || result.currency !== payment.currency || result.amount !== payment.amountMinor) {
+    // Checked against what the gateway was asked to charge (in its charge currency, if it used another one).
+    const asked = paymentRef(payment);
+    if (result.reference !== payment.reference || result.currency !== asked.currency || result.amount !== asked.amount) {
       this.logger.error({ paymentId: payment.id, result: { ...result, amount: String(result.amount), fee: String(result.fee) } }, 'Payment does not match the top-up; refunding');
       await this.fail(payment, 'The amount paid did not match, so it is being refunded.');
       // Only money paid against this payment's own reference is ours to refund.
@@ -358,8 +400,10 @@ export class PaymentsService {
     ];
   }
 
-  private async credit(payment: Payment, result: ChargeResult) {
+  private async credit(payment: Payment, charged: ChargeResult) {
     const checkout = payment.purpose === 'checkout';
+    // The gateway's fee comes in what it charged; booked in the payment's own currency (proportionally).
+    const result = { ...charged, fee: inPaymentCurrency(payment, charged.fee) };
     if (payment.connectionId) {
       // Paid into the reseller's own gateway account: the money is theirs, so nothing is posted to BitoCard's ledger.
       const claimed = await this.prisma.payment.updateMany({

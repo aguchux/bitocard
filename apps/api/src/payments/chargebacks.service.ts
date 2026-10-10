@@ -9,6 +9,7 @@ import { WalletService } from '../ledger/wallet.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { PaymentProviders } from './payment-providers.js';
+import { inPaymentCurrency } from './payments.service.js';
 
 export const chargebackOutcomes = ['won', 'lost'] as const;
 export type ChargebackOutcome = (typeof chargebackOutcomes)[number];
@@ -122,7 +123,10 @@ export class ChargebacksService {
       this.logger.warn({ disputeId }, 'Stripe dispute for a payment BitoCard does not know');
       return { handled: false, reason: 'unknown_payment' };
     }
-    const opened = await this.open(payment, { providerDisputeId: chargeback.id, amount: chargeback.amount, currency: chargeback.currency, reason: chargeback.reason });
+    // A payment charged in another currency (US dollars) is disputed in that currency: held in the payment's own.
+    const charged = payment.chargeCurrency !== null && chargeback.currency === payment.chargeCurrency;
+    const amount = charged ? inPaymentCurrency(payment, chargeback.amount) : chargeback.amount;
+    const opened = await this.open(payment, { providerDisputeId: chargeback.id, amount, currency: charged ? payment.currency : chargeback.currency, reason: chargeback.reason });
     if (chargeback.outcome) await this.resolve(opened.id, chargeback.outcome, null, `Stripe: ${chargeback.status}`);
     return { handled: true, status: (await this.prisma.chargeback.findUniqueOrThrow({ where: { id: opened.id } })).status };
   }

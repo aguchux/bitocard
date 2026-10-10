@@ -97,6 +97,45 @@ describe('payment methods per market', () => {
 });
 
 describe('wallet top-ups through each gateway', () => {
+  test('Stripe cannot take the currency: charged in US dollars, credited in the local amount, and remembered', async () => {
+    const { forgetStripeCurrencies } = await import('../dist/payments/stripe.provider.js');
+    forgetStripeCurrencies();
+    for (const source of ['open_exchange_rates', 'flutterwave']) {
+      await prisma.exchangeRate.create({ data: { currency: 'GHS', source, unitsPerUsd: 15, fetchedAt: new Date(Date.now() + 3600_000) } });
+    }
+    await setMethods('GH', 'wallet_top_up', ['stripe']);
+    stripe.state.refuseCurrencies.add('ghs');
+    try {
+      const reseller = await verifiedReseller({ country: 'GH' });
+      const created = await reseller.browser.post('/v1/wallet/top-ups', { amount: 25000, method: 'stripe' });
+      assert.equal(created.status, 201, JSON.stringify(created.json));
+      assert.deepEqual([created.json.amount, created.json.currency], [25000, 'GHS'], 'the top-up is still GH₵250');
+      const payment = await prisma.payment.findUniqueOrThrow({ where: { id: created.json.id } });
+      // GH₵250 at the receive rate (15 less the 1.5% margin = 14.775 per dollar), rounded up: $16.93.
+      assert.deepEqual([payment.amountMinor, payment.currency, payment.chargeAmountMinor, payment.chargeCurrency], [25000n, 'GHS', 1693n, 'USD']);
+      const session = stripe.state.sessions[payment.providerTransactionId];
+      assert.deepEqual([session.fields['line_items[0][price_data][currency]'], session.fields['line_items[0][price_data][unit_amount]']], ['usd', '1693']);
+      assert.deepEqual(stripe.state.attempts.slice(-2), ['ghs', 'usd'], 'tried cedis first, then dollars');
+
+      Object.assign(session, { status: 'complete', payment_status: 'paid' });
+      stripe.state.fee = 50;
+      assert.equal((await stripeWebhook(sessionPaid(payment.providerTransactionId))).status, 200);
+      const done = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      assert.deepEqual([done.status, done.feeMinor], ['succeeded', 738n], 'Stripe’s 50¢ fee booked as GH₵7.38 (proportionally)');
+      assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 25000, 'credited the GH₵250 owed');
+
+      const second = await reseller.browser.post('/v1/wallet/top-ups', { amount: 10000, method: 'stripe' });
+      assert.equal(second.status, 201);
+      assert.equal(stripe.state.attempts.at(-1), 'usd');
+      assert.notEqual(stripe.state.attempts.at(-2), 'ghs', 'remembered: straight to dollars');
+    } finally {
+      stripe.state.refuseCurrencies.delete('ghs');
+      stripe.state.fee = 0;
+      forgetStripeCurrencies();
+      await setMethods('GH', 'wallet_top_up', []);
+    }
+  });
+
   test('Stripe: a Checkout page, credited once when the signed notification is confirmed with Stripe', async () => {
     const reseller = await verifiedReseller();
     const created = await reseller.browser.post('/v1/wallet/top-ups', { amount: 500000, method: 'stripe' });
@@ -119,7 +158,7 @@ describe('wallet top-ups through each gateway', () => {
     const done = (await reseller.browser.get(`/v1/wallet/top-ups/${payment.id}`)).json;
     assert.deepEqual([done.status, done.method, done.amount], ['succeeded', 'stripe', 500000]);
     assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 500000, 'credited once, in full');
-    const fee = await prisma.ledgerAccount.findFirst({ where: { kind: 'processing_fees', ownerKey: 'provider:stripe', mode: 'live' } });
+    const fee = await prisma.ledgerAccount.findFirst({ where: { kind: 'processing_fees', ownerKey: 'provider:stripe', mode: 'live', currency: 'NGN' } });
     assert.equal(fee.balanceMinor, 7500n, 'Stripe’s fee is BitoCard’s cost');
   });
 

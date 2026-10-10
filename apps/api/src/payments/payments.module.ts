@@ -1,3 +1,4 @@
+import { FxModule } from '../fx/fx.module.js';
 import { Module } from '@nestjs/common';
 import { IdentityModule } from '../identity/identity.module.js';
 import { PayoutsModule } from '../payouts/payouts.module.js';
@@ -11,7 +12,7 @@ import { PaymentsService } from './payments.service.js';
 import { ProviderWebhooksController } from './webhooks.controller.js';
 
 @Module({
-  imports: [PayoutsModule, IdentityModule, SettingsModule],
+  imports: [PayoutsModule, IdentityModule, SettingsModule, FxModule],
   controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController],
   providers: [PaymentsService, PaymentMethodsService, ChargebacksService],
   exports: [PaymentsService, PaymentMethodsService, ChargebacksService],
