@@ -1,12 +1,24 @@
 import { bitocardApi } from '../base';
 import type { ProductCategory, Section } from '../storefront';
-import type { StoreCustomer, StoreCustomerFilter } from '../store-customers';
+import type { StoreCustomer, StoreCustomerDetail, StoreCustomerFilter, StoreCustomerUpdate } from '../store-customers';
 import type { List } from './types';
 
-export type { StoreCustomer } from '../store-customers';
+export type { StoreCustomer, StoreCustomerDetail } from '../store-customers';
 
-/** bitocard.com's identity check settings: off for every customer, or asked only some days after a first purchase. */
-export type CustomerVerificationSettings = { object: 'customer_verification_settings'; enabled: boolean; grace_days: number | null };
+/** bitocard.com's store settings. */
+export type StorefrontSettings = {
+  object: 'storefront_settings';
+  /** Customers are asked for the identity check where the market requires it (true), or never. */
+  customer_verification: boolean;
+  /** Asked only once this many days have passed since the customer's first paid purchase; null asks before buying. */
+  grace_days: number | null;
+  /** The customer account app's desktop menu; null follows the `customer_app_bottom_bar_desktop` switch. */
+  desktop_nav: 'rail' | 'bottom' | null;
+  desktop_nav_effective: 'rail' | 'bottom';
+  /** From the Customer checkout integration's Sandbox switch. */
+  checkout_mode: 'test' | 'live';
+};
+export type StorefrontSettingsInput = Partial<Pick<StorefrontSettings, 'customer_verification' | 'grace_days' | 'desktop_nav'>>;
 
 export type StorefrontPage = {
   object: 'storefront_page';
@@ -116,13 +128,23 @@ export const adminStorefrontApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Category', 'Media', 'Activity'],
     }),
     storefrontCustomers: build.query<List<StoreCustomer>, StoreCustomerFilter>({ query: params => ({ url: '/v1/admin/storefront/customers', params }), providesTags: ['StoreCustomer'] }),
-    setStorefrontCustomerCheck: build.mutation<StoreCustomer, { id: string; identity_check: boolean }>({
-      query: ({ id, identity_check }) => ({ url: `/v1/admin/storefront/customers/${id}`, method: 'PATCH', body: { identity_check } }),
+    storefrontCustomer: build.query<StoreCustomerDetail, string>({ query: id => `/v1/admin/storefront/customers/${id}`, providesTags: ['StoreCustomer'] }),
+    /** The identity check off or on (never marks them checked), or the account disabled or re-enabled. Audited. */
+    updateStorefrontCustomer: build.mutation<StoreCustomerDetail, { id: string } & StoreCustomerUpdate>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/storefront/customers/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['StoreCustomer', 'Activity'],
     }),
-    customerVerificationSettings: build.query<CustomerVerificationSettings, void>({ query: () => '/v1/admin/storefront/customer-verification', providesTags: ['StoreCustomer'] }),
-    setCustomerVerificationSettings: build.mutation<CustomerVerificationSettings, { enabled?: boolean; grace_days?: number | null }>({
-      query: body => ({ url: '/v1/admin/storefront/customer-verification', method: 'PUT', body }),
+    unlockStorefrontCustomer: build.mutation<StoreCustomerDetail, string>({
+      query: id => ({ url: `/v1/admin/storefront/customers/${id}/unlock`, method: 'POST' }),
+      invalidatesTags: ['StoreCustomer', 'Activity'],
+    }),
+    signOutStorefrontCustomer: build.mutation<StoreCustomerDetail, string>({
+      query: id => ({ url: `/v1/admin/storefront/customers/${id}/sign-out`, method: 'POST' }),
+      invalidatesTags: ['StoreCustomer', 'Activity'],
+    }),
+    storefrontSettings: build.query<StorefrontSettings, void>({ query: () => '/v1/admin/storefront/settings', providesTags: ['StoreCustomer'] }),
+    setStorefrontSettings: build.mutation<StorefrontSettings, StorefrontSettingsInput>({
+      query: body => ({ url: '/v1/admin/storefront/settings', method: 'PUT', body }),
       invalidatesTags: ['StoreCustomer', 'Activity'],
     }),
   }),
@@ -130,9 +152,12 @@ export const adminStorefrontApi = bitocardApi.injectEndpoints({
 
 export const {
   useStorefrontCustomersQuery,
-  useSetStorefrontCustomerCheckMutation,
-  useCustomerVerificationSettingsQuery,
-  useSetCustomerVerificationSettingsMutation,
+  useStorefrontCustomerQuery,
+  useUpdateStorefrontCustomerMutation,
+  useUnlockStorefrontCustomerMutation,
+  useSignOutStorefrontCustomerMutation,
+  useStorefrontSettingsQuery,
+  useSetStorefrontSettingsMutation,
   useStorefrontHomeQuery,
   useSaveStorefrontDraftMutation,
   usePublishStorefrontMutation,

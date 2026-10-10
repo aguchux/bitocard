@@ -35,6 +35,7 @@ All **Decided**. BitoCard's own retail store (the parent store) is on the main s
   - **BitoCard, for bitocard.com customers only** (never resellers' store customers): off for one supplier's products, off for one customer, off for every bitocard.com customer, or asked only once a set number of days (1 to 365) has passed since the customer's first paid purchase, so new customers can try products first.
   - **Resellers, for their own store's customers** (asked by default): off for every customer of their store, or for one customer. Their choice wins over BitoCard's rules for their store.
   - Nobody can mark a customer as checked: turning a check off only stops asking. Only passing the check marks a customer checked.
+- **Store owners manage their customers (Decided, built).** BitoCard (bitocard.com, admin Storefront > Customers and Settings) and each reseller (their store, SHQ Store > Customers) list and open their own customers with their purchases, switch the identity check off or on, disable or re-enable accounts, unlock them and sign them out; neither sees the other's customers.
 
 ## 3. Catalogue
 

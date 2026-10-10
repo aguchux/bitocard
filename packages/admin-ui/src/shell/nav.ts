@@ -62,7 +62,6 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     items: [
       { label: 'Needs review', href: '/verifications', icon: ListChecks },
       { label: 'All checks', href: '/verifications/all', icon: ShieldCheck },
-      { label: 'bitocard.com customers', href: '/verifications/customers', icon: Users },
     ],
   },
   activity: { title: 'Activity', items: [{ label: 'Activity log', href: '/activity', icon: History }] },
@@ -73,6 +72,8 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Brand registry', href: '/storefront/registry', icon: BookImage },
       { label: 'Categories', href: '/storefront/categories', icon: Shapes },
       { label: 'Media library', href: '/storefront/media', icon: Images },
+      { label: 'Customers', href: '/storefront/customers', icon: Users },
+      { label: 'Settings', href: '/storefront/settings', icon: Settings },
     ],
   },
   settings: {

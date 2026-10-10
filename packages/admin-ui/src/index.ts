@@ -11,4 +11,4 @@ export { ExternalLinks } from './ui/external-links';
 export { amountToMinor, bpsToPercent, percentToBps, PriceBreakdown, PricingSchemes, type BreakdownRow } from './ui/pricing';
 export { DisputeReply, DisputeThread, disputeActionLabels, disputeKindLabels, disputeOutcomeLabels, disputeTopicLabels, type DisputeThreadMessage } from './ui/disputes';
 export { searchDelayMs, useDebouncedValue } from './ui/hooks';
-export { StoreCustomersTable, type StoreCustomerRow } from './ui/store-customers';
+export { StoreCustomersTable, StoreCustomerView, type StoreCustomerDetailView, type StoreCustomerPurchase, type StoreCustomerRow } from './ui/store-customers';

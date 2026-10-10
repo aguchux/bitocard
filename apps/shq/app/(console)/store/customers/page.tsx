@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Store as StoreIcon } from "lucide-react";
 import { Card, EmptyState, errorMessage, Notice, PageHeader, QueryView, Skeleton, StoreCustomersTable, useDebouncedValue } from "@bitocard/admin-ui";
-import { type Store, useSetStoreCustomerCheckMutation, useStoreCustomersQuery, useStoresQuery } from "@bitocard/api-client/reseller";
+import { type Store, useStoreCustomersQuery, useStoresQuery, useUpdateStoreCustomerMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -11,7 +12,8 @@ function Customers({ store, canManage }: { store: Store; canManage: boolean }) {
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim());
   const customers = useStoreCustomersQuery({ storeId: store.id, ...(q ? { q } : {}), limit: 100 });
-  const [setCheck, state] = useSetStoreCustomerCheckMutation();
+  const router = useRouter();
+  const [update, state] = useUpdateStoreCustomerMutation();
   return (
     <div className="space-y-4">
       {!store.customer_verification ? <Notice tone="amber">Identity checks are off for your whole store (Store &gt; Customer identity checks), so no customer is asked whatever is set here.</Notice> : null}
@@ -26,7 +28,8 @@ function Customers({ store, canManage }: { store: Store; canManage: boolean }) {
           onSearch={setSearch}
           editable={canManage}
           hasMore={customers.data?.has_more}
-          onIdentityCheck={(customer, on) => void setCheck({ storeId: store.id, id: customer.id, identity_check: on })}
+          onIdentityCheck={(customer, on) => void update({ storeId: store.id, id: customer.id, identity_check: on })}
+          onOpen={customer => router.push(`/store/customers/${customer.id}`)}
         />
       </Card>
     </div>

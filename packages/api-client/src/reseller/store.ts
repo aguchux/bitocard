@@ -1,8 +1,8 @@
 import { bitocardApi } from '../base';
-import type { StoreCustomer, StoreCustomerFilter } from '../store-customers';
+import type { StoreCustomer, StoreCustomerDetail, StoreCustomerFilter, StoreCustomerUpdate } from '../store-customers';
 import type { List, ResellerStatus } from './common';
 
-export type { StoreCustomer } from '../store-customers';
+export type { StoreCustomer, StoreCustomerDetail } from '../store-customers';
 
 export type StoreStatus = 'draft' | 'published' | 'suspended';
 export type StoreBranding = { logo_url: string | null; primary_color: string | null; accent_color: string | null };
@@ -82,9 +82,21 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
       query: ({ storeId, ...params }) => ({ url: `/v1/stores/${storeId}/customers`, params }),
       providesTags: ['StoreCustomer'],
     }),
-    /** Turns the identity check off or on for one customer of the store. Never marks them checked. */
-    setStoreCustomerCheck: build.mutation<StoreCustomer, { storeId: string; id: string; identity_check: boolean }>({
-      query: ({ storeId, id, identity_check }) => ({ url: `/v1/stores/${storeId}/customers/${id}`, method: 'PATCH', body: { identity_check } }),
+    storeCustomer: build.query<StoreCustomerDetail, { storeId: string; id: string }>({
+      query: ({ storeId, id }) => `/v1/stores/${storeId}/customers/${id}`,
+      providesTags: ['StoreCustomer'],
+    }),
+    /** The identity check off or on (never marks them checked), or the account disabled or re-enabled. */
+    updateStoreCustomer: build.mutation<StoreCustomerDetail, { storeId: string; id: string } & StoreCustomerUpdate>({
+      query: ({ storeId, id, ...body }) => ({ url: `/v1/stores/${storeId}/customers/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['StoreCustomer'],
+    }),
+    unlockStoreCustomer: build.mutation<StoreCustomerDetail, { storeId: string; id: string }>({
+      query: ({ storeId, id }) => ({ url: `/v1/stores/${storeId}/customers/${id}/unlock`, method: 'POST' }),
+      invalidatesTags: ['StoreCustomer'],
+    }),
+    signOutStoreCustomer: build.mutation<StoreCustomerDetail, { storeId: string; id: string }>({
+      query: ({ storeId, id }) => ({ url: `/v1/stores/${storeId}/customers/${id}/sign-out`, method: 'POST' }),
       invalidatesTags: ['StoreCustomer'],
     }),
     publicCountries: build.query<List<Country>, void>({ query: () => '/v1/countries', providesTags: ['Country'] }),
@@ -103,7 +115,10 @@ export const {
   useResellerSettingsQuery,
   useSetSettingsOptionMutation,
   useStoreCustomersQuery,
-  useSetStoreCustomerCheckMutation,
+  useStoreCustomerQuery,
+  useUpdateStoreCustomerMutation,
+  useUnlockStoreCustomerMutation,
+  useSignOutStoreCustomerMutation,
   usePublicCountriesQuery,
   usePublicCountryQuery,
 } = resellerStoreApi;
