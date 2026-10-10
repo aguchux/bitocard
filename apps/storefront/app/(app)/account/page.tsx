@@ -30,15 +30,15 @@ function spent(summary: StoreCustomerSummary | null) {
 
 /** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
 export default async function AccountHome() {
-  const [{ store }, market] = await Promise.all([currentStore(), currentMarket()]);
-  // The wallet in the store's country, or on bitocard.com the shopper's market (none while they shop globally).
-  const walletCountry = store ? null : market && market !== "global" ? market : undefined;
-  const [summary, navigation, popular, recent, wallet] = await Promise.all([
+  const [{ store }, market, navigation] = await Promise.all([currentStore(), currentMarket(), storeNavigation()]);
+  // The wallet in the store's country; on bitocard.com the shopper's market, else (shopping globally) the first market,
+  // as the wallet page does.
+  const walletCountry = store ? null : market && market !== "global" ? market : (navigation.countries[0]?.code ?? null);
+  const [summary, popular, recent, wallet] = await Promise.all([
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
-    storeNavigation(),
     inMarket("/v1/store/products?sort=popular&limit=8").then(path => storeApi<StoreList<StoreProduct>>(path)),
     customerApi<StoreList<StoreCheckout>>("GET", "/v1/store/checkouts?limit=3"),
-    walletCountry === undefined ? null : walletFor(walletCountry),
+    store || walletCountry ? walletFor(walletCountry) : null,
   ]);
   const figures = summary.ok ? summary.data : null;
   const total = spent(figures);
