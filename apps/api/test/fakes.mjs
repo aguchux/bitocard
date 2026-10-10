@@ -651,6 +651,7 @@ export async function fakePawapay() {
       return { body: { payoutId: body.payoutId, status: 'ACCEPTED', created: new Date().toISOString() } };
     }
     if (method === 'POST' && path === '/v2/paymentpage') {
+      if (state.rejectPaymentPage) return { body: { depositId: body.depositId, status: 'REJECTED', failureReason: { failureCode: 'PAYMENT_NOT_APPROVED', failureMessage: 'Deposits are not enabled for this country' } } };
       if (state.refusePaymentPage) return { status: 403, body: { failureReason: { failureCode: 'AUTHORISATION_ERROR', failureMessage: 'Payment page is not enabled for this account' } } };
       state.deposits[body.depositId] = { body, status: null };
       return { body: { redirectUrl: `https://paywith.pawapay.io/?token=${body.depositId}` } };

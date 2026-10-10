@@ -234,6 +234,24 @@ describe('wallet top-ups through each gateway', () => {
     }
   });
 
+  test('pawaPay rejecting the payment page (a 200 with REJECTED): its reason is logged and admins are told', async () => {
+    await prisma.notification.deleteMany({ where: { type: 'admin.payment.gateway_refused' } });
+    await setMethods('GH', 'wallet_top_up', ['pawapay']);
+    const reseller = await verifiedReseller({ country: 'GH' });
+    pawapay.state.rejectPaymentPage = true;
+    try {
+      const refused = await reseller.browser.post('/v1/wallet/top-ups', { amount: 25000 });
+      assert.deepEqual([refused.status, refused.json.error.code], [502, 'provider_error']);
+      assert.doesNotMatch(refused.json.error.message, /pawapay|REJECTED|enabled/i);
+      const payment = await prisma.payment.findFirstOrThrow({ where: { resellerId: reseller.id }, orderBy: { createdAt: 'desc' } });
+      assert.equal(payment.status, 'failed', 'a clear refusal fails the payment');
+      const [notice] = await prisma.notification.findMany({ where: { type: 'admin.payment.gateway_refused' } });
+      assert.match(notice.body, /PAYMENT_NOT_APPROVED: Deposits are not enabled for this country\. pawaPay rejected the payment page for GH in GHS/);
+    } finally {
+      pawapay.state.rejectPaymentPage = false;
+    }
+  });
+
   test('Monnify: its payment page, settled from a notification or by the scheduled check', async () => {
     const reseller = await verifiedReseller();
     const created = await reseller.browser.post('/v1/wallet/top-ups', { amount: 1_000_000, method: 'monnify' });

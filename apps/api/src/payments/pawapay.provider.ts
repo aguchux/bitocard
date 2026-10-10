@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import { pawapayAlpha2, pawapayCountry } from '../suppliers/pawapay.adapter.js';
-import { ProviderError, providerRequest } from './provider-error.js';
+import { errorText, ProviderError, providerRequest } from './provider-error.js';
 import { type ChargeResult, type CheckoutInput, type CheckoutProvider, fromMajor, type PaymentRef, type RefundResult, toMajor, uuidFor } from './providers.js';
 
 type Found<T> = { status?: 'FOUND' | 'NOT_FOUND' | string; data?: T };
@@ -15,6 +15,8 @@ type Deposit = {
   failureReason?: { failureCode?: string; failureMessage?: string };
 };
 type Refund = { refundId: string; status?: string; failureReason?: { failureCode?: string; failureMessage?: string } };
+
+type PaymentPageReply = { redirectUrl?: string; status?: string; failureReason?: { failureCode?: string; failureMessage?: string } };
 
 type OperationConfig = { operationType?: string; status?: string };
 type ActiveConf = {
@@ -135,7 +137,7 @@ export class PawapayPaymentsProvider implements CheckoutProvider {
     const country = pawapayCountry(input.country);
     if (!country) throw new ProviderError(this.name, `no mobile money in ${input.country}`, true);
     const depositId = uuidFor('deposit', input.reference);
-    const res = await this.call<{ redirectUrl?: string }>('/v2/paymentpage', {
+    const res = await this.call<PaymentPageReply>('/v2/paymentpage', {
       method: 'POST',
       body: {
         depositId,
@@ -148,8 +150,26 @@ export class PawapayPaymentsProvider implements CheckoutProvider {
         metadata: [{ reference: input.reference }],
       },
     });
-    if (!res.redirectUrl) throw new ProviderError(this.name, 'no payment page returned', false);
+    if (!res.redirectUrl) throw this.noPaymentPage(res, input);
     return { checkoutUrl: res.redirectUrl, providerTransactionId: depositId };
+  }
+
+  /**
+   * pawaPay answered without a payment page. `REJECTED` (or a `failureReason`) is a clear refusal, with pawaPay's reason
+   * and what to check, so the payment fails and admins are told; anything else is unclear, logged with what pawaPay sent.
+   */
+  private noPaymentPage(res: PaymentPageReply, input: CheckoutInput) {
+    const status = String(res.status ?? '').toUpperCase();
+    if (status === 'REJECTED' || res.failureReason) {
+      const reason = res.failureReason ? errorText(res, '', 200) : 'no reason given';
+      return new ProviderError(
+        this.name,
+        `${reason}. pawaPay rejected the payment page for ${input.country} in ${input.currency}: check that deposits and the Payment Page are enabled on the account for this country and currency, and that the amount is within its mobile money providers' limits (pawaPay dashboard).`,
+        true,
+      );
+    }
+    const excerpt = JSON.stringify(res ?? null).slice(0, 200);
+    return new ProviderError(this.name, `no payment page returned${status ? ` (status ${status})` : ''}: ${excerpt}`, false);
   }
 
   async verify(payment: PaymentRef): Promise<ChargeResult | null> {
