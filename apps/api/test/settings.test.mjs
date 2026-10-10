@@ -21,7 +21,7 @@ describe('settings chain', () => {
     assert.equal(status, 200);
     assert.deepEqual(json.options.gift_card_payout, { value: 'wallet', allowed: ['wallet', 'bank'], source: 'country_default' });
     assert.equal(json.options.fixed_price_earning, undefined, 'discount products always sell at face value at most');
-    assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, reserved_accounts: false, own_integrations: false, customer_app_bottom_bar_desktop: false, manual_reseller_approval: false });
+    assert.deepEqual(json.features, { startup_allowance: false, welcome_bonus: false, reserved_accounts: false, own_integrations: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, manual_reseller_approval: false }, 'customer wallets are on unless switched off');
   });
 
   test('a reseller can choose only what their country allows', async () => {

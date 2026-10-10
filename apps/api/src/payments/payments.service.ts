@@ -189,7 +189,9 @@ export class PaymentsService {
   async openPayment(input: {
     resellerId: string;
     mode: LedgerMode;
-    purpose: 'wallet_top_up' | 'checkout';
+    purpose: 'wallet_top_up' | 'checkout' | 'customer_top_up';
+    /** A customer's wallet top-up: whose wallet it is credited to. */
+    customerId?: string;
     gateway: string;
     reference: string;
     amount: bigint;
@@ -209,6 +211,7 @@ export class PaymentsService {
         id: input.id,
         connectionId: input.own?.connectionId ?? null,
         resellerId: input.resellerId,
+        customerId: input.customerId ?? null,
         mode: input.mode,
         purpose: input.purpose,
         provider: provider.name,
@@ -281,7 +284,7 @@ export class PaymentsService {
     const limit = page.limit ?? 25;
     const payments = await this.prisma.payment.findMany({
       // Checkout payments and bank transfers into reserved accounts (`source` tells them apart).
-      where: { resellerId, mode, purpose: { in: ['wallet_top_up', 'reserved_account_deposit'] } },
+      where: { resellerId, mode, customerId: null, purpose: { in: ['wallet_top_up', 'reserved_account_deposit'] } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(page.starting_after ? { cursor: { id: page.starting_after }, skip: 1 } : {}),
@@ -294,7 +297,7 @@ export class PaymentsService {
    * is checked with the provider before it is returned (transfers are only recorded once they settle).
    */
   async getTopUp(resellerId: string, mode: LedgerMode, id: string) {
-    const payment = await this.prisma.payment.findFirst({ where: { id, resellerId, mode, purpose: { in: ['wallet_top_up', 'reserved_account_deposit'] } } });
+    const payment = await this.prisma.payment.findFirst({ where: { id, resellerId, mode, customerId: null, purpose: { in: ['wallet_top_up', 'reserved_account_deposit'] } } });
     if (!payment) throw notFound('top-up');
     if (payment.status !== 'pending' || payment.mode === 'test' || payment.purpose !== 'wallet_top_up') return presentTopUp(payment);
     return presentTopUp(await this.requery(payment).catch(() => payment));
@@ -320,7 +323,7 @@ export class PaymentsService {
   /** Requeries live top-ups and checkout payments still pending after a couple of minutes. Run on a schedule. */
   async requeryPending(olderThanMs = 2 * 60_000) {
     const pending = await this.prisma.payment.findMany({
-      where: { status: 'pending', purpose: { in: ['wallet_top_up', 'checkout'] }, mode: 'live', createdAt: { lt: new Date(Date.now() - olderThanMs) } },
+      where: { status: 'pending', purpose: { in: ['wallet_top_up', 'checkout', 'customer_top_up'] }, mode: 'live', createdAt: { lt: new Date(Date.now() - olderThanMs) } },
       orderBy: { createdAt: 'asc' },
       take: 100,
     });
@@ -362,8 +365,8 @@ export class PaymentsService {
   private async fail(payment: Payment, reason: string) {
     const failed = await this.prisma.$transaction(async tx => {
       const claimed = await tx.payment.updateMany({ where: { id: payment.id, status: 'pending' }, data: { status: 'failed', failureReason: reason, completedAt: new Date() } });
-      // Checkout payments are the customer's, not the reseller's: no top-up event.
-      if (claimed.count === 1 && payment.purpose !== 'checkout') await this.recordEvent(tx, 'top_up.failed', payment.id);
+      // Checkout payments and customers' wallet top-ups are the customer's, not the reseller's: no top-up event.
+      if (claimed.count === 1 && payment.purpose === 'wallet_top_up') await this.recordEvent(tx, 'top_up.failed', payment.id);
       return claimed.count === 1;
     });
     if (failed) {
@@ -391,13 +394,35 @@ export class PaymentsService {
    * The payer's money in: the reseller's topped-up funds, or for a checkout what the customer paid (held for their
    * order). The full amount is credited; the provider's fee is BitoCard's cost.
    */
-  private creditLines(payment: Pick<Payment, 'resellerId' | 'currency' | 'provider' | 'amountMinor'>, fee: bigint, to: 'reseller_funding' | 'customer_payments' = 'reseller_funding'): Line[] {
+  private creditLines(
+    payment: Pick<Payment, 'resellerId' | 'currency' | 'provider' | 'amountMinor'> & { customerId?: string | null },
+    fee: bigint,
+    to: 'reseller_funding' | 'customer_payments' = 'reseller_funding',
+  ): Line[] {
     const safeFee = fee > 0n && fee < payment.amountMinor ? fee : 0n;
+    // A customer's top-up goes to their own wallet; the gateway's fee is still BitoCard's cost.
+    const credited: Line = payment.customerId
+      ? { account: { kind: 'customer_wallet', currency: payment.currency, customerId: payment.customerId }, credit: payment.amountMinor }
+      : { account: { kind: to, currency: payment.currency, resellerId: payment.resellerId }, credit: payment.amountMinor };
     return [
       { account: { kind: 'provider_balance', currency: payment.currency, provider: payment.provider }, debit: payment.amountMinor - safeFee },
       ...(safeFee > 0n ? [{ account: { kind: 'processing_fees' as const, currency: payment.currency, provider: payment.provider }, debit: safeFee }] : []),
-      { account: { kind: to, currency: payment.currency, resellerId: payment.resellerId }, credit: payment.amountMinor },
+      credited,
     ];
+  }
+
+  /** Tells the customer their wallet was topped up (in their store's app). */
+  private async customerToppedUp(payment: { id: string; customerId: string | null; mode: LedgerMode; amountMinor: bigint; currency: string }, how: string) {
+    if (!payment.customerId) return;
+    const customer = await this.prisma.customer.findUnique({ where: { id: payment.customerId }, select: { id: true, storeId: true } });
+    if (!customer) return;
+    await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.wallet.credited', {
+      subject: payment.id,
+      title: `${formatMoney(payment.amountMinor, payment.currency)} added to your wallet`,
+      body: `Your ${how} has been confirmed and added to your wallet.`,
+      link: '/account/wallet',
+      mode: payment.mode,
+    });
   }
 
   private async credit(payment: Payment, charged: ChargeResult) {
@@ -414,12 +439,14 @@ export class PaymentsService {
       if (claimed.count === 0) await this.paidAfterClosing(payment.id, result);
       return;
     }
+    const customerTopUp = payment.purpose === 'customer_top_up';
     const entry = await this.ledger.prepare({
       mode: payment.mode,
-      type: checkout ? 'checkout_payment' : 'top_up',
+      type: checkout ? 'checkout_payment' : customerTopUp ? 'customer_top_up' : 'top_up',
       reference: `payment:${payment.id}`,
-      resellerId: payment.resellerId,
-      description: checkout ? 'Customer payment at checkout' : 'Wallet top-up',
+      // A customer's wallet is not the reseller's money: kept out of the reseller's wallet transactions.
+      resellerId: customerTopUp ? null : payment.resellerId,
+      description: checkout ? 'Customer payment at checkout' : customerTopUp ? 'Customer wallet top-up' : 'Wallet top-up',
       metadata: { payment_id: payment.id, provider: payment.provider, provider_transaction_id: result.providerTransactionId },
       lines: this.creditLines(payment, result.fee, checkout ? 'customer_payments' : 'reseller_funding'),
     });
@@ -431,12 +458,13 @@ export class PaymentsService {
         });
         if (claimed.count === 1) {
           await this.ledger.write(tx, entry);
-          if (!checkout) await this.recordEvent(tx, 'top_up.succeeded', payment.id);
+          if (payment.purpose === 'wallet_top_up') await this.recordEvent(tx, 'top_up.succeeded', payment.id);
         }
         return claimed.count === 1;
       });
       if (credited && checkout) await this.tellCheckout('paid', payment.id);
-      if (credited && !checkout) {
+      if (credited && customerTopUp) await this.customerToppedUp(payment, 'top-up');
+      if (credited && payment.purpose === 'wallet_top_up') {
         this.events.committed();
         await this.toppedUp(payment, 'top-up');
       }
@@ -485,7 +513,7 @@ export class PaymentsService {
   // -- Reserved bank accounts ------------------------------------------------------------------------------------
 
   async listReservedAccounts(resellerId: string, mode: LedgerMode) {
-    const accounts = await this.prisma.reservedAccount.findMany({ where: { resellerId, mode }, orderBy: { createdAt: 'asc' } });
+    const accounts = await this.prisma.reservedAccount.findMany({ where: { resellerId, mode, customerId: null }, orderBy: { createdAt: 'asc' } });
     return { object: 'list' as const, data: accounts.map(presentReservedAccount) };
   }
 
@@ -534,6 +562,55 @@ export class PaymentsService {
     throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'Reserved accounts are unavailable right now. Try again shortly.');
   }
 
+  /**
+   * A store customer's reserved bank account(s), through Flutterwave (the sandbox in test mode): transfers into them top
+   * up the customer's wallet in the seller's currency. Asking again returns the existing ones. In Nigeria Flutterwave
+   * needs the customer's BVN: passed to it and never kept.
+   */
+  async createCustomerReservedAccounts(input: {
+    customer: { id: string; email: string; name: string };
+    sellerId: string;
+    mode: LedgerMode;
+    country: { code: string; currency: string; reservedAccounts: boolean };
+    bvn?: string;
+  }) {
+    const { customer, mode, country } = input;
+    if (!country.reservedAccounts) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'reserved_accounts_unavailable', 'Bank account numbers are not available in your country yet. Top up with a card or mobile money instead.');
+    }
+    const existing = await this.customerReservedAccounts(customer.id, mode, country.currency);
+    if (existing.length) return existing;
+    if (mode === 'live' && country.code === 'NG' && !input.bvn) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your BVN: the bank needs it to open your account number. We do not keep it.', 'bvn');
+    }
+    const providers = mode === 'test' ? this.providers.reservedAccounts(mode, country.code, country.currency) : this.providers.reservedAccounts(mode, country.code, country.currency).filter(provider => provider.name === 'flutterwave');
+    if (providers.length === 0) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'Bank account numbers are unavailable right now. Top up with a card or mobile money instead.');
+    let refused = false;
+    for (const provider of providers) {
+      const reference = `bc_rc_${mode}_${customer.id.replaceAll('-', '')}`;
+      try {
+        const accounts = await provider.createReservedAccount({ reference, email: customer.email, name: customer.name, currency: country.currency, bvn: input.bvn });
+        await this.prisma.reservedAccount.createMany({
+          data: accounts.map(account => ({ resellerId: input.sellerId, customerId: customer.id, mode, provider: provider.name, currency: country.currency, providerReference: reference, ...account })),
+          skipDuplicates: true,
+        });
+        return this.customerReservedAccounts(customer.id, mode, country.currency);
+      } catch (error) {
+        refused ||= error instanceof ProviderError && error.definite;
+        this.logger.warn({ err: error, provider: provider.name, customerId: customer.id }, 'Customer reserved account provider failed');
+      }
+    }
+    if (refused) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'reserved_account_refused', 'The bank could not open your account number. Check your BVN and name, then try again.', 'bvn');
+    }
+    throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'Bank account numbers are unavailable right now. Try again shortly.');
+  }
+
+  /** A customer's reserved bank accounts in one mode and currency. */
+  customerReservedAccounts(customerId: string, mode: LedgerMode, currency: string) {
+    return this.prisma.reservedAccount.findMany({ where: { customerId, mode, currency }, orderBy: { createdAt: 'asc' } });
+  }
+
   /** The owner's verified BVN, held encrypted on their passed BVN check until the accounts are opened. */
   private async verifiedBvn(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
@@ -568,12 +645,12 @@ export class PaymentsService {
     if (await this.prisma.payment.findUnique({ where: { reference } })) return { credited: false, reason: 'duplicate' };
 
     const id = randomUUID();
-    const base = { resellerId: account.resellerId, currency: account.currency, provider, amountMinor: result.amount };
+    const base = { resellerId: account.resellerId, customerId: account.customerId, currency: account.currency, provider, amountMinor: result.amount };
     const entry = await this.ledger.prepare({
       mode: account.mode,
-      type: 'deposit',
+      type: account.customerId ? 'customer_deposit' : 'deposit',
       reference: `payment:${id}`,
-      resellerId: account.resellerId,
+      resellerId: account.customerId ? null : account.resellerId,
       description: `Bank transfer to ${account.bankName} ${account.accountNumber}`,
       metadata: { payment_id: id, provider, provider_transaction_id: result.providerTransactionId },
       lines: this.creditLines(base, result.fee),
@@ -595,10 +672,14 @@ export class PaymentsService {
           },
         });
         await this.ledger.write(tx, entry);
-        await this.recordEvent(tx, 'top_up.succeeded', id);
+        if (!account.customerId) await this.recordEvent(tx, 'top_up.succeeded', id);
       });
-      this.events.committed();
-      await this.toppedUp({ id, ...base, mode: account.mode }, 'bank transfer');
+      if (account.customerId) {
+        await this.customerToppedUp({ id, ...base, mode: account.mode }, 'bank transfer');
+      } else {
+        this.events.committed();
+        await this.toppedUp({ id, ...base, mode: account.mode }, 'bank transfer');
+      }
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { credited: false, reason: 'duplicate' };
       throw error;
@@ -608,7 +689,7 @@ export class PaymentsService {
 
   async simulateDeposit(resellerId: string, mode: LedgerMode, accountId: string, amount: number) {
     if (mode !== 'test') throw testModeOnly();
-    const account = await this.prisma.reservedAccount.findFirst({ where: { id: accountId, resellerId, mode: 'test' } });
+    const account = await this.prisma.reservedAccount.findFirst({ where: { id: accountId, resellerId, mode: 'test', customerId: null } });
     if (!account) throw notFound('reserved account');
     const outcome = await this.recordDeposit('sandbox', {
       status: 'succeeded',

@@ -11,7 +11,7 @@ export const optionDefinitions = {
   gift_card_payout: { values: ['wallet', 'bank'], description: 'Where customers receive money from gift cards they sell.' },
 } as const;
 
-/** Admin switches for gated features, and the scopes each can be set at. Off unless switched on. */
+/** Admin switches for gated features, and the scopes each can be set at. Off unless switched on, or `default: true`. */
 export const switchDefinitions = {
   startup_allowance: { scopes: ['global', 'country', 'reseller'], description: 'The one-time $500 startup allowance.' },
   welcome_bonus: { scopes: ['reseller'], description: 'The $1 customer welcome bonus; only ever per reseller.' },
@@ -27,6 +27,12 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Customers' account app uses the bottom tab bar on desktop too, instead of the side rail. A reseller's own choice for their store (SHQ Store) wins over this.",
   },
+  customer_wallets: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description:
+      "Store customers have a wallet: they top it up (card, mobile money, Flutterwave or their own bank account number) and buy only from it, never withdrawing. Off, they pay at checkout instead (any balance left can still be spent). On unless switched off.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
@@ -39,6 +45,8 @@ type SwitchScope = { countryCode?: string | null; resellerId?: string | null };
 
 export const isOptionKey = (key: string): key is OptionKey => key in optionDefinitions;
 export const isSwitchKey = (key: string): key is SwitchKey => key in switchDefinitions;
+/** A switch's value where no admin has set it: off, unless its definition says `default: true`. */
+export const switchDefault = (key: SwitchKey): boolean => ('default' in switchDefinitions[key] ? Boolean(switchDefinitions[key].default) : false);
 
 const unknownSetting = (param: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such setting.', param);
 
@@ -103,7 +111,7 @@ export class SettingsService {
     return { object: 'country_option' as const, country: code, key, allowed: after.allowed, default: after.defaultValue };
   }
 
-  /** Whether a switch is on for a reseller: their own switch, else their country's, else the global one. Off by default. */
+  /** Whether a switch is on for a reseller: their own switch, else their country's, else the global one, else its default. */
   async isOn(key: SwitchKey, resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const rows = await this.prisma.featureSwitch.findMany({ where: { key } });
@@ -112,7 +120,7 @@ export class SettingsService {
       pick(row => row.resellerId === resellerId) ??
       pick(row => row.countryCode !== null && row.countryCode === reseller.country) ??
       pick(row => row.countryCode === null && row.resellerId === null) ??
-      false
+      switchDefault(key)
     );
   }
 
@@ -158,7 +166,8 @@ export class SettingsService {
     const rows = await this.prisma.featureSwitch.findMany({ orderBy: [{ key: 'asc' }, { updatedAt: 'desc' }] });
     return {
       object: 'list' as const,
-      definitions: switchDefinitions,
+      /** Each switch's scopes, description and `default` (its value where nothing is set). */
+      definitions: Object.fromEntries((Object.keys(switchDefinitions) as SwitchKey[]).map(key => [key, { ...switchDefinitions[key], default: switchDefault(key) }])),
       data: rows.map(row => ({
         object: 'switch' as const,
         key: row.key,

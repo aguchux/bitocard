@@ -264,8 +264,9 @@ export const adminApi = bitocardApi.injectEndpoints({
         );
         await settleOptimistic([patch], queryFulfilled);
       },
-      // The list is small: refetched after the change (and after a refusal) so it matches the server exactly.
-      invalidatesTags: ['Switch', 'Activity'],
+      // The list is small: refetched after the change (and after a refusal) so it matches the server exactly. A reseller's
+      // own switch also changes what their page shows as on.
+      invalidatesTags: (_result, _error, { reseller_id }) => ['Switch', 'Activity', ...(reseller_id ? [{ type: 'Reseller' as const, id: reseller_id }] : [])],
     }),
     countries: build.query<List<Country>, void>({ query: () => '/v1/admin/countries', providesTags: ['Country'] }),
     /** Tax BitoCard collects per country; live sales in taxable categories need a confirmed rate. */

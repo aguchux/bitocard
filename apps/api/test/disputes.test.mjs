@@ -19,6 +19,8 @@ before(async () => {
   [stripe, flw] = await Promise.all([fakeStripe(), fakeFlutterwave()]);
   server = await startApp({ env: { ...stripe.env, ...flw.env } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  // Paying at checkout (customer wallets, on by default, are tested in customer-wallets.test.mjs).
+  await prisma.featureSwitch.create({ data: { key: 'customer_wallets', enabled: false } });
   admin = await adminClient(server);
   check = await responseChecker(server.app);
   for (const source of ['open_exchange_rates', 'flutterwave']) {

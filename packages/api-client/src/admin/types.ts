@@ -342,7 +342,8 @@ export type AdminPricePreviewArgs = {
 // -- Settings -----------------------------------------------------------------------------------------------------
 
 export type SwitchRow = { object: 'switch'; key: string; scope: 'global' | 'country' | 'reseller'; country_code: string | null; reseller_id: string | null; enabled: boolean };
-export type Switches = List<SwitchRow> & { definitions: Record<string, { scopes: string[]; description: string }> };
+/** `default`: the switch's value where no admin has set it. */
+export type Switches = List<SwitchRow> & { definitions: Record<string, { scopes: string[]; description: string; default: boolean }> };
 export type Country = {
   object: 'country';
   code: string;

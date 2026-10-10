@@ -1,10 +1,11 @@
-import { Home, LayoutGrid, ReceiptText, UserRound, type LucideIcon } from "lucide-react";
+import { Home, LayoutGrid, ReceiptText, UserRound, Wallet, type LucideIcon } from "lucide-react";
 
-/** The customer account app's four places. */
+/** The customer account app's places. */
 export const appTabs: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/account", label: "Home", icon: Home },
   { href: "/account/catalog", label: "Catalog", icon: LayoutGrid },
   { href: "/account/orders", label: "Orders", icon: ReceiptText },
+  { href: "/account/wallet", label: "Wallet", icon: Wallet },
   { href: "/account/profile", label: "Account", icon: UserRound },
 ];
 

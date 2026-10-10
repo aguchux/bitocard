@@ -37,6 +37,8 @@ export type StoreCustomerDetailView = StoreCustomerRow & {
   locked_until: string | null;
   signed_in_sessions: number;
   disputes: number;
+  /** Wallet balances (spend only, never withdrawn), per mode and currency. */
+  wallet: Array<{ mode: 'live' | 'test'; currency: string; balance: number }>;
   purchases_list: StoreCustomerPurchase[];
 };
 
@@ -184,6 +186,12 @@ export function StoreCustomerView({
                 { label: 'Last signed in', value: customer.last_sign_in_at ? formatRelative(customer.last_sign_in_at) : 'Never' },
                 { label: 'Signed in on', value: `${customer.signed_in_sessions} ${customer.signed_in_sessions === 1 ? 'device' : 'devices'}` },
                 { label: 'Disputes', value: customer.disputes.toLocaleString('en-GB') },
+                {
+                  label: 'Wallet',
+                  value: customer.wallet.length
+                    ? customer.wallet.map(item => `${formatMoney(item.balance, item.currency)}${item.mode === 'test' ? ' (test)' : ''}`).join(' · ')
+                    : 'Never topped up',
+                },
               ]}
             />
             {customer.locked_until ? <Notice tone="amber">{`Locked after too many wrong passwords until ${formatDateTime(customer.locked_until)}.`}</Notice> : null}

@@ -4,7 +4,7 @@ import { Card, CardHeader, ErrorState, errorMessage, humanise, Notice, PageHeade
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useSetSwitchMutation, useSwitchesQuery } from "@bitocard/api-client/admin";
 
-/** Global and per-country feature switches. Switches set for one reseller stay in the API for now. */
+/** Global and per-country feature switches (a reseller's own are on their page). Unset switches show their default. */
 export default function SwitchesPage() {
   const admin = useAdmin();
   const { data, error, isFetching, refetch } = useSwitchesQuery();
@@ -40,7 +40,7 @@ export default function SwitchesPage() {
                     <span className="text-sm font-medium">Everywhere (global)</span>
                     <Toggle
                       label={`${humanise(key)} globally`}
-                      checked={Boolean(value(key))}
+                      checked={value(key) ?? definition.default}
                       disabled={!editable}
                       onChange={enabled => setSwitch({ key, enabled })}
                     />
@@ -67,7 +67,7 @@ export default function SwitchesPage() {
                             ) : null}
                             <Toggle
                               label={`${humanise(key)} in ${country.name}`}
-                              checked={set ?? Boolean(value(key))}
+                              checked={set ?? value(key) ?? definition.default}
                               disabled={!editable}
                               onChange={enabled => setSwitch({ key, country_code: country.code, enabled })}
                             />

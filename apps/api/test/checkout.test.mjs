@@ -21,6 +21,8 @@ before(async () => {
   [stripe, pawapay, monnify, flw] = await Promise.all([fakeStripe(), fakePawapay(), fakeMonnify(), fakeFlutterwave()]);
   server = await startApp({ env: { ...stripe.env, ...pawapay.env, ...monnify.env, ...flw.env, CRON_SECRET: 'cron-secret' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  // Paying at checkout (customer wallets, on by default, are tested in customer-wallets.test.mjs).
+  await prisma.featureSwitch.create({ data: { key: 'customer_wallets', enabled: false } });
   admin = await adminClient(server);
   for (const source of ['open_exchange_rates', 'flutterwave']) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });

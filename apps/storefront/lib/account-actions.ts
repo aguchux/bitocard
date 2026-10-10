@@ -5,7 +5,13 @@ import { redirect } from "next/navigation";
 import { type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
-export type FormState = { error?: string; field?: string | null; notice?: string };
+export type FormState = {
+  error?: string;
+  field?: string | null;
+  notice?: string;
+  /** Paying from the wallet: the price quoted, for the customer to confirm before it is taken. */
+  preview?: { quote_id: string; amount: number; currency: string; wallet_balance: number; expires_at: string };
+};
 
 type SessionReply = { customer: Customer; session: { token: string } };
 
@@ -78,9 +84,13 @@ export async function changePassword(_state: FormState, form: FormData): Promise
   return result.ok ? { notice: "Your password has changed. Other devices have been signed out." } : failed(result);
 }
 
-type Checkout = { id: string; mode: "test" | "live"; checkout_url: string | null };
+type Checkout = { object: "checkout"; id: string; mode: "test" | "live"; checkout_url: string | null };
+type Preview = { object: "checkout_preview"; quote_id: string; amount: number; currency: string; wallet_balance: number; expires_at: string };
 
-/** Opens the payment page for the product chosen; the payment page returns to the order. */
+/**
+ * Opens the payment page for the product chosen; the payment page returns to the order. Paying from the wallet takes two
+ * steps: the price is quoted for the customer to see (`preview`), then that quote is paid (`quote_id`).
+ */
 export async function startCheckout(_state: FormState, form: FormData): Promise<FormState> {
   const recipient: Record<string, string> = {};
   for (const name of ["phone", "account_number", "email"] as const) {
@@ -90,22 +100,32 @@ export async function startCheckout(_state: FormState, form: FormData): Promise<
   // A listed value comes in minor units; an amount the customer typed, in the currency's main unit.
   const amount = text(form, "face_value_minor") ? Number(text(form, "face_value_minor")) : Math.round(Number(text(form, "face_value")) * 100);
   if (!Number.isFinite(amount) || amount <= 0) return { error: "Choose a value.", field: "face_value" };
-  const result = await customerApi<Checkout>("POST", "/v1/store/checkouts", {
+  const method = text(form, "method") || undefined;
+  const fromWallet = form.get("wallet_required") === "1" || method === "wallet";
+  const quoteId = text(form, "quote_id") || undefined;
+  const result = await customerApi<Checkout | Preview>("POST", "/v1/store/checkouts", {
     product_id: text(form, "product_id"),
     face_value: amount,
     quantity: Number(text(form, "quantity") || 1),
     country: text(form, "country"),
-    method: text(form, "method") || undefined,
+    method,
     recipient: Object.keys(recipient).length ? recipient : undefined,
     return_url: `${await siteOrigin()}/checkout/return`,
+    ...(fromWallet ? (quoteId ? { quote_id: quoteId } : { preview: true }) : {}),
   });
   if (!result.ok) {
     if (result.status === 401) redirect(`/signin?next=${encodeURIComponent(safeNext(form.get("back"), "/"))}`);
     if (result.code === "email_not_verified") redirect(`/account/verify?next=${encodeURIComponent(safeNext(form.get("back"), "/"))}`);
     if (result.code === "customer_verification_required") redirect(`/account/verification?country=${encodeURIComponent(text(form, "country"))}`);
+    // The wallet is too low: the form offers a top-up.
+    if (result.code === "wallet_balance_low") return { error: result.message, field: "wallet" };
     return failed({ ...result, param: result.param?.replace(/^recipient\./, "recipient_") ?? null });
   }
-  // Live: to the payment page. The sandbox has none: the order page simulates the payment.
+  if (result.data.object === "checkout_preview") {
+    const { quote_id, amount, currency, wallet_balance, expires_at } = result.data;
+    return { preview: { quote_id, amount, currency, wallet_balance, expires_at } };
+  }
+  // Live: to the payment page. Paid from the wallet, or in the sandbox: straight to the order.
   redirect(result.data.mode === "live" && result.data.checkout_url ? result.data.checkout_url : `/account/orders/${result.data.id}`);
 }
 

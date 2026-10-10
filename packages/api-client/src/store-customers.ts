@@ -24,6 +24,8 @@ export type StoreCustomerDetail = Omit<StoreCustomer, 'object'> & {
   locked_until: string | null;
   signed_in_sessions: number;
   disputes: number;
+  /** Wallet balances (spend only, never withdrawn), per mode and currency. */
+  wallet: Array<{ mode: 'live' | 'test'; currency: string; balance: number }>;
   purchases_list: Array<{
     id: string;
     order_id: string | null;

@@ -1689,6 +1689,7 @@
                     "reserved_accounts": true,
                     "own_integrations": false,
                     "customer_app_bottom_bar_desktop": false,
+                    "customer_wallets": true,
                     "manual_reseller_approval": false
                   }
                 }
@@ -26436,6 +26437,7 @@
               "reserved_accounts",
               "own_integrations",
               "customer_app_bottom_bar_desktop",
+              "customer_wallets",
               "manual_reseller_approval"
             ],
             "additionalProperties": false,
@@ -26459,6 +26461,10 @@
               "customer_app_bottom_bar_desktop": {
                 "type": "boolean",
                 "description": "Customers' account app uses the bottom tab bar on desktop too, instead of the side rail. A reseller's own choice for their store (SHQ Store) wins over this."
+              },
+              "customer_wallets": {
+                "type": "boolean",
+                "description": "Store customers have a wallet: they top it up (card, mobile money, Flutterwave or their own bank account number) and buy only from it, never withdrawing. Off, they pay at checkout instead (any balance left can still be spent). On unless switched off."
               },
               "manual_reseller_approval": {
                 "type": "boolean",

@@ -739,6 +739,9 @@ enum AccountKind {
   cost_of_sales
   /// Card disputes BitoCard lost and bore itself: chargeback protection, or more than the reseller's wallet held (an expense).
   chargebacks
+  /// A store customer's wallet (what BitoCard owes them): topped up through BitoCard's gateways or their reserved bank
+  /// account, spent only on the store's products, never withdrawn. Never below zero.
+  customer_wallet
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -778,9 +781,11 @@ model LedgerAccount {
   kind         AccountKind
   mode         LedgerMode
   currency     String          @db.Char(3)
-  /// reseller:<id>, provider:<name> or platform.
+  /// reseller:<id>, customer:<id>, provider:<name> or platform.
   ownerKey     String          @map("owner_key")
   resellerId   String?         @map("reseller_id") @db.Uuid
+  /// A store customer's wallet.
+  customerId   String?         @map("customer_id") @db.Uuid
   /// Natural balance in minor units: positive means money held (assets, expenses) or owed (reseller and liability accounts).
   balanceMinor BigInt          @default(0) @map("balance_minor")
   /// Reseller money can never go below zero; a posting that would do so fails.
@@ -788,9 +793,11 @@ model LedgerAccount {
   createdAt    DateTime        @default(now()) @map("created_at")
   postings     LedgerPosting[]
   reseller     Reseller?       @relation(fields: [resellerId], references: [id])
+  customer     Customer?       @relation(fields: [customerId], references: [id])
 
   @@unique([kind, mode, currency, ownerKey])
   @@index([resellerId])
+  @@index([customerId])
   @@map("ledger_accounts")
 }
 
@@ -905,6 +912,8 @@ enum PaymentPurpose {
   reserved_account_deposit
   /// A storefront customer paying for an order at checkout.
   checkout
+  /// A storefront customer topping up their wallet through a payment page.
+  customer_top_up
 }
 
 enum PaymentStatus {
@@ -917,6 +926,8 @@ enum PaymentStatus {
 model Payment {
   id                      String           @id @default(uuid()) @db.Uuid
   resellerId              String           @map("reseller_id") @db.Uuid
+  /// A customer's wallet top-up (a payment page or a transfer into their reserved account): credited to their wallet.
+  customerId              String?          @map("customer_id") @db.Uuid
   mode                    LedgerMode
   purpose                 PaymentPurpose
   /// flutterwave, monnify or sandbox.
@@ -953,12 +964,14 @@ model Payment {
   unmatchedRefundAttempts Int              @default(0) @map("unmatched_refund_attempts")
   unmatchedRefundedAt     DateTime?        @map("unmatched_refunded_at")
   reseller                Reseller         @relation(fields: [resellerId], references: [id])
+  customer                Customer?        @relation(fields: [customerId], references: [id])
   reservedAccount         ReservedAccount? @relation(fields: [reservedAccountId], references: [id])
   checkout                Checkout?
   chargebacks             Chargeback[]
 
   @@unique([provider, providerTransactionId])
   @@index([resellerId, createdAt])
+  @@index([customerId, createdAt])
   @@index([status, createdAt])
   @@index([unmatchedAt, unmatchedRefundedAt])
   @@map("payments")
@@ -968,6 +981,8 @@ model Payment {
 model ReservedAccount {
   id                String     @id @default(uuid()) @db.Uuid
   resellerId        String     @map("reseller_id") @db.Uuid
+  /// A store customer's account: transfers top up their wallet (`resellerId` is the store's seller in that market).
+  customerId        String?    @map("customer_id") @db.Uuid
   mode              LedgerMode
   provider          String
   currency          String     @db.Char(3)
@@ -978,10 +993,12 @@ model ReservedAccount {
   providerReference String     @map("provider_reference")
   createdAt         DateTime   @default(now()) @map("created_at")
   reseller          Reseller   @relation(fields: [resellerId], references: [id])
+  customer          Customer?  @relation(fields: [customerId], references: [id])
   payments          Payment[]
 
   @@unique([provider, accountNumber])
   @@index([resellerId])
+  @@index([customerId])
   @@index([providerReference])
   @@map("reserved_accounts")
 }
@@ -2128,30 +2145,33 @@ model PaymentMethod {
 
 /// A storefront customer: an account at one store only (the same email can be a customer at any other store).
 model Customer {
-  id              String                   @id @default(uuid()) @db.Uuid
-  storeId         String                   @map("store_id") @db.Uuid
+  id               String                   @id @default(uuid()) @db.Uuid
+  storeId          String                   @map("store_id") @db.Uuid
   /// Stored lower-case.
-  email           String
-  name            String
+  email            String
+  name             String
   /// Argon2id.
-  passwordHash    String                   @map("password_hash")
-  emailVerifiedAt DateTime?                @map("email_verified_at")
-  status          UserStatus               @default(active)
-  failedSignIns   Int                      @default(0) @map("failed_sign_ins")
-  lockedUntil     DateTime?                @map("locked_until")
-  lastSignInAt    DateTime?                @map("last_sign_in_at")
+  passwordHash     String                   @map("password_hash")
+  emailVerifiedAt  DateTime?                @map("email_verified_at")
+  status           UserStatus               @default(active)
+  failedSignIns    Int                      @default(0) @map("failed_sign_ins")
+  lockedUntil      DateTime?                @map("locked_until")
+  lastSignInAt     DateTime?                @map("last_sign_in_at")
   /// Asked for the identity check where it applies (true) or not: set by the store's owner. Never means checked.
-  identityCheck   Boolean                  @default(true) @map("identity_check")
-  createdAt       DateTime                 @default(now()) @map("created_at")
-  updatedAt       DateTime                 @updatedAt @map("updated_at")
-  store           Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  sessions        CustomerSession[]
-  codes           CustomerCode[]
-  checkouts       Checkout[]
-  orders          Order[]
-  notifications   Notification[]
-  devices         Device[]
-  preferences     NotificationPreference[]
+  identityCheck    Boolean                  @default(true) @map("identity_check")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  store            Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sessions         CustomerSession[]
+  codes            CustomerCode[]
+  checkouts        Checkout[]
+  orders           Order[]
+  notifications    Notification[]
+  devices          Device[]
+  preferences      NotificationPreference[]
+  ledgerAccounts   LedgerAccount[]
+  payments         Payment[]
+  reservedAccounts ReservedAccount[]
 
   @@unique([storeId, email])
   @@map("customers")

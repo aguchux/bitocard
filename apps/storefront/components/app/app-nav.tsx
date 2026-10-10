@@ -13,7 +13,7 @@ export function AppNav({ desktopNav }: { desktopNav: "rail" | "bottom" }) {
   const rail = desktopNav === "rail";
   return (
     <nav aria-label="Account" className={`fixed inset-x-0 bottom-0 z-30 border-t border-slate-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur ${rail ? "lg:hidden" : ""}`}>
-      <ul className="mx-auto grid h-16 max-w-xl grid-cols-4">
+      <ul className="mx-auto grid h-16 max-w-xl grid-cols-5">
         {appTabs.map(tab => {
           const current = active === tab.href;
           return (

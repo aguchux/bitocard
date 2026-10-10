@@ -5,7 +5,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
-import type { Checkout, CheckoutStatus, Order, OrderDelivery, Payment, Product, ProductCategory, Store } from '../generated/prisma/client.js';
+import { type Checkout, type CheckoutStatus, type Order, type OrderDelivery, type Payment, Prisma, type Product, type ProductCategory, type Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
@@ -17,6 +17,7 @@ import { presentMethod } from '../payments/payment-methods.service.js';
 import { isPaymentGateway } from '../payments/payment-providers.js';
 import { paymentRef, PaymentsService } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
+import { CustomerWalletsService, walletMethod } from './customer-wallets.js';
 import { type PaymentOption, StoreSellers } from './store-sellers.js';
 
 const minute = 60 * 1000;
@@ -48,7 +49,14 @@ export type CheckoutInput = {
   method?: string;
   recipient?: { phone?: string; account_number?: string; transaction_type?: 'change' | 'renew'; email?: string };
   return_url: string;
+  /** Paying from the wallet: only quote the price (nothing is paid), for the customer to confirm. */
+  preview?: boolean;
+  /** Paying from the wallet: the quote the customer confirmed (from `preview`). */
+  quote_id?: string;
 };
+
+const quoteGone = () =>
+  new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'quote_expired', 'The price has changed or expired. Check the new price and confirm again.', 'quote_id');
 
 /**
  * Customers buying on a store: the price is quoted and locked, the customer pays it on the gateway's payment page, and
@@ -83,6 +91,7 @@ export class CheckoutService implements OnModuleInit {
     private readonly fees: PlatformFeesService,
     private readonly identity: IdentityService,
     private readonly inbox: InboxService,
+    private readonly customerWallets: CustomerWalletsService,
   ) {}
 
   onModuleInit() {
@@ -129,7 +138,11 @@ export class CheckoutService implements OnModuleInit {
       /** Charged by the gateway in another currency (cards in US dollars where Stripe cannot take this one); null otherwise. */
       charged: checkout.payment?.chargeCurrency && checkout.payment.chargeAmountMinor ? { amount: minor(checkout.payment.chargeAmountMinor), currency: checkout.payment.chargeCurrency } : null,
       tax: checkout.quote.taxName ? { name: checkout.quote.taxName, amount: minor(checkout.quote.taxMinor) } : null,
-      method: isPaymentGateway(checkout.gateway) ? presentMethod(checkout.gateway) : { object: 'payment_method' as const, id: checkout.gateway, label: 'Sandbox', description: 'Simulated payment' },
+      method: isPaymentGateway(checkout.gateway)
+        ? presentMethod(checkout.gateway)
+        : checkout.gateway === 'wallet'
+          ? walletMethod
+          : { object: 'payment_method' as const, id: checkout.gateway, label: 'Sandbox', description: 'Simulated payment', networks: [] as string[] },
       checkout_url: checkout.status === 'awaiting_payment' && checkout.payment?.status === 'pending' ? checkout.payment.checkoutUrl : null,
       recipient: checkout.quote.recipient ?? null,
       order: checkout.order
@@ -150,14 +163,18 @@ export class CheckoutService implements OnModuleInit {
 
   // -- Customers -------------------------------------------------------------------------------------------------
 
-  /** How customers can pay on a store, best first (bitocard.com: in the country given; a reseller's store: theirs). */
+  /**
+   * How customers can pay on a store, best first (bitocard.com: in the country given; a reseller's store: theirs). With
+   * wallets on (`wallet_required`), only the wallet: customers top it up (the wallet's own methods) and buy from it.
+   */
   async methodsFor(store: Store, countryCode: string) {
     const mode = this.stores.mode(store);
     const seller = await this.sellerOrNull(store, countryCode);
+    if (seller && (await this.customerWallets.enabled(seller))) return { object: 'list' as const, mode, wallet_required: true, data: [walletMethod] };
     const options = seller ? await this.stores.paymentOptions(store, seller, mode) : [];
     const country = seller?.country ? await this.prisma.country.findUnique({ where: { code: seller.country } }) : null;
     const shown = options.filter(option => option.gateway !== 'sandbox');
-    return { object: 'list' as const, mode, data: country ? await Promise.all(shown.map(option => this.stores.describe(option, country))) : [] };
+    return { object: 'list' as const, mode, wallet_required: false, data: country ? await Promise.all(shown.map(option => this.stores.describe(option, country))) : [] };
   }
 
   private async sellerOrNull(store: Store, countryCode: string) {
@@ -192,25 +209,55 @@ export class CheckoutService implements OnModuleInit {
     const listed = product && (this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } }));
     if (!product || !listed) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');
 
-    const option = this.choose(await this.stores.paymentOptions(store, seller, mode), mode, input.method);
+    // Wallets on: the customer buys only from their wallet. Off: at checkout, or from a balance they still have.
+    const walletsOn = await this.customerWallets.enabled(seller);
+    if (walletsOn && input.method && input.method !== 'wallet') {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'payment_method_unavailable', 'This store takes payment from your wallet: top it up, then buy.', 'method');
+    }
+    const fromWallet = walletsOn || input.method === 'wallet';
+    const option: PaymentOption = fromWallet ? { gateway: 'sandbox' } : this.choose(await this.stores.paymentOptions(store, seller, mode), mode, input.method);
 
     // Codes and licence keys are also emailed to the customer, unless they named another address.
     const recipient = { ...input.recipient };
     if (emailedCategories.has(product.category) && !recipient.email) recipient.email = customer.email;
-    const presented = await this.quotes.create(
-      seller.id,
-      mode,
-      { product_id: product.id, face_value: input.face_value, quantity: input.quantity, recipient, customer_reference: customer.id },
-      // Products from the reseller's own supplier can only be paid into their own gateway.
-      { ownSources: Boolean(option.own) },
-    );
-    const quote = await this.prisma.quote.findUniqueOrThrow({ where: { id: presented.id } });
+    if ((input.preview || input.quote_id) && !fromWallet) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Prices are confirmed on the payment page when paying by another method.', input.quote_id ? 'quote_id' : 'preview');
+    }
+    let quote;
+    if (input.quote_id) {
+      // The price the customer saw and confirmed: still theirs, for this product, open and unexpired.
+      quote = await this.prisma.quote.findUnique({ where: { id: input.quote_id } });
+      if (!quote || quote.resellerId !== seller.id || quote.mode !== mode || quote.customerReference !== customer.id || quote.productId !== product.id || quote.status !== 'open' || quote.expiresAt <= new Date()) {
+        throw quoteGone();
+      }
+    } else {
+      const presented = await this.quotes.create(
+        seller.id,
+        mode,
+        { product_id: product.id, face_value: input.face_value, quantity: input.quantity, recipient, customer_reference: customer.id },
+        // Products from the reseller's own supplier can only be paid into their own gateway.
+        { ownSources: Boolean(option.own) },
+      );
+      quote = await this.prisma.quote.findUniqueOrThrow({ where: { id: presented.id } });
+    }
     // Asked after quoting: on bitocard.com it can depend on the supplier the order is routed to.
     if ((await this.identityCheckNeeded(customer, seller, product.category, quote.supplierCode)) && !(await this.identity.isCustomerVerified(seller.id, mode, customer.id))) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before buying this. It takes a few minutes and is needed once.');
     }
 
+    if (input.preview) {
+      return {
+        object: 'checkout_preview' as const,
+        quote_id: quote.id,
+        amount: minor(quote.priceMinor),
+        currency: quote.currency,
+        tax: quote.taxName ? { name: quote.taxName, amount: minor(quote.taxMinor) } : null,
+        expires_at: quote.expiresAt.toISOString(),
+        wallet_balance: minor(await this.customerWallets.balance(customer.id, mode, quote.currency)),
+      };
+    }
     const id = randomUUID();
+    if (fromWallet) return this.payFromWallet({ id, store, customer, seller, mode, quote, productName: product.name });
     const paymentId = randomUUID();
     let feeChargeId: string | null = null;
     if (option.own) feeChargeId = await this.holdGatewayFee(seller.id, mode, quote, paymentId, product.name);
@@ -254,6 +301,71 @@ export class CheckoutService implements OnModuleInit {
       if (feeChargeId) await this.fees.release(feeChargeId).catch(err => this.logger.error({ err, checkoutId: id }, 'Fee hold not released'));
       throw error;
     }
+    return this.present((await this.load({ id }))!);
+  }
+
+  /**
+   * Pays a checkout from the customer's wallet: in one step the price leaves their wallet for the seller's
+   * `customer_payments` (exactly as a gateway payment arrives) and the checkout is paid; then the order is placed as
+   * usual. A wallet too low refuses it, saying how much to add, and nothing is kept.
+   */
+  private async payFromWallet(input: {
+    id: string;
+    store: Store;
+    customer: CustomerWithStore;
+    seller: { id: string };
+    mode: Checkout['mode'];
+    quote: { id: string; priceMinor: bigint; currency: string; quantity: number };
+    productName: string;
+  }) {
+    const { id, customer, seller, mode, quote } = input;
+    const balance = await this.customerWallets.balance(customer.id, mode, quote.currency);
+    const short = () =>
+      new ApiError(
+        HttpStatus.PAYMENT_REQUIRED,
+        'invalid_request_error',
+        'wallet_balance_low',
+        `Your wallet has ${formatMoney(balance, quote.currency)}. Add ${formatMoney(quote.priceMinor - balance > 0n ? quote.priceMinor - balance : quote.priceMinor, quote.currency)} to buy this.`,
+      );
+    if (balance < quote.priceMinor) throw short();
+    const entry = await this.ledger.prepare({
+      mode,
+      type: 'wallet_purchase',
+      reference: `wallet_purchase:${id}`,
+      resellerId: seller.id,
+      description: quote.quantity > 1 ? `Paid from wallet: ${quote.quantity} x ${input.productName}` : `Paid from wallet: ${input.productName}`,
+      metadata: { checkout_id: id },
+      lines: [
+        { account: { kind: 'customer_wallet', currency: quote.currency, customerId: customer.id }, debit: quote.priceMinor },
+        { account: { kind: 'customer_payments', currency: quote.currency, resellerId: seller.id }, credit: quote.priceMinor },
+      ],
+    });
+    try {
+      await this.prisma.$transaction(async tx => {
+        await tx.checkout.create({
+          data: {
+            id,
+            storeId: input.store.id,
+            customerId: customer.id,
+            resellerId: seller.id,
+            mode,
+            quoteId: quote.id,
+            gateway: 'wallet',
+            amountMinor: quote.priceMinor,
+            currency: quote.currency,
+            status: 'paid',
+          },
+        });
+        await this.ledger.write(tx, entry);
+      });
+    } catch (error) {
+      // Spent meanwhile (another purchase): nothing was written.
+      if (error instanceof ApiError && error.code === 'insufficient_funds') throw short();
+      // The same quote paid twice at once: the first one won.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw quoteGone();
+      throw error;
+    }
+    await this.placeOrder(id);
     return this.present((await this.load({ id }))!);
   }
 
@@ -486,7 +598,7 @@ export class CheckoutService implements OnModuleInit {
       await this.inbox.customer(recipient, 'customer.order.failed', {
         subject: checkout.id,
         title: `${product.name} could not be delivered`,
-        body: `We could not complete your order, so we are refunding ${formatMoney(checkout.amountMinor, checkout.currency)} to how you paid.`,
+        body: `We could not complete your order, so we are refunding ${formatMoney(checkout.amountMinor, checkout.currency)} to ${checkout.gateway === 'wallet' ? 'your wallet' : 'how you paid'}.`,
         link: `/account/orders/${checkout.id}`,
         mode: checkout.mode,
       });
@@ -511,7 +623,13 @@ export class CheckoutService implements OnModuleInit {
    * once (the refund's ID is kept), checked until the gateway confirms it, then booked. Never throws.
    */
   async refund(checkoutId: string) {
-    const checkout = await this.prisma.checkout.findUnique({ where: { id: checkoutId }, include: { payment: true } });
+    const found = await this.prisma.checkout.findUnique({ where: { id: checkoutId }, include: { payment: true } });
+    // Paid from the wallet: straight back to it (no gateway).
+    if (found?.status === 'refund_pending' && found.gateway === 'wallet') {
+      await this.refunded(found.id);
+      return (await this.prisma.checkout.findUniqueOrThrow({ where: { id: found.id } })).status;
+    }
+    const checkout = found;
     if (!checkout || checkout.status !== 'refund_pending' || !checkout.payment) return checkout?.status ?? null;
     const payment = checkout.payment;
     const provider = await this.payments.providerFor(payment);
@@ -559,8 +677,9 @@ export class CheckoutService implements OnModuleInit {
 
   private async refunded(checkoutId: string) {
     const checkout = await this.prisma.checkout.findUniqueOrThrow({ where: { id: checkoutId }, include: { payment: true } });
-    // Paid through BitoCard's gateway: what the customer paid leaves `customer_payments`. The reseller's own gateway
-    // never touched BitoCard's ledger.
+    // Paid through BitoCard's gateway: what the customer paid leaves `customer_payments` (to the gateway, or back to the
+    // customer's wallet when they paid from it). The reseller's own gateway never touched BitoCard's ledger.
+    const toWallet = checkout.gateway === 'wallet';
     const entry = checkout.connectionId
       ? null
       : await this.ledger.prepare({
@@ -572,7 +691,9 @@ export class CheckoutService implements OnModuleInit {
           metadata: { checkout_id: checkout.id, payment_id: checkout.paymentId },
           lines: [
             { account: { kind: 'customer_payments', currency: checkout.currency, resellerId: checkout.resellerId }, debit: checkout.amountMinor },
-            { account: { kind: 'provider_balance', currency: checkout.currency, provider: checkout.payment!.provider }, credit: checkout.amountMinor },
+            toWallet
+              ? { account: { kind: 'customer_wallet', currency: checkout.currency, customerId: checkout.customerId }, credit: checkout.amountMinor }
+              : { account: { kind: 'provider_balance', currency: checkout.currency, provider: checkout.payment!.provider }, credit: checkout.amountMinor },
           ],
         });
     const done = await this.prisma.$transaction(async tx => {
@@ -588,7 +709,7 @@ export class CheckoutService implements OnModuleInit {
     await this.inbox.customer({ customerId: checkout.customerId, storeId: checkout.storeId }, 'customer.order.refunded', {
       subject: checkout.id,
       title: `${formatMoney(checkout.amountMinor, checkout.currency)} refunded`,
-      body: 'Your refund has been sent to how you paid. Banks and mobile money providers can take a few days to show it.',
+      body: toWallet ? 'Your refund is back in your wallet, ready to spend.' : 'Your refund has been sent to how you paid. Banks and mobile money providers can take a few days to show it.',
       link: `/account/orders/${checkout.id}`,
       mode: checkout.mode,
     });

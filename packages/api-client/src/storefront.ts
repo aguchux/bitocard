@@ -176,7 +176,56 @@ export function formatFace(minor: number, currency: string) {
 /** A way customers in a market can pay (`/v1/store/payment-methods?country=`). */
 /** `networks`: the mobile money networks payers in the country can pay from (MTN, Telecel…); empty for cards and bank. */
 export type StorePaymentMethod = { object: 'payment_method'; id: string; label: string; description: string; networks: string[] };
-export type StorePaymentMethods = { object: 'list'; mode: 'live' | 'test'; data: StorePaymentMethod[] };
+/** With wallets on (`wallet_required`) the only method is `wallet`: customers top their wallet up, then buy from it. */
+export type StorePaymentMethods = { object: 'list'; mode: 'live' | 'test'; wallet_required?: boolean; data: StorePaymentMethod[] };
+
+/** A customer's own bank account number: transfers into it top the wallet up. */
+export type StoreReservedAccount = { object: 'reserved_account'; id: string; currency: string; bank_name: string; account_number: string; account_name: string };
+
+/** A store customer's wallet in one market: spent only on the store's products, never withdrawn. */
+export type StoreWallet = {
+  object: 'customer_wallet';
+  mode: 'live' | 'test';
+  country: string;
+  currency: string;
+  /** Wallets are on for this store: purchases are paid only from the wallet. */
+  enabled: boolean;
+  balance: number;
+  top_up_methods: StorePaymentMethod[];
+  reserved_accounts: StoreReservedAccount[];
+  reserved_accounts_available: boolean;
+  reserved_account_needs_bvn: boolean;
+};
+
+export type StoreWalletTopUp = {
+  object: 'customer_top_up';
+  id: string;
+  mode: 'live' | 'test';
+  status: 'pending' | 'succeeded' | 'failed';
+  source: 'checkout' | 'bank_transfer';
+  amount: number;
+  currency: string;
+  method: { id: string; label: string };
+  charged: { amount: number; currency: string } | null;
+  checkout_url: string | null;
+  failure_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type StoreWalletTransaction = {
+  object: 'wallet_transaction';
+  id: string;
+  /** customer_top_up, customer_deposit, wallet_purchase or checkout_refund. */
+  type: string;
+  description: string;
+  /** Positive in, negative out. */
+  amount: number;
+  currency: string;
+  checkout_id: string | null;
+  top_up_id: string | null;
+  created_at: string;
+};
 
 export type CheckoutStatus = 'awaiting_payment' | 'paid' | 'completed' | 'failed' | 'refund_pending' | 'refunded';
 

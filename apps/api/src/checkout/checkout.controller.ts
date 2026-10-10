@@ -79,6 +79,10 @@ class CheckoutListDto extends PageDto {
 class CountryQueryDto {
   @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
   country: string;
+
+  /** The store's subdomain (how the store's server names it on cacheable reads; read by `StoreKey`). */
+  @IsOptional() @IsString() @Length(1, 63)
+  store?: string;
 }
 
 class RecipientDto {
@@ -110,7 +114,8 @@ class StartCheckoutDto {
   @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
   country: string;
 
-  @IsOptional() @IsIn(Object.keys(paymentGateways))
+  /** A gateway, or `wallet` (the only one while the store's wallets are on). */
+  @IsOptional() @IsIn([...Object.keys(paymentGateways), 'wallet'])
   method?: string;
 
   @IsOptional() @ValidateNested() @Type(() => RecipientDto)
@@ -119,6 +124,14 @@ class StartCheckoutDto {
   /** The store page the payment page returns the customer to (the checkout's ID is added). */
   @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
   return_url: string;
+
+  /** Paying from the wallet: quote the price only (nothing is paid), for the customer to confirm. */
+  @IsOptional() @IsBoolean()
+  preview?: boolean;
+
+  /** Paying from the wallet: the quote the customer confirmed (from `preview`). */
+  @IsOptional() @IsUUID()
+  quote_id?: string;
 }
 
 class SimulateDto {

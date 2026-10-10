@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { formatFace, type StorePaymentMethods, type StoreProductDetail } from "@bitocard/api-client/storefront";
 import { BuyForm } from "@/components/store/buy-form";
+import { walletFor } from "@/lib/wallet";
 import { BrandArt, ProductCard, priceLabel } from "@/components/store/product-card";
 import { FeatureIcons } from "@/components/store/features";
 import { CategoryIcon, categoryArt } from "@/components/store/category-icon";
@@ -48,7 +49,10 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
   // Where the customer pays from: their chosen market, else the product's own country (worldwide products ask).
   // A reseller's store sells in its own country only.
   const country = store?.country ? store.country : market && market !== "global" ? market : product.global ? null : product.country;
-  const methods = country ? await storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }) : null;
+  const [methods, wallet] = await Promise.all([
+    country ? storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }) : null,
+    customer && country ? walletFor(store?.country ? null : country) : null,
+  ]);
 
   return (
     <div className="space-y-8 sm:space-y-12">
@@ -136,11 +140,13 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
             country={country}
             lockCountry={Boolean(store?.country)}
             methods={methods?.ok ? methods.data.data : []}
+            walletRequired={methods?.ok ? Boolean(methods.data.wallet_required) : false}
+            wallet={wallet}
             signedIn={Boolean(customer)}
             back={`${base}/${encodeURIComponent(product.key)}`}
             sandbox={methods?.ok ? methods.data.mode === "test" : false}
           />
-          <p className="mt-2 text-sm text-slate-500">Values shown are what the product is worth; your price is confirmed on the payment page.</p>
+          <p className="mt-2 text-sm text-slate-500">Values shown are what the product is worth; you see your price before you pay.</p>
 
           <div className="mt-6 flex gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
             <Info className="mt-0.5 size-5 shrink-0 text-slate-500" aria-hidden="true" />

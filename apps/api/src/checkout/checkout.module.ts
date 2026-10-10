@@ -11,6 +11,7 @@ import { ResellerIntegrationsModule } from '../reseller-integrations/reseller-in
 import { SettingsModule } from '../settings/settings.module.js';
 import { CheckoutController, CustomerAccountController } from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
+import { CustomerWalletController, CustomerWalletsService } from './customer-wallets.js';
 import { HouseService } from './house.service.js';
 import { AdminStoreCustomersController, StoreCustomersService, StoreCustomersController } from './store-customers.js';
 import { StoreSellers } from './store-sellers.js';
@@ -18,8 +19,8 @@ import { StoreSellers } from './store-sellers.js';
 /** Store customers (accounts and sign-in) and checkout on hosted stores: bitocard.com and resellers' stores. */
 @Module({
   imports: [AuthModule, CatalogueModule, FeesModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule],
-  controllers: [CustomerAccountController, CheckoutController, StoreCustomersController, AdminStoreCustomersController],
-  providers: [CustomersService, CustomerGuard, CheckoutService, HouseService, StoreSellers, StoreCustomersService],
+  controllers: [CustomerAccountController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController],
+  providers: [CustomersService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
   exports: [CheckoutService, HouseService, CustomersService, StoreSellers],
 })
 export class CheckoutModule {}

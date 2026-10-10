@@ -6,7 +6,7 @@ import { type AccountKind, type LedgerMode, Prisma } from '../generated/prisma/c
 export type Tx = Prisma.TransactionClient;
 
 /** Which account: its kind and currency, and its owner (a reseller, a payment provider, or BitoCard itself). */
-export type AccountRef = { kind: AccountKind; currency: string; resellerId?: string; provider?: string };
+export type AccountRef = { kind: AccountKind; currency: string; resellerId?: string; customerId?: string; provider?: string };
 
 /** One side of an entry. Exactly one of debit or credit, a positive amount in minor units. */
 export type Line = { account: AccountRef; debit?: bigint; credit?: bigint };
@@ -28,11 +28,17 @@ export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ acco
 /** Assets and expenses grow with debits; every other account (what BitoCard owes, revenue, tax) grows with credits. */
 const debitNormal = new Set<AccountKind>(['provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales', 'promotions']);
 const resellerKinds = new Set<AccountKind>(['reseller_funding', 'reseller_earnings', 'reseller_earnings_held', 'reseller_reserved', 'reseller_payouts_pending', 'reseller_allowance', 'customer_payments']);
+/** A store customer's own money: their wallet, never below zero. */
+const customerKinds = new Set<AccountKind>(['customer_wallet']);
 
 export const insufficientFunds = () =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'insufficient_funds', 'The wallet balance is too low for this.');
 
 function ownerKey(ref: AccountRef) {
+  if (customerKinds.has(ref.kind)) {
+    if (!ref.customerId) throw new Error(`${ref.kind} needs a customer`);
+    return `customer:${ref.customerId}`;
+  }
   if (resellerKinds.has(ref.kind)) {
     if (!ref.resellerId) throw new Error(`${ref.kind} needs a reseller`);
     return `reseller:${ref.resellerId}`;
@@ -58,7 +64,12 @@ export class LedgerService {
     if (existing) return existing.id;
     try {
       const created = await this.prisma.ledgerAccount.create({
-        data: { ...key, resellerId: resellerKinds.has(ref.kind) ? ref.resellerId : null, nonNegative: resellerKinds.has(ref.kind) },
+        data: {
+          ...key,
+          resellerId: resellerKinds.has(ref.kind) ? ref.resellerId : null,
+          customerId: customerKinds.has(ref.kind) ? ref.customerId : null,
+          nonNegative: resellerKinds.has(ref.kind) || customerKinds.has(ref.kind),
+        },
         select: { id: true },
       });
       return created.id;
@@ -88,7 +99,7 @@ export class LedgerService {
     return { mode: input.mode, type: input.type, reference: input.reference, resellerId: input.resellerId, description: input.description, metadata: input.metadata, postings };
   }
 
-  /** Writes a prepared entry inside `tx`. Throws insufficient_funds (and so rolls back `tx`) if a reseller account would go negative. */
+  /** Writes a prepared entry inside `tx`. Throws insufficient_funds (and so rolls back `tx`) if a reseller or customer account would go negative. */
   async write(tx: Tx, entry: PreparedEntry) {
     const created = await tx.journalEntry.create({
       data: {

@@ -10,6 +10,7 @@ import type { Customer, Prisma } from '../generated/prisma/client.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { desktopNavFor } from '../stores/stores.service.js';
+import { CustomerWalletsService } from './customer-wallets.js';
 import { HouseService, houseStoreId } from './house.service.js';
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such customer.');
@@ -51,6 +52,7 @@ export class StoreCustomersService {
     private readonly audit: AuditService,
     private readonly house: HouseService,
     private readonly settings: SettingsService,
+    private readonly wallets: CustomerWalletsService,
   ) {}
 
   async list(storeId: string, filter: { q?: string; limit?: number; starting_after?: string }) {
@@ -90,6 +92,8 @@ export class StoreCustomersService {
       locked_until: customer.lockedUntil && customer.lockedUntil > new Date() ? customer.lockedUntil.toISOString() : null,
       signed_in_sessions: sessions,
       disputes,
+      /** The customer's wallet balances (spend only, never withdrawn), per mode and currency. */
+      wallet: await this.wallets.balances(id),
       purchases_list: checkouts.map(checkout => {
         const quote = quotes.find(row => row.id === checkout.quoteId);
         return {

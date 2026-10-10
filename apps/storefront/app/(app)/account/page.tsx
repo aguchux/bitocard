@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag } from "lucide-react";
+import { ChevronRight, PackageCheck, Plus, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
-import { inMarket } from "@/lib/market";
+import { currentMarket, inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
+import { currentStore } from "@/lib/store";
+import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
 
@@ -28,11 +30,15 @@ function spent(summary: StoreCustomerSummary | null) {
 
 /** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
 export default async function AccountHome() {
-  const [summary, navigation, popular, recent] = await Promise.all([
+  const [{ store }, market] = await Promise.all([currentStore(), currentMarket()]);
+  // The wallet in the store's country, or on bitocard.com the shopper's market (none while they shop globally).
+  const walletCountry = store ? null : market && market !== "global" ? market : undefined;
+  const [summary, navigation, popular, recent, wallet] = await Promise.all([
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
     storeNavigation(),
     inMarket("/v1/store/products?sort=popular&limit=8").then(path => storeApi<StoreList<StoreProduct>>(path)),
     customerApi<StoreList<StoreCheckout>>("GET", "/v1/store/checkouts?limit=3"),
+    walletCountry === undefined ? null : walletFor(walletCountry),
   ]);
   const figures = summary.ok ? summary.data : null;
   const total = spent(figures);
@@ -57,6 +63,22 @@ export default async function AccountHome() {
           </li>
         </ul>
       </section>
+
+      {wallet && (wallet.enabled || wallet.balance > 0) ? (
+        <section aria-label="Wallet" className="flex flex-wrap items-center gap-4 rounded-3xl bg-[#070f4c] p-5 text-white">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/10">
+            <Wallet className="size-6" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm text-white/70">Wallet balance{wallet.mode === "test" ? " (test)" : ""}</span>
+            <span className="block font-display text-2xl font-extrabold">{amount(wallet.balance, wallet.currency)}</span>
+          </span>
+          <Link href={`/account/wallet${walletCountry ? `?country=${walletCountry}` : ""}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold hover:bg-[#e8116d]">
+            {wallet.enabled ? <Plus className="size-4" aria-hidden="true" /> : null}
+            {wallet.enabled ? "Top up" : "Open wallet"}
+          </Link>
+        </section>
+      ) : null}
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />

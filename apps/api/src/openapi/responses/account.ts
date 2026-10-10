@@ -277,7 +277,7 @@ export const accountDocs: DocsArea = {
       status: 200,
       description: 'Your settings.',
       schema: 'Settings',
-      example: { object: 'settings', options: exampleOptions, features: { startup_allowance: true, welcome_bonus: false, reserved_accounts: true, own_integrations: false, customer_app_bottom_bar_desktop: false, manual_reseller_approval: false } },
+      example: { object: 'settings', options: exampleOptions, features: { startup_allowance: true, welcome_bonus: false, reserved_accounts: true, own_integrations: false, customer_app_bottom_bar_desktop: false, customer_wallets: true, manual_reseller_approval: false } },
     },
     'PUT /v1/settings/options/{key}': {
       status: 200,

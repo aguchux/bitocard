@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useActionState, useId, useState, useTransition } from "react";
-import { Lock } from "lucide-react";
-import { formatFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail } from "@bitocard/api-client/storefront";
+import { Lock, Wallet } from "lucide-react";
+import { formatFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
 import { type FormState, startCheckout } from "@/lib/account-actions";
-import { paymentMethodsFor } from "@/lib/payment-methods";
+import { type PaymentChoice, paymentMethodsFor } from "@/lib/payment-methods";
 import { FormMessage, Submit, TextField } from "./account-forms";
 
 /** Bought several at a time, each its own code. */
@@ -16,9 +16,15 @@ const emailed = new Set(["gift_cards", "software"]);
 const optionClass =
   "flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-display font-bold text-[#070f4c] has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#ff2382]/40";
 
+const walletOption: StorePaymentMethod = { object: "payment_method", id: "wallet", label: "Wallet", description: "Pay from your wallet balance", networks: [] };
+
+/** The wallet page for a country (bitocard.com; a reseller's store has one), coming back here. */
+const topUpHref = (country: string | null, back: string) => `/account/wallet?${new URLSearchParams({ ...(country ? { country } : {}), back }).toString()}`;
+
 /**
- * Buying on a product page: the value, how many, who it is for, where the customer pays from and how. The price is
- * confirmed on the payment page; signing in comes first.
+ * Buying on a product page: the value, how many, who it is for, where the customer pays from and how. With wallets on
+ * the customer pays from their wallet (topping it up first); otherwise the price is confirmed on the payment page, and
+ * a balance left in the wallet can still be spent. Signing in comes first.
  */
 export function BuyForm({
   product,
@@ -26,6 +32,8 @@ export function BuyForm({
   country,
   lockCountry = false,
   methods,
+  walletRequired = false,
+  wallet = null,
   signedIn,
   back,
   sandbox,
@@ -36,6 +44,10 @@ export function BuyForm({
   /** A reseller's store sells in its own country: no choice of where to pay from. */
   lockCountry?: boolean;
   methods: StorePaymentMethod[];
+  /** Wallets are on: the wallet is the only way to pay. */
+  walletRequired?: boolean;
+  /** The signed-in customer's wallet in `country`. */
+  wallet?: StoreWallet | null;
   signedIn: boolean;
   back: string;
   sandbox: boolean;
@@ -47,14 +59,20 @@ export function BuyForm({
   // The country the last attempt was for: its error is hidden once the shopper picks another country.
   const [tried, setTried] = useState(market);
   // The payment methods for the country chosen: the page's own country comes with the page; another is asked for.
-  const [shown, setShown] = useState<{ country: string | null; methods: StorePaymentMethod[] }>({ country, methods });
+  const [shown, setShown] = useState<PaymentChoice & { country: string | null }>({ country, methods, walletRequired, wallet });
   const [loadingMethods, startLoading] = useTransition();
   const chooseMarket = (next: string) => {
     setMarket(next);
     if (next === shown.country) return;
-    if (next === country) return setShown({ country, methods });
-    startLoading(async () => setShown({ country: next, methods: await paymentMethodsFor(next) }));
+    if (next === country) return setShown({ country, methods, walletRequired, wallet });
+    startLoading(async () => setShown({ country: next, ...(await paymentMethodsFor(next)) }));
   };
+  // A balance left after wallets were switched off can still be spent.
+  const offered = !shown.walletRequired && shown.wallet && shown.wallet.balance > 0 ? [walletOption, ...shown.methods] : shown.methods;
+  const payingFromWallet = shown.walletRequired || (offered[0]?.id === "wallet" && offered.length === 1);
+  // The price quoted for paying from the wallet, until the customer changes anything in the form.
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const preview = market === tried && state.preview && state.preview.quote_id !== dismissed ? state.preview : null;
 
   if (!signedIn) {
     return (
@@ -74,10 +92,17 @@ export function BuyForm({
   }
 
   return (
-    <form action={action} onSubmit={() => setTried(market)} className="mt-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Buy ${product.name}`}>
+    <form action={action} onSubmit={() => setTried(market)} onChange={() => state.preview && setDismissed(state.preview.quote_id)} className="mt-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Buy ${product.name}`}>
       <input type="hidden" name="product_id" value={product.id} />
       <input type="hidden" name="back" value={back} />
+      {shown.walletRequired ? <input type="hidden" name="wallet_required" value="1" /> : null}
+      {preview ? <input type="hidden" name="quote_id" value={preview.quote_id} /> : null}
       {market === tried ? <FormMessage state={state} /> : null}
+      {market === tried && state.field === "wallet" ? (
+        <Link href={topUpHref(shown.country, back)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white hover:bg-[#0b1766]">
+          <Wallet className="size-4" aria-hidden="true" /> Top up your wallet
+        </Link>
+      ) : null}
 
       {values.length ? (
         <fieldset>
@@ -167,16 +192,29 @@ export function BuyForm({
         <p className="text-sm text-slate-500" aria-live="polite">
           Finding how you can pay from there…
         </p>
-      ) : shown.methods.length && market === shown.country ? (
+      ) : offered.length && market === shown.country ? (
         <fieldset>
           <legend className="text-sm font-semibold">Pay with</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {shown.methods.map((method, index) => (
+            {offered.map((method, index) => (
               <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50">
                 <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-[#ff2382]" />
                 <span>
                   <span className="block text-sm font-semibold">{method.label}</span>
                   <span className="block text-xs text-slate-500">{method.description}</span>
+                  {method.id === "wallet" && shown.wallet ? (
+                    <span className="mt-1.5 block text-xs">
+                      <span className="font-semibold text-[#070f4c]">Balance {formatFace(shown.wallet.balance, shown.wallet.currency)}</span>
+                      {shown.wallet.enabled ? (
+                        <>
+                          {" · "}
+                          <Link href={topUpHref(shown.country, back)} className="font-semibold text-[#ff2382] underline-offset-2 hover:underline">
+                            Top up
+                          </Link>
+                        </>
+                      ) : null}
+                    </span>
+                  ) : null}
                   {method.networks?.length ? (
                     <span className="mt-1.5 flex flex-wrap gap-1" aria-label={`Networks: ${method.networks.join(", ")}`}>
                       {method.networks.map(network => (
@@ -193,14 +231,41 @@ export function BuyForm({
         </fieldset>
       ) : null}
 
-      <Submit pending={pending} className="w-full text-lg sm:w-auto">
-        <Lock className="size-4" aria-hidden="true" />
-        {sandbox ? "Place a test order" : "Continue to payment"}
-      </Submit>
+      {preview ? (
+        <div className="space-y-3 rounded-2xl bg-slate-50 p-4" role="status">
+          <p className="text-sm text-slate-600">You pay</p>
+          <p className="font-display text-3xl font-extrabold text-[#070f4c]">{formatFace(preview.amount, preview.currency)}</p>
+          <p className="text-sm text-slate-600">
+            From your wallet: {formatFace(preview.wallet_balance, preview.currency)}
+            {preview.wallet_balance >= preview.amount ? `, leaving ${formatFace(preview.wallet_balance - preview.amount, preview.currency)}.` : "."}
+          </p>
+          {preview.wallet_balance >= preview.amount ? (
+            <div className="flex flex-wrap gap-3">
+              <Submit pending={pending} className="text-lg">
+                <Wallet className="size-4" aria-hidden="true" /> Pay {formatFace(preview.amount, preview.currency)}
+              </Submit>
+              <button type="button" onClick={() => setDismissed(preview.quote_id)} className="inline-flex min-h-12 items-center rounded-xl px-4 font-semibold text-slate-600 hover:text-[#070f4c]">
+                Change
+              </button>
+            </div>
+          ) : (
+            <Link href={topUpHref(shown.country, back)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]">
+              <Wallet className="size-4" aria-hidden="true" /> Top up {formatFace(preview.amount - preview.wallet_balance, preview.currency)} or more
+            </Link>
+          )}
+        </div>
+      ) : (
+        <Submit pending={pending} className="w-full text-lg sm:w-auto">
+          {payingFromWallet ? <Wallet className="size-4" aria-hidden="true" /> : <Lock className="size-4" aria-hidden="true" />}
+          {sandbox && !payingFromWallet ? "Place a test order" : payingFromWallet ? "See the price" : "Continue to payment"}
+        </Submit>
+      )}
       <p className="text-xs text-slate-500">
         {sandbox
           ? "Checkout is in test mode: no money is taken and codes are not real."
-          : "You confirm the price on the secure payment page. If we cannot deliver your order, you are refunded in full."}
+          : payingFromWallet
+            ? "You see the price before it is taken from your wallet. If we cannot deliver your order, it goes back to your wallet in full."
+            : "You confirm the price on the secure payment page. If we cannot deliver your order, you are refunded in full."}
       </p>
     </form>
   );
