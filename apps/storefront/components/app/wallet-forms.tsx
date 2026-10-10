@@ -66,10 +66,62 @@ export function BankAccountForm({ country, needsBvn }: { country: string | null;
   );
 }
 
+/** The bank account popup's ID: one popup, opened from the wallet card and from Add funds. */
+const bankDialogId = "wallet-bank-account";
+
+/** Opens the bank account popup (closing Add funds first, when it is asked from there). */
+function openBankDialog(from?: HTMLDialogElement | null) {
+  from?.close();
+  (document.getElementById(bankDialogId) as HTMLDialogElement | null)?.showModal();
+}
+
+/** The link that opens the bank account popup: "Get a free account number". */
+export function BankAccountLink({ tone = "dark", from }: { tone?: "dark" | "light"; from?: () => HTMLDialogElement | null }) {
+  return (
+    <button
+      type="button"
+      onClick={() => openBankDialog(from?.())}
+      className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold underline-offset-2 hover:underline ${tone === "light" ? "text-pink-200 hover:text-white" : "text-[#ff2382]"}`}
+    >
+      <Landmark className="size-4" aria-hidden="true" /> Get a free account number
+    </button>
+  );
+}
+
 /**
- * "Add funds" beside the balance: a popup (native dialog: Escape and the backdrop close it, focus stays inside) with
- * the ways to top up: card or mobile money through a payment page, and the customer's own bank account number where
- * the market offers one. Opens by itself when the customer came to top up for a purchase (`open`).
+ * The customer's own bank account number: a popup with the BVN form where needed (Nigeria; passed to the bank, never
+ * kept). Rendered once on the wallet page; `BankAccountLink` opens it.
+ */
+export function BankAccountDialog({ country, needsBvn }: { country: string | null; needsBvn: boolean }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  return (
+    <dialog
+      ref={dialog}
+      id={bankDialogId}
+      aria-labelledby={`${bankDialogId}-title`}
+      onClick={event => event.target === dialog.current && dialog.current?.close()}
+      className="m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-[#070f4c] shadow-2xl backdrop:bg-[#070f4c]/50"
+    >
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <h2 id={`${bankDialogId}-title`} className="flex items-center gap-2 text-lg font-bold">
+          <Landmark className="size-5" aria-hidden="true" /> Your own account number
+        </h2>
+        <button type="button" aria-label="Close" onClick={() => dialog.current?.close()} className="grid size-11 place-items-center rounded-xl hover:bg-slate-50">
+          <X className="size-6" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="space-y-4 p-5">
+        <p className="text-sm text-slate-600">A bank account number in your name, free. Transfer to it from any bank app and the money is added to your wallet once it arrives.</p>
+        <BankAccountForm country={country} needsBvn={needsBvn} />
+      </div>
+    </dialog>
+  );
+}
+
+/**
+ * "Add funds" beside the balance: a popup (native dialog: Escape and the backdrop close it, focus stays inside) to top
+ * up by card or mobile money through a payment page. Where the market offers bank account numbers it also shows the
+ * customer's (to transfer to), or the link to get one. Opens by itself when the customer came to top up for a purchase.
  */
 export function AddFunds({ wallet, country, amount, open = false }: { wallet: StoreWallet; country: string | null; amount?: string; open?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -101,37 +153,40 @@ export function AddFunds({ wallet, country, amount, open = false }: { wallet: St
           </button>
         </div>
         <div className="space-y-6 p-5">
-          <section aria-label="Pay now">
-            <TopUpForm country={country} currency={wallet.currency} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
-          </section>
+          <TopUpForm country={country} currency={wallet.currency} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
           {wallet.reserved_accounts_available ? (
             <section aria-labelledby="add-bank" className="border-t border-slate-100 pt-5">
               <h3 id="add-bank" className="mb-1 flex items-center gap-2 font-semibold">
                 <Landmark className="size-5" aria-hidden="true" /> Bank transfer
               </h3>
-              <p className="mb-3 text-sm text-slate-600">Transfer to your own account number from any bank app: the money is added to your wallet once it arrives.</p>
               {wallet.reserved_accounts.length ? (
-                <ul className="space-y-3">
-                  {wallet.reserved_accounts.map(account => (
-                    <li key={account.id} className="rounded-2xl bg-slate-50 p-4">
-                      <p className="font-display text-2xl font-extrabold tracking-wide">{account.account_number}</p>
-                      <p className="text-sm text-slate-600">
-                        {account.bank_name} · {account.account_name}
-                      </p>
-                      {sandbox ? (
-                        <form action={simulateDeposit} className="mt-3 flex flex-wrap items-center gap-2">
-                          <input type="hidden" name="id" value={account.id} />
-                          <input name="amount" defaultValue="5000" inputMode="decimal" aria-label="Test transfer amount" className="min-h-10 w-28 rounded-xl border border-slate-200 bg-white px-3" />
-                          <button type="submit" className="min-h-10 rounded-xl bg-white px-3 font-semibold ring-1 ring-slate-200 hover:ring-slate-300">
-                            Simulate a transfer
-                          </button>
-                        </form>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <p className="mb-3 text-sm text-slate-600">Transfer to your account number from any bank app: the money is added to your wallet once it arrives.</p>
+                  <ul className="space-y-3">
+                    {wallet.reserved_accounts.map(account => (
+                      <li key={account.id} className="rounded-2xl bg-slate-50 p-4">
+                        <p className="font-display text-2xl font-extrabold tracking-wide">{account.account_number}</p>
+                        <p className="text-sm text-slate-600">
+                          {account.bank_name} · {account.account_name}
+                        </p>
+                        {sandbox ? (
+                          <form action={simulateDeposit} className="mt-3 flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="id" value={account.id} />
+                            <input name="amount" defaultValue="5000" inputMode="decimal" aria-label="Test transfer amount" className="min-h-10 w-28 rounded-xl border border-slate-200 bg-white px-3" />
+                            <button type="submit" className="min-h-10 rounded-xl bg-white px-3 font-semibold ring-1 ring-slate-200 hover:ring-slate-300">
+                              Simulate a transfer
+                            </button>
+                          </form>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               ) : (
-                <BankAccountForm country={country} needsBvn={wallet.reserved_account_needs_bvn} />
+                <>
+                  <p className="mb-2 text-sm text-slate-600">Prefer to pay by bank transfer? Get an account number of your own, free.</p>
+                  <BankAccountLink from={() => dialog.current} />
+                </>
               )}
             </section>
           ) : null}

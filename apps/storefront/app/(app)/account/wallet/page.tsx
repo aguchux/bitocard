@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Landmark, Wallet } from "lucide-react";
 import { formatFace, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
-import { AddFunds } from "@/components/app/wallet-forms";
+import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/wallet-forms";
 import { customerApi, safeNext } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
@@ -99,20 +99,41 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         <p className={card}>Your wallet cannot be shown right now. Try again shortly.</p>
       ) : (
         <>
-          <section aria-label="Balance" className="flex flex-col gap-4 rounded-3xl bg-[#070f4c] p-6 text-white sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
+          <section aria-label="Balance" className="rounded-3xl bg-[#070f4c] p-6 text-white">
+            {/* Top row: the label on the left, the customer's own bank account (or the link to get one) top right. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <p className="flex items-center gap-2 text-sm text-white/70">
                 <Wallet className="size-4" aria-hidden="true" /> Wallet balance{wallet.mode === "test" ? " (test)" : ""}
               </p>
-              <p className="mt-2 font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
-              <p className="mt-2 text-sm text-white/70">
-                {wallet.enabled
-                  ? "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."
-                  : "This store now takes payment when you buy. You can still spend what is left here."}
-              </p>
+              {wallet.enabled && wallet.reserved_accounts_available ? (
+                wallet.reserved_accounts[0] ? (
+                  <p className="flex items-center gap-1.5 text-sm text-white/80" aria-label="Your bank account number">
+                    <Landmark className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="font-semibold tracking-wide text-white">{wallet.reserved_accounts[0].account_number}</span>
+                    <span>· {wallet.reserved_accounts[0].bank_name}</span>
+                  </p>
+                ) : (
+                  <span className="-mx-2">
+                    <BankAccountLink tone="light" />
+                  </span>
+                )
+              ) : null}
             </div>
-            {wallet.enabled ? <AddFunds wallet={wallet} country={country} amount={params.amount} open={Boolean(back || params.amount)} /> : null}
+            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
+                <p className="mt-2 text-sm text-white/70">
+                  {wallet.enabled
+                    ? "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."
+                    : "This store now takes payment when you buy. You can still spend what is left here."}
+                </p>
+              </div>
+              {wallet.enabled ? <AddFunds wallet={wallet} country={country} amount={params.amount} open={Boolean(back || params.amount)} /> : null}
+            </div>
           </section>
+          {wallet.enabled && wallet.reserved_accounts_available && !wallet.reserved_accounts.length ? (
+            <BankAccountDialog country={country} needsBvn={wallet.reserved_account_needs_bvn} />
+          ) : null}
         </>
       )}
 
