@@ -11,11 +11,12 @@ import { groupTint } from "./theme";
 export const appProductBase = "/account/p";
 
 /** A tinted figure card at the top of Home (as in the mockups): icon tile, label, large figure. */
-export function StatCard({ icon: Icon, label, value, note, tone }: { icon: LucideIcon; label: string; value: string; note?: string; tone: "pink" | "blue" | "green" }) {
+export function StatCard({ icon: Icon, label, value, note, tone }: { icon: LucideIcon; label: string; value: string; note?: string; tone: "pink" | "blue" | "green" | "navy" }) {
   const colours = {
     pink: { card: "bg-pink-50", tile: "bg-pink-100 text-[#ff2382]" },
     blue: { card: "bg-blue-50", tile: "bg-blue-100 text-[#2477ff]" },
     green: { card: "bg-emerald-50", tile: "bg-emerald-100 text-emerald-600" },
+    navy: { card: "bg-indigo-50", tile: "bg-indigo-100 text-[#070f4c]" },
   }[tone];
   return (
     // As in the mockups: the icon tile beside the label and figure at every width.

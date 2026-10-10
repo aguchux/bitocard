@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Landmark, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Wallet } from "lucide-react";
 import { formatFace, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
-import { BankAccountForm, TopUpForm } from "@/components/app/wallet-forms";
+import { AddFunds } from "@/components/app/wallet-forms";
 import { customerApi, safeNext } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore } from "@/lib/store";
-import { simulateDeposit, simulateTopUp, walletFor } from "@/lib/wallet";
+import { simulateTopUp, walletFor } from "@/lib/wallet";
 
 export const metadata: Metadata = { title: "Wallet" };
 
@@ -55,8 +55,8 @@ async function TopUpStatus({ id }: { id: string }) {
 }
 
 /**
- * The wallet: the balance, topping it up (card, mobile money, Flutterwave, or the customer's own bank account number),
- * and what went in and out. Spent only in this store, never withdrawn. bitocard.com keeps one wallet per market.
+ * The wallet: the balance with Add funds beside it (a popup: card, mobile money, Flutterwave, or the customer's own bank
+ * account number), and what went in and out. Spent only in this store, never withdrawn. bitocard.com keeps one wallet per market.
  */
 export default async function WalletPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
@@ -99,58 +99,20 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         <p className={card}>Your wallet cannot be shown right now. Try again shortly.</p>
       ) : (
         <>
-          <section aria-label="Balance" className="rounded-3xl bg-[#070f4c] p-6 text-white">
-            <p className="flex items-center gap-2 text-sm text-white/70">
-              <Wallet className="size-4" aria-hidden="true" /> Wallet balance{wallet.mode === "test" ? " (test)" : ""}
-            </p>
-            <p className="mt-2 font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
-            <p className="mt-2 text-sm text-white/70">
-              {wallet.enabled
-                ? "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."
-                : "This store now takes payment when you buy. You can still spend what is left here."}
-            </p>
+          <section aria-label="Balance" className="flex flex-col gap-4 rounded-3xl bg-[#070f4c] p-6 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-sm text-white/70">
+                <Wallet className="size-4" aria-hidden="true" /> Wallet balance{wallet.mode === "test" ? " (test)" : ""}
+              </p>
+              <p className="mt-2 font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
+              <p className="mt-2 text-sm text-white/70">
+                {wallet.enabled
+                  ? "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."
+                  : "This store now takes payment when you buy. You can still spend what is left here."}
+              </p>
+            </div>
+            {wallet.enabled ? <AddFunds wallet={wallet} country={country} amount={params.amount} open={Boolean(back || params.amount)} /> : null}
           </section>
-
-          {wallet.enabled ? (
-            <section aria-labelledby="top-up" className={card}>
-              <h2 id="top-up" className="mb-4 text-lg font-bold">
-                Top up
-              </h2>
-              <TopUpForm country={country} currency={wallet.currency} methods={wallet.top_up_methods} amount={params.amount} sandbox={wallet.mode === "test"} />
-            </section>
-          ) : null}
-
-          {wallet.enabled && wallet.reserved_accounts_available ? (
-            <section aria-labelledby="bank" className={card}>
-              <h2 id="bank" className="mb-1 flex items-center gap-2 text-lg font-bold">
-                <Landmark className="size-5" aria-hidden="true" /> Your bank account number
-              </h2>
-              <p className="mb-4 text-sm text-slate-600">Transfer to it from any bank app: the money is added to your wallet once it arrives.</p>
-              {wallet.reserved_accounts.length ? (
-                <ul className="space-y-3">
-                  {wallet.reserved_accounts.map(account => (
-                    <li key={account.id} className="rounded-2xl bg-slate-50 p-4">
-                      <p className="font-display text-2xl font-extrabold tracking-wide">{account.account_number}</p>
-                      <p className="text-sm text-slate-600">
-                        {account.bank_name} · {account.account_name}
-                      </p>
-                      {wallet.mode === "test" ? (
-                        <form action={simulateDeposit} className="mt-3 flex flex-wrap items-center gap-2">
-                          <input type="hidden" name="id" value={account.id} />
-                          <input name="amount" defaultValue="5000" inputMode="decimal" aria-label="Test transfer amount" className="min-h-10 w-28 rounded-xl border border-slate-200 bg-white px-3" />
-                          <button type="submit" className="min-h-10 rounded-xl bg-white px-3 font-semibold ring-1 ring-slate-200 hover:ring-slate-300">
-                            Simulate a transfer
-                          </button>
-                        </form>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <BankAccountForm country={country} needsBvn={wallet.reserved_account_needs_bvn} />
-              )}
-            </section>
-          ) : null}
         </>
       )}
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, PackageCheck, Plus, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
+import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
 import { StatusPill } from "@/components/store/order-status";
@@ -51,7 +51,14 @@ export default async function AccountHome() {
 
       {/* Phones: a sideways slider (snap, no visible scroll bar) with the next card peeking; three across from tablets. */}
       <section aria-label="Your figures">
-        <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+        <ul className={`-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 md:mx-0 md:grid ${wallet ? "md:grid-cols-2 2xl:grid-cols-4" : "md:grid-cols-3"} md:gap-4 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden`}>
+          {wallet ? (
+            <li className="w-[82%] shrink-0 snap-start sm:w-[60%] md:w-auto">
+              <Link href={`/account/wallet${walletCountry ? `?country=${walletCountry}` : ""}`} className="block h-full rounded-3xl">
+                <StatCard icon={Wallet} tone="navy" label="Wallet balance" value={amount(wallet.balance, wallet.currency)} note={`${wallet.mode === "test" ? "Test money · " : ""}${wallet.enabled ? "Add funds" : "Spend what is left"}`} />
+              </Link>
+            </li>
+          ) : null}
           <li className="w-[82%] shrink-0 snap-start sm:w-[60%] md:w-auto">
             <StatCard icon={ShoppingBag} tone="pink" label="Orders total" value={total.value} note={total.note} />
           </li>
@@ -63,22 +70,6 @@ export default async function AccountHome() {
           </li>
         </ul>
       </section>
-
-      {wallet && (wallet.enabled || wallet.balance > 0) ? (
-        <section aria-label="Wallet" className="flex flex-wrap items-center gap-4 rounded-3xl bg-[#070f4c] p-5 text-white">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/10">
-            <Wallet className="size-6" aria-hidden="true" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm text-white/70">Wallet balance{wallet.mode === "test" ? " (test)" : ""}</span>
-            <span className="block font-display text-2xl font-extrabold">{amount(wallet.balance, wallet.currency)}</span>
-          </span>
-          <Link href={`/account/wallet${walletCountry ? `?country=${walletCountry}` : ""}`} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold hover:bg-[#e8116d]">
-            {wallet.enabled ? <Plus className="size-4" aria-hidden="true" /> : null}
-            {wallet.enabled ? "Top up" : "Open wallet"}
-          </Link>
-        </section>
-      ) : null}
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />
