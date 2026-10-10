@@ -37,12 +37,14 @@ export function presentStore(store: Store) {
     checkout_mode: store.checkoutMode,
     /** The account app's menu on desktop: `rail`, `bottom`, or null to follow BitoCard's default. */
     desktop_nav: store.desktopNav,
+    /** Customers are asked for the identity check where BitoCard's market rules require it (true), or never. */
+    customer_verification: store.customerVerification,
     published_at: store.publishedAt?.toISOString() ?? null,
     created_at: store.createdAt.toISOString(),
   };
 }
 
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: LedgerMode; desktop_nav?: 'rail' | 'bottom' | null };
+export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: LedgerMode; desktop_nav?: 'rail' | 'bottom' | null; customer_verification?: boolean };
 
 export type DesktopNav = 'rail' | 'bottom';
 
@@ -161,6 +163,7 @@ export class StoresService {
           accentColor: input.accent_color?.toLowerCase(),
           checkoutMode: input.checkout_mode,
           desktopNav: input.desktop_nav,
+          customerVerification: input.customer_verification,
         },
       });
       return presentStore(updated);

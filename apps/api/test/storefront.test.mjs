@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, client, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeReloadly } from './fakes.mjs';
 
 let server;
@@ -24,7 +24,7 @@ before(async () => {
   }
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
   // BitoCard's store shows only listed products: list the whole catalogue, as an admin would.
-  assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
+  await listForTest(server);
   visitor = client(server.base);
 });
 

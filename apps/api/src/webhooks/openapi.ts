@@ -160,7 +160,7 @@ export const eventObjectSchemas: Record<string, Schema> = {
       recommended_amount: { type: ['integer', 'null'], description: 'For `credit_reseller`: the amount you recommended, in minor units of `currency`.' },
       report: nullableStr('Your report when escalating.'),
       escalated_at: nullableTime('When it was escalated to BitoCard.'),
-      outcome: nullableStr('What was done, once resolved.', { enum: ['resolved_by_reseller', 'refunded_customer', 'credited_reseller', 'rejected', 'chargeback_won', 'chargeback_lost', null] }),
+      outcome: nullableStr('What was done, once resolved.', { enum: ['resolved_by_reseller', 'refunded_customer', 'credited_reseller', 'rejected', 'chargeback_won', 'chargeback_lost', 'chargeback_accepted', null] }),
       outcome_amount: { type: ['integer', 'null'], description: 'For `credited_reseller`: the amount credited, in minor units of `currency`.' },
       outcome_note: nullableStr('The note with the decision.'),
       resolved_at: nullableTime('When it was resolved.'),

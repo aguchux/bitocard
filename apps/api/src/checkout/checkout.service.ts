@@ -5,7 +5,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
-import type { Checkout, CheckoutStatus, Order, OrderDelivery, Payment, Product, Store } from '../generated/prisma/client.js';
+import type { Checkout, CheckoutStatus, Order, OrderDelivery, Payment, Product, ProductCategory, Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
@@ -188,10 +188,6 @@ export class CheckoutService implements OnModuleInit {
     const listed = product && (this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } }));
     if (!product || !listed) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');
 
-    const rule = await this.prisma.countryCategory.findUnique({ where: { countryCode_category: { countryCode: seller.country!, category: product.category } } });
-    if (rule?.customerVerification && !(await this.identity.isCustomerVerified(seller.id, mode, customer.id))) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before buying this. It takes a few minutes and is needed once.');
-    }
     const option = this.choose(await this.stores.paymentOptions(store, seller, mode), mode, input.method);
 
     // Codes and licence keys are also emailed to the customer, unless they named another address.
@@ -205,6 +201,10 @@ export class CheckoutService implements OnModuleInit {
       { ownSources: Boolean(option.own) },
     );
     const quote = await this.prisma.quote.findUniqueOrThrow({ where: { id: presented.id } });
+    // Asked after quoting: on bitocard.com it can depend on the supplier the order is routed to.
+    if ((await this.identityCheckNeeded(customer, seller, product.category, quote.supplierCode)) && !(await this.identity.isCustomerVerified(seller.id, mode, customer.id))) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before buying this. It takes a few minutes and is needed once.');
+    }
 
     const id = randomUUID();
     const paymentId = randomUUID();
@@ -251,6 +251,30 @@ export class CheckoutService implements OnModuleInit {
       throw error;
     }
     return this.present((await this.load({ id }))!);
+  }
+
+  /**
+   * Whether this purchase needs the customer's identity check. The market's category rule decides first; then the
+   * store's owner can have turned checks off for this customer or for the whole store (a reseller for their store's
+   * customers, BitoCard for bitocard.com's). BitoCard's other settings are for bitocard.com only: a supplier whose
+   * products need no check, and asking only once some days have passed since the customer's first paid purchase.
+   */
+  async identityCheckNeeded(customer: CustomerWithStore, seller: { country: string | null }, category: ProductCategory, supplierCode: string | null) {
+    const rule = await this.prisma.countryCategory.findUnique({ where: { countryCode_category: { countryCode: seller.country!, category } } });
+    if (!rule?.customerVerification || !customer.identityCheck || !customer.store.customerVerification) return false;
+    if (!this.stores.isHouse(customer.store)) return true;
+    if (supplierCode) {
+      const supplier = await this.prisma.supplier.findUnique({ where: { code: supplierCode }, select: { customerVerification: true } });
+      if (supplier && !supplier.customerVerification) return false;
+    }
+    const days = customer.store.verificationGraceDays;
+    if (!days) return true;
+    const first = await this.prisma.checkout.findFirst({
+      where: { customerId: customer.id, status: { in: ['paid', 'completed', 'refund_pending', 'refunded'] } },
+      orderBy: { createdAt: 'asc' },
+      select: { createdAt: true },
+    });
+    return first !== null && Date.now() >= first.createdAt.getTime() + days * 86_400_000;
   }
 
   /**

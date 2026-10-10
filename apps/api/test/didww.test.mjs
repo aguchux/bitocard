@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeDidww } from './fakes.mjs';
 
 const callbackBase = 'https://api.test.example';
@@ -29,7 +29,7 @@ before(async () => {
   const sync = await admin.post('/v1/admin/suppliers/didww/sync');
   assert.equal(sync.status, 200, JSON.stringify(sync.json));
   // BitoCard's store shows only listed products: list the whole catalogue, as an admin would.
-  assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
+  await listForTest(server);
 });
 
 after(async () => {

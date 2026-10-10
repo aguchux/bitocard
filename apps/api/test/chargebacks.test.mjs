@@ -162,6 +162,66 @@ describe('Stripe chargebacks', () => {
   });
 });
 
+describe('chargebacks that stopped part way are completed', () => {
+  test('one opened without its hold (the run stopped) is held by the next notice, before anything else', async () => {
+    const { browser, payment, intent } = await toppedUp(250_000);
+    const id = stripeDispute(intent, 250_000);
+    // As if a run created the chargeback and then stopped: no hold, no shortfall.
+    const row = await prisma.chargeback.create({
+      data: { paymentId: payment.id, resellerId: payment.resellerId, mode: 'live', provider: 'stripe', providerDisputeId: id, amountMinor: 250_000n, currency: 'NGN', protected: false, reason: 'fraudulent' },
+    });
+    assert.equal((await wallet(browser)).available, 250_000, 'nothing held yet');
+    await stripeWebhook(disputeEvent(id, 'charge.dispute.updated'));
+    const held = await prisma.chargeback.findUniqueOrThrow({ where: { id: row.id } });
+    assert.deepEqual([held.heldMinor, held.shortfallMinor, held.holdId !== null], [250_000n, 0n, true]);
+    assert.deepEqual([(await wallet(browser)).available, (await wallet(browser)).reserved], [0, 250_000]);
+    assert.ok(await prisma.dispute.findUnique({ where: { chargebackId: row.id } }), 'its dispute is opened too');
+    await ledgerOk();
+  });
+
+  test('decided straight away without a hold: held first, then paid back from it', async () => {
+    const { browser, payment, intent } = await toppedUp(150_000);
+    const stripeBefore = await balance('provider_balance', { ownerKey: 'provider:stripe' });
+    const id = stripeDispute(intent, 150_000, 'lost');
+    await prisma.chargeback.create({
+      data: { paymentId: payment.id, resellerId: payment.resellerId, mode: 'live', provider: 'stripe', providerDisputeId: id, amountMinor: 150_000n, currency: 'NGN', protected: false, reason: 'fraudulent' },
+    });
+    await stripeWebhook(disputeEvent(id, 'charge.dispute.closed'));
+    const lost = await prisma.chargeback.findFirstOrThrow({ where: { providerDisputeId: id } });
+    assert.deepEqual([lost.status, lost.heldMinor, lost.shortfallMinor], ['lost', 150_000n, 0n], 'the reseller pays it, not BitoCard');
+    assert.deepEqual([(await wallet(browser)).available, (await wallet(browser)).reserved], [0, 0]);
+    assert.equal(stripeBefore - (await balance('provider_balance', { ownerKey: 'provider:stripe' })), 150_000n);
+    await ledgerOk();
+  });
+
+  test('decided but its money not moved (the run stopped): the next notice moves it, once', async () => {
+    const { browser, intent } = await toppedUp(120_000);
+    const id = stripeDispute(intent, 120_000);
+    await stripeWebhook(disputeEvent(id));
+    const open = await prisma.chargeback.findFirstOrThrow({ where: { providerDisputeId: id } });
+    await prisma.chargeback.update({ where: { id: open.id }, data: { status: 'lost', resolvedAt: new Date() } });
+    assert.equal((await wallet(browser)).reserved, 120_000, 'still held');
+    stripe.state.disputes[id].status = 'lost';
+    await stripeWebhook(disputeEvent(id, 'charge.dispute.closed'));
+    await stripeWebhook(disputeEvent(id, 'charge.dispute.closed'));
+    assert.equal((await prisma.hold.findUniqueOrThrow({ where: { id: open.holdId } })).status, 'captured');
+    assert.deepEqual([(await wallet(browser)).available, (await wallet(browser)).reserved], [0, 0]);
+    await ledgerOk();
+  });
+
+  test('Stripe chargebacks are never decided or recorded by hand: Stripe reports them', async () => {
+    const { payment, intent } = await toppedUp(90_000);
+    const id = stripeDispute(intent, 90_000);
+    await stripeWebhook(disputeEvent(id));
+    const open = await prisma.chargeback.findFirstOrThrow({ where: { providerDisputeId: id } });
+    const decided = await admin.post(`/v1/admin/chargebacks/${open.id}/resolve`, { outcome: 'won', reason: 'By hand' });
+    assert.deepEqual([decided.status, decided.json.error.code], [409, 'chargeback_reported_by_stripe']);
+    const recorded = await admin.post('/v1/admin/chargebacks', { payment_id: payment.id, provider_dispute_id: 'made-up', reason: 'By hand' });
+    assert.deepEqual([recorded.status, recorded.json.error.code], [409, 'chargeback_reported_by_stripe']);
+    assert.equal((await prisma.chargeback.findUniqueOrThrow({ where: { id: open.id } })).status, 'open');
+  });
+});
+
 describe('chargebacks recorded by finance', () => {
   test('finance records another gateway’s chargeback and decides it; other admins cannot', async () => {
     const reseller = await resellerClient(server);

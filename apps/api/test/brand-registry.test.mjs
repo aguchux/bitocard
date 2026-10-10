@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, client, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeReloadly } from './fakes.mjs';
 
 const { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } = await import('../dist/storefront/brand-registry.js');
@@ -118,7 +118,7 @@ describe('brands on the store', () => {
     }
     assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
     // BitoCard's store shows only listed products: list the whole catalogue, as an admin would.
-    assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
+    await listForTest(server);
   });
 
   after(async () => {

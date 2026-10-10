@@ -231,7 +231,7 @@ function DisputeView({ dispute }: { dispute: AdminDispute }) {
             </Card>
           ) : null}
           {dispute.outcome ? (
-            <Notice tone={dispute.outcome === "rejected" || dispute.outcome === "chargeback_lost" ? "grey" : "green"} title={disputeOutcomeLabels[dispute.outcome]}>
+            <Notice tone={dispute.outcome === "rejected" || dispute.outcome === "chargeback_lost" || dispute.outcome === "chargeback_accepted" ? "grey" : "green"} title={disputeOutcomeLabels[dispute.outcome]}>
               {[dispute.outcome_amount ? money(dispute.outcome_amount) : null, dispute.outcome_note].filter(Boolean).join(" · ") || "Resolved."}
             </Notice>
           ) : null}

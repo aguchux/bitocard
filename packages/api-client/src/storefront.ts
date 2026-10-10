@@ -195,7 +195,7 @@ export type StoreDispute = {
   topic: 'order' | 'payment' | 'funding' | 'trade' | 'other';
   status: 'open' | 'escalated' | 'resolved';
   checkout_id: string | null;
-  outcome: 'resolved_by_reseller' | 'refunded_customer' | 'credited_reseller' | 'rejected' | 'chargeback_won' | 'chargeback_lost' | null;
+  outcome: 'resolved_by_reseller' | 'refunded_customer' | 'credited_reseller' | 'rejected' | 'chargeback_won' | 'chargeback_lost' | 'chargeback_accepted' | null;
   created_at: string;
   resolved_at: string | null;
   messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'system'; author_name: string | null; visibility: 'all'; body: string; created_at: string }>;

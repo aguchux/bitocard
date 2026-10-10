@@ -154,7 +154,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     suppliers: build.query<List<Supplier>, void>({ query: () => '/v1/admin/suppliers', providesTags: [{ type: 'Supplier', id: 'LIST' }] }),
     supplier: build.query<Supplier, string>({ query: code => `/v1/admin/suppliers/${code}`, providesTags: (_result, _error, code) => [{ type: 'Supplier', id: code }] }),
     /** Shown at once in the list and on the supplier; the saved supplier replaces both, so neither is refetched. */
-    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null; feature_rules: Partial<Record<ProductFeature, FeatureRule>> }>>({
+    updateSupplier: build.mutation<Supplier, { code: string } & Partial<{ enabled: boolean; status: string; notes: string | null; resale_approved: boolean; logo_url: string | null; feature_rules: Partial<Record<ProductFeature, FeatureRule>>; customer_verification: boolean }>>({
       query: ({ code, ...body }) => ({ url: `/v1/admin/suppliers/${code}`, method: 'PATCH', body }),
       async onQueryStarted({ code, resale_approved, ...change }, { dispatch, queryFulfilled }) {
         const apply = (supplier: Supplier) => {
@@ -209,7 +209,7 @@ export const adminApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Activity', 'Media'],
     }),
     /** Lists or unlists products on BitoCard's store: these IDs, or everything matching the filters. */
-    setProductListing: build.mutation<{ object: 'product_listing'; listed: boolean; updated: number }, { listed: boolean; product_ids?: string[]; filter?: AdminProductFilter }>({
+    setProductListing: build.mutation<{ object: 'product_listing'; listed: boolean; updated: number; blocked: { product_id: string; name: string; country: string; reseller_discount_bps: number; supplier_discount_bps: number }[] }, { listed: boolean; product_ids?: string[]; filter?: AdminProductFilter }>({
       query: body => ({ url: '/v1/admin/products/listing', method: 'POST', body }),
       // Chosen products show the change at once; "everything matching" cannot be drawn ahead, so the lists refetch.
       async onQueryStarted({ listed, product_ids }, { dispatch, getState, queryFulfilled }) {

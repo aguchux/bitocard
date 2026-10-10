@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, client, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, adminCode, client, lastEmailCode, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeFlutterwave, fakeStripe } from './fakes.mjs';
 import { responseChecker } from './openapi-docs.mjs';
 
@@ -102,7 +102,7 @@ async function resellerStore(products) {
   const created = await reseller.browser.post('/v1/stores', { name: 'Ada Digital', subdomain });
   assert.equal(created.status, 201, JSON.stringify(created.json));
   assert.equal((await reseller.browser.post(`/v1/stores/${created.json.id}/publish`)).status, 200);
-  assert.equal((await reseller.browser.post('/v1/catalogue/listing', { listed: true, product_ids: products.map(item => item.id) })).status, 200);
+  await listForTest(server, { resellerId: reseller.resellerId, productIds: products.map(item => item.id) });
   assert.equal((await reseller.browser.patch(`/v1/stores/${created.json.id}`, { checkout_mode: 'live' })).status, 200);
   return { ...reseller, subdomain };
 }
@@ -268,6 +268,10 @@ describe('a reseller’s own dispute with BitoCard', () => {
     assert.deepEqual([credited.json.outcome, credited.json.outcome_amount], ['credited_reseller', 300_000]);
     assert.equal((await reseller.browser.get('/v1/wallet')).json.available - before, 300_000);
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'wallet.adjusted', targetId: reseller.resellerId } }));
+    // Executed again (as after a failure that put it back in BitoCard's queue): the credit is posted once only.
+    await prisma.dispute.update({ where: { id: opened.json.id }, data: { status: 'escalated' } });
+    assert.equal((await admin.post(`/v1/admin/disputes/${opened.json.id}/execute`, { action: 'credit_reseller', amount: 300_000, note: 'Again' })).status, 200);
+    assert.equal((await reseller.browser.get('/v1/wallet')).json.available - before, 300_000, 'credited once');
     assert.equal((await admin.get('/v1/admin/ledger/check')).json.ok, true);
   });
 
@@ -315,7 +319,7 @@ describe('chargebacks open a dispute for the reseller', () => {
     assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 400_000, 'the hold came back');
   });
 
-  test('BitoCard can accept one: the chargeback is lost and the dispute resolved', async () => {
+  test('BitoCard can accept a Stripe one: the dispute is resolved and Stripe closes the chargeback as lost', async () => {
     const reseller = await resellerClient(server);
     await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', verifiedAt: new Date(), verifiedName: 'Ada Obi' } });
     const created = (await reseller.browser.post('/v1/wallet/top-ups', { amount: 200_000, method: 'stripe' })).json;
@@ -328,8 +332,19 @@ describe('chargebacks open a dispute for the reseller', () => {
     const dispute = (await reseller.browser.get('/v1/disputes?kind=chargeback')).json.data[0];
     await reseller.browser.post(`/v1/disputes/${dispute.id}/escalate`, { recommendation: 'accept_chargeback', report: 'I cannot show this payment was mine.' });
     const accepted = await admin.post(`/v1/admin/disputes/${dispute.id}/execute`, { action: 'accept_chargeback', note: 'Accepted at Stripe.' });
-    assert.deepEqual([accepted.json.status, accepted.json.outcome], ['resolved', 'chargeback_lost']);
+    assert.deepEqual([accepted.json.status, accepted.json.outcome], ['resolved', 'chargeback_accepted']);
+    assert.equal((await prisma.chargeback.findUniqueOrThrow({ where: { id: dispute.chargeback_id } })).status, 'open', 'Stripe decides it, not BitoCard by hand');
+    stripe.state.disputes[disputeId].status = 'lost';
+    await stripeWebhook({ type: 'charge.dispute.closed', data: { object: { id: disputeId, object: 'dispute' } } });
     assert.equal((await prisma.chargeback.findUniqueOrThrow({ where: { id: dispute.chargeback_id } })).status, 'lost');
+    assert.equal((await reseller.browser.get(`/v1/disputes/${dispute.id}`)).json.outcome, 'chargeback_accepted', 'the decision stands');
     assert.equal((await admin.get('/v1/admin/ledger/check')).json.ok, true);
+  });
+
+  test('a chargeback is never also refunded: the chargeback already returns the money', async () => {
+    const { DisputesService } = await import('../dist/disputes/disputes.service.js');
+    const service = server.app.get(DisputesService);
+    assert.throws(() => service.checkAction({ chargebackId: 'cb', orderId: 'order' }, 'refund_customer', undefined, 'action'), error => error.code === 'action_not_applicable');
+    assert.doesNotThrow(() => service.checkAction({ chargebackId: null, orderId: 'order' }, 'refund_customer', undefined, 'action'));
   });
 });

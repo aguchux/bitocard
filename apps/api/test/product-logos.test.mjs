@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, client, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeReloadly } from './fakes.mjs';
 
 let server;
@@ -24,7 +24,7 @@ before(async () => {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
-  assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
+  await listForTest(server);
   // As a supplier's catalogue gives them: a logo on the supplier's own servers.
   for (const product of await prisma.product.findMany()) {
     await prisma.product.update({ where: { id: product.id }, data: { logoUrl: `https://${supplierHost}/logos/${product.brand}.png` } });

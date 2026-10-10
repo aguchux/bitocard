@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { CheckCircle2, CreditCard, ExternalLink, Globe, Store as StoreIcon, XCircle } from "lucide-react";
+import { CheckCircle2, CreditCard, ExternalLink, Globe, ShieldCheck, Store as StoreIcon, XCircle } from "lucide-react";
 import {
   ActionDialog,
   Button,
@@ -20,6 +20,7 @@ import {
   Select,
   Skeleton,
   StatusBadge,
+  Toggle,
 } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
@@ -219,6 +220,47 @@ function StoreCheckout({ store, canManage }: { store: Store; canManage: boolean 
   );
 }
 
+/**
+ * Whether the store's customers are asked for BitoCard's identity check where the market requires one (the default).
+ * Off for everyone here, or for one customer on the Customers page; never marks anyone as checked.
+ */
+function StoreIdentityChecks({ store, canManage }: { store: Store; canManage: boolean }) {
+  const [update, state] = useUpdateStoreMutation();
+  return (
+    <Card>
+      <CardHeader
+        title="Customer identity checks"
+        description={store.customer_verification ? "Customers are asked where BitoCard requires a check." : "Your customers are never asked."}
+        actions={
+          <span className="flex items-center gap-2 text-sm font-medium">
+            {store.customer_verification ? "On" : "Off"}
+            <Toggle
+              label="Ask customers for the identity check"
+              checked={store.customer_verification}
+              disabled={!canManage || state.isLoading}
+              onChange={customer_verification => update({ id: store.id, customer_verification })}
+            />
+          </span>
+        }
+      />
+      <div className="space-y-4 p-5 sm:p-6">
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-subtle" aria-hidden />
+          <p className="text-sm text-muted">
+            BitoCard asks customers to verify their identity before buying some products in some countries (gift cards, for example). Turn it off and none of your customers are
+            asked: you take responsibility for knowing them. You can also turn it off for one customer on the{" "}
+            <AppLink href="/store/customers" className="font-semibold text-brand-600 hover:underline">
+              Customers
+            </AppLink>{" "}
+            page. Turning it off never marks a customer as checked.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }) {
   const [name, setName] = useState(store.name);
   const [subdomain, setSubdomain] = useState(store.subdomain);
@@ -312,6 +354,7 @@ function StoreDetails({ store, canManage }: { store: Store; canManage: boolean }
       </Card>
 
       <StoreCheckout store={store} canManage={canManage} />
+      <StoreIdentityChecks store={store} canManage={canManage} />
 
       <Card>
         <CardHeader title="Name and branding" description={canManage ? "Changes show on your store straight away." : "Only the owner or an admin can change the store."} />

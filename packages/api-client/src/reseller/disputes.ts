@@ -6,7 +6,7 @@ export type DisputeTopic = 'order' | 'payment' | 'funding' | 'trade' | 'other';
 export type DisputeStatus = 'open' | 'escalated' | 'contested' | 'resolved';
 /** What a reseller recommends when escalating, and what BitoCard can execute. */
 export type DisputeAction = 'refund_customer' | 'credit_reseller' | 'reject' | 'contest_chargeback' | 'accept_chargeback';
-export type DisputeOutcome = 'resolved_by_reseller' | 'refunded_customer' | 'credited_reseller' | 'rejected' | 'chargeback_won' | 'chargeback_lost';
+export type DisputeOutcome = 'resolved_by_reseller' | 'refunded_customer' | 'credited_reseller' | 'rejected' | 'chargeback_won' | 'chargeback_lost' | 'chargeback_accepted';
 
 export type DisputeMessage = {
   id: string;

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, client, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, client, lastEmailCode, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeReloadly, fakeVtpass } from './fakes.mjs';
 import { responseChecker } from './openapi-docs.mjs';
 
@@ -27,7 +27,7 @@ before(async () => {
   }
   assert.equal((await admin.post('/v1/admin/suppliers/reloadly/sync')).status, 200);
   assert.equal((await admin.post('/v1/admin/suppliers/vtpass/sync')).status, 200);
-  assert.equal((await admin.post('/v1/admin/products/listing', { listed: true, filter: {} })).status, 200);
+  await listForTest(server);
   check = await responseChecker(server.app);
 });
 
@@ -68,7 +68,10 @@ describe('catalogue, pricing, quotes and orders', () => {
     assert.equal(catalogue.has_more, true);
     await call(browser, 'GET /v1/catalogue/products', 200, 'GET', `/v1/catalogue/products?limit=100`, undefined, sandbox);
     await call(browser, 'GET /v1/catalogue/products/{id}', 200, 'GET', `/v1/catalogue/products/${amazon}`, undefined, sandbox);
+    // MTN airtime is a discount product: resellers list it only once BitoCard gives them a share of the discount.
+    const share = await prisma.pricingRule.create({ data: { category: 'airtime', countryCode: 'NG', kind: 'discount', marginBps: 0, resellerDiscountBps: 100 } });
     await call(browser, 'POST /v1/catalogue/listing', 200, 'POST', '/v1/catalogue/listing', { listed: true, product_ids: [amazon, mtn] }, sandbox);
+    await prisma.pricingRule.delete({ where: { id: share.id } });
     const listed = await call(browser, 'GET /v1/catalogue/products/{id}', 200, 'GET', `/v1/catalogue/products/${mtn}`, undefined, sandbox);
     assert.equal(listed.listed, true);
     await call(browser, 'POST /v1/catalogue/listing', 200, 'POST', '/v1/catalogue/listing', { listed: false, product_ids: [mtn] }, sandbox);

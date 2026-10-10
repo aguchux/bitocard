@@ -30,6 +30,7 @@ export const disputeOutcomeLabels: Record<string, string> = {
   rejected: 'Rejected',
   chargeback_won: 'Chargeback won',
   chargeback_lost: 'Chargeback lost',
+  chargeback_accepted: 'Chargeback accepted',
 };
 
 export const disputeKindLabels: Record<string, string> = { customer: 'Customer', reseller: 'Reseller with BitoCard', chargeback: 'Chargeback' };

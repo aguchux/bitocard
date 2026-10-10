@@ -62,6 +62,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     items: [
       { label: 'Needs review', href: '/verifications', icon: ListChecks },
       { label: 'All checks', href: '/verifications/all', icon: ShieldCheck },
+      { label: 'bitocard.com customers', href: '/verifications/customers', icon: Users },
     ],
   },
   activity: { title: 'Activity', items: [{ label: 'Activity log', href: '/activity', icon: History }] },

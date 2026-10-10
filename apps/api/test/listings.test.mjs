@@ -78,12 +78,50 @@ describe("BitoCard's store listing", () => {
   });
 });
 
+describe('discount products need a reseller share before listing', () => {
+  const sandbox = { 'bitocard-mode': 'test' };
+
+  test('no share, or one the supplier discount does not cover, blocks listing for admins (named) and resellers', async () => {
+    const mtn = await prisma.product.findUniqueOrThrow({ where: { key: 'airtime:NG:mtn:topup' } });
+    const single = await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true });
+    assert.deepEqual([single.status, single.json.error.code, single.json.error.param], [400, 'reseller_discount_missing', 'listed']);
+    assert.match(single.json.error.message, /in NG no reseller discount share is set/);
+    assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: mtn.id } })).listed, false);
+
+    const bulk = await admin.post('/v1/admin/products/listing', { listed: true, filter: { category: 'airtime' } });
+    assert.equal(bulk.status, 200);
+    assert.ok(bulk.json.blocked.some(item => item.product_id === mtn.id && item.country === 'NG' && item.reseller_discount_bps === 0), 'named, so admins can set a share');
+    assert.equal(await prisma.product.count({ where: { category: 'airtime', listed: true } }), bulk.json.updated, 'the rest are listed');
+    await admin.post('/v1/admin/products/listing', { listed: false, filter: {} });
+
+    const { browser } = await resellerClient(server);
+    const reseller = await browser.post('/v1/catalogue/listing', { listed: true, product_ids: [mtn.id] }, sandbox);
+    assert.deepEqual([reseller.status, reseller.json.error.code], [400, 'reseller_discount_missing']);
+    assert.doesNotMatch(reseller.json.error.message, /supplier/i, 'resellers are never told about the supplier');
+
+    // MTN's supplier gives 3%: a 4% share is not covered; a 1% share is.
+    const finance = await adminClient(server, ['finance']);
+    const rule = (await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 400 })).json;
+    try {
+      const uncovered = await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true });
+      assert.match(uncovered.json.error.message, /the reseller share \(4%\) is not less than the supplier's discount \(3%\)/);
+      await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 100 });
+      assert.equal((await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: true })).status, 200);
+      assert.equal((await browser.post('/v1/catalogue/listing', { listed: true, product_ids: [mtn.id] }, sandbox)).status, 200);
+    } finally {
+      await admin.patch(`/v1/admin/products/${mtn.id}`, { listed: false });
+      await finance.delete(`/v1/admin/pricing-rules/${rule.id}`);
+    }
+  });
+});
+
 describe("a reseller's own store listing", () => {
   const sandbox = { 'bitocard-mode': 'test' };
 
   test('resellers list what their store shows; their API catalogue is never gated by either listing', async () => {
     const { browser } = await resellerClient(server);
-    const catalogue = (await browser.get('/v1/catalogue/products?limit=50', sandbox)).json;
+    // Gift cards (sold by markup here): discount products need a share first (above).
+    const catalogue = (await browser.get('/v1/catalogue/products?category=gift_cards&limit=50', sandbox)).json;
     assert.ok(catalogue.data.length > 0, 'the whole catalogue, though BitoCard has listed nothing');
     assert.ok(catalogue.data.every(product => product.listed === false));
 

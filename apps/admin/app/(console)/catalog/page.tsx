@@ -136,6 +136,8 @@ function Products() {
   const [open, setOpen] = useState<AdminProduct | null>(null);
   const [pricing, setPricing] = useState<AdminProduct | null>(null);
   const [bulk, setBulk] = useState<"list" | "unlist" | null>(null);
+  // Products a bulk listing left unlisted because resellers would get no discount on them.
+  const [blocked, setBlocked] = useState<{ product_id: string; name: string; country: string }[]>([]);
   const [setProductListing] = useSetProductListingMutation();
   const filter = {
     country: country || undefined,
@@ -211,6 +213,16 @@ function Products() {
             </label>
           </div>
           {productState.error ? <Notice tone="red">{errorMessage(productState.error)}</Notice> : null}
+          {blocked.length ? (
+            <Notice tone="red">
+              {`${blocked.length.toLocaleString("en-GB")} ${blocked.length === 1 ? "product was" : "products were"} not listed because resellers would get no discount on them (no reseller discount share, or one the supplier's discount does not cover): `}
+              {blocked
+                .slice(0, 5)
+                .map(item => `${item.name} (${item.country})`)
+                .join(", ")}
+              {blocked.length > 5 ? ` and ${(blocked.length - 5).toLocaleString("en-GB")} more` : ""}. Set a reseller discount share in Catalog &gt; Pricing rules, then list them again.
+            </Notice>
+          ) : null}
           {/* bitocard.com shows only listed products; resellers list for their own stores. */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-3">
             <p className="flex items-center gap-2 text-sm">
@@ -347,7 +359,8 @@ function Products() {
           requireReason={false}
           onConfirm={async () => {
             const { q: words, ...rest } = filter;
-            await setProductListing({ listed: bulk === "list", filter: { ...rest, ...(words ? { q: words } : {}) } }).unwrap();
+            const result = await setProductListing({ listed: bulk === "list", filter: { ...rest, ...(words ? { q: words } : {}) } }).unwrap();
+            setBlocked(result.blocked ?? []);
           }}
         />
       ) : null}

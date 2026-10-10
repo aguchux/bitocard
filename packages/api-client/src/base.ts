@@ -101,6 +101,7 @@ export const tagTypes = [
   'Catalogue',
   'Settings',
   'IdentityCheck',
+  'StoreCustomer',
   'ResellerIntegration',
   'Fee',
   'FeeRule',

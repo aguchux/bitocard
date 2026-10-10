@@ -82,7 +82,13 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "BitoCard fees", href: "/wallet/fees", icon: Percent },
     ],
   },
-  store: { title: "Store", items: [{ label: "Your store", href: "/store", icon: Store }] },
+  store: {
+    title: "Store",
+    items: [
+      { label: "Your store", href: "/store", icon: Store },
+      { label: "Customers", href: "/store/customers", icon: Users },
+    ],
+  },
   integrations: { title: "Integrations", items: [{ label: "Your integrations", href: "/integrations", icon: Plug }] },
   developers: {
     title: "Developers",

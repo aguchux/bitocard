@@ -4,7 +4,7 @@
 // never the customer's money).
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { adminClient, adminCode, lastEmailCode, resellerClient, startApp, listForTest } from './helpers.mjs';
 import { fakeFlutterwave, fakeStripe } from './fakes.mjs';
 
 let server;
@@ -183,7 +183,7 @@ describe('refunding delivered checkout orders', () => {
     const third = await customer(store.subdomain);
     const product2 = await giftCard('Amazon Withdrawn Card', ['WITHDRAWN-CODE-0001']);
     await prisma.pricingRule.create({ data: { productId: product2.id, kind: 'discount', marginBps: 0, resellerDiscountBps: 1000 } });
-    await store.browser.post('/v1/catalogue/listing', { listed: true, product_ids: [product2.id] });
+    await listForTest(server, { resellerId: store.resellerId, productIds: [product2.id] });
     const last = await third.post('/v1/store/checkouts', { product_id: product2.id, face_value: 2500, country: 'NG', return_url: returnUrl });
     const sold = await prisma.order.findUniqueOrThrow({ where: { id: (await payOnStripe(third, last.json.id)).order.id } });
     await prisma.earningsLot.update({ where: { reference: `order:${sold.id}` }, data: { releaseAt: new Date(Date.now() - 1000) } });
@@ -210,8 +210,7 @@ async function resellerStore(products, { live = false, premium = false, markup =
   assert.equal(created.json.checkout_mode, 'test', 'checkout starts in the sandbox');
   assert.equal((await reseller.browser.post(`/v1/stores/${created.json.id}/publish`)).status, 200);
   if (products.length) {
-    const listed = await reseller.browser.post('/v1/catalogue/listing', { listed: true, product_ids: products.map(item => item.id) });
-    assert.equal(listed.status, 200, JSON.stringify(listed.json));
+    await listForTest(server, { resellerId: reseller.resellerId, productIds: products.map(item => item.id) });
   }
   if (live) {
     const updated = await reseller.browser.patch(`/v1/stores/${created.json.id}`, { checkout_mode: 'live' });
@@ -487,5 +486,95 @@ describe('the customer account app', () => {
     } finally {
       await admin.put('/v1/admin/switches/customer_app_bottom_bar_desktop', { enabled: null });
     }
+  });
+});
+
+describe('who is asked for the identity check', () => {
+  let product;
+  const giftCardsCheck = on => prisma.countryCategory.update({ where: { countryCode_category: { countryCode: 'NG', category: 'gift_cards' } }, data: { customerVerification: on } });
+  const start = shopper => shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
+  const refused = async shopper => {
+    const res = await start(shopper);
+    return res.status === 403 && res.json.error.code === 'customer_verification_required';
+  };
+
+  before(async () => {
+    product = await giftCard('Amazon Checked Card', ['CHECKED-CODE-0001', 'CHECKED-CODE-0002', 'CHECKED-CODE-0003', 'CHECKED-CODE-0004']);
+    await giftCardsCheck(true);
+  });
+  after(async () => {
+    await giftCardsCheck(false);
+    await prisma.store.update({ where: { id: '00000000-0000-4000-8000-0000000000b2' }, data: { customerVerification: true, verificationGraceDays: null } });
+    await prisma.supplier.update({ where: { code: 'stock' }, data: { customerVerification: true } });
+  });
+
+  test('bitocard.com: BitoCard turns it off for one customer, for a supplier, for every customer, or until days after a first purchase', async () => {
+    const shopper = await customer();
+    assert.ok(await refused(shopper), 'the market requires it for gift cards');
+
+    // One customer, by an operations admin (audited); support can look but not change.
+    const support = await adminClient(server, ['support']);
+    const listed = (await support.get(`/v1/admin/storefront/customers?q=${encodeURIComponent(shopper.email)}`)).json.data;
+    assert.deepEqual(listed.map(item => [item.id, item.identity_check, item.identity_checked]), [[shopper.id, true, false]]);
+    assert.equal((await support.patch(`/v1/admin/storefront/customers/${shopper.id}`, { identity_check: false })).status, 403);
+    const off = await admin.patch(`/v1/admin/storefront/customers/${shopper.id}`, { identity_check: false });
+    assert.deepEqual([off.status, off.json.identity_check, off.json.identity_checked], [200, false, false], 'off is never checked');
+    assert.equal((await admin.patch(`/v1/admin/storefront/customers/${shopper.id}`, { identity_checked: true })).status, 400, 'nobody can mark a customer checked');
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'customer.identity_check_off', targetId: shopper.id } }));
+    assert.equal((await start(shopper)).status, 201);
+
+    // A supplier: BitoCard's stock needs no check.
+    const other = await customer();
+    assert.equal((await admin.patch('/v1/admin/suppliers/stock', { customer_verification: false })).status, 200);
+    assert.equal((await start(other)).status, 201);
+    await admin.patch('/v1/admin/suppliers/stock', { customer_verification: true });
+    assert.ok(await refused(other));
+
+    // Every bitocard.com customer.
+    const settings = await admin.put('/v1/admin/storefront/customer-verification', { enabled: false });
+    assert.deepEqual([settings.json.enabled, settings.json.grace_days], [false, null]);
+    assert.equal((await start(other)).status, 201);
+
+    // Only after 7 days from their first paid purchase: buy first, asked once the days have passed.
+    assert.equal((await admin.put('/v1/admin/storefront/customer-verification', { enabled: true, grace_days: 7 })).json.grace_days, 7);
+    const tester = await customer();
+    const first = await start(tester);
+    assert.equal(first.status, 201, 'no purchase yet: they can try products first');
+    await prisma.checkout.update({ where: { id: first.json.id }, data: { status: 'completed', createdAt: new Date(Date.now() - 2 * 86_400_000) } });
+    assert.equal((await start(tester)).status, 201, 'within 7 days of their first purchase');
+    await prisma.checkout.update({ where: { id: first.json.id }, data: { createdAt: new Date(Date.now() - 8 * 86_400_000) } });
+    assert.ok(await refused(tester), 'asked once 7 days have passed');
+    assert.equal((await admin.put('/v1/admin/storefront/customer-verification', { grace_days: 0 })).status, 400);
+    await admin.put('/v1/admin/storefront/customer-verification', { grace_days: null });
+  });
+
+  test('a reseller’s store: the reseller turns it off for one customer or all; BitoCard’s bitocard.com settings never apply', async () => {
+    const store = await resellerStore([product]);
+    const shopper = await customer(store.subdomain);
+    assert.ok(await refused(shopper), 'the market requires it at their store too');
+
+    // BitoCard's bitocard.com settings do not reach resellers' customers, and admins cannot change them.
+    await admin.put('/v1/admin/storefront/customer-verification', { enabled: false });
+    await admin.patch('/v1/admin/suppliers/stock', { customer_verification: false });
+    assert.ok(await refused(shopper));
+    await admin.put('/v1/admin/storefront/customer-verification', { enabled: true });
+    await admin.patch('/v1/admin/suppliers/stock', { customer_verification: true });
+    assert.equal((await admin.patch(`/v1/admin/storefront/customers/${shopper.id}`, { identity_check: false })).status, 404);
+
+    // One customer.
+    const list = (await store.browser.get(`/v1/stores/${store.storeId}/customers`)).json;
+    assert.deepEqual(list.data.map(item => [item.id, item.identity_check]), [[shopper.id, true]]);
+    const off = await store.browser.patch(`/v1/stores/${store.storeId}/customers/${shopper.id}`, { identity_check: false });
+    assert.deepEqual([off.status, off.json.identity_check, off.json.identity_checked], [200, false, false]);
+    assert.equal((await start(shopper)).status, 201);
+    const other = await resellerStore([]);
+    assert.equal((await other.browser.get(`/v1/stores/${store.storeId}/customers`)).status, 404, 'only their own store');
+
+    // Everyone at their store.
+    const second = await customer(store.subdomain);
+    assert.ok(await refused(second));
+    const updated = await store.browser.patch(`/v1/stores/${store.storeId}`, { customer_verification: false });
+    assert.deepEqual([updated.status, updated.json.customer_verification], [200, false]);
+    assert.equal((await start(second)).status, 201);
   });
 });

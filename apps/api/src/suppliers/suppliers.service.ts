@@ -1,9 +1,10 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma, type Product, type ProductCategory, type Supplier, type SupplierMarket, type SupplierStatus } from '../generated/prisma/client.js';
-import { worldwideCategories } from '../catalogue/pricing.service.js';
+import { PricingService, worldwideCategories } from '../catalogue/pricing.service.js';
 import { featureRuleValues, type FeatureRule, isProductFeature, type ProductFeature, readFeatureRules } from '../catalogue/features.js';
 import type { CatalogueItem, CatalogueScope, SupplierAdapter } from './adapter.js';
 import { stockSupplier } from './stock.adapter.js';
@@ -122,6 +123,7 @@ export type SupplierUpdate = Partial<{
   logo_url: string | null;
   /** The whole set of feature rules ({ feature: required | allowed | excluded }); features left out are allowed. */
   feature_rules: Record<string, string>;
+  customer_verification: boolean;
 }>;
 
 /** Admin view of a supplier. Never returned by reseller endpoints. */
@@ -158,6 +160,8 @@ export function presentSupplier(supplier: Supplier & { markets?: SupplierMarket[
     requires_ip_allowlist: supplier.requiresIpAllowlist,
     notes: supplier.notes,
     feature_rules: presentFeatureRules(supplier, adapter),
+    /** bitocard.com customers buying its products are asked for the identity check where the market requires it. */
+    customer_verification: supplier.customerVerification,
     markets: supplier.markets?.map(m => ({ country: m.countryCode, category: m.category, enabled: m.enabled })),
     last_synced_at: supplier.lastSyncedAt?.toISOString() ?? null,
     last_sync_error: supplier.lastSyncError,
@@ -174,7 +178,19 @@ export class SuppliersService {
     private readonly adapters: SupplierAdapters,
     private readonly audit: AuditService,
     private readonly storefront: StorefrontService,
+    private readonly modules: ModuleRef,
   ) {}
+
+  /** Pricing is in the catalogue module, which itself uses suppliers: looked up when needed. */
+  private get pricing() {
+    return this.modules.get(PricingService, { strict: false });
+  }
+
+  /** Discount products leaving resellers no discount in some market, which cannot be listed (see `resellerShareProblems`). */
+  private async shareProblems(where: Prisma.ProductWhereInput) {
+    const products = await this.prisma.product.findMany({ where, include: { supplierProducts: { where: { available: true }, include: { supplier: true } } } });
+    return this.pricing.resellerShareProblems(products);
+  }
 
   async list() {
     // BitoCard's own stock is managed under Catalog > Stock, not as an outside supplier.
@@ -209,6 +225,7 @@ export class SuppliersService {
         notes: input.notes,
         logoUrl: input.logo_url,
         featureRules,
+        customerVerification: input.customer_verification,
       },
     });
     await this.audit.record({ actorId, action: 'supplier.updated', targetType: 'supplier', targetId: code, before, after });
@@ -458,6 +475,10 @@ export class SuppliersService {
     const before = await this.prisma.product.findUnique({ where: { id } });
     if (!before) throw notFound('product');
     const listing = input.listed === undefined || input.listed === before.listed ? {} : { listed: input.listed, listedAt: input.listed ? new Date() : null };
+    if (input.listed === true && !before.listed) {
+      const [problem] = await this.shareProblems({ id });
+      if (problem) throw noResellerShare(problem);
+    }
     const after = await this.prisma.product.update({ where: { id }, data: { active: input.active, name: input.name, description: input.description, imageUrl: input.image_url, ...listing } });
     await this.audit.record({ actorId, action: 'product.updated', targetType: 'product', targetId: id, before, after });
     return {
@@ -481,7 +502,10 @@ export class SuppliersService {
     if (!input.product_ids?.length && !input.filter) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Give product_ids or a filter.', 'product_ids');
     }
-    const where: Prisma.ProductWhereInput = { AND: [input.product_ids?.length ? { id: { in: input.product_ids } } : this.productWhere(input.filter!), { listed: !input.listed }] };
+    let where: Prisma.ProductWhereInput = { AND: [input.product_ids?.length ? { id: { in: input.product_ids } } : this.productWhere(input.filter!), { listed: !input.listed }] };
+    // Products leaving resellers no discount are left unlisted and named, so admins can set a share for them.
+    const blocked = input.listed ? await this.shareProblems(where) : [];
+    if (blocked.length) where = { AND: [where, { id: { notIn: blocked.map(problem => problem.product_id) } }] };
     const result = await this.prisma.product.updateMany({ where, data: { listed: input.listed, listedAt: input.listed ? new Date() : null } });
     await this.audit.record({
       actorId,
@@ -490,7 +514,7 @@ export class SuppliersService {
       targetId: input.product_ids?.length === 1 ? input.product_ids[0] : 'many',
       after: { count: result.count, product_ids: input.product_ids ?? null, filter: input.filter ?? null },
     });
-    return { object: 'product_listing' as const, listed: input.listed, updated: result.count };
+    return { object: 'product_listing' as const, listed: input.listed, updated: result.count, blocked };
   }
 
   /** The commission agreed with a supplier for one offer, and its routing priority. */
@@ -501,4 +525,20 @@ export class SuppliersService {
     await this.audit.record({ actorId, action: 'supplier_product.updated', targetType: 'supplier_product', targetId: id, before, after });
     return { object: 'supplier_offer' as const, id, discount_bps: after.discountBps, priority: after.priority, available: after.available };
   }
+}
+
+/** A discount product whose resellers would get no discount: refused, saying what to set. */
+export function noResellerShare(problem: { name: string; country: string; reseller_discount_bps: number; supplier_discount_bps: number }) {
+  const percent = (bps: number) => `${(bps / 100).toFixed(2).replace(/\.?0+$/, '')}%`;
+  const why =
+    problem.reseller_discount_bps === 0
+      ? 'no reseller discount share is set'
+      : `the reseller share (${percent(problem.reseller_discount_bps)}) is not less than the supplier's discount (${percent(problem.supplier_discount_bps)})`;
+  return new ApiError(
+    HttpStatus.BAD_REQUEST,
+    'invalid_request_error',
+    'reseller_discount_missing',
+    `${problem.name} cannot be listed: in ${problem.country} ${why}, so resellers would make nothing. Set a reseller discount share below the supplier's discount in Catalog > Pricing rules.`,
+    'listed',
+  );
 }

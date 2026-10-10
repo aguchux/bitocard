@@ -57,6 +57,12 @@ export function presentResellerChargeback(chargeback: Chargeback) {
 }
 
 /** What follows a chargeback: the dispute the reseller investigates. */
+/** Not yet held: unprotected, and no hold or shortfall recorded (a recorded hold or shortfall means it was tried). */
+const needsHold = (chargeback: Chargeback) => !chargeback.protected && chargeback.holdId === null && chargeback.heldMinor === 0n && chargeback.shortfallMinor === 0n;
+
+const reportedByStripe = () =>
+  new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'chargeback_reported_by_stripe', 'Stripe reports this chargeback and its outcome itself; BitoCard reads them from Stripe.');
+
 export type ChargebackListener = {
   opened(chargeback: Chargeback, payment: Payment): Promise<void>;
   decided(chargeback: Chargeback, outcome: ChargebackOutcome): Promise<void>;
@@ -125,6 +131,7 @@ export class ChargebacksService {
   async record(actorId: string | null, input: { payment_id: string; provider_dispute_id: string; amount?: number; reason: string }) {
     const payment = await this.prisma.payment.findUnique({ where: { id: input.payment_id } });
     if (!payment) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such payment.', 'payment_id');
+    if (payment.provider === 'stripe') throw reportedByStripe();
     const amount = input.amount === undefined ? payment.amountMinor : BigInt(input.amount);
     if (amount <= 0n || amount > payment.amountMinor) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'The disputed amount must be more than nothing and at most what was paid.', 'amount');
@@ -137,7 +144,7 @@ export class ChargebacksService {
   /** Opens a chargeback once (per gateway chargeback ID) and holds its amount from the reseller's wallet. */
   private async open(payment: Payment, input: { providerDisputeId: string; amount: bigint; currency: string; reason: string | null }) {
     const existing = await this.prisma.chargeback.findUnique({ where: { provider_providerDisputeId: { provider: payment.provider, providerDisputeId: input.providerDisputeId } } });
-    if (existing) return existing;
+    if (existing) return this.finishOpening(existing, payment);
     if (payment.status !== 'succeeded') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'payment_not_succeeded', 'Only a payment that was credited can be charged back.', 'payment_id');
     if (payment.connectionId) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'own_gateway_payment', 'This payment went to the reseller’s own gateway account: they handle its chargebacks with their gateway.', 'payment_id');
@@ -161,11 +168,23 @@ export class ChargebacksService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        return this.prisma.chargeback.findUniqueOrThrow({ where: { provider_providerDisputeId: { provider: payment.provider, providerDisputeId: input.providerDisputeId } } });
+        const raced = await this.prisma.chargeback.findUniqueOrThrow({ where: { provider_providerDisputeId: { provider: payment.provider, providerDisputeId: input.providerDisputeId } } });
+        return this.finishOpening(raced, payment);
       }
       throw error;
     }
-    if (!isProtected) chargeback = await this.holdFor(chargeback);
+    return this.finishOpening(chargeback, payment);
+  }
+
+  /**
+   * The rest of opening a chargeback, safe to run again: the hold (once), the notices (deduplicated by the inbox) and
+   * the dispute (once per chargeback). A run that stopped after creating the row is completed by the next notice or
+   * check, so a chargeback is never left without its hold.
+   */
+  private async finishOpening(found: Chargeback, payment: Payment) {
+    let chargeback = found;
+    if (chargeback.status !== 'open') return chargeback;
+    if (needsHold(chargeback)) chargeback = await this.holdFor(chargeback);
     const amount = formatMoney(chargeback.amountMinor, chargeback.currency);
     await this.inbox.reseller(chargeback.resellerId, 'chargeback.opened', {
       subject: chargeback.id,
@@ -210,18 +229,18 @@ export class ChargebacksService {
     } else {
       this.logger.error({ disputeId: chargeback.id }, 'Disputed payment is not in the reseller’s wallet currency; finance must settle it');
     }
-    return this.prisma.chargeback.update({ where: { id: chargeback.id }, data: { holdId, heldMinor: held, shortfallMinor: chargeback.amountMinor - held } });
+    const recorded = await this.prisma.chargeback.updateMany({
+      where: { id: chargeback.id, status: 'open', holdId: null, heldMinor: 0n, shortfallMinor: 0n },
+      data: { holdId, heldMinor: held, shortfallMinor: chargeback.amountMinor - held },
+    });
+    const now = await this.prisma.chargeback.findUniqueOrThrow({ where: { id: chargeback.id } });
+    // Decided (or held by another run) in the meantime: a hold this run made and the row does not name is released.
+    if (recorded.count === 0 && holdId && now.holdId !== holdId) await this.wallets.releaseHold(holdId, 'Chargeback decided before it was held: funds released');
+    return now;
   }
 
-  /** The card network decided. Applied once, whoever reports it first. */
-  async resolve(id: string, outcome: ChargebackOutcome, actorId: string | null, reason: string) {
-    const before = await this.prisma.chargeback.findUnique({ where: { id } });
-    if (!before) throw notFound();
-    const claimed = await this.prisma.chargeback.updateMany({ where: { id, status: 'open' }, data: { status: outcome, resolvedAt: new Date() } });
-    if (claimed.count === 0) {
-      if (before.status === outcome) return presentChargeback(before);
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'chargeback_closed', `This chargeback was already decided (${before.status}).`);
-    }
+  /** Moves a decided chargeback's money: each step happens once, so it can be run again after a failure. */
+  private async settleMoney(before: Chargeback, outcome: ChargebackOutcome) {
     const payment = await this.prisma.payment.findUniqueOrThrow({ where: { id: before.paymentId } });
     if (outcome === 'won') {
       if (before.holdId) await this.wallets.releaseHold(before.holdId, 'Card chargeback won: funds released');
@@ -231,10 +250,11 @@ export class ChargebacksService {
       if (before.holdId) await this.wallets.captureHoldTo(before.holdId, 'Card chargeback lost: returned to the cardholder', provider);
       const borne = before.amountMinor - before.heldMinor;
       if (borne > 0n) {
-        await this.ledger.post({
+        const reference = `chargeback:lost:${before.id}`;
+        if (!(await this.prisma.journalEntry.findUnique({ where: { reference } }))) await this.ledger.post({
           mode: before.mode,
           type: 'chargeback',
-          reference: `chargeback:lost:${before.id}`,
+          reference,
           resellerId: before.resellerId,
           description: before.protected ? 'Card chargeback lost: covered by chargeback protection' : 'Card chargeback lost: more than the wallet held',
           metadata: { chargeback_id: before.id, payment_id: payment.id },
@@ -242,9 +262,33 @@ export class ChargebacksService {
             { account: { kind: 'chargebacks', currency: before.currency }, debit: borne },
             { account: provider, credit: borne },
           ],
+        }).catch(error => {
+          // Another run posted it at the same moment: the unique reference keeps it once.
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
         });
       }
     }
+  }
+
+  /** The card network decided. Applied once, whoever reports it first. */
+  async resolve(id: string, outcome: ChargebackOutcome, actorId: string | null, reason: string) {
+    let before = await this.prisma.chargeback.findUnique({ where: { id } });
+    if (!before) throw notFound();
+    // Stripe reports its own decisions (re-read from Stripe); a hand-made one could contradict Stripe's later.
+    if (actorId !== null && before.provider === 'stripe') throw reportedByStripe();
+    // Never decided without its hold: one that was never made is made first.
+    if (before.status === 'open' && needsHold(before)) before = await this.holdFor(before);
+    const claimed = await this.prisma.chargeback.updateMany({ where: { id, status: 'open' }, data: { status: outcome, resolvedAt: new Date() } });
+    if (claimed.count === 0) {
+      const current = await this.prisma.chargeback.findUniqueOrThrow({ where: { id } });
+      if (current.status !== outcome) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'chargeback_closed', `This chargeback was already decided (${current.status}).`);
+      }
+      // Already decided this way: finish moving its money if an earlier run stopped part way (every step is once only).
+      await this.settleMoney(current, outcome);
+      return presentChargeback(current);
+    }
+    await this.settleMoney(before, outcome);
     const after = await this.prisma.chargeback.findUniqueOrThrow({ where: { id } });
     await this.tellDisputes(listener => listener.decided(after, outcome));
     if (actorId !== null) await this.audit.record({ actorId, action: `chargeback.${outcome}`, targetType: 'chargeback', targetId: id, before: presentChargeback(before), after: { ...presentChargeback(after), reason } });

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUrl, Length, Matches, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, IsUrl, Length, Matches, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, Roles, Scopes, SessionOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
@@ -49,6 +49,10 @@ class StoreFieldsDto {
   @ApiPropertyOptional({ enum: ['rail', 'bottom'], nullable: true, description: 'Your customers’ account app menu on desktop: a side `rail` or the `bottom` bar; null follows BitoCard’s default. Phones and tablets always use the bottom bar.' })
   @IsOptional() @ValidateIf((_dto, value) => value !== null) @IsIn(['rail', 'bottom'])
   desktop_nav?: 'rail' | 'bottom' | null;
+
+  @ApiPropertyOptional({ description: 'Ask your store’s customers for the identity check where BitoCard’s market rules require one (`true`, the default), or never (`false`: you take responsibility for knowing your customers). You can also turn it off for one customer in SHQ.' })
+  @IsOptional() @IsBoolean()
+  customer_verification?: boolean;
 }
 
 class CreateStoreDto extends StoreFieldsDto {

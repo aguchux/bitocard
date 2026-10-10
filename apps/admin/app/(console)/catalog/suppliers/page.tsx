@@ -238,6 +238,22 @@ function SupplierCard({ supplier }: { supplier: Supplier }) {
         <AppLink href={`/catalog?supplier=${supplier.code}`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
           View its products and list them on bitocard.com →
         </AppLink>
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-line p-4">
+          <div>
+            <p className="text-sm font-semibold text-ink">Identity checks for bitocard.com customers</p>
+            <p className="text-sm text-muted">
+              {supplier.customer_verification
+                ? "Customers buying its products on bitocard.com are asked where the market requires it."
+                : "Customers buying its products on bitocard.com are never asked. Resellers’ stores decide for themselves."}
+            </p>
+          </div>
+          <Toggle
+            label={`Ask bitocard.com customers buying ${supplier.name} products for the identity check`}
+            checked={supplier.customer_verification}
+            disabled={!operator}
+            onChange={customer_verification => update({ code: supplier.code, customer_verification })}
+          />
+        </div>
         <SupplierFeatures supplier={supplier} editable={operator} />
         <SupplierMarkets supplier={supplier} editable={operator} />
         <SupplierLogo key={supplier.logo_url ?? ""} supplier={supplier} editable={operator} />

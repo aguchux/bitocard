@@ -645,28 +645,33 @@ enum StoreStatus {
 
 /// A reseller's hosted storefront on <subdomain>.bitocard.com.
 model Store {
-  id            String         @id @default(uuid()) @db.Uuid
-  resellerId    String         @map("reseller_id") @db.Uuid
-  name          String
+  id                    String         @id @default(uuid()) @db.Uuid
+  resellerId            String         @map("reseller_id") @db.Uuid
+  name                  String
   /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.
-  subdomain     String         @unique
-  status        StoreStatus    @default(draft)
+  subdomain             String         @unique
+  status                StoreStatus    @default(draft)
   /// Customer checkout on the store: `test` (sandbox: simulated payments and orders) until the reseller switches it live.
-  checkoutMode  LedgerMode     @default(test) @map("checkout_mode")
+  checkoutMode          LedgerMode     @default(test) @map("checkout_mode")
   /// The customer account app's menu on desktop: `rail` or `bottom`; null follows BitoCard (the
   /// `customer_app_bottom_bar_desktop` switch). Phones and tablets always use the bottom bar.
-  desktopNav    String?        @map("desktop_nav")
-  logoUrl       String?        @map("logo_url")
-  primaryColor  String         @default("#070f4c") @map("primary_color")
-  accentColor   String         @default("#ff2382") @map("accent_color")
-  publishedAt   DateTime?      @map("published_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  reseller      Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
-  notifications Notification[]
-  devices       Device[]
-  customers     Customer[]
-  checkouts     Checkout[]
+  desktopNav            String?        @map("desktop_nav")
+  /// The store's customers are asked for the identity check where the market requires it (true) or never (false).
+  /// The reseller's choice for their store; BitoCard's for bitocard.com.
+  customerVerification  Boolean        @default(true) @map("customer_verification")
+  /// bitocard.com only: customers are asked only once this many days have passed since their first paid purchase.
+  verificationGraceDays Int?           @map("verification_grace_days")
+  logoUrl               String?        @map("logo_url")
+  primaryColor          String         @default("#070f4c") @map("primary_color")
+  accentColor           String         @default("#ff2382") @map("accent_color")
+  publishedAt           DateTime?      @map("published_at")
+  createdAt             DateTime       @default(now()) @map("created_at")
+  updatedAt             DateTime       @updatedAt @map("updated_at")
+  reseller              Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  notifications         Notification[]
+  devices               Device[]
+  customers             Customer[]
+  checkouts             Checkout[]
 
   @@index([resellerId])
   @@map("stores")
@@ -910,49 +915,48 @@ enum PaymentStatus {
 
 /// Money coming in: checkout top-ups and deposits into reserved bank accounts. Credited once, after the provider confirms.
 model Payment {
-  id                    String           @id @default(uuid()) @db.Uuid
-  resellerId            String           @map("reseller_id") @db.Uuid
-  mode                  LedgerMode
-  purpose               PaymentPurpose
+  id                      String           @id @default(uuid()) @db.Uuid
+  resellerId              String           @map("reseller_id") @db.Uuid
+  mode                    LedgerMode
+  purpose                 PaymentPurpose
   /// flutterwave, monnify or sandbox.
-  provider              String
+  provider                String
   /// Our reference sent to the provider (tx_ref).
-  reference             String           @unique
+  reference               String           @unique
   /// The provider's own transaction ID, once known. Unique, so one provider transaction is credited once.
-  providerTransactionId String?          @map("provider_transaction_id")
-  amountMinor           BigInt           @map("amount_minor")
-  currency              String           @db.Char(3)
-  feeMinor              BigInt           @default(0) @map("fee_minor")
-  status                PaymentStatus    @default(pending)
-  checkoutUrl           String?          @map("checkout_url")
-  returnUrl             String?          @map("return_url")
-  reservedAccountId     String?          @map("reserved_account_id") @db.Uuid
+  providerTransactionId   String?          @map("provider_transaction_id")
+  amountMinor             BigInt           @map("amount_minor")
+  currency                String           @db.Char(3)
+  feeMinor                BigInt           @default(0) @map("fee_minor")
+  status                  PaymentStatus    @default(pending)
+  checkoutUrl             String?          @map("checkout_url")
+  returnUrl               String?          @map("return_url")
+  reservedAccountId       String?          @map("reserved_account_id") @db.Uuid
   /// Taken through a reseller's own gateway (their connection), checked with their credentials: never in BitoCard's ledger.
-  connectionId          String?          @map("connection_id") @db.Uuid
-  failureReason         String?          @map("failure_reason")
-  createdAt             DateTime         @default(now()) @map("created_at")
-  completedAt           DateTime?        @map("completed_at")
+  connectionId            String?          @map("connection_id") @db.Uuid
+  failureReason           String?          @map("failure_reason")
+  createdAt               DateTime         @default(now()) @map("created_at")
+  completedAt             DateTime?        @map("completed_at")
   /// Money the provider took that BitoCard cannot credit: paid after the payment was closed (`late`) or for another amount
   /// (`mismatch`). Admins are told and it is refunded in full through the same gateway.
-  unmatchedReason       String?          @map("unmatched_reason")
-  unmatchedAmountMinor  BigInt?          @map("unmatched_amount_minor")
-  unmatchedCurrency     String?          @map("unmatched_currency") @db.Char(3)
-  unmatchedTransactionId String?         @map("unmatched_transaction_id")
-  unmatchedAt           DateTime?        @map("unmatched_at")
+  unmatchedReason         String?          @map("unmatched_reason")
+  unmatchedAmountMinor    BigInt?          @map("unmatched_amount_minor")
+  unmatchedCurrency       String?          @map("unmatched_currency") @db.Char(3)
+  unmatchedTransactionId  String?          @map("unmatched_transaction_id")
+  unmatchedAt             DateTime?        @map("unmatched_at")
   /// The gateway's refund of the unmatched money, once sent; attempts count refusals.
-  unmatchedRefundId     String?          @map("unmatched_refund_id")
-  unmatchedRefundAttempts Int            @default(0) @map("unmatched_refund_attempts")
-  unmatchedRefundedAt   DateTime?        @map("unmatched_refunded_at")
-  reseller              Reseller         @relation(fields: [resellerId], references: [id])
-  reservedAccount       ReservedAccount? @relation(fields: [reservedAccountId], references: [id])
-  checkout              Checkout?
+  unmatchedRefundId       String?          @map("unmatched_refund_id")
+  unmatchedRefundAttempts Int              @default(0) @map("unmatched_refund_attempts")
+  unmatchedRefundedAt     DateTime?        @map("unmatched_refunded_at")
+  reseller                Reseller         @relation(fields: [resellerId], references: [id])
+  reservedAccount         ReservedAccount? @relation(fields: [reservedAccountId], references: [id])
+  checkout                Checkout?
+  chargebacks             Chargeback[]
 
   @@unique([provider, providerTransactionId])
   @@index([resellerId, createdAt])
   @@index([status, createdAt])
   @@index([unmatchedAt, unmatchedRefundedAt])
-  chargebacks           Chargeback[]
-
   @@map("payments")
 }
 
@@ -1089,6 +1093,8 @@ model Supplier {
   /// Admin feature rules for the supplier's products ({ feature: required | allowed | excluded }), for adapters with
   /// gatedFeatures (DIDWW's numbers). Products breaking a rule are not synced.
   featureRules         Json              @default("{}") @map("feature_rules")
+  /// bitocard.com customers buying products routed here are asked for the identity check where the market requires it (true) or not.
+  customerVerification Boolean           @default(true) @map("customer_verification")
   lastSyncedAt         DateTime?         @map("last_synced_at")
   lastSyncError        String?           @map("last_sync_error")
   updatedAt            DateTime          @updatedAt @map("updated_at")
@@ -1351,63 +1357,63 @@ enum OrderStatus {
 
 /// A purchase from a quote. The wholesale cost and tax are held from the wallet until the supplier confirms the outcome.
 model Order {
-  id                    String          @id @default(uuid()) @db.Uuid
-  resellerId            String          @map("reseller_id") @db.Uuid
-  mode                  LedgerMode
-  quoteId               String          @unique @map("quote_id") @db.Uuid
-  productId             String          @map("product_id") @db.Uuid
-  quantity              Int
-  faceValueMinor        BigInt          @map("face_value_minor")
-  faceCurrency          String          @map("face_currency") @db.Char(3)
-  currency              String          @db.Char(3)
-  wholesaleMinor        BigInt          @map("wholesale_minor")
-  taxMinor              BigInt          @map("tax_minor")
-  priceMinor            BigInt          @map("price_minor")
-  resellerProfitMinor   BigInt          @map("reseller_profit_minor")
-  recipient             Json?
-  customerReference     String?         @map("customer_reference")
-  status                OrderStatus     @default(processing)
+  id                        String          @id @default(uuid()) @db.Uuid
+  resellerId                String          @map("reseller_id") @db.Uuid
+  mode                      LedgerMode
+  quoteId                   String          @unique @map("quote_id") @db.Uuid
+  productId                 String          @map("product_id") @db.Uuid
+  quantity                  Int
+  faceValueMinor            BigInt          @map("face_value_minor")
+  faceCurrency              String          @map("face_currency") @db.Char(3)
+  currency                  String          @db.Char(3)
+  wholesaleMinor            BigInt          @map("wholesale_minor")
+  taxMinor                  BigInt          @map("tax_minor")
+  priceMinor                BigInt          @map("price_minor")
+  resellerProfitMinor       BigInt          @map("reseller_profit_minor")
+  recipient                 Json?
+  customerReference         String?         @map("customer_reference")
+  status                    OrderStatus     @default(processing)
   /// In the admin exception queue: the supplier has not confirmed the outcome after repeated checks.
-  needsReview           Boolean         @default(false) @map("needs_review")
-  holdId                String?         @map("hold_id") @db.Uuid
+  needsReview               Boolean         @default(false) @map("needs_review")
+  holdId                    String?         @map("hold_id") @db.Uuid
   /// The supplier handling the current attempt (internal).
-  supplierCode          String          @map("supplier_code")
-  supplierProductId     String          @map("supplier_product_id") @db.Uuid
-  supplierCostMinor     BigInt          @map("supplier_cost_minor")
+  supplierCode              String          @map("supplier_code")
+  supplierProductId         String          @map("supplier_product_id") @db.Uuid
+  supplierCostMinor         BigInt          @map("supplier_cost_minor")
   /// What the supplier said it charged (Reloadly `balanceInfo.cost`, VTpass `total_amount`), and whether that differs from the expected cost.
-  supplierReportedCostMinor BigInt?     @map("supplier_reported_cost_minor")
-  costMismatch          Boolean         @default(false) @map("cost_mismatch")
-  supplierCurrency      String          @map("supplier_currency") @db.Char(3)
+  supplierReportedCostMinor BigInt?         @map("supplier_reported_cost_minor")
+  costMismatch              Boolean         @default(false) @map("cost_mismatch")
+  supplierCurrency          String          @map("supplier_currency") @db.Char(3)
   /// Our reference for the current attempt, sent to the supplier so a status check can find it.
-  supplierReference     String          @unique @map("supplier_reference")
-  supplierTransactionId String?         @map("supplier_transaction_id")
+  supplierReference         String          @unique @map("supplier_reference")
+  supplierTransactionId     String?         @map("supplier_transaction_id")
   /// `bitocard`, or `own`: fulfilled through the reseller's own supplier account (BitoCard charges only its fee).
-  source                String          @default("bitocard")
-  connectionId          String?         @map("connection_id") @db.Uuid
-  feeChargeId           String?         @map("fee_charge_id") @db.Uuid
+  source                    String          @default("bitocard")
+  connectionId              String?         @map("connection_id") @db.Uuid
+  feeChargeId               String?         @map("fee_charge_id") @db.Uuid
   /// Own supplier: BitoCard's fee taken from the wallet: the most it can be while processing, then what was charged.
-  feeMinor              BigInt?         @map("fee_minor")
+  feeMinor                  BigInt?         @map("fee_minor")
   /// Sandbox only: the outcome to simulate.
-  simulate              String?
-  checks                Int             @default(0)
-  nextCheckAt           DateTime?       @map("next_check_at")
-  failureReason         String?         @map("failure_reason")
+  simulate                  String?
+  checks                    Int             @default(0)
+  nextCheckAt               DateTime?       @map("next_check_at")
+  failureReason             String?         @map("failure_reason")
   /// Sequential receipt number, given when the order completes.
-  receiptNumber         Int?            @unique @map("receipt_number")
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-  completedAt           DateTime?       @map("completed_at")
+  receiptNumber             Int?            @unique @map("receipt_number")
+  createdAt                 DateTime        @default(now()) @map("created_at")
+  updatedAt                 DateTime        @updatedAt @map("updated_at")
+  completedAt               DateTime?       @map("completed_at")
   /// When the codes or licence keys were emailed to the customer (`recipient.email`); retried until sent.
-  deliveryEmailedAt     DateTime?       @map("delivery_emailed_at")
+  deliveryEmailedAt         DateTime?       @map("delivery_emailed_at")
   /// A storefront customer's order (checkout); they see it in their account.
-  customerId            String?         @map("customer_id") @db.Uuid
-  customer              Customer?       @relation(fields: [customerId], references: [id])
-  reseller              Reseller        @relation(fields: [resellerId], references: [id])
-  product               Product         @relation(fields: [productId], references: [id])
-  deliveries            OrderDelivery[]
-  access                OrderAccess?
-  virtualNumber         VirtualNumber?
-  attempts              OrderAttempt[]
+  customerId                String?         @map("customer_id") @db.Uuid
+  customer                  Customer?       @relation(fields: [customerId], references: [id])
+  reseller                  Reseller        @relation(fields: [resellerId], references: [id])
+  product                   Product         @relation(fields: [productId], references: [id])
+  deliveries                OrderDelivery[]
+  access                    OrderAccess?
+  virtualNumber             VirtualNumber?
+  attempts                  OrderAttempt[]
 
   @@index([resellerId, createdAt])
   @@index([status, nextCheckAt])
@@ -1456,44 +1462,44 @@ model OrderAccess {
 /// A virtual number sold through an order: its supplier's ID for it (internal), when it is paid up to, renewal and
 /// reminder state, and its SMS. Numbers stay with their supplier for life.
 model VirtualNumber {
-  id                String          @id @default(uuid()) @db.Uuid
-  orderId           String          @unique @map("order_id") @db.Uuid
-  resellerId        String          @map("reseller_id") @db.Uuid
-  mode              LedgerMode
-  productId         String          @map("product_id") @db.Uuid
-  supplierCode      String          @map("supplier_code")
+  id               String          @id @default(uuid()) @db.Uuid
+  orderId          String          @unique @map("order_id") @db.Uuid
+  resellerId       String          @map("reseller_id") @db.Uuid
+  mode             LedgerMode
+  productId        String          @map("product_id") @db.Uuid
+  supplierCode     String          @map("supplier_code")
   /// The supplier's ID for the number (DIDWW's DID ID). Internal: never shown to resellers or customers.
-  supplierNumberId  String          @map("supplier_number_id")
+  supplierNumberId String          @map("supplier_number_id")
   /// E.164, for example +442071234567.
-  number            String
+  number           String
   /// The supplier's monthly cost, in `costCurrency` minor units: what renewals are priced from.
-  monthlyCostMinor  BigInt          @map("monthly_cost_minor")
-  costCurrency      String          @map("cost_currency") @db.Char(3)
+  monthlyCostMinor BigInt          @map("monthly_cost_minor")
+  costCurrency     String          @map("cost_currency") @db.Char(3)
   /// active; expired (paused: in the 15-day grace, renewable); deleted (released, gone for good).
-  status            String          @default("active")
+  status           String          @default("active")
   /// Paid up to: renewing adds a month.
-  expiresAt         DateTime        @map("expires_at")
+  expiresAt        DateTime        @map("expires_at")
   /// Renew from the reseller's wallet 3 days before expiry: off until the customer (on the order page) or the reseller switches it on.
-  autoRenew         Boolean         @default(false) @map("auto_renew")
+  autoRenew        Boolean         @default(false) @map("auto_renew")
   /// The reseller lets the customer send SMS from the order page (charged to the reseller's wallet).
-  customerSending   Boolean         @default(false) @map("customer_sending")
-  renewedAt         DateTime?       @map("renewed_at")
+  customerSending  Boolean         @default(false) @map("customer_sending")
+  renewedAt        DateTime?       @map("renewed_at")
   /// Reminders for the current period: 7 days before expiry, on expiry, the delete warning 7 days after.
-  remindedAt        DateTime?       @map("reminded_at")
-  expiredAt         DateTime?       @map("expired_at")
-  warnedAt          DateTime?       @map("warned_at")
-  deletedAt         DateTime?       @map("deleted_at")
+  remindedAt       DateTime?       @map("reminded_at")
+  expiredAt        DateTime?       @map("expired_at")
+  warnedAt         DateTime?       @map("warned_at")
+  deletedAt        DateTime?       @map("deleted_at")
   /// Why the last automatic renewal did not happen (for example the wallet was short), and when it was tried.
-  renewalError      String?         @map("renewal_error")
-  renewalAttemptAt  DateTime?       @map("renewal_attempt_at")
+  renewalError     String?         @map("renewal_error")
+  renewalAttemptAt DateTime?       @map("renewal_attempt_at")
   /// A renewal the supplier left unclear (a timeout): its period (the hold's reference) and the renewals-left count asked
   /// for, so it is asked again exactly as before (never a second month) while the hold stays. Cleared once settled.
-  renewalPending    String?         @map("renewal_pending")
-  renewalCycles     Int?            @map("renewal_cycles")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
-  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  messages          NumberMessage[]
+  renewalPending   String?         @map("renewal_pending")
+  renewalCycles    Int?            @map("renewal_cycles")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  messages         NumberMessage[]
 
   @@unique([supplierCode, supplierNumberId])
   @@index([number, status])
@@ -2130,6 +2136,8 @@ model Customer {
   failedSignIns   Int                      @default(0) @map("failed_sign_ins")
   lockedUntil     DateTime?                @map("locked_until")
   lastSignInAt    DateTime?                @map("last_sign_in_at")
+  /// Asked for the identity check where it applies (true) or not: set by the store's owner. Never means checked.
+  identityCheck   Boolean                  @default(true) @map("identity_check")
   createdAt       DateTime                 @default(now()) @map("created_at")
   updatedAt       DateTime                 @updatedAt @map("updated_at")
   store           Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)

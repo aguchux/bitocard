@@ -1,6 +1,12 @@
 import { bitocardApi } from '../base';
 import type { ProductCategory, Section } from '../storefront';
+import type { StoreCustomer, StoreCustomerFilter } from '../store-customers';
 import type { List } from './types';
+
+export type { StoreCustomer } from '../store-customers';
+
+/** bitocard.com's identity check settings: off for every customer, or asked only some days after a first purchase. */
+export type CustomerVerificationSettings = { object: 'customer_verification_settings'; enabled: boolean; grace_days: number | null };
 
 export type StorefrontPage = {
   object: 'storefront_page';
@@ -109,10 +115,24 @@ export const adminStorefrontApi = bitocardApi.injectEndpoints({
       query: ({ category, ...body }) => ({ url: `/v1/admin/storefront/categories/${category}`, method: 'PUT', body }),
       invalidatesTags: ['Category', 'Media', 'Activity'],
     }),
+    storefrontCustomers: build.query<List<StoreCustomer>, StoreCustomerFilter>({ query: params => ({ url: '/v1/admin/storefront/customers', params }), providesTags: ['StoreCustomer'] }),
+    setStorefrontCustomerCheck: build.mutation<StoreCustomer, { id: string; identity_check: boolean }>({
+      query: ({ id, identity_check }) => ({ url: `/v1/admin/storefront/customers/${id}`, method: 'PATCH', body: { identity_check } }),
+      invalidatesTags: ['StoreCustomer', 'Activity'],
+    }),
+    customerVerificationSettings: build.query<CustomerVerificationSettings, void>({ query: () => '/v1/admin/storefront/customer-verification', providesTags: ['StoreCustomer'] }),
+    setCustomerVerificationSettings: build.mutation<CustomerVerificationSettings, { enabled?: boolean; grace_days?: number | null }>({
+      query: body => ({ url: '/v1/admin/storefront/customer-verification', method: 'PUT', body }),
+      invalidatesTags: ['StoreCustomer', 'Activity'],
+    }),
   }),
 });
 
 export const {
+  useStorefrontCustomersQuery,
+  useSetStorefrontCustomerCheckMutation,
+  useCustomerVerificationSettingsQuery,
+  useSetCustomerVerificationSettingsMutation,
   useStorefrontHomeQuery,
   useSaveStorefrontDraftMutation,
   usePublishStorefrontMutation,

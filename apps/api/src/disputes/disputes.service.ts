@@ -371,11 +371,18 @@ export class DisputesService {
         outcome = 'refunded_customer';
       } else if (input.action === 'credit_reseller') {
         amount = BigInt(input.amount!);
-        await this.wallets.adjust(actor.id, { resellerId: before.resellerId, mode: before.mode, balance: 'funding', amount: input.amount!, reason: `${disputeReference(before.number)}: ${note}` });
+        // Posted once per dispute, so executing it again after a failure can never credit twice.
+        await this.wallets.adjust(actor.id, { resellerId: before.resellerId, mode: before.mode, balance: 'funding', amount: input.amount!, reason: `${disputeReference(before.number)}: ${note}`, reference: `dispute:${before.id}:credit` });
         outcome = 'credited_reseller';
       } else if (input.action === 'accept_chargeback') {
-        await this.chargebacks.resolve(before.chargebackId!, 'lost', actor.id, note);
-        outcome = 'chargeback_lost';
+        const chargeback = await this.prisma.chargeback.findUniqueOrThrow({ where: { id: before.chargebackId! } });
+        if (chargeback.provider === 'stripe') {
+          // Not contested: Stripe closes it as lost and its notice moves the money.
+          outcome = 'chargeback_accepted';
+        } else {
+          await this.chargebacks.resolve(before.chargebackId!, 'lost', actor.id, note);
+          outcome = 'chargeback_lost';
+        }
       } else if (input.action === 'reject') {
         outcome = 'rejected';
       }
@@ -405,6 +412,8 @@ export class DisputesService {
     const chargeback = action === 'contest_chargeback' || action === 'accept_chargeback';
     if (chargeback && !dispute.chargebackId) throw invalid('action_not_applicable', 'This dispute is not a chargeback.', param);
     if (action === 'refund_customer' && !dispute.orderId) throw invalid('action_not_applicable', 'There is no order on this dispute to refund.', param);
+    // The chargeback already returns the money to the cardholder: refunding as well would pay them twice.
+    if (action === 'refund_customer' && dispute.chargebackId) throw invalid('action_not_applicable', 'The chargeback returns this money to the cardholder; decide the chargeback instead of refunding.', param);
     if (action === 'credit_reseller' && (amount === undefined || amount <= 0)) throw invalid('parameter_invalid', 'Say how much to credit, in minor units of the dispute currency.', 'amount');
     if (action !== 'credit_reseller' && amount !== undefined) throw invalid('parameter_invalid', 'An amount is only for crediting the reseller.', 'amount');
   }

@@ -258,6 +258,23 @@ describe('pricing', () => {
     assert.deepEqual([markup.settings.fixed_price, markup.customer_price], [null, Math.ceil(before.wholesale * 1.1)], 'trying a markup tries it instead of the fixed price');
   });
 
+  test('a fixed price is held to the Markup Protection Scheme: refused above the cap, and capped if the cap is lowered', async () => {
+    const { browser } = await resellerClient(server, { country: 'KE' });
+    const steam = await productId('gift_cards:US:steam-global');
+    const den = (await byKey(browser, 'gift_cards:US:steam-global')).pricing.denominations[0];
+    const tooHigh = await browser.put('/v1/pricing/markups', { product_id: steam, fixed_price: den.wholesale * 3 });
+    assert.deepEqual([tooHigh.status, tooHigh.json.error.code, tooHigh.json.error.param], [400, 'markup_above_cap', 'fixed_price'], 'at most 100% above BitoCard’s price');
+    assert.equal((await browser.put('/v1/pricing/markups', { product_id: steam, fixed_price: den.wholesale * 2 })).status, 200, 'exactly at the cap is allowed');
+    await admin.patch('/v1/admin/countries/KE', { markup_cap_percent: 10 });
+    try {
+      const capped = (await byKey(browser, 'gift_cards:US:steam-global')).pricing.denominations[0];
+      assert.equal(capped.price, Math.ceil(capped.wholesale * 1.1), 'a saved fixed price is capped again when priced');
+    } finally {
+      await admin.patch('/v1/admin/countries/KE', { markup_cap_percent: 100 });
+      await browser.delete(`/v1/pricing/markups?product_id=${steam}`);
+    }
+  });
+
   test('a lowered cap limits existing markups', async () => {
     const { browser } = await resellerClient(server, { country: 'KE' });
     await browser.put('/v1/pricing/markups', { category: 'gift_cards', markup_bps: 4000 });
@@ -303,9 +320,17 @@ describe('pricing', () => {
         'a customer discount can never exceed their own',
       );
 
-      // More than the supplier's 3% to BitoCard: capped at what BitoCard gets, so it never sells below cost.
+      // More than the supplier's 3% to BitoCard: no reseller discount at all, never cut to what BitoCard gets, which
+      // would show the reseller the supplier's cost (and leave BitoCard nothing).
       await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 400 });
-      assert.equal((await second()).wholesale, 4_850_000);
+      assert.equal((await second()).wholesale, 5_000_000);
+      const exact = (await browser.get(`/v1/catalogue/products/${mtn}/price-preview?face_value=5000000`)).json;
+      assert.deepEqual([exact.bitocard_price, exact.your_discount], [5_000_000, 0]);
+      const admin = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${mtn}&country=NG&face_value=5000000`)).json;
+      assert.deepEqual([admin.offers[0].reseller_discount, admin.offers[0].bitocard_profit], [0, 150_000], 'admins see BitoCard keeps the supplier discount');
+      // The supplier's 3% exactly: nothing left for BitoCard, so no reseller discount either.
+      await finance.put('/v1/admin/pricing-rules', { category: 'airtime', country: 'NG', kind: 'discount', reseller_discount_bps: 300 });
+      assert.equal((await second()).wholesale, 5_000_000);
     } finally {
       await finance.delete(`/v1/admin/pricing-rules/${rule.id}`);
     }
@@ -329,6 +354,14 @@ describe('pricing', () => {
       assert.ok(preview.offers[0].bitocard_profit > 0);
       const trial = (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${steam}&country=NG&face_value=500&kind=markup&margin_bps=0`)).json;
       assert.deepEqual([trial.trial.level, trial.offers[0].bitocard_profit], ['product', 0], 'a trial product rule, nothing saved');
+
+      // BitoCard's fixed price on a single-value product (DStv Padi, VTpass cost ₦3,546) is its own decision per market,
+      // with no cap: sold at exactly that price however far above cost (only resellers' prices are capped).
+      const padi = await productId('pay_tv:NG:dstv:dstv-padi');
+      const fixedAt = async price =>
+        (await finance.get(`/v1/admin/pricing-rules/preview?product_id=${padi}&country=NG&face_value=360000&kind=fixed&fixed_price=${price}&fixed_currency=NGN`)).json.offers.find(o => o.supplier_code === 'vtpass');
+      assert.deepEqual(await fixedAt(500_000).then(o => [o.sellable, o.wholesale]), [true, 500_000]);
+      assert.deepEqual(await fixedAt(2_000_000).then(o => [o.sellable, o.wholesale]), [true, 2_000_000]);
     } finally {
       await finance.delete(`/v1/admin/pricing-rules/${supplier.id}`);
     }

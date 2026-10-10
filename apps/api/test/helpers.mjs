@@ -262,3 +262,15 @@ Controller('fixtures/scoped')(ScopedController);
 
 export class FixturesModule {}
 Module({ controllers: [ThingsController, ScopedController] })(FixturesModule);
+
+/**
+ * Lists products for a test's store without the listing checks (resellers must get a discount on discount products,
+ * tested in listings.test.mjs), so fixtures keep BitoCard's default prices: everything on bitocard.com, or the given
+ * products on a reseller's store.
+ */
+export async function listForTest(server, { resellerId, productIds } = {}) {
+  const { PrismaService } = await import('../dist/database/prisma.service.js');
+  const prisma = server.app.get(PrismaService);
+  if (resellerId) return prisma.resellerListing.createMany({ data: productIds.map(productId => ({ resellerId, productId })), skipDuplicates: true });
+  return prisma.product.updateMany({ where: { listed: false }, data: { listed: true, listedAt: new Date() } });
+}

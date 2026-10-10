@@ -347,7 +347,12 @@ export class WalletService {
   }
 
   /** Admin correction with a recorded reason. Positive adds to the wallet, negative takes from it. */
-  async adjust(actorId: string | null, input: { resellerId: string; mode: LedgerMode; balance: 'funding' | 'earnings'; amount: number; reason: string }) {
+  /**
+   * A finance adjustment. With `reference` (a dispute's credit, for example) it is posted once: running it again
+   * changes nothing.
+   */
+  async adjust(actorId: string | null, input: { resellerId: string; mode: LedgerMode; balance: 'funding' | 'earnings'; amount: number; reason: string; reference?: string }) {
+    if (input.reference && (await this.prisma.journalEntry.findUnique({ where: { reference: input.reference } }))) return this.wallet(input.resellerId, input.mode);
     const { currency } = await this.currencyOf(input.resellerId);
     const amount = BigInt(input.amount);
     const resellerAccount = this.ref(input.resellerId, currency, input.balance === 'funding' ? 'reseller_funding' : 'reseller_earnings');
@@ -356,7 +361,7 @@ export class WalletService {
     const entry = await this.ledger.post({
       mode: input.mode,
       type: 'adjustment',
-      reference: `adjustment:${randomUUID()}`,
+      reference: input.reference ?? `adjustment:${randomUUID()}`,
       resellerId: input.resellerId,
       description: `Adjustment: ${input.reason}`,
       metadata: { actor_id: actorId, reason: input.reason },

@@ -1,5 +1,8 @@
 import { bitocardApi } from '../base';
+import type { StoreCustomer, StoreCustomerFilter } from '../store-customers';
 import type { List, ResellerStatus } from './common';
+
+export type { StoreCustomer } from '../store-customers';
 
 export type StoreStatus = 'draft' | 'published' | 'suspended';
 export type StoreBranding = { logo_url: string | null; primary_color: string | null; accent_color: string | null };
@@ -16,12 +19,14 @@ export type Store = {
   checkout_mode: 'test' | 'live';
   /** The customer account app's menu on desktop; null follows BitoCard's default. */
   desktop_nav: 'rail' | 'bottom' | null;
+  /** Customers are asked for the identity check where BitoCard's market rules require one (true), or never. */
+  customer_verification: boolean;
   published_at: string | null;
   created_at: string;
 };
 /** `reason` explains why an address cannot be used (format, reserved or taken). Your own store's address reads as taken. */
 export type SubdomainCheck = { object: 'subdomain_availability'; subdomain: string; available: boolean; reason: string | null };
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: 'test' | 'live'; desktop_nav?: 'rail' | 'bottom' | null };
+export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: 'test' | 'live'; desktop_nav?: 'rail' | 'bottom' | null; customer_verification?: boolean };
 
 /** The business details (`PATCH /v1/reseller`). The country can only be set once. */
 export type ResellerProfile = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus };
@@ -73,6 +78,15 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
       query: ({ key, value }) => ({ url: `/v1/settings/options/${key}`, method: 'PUT', body: { value } }),
       invalidatesTags: ['Settings'],
     }),
+    storeCustomers: build.query<List<StoreCustomer>, { storeId: string } & StoreCustomerFilter>({
+      query: ({ storeId, ...params }) => ({ url: `/v1/stores/${storeId}/customers`, params }),
+      providesTags: ['StoreCustomer'],
+    }),
+    /** Turns the identity check off or on for one customer of the store. Never marks them checked. */
+    setStoreCustomerCheck: build.mutation<StoreCustomer, { storeId: string; id: string; identity_check: boolean }>({
+      query: ({ storeId, id, identity_check }) => ({ url: `/v1/stores/${storeId}/customers/${id}`, method: 'PATCH', body: { identity_check } }),
+      invalidatesTags: ['StoreCustomer'],
+    }),
     publicCountries: build.query<List<Country>, void>({ query: () => '/v1/countries', providesTags: ['Country'] }),
     publicCountry: build.query<Country, string>({ query: code => `/v1/countries/${encodeURIComponent(code)}`, providesTags: ['Country'] }),
   }),
@@ -88,6 +102,8 @@ export const {
   useUpdateBusinessMutation,
   useResellerSettingsQuery,
   useSetSettingsOptionMutation,
+  useStoreCustomersQuery,
+  useSetStoreCustomerCheckMutation,
   usePublicCountriesQuery,
   usePublicCountryQuery,
 } = resellerStoreApi;

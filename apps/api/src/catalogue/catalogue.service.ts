@@ -147,6 +147,11 @@ export class CatalogueService {
         throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'product_unavailable', `Product ${id} is not available to you, so it cannot be listed.`, 'product_ids');
       }
     }
+    // Discount products that would leave them no discount cannot be listed until BitoCard sets a share.
+    const [problem] = await this.pricing.resellerShareProblems(await this.prisma.product.findMany({ where: { id: { in: ids } }, include: offersInclude }), ctx.country.code);
+    if (problem) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'reseller_discount_missing', `${problem.name} cannot be listed yet: BitoCard has not set your discount on it. Contact BitoCard support.`, 'product_ids');
+    }
     const added = await this.prisma.resellerListing.createMany({ data: ids.map(productId => ({ resellerId, productId })), skipDuplicates: true });
     return { object: 'listing_update' as const, listed, product_ids: ids, updated: added.count };
   }

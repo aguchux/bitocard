@@ -214,6 +214,8 @@ export type Supplier = {
    * or must not have it. Null for suppliers without features to set.
    */
   feature_rules: Record<ProductFeature, FeatureRule> | null;
+  /** bitocard.com customers buying its products are asked for the identity check where the market requires it. */
+  customer_verification: boolean;
   markets?: Array<{ country: string; category: ProductCategory; enabled: boolean }>;
   last_synced_at: string | null;
   last_sync_error: string | null;

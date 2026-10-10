@@ -12,13 +12,14 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { CheckoutController, CustomerAccountController } from './checkout.controller.js';
 import { CheckoutService } from './checkout.service.js';
 import { HouseService } from './house.service.js';
+import { AdminStoreCustomersController, IdentityChecksService, StoreCustomersController } from './identity-checks.js';
 import { StoreSellers } from './store-sellers.js';
 
 /** Store customers (accounts and sign-in) and checkout on hosted stores: bitocard.com and resellers' stores. */
 @Module({
   imports: [AuthModule, CatalogueModule, FeesModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule],
-  controllers: [CustomerAccountController, CheckoutController],
-  providers: [CustomersService, CustomerGuard, CheckoutService, HouseService, StoreSellers],
+  controllers: [CustomerAccountController, CheckoutController, StoreCustomersController, AdminStoreCustomersController],
+  providers: [CustomersService, CustomerGuard, CheckoutService, HouseService, StoreSellers, IdentityChecksService],
   exports: [CheckoutService, HouseService, CustomersService, StoreSellers],
 })
 export class CheckoutModule {}

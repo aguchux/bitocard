@@ -32,6 +32,7 @@ const store = objectSchema(
       ['test', 'live'],
     ),
     desktop_nav: nullableStr('Your customers’ account app menu on desktop: `rail` (side rail) or `bottom` (bottom bar); null follows BitoCard’s default. Phones and tablets always use the bottom bar.', { enum: ['rail', 'bottom', null] }),
+    customer_verification: bool('Whether your store’s customers are asked for the identity check where BitoCard’s market rules require one (`true`), or never (`false`). Turning it off never marks anyone as checked.'),
     published_at: nullableTime('When the store was first published; kept when it is unpublished.'),
     created_at: time('When the store was created.'),
   },
@@ -48,6 +49,7 @@ const storeExample = {
   branding: { logo_url: 'https://cdn.bitocard.com/bitocard/resellers/2f1e0d9c-8b7a-4c6d-9e5f-4a3b2c1d0e9f/store/logos/6b1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.png', primary_color: '#070f4c', accent_color: '#ff2382' },
   checkout_mode: 'live',
   desktop_nav: null,
+  customer_verification: true,
   published_at: '2026-10-02T14:20:00.000Z',
   created_at: '2026-10-01T10:05:12.000Z',
 };

@@ -235,7 +235,7 @@ export class PricingService {
     const fixed = ofProduct?.fixedMinor ?? null;
     return {
       customerDiscountBps: discount.value,
-      markupBps: Math.min(markup.value, ctx.capBps),
+      markupBps: Math.min(markup.value, ctx.capBps, maxResellerMarkupBps),
       fixedMinor: fixed,
       from: { customerDiscount: discount.from, markup: markup.from, fixed: fixed === null ? 'none' : 'product' },
     };
@@ -302,15 +302,21 @@ export class PricingService {
     if (rule.kind === 'discount') {
       const floor = ownFee === null ? cost : cost + ownFee;
       if (floor > face) return null;
-      // BitoCard's own offers: the reseller's discount, at most what the supplier gives. Own supplier: their cost plus BitoCard's fee.
-      wholesale = ownFee === null ? face - min(shareBps(face, rule.resellerDiscountBps), face - cost) : floor;
+      // BitoCard's own offers: the reseller's discount only while the supplier's covers it with some left for BitoCard;
+      // otherwise none. Never cut to what the supplier gives, which would show resellers the supplier's cost.
+      // Own supplier: their cost plus BitoCard's fee.
+      const share = shareBps(face, rule.resellerDiscountBps);
+      wholesale = ownFee === null ? (share < face - cost ? face - share : face) : floor;
       price = face - min(shareBps(face, terms.customerDiscountBps), face - wholesale);
     } else {
+      // BitoCard's fixed price is its own decision per market, with no cap (a $2.50 number may sell to resellers at $15).
       wholesale = ownFee !== null ? cost + ownFee : rule.kind === 'fixed' ? fixedWholesale! : addBps(cost, rule.marginBps);
       if (wholesale < cost) return null;
+      // The Markup Protection Scheme caps the reseller's fixed price as it caps their markup, when set and when priced.
+      const ceiling = addBps(wholesale, Math.min(ctx.capBps, maxResellerMarkupBps));
       if (terms.fixedMinor !== null) {
         fixedBelowCost = terms.fixedMinor < wholesale;
-        price = fixedBelowCost ? wholesale : terms.fixedMinor;
+        price = fixedBelowCost ? wholesale : min(terms.fixedMinor, ceiling);
       } else {
         price = addBps(wholesale, terms.markupBps);
       }
@@ -446,6 +452,7 @@ export class PricingService {
         throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such product in this category.', 'product_id');
       }
       category = product.category;
+      if (input.fixed_price !== undefined && input.fixed_price !== null) await this.assertFixedWithinCap(resellerId, input.product_id, BigInt(input.fixed_price), cap);
     } else if (input.fixed_price !== undefined && input.fixed_price !== null) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'A fixed price is set for one product.', 'fixed_price');
     }
@@ -461,9 +468,85 @@ export class PricingService {
     return this.pricingSettings(resellerId);
   }
 
+  /**
+   * A fixed customer price may be at most the Markup Protection Scheme's cap above BitoCard's price today (it is
+   * capped again whenever it is priced, as BitoCard's price moves). Products not on sale to the reseller are not checked.
+   */
+  private async assertFixedWithinCap(resellerId: string, productId: string, fixed: bigint, capBps: number) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId }, include: { supplierProducts: { where: { available: true }, include: { supplier: true } } } });
+    if (!product) return;
+    const priced = await this.preview(resellerId, 'live', product, null, { fixed_price: null }).catch(() => null);
+    if (!priced || priced.scheme !== 'markup') return;
+    const ceiling = addBps(BigInt(priced.bitocard_price), capBps);
+    if (fixed > ceiling) {
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'invalid_request_error',
+        'markup_above_cap',
+        `The Markup Protection Scheme allows at most ${capBps / 100}% above BitoCard's price: a fixed price of at most ${ceiling} (minor units) for this product today.`,
+        'fixed_price',
+      );
+    }
+  }
+
   async removeMarkup(resellerId: string, category: ProductCategory | null, productId: string | null) {
     await this.prisma.resellerMarkup.deleteMany({ where: productId ? { resellerId, productId } : { resellerId, category, productId: null } });
     return this.pricingSettings(resellerId);
+  }
+
+  /** A reseller-less context for one market (admin previews and checks): BitoCard's rules, no reseller settings. */
+  private async marketContext(country: PricingContext['country'], mode: LedgerMode, rules?: PricingRule[]): Promise<PricingContext> {
+    const markets = await this.prisma.supplierMarket.findMany({ where: { countryCode: country.code, enabled: true } });
+    return {
+      resellerId: '',
+      mode,
+      country,
+      currency: country.currency,
+      international: true,
+      capBps: country.markupCapPercent * 100,
+      markups: [],
+      rules: rules ?? (await this.prisma.pricingRule.findMany()),
+      markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
+      rates: new Map(),
+      planCode: 'standard',
+      feeRules: [],
+      own: new Map(),
+    };
+  }
+
+  /**
+   * Discount products that would leave resellers no discount, per market: BitoCard's rule gives them no share, or the
+   * supplier's discount does not cover their share with some left for BitoCard. Resellers sell for profit, so such a
+   * product cannot be listed until an admin sets a share the supplier's discount covers. Every enabled supplier in
+   * the market counts (the cheapest is routed, and it gives the biggest discount). Products not sold in a market,
+   * or sold there by markup, have no problem.
+   */
+  async resellerShareProblems(products: ProductWithOffers[], onlyCountry?: string) {
+    const countries = await this.prisma.country.findMany({ where: onlyCountry ? { code: onlyCountry } : {}, include: { categories: true } });
+    const rules = await this.prisma.pricingRule.findMany();
+    const contexts = new Map<string, PricingContext>();
+    const problems: { product_id: string; name: string; country: string; reseller_discount_bps: number; supplier_discount_bps: number }[] = [];
+    for (const product of products) {
+      const face = product.fixedValues[0] ?? product.minValueMinor ?? null;
+      if (face === null || face <= 0n) continue;
+      const markets = onlyCountry ? countries : countries.filter(country => country.code === product.country);
+      for (const country of markets.length ? markets : countries) {
+        if (!contexts.has(country.code)) contexts.set(country.code, await this.marketContext(country, 'test', rules));
+        const ctx = contexts.get(country.code)!;
+        if (this.unavailableReason(ctx, product)) continue;
+        const priced = await this.price(ctx, product, face).catch(() => null);
+        if (!priced || priced.basis !== 'discount' || priced.wholesale < priced.face) continue;
+        problems.push({
+          product_id: product.id,
+          name: product.name,
+          country: country.code,
+          reseller_discount_bps: priced.rule.resellerDiscountBps,
+          supplier_discount_bps: priced.face > 0n ? Number(((priced.face - priced.cost) * 10_000n) / priced.face) : 0,
+        });
+        break;
+      }
+    }
+    return problems;
   }
 
   /**
@@ -597,22 +680,7 @@ export class PricingService {
   ) {
     const country = await this.prisma.country.findUnique({ where: { code: countryCode.toUpperCase() }, include: { categories: true } });
     if (!country) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such market.', 'country');
-    const markets = await this.prisma.supplierMarket.findMany({ where: { countryCode: country.code, enabled: true } });
-    const ctx: PricingContext = {
-      resellerId: '',
-      mode: 'live',
-      country,
-      currency: country.currency,
-      international: true,
-      capBps: country.markupCapPercent * 100,
-      markups: [],
-      rules: await this.prisma.pricingRule.findMany(),
-      markets: new Set(markets.map(m => `${m.supplierCode}:${m.category}`)),
-      rates: new Map(),
-      planCode: 'standard',
-      feeRules: [],
-      own: new Map(),
-    };
+    const ctx = await this.marketContext(country, 'live');
     const current = this.rule(ctx, product, null);
     if (trial?.kind) {
       const row: PricingRule = {
