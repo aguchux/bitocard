@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import type { LedgerMode, TaxRate } from '../generated/prisma/client.js';
 
 export type TaxBreakdown = { name: string; rateBps: number; pricesIncludeTax: boolean; net: bigint; tax: bigint; gross: bigint };
@@ -41,12 +42,26 @@ export class TaxService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly inbox: InboxService,
   ) {}
 
+  /**
+   * Tax on a sale in a taxable category. Without a rate (or, live, an unconfirmed one) the sale is refused, the buyer
+   * told only that the country is not open yet, and admins told once a day per country what to set.
+   */
   async calculate(countryCode: string, amount: bigint, mode: LedgerMode) {
     const rate = await this.prisma.taxRate.findUnique({ where: { countryCode } });
     if (!rate || (mode === 'live' && !rate.confirmed)) {
-      throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'tax_not_configured', `Sales to ${countryCode} are not open yet.`);
+      const country = await this.prisma.country.findUnique({ where: { code: countryCode }, select: { name: true } });
+      const name = country?.name ?? countryCode;
+      await this.inbox.admins('admin.tax.rate_unconfirmed', {
+        subject: `${countryCode}:${new Date().toISOString().slice(0, 10)}`,
+        title: `Sales refused in ${name}: tax rate not confirmed`,
+        body: `A ${mode === 'live' ? 'live ' : ''}sale in a category marked taxable in ${name} was refused because ${name}'s tax rate is ${rate ? 'not confirmed' : 'not set'}. Confirm it, or mark the category not taxable, in Settings > Markets.`,
+        link: `/settings/markets?country=${countryCode}`,
+        mode,
+      });
+      throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'tax_not_configured', `This cannot be bought in ${name} yet.`);
     }
     return computeTax(rate, amount);
   }

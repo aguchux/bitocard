@@ -39,6 +39,7 @@ import type {
   Switches,
   Verification,
   VerificationStatus,
+  TaxRate,
 } from './types';
 
 export * from './types';
@@ -267,6 +268,12 @@ export const adminApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Switch', 'Activity'],
     }),
     countries: build.query<List<Country>, void>({ query: () => '/v1/admin/countries', providesTags: ['Country'] }),
+    /** Tax BitoCard collects per country; live sales in taxable categories need a confirmed rate. */
+    taxRates: build.query<List<TaxRate>, void>({ query: () => '/v1/admin/tax-rates', providesTags: ['Country'] }),
+    setTaxRate: build.mutation<TaxRate, { country: string; name: string; rate_bps: number; prices_include_tax: boolean; confirmed: boolean }>({
+      query: ({ country, ...body }) => ({ url: `/v1/admin/tax-rates/${country}`, method: 'PUT', body }),
+      invalidatesTags: ['Country', 'Activity'],
+    }),
     /** Shown at once; the saved country replaces the cached one, so nothing is refetched. */
     updateCountryCategory: build.mutation<Country, { code: string; category: ProductCategory; enabled?: boolean; customer_verification?: boolean; taxable?: boolean }>({
       query: ({ code, category, ...body }) => ({ url: `/v1/admin/countries/${code}/categories/${category}`, method: 'PUT', body }),
@@ -384,6 +391,8 @@ export const {
   useSetSwitchMutation,
   useCountriesQuery,
   useUpdateCountryCategoryMutation,
+  useTaxRatesQuery,
+  useSetTaxRateMutation,
   useIntegrationsQuery,
   useUpdateIntegrationMutation,
   useTestIntegrationMutation,

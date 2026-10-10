@@ -7,6 +7,9 @@ import type { ProductFeature } from '../storefront';
 export type { ProductFeature };
 export type Mode = 'test' | 'live';
 export type List<T> = { object: 'list'; data: T[]; has_more?: boolean };
+
+/** A country's sales tax. Live sales in its taxable categories need it confirmed (after tax advice). */
+export type TaxRate = { object: 'tax_rate'; country: string; name: string; rate_bps: number; prices_include_tax: boolean; confirmed: boolean; updated_at: string };
 export type Page = { limit?: number; starting_after?: string };
 
 export const productCategories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;

@@ -4,8 +4,9 @@ import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { useCountriesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
+import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
 import { PaymentMethods } from "./payment-methods";
+import { TaxRateCard } from "./tax-rate";
 
 const fields = [
   { key: "enabled", label: "Sold here" },
@@ -35,6 +36,8 @@ function Markets() {
   const { data, error, isFetching, refetch } = useCountriesQuery();
   const [update, state] = useUpdateCountryCategoryMutation();
   const editable = can(admin, "operations");
+  const taxRates = useTaxRatesQuery();
+  const rate = taxRates.data?.data.find(item => item.country === country?.code);
   const paymentsEditable = can(admin, "operations", "finance");
   const countries = data?.data ?? [];
   const country = countries.find(item => item.code === asked) ?? countries[0];
@@ -124,6 +127,18 @@ function Markets() {
               </tbody>
             </table>
           </div>
+          {rate && !rate.confirmed && country.categories.some(item => item.enabled && item.taxable) ? (
+            <div className="px-4 pb-3 sm:px-6">
+              <Notice tone="amber" title="Live sales refused">
+                {`${country.categories
+                  .filter(item => item.enabled && item.taxable)
+                  .map(item => categoryName(item.category))
+                  .join(", ")} ${country.categories.filter(item => item.enabled && item.taxable).length === 1 ? "is" : "are"} marked taxable, but ${country.name}'s tax rate is not confirmed, so customers cannot buy ${country.categories.filter(item => item.enabled && item.taxable).length === 1 ? "it" : "them"} live. Confirm the rate below after tax advice, or switch Taxable off.`}
+              </Notice>
+            </div>
+          ) : null}
+          <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Tax</h3>
+          <TaxRateCard key={`${country.code}:${rate?.updated_at ?? ""}`} country={country.name} code={country.code} rate={rate ?? null} editable={can(admin, "finance")} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Payment methods</h3>
           <PaymentMethods code={country.code} country={country.name} editable={paymentsEditable} />
         </Card>

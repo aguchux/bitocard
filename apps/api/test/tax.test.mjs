@@ -40,8 +40,16 @@ describe('rates', () => {
   test('pilot rates are seeded unconfirmed: the sandbox can use them, live sales cannot', async () => {
     const sandbox = await tax.calculate('NG', 10_750n, 'test');
     assert.deepEqual([sandbox.name, sandbox.tax], ['VAT', 750n]);
-    await assert.rejects(tax.calculate('NG', 10_750n, 'live'), error => error.code === 'tax_not_configured');
+    await assert.rejects(tax.calculate('NG', 10_750n, 'live'), error => error.code === 'tax_not_configured' && error.message === 'This cannot be bought in Nigeria yet.');
     await assert.rejects(tax.calculate('GB', 100n, 'test'), error => error.code === 'tax_not_configured');
+    // Admins are told what to set, once a day per country however many sales are refused.
+    await adminClient(server, ['finance']);
+    await assert.rejects(tax.calculate('NG', 10_750n, 'live'));
+    await assert.rejects(tax.calculate('NG', 10_750n, 'live'));
+    const prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+    const notices = await prisma.notification.findMany({ where: { type: 'admin.tax.rate_unconfirmed' } });
+    assert.ok(notices.length > 0 && notices.every(row => row.link === '/settings/markets?country=NG'));
+    assert.equal(new Set(notices.map(row => row.userId)).size, notices.length, 'once per admin');
   });
 
   test('finance admins confirm a rate, which opens live sales and is audited', async () => {

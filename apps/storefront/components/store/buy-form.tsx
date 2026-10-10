@@ -43,6 +43,8 @@ export function BuyForm({
   const [state, action, pending] = useActionState<FormState, FormData>(startCheckout, {});
   const values = product.denominations ?? [];
   const [market, setMarket] = useState(country ?? (product.global ? "" : product.country));
+  // The country the last attempt was for: its error is hidden once the shopper picks another country.
+  const [tried, setTried] = useState(market);
 
   if (!signedIn) {
     return (
@@ -62,10 +64,10 @@ export function BuyForm({
   }
 
   return (
-    <form action={action} className="mt-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Buy ${product.name}`}>
+    <form action={action} onSubmit={() => setTried(market)} className="mt-6 space-y-5 rounded-2xl border border-slate-200 bg-white p-5" aria-label={`Buy ${product.name}`}>
       <input type="hidden" name="product_id" value={product.id} />
       <input type="hidden" name="back" value={back} />
-      <FormMessage state={state} />
+      {market === tried ? <FormMessage state={state} /> : null}
 
       {values.length ? (
         <fieldset>
