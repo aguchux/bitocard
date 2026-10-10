@@ -21,6 +21,11 @@ class StoreQueryDto {
   @IsOptional()
   @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
   store?: string;
+
+  @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
 }
 
 /** Endpoints that only take the shopper’s market. */
@@ -47,6 +52,11 @@ class HomeQueryDto {
   @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
   store?: string;
 
+  @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
+
   @ApiPropertyOptional({ description: 'A preview link token from the Storefront Manager: shows the draft.' })
   @IsOptional()
   @IsString()
@@ -64,6 +74,11 @@ class StoreProductsQueryDto {
   @IsOptional()
   @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
   store?: string;
+
+  @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
 
   @ApiPropertyOptional({ enum: categories })
   @IsOptional()
@@ -144,6 +159,11 @@ class SearchQueryDto {
   @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
   store?: string;
 
+  @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
+
   @ApiProperty({ description: 'What to look for: a brand, a company, a product, a category or a country.', example: 'playstation' })
   @IsString()
   @Length(1, 100)
@@ -208,28 +228,28 @@ export class StorefrontController {
   @Get('home')
   @Header('Cache-Control', 'public, max-age=60')
   home(@Query() query: HomeQueryDto) {
-    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.home(query.preview));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.home(query.preview), query.currency);
   }
 
   @ApiOperation({ summary: 'List products', description: 'Filter by category, menu group, country, brand, tag or words; sorted by popularity, name or newest.' })
   @Get('products')
   @Header('Cache-Control', 'public, max-age=60')
   products(@Query() query: StoreProductsQueryDto) {
-    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.products(query));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.products(query), query.currency);
   }
 
   @ApiOperation({ summary: 'Get a product', description: 'Its face values, how it is delivered, and related products.' })
   @Get('products/:key')
   @Header('Cache-Control', 'public, max-age=60')
   product(@Param('key') key: string, @Query() query: StoreQueryDto) {
-    return this.storefront.inStore(storeOf(query), undefined, () => this.storefront.product(key));
+    return this.storefront.inStore(storeOf(query), undefined, () => this.storefront.product(key), query.currency);
   }
 
   @ApiOperation({ summary: 'Search everything', description: 'Products, brands and the companies behind them, categories and countries, best matches first.' })
   @Get('search')
   @Header('Cache-Control', 'public, max-age=60')
   search(@Query() query: SearchQueryDto) {
-    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.search(query.q, query));
+    return this.storefront.inStore(storeOf(query), query.market, () => this.storefront.search(query.q, query), query.currency);
   }
 
   @ApiOperation({ summary: 'List categories on sale' })

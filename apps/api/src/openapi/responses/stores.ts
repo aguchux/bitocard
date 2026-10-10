@@ -1,5 +1,5 @@
 import { categoryLabels, navigationGroups, productSources } from '../../storefront/layout.js';
-import { array, bool, constant, int, list, listExample, nullableInt, nullableStr, nullableTime, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
+import { array, bool, constant, int, list, listExample, nullable, nullableInt, nullableStr, nullableTime, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import { category, features } from './commerce.js';
 import type { DocsArea } from './index.js';
 
@@ -112,6 +112,17 @@ const productProperties: Record<string, Schema> = {
   denomination_type: oneOf('`fixed` face values, or a `range` the customer chooses within.', ['fixed', 'range']),
   from: int('Lowest face value, in minor units of `face_currency`.'),
   to: int('Highest face value, in minor units of `face_currency`.'),
+  price: nullable(
+    shape(
+      {
+        currency: str('The currency asked (ISO 4217).'),
+        from: int('Lowest face value in `currency`, in minor units, rounded up to a whole unit.'),
+        to: int('Highest face value in `currency`, in minor units, rounded up to a whole unit.'),
+        rate: str('Minor units of `currency` per minor unit of `face_currency` (a decimal), for converting any face value the same way.'),
+      },
+      'The face values in the signed-in customer’s currency, at BitoCard’s rate. Only when `currency` is asked and has a rate; what the customer pays is quoted at checkout.',
+    ),
+  ),
   description: nullableStr('About the product.'),
   logo_url: nullableStr('The product logo from BitoCard files: the product image, else the brand logo; or null.'),
   features,
@@ -278,6 +289,7 @@ const mtnProduct = {
   denomination_type: 'range',
   from: 5_000,
   to: 5_000_000,
+  price: null,
   description: 'Top up any MTN Nigeria prepaid line.',
   logo_url: null,
   features: [],

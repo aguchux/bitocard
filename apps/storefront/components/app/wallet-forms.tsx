@@ -8,11 +8,10 @@ import type { FormState } from "@/lib/account-actions";
 import { openBankAccount, simulateDeposit, topUpWallet } from "@/lib/wallet";
 
 /** Topping the wallet up: an amount, then the payment page of the method chosen. */
-export function TopUpForm({ country, currency, methods, amount, sandbox }: { country: string | null; currency: string; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean }) {
+export function TopUpForm({ currency, methods, amount, sandbox }: { currency: string; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(topUpWallet, {});
   return (
     <form action={action} className="space-y-4" aria-label="Top up your wallet">
-      {country ? <input type="hidden" name="country" value={country} /> : null}
       <FormMessage state={state} />
       <TextField label={`Amount (${currency})`} name="amount" inputMode="decimal" required defaultValue={amount} state={state} hint="Spent only in this store. Wallet money cannot be withdrawn." />
       {methods.length ? (
@@ -50,11 +49,10 @@ export function TopUpForm({ country, currency, methods, amount, sandbox }: { cou
 }
 
 /** Opening the customer's own bank account number (Nigeria asks for the BVN, which goes to the bank only). */
-export function BankAccountForm({ country, needsBvn }: { country: string | null; needsBvn: boolean }) {
+export function BankAccountForm({ needsBvn }: { needsBvn: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(openBankAccount, {});
   return (
     <form action={action} className="space-y-4" aria-label="Get a bank account number">
-      {country ? <input type="hidden" name="country" value={country} /> : null}
       <FormMessage state={state} />
       {needsBvn ? (
         <TextField label="BVN" name="bvn" inputMode="numeric" pattern="\d{11}" maxLength={11} required state={state} hint="The bank needs your BVN to open the account. We pass it on and do not keep it." />
@@ -92,7 +90,7 @@ export function BankAccountLink({ tone = "dark", from }: { tone?: "dark" | "ligh
  * The customer's own bank account number: a popup with the BVN form where needed (Nigeria; passed to the bank, never
  * kept). Rendered once on the wallet page; `BankAccountLink` opens it.
  */
-export function BankAccountDialog({ country, needsBvn }: { country: string | null; needsBvn: boolean }) {
+export function BankAccountDialog({ needsBvn }: { needsBvn: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   return (
     <dialog
@@ -112,7 +110,7 @@ export function BankAccountDialog({ country, needsBvn }: { country: string | nul
       </div>
       <div className="space-y-4 p-5">
         <p className="text-sm text-slate-600">A bank account number in your name, free. Transfer to it from any bank app and the money is added to your wallet once it arrives.</p>
-        <BankAccountForm country={country} needsBvn={needsBvn} />
+        <BankAccountForm needsBvn={needsBvn} />
       </div>
     </dialog>
   );
@@ -123,7 +121,7 @@ export function BankAccountDialog({ country, needsBvn }: { country: string | nul
  * up by card or mobile money through a payment page. Where the market offers bank account numbers it also shows the
  * customer's (to transfer to), or the link to get one. Opens by itself when the customer came to top up for a purchase.
  */
-export function AddFunds({ wallet, country, amount, open = false }: { wallet: StoreWallet; country: string | null; amount?: string; open?: boolean }) {
+export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet; amount?: string; open?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (open && !dialog.current?.open) dialog.current?.showModal();
@@ -153,7 +151,7 @@ export function AddFunds({ wallet, country, amount, open = false }: { wallet: St
           </button>
         </div>
         <div className="space-y-6 p-5">
-          <TopUpForm country={country} currency={wallet.currency} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
+          <TopUpForm currency={wallet.currency} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
           {wallet.reserved_accounts_available ? (
             <section aria-labelledby="add-bank" className="border-t border-slate-100 pt-5">
               <h3 id="add-bank" className="mb-1 flex items-center gap-2 font-semibold">

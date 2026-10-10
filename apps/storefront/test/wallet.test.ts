@@ -36,26 +36,26 @@ afterEach(() => {
 });
 
 describe("topping the wallet up", () => {
-  test("sends the amount in minor units and returns to the wallet; live goes to the payment page", async () => {
+  test("sends the amount in minor units (never a country: the wallet is the customer's own) and returns to the wallet; live goes to the payment page", async () => {
     const fetch = vi.fn(async () => reply({ object: "customer_top_up", id: "t1", mode: "live", checkout_url: "https://checkout.stripe.com/c/1" }, 201));
     vi.stubGlobal("fetch", fetch);
-    await expect(topUpWallet({}, form({ amount: "2500.50", country: "NG", method: "stripe" }))).rejects.toThrow("redirect:https://checkout.stripe.com/c/1");
+    await expect(topUpWallet({}, form({ amount: "2500.50", country: "GH", method: "stripe" }))).rejects.toThrow("redirect:https://checkout.stripe.com/c/1");
     const [call] = fetch.mock.calls as unknown as Call[];
     expect(call[0]).toBe("http://api.test/v1/store/wallet/top-ups");
-    expect(bodyOf(call)).toEqual({ amount: 250050, country: "NG", method: "stripe", return_url: "https://bitocard.com/account/wallet?country=NG" });
+    expect(bodyOf(call)).toEqual({ amount: 250050, method: "stripe", return_url: "https://bitocard.com/account/wallet" });
   });
 
   test("the sandbox has no payment page: back to the wallet showing the top-up; nonsense amounts are refused here", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ object: "customer_top_up", id: "t2", mode: "test", checkout_url: "https://sandbox.test" }, 201)));
-    await expect(topUpWallet({}, form({ amount: "10", country: "NG" }))).rejects.toThrow("redirect:/account/wallet?country=NG&top_up=t2");
+    await expect(topUpWallet({}, form({ amount: "10" }))).rejects.toThrow("redirect:/account/wallet?top_up=t2");
     expect(await topUpWallet({}, form({ amount: "0.5" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
   });
 
   test("a bank account number: the BVN goes to the API only, and the page refreshes", async () => {
     const fetch = vi.fn(async () => reply({ object: "list", data: [] }));
     vi.stubGlobal("fetch", fetch);
-    expect((await openBankAccount({}, form({ country: "NG", bvn: "22222222222" }))).notice).toMatch(/account number is ready/);
-    expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toEqual({ country: "NG", bvn: "22222222222" });
+    expect((await openBankAccount({}, form({ bvn: "22222222222" }))).notice).toMatch(/account number is ready/);
+    expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toEqual({ bvn: "22222222222" });
     expect(revalidatePath).toHaveBeenCalledWith("/account/wallet");
   });
 
@@ -93,7 +93,7 @@ describe("paying from the wallet", () => {
     expect(bodyOf((fetch.mock.calls as unknown as Call[])[0]).preview).toBeUndefined();
   });
 
-  test("changing country brings that country's methods and the wallet there", async () => {
+  test("another country's methods come with the customer's own wallet (it never changes country)", async () => {
     const fetch = vi.fn(async (url: string) =>
       url.includes("/payment-methods")
         ? reply({ object: "list", mode: "live", wallet_required: true, data: [{ object: "payment_method", id: "wallet", label: "Wallet", description: "", networks: [] }] })
@@ -102,6 +102,6 @@ describe("paying from the wallet", () => {
     vi.stubGlobal("fetch", fetch);
     const choice = await paymentMethodsFor("GH");
     expect([choice.walletRequired, choice.methods.map(item => item.id), choice.wallet?.currency]).toEqual([true, ["wallet"], "GHS"]);
-    expect((fetch.mock.calls as unknown as Call[]).map(call => call[0]).sort()).toEqual(["http://api.test/v1/store/payment-methods?country=GH", "http://api.test/v1/store/wallet?country=GH"]);
+    expect((fetch.mock.calls as unknown as Call[]).map(call => call[0]).sort()).toEqual(["http://api.test/v1/store/payment-methods?country=GH", "http://api.test/v1/store/wallet"]);
   });
 });

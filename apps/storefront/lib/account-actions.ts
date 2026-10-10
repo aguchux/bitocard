@@ -19,7 +19,12 @@ const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim
 const failed = (result: { message: string; param: string | null }): FormState => ({ error: result.message, field: result.param });
 
 export async function signUp(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi<SessionReply>("POST", "/v1/store/account/signup", { name: text(form, "name"), email: text(form, "email"), password: String(form.get("password") ?? "") });
+  const result = await customerApi<SessionReply>("POST", "/v1/store/account/signup", {
+    name: text(form, "name"),
+    email: text(form, "email"),
+    password: String(form.get("password") ?? ""),
+    country: text(form, "country") || undefined,
+  });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
   redirect(`/account/verify?next=${encodeURIComponent(safeNext(form.get("next")))}`);
@@ -74,6 +79,14 @@ export async function updateName(_state: FormState, form: FormData): Promise<For
   if (!result.ok) return failed(result);
   revalidatePath("/account");
   return { notice: "Saved." };
+}
+
+/** Sets the country of an account from before it was asked (once: it never changes after). */
+export async function setCountry(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { country: text(form, "country") });
+  if (!result.ok) return failed(result);
+  revalidatePath("/", "layout");
+  return { notice: "Saved. Your wallet and prices are now in your country's currency." };
 }
 
 export async function changePassword(_state: FormState, form: FormData): Promise<FormState> {

@@ -9,10 +9,10 @@ import { categoryTheme } from "./theme";
 /** A product's page: `/p/<key>` in the store, `/account/p/<key>` inside the customer's account app. */
 export const productHref = (product: Pick<StoreProduct, "key">, base = "/p") => `${base}/${encodeURIComponent(product.key)}`;
 
-/** "From $10", or "$10" when there is one value. */
+/** "From $10", or "$10" when there is one value; signed in, in the customer's own currency ("From ₦15,000"). */
 export function priceLabel(product: StoreProduct) {
   if (!product.from) return "";
-  const from = formatFace(product.from, product.face_currency);
+  const from = product.price ? formatFace(product.price.from, product.price.currency) : formatFace(product.from, product.face_currency);
   return product.to > product.from ? `From ${from}` : from;
 }
 

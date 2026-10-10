@@ -6,9 +6,8 @@ import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
-import { currentMarket, inMarket } from "@/lib/market";
+import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
-import { currentStore } from "@/lib/store";
 import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
@@ -31,15 +30,12 @@ function spent(summary: StoreCustomerSummary | null) {
 
 /** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
 export default async function AccountHome() {
-  const [{ store }, market, navigation] = await Promise.all([currentStore(), currentMarket(), storeNavigation()]);
-  // The wallet in the store's country; on bitocard.com the shopper's market, else (shopping globally) the first market,
-  // as the wallet page does.
-  const walletCountry = store ? null : market && market !== "global" ? market : (navigation.countries[0]?.code ?? null);
-  const [summary, popular, recent, wallet] = await Promise.all([
+  const [navigation, summary, popular, recent, wallet] = await Promise.all([
+    storeNavigation(),
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
     inMarket("/v1/store/products?sort=popular&limit=8").then(path => storeApi<StoreList<StoreProduct>>(path)),
     customerApi<StoreList<StoreCheckout>>("GET", "/v1/store/checkouts?limit=3"),
-    store || walletCountry ? walletFor(walletCountry) : null,
+    walletFor(),
   ]);
   const figures = summary.ok ? summary.data : null;
   // Card widths: the next one peeks at every width; on desktops three and a quarter show (exactly three without a wallet).
@@ -60,7 +56,7 @@ export default async function AccountHome() {
         <StatsSlider>
           {wallet ? (
             <li className={statItem}>
-              <Link href={`/account/wallet${walletCountry ? `?country=${walletCountry}` : ""}`} className="block h-full rounded-3xl">
+              <Link href="/account/wallet" className="block h-full rounded-3xl">
                 <StatCard icon={Wallet} tone="navy" label="Wallet balance" value={amount(wallet.balance, wallet.currency)} note={`${wallet.mode === "test" ? "Test money · " : ""}${wallet.enabled ? "Add funds" : "Spend what is left"}`} />
               </Link>
             </li>

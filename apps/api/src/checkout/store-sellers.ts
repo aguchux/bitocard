@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { LedgerMode, Reseller, Store } from '../generated/prisma/client.js';
+import type { Customer, LedgerMode, Reseller, Store } from '../generated/prisma/client.js';
 import { PaymentMethodsService, presentMethod } from '../payments/payment-methods.service.js';
 import { isPaymentGateway, type PaymentGateway, PaymentProviders } from '../payments/payment-providers.js';
 import type { CheckoutProvider } from '../payments/providers.js';
@@ -62,6 +62,24 @@ export class StoreSellers {
       throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'store_checkout_unavailable', 'This store cannot take orders yet. Try again later.');
     }
     return reseller;
+  }
+
+  /**
+   * The account selling to a customer: on bitocard.com their country's house account (their country is fixed at
+   * sign-up; an older account without one is fixed now to the country asked, else `country_required`), on a reseller's
+   * store the reseller. Whatever else is asked, a customer always buys and tops up in their own country's currency.
+   */
+  async sellerFor(customer: Customer & { store: Store }, asked?: string): Promise<Reseller> {
+    if (!this.isHouse(customer.store)) return this.seller(customer.store, '');
+    if (!customer.country) {
+      if (!asked) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'Choose your country in your account first.', 'country');
+      const market = await this.prisma.country.findUnique({ where: { code: asked.toUpperCase() } });
+      if (!market) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'market_unavailable', 'BitoCard does not sell in this country yet.', 'country');
+      await this.prisma.customer.updateMany({ where: { id: customer.id, country: null }, data: { country: market.code } });
+      // Another request may have fixed it first: theirs stands.
+      customer.country = (await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { country: true } })).country;
+    }
+    return this.seller(customer.store, customer.country!);
   }
 
   /**

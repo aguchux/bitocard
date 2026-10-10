@@ -353,7 +353,7 @@ let counter = 0;
 async function customer({ verified = true } = {}) {
   const shopper = store();
   const email = `shopper${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery' });
+  const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery', country: 'NG' });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   if (verified) {
     const code = await lastEmailCode(server.app, email);
@@ -368,7 +368,7 @@ describe('store customer accounts', () => {
   test('sign up confirms the email by code; the store keeps the session token, the API only its hash', async () => {
     const shopper = store();
     const email = `ada-${Date.now()}@example.com`;
-    const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada', email: email.toUpperCase(), password: 'correct horse battery' });
+    const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada', email: email.toUpperCase(), password: 'correct horse battery', country: 'NG' });
     assert.equal(signup.status, 201, JSON.stringify(signup.json));
     assert.deepEqual([signup.json.customer.email, signup.json.customer.email_verified], [email, false]);
     assert.match(signup.json.session.token, /^bcc_/);
@@ -377,7 +377,7 @@ describe('store customer accounts', () => {
     const message = server.app.get(EmailService).outbox.filter(item => item.to === email).at(-1);
     assert.match(message.subject, /is your BitoCard verification code/);
 
-    assert.deepEqual([(await store().post('/v1/store/account/signup', { name: 'Ada', email, password: 'correct horse battery' })).json.error.code], ['email_taken']);
+    assert.deepEqual([(await store().post('/v1/store/account/signup', { name: 'Ada', email, password: 'correct horse battery', country: 'NG' })).json.error.code], ['email_taken']);
     assert.equal((await store().get('/v1/store/account')).status, 401);
     assert.equal((await shopper.post('/v1/store/account/email/verify', { code: '000000' })).json.error.code, 'code_invalid');
     const verified = await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) });

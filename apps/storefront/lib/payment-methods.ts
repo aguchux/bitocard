@@ -13,6 +13,6 @@ export type PaymentChoice = { methods: StorePaymentMethod[]; walletRequired: boo
  */
 export async function paymentMethodsFor(country: string): Promise<PaymentChoice> {
   if (!/^[A-Z]{2}$/.test(country)) return { methods: [], walletRequired: false, wallet: null };
-  const [result, wallet] = await Promise.all([storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }), walletFor(country)]);
+  const [result, wallet] = await Promise.all([storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }), walletFor()]);
   return result.ok ? { methods: result.data.data, walletRequired: Boolean(result.data.wallet_required), wallet } : { methods: [], walletRequired: false, wallet };
 }

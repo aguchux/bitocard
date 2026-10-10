@@ -6,7 +6,7 @@ import { Public } from '../auth/caller.js';
 import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
-import { CustomersService, presentCustomer } from '../customers/customers.service.js';
+import { CustomersService } from '../customers/customers.service.js';
 import { StoreKey } from '../customers/store-key.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { PageDto } from '../ledger/wallet.controller.js';
@@ -23,6 +23,10 @@ const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? va
 class SignUpDto {
   @Transform(trim) @IsString() @Length(2, 100)
   name: string;
+
+  /** bitocard.com: the customer's country (a BitoCard market), fixed for good. Ignored on a reseller's store (theirs). */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
 
   @Transform(lowerTrim) @IsEmail() @Length(3, 254)
   email: string;
@@ -58,8 +62,12 @@ class ResetDto extends CodeDto {
 }
 
 class ProfileDto {
-  @Transform(trim) @IsString() @Length(2, 100)
-  name: string;
+  @IsOptional() @Transform(trim) @IsString() @Length(2, 100)
+  name?: string;
+
+  /** Only for an account with no country yet (bitocard.com); a country once set never changes. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
 }
 
 class ChangePasswordDto {
@@ -110,9 +118,12 @@ class StartCheckoutDto {
   @IsOptional() @IsInt() @Min(1) @Max(10)
   quantity?: number;
 
-  /** The customer's market: they pay in its currency (a reseller's store always sells in its own country). */
-  @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
-  country: string;
+  /**
+   * Ignored once the customer has a country (fixed at sign-up; a reseller's store is theirs): they always pay in its
+   * currency. An older bitocard.com account without one is fixed to this country.
+   */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
 
   /** A gateway, or `wallet` (the only one while the store's wallets are on). */
   @IsOptional() @IsIn([...Object.keys(paymentGateways), 'wallet'])
@@ -209,7 +220,7 @@ export class CustomerAccountController {
   @UseGuards(CustomerGuard)
   @Get()
   me(@CurrentCustomer() caller: CustomerCaller) {
-    return presentCustomer(caller.customer);
+    return this.customers.present(caller.customer);
   }
 
   @UseGuards(CustomerGuard)
@@ -253,7 +264,7 @@ export class CustomerAccountController {
   async verification(@CurrentCustomer() caller: CustomerCaller, @Query() query: CountryQueryDto) {
     const store = caller.customer.store;
     const mode = this.stores.mode(store);
-    const seller = await this.stores.seller(store, query.country);
+    const seller = await this.stores.sellerFor(caller.customer, query.country);
     const verified = await this.identity.isCustomerVerified(seller.id, mode, caller.customer.id);
     const latest = verified ? null : await this.identity.customerVerification(seller.id, mode, caller.customer.id).catch(() => null);
     return { object: 'customer_verification_status' as const, country: seller.country, verified, latest };

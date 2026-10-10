@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, FileText, LogOut, ShieldCheck, Store } from "lucide-react";
+import { ChevronRight, FileText, Lock, LogOut, ShieldCheck, Store } from "lucide-react";
 import { legalDocuments } from "@bitocard/ui/legal";
 import { appUrl } from "@bitocard/ui/site";
-import { NameForm, PasswordForm } from "@/components/store/account-forms";
+import { CountryForm, NameForm, PasswordForm } from "@/components/store/account-forms";
+import { Flag } from "@/components/store/flag";
 import { signOut } from "@/lib/account-actions";
+import { markets } from "@/lib/countries";
 import { currentCustomer } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Account" };
@@ -43,9 +45,14 @@ function Row({ href, icon: Icon, label, note, external = false }: { href: string
   );
 }
 
-/** The Account tab: who the customer is, their name and password, identity check, legal documents and signing out. */
+/**
+ * The Account tab: who the customer is, their country (chosen at sign-up and fixed: their wallet, payments and prices
+ * are in its currency; an older account chooses it here once), their name and password, identity check, legal
+ * documents and signing out.
+ */
 export default async function ProfilePage() {
-  const customer = (await currentCustomer())!;
+  const [customer, countries] = await Promise.all([currentCustomer().then(found => found!), markets()]);
+  const country = countries.find(item => item.code === customer.country);
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="sr-only">Account</h1>
@@ -57,6 +64,29 @@ export default async function ProfilePage() {
           <p className="truncate text-xl font-extrabold">{customer.name}</p>
           <p className="truncate text-slate-500">{customer.email}</p>
         </div>
+      </section>
+
+      <section id="country" aria-labelledby="country-heading" className="scroll-mt-24 rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
+        <h2 id="country-heading" className="mb-3 text-lg font-bold">
+          Your country
+        </h2>
+        {customer.country ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <Flag code={customer.country} className="h-6 w-9" />
+            <p className="min-w-0 flex-1">
+              <span className="block font-semibold">{country?.name ?? customer.country}</span>
+              <span className="block text-sm text-slate-500">Your wallet, payments and prices are in {customer.currency ?? country?.currency ?? "its currency"}.</span>
+            </p>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              <Lock className="size-3.5" aria-hidden="true" /> Fixed
+            </span>
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-slate-600">Choose the country you buy from. Your wallet, payments and prices will be in its currency, and it cannot be changed later.</p>
+            <CountryForm markets={countries} />
+          </>
+        )}
       </section>
 
       <div className="grid gap-6 md:grid-cols-2">

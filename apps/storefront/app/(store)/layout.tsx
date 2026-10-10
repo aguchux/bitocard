@@ -53,7 +53,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           Test store: orders are simulated and no money is taken.
         </p>
       ) : null}
-      <StoreHeader groups={groups} countries={countries} market={market} signedIn={Boolean(customer)} store={store} />
+      <StoreHeader groups={groups} countries={countries} market={market} marketLocked={Boolean(customer?.country && !store)} signedIn={Boolean(customer)} store={store} />
       <main id="main" className="mx-auto w-full max-w-[1400px] px-4 pt-6 sm:px-6 lg:px-8">
         {children}
       </main>

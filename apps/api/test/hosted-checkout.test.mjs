@@ -99,7 +99,7 @@ function storeServer(subdomain = null) {
 async function customer(subdomain = null) {
   const shopper = storeServer(subdomain);
   const email = `buyer${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery' });
+  const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery', country: 'NG' });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   shopper.email = email;

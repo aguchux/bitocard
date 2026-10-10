@@ -16816,6 +16816,16 @@
             }
           },
           {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.",
+            "schema": {
+              "example": "NGN",
+              "type": "string"
+            }
+          },
+          {
             "name": "preview",
             "required": false,
             "in": "query",
@@ -16940,6 +16950,7 @@
                             "denomination_type": "range",
                             "from": 5000,
                             "to": 5000000,
+                            "price": null,
                             "description": "Top up any MTN Nigeria prepaid line.",
                             "logo_url": null,
                             "features": [],
@@ -16972,6 +16983,7 @@
                             "denomination_type": "fixed",
                             "from": 440000,
                             "to": 440000,
+                            "price": null,
                             "description": "One month of DStv Padi.",
                             "logo_url": null,
                             "features": [],
@@ -17004,6 +17016,7 @@
                             "denomination_type": "fixed",
                             "from": 1000,
                             "to": 5000,
+                            "price": null,
                             "description": null,
                             "logo_url": null,
                             "features": [],
@@ -17505,6 +17518,16 @@
             }
           },
           {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.",
+            "schema": {
+              "example": "NGN",
+              "type": "string"
+            }
+          },
+          {
             "name": "category",
             "required": false,
             "in": "query",
@@ -17679,6 +17702,7 @@
                       "denomination_type": "range",
                       "from": 5000,
                       "to": 5000000,
+                      "price": null,
                       "description": "Top up any MTN Nigeria prepaid line.",
                       "logo_url": null,
                       "features": [],
@@ -17711,6 +17735,7 @@
                       "denomination_type": "range",
                       "from": 100,
                       "to": 100000,
+                      "price": null,
                       "description": null,
                       "logo_url": null,
                       "features": [],
@@ -17803,6 +17828,16 @@
               "example": "adadigital",
               "type": "string"
             }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.",
+            "schema": {
+              "example": "NGN",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -17827,6 +17862,7 @@
                   "denomination_type": "fixed",
                   "from": 440000,
                   "to": 440000,
+                  "price": null,
                   "description": "One month of DStv Padi.",
                   "logo_url": null,
                   "features": [],
@@ -17945,6 +17981,16 @@
             }
           },
           {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.",
+            "schema": {
+              "example": "NGN",
+              "type": "string"
+            }
+          },
+          {
             "name": "q",
             "required": true,
             "in": "query",
@@ -18001,6 +18047,7 @@
                       "denomination_type": "range",
                       "from": 5000,
                       "to": 5000000,
+                      "price": null,
                       "description": "Top up any MTN Nigeria prepaid line.",
                       "logo_url": null,
                       "features": [],
@@ -18033,6 +18080,7 @@
                       "denomination_type": "range",
                       "from": 100,
                       "to": 100000,
+                      "price": null,
                       "description": null,
                       "logo_url": null,
                       "features": [],
@@ -30504,6 +30552,7 @@
           "denomination_type",
           "from",
           "to",
+          "price",
           "description",
           "logo_url",
           "features",
@@ -30581,6 +30630,42 @@
             "type": "integer",
             "description": "Highest face value, in minor units of `face_currency`."
           },
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "The face values in the signed-in customer’s currency, at BitoCard’s rate. Only when `currency` is asked and has a rate; what the customer pays is quoted at checkout.",
+                "required": [
+                  "currency",
+                  "from",
+                  "to",
+                  "rate"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "description": "The currency asked (ISO 4217)."
+                  },
+                  "from": {
+                    "type": "integer",
+                    "description": "Lowest face value in `currency`, in minor units, rounded up to a whole unit."
+                  },
+                  "to": {
+                    "type": "integer",
+                    "description": "Highest face value in `currency`, in minor units, rounded up to a whole unit."
+                  },
+                  "rate": {
+                    "type": "string",
+                    "description": "Minor units of `currency` per minor unit of `face_currency` (a decimal), for converting any face value the same way."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "description": {
             "type": [
               "string",
@@ -30637,6 +30722,7 @@
           "denomination_type",
           "from",
           "to",
+          "price",
           "description",
           "logo_url",
           "features",
@@ -30719,6 +30805,42 @@
           "to": {
             "type": "integer",
             "description": "Highest face value, in minor units of `face_currency`."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "The face values in the signed-in customer’s currency, at BitoCard’s rate. Only when `currency` is asked and has a rate; what the customer pays is quoted at checkout.",
+                "required": [
+                  "currency",
+                  "from",
+                  "to",
+                  "rate"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "description": "The currency asked (ISO 4217)."
+                  },
+                  "from": {
+                    "type": "integer",
+                    "description": "Lowest face value in `currency`, in minor units, rounded up to a whole unit."
+                  },
+                  "to": {
+                    "type": "integer",
+                    "description": "Highest face value in `currency`, in minor units, rounded up to a whole unit."
+                  },
+                  "rate": {
+                    "type": "string",
+                    "description": "Minor units of `currency` per minor unit of `face_currency` (a decimal), for converting any face value the same way."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "description": {
             "type": [

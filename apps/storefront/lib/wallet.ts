@@ -9,12 +9,12 @@ import { customerApi, siteOrigin } from "@/lib/customer";
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
 /**
- * The signed-in customer's wallet in a country (bitocard.com; a reseller's store is always its own country), for the
- * buy form when the shopper changes "Paying from". Null when signed out or the API cannot be reached.
+ * The signed-in customer's wallet: always in their own country's currency (chosen at sign-up and fixed; a reseller's
+ * store is the reseller's). Null when signed out, before an older account has chosen its country, or when the API
+ * cannot be reached.
  */
-export async function walletFor(country: string | null): Promise<StoreWallet | null> {
-  if (country !== null && !/^[A-Z]{2}$/.test(country)) return null;
-  const result = await customerApi<StoreWallet>("GET", `/v1/store/wallet${country ? `?country=${country}` : ""}`);
+export async function walletFor(): Promise<StoreWallet | null> {
+  const result = await customerApi<StoreWallet>("GET", "/v1/store/wallet");
   return result.ok ? result.data : null;
 }
 
@@ -22,12 +22,9 @@ export async function walletFor(country: string | null): Promise<StoreWallet | n
 export async function topUpWallet(_state: FormState, form: FormData): Promise<FormState> {
   const amount = Math.round(Number(text(form, "amount")) * 100);
   if (!Number.isFinite(amount) || amount < 100) return { error: "Enter an amount of at least 1.", field: "amount" };
-  const country = text(form, "country") || undefined;
   const back = new URL(`${await siteOrigin()}/account/wallet`);
-  if (country) back.searchParams.set("country", country);
   const result = await customerApi<StoreWalletTopUp>("POST", "/v1/store/wallet/top-ups", {
     amount,
-    country,
     method: text(form, "method") || undefined,
     return_url: back.toString(),
   });
@@ -38,13 +35,12 @@ export async function topUpWallet(_state: FormState, form: FormData): Promise<Fo
   }
   // Live: to the payment page. The sandbox has none: the wallet page simulates it.
   if (result.data.mode === "live" && result.data.checkout_url) redirect(result.data.checkout_url);
-  redirect(`/account/wallet?${new URLSearchParams({ ...(country ? { country } : {}), top_up: result.data.id }).toString()}`);
+  redirect(`/account/wallet?${new URLSearchParams({ top_up: result.data.id }).toString()}`);
 }
 
 /** Opens the customer's own bank account number for the wallet (Nigeria asks for the BVN, passed to the bank only). */
 export async function openBankAccount(_state: FormState, form: FormData): Promise<FormState> {
-  const country = text(form, "country") || undefined;
-  const result = await customerApi<{ data: StoreReservedAccount[] }>("POST", "/v1/store/wallet/reserved-accounts", { country, bvn: text(form, "bvn") || undefined });
+  const result = await customerApi<{ data: StoreReservedAccount[] }>("POST", "/v1/store/wallet/reserved-accounts", { bvn: text(form, "bvn") || undefined });
   if (!result.ok) return { error: result.message, field: result.param };
   revalidatePath("/account/wallet");
   return { notice: "Your account number is ready. Transfers into it top up your wallet." };

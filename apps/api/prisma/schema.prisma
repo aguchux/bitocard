@@ -549,6 +549,7 @@ model Country {
   options            CountryOption[]
   paymentMethods     PaymentMethod[]
   resellers          Reseller[]
+  customers          Customer[]
 
   @@map("countries")
 }
@@ -2159,9 +2160,13 @@ model Customer {
   lastSignInAt     DateTime?                @map("last_sign_in_at")
   /// Asked for the identity check where it applies (true) or not: set by the store's owner. Never means checked.
   identityCheck    Boolean                  @default(true) @map("identity_check")
+  /// The customer's country, chosen at sign-up (a reseller's store: the reseller's) and then fixed: their wallet,
+  /// checkouts and prices are in its currency. Null only for accounts from before it was asked, until they choose.
+  country          String?                  @db.Char(2)
   createdAt        DateTime                 @default(now()) @map("created_at")
   updatedAt        DateTime                 @updatedAt @map("updated_at")
   store            Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  market           Country?                 @relation(fields: [country], references: [code], onDelete: Restrict)
   sessions         CustomerSession[]
   codes            CustomerCode[]
   checkouts        Checkout[]

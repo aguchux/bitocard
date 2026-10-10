@@ -184,7 +184,7 @@ describe('proving the order is yours', () => {
   test('a store customer’s order opens only for them, signed in', async () => {
     const placed = await order({ email: false });
     const signup = async name => {
-      const res = await visitor.post('/v1/store/account/signup', { name, email: `${name}-${Date.now()}@example.com`, password: 'correct horse battery' });
+      const res = await visitor.post('/v1/store/account/signup', { name, email: `${name}-${Date.now()}@example.com`, password: 'correct horse battery', country: 'NG' });
       assert.equal(res.status, 201, JSON.stringify(res.json));
       return res.json;
     };

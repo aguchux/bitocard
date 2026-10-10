@@ -11,7 +11,7 @@ import { Flag } from "./flag";
  * markets on sale, or to stay global; the choice is kept in a cookie and the store then leaves out other countries'
  * local products (their airtime, data, bills…). The header button shows the choice and changes it.
  */
-export function MarketChooser({ countries, market }: { countries: StoreCountry[]; market: string | null }) {
+export function MarketChooser({ countries, market, locked = false }: { countries: StoreCountry[]; market: string | null; locked?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [filter, setFilter] = useState("");
@@ -30,6 +30,17 @@ export function MarketChooser({ countries, market }: { countries: StoreCountry[]
       await chooseMarket(value);
       dialog.current?.close();
     });
+
+  // Signed in, the market is the customer's own country (chosen at sign-up and fixed): shown, not changed.
+  if (locked) {
+    return (
+      <span title="Your account's country" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-[15px] font-semibold text-[#070f4c] sm:px-3">
+        <Flag code={market} className="h-4 w-6" />
+        <span className="hidden max-w-28 truncate sm:inline">{current?.name ?? market}</span>
+        <span className="sr-only">, your account&apos;s country</span>
+      </span>
+    );
+  }
 
   return (
     <>

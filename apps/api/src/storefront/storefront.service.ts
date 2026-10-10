@@ -4,12 +4,15 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { worldwideCategories, worldwideCountry } from '../catalogue/pricing.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Brand, LedgerMode, Prisma, Product, ProductCategory } from '../generated/prisma/client.js';
+import { FxService } from '../fx/fx.service.js';
+import { type Brand, type LedgerMode, Prisma, type Product, type ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
 import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
 import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema, storeHome } from './layout.js';
 
+const Decimal = Prisma.Decimal;
+type Decimal = Prisma.Decimal;
 const homeKey = 'home';
 const previewLifetimeMs = 30 * 60_000;
 const regionNames = new Intl.DisplayNames(['en-GB'], { type: 'region' });
@@ -46,8 +49,18 @@ export type StoreProductFilter = {
 
 type Availability = { where: Prisma.ProductWhereInput; categories: Set<ProductCategory> };
 
-/** What a request sees: the shopper's market, and on a reseller's hosted store, that reseller (their listings and offers). */
-type Scope = { market: string | null; store?: { resellerId: string; country: string; mode: LedgerMode } };
+/** Currencies shown without minor units (as the store's `formatFace`). */
+const wholeCurrencies = new Set(['JPY', 'KRW', 'UGX', 'RWF', 'XOF', 'XAF']);
+const digits = (currency: string) => (wholeCurrencies.has(currency) ? 0 : 2);
+
+/** Each currency's `pay` rate (units per US dollar) for showing prices in a shopper's currency. */
+type Prices = { currency: string; perUsd: Map<string, Decimal> };
+
+/**
+ * What a request sees: the shopper's market, on a reseller's hosted store that reseller (their listings and offers),
+ * and the signed-in customer's currency for prices (`prices`).
+ */
+type Scope = { market: string | null; store?: { resellerId: string; country: string; mode: LedgerMode }; prices?: Prices };
 
 /**
  * BitoCard's own storefront (bitocard.com), read by anyone: the published home page with its sections filled in, the
@@ -62,18 +75,51 @@ export class StorefrontService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
+    private readonly fx: FxService,
   ) {}
+
+  /**
+   * The rates for showing prices in `currency` (the signed-in customer's): BitoCard's `pay` rate for every currency
+   * that has one. None when no currency is asked or it has no rate (paused or stale), so prices stay face values.
+   */
+  private async prices(currency: string | undefined): Promise<Prices | undefined> {
+    if (!currency) return undefined;
+    const settings = await this.prisma.currencySetting.findMany({ select: { currency: true } });
+    const perUsd = new Map<string, Decimal>([['USD', new Decimal(1)]]);
+    for (const { currency: code } of settings) {
+      const rate = await this.fx.rate(code).catch(() => null);
+      if (rate) perUsd.set(code, rate.pay);
+    }
+    return perUsd.has(currency) ? { currency, perUsd } : undefined;
+  }
+
+  /**
+   * A product's face values in the shopper's currency, converted at BitoCard's rate and rounded up to a whole unit
+   * (`rate`: the shopper's minor units per face minor unit, for converting any value the same way). Null without a
+   * currency or a rate. What the customer pays is quoted at checkout.
+   */
+  private localPrice(faceCurrency: string, from: bigint, to: bigint) {
+    const prices = this.scope.getStore()?.prices;
+    const face = prices?.perUsd.get(faceCurrency);
+    const local = prices?.perUsd.get(prices.currency);
+    if (!prices || !face || !local) return null;
+    const rate = local.div(face).mul(new Decimal(10).pow(digits(prices.currency) - digits(faceCurrency)));
+    const unit = new Decimal(10).pow(digits(prices.currency));
+    const convert = (value: bigint) => (faceCurrency === prices.currency ? Number(value) : rate.mul(value.toString()).div(unit).ceil().mul(unit).toNumber());
+    return { currency: prices.currency, from: convert(from), to: convert(to), rate: faceCurrency === prices.currency ? '1' : rate.toSignificantDigits(12).toString() };
+  }
 
   /**
    * Runs `work` for a shopper who chose a market (bitocard.com asks on the first visit and remembers it): other
    * countries' local products (their airtime, data, bills, pay-TV, mobile money) are left out, while products usable
    * anywhere (gift cards, eSIMs, software, numbers) stay. `global` or nothing shows the whole store.
    */
-  inMarket<T>(market: string | undefined, work: () => Promise<T>) {
+  async inMarket<T>(market: string | undefined, work: () => Promise<T>, currency?: string) {
     const code = market && market.toLowerCase() !== 'global' ? market.toUpperCase() : null;
     const store = this.scope.getStore()?.store;
+    const prices = await this.prices(currency);
     // A reseller's store always sells in its own country.
-    return this.scope.run(store ? { market: store.country, store } : { market: code }, work);
+    return this.scope.run(store ? { market: store.country, store, prices } : { market: code, prices }, work);
   }
 
   /**
@@ -82,14 +128,15 @@ export class StorefrontService {
    * their country plus products usable anywhere. No store (or `bitocard`) is bitocard.com. A store that is not
    * published is a 404.
    */
-  async inStore<T>(subdomain: string | null, market: string | undefined, work: () => Promise<T>) {
-    if (!subdomain) return this.inMarket(market, work);
+  async inStore<T>(subdomain: string | null, market: string | undefined, work: () => Promise<T>, currency?: string) {
+    if (!subdomain) return this.inMarket(market, work, currency);
     const store = await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: true } });
     if (!store || store.status !== 'published' || store.reseller.status === 'suspended' || store.reseller.house || !store.reseller.country) {
       throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
     }
     const scope = { resellerId: store.resellerId, country: store.reseller.country, mode: store.checkoutMode };
-    return this.scope.run({ market: scope.country, store: scope }, work);
+    const prices = await this.prices(currency);
+    return this.scope.run({ market: scope.country, store: scope, prices }, work);
   }
 
   /** Whether the request is for a reseller's hosted store. */
@@ -194,6 +241,8 @@ export class StorefrontService {
       /** Lowest and highest face value, in minor units. */
       from: minor(from),
       to: minor(to),
+      /** The face values in the signed-in customer's currency (`currency` asked), or null. */
+      price: this.localPrice(product.faceCurrency, from, to),
       description: product.description,
       /** The admin's product image, else the brand's logo from BitoCard's own files: never the supplier's (it would name them). */
       logo_url: product.imageUrl ?? this.presentBrand(product.brand, brand).logo_url,

@@ -79,19 +79,20 @@ function storeServer(subdomain = null) {
   return { get: path => request('GET', path), post: (path, body = {}) => request('POST', path, body) };
 }
 
-async function customer(subdomain = null) {
+async function customer(subdomain = null, country = 'NG') {
   const shopper = storeServer(subdomain);
   const email = `wallet${(counter += 1)}-${Date.now()}@example.com`;
-  const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery' });
+  const signup = await shopper.post('/v1/store/account/signup', { name: 'Chi Okafor', email, password: 'correct horse battery', country });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   shopper.id = signup.json.customer.id;
+  shopper.signup = signup.json.customer;
   return shopper;
 }
 
 /** Tops a bitocard.com customer's Nigerian wallet up through Stripe, paid and confirmed. */
 async function topUpWithStripe(shopper, amount) {
-  const started = await shopper.post('/v1/store/wallet/top-ups', { amount, country: 'NG', method: 'stripe', return_url: returnUrl });
+  const started = await shopper.post('/v1/store/wallet/top-ups', { amount, method: 'stripe', return_url: returnUrl });
   assert.equal(started.status, 201, JSON.stringify(started.json));
   const payment = await prisma.payment.findUniqueOrThrow({ where: { id: started.json.id } });
   Object.assign(stripe.state.sessions[payment.providerTransactionId], { status: 'complete', payment_status: 'paid' });
@@ -120,14 +121,14 @@ describe('customer wallets on bitocard.com', () => {
   test('a Stripe top-up is credited once, then spent: the order is delivered and the wallet charged the price', async () => {
     const product = await giftCard('Amazon Spend Card', ['SPEND-CODE-0001']);
     const shopper = await customer();
-    const wallet = await shopper.get('/v1/store/wallet?country=NG');
+    const wallet = await shopper.get('/v1/store/wallet');
     assert.deepEqual([wallet.json.enabled, wallet.json.currency, wallet.json.balance], [true, 'NGN', 0]);
     assert.deepEqual(wallet.json.top_up_methods.map(item => item.id), ['stripe', 'flutterwave'], "the market's checkout methods");
 
     const topUp = await topUpWithStripe(shopper, 10_000_000);
     assert.deepEqual([topUp.status, topUp.amount, topUp.currency], ['succeeded', 10_000_000, 'NGN']);
     assert.equal((await shopper.get(`/v1/store/wallet/top-ups/${topUp.id}`)).json.status, 'succeeded');
-    assert.equal((await shopper.get('/v1/store/wallet?country=NG')).json.balance, 10_000_000);
+    assert.equal((await shopper.get('/v1/store/wallet')).json.balance, 10_000_000);
     const notice = await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.wallet.credited' } });
     assert.ok(notice, 'the customer is told');
     const seller = await houseSeller();
@@ -136,7 +137,7 @@ describe('customer wallets on bitocard.com', () => {
     const bought = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
     assert.equal(bought.status, 201, JSON.stringify(bought.json));
     assert.deepEqual([bought.json.status, bought.json.method.id, bought.json.checkout_url], ['completed', 'wallet', null]);
-    const balance = (await shopper.get('/v1/store/wallet?country=NG')).json.balance;
+    const balance = (await shopper.get('/v1/store/wallet')).json.balance;
     assert.equal(balance, 10_000_000 - bought.json.amount);
     const activity = (await shopper.get('/v1/store/wallet/transactions')).json.data;
     assert.deepEqual(activity.map(item => [item.type, item.amount]), [['wallet_purchase', -bought.json.amount], ['customer_top_up', 10_000_000]]);
@@ -152,7 +153,7 @@ describe('customer wallets on bitocard.com', () => {
     assert.equal(preview.status, 201, JSON.stringify(preview.json));
     assert.equal(preview.json.object, 'checkout_preview');
     assert.equal(preview.json.wallet_balance, 10_000_000);
-    assert.equal((await shopper.get('/v1/store/wallet?country=NG')).json.balance, 10_000_000, 'nothing paid');
+    assert.equal((await shopper.get('/v1/store/wallet')).json.balance, 10_000_000, 'nothing paid');
     assert.equal(await prisma.checkout.count({ where: { customerId: shopper.id } }), 0);
 
     const paid = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl, quote_id: preview.json.quote_id });
@@ -164,7 +165,7 @@ describe('customer wallets on bitocard.com', () => {
     const theirs = await stranger.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl, preview: true });
     const stolen = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl, quote_id: theirs.json.quote_id });
     assert.deepEqual([stolen.status, stolen.json.error.code], [409, 'quote_expired'], "never another customer's quote");
-    assert.equal((await shopper.get('/v1/store/wallet?country=NG')).json.balance, 10_000_000 - paid.json.amount);
+    assert.equal((await shopper.get('/v1/store/wallet')).json.balance, 10_000_000 - paid.json.amount);
     await ledgerOk();
   });
 
@@ -178,7 +179,7 @@ describe('customer wallets on bitocard.com', () => {
     const refunded = await admin.post(`/v1/admin/orders/${bought.json.order.id}/refund`, { reason: 'Customer could not redeem', supplier_refunded: false });
     assert.equal(refunded.status, 200, JSON.stringify(refunded.json));
     assert.equal((await shopper.get(`/v1/store/checkouts/${bought.json.id}`)).json.status, 'refunded');
-    assert.equal((await shopper.get('/v1/store/wallet?country=NG')).json.balance, 5_000_000, 'all of it back in the wallet');
+    assert.equal((await shopper.get('/v1/store/wallet')).json.balance, 5_000_000, 'all of it back in the wallet');
     assert.equal(Object.keys(stripe.state.refunds).length, refundsBefore, 'no card refund');
     await ledgerOk();
   });
@@ -194,27 +195,27 @@ describe('customer wallets on bitocard.com', () => {
     const results = await Promise.all([1, 2, 3].map(() => racer.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl })));
     assert.deepEqual(results.map(item => item.status).sort(), [201, 402, 402], JSON.stringify(results.map(item => item.json?.error?.code ?? item.json.status)));
     assert.ok(results.filter(item => item.status === 402).every(item => item.json.error.code === 'wallet_balance_low'));
-    assert.equal((await racer.get('/v1/store/wallet?country=NG')).json.balance, Math.floor(price / 2));
+    assert.equal((await racer.get('/v1/store/wallet')).json.balance, Math.floor(price / 2));
     await ledgerOk();
   });
 
   test("a bank account number of the customer's own: Flutterwave transfers top the wallet up once (BVN in Nigeria, never kept)", async () => {
     const shopper = await customer();
-    const noBvn = await shopper.post('/v1/store/wallet/reserved-accounts', { country: 'NG' });
+    const noBvn = await shopper.post('/v1/store/wallet/reserved-accounts', {});
     assert.deepEqual([noBvn.status, noBvn.json.error.code], [400, 'parameter_missing']);
-    const opened = await shopper.post('/v1/store/wallet/reserved-accounts', { country: 'NG', bvn: '22222222222' });
+    const opened = await shopper.post('/v1/store/wallet/reserved-accounts', { bvn: '22222222222' });
     assert.equal(opened.status, 200, JSON.stringify(opened.json));
     assert.equal(opened.json.data.length, 1);
     assert.equal(flw.calls.findLast(call => call.url === '/virtual-account-numbers').body.bvn, '22222222222');
     const account = await prisma.reservedAccount.findFirstOrThrow({ where: { customerId: shopper.id } });
     assert.equal(account.provider, 'flutterwave');
     assert.equal(JSON.stringify(account).includes('22222222222'), false, 'the BVN is not kept');
-    assert.equal((await shopper.post('/v1/store/wallet/reserved-accounts', { country: 'NG' })).json.data[0].account_number, account.accountNumber, 'asked again: the same account');
+    assert.equal((await shopper.post('/v1/store/wallet/reserved-accounts', {})).json.data[0].account_number, account.accountNumber, 'asked again: the same account');
 
     flw.state.charges[account.providerReference] = { id: 9700, status: 'successful', amount: 20000, currency: 'NGN', app_fee: 50 };
     await flutterwaveWebhook({ event: 'charge.completed', data: { id: 9700 } });
     await flutterwaveWebhook({ event: 'charge.completed', data: { id: 9700 } });
-    const wallet = (await shopper.get('/v1/store/wallet?country=NG')).json;
+    const wallet = (await shopper.get('/v1/store/wallet')).json;
     assert.equal(wallet.balance, 2_000_000, 'credited once');
     assert.equal(wallet.reserved_accounts[0].account_number, account.accountNumber);
     const seller = await houseSeller();
@@ -232,7 +233,7 @@ describe('customer wallets on bitocard.com', () => {
     try {
       const methods = await fetch(`${server.base}/v1/store/payment-methods?country=NG`).then(res => res.json());
       assert.deepEqual([methods.wallet_required, methods.data.map(item => item.id)], [false, ['stripe', 'flutterwave']]);
-      const refused = await shopper.post('/v1/store/wallet/top-ups', { amount: 100_000, country: 'NG', return_url: returnUrl });
+      const refused = await shopper.post('/v1/store/wallet/top-ups', { amount: 100_000, return_url: returnUrl });
       assert.deepEqual([refused.status, refused.json.error.code], [409, 'wallets_not_enabled']);
       const card = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
       assert.equal(card.status, 201, JSON.stringify(card.json));
@@ -255,7 +256,8 @@ describe("customer wallets on a reseller's store", () => {
     assert.equal(created.status, 201, JSON.stringify(created.json));
     assert.equal((await reseller.browser.post(`/v1/stores/${created.json.id}/publish`)).status, 200);
     const store = { id: created.json.id, subdomain: created.json.subdomain };
-    const shopper = await customer(store.subdomain);
+    const shopper = await customer(store.subdomain, 'GH');
+    assert.deepEqual([shopper.signup.country, shopper.signup.currency], ['NG', 'NGN'], "a reseller's store: the reseller's country, whatever was sent");
 
     const wallet = (await shopper.get('/v1/store/wallet')).json;
     assert.deepEqual([wallet.mode, wallet.currency, wallet.enabled], ['test', 'NGN', true]);
@@ -279,5 +281,64 @@ describe("customer wallets on a reseller's store", () => {
     assert.equal(methods.wallet_required, false, 'switched off for this reseller only');
     assert.equal((await fetch(`${server.base}/v1/store/payment-methods?country=NG`).then(res => res.json())).wallet_required, true, 'bitocard.com unchanged');
     await ledgerOk();
+  });
+});
+
+describe("a customer's country", () => {
+  test('chosen at sign-up on bitocard.com and fixed: the wallet and payments are in its currency', async () => {
+    const shopper = storeServer();
+    const email = `country${Date.now()}@example.com`;
+    const body = { name: 'Kofi Mensah', email, password: 'correct horse battery' };
+    assert.equal((await shopper.post('/v1/store/account/signup', body)).json.error.code, 'parameter_missing', 'bitocard.com asks for the country');
+    assert.equal((await shopper.post('/v1/store/account/signup', { ...body, country: 'FR' })).json.error.code, 'market_unavailable');
+    const signup = await shopper.post('/v1/store/account/signup', { ...body, country: 'gh' });
+    assert.equal(signup.status, 201, JSON.stringify(signup.json));
+    assert.deepEqual([signup.json.customer.country, signup.json.customer.currency], ['GH', 'GHS']);
+    assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+    assert.deepEqual([(await shopper.get('/v1/store/account')).json.country, (await shopper.get('/v1/store/wallet')).json.currency], ['GH', 'GHS']);
+
+    const moved = await shopper.post('/v1/store/account/profile', { country: 'NG' });
+    assert.deepEqual([moved.status, moved.json.error.code], [409, 'country_locked']);
+    const same = await shopper.post('/v1/store/account/profile', { name: 'Kofi A. Mensah', country: 'GH' });
+    assert.deepEqual([same.status, same.json.name, same.json.country], [200, 'Kofi A. Mensah', 'GH'], 'the same country is fine');
+    assert.equal((await shopper.get('/v1/store/wallet?country=NG')).json.currency, 'GHS', 'another country asked: always their own');
+  });
+
+  test('an older account without one chooses it once in their account; checkouts fix it too', async () => {
+    const shopper = await customer();
+    await prisma.customer.update({ where: { id: shopper.id }, data: { country: null } });
+    assert.equal((await shopper.get('/v1/store/account')).json.country, null);
+    const wallet = await shopper.get('/v1/store/wallet');
+    assert.deepEqual([wallet.status, wallet.json.error.code], [409, 'country_required']);
+    const set = await shopper.post('/v1/store/account/profile', { country: 'NG' });
+    assert.deepEqual([set.status, set.json.country, set.json.currency], [200, 'NG', 'NGN']);
+    assert.equal((await shopper.post('/v1/store/account/profile', { country: 'GH' })).json.error.code, 'country_locked');
+
+    const product = await giftCard(`Country card ${Date.now()}`, [`CTRY-${Date.now()}`]);
+    const buyer = await customer();
+    await prisma.customer.update({ where: { id: buyer.id }, data: { country: null } });
+    const preview = await buyer.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', method: 'wallet', preview: true, return_url: returnUrl });
+    assert.deepEqual([preview.json.object, preview.json.currency], ['checkout_preview', 'NGN'], JSON.stringify(preview.json));
+    assert.equal((await prisma.customer.findUnique({ where: { id: buyer.id } })).country, 'NG', 'fixed by their first checkout');
+    const elsewhere = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'GH', method: 'wallet', preview: true, return_url: returnUrl });
+    assert.equal(elsewhere.json.currency, 'NGN', 'another country sent: still their own');
+  });
+
+  test("products show their face values in the signed-in customer's currency", async () => {
+    const product = await giftCard(`Priced card ${Date.now()}`, [`PRICE-${Date.now()}`]);
+    const { marginBps } = await prisma.currencySetting.findUnique({ where: { currency: 'NGN' } });
+    // US$25 at the pay rate (1,500 plus the margin), rounded up to a whole naira.
+    const expected = Math.ceil(25 * 1500 * (1 + marginBps / 10_000)) * 100;
+    const plain = await fetch(`${server.base}/v1/store/products/${encodeURIComponent(product.key)}`).then(res => res.json());
+    assert.equal(plain.price, null, 'no currency asked: face values only');
+    const local = await fetch(`${server.base}/v1/store/products/${encodeURIComponent(product.key)}?currency=NGN`).then(res => res.json());
+    assert.deepEqual([local.face_currency, local.from, local.price.currency, local.price.from, local.price.to], ['USD', 2500, 'NGN', expected, expected]);
+    assert.ok(Math.abs(Number(local.price.rate) * 2500 - expected) < 100, 'the rate converts any value the same way');
+    const listed = await fetch(`${server.base}/v1/store/products?currency=NGN&brand=amazon&sort=new`).then(res => res.json());
+    assert.equal(listed.data.find(item => item.key === product.key).price.from, expected);
+    const search = await fetch(`${server.base}/v1/store/search?q=amazon&currency=NGN`).then(res => res.json());
+    assert.ok(search.products.length > 0 && search.products.every(item => item.price?.currency === 'NGN'));
+    const unknown = await fetch(`${server.base}/v1/store/products/${encodeURIComponent(product.key)}?currency=XYZ`).then(res => res.json());
+    assert.equal(unknown.price, null, 'a currency without a rate: face values only');
   });
 });

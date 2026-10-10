@@ -65,12 +65,20 @@ export type StoreProduct = {
   denomination_type: 'fixed' | 'range';
   from: number;
   to: number;
+  /** The face values in the signed-in customer's currency (asked with `currency`), or null. */
+  price: StoreLocalPrice | null;
   description: string | null;
   logo_url: string | null;
   /** What it can do, for icons and filters (empty for most categories). */
   features: ProductFeature[];
   brand: StoreBrand;
 };
+
+/**
+ * A product's face values in the shopper's currency, at BitoCard's rate, rounded up to a whole unit. `rate` is the
+ * shopper's minor units per face minor unit (a decimal string). What the customer pays is quoted at checkout.
+ */
+export type StoreLocalPrice = { currency: string; from: number; to: number; rate: string };
 
 export type StoreProductDetail = StoreProduct & {
   denominations: number[] | null;
@@ -162,8 +170,22 @@ export type StoreHome = {
 };
 
 /** "$10.00", "₦1,000" or "GBP 5.00": a face value in its currency. */
+/** Minor-unit digits as the store shows them (the API's `wholeCurrencies` too). */
+const currencyDigits = (currency: string) => (['JPY', 'KRW', 'UGX', 'RWF', 'XOF', 'XAF'].includes(currency) ? 0 : 2);
+
+/**
+ * A face value of the product in the shopper's currency (`price`), converted the way the API does (its rate, rounded up
+ * to a whole unit), or null when the product has no local price or is already in that currency.
+ */
+export function localFace(value: number, product: Pick<StoreProduct, 'face_currency' | 'price'>) {
+  const price = product.price;
+  if (!price || price.currency === product.face_currency) return null;
+  const unit = 10 ** currencyDigits(price.currency);
+  return { amount: Math.ceil((value * Number(price.rate)) / unit - 1e-9) * unit, currency: price.currency };
+}
+
 export function formatFace(minor: number, currency: string) {
-  const digits = ['JPY', 'KRW', 'UGX', 'RWF', 'XOF', 'XAF'].includes(currency) ? 0 : 2;
+  const digits = currencyDigits(currency);
   try {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: minor % 10 ** digits === 0 ? 0 : digits, maximumFractionDigits: digits }).format(minor / 10 ** digits);
   } catch {

@@ -3,10 +3,7 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Landmark, Wallet } from "lucide-react";
 import { formatFace, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
 import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/wallet-forms";
-import { customerApi, safeNext } from "@/lib/customer";
-import { currentMarket } from "@/lib/market";
-import { storeNavigation } from "@/lib/navigation";
-import { currentStore } from "@/lib/store";
+import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
 import { simulateTopUp, walletFor } from "@/lib/wallet";
 
 export const metadata: Metadata = { title: "Wallet" };
@@ -14,7 +11,7 @@ export const metadata: Metadata = { title: "Wallet" };
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
-type Search = { country?: string; top_up?: string; back?: string; amount?: string };
+type Search = { top_up?: string; back?: string; amount?: string };
 
 /** A top-up just made (back from the payment page, or in the sandbox): where it stands. */
 async function TopUpStatus({ id }: { id: string }) {
@@ -56,15 +53,12 @@ async function TopUpStatus({ id }: { id: string }) {
 
 /**
  * The wallet: the balance with Add funds beside it (a popup: card, mobile money, Flutterwave, or the customer's own bank
- * account number), and what went in and out. Spent only in this store, never withdrawn. bitocard.com keeps one wallet per market.
+ * account number), and what went in and out. Spent only in this store, never withdrawn. It is in the customer's own
+ * country's currency, chosen at sign-up and fixed (Account shows it); an older account chooses it there first.
  */
 export default async function WalletPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
-  const [{ store }, market, navigation] = await Promise.all([currentStore(), currentMarket(), storeNavigation()]);
-  // A reseller's store is its own country; bitocard.com the market asked for, else the shopper's, else the first.
-  const asked = params.country && /^[A-Z]{2}$/.test(params.country) ? params.country : null;
-  const country = store ? null : (asked ?? (market && market !== "global" ? market : (navigation.countries[0]?.code ?? null)));
-  const [wallet, activity] = await Promise.all([walletFor(country), customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20")]);
+  const [customer, wallet, activity] = await Promise.all([currentCustomer(), walletFor(), customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20")]);
   const back = params.back ? safeNext(params.back, "") : "";
 
   return (
@@ -77,25 +71,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       ) : null}
       {params.top_up ? <TopUpStatus id={params.top_up} /> : null}
 
-      {!store && navigation.countries.length > 1 ? (
-        <form className="flex flex-wrap items-end gap-3" aria-label="Choose the wallet's country">
-          <label className="space-y-1.5">
-            <span className="block text-sm font-semibold">Wallet for</span>
-            <select name="country" defaultValue={country ?? ""} className="min-h-12 rounded-xl border border-slate-200 bg-white px-3 text-[15px]">
-              {navigation.countries.map(item => (
-                <option key={item.code} value={item.code}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" className="min-h-12 rounded-xl px-4 font-semibold text-[#070f4c] ring-1 ring-slate-200 hover:ring-slate-300">
-            Show
-          </button>
-        </form>
-      ) : null}
-
-      {!wallet ? (
+      {customer && !customer.country ? (
+        <div className={card}>
+          <p className="font-semibold">Choose your country first</p>
+          <p className="mt-1 text-sm text-slate-600">Your wallet is in your country&apos;s currency. Choose it once in your account; it then stays the same.</p>
+          <Link href="/account/profile#country" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+            Choose your country
+          </Link>
+        </div>
+      ) : !wallet ? (
         <p className={card}>Your wallet cannot be shown right now. Try again shortly.</p>
       ) : (
         <>
@@ -128,11 +112,11 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                     : "This store now takes payment when you buy. You can still spend what is left here."}
                 </p>
               </div>
-              {wallet.enabled ? <AddFunds wallet={wallet} country={country} amount={params.amount} open={Boolean(back || params.amount)} /> : null}
+              {wallet.enabled ? <AddFunds wallet={wallet} amount={params.amount} open={Boolean(back || params.amount)} /> : null}
             </div>
           </section>
           {wallet.enabled && wallet.reserved_accounts_available && !wallet.reserved_accounts.length ? (
-            <BankAccountDialog country={country} needsBvn={wallet.reserved_account_needs_bvn} />
+            <BankAccountDialog needsBvn={wallet.reserved_account_needs_bvn} />
           ) : null}
         </>
       )}

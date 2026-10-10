@@ -12,7 +12,7 @@ import { storeNavigation } from "@/lib/navigation";
 import { query, storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
 import { currentStore } from "@/lib/store";
-import { currentMarket } from "@/lib/market";
+import { currentMarket, withPrices } from "@/lib/market";
 
 /** How the customer receives it, by what it is delivered to. */
 const delivery: Record<string, string> = {
@@ -22,8 +22,9 @@ const delivery: Record<string, string> = {
   meter: "Paid to the meter number you enter; we show the account name to confirm before you pay.",
 };
 
-export function loadProduct(key: string) {
-  return storeApi<StoreProductDetail>(`/v1/store/products/${encodeURIComponent(key)}`);
+/** The product, with its values in the signed-in customer's currency (`price`). */
+export async function loadProduct(key: string) {
+  return storeApi<StoreProductDetail>(await withPrices(`/v1/store/products/${encodeURIComponent(key)}`));
 }
 
 /** A product page's title and description; `base` is where its pages live (`/p` or `/account/p`). */
@@ -46,12 +47,14 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
   const [navigation, customer, market, { store }] = await Promise.all([storeNavigation(), currentCustomer(), currentMarket(), currentStore()]);
   const art = categoryArt(navigation.groups);
   const values = product.denominations ?? [];
-  // Where the customer pays from: their chosen market, else the product's own country (worldwide products ask).
-  // A reseller's store sells in its own country only.
-  const country = store?.country ? store.country : market && market !== "global" ? market : product.global ? null : product.country;
+  // Where the customer pays from: a reseller's store sells in its own country only, and a signed-in customer always
+  // pays in their own country's currency (fixed at sign-up). Otherwise their chosen market, else the product's own
+  // country (worldwide products ask).
+  const fixed = store?.country ?? customer?.country ?? null;
+  const country = fixed ?? (market && market !== "global" ? market : product.global ? null : product.country);
   const [methods, wallet] = await Promise.all([
     country ? storeApi<StorePaymentMethods>(`/v1/store/payment-methods${query({ country })}`, { fresh: true }) : null,
-    customer && country ? walletFor(store?.country ? null : country) : null,
+    customer && country ? walletFor() : null,
   ]);
 
   return (
@@ -138,7 +141,7 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
             product={product}
             countries={navigation.countries}
             country={country}
-            lockCountry={Boolean(store?.country)}
+            lockCountry={Boolean(fixed)}
             methods={methods?.ok ? methods.data.data : []}
             walletRequired={methods?.ok ? Boolean(methods.data.wallet_required) : false}
             wallet={wallet}

@@ -45,7 +45,7 @@ export type CheckoutInput = {
   product_id: string;
   face_value: number;
   quantity?: number;
-  country: string;
+  country?: string;
   method?: string;
   recipient?: { phone?: string; account_number?: string; transaction_type?: 'change' | 'renew'; email?: string };
   return_url: string;
@@ -204,7 +204,8 @@ export class CheckoutService implements OnModuleInit {
     }
     const store = customer.store;
     const mode = this.stores.mode(store);
-    const seller = await this.stores.seller(store, input.country);
+    // The customer's own country (fixed at sign-up), whatever country was sent.
+    const seller = await this.stores.sellerFor(customer, input.country);
     const product = await this.prisma.product.findUnique({ where: { id: input.product_id } });
     const listed = product && (this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } }));
     if (!product || !listed) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');

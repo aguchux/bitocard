@@ -29,7 +29,22 @@ export function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "
  * The store header: wordmark, the category menus, then the shopper's country, currency, sign in and the reseller call
  * to action. On a reseller's store: their name and logo, and no market, currency or reseller call to action.
  */
-export function StoreHeader({ groups, countries, market, signedIn, store = null }: { groups: StoreNavigationGroup[]; countries: StoreCountry[]; market: string | null; signedIn: boolean; store?: HostedStore | null }) {
+export function StoreHeader({
+  groups,
+  countries,
+  market,
+  marketLocked = false,
+  signedIn,
+  store = null,
+}: {
+  groups: StoreNavigationGroup[];
+  countries: StoreCountry[];
+  market: string | null;
+  /** The signed-in customer's own country: shown, not chosen. */
+  marketLocked?: boolean;
+  signedIn: boolean;
+  store?: HostedStore | null;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
@@ -49,7 +64,7 @@ export function StoreHeader({ groups, countries, market, signedIn, store = null 
           </Link>
           {store ? null : (
             <>
-              <MarketChooser countries={countries} market={market} />
+              <MarketChooser countries={countries} market={market} locked={marketLocked} />
               <div className="hidden lg:block">
                 <CurrencyMenu />
               </div>

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsUrl, Matches, Max, Min } from 'class-validator';
 import { Public } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -17,7 +16,6 @@ import { PaymentsService, testModeOnly } from '../payments/payments.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { StoreSellers } from './store-sellers.js';
 
-const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toUpperCase() : value);
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
 
 /** How a wallet payment shows among the payment methods (`id: wallet`). */
@@ -91,13 +89,13 @@ export class CustomerWalletsService {
     return account?.balanceMinor ?? 0n;
   }
 
-  /** The store, mode, seller and market a wallet belongs to: a reseller's store is its country; bitocard.com the one asked. */
-  private async context(customer: CustomerWithStore, country: string | undefined): Promise<WalletContext> {
+  /**
+   * The store, mode, seller and market a wallet belongs to: the customer's own country (fixed at sign-up; a reseller's
+   * store is the reseller's). An older bitocard.com account without one is asked to choose it first (`country_required`).
+   */
+  private async context(customer: CustomerWithStore): Promise<WalletContext> {
     const store = customer.store;
-    if (this.stores.isHouse(store) && !country) {
-      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Choose the country your wallet is in.', 'country');
-    }
-    const seller = await this.stores.seller(store, country ?? '');
+    const seller = await this.stores.sellerFor(customer);
     const market = await this.prisma.country.findUniqueOrThrow({ where: { code: seller.country! } });
     return { store, mode: this.stores.mode(store), seller, country: market };
   }
@@ -108,8 +106,8 @@ export class CustomerWalletsService {
     return Promise.all(offered.map(gateway => this.methods.describe(gateway, context.country)));
   }
 
-  async get(customer: CustomerWithStore, country?: string) {
-    const context = await this.context(customer, country);
+  async get(customer: CustomerWithStore) {
+    const context = await this.context(customer);
     const { mode, country: market } = context;
     const accounts = await this.payments.customerReservedAccounts(customer.id, mode, market.currency);
     return {
@@ -142,9 +140,9 @@ export class CustomerWalletsService {
   }
 
   /** Opens a payment page to top the wallet up; it is credited once the gateway confirms the payment. */
-  async topUp(customer: CustomerWithStore, input: { amount: number; method?: string; country?: string; return_url: string }) {
+  async topUp(customer: CustomerWithStore, input: { amount: number; method?: string; return_url: string }) {
     this.requireConfirmed(customer);
-    const context = await this.context(customer, input.country);
+    const context = await this.context(customer);
     await this.requireEnabled(context);
     const offered = await this.methods.offered('checkout', context.country, context.mode);
     let gateway: string;
@@ -200,9 +198,9 @@ export class CustomerWalletsService {
   }
 
   /** Opens the customer's own bank account number for the wallet (Flutterwave), where the market offers them. */
-  async createReservedAccounts(customer: CustomerWithStore, input: { country?: string; bvn?: string }) {
+  async createReservedAccounts(customer: CustomerWithStore, input: { bvn?: string }) {
     this.requireConfirmed(customer);
-    const context = await this.context(customer, input.country);
+    const context = await this.context(customer);
     await this.requireEnabled(context);
     const accounts = await this.payments.createCustomerReservedAccounts({ customer, sellerId: context.seller.id, mode: context.mode, country: context.country, bvn: input.bvn });
     return { object: 'list' as const, data: accounts.map(presentAccount) };
@@ -262,13 +260,7 @@ export class CustomerWalletsService {
   }
 }
 
-class WalletQueryDto {
-  /** bitocard.com: the market the wallet is in (its currency). Ignored on a reseller's store. */
-  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
-  country?: string;
-}
-
-class TopUpDto extends WalletQueryDto {
+class TopUpDto {
   /** Minor units of the wallet's currency. */
   @IsInt() @Min(100) @Max(100_000_000_00)
   amount: number;
@@ -281,7 +273,7 @@ class TopUpDto extends WalletQueryDto {
   return_url: string;
 }
 
-class ReservedAccountDto extends WalletQueryDto {
+class ReservedAccountDto {
   @IsOptional() @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
   bvn?: string;
 }
@@ -305,8 +297,8 @@ export class CustomerWalletController {
   constructor(private readonly wallets: CustomerWalletsService) {}
 
   @Get()
-  get(@CurrentCustomer() caller: CustomerCaller, @Query() query: WalletQueryDto) {
-    return this.wallets.get(caller.customer, query.country);
+  get(@CurrentCustomer() caller: CustomerCaller) {
+    return this.wallets.get(caller.customer);
   }
 
   @Get('transactions')

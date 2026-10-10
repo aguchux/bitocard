@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useId, useState, useTransition } from "react";
 import { Lock, Wallet } from "lucide-react";
-import { formatFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
+import { formatFace, localFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
 import { type FormState, startCheckout } from "@/lib/account-actions";
 import { type PaymentChoice, paymentMethodsFor } from "@/lib/payment-methods";
 import { FormMessage, Submit, TextField } from "./account-forms";
@@ -18,8 +18,27 @@ const optionClass =
 
 const walletOption: StorePaymentMethod = { object: "payment_method", id: "wallet", label: "Wallet", description: "Pay from your wallet balance", networks: [] };
 
-/** The wallet page for a country (bitocard.com; a reseller's store has one), coming back here. */
-const topUpHref = (country: string | null, back: string) => `/account/wallet?${new URLSearchParams({ ...(country ? { country } : {}), back }).toString()}`;
+/** The wallet page (always in the customer's own currency), coming back here. */
+const topUpHref = (back: string) => `/account/wallet?${new URLSearchParams({ back }).toString()}`;
+
+/** A value in the customer's own currency first (their prices), with the card's own value beneath. */
+function FaceValue({ value, product }: { value: number; product: StoreProductDetail }) {
+  const local = localFace(value, product);
+  if (!local) return <>{formatFace(value, product.face_currency)}</>;
+  return (
+    <span className="flex flex-col items-center leading-tight">
+      <span>{formatFace(local.amount, local.currency)}</span>
+      <span className="text-xs font-semibold text-slate-500">{formatFace(value, product.face_currency)} value</span>
+    </span>
+  );
+}
+
+/** ", about ₦15,000 to ₦1,500,000" for a range in another currency. */
+function rangeInLocal(product: StoreProductDetail) {
+  const min = product.range && localFace(product.range.min, product);
+  const max = product.range && localFace(product.range.max, product);
+  return min && max ? `, about ${formatFace(min.amount, min.currency)} to ${formatFace(max.amount, max.currency)}` : "";
+}
 
 /**
  * Buying on a product page: the value, how many, who it is for, where the customer pays from and how. With wallets on
@@ -41,12 +60,12 @@ export function BuyForm({
   product: StoreProductDetail;
   countries: StoreCountry[];
   country: string | null;
-  /** A reseller's store sells in its own country: no choice of where to pay from. */
+  /** A reseller's store sells in its own country, and a signed-in customer pays in their own: no choice of where to pay from. */
   lockCountry?: boolean;
   methods: StorePaymentMethod[];
   /** Wallets are on: the wallet is the only way to pay. */
   walletRequired?: boolean;
-  /** The signed-in customer's wallet in `country`. */
+  /** The signed-in customer's wallet (in their own country's currency). */
   wallet?: StoreWallet | null;
   signedIn: boolean;
   back: string;
@@ -99,7 +118,7 @@ export function BuyForm({
       {preview ? <input type="hidden" name="quote_id" value={preview.quote_id} /> : null}
       {market === tried ? <FormMessage state={state} /> : null}
       {market === tried && state.field === "wallet" ? (
-        <Link href={topUpHref(shown.country, back)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white hover:bg-[#0b1766]">
+        <Link href={topUpHref(back)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white hover:bg-[#0b1766]">
           <Wallet className="size-4" aria-hidden="true" /> Top up your wallet
         </Link>
       ) : null}
@@ -111,7 +130,7 @@ export function BuyForm({
             {values.map((value, index) => (
               <label key={value} className={optionClass}>
                 <input type="radio" name="face_value_minor" value={value} defaultChecked={index === 0} className="sr-only" />
-                {formatFace(value, product.face_currency)}
+                <FaceValue value={value} product={product} />
               </label>
             ))}
           </div>
@@ -123,7 +142,7 @@ export function BuyForm({
           inputMode="decimal"
           required
           state={state}
-          hint={`From ${formatFace(product.range.min, product.face_currency)} to ${formatFace(product.range.max, product.face_currency)}.`}
+          hint={`From ${formatFace(product.range.min, product.face_currency)} to ${formatFace(product.range.max, product.face_currency)}${rangeInLocal(product)}.`}
         />
       ) : null}
 
@@ -208,7 +227,7 @@ export function BuyForm({
                       {shown.wallet.enabled ? (
                         <>
                           {" · "}
-                          <Link href={topUpHref(shown.country, back)} className="font-semibold text-[#ff2382] underline-offset-2 hover:underline">
+                          <Link href={topUpHref(back)} className="font-semibold text-[#ff2382] underline-offset-2 hover:underline">
                             Top up
                           </Link>
                         </>
@@ -249,7 +268,7 @@ export function BuyForm({
               </button>
             </div>
           ) : (
-            <Link href={topUpHref(shown.country, back)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]">
+            <Link href={topUpHref(back)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]">
               <Wallet className="size-4" aria-hidden="true" /> Top up {formatFace(preview.amount - preview.wallet_balance, preview.currency)} or more
             </Link>
           )}

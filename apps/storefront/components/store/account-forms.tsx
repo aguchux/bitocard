@@ -9,12 +9,14 @@ import {
   forgotPassword,
   resendCode,
   resetPassword,
+  setCountry,
   signIn,
   signUp,
   startVerification,
   updateName,
   verifyEmail,
 } from "@/lib/account-actions";
+import type { Market } from "@/lib/countries";
 
 const empty: FormState = {};
 const inputClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-[#070f4c] focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15 aria-[invalid=true]:border-red-400";
@@ -97,7 +99,44 @@ export function SignInForm({ next }: { next: string }) {
   );
 }
 
-export function SignUpForm({ next }: { next: string }) {
+/**
+ * The customer's country (bitocard.com): fixed once chosen, so the hint says so. Their wallet, payments and prices are
+ * in its currency.
+ */
+export function CountryField({ markets, defaultValue, state }: { markets: Market[]; defaultValue?: string | null; state?: FormState }) {
+  const id = useId();
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-sm font-semibold text-[#070f4c]">
+        Your country
+      </label>
+      <select
+        id={id}
+        name="country"
+        required
+        defaultValue={defaultValue && markets.some(market => market.code === defaultValue) ? defaultValue : ""}
+        aria-invalid={state?.field === "country" || undefined}
+        aria-describedby={`${id}-hint`}
+        className={inputClass}
+      >
+        <option value="" disabled>
+          Choose your country
+        </option>
+        {markets.map(market => (
+          <option key={market.code} value={market.code}>
+            {market.name} ({market.currency})
+          </option>
+        ))}
+      </select>
+      <p id={`${id}-hint`} className="text-xs text-slate-500">
+        Your wallet, payments and prices are in its currency. It cannot be changed later.
+      </p>
+    </div>
+  );
+}
+
+/** Sign-up: on bitocard.com with the customer's country (`markets`); a reseller's store is the reseller's country. */
+export function SignUpForm({ next, markets = [], market = null }: { next: string; markets?: Market[]; market?: string | null }) {
   const [state, action, pending] = useActionState(signUp, empty);
   return (
     <form action={action} className="space-y-4">
@@ -105,6 +144,7 @@ export function SignUpForm({ next }: { next: string }) {
       <FormMessage state={state} />
       <TextField label="Your name" name="name" autoComplete="name" required minLength={2} maxLength={100} state={state} />
       <TextField label="Email" name="email" type="email" autoComplete="email" required state={state} hint="We send your codes and receipts here." />
+      {markets.length ? <CountryField markets={markets} defaultValue={market} state={state} /> : null}
       <TextField label="Password" name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={128} state={state} hint={passwordHint} />
       <Submit pending={pending} className="w-full sm:w-auto">
         Create account
@@ -175,6 +215,18 @@ export function NameForm({ name }: { name: string }) {
       <FormMessage state={state} />
       <TextField label="Your name" name="name" defaultValue={name} required minLength={2} maxLength={100} autoComplete="name" state={state} />
       <Submit pending={pending}>Save</Submit>
+    </form>
+  );
+}
+
+/** Choosing the country once, for an account from before it was asked. */
+export function CountryForm({ markets }: { markets: Market[] }) {
+  const [state, action, pending] = useActionState(setCountry, empty);
+  return (
+    <form action={action} className="space-y-3">
+      <FormMessage state={state} />
+      <CountryField markets={markets} state={state} />
+      <Submit pending={pending}>Save my country</Submit>
     </form>
   );
 }
