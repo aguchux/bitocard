@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
+import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
@@ -41,6 +42,10 @@ export default async function AccountHome() {
     store || walletCountry ? walletFor(walletCountry) : null,
   ]);
   const figures = summary.ok ? summary.data : null;
+  // Card widths: the next one peeks at every width; on desktops three and a quarter show (exactly three without a wallet).
+  const statItem = wallet
+    ? "w-[82%] shrink-0 snap-start sm:w-[60%] md:w-[calc((100%-1rem)/2.25)] lg:w-[calc((100%-3rem)/3.25)]"
+    : "w-[82%] shrink-0 snap-start sm:w-[60%] md:w-[calc((100%-1rem)/2.25)] lg:w-[calc((100%-2rem)/3)]";
   const total = spent(figures);
   const products = popular.ok ? popular.data.data : [];
   const orders = recent.ok ? recent.data.data : [];
@@ -49,26 +54,27 @@ export default async function AccountHome() {
     <div className="space-y-8 sm:space-y-10">
       <h1 className="sr-only">Home</h1>
 
-      {/* Phones: a sideways slider (snap, no visible scroll bar) with the next card peeking; three across from tablets. */}
+      {/* A sideways slider at every width with the next card peeking: one on phones, two on tablets, three on desktops
+          (with arrows). Without a wallet the three figures fit across a desktop exactly. */}
       <section aria-label="Your figures">
-        <ul className={`-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 md:mx-0 md:grid ${wallet ? "md:grid-cols-2 2xl:grid-cols-4" : "md:grid-cols-3"} md:gap-4 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden`}>
+        <StatsSlider>
           {wallet ? (
-            <li className="w-[82%] shrink-0 snap-start sm:w-[60%] md:w-auto">
+            <li className={statItem}>
               <Link href={`/account/wallet${walletCountry ? `?country=${walletCountry}` : ""}`} className="block h-full rounded-3xl">
                 <StatCard icon={Wallet} tone="navy" label="Wallet balance" value={amount(wallet.balance, wallet.currency)} note={`${wallet.mode === "test" ? "Test money · " : ""}${wallet.enabled ? "Add funds" : "Spend what is left"}`} />
               </Link>
             </li>
           ) : null}
-          <li className="w-[82%] shrink-0 snap-start sm:w-[60%] md:w-auto">
+          <li className={statItem}>
             <StatCard icon={ShoppingBag} tone="pink" label="Orders total" value={total.value} note={total.note} />
           </li>
-          <li className="w-[82%] shrink-0 snap-start sm:w-[60%] md:w-auto">
+          <li className={statItem}>
             <StatCard icon={ReceiptText} tone="blue" label="Orders" value={String(figures?.orders.total ?? 0)} note={figures?.orders.in_progress ? `${figures.orders.in_progress} on the way` : "None on the way"} />
           </li>
-          <li className="w-[82%] shrink-0 snap-start sm:w-[60%] md:w-auto">
+          <li className={statItem}>
             <StatCard icon={PackageCheck} tone="green" label="Delivered this month" value={String(figures?.delivered_this_month ?? 0)} />
           </li>
-        </ul>
+        </StatsSlider>
       </section>
 
       <section aria-labelledby="shop">

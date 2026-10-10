@@ -5,6 +5,7 @@ import { GroupIcon } from "@/components/store/category-icon";
 import { groupIcon } from "@/components/store/theme";
 import { BrandImage } from "@/components/store/brand-image";
 import { priceLabel, productHref } from "@/components/store/product-card";
+import { Slider } from "./stats-slider";
 import { groupTint } from "./theme";
 
 /** Where the account app's product pages live. */
@@ -120,17 +121,14 @@ export function SectionTitle({ id, title, href, action = "See all" }: { id: stri
 }
 
 /**
- * A horizontal row of cards that scrolls sideways on its own (snap, no script), so long lists never crowd the page or
- * make it scroll sideways. It bleeds to the screen edge on phones.
+ * A horizontal row of cards that scrolls sideways on its own (`Slider`: snap, no scroll bar, arrows on desktops), so
+ * long lists never crowd the page or make it scroll sideways. It bleeds to the screen edge on phones.
  */
 export function Carousel({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <ul aria-label={label} className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:scroll-px-0 lg:px-0">
-      {children}
-    </ul>
-  );
+  return <Slider label={label}>{children}</Slider>;
 }
 
+/** An item in a carousel: `relative`, so nothing positioned inside a card can stretch the page. */
 export function CarouselItem({ children, width = "w-[68%] sm:w-64" }: { children: React.ReactNode; width?: string }) {
-  return <li className={`shrink-0 snap-start ${width}`}>{children}</li>;
+  return <li className={`relative shrink-0 snap-start ${width}`}>{children}</li>;
 }

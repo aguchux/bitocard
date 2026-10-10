@@ -32,7 +32,7 @@ export function FeatureIcons({ features, compact = false }: { features: ProductF
         const Icon = featureIcon[feature];
         const label = productFeatureLabels[feature];
         return compact ? (
-          <li key={feature} title={label} className="grid size-8 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+          <li key={feature} title={label} className="relative grid size-8 place-items-center rounded-lg bg-sky-50 text-sky-700 ring-1 ring-sky-100">
             <Icon className="size-4" aria-hidden="true" />
             <span className="sr-only">{label}</span>
           </li>
