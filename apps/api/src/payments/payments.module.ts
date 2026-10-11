@@ -8,13 +8,14 @@ import { AdminChargebacksController } from './chargebacks.controller.js';
 import { ChargebacksService } from './chargebacks.service.js';
 import { AdminPaymentMethodsController } from './payment-methods.controller.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
+import { AdminPawapayCoverageController, PawapayCoverageService } from './pawapay-coverage.js';
 import { PaymentsService } from './payments.service.js';
 import { ProviderWebhooksController } from './webhooks.controller.js';
 
 @Module({
   imports: [PayoutsModule, IdentityModule, SettingsModule, FxModule],
-  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController],
-  providers: [PaymentsService, PaymentMethodsService, ChargebacksService],
+  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController, AdminPawapayCoverageController],
+  providers: [PaymentsService, PaymentMethodsService, ChargebacksService, PawapayCoverageService],
   exports: [PaymentsService, PaymentMethodsService, ChargebacksService],
 })
 export class PaymentsModule {}

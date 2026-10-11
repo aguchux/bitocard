@@ -22,8 +22,57 @@ type OperationConfig = { operationType?: string; status?: string };
 type ActiveConf = {
   countries?: Array<{
     country: string;
+    displayName?: { en?: string } | string;
     providers?: Array<{ provider?: string; displayName?: string; currencies?: Array<{ currency: string; operationTypes?: OperationConfig[] | Record<string, OperationConfig> }> }>;
   }>;
+};
+
+/** A mobile money network in pawaPay's coverage: whether it takes deposits (payments in) and makes payouts (money out). */
+export type CoverageNetwork = { id: string; name: string; deposits: string | null; payouts: string | null };
+export type CoverageCountry = { code: string; alpha3: string; name: string; currencies: Array<{ currency: string; networks: CoverageNetwork[] }> };
+
+/**
+ * Every country, currency and network on the account, from pawaPay's active configuration for deposits and for
+ * payouts, with each network's status for each (`OPERATIONAL`, `DELAYED`, `CLOSED`, or null when not on the account).
+ * Countries BitoCard does not know (not alpha-3 African codes it maps) are left out.
+ */
+export function coverageOf(deposits: ActiveConf, payouts: ActiveConf): CoverageCountry[] {
+  const countries = new Map<string, CoverageCountry>();
+  const read = (conf: ActiveConf, operation: 'DEPOSIT' | 'PAYOUT') => {
+    for (const country of conf.countries ?? []) {
+      const code = pawapayAlpha2(country.country);
+      if (!code) continue;
+      const shown = typeof country.displayName === 'string' ? country.displayName : country.displayName?.en;
+      const entry = countries.get(code) ?? { code, alpha3: country.country.toUpperCase(), name: shown || regionName(code), currencies: [] };
+      countries.set(code, entry);
+      for (const provider of country.providers ?? []) {
+        for (const currency of provider.currencies ?? []) {
+          const types = currency.operationTypes ?? [];
+          const config = Array.isArray(types) ? types.find(item => item.operationType === operation) : types[operation];
+          if (!config) continue;
+          const code3 = currency.currency.toUpperCase();
+          let money = entry.currencies.find(item => item.currency === code3);
+          if (!money) entry.currencies.push((money = { currency: code3, networks: [] }));
+          const id = provider.provider ?? provider.displayName ?? 'unknown';
+          let network = money.networks.find(item => item.id === id);
+          if (!network) money.networks.push((network = { id, name: provider.displayName || id, deposits: null, payouts: null }));
+          network[operation === 'DEPOSIT' ? 'deposits' : 'payouts'] = config.status ?? 'OPERATIONAL';
+        }
+      }
+    }
+  };
+  read(deposits, 'DEPOSIT');
+  read(payouts, 'PAYOUT');
+  return [...countries.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const regionNames = new Intl.DisplayNames(['en-GB'], { type: 'region' });
+const regionName = (code: string) => {
+  try {
+    return regionNames.of(code) ?? code;
+  } catch {
+    return code;
+  }
 };
 
 /** Each country's (alpha-2) currencies and, per currency, the mobile money networks taking deposits, from pawaPay's active configuration. */
@@ -115,6 +164,12 @@ export class PawapayPaymentsProvider implements CheckoutProvider {
   /** The mobile money networks payers in this country can pay from in this currency (MTN, Telecel…). */
   async networks(country: string, currency: string) {
     return (await this.depositCountries()).get(country.toUpperCase())?.get(currency.toUpperCase()) ?? [];
+  }
+
+  /** Everything on the account: every country, currency and network, for deposits and payouts (never cached: admins ask). */
+  async coverage() {
+    const [deposits, payouts] = await Promise.all([this.call<ActiveConf>('/v2/active-conf?operationType=DEPOSIT'), this.call<ActiveConf>('/v2/active-conf?operationType=PAYOUT')]);
+    return coverageOf(deposits, payouts);
   }
 
   /** Every country (alpha-2) and currency this account takes deposits in. */

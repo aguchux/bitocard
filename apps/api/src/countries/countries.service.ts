@@ -95,6 +95,8 @@ export class CountriesService {
       },
       include: { categories: true },
     });
+    // Its currency needs exchange rates (fetched for every currency with a setting) before anything is priced in it.
+    await this.prisma.currencySetting.upsert({ where: { currency: country.currency }, create: { currency: country.currency }, update: {} });
     await this.audit.record({ actorId, action: 'country.created', targetType: 'country', targetId: code, after: country });
     return country;
   }

@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'settings';
 
@@ -82,6 +82,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Feature switches', href: '/settings', icon: ToggleRight },
       { label: 'Markets', href: '/settings/markets', icon: Globe2 },
       { label: 'Integrations', href: '/settings/integrations', icon: PlugZap },
+      { label: 'pawaPay coverage', href: '/settings/pawapay', icon: Smartphone },
       { label: 'Platform fees', href: '/settings/fees', icon: Percent },
     ],
   },
