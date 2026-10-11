@@ -60,6 +60,8 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
     if (method === 'GET' && request.timeout === undefined) request.timeout = readTimeoutMs;
     const result = await client(baseUrl())(request, api, extra);
     if (result.error) {
+      // Runs only on a request, long after the API slice below exists.
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       if (result.error.status === 401 && !request.url.includes('/auth/')) api.dispatch(bitocardApi.util.invalidateTags(['Session']));
       return { error: toApiError(result.error.status, result.error.data), meta: result.meta };
     }

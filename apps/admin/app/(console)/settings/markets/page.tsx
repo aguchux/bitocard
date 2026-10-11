@@ -37,10 +37,10 @@ function Markets() {
   const [update, state] = useUpdateCountryCategoryMutation();
   const editable = can(admin, "operations");
   const taxRates = useTaxRatesQuery();
-  const rate = taxRates.data?.data.find(item => item.country === country?.code);
   const paymentsEditable = can(admin, "operations", "finance");
   const countries = data?.data ?? [];
   const country = countries.find(item => item.code === asked) ?? countries[0];
+  const rate = taxRates.data?.data.find(item => item.country === country?.code);
   const choose = (code: string) => router.replace(`${pathname}?country=${code}`, { scroll: false });
 
   return (
