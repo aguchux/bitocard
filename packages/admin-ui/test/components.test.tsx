@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { categoryName, CodeInput, DataTable, formatBps, ImageField, formatMoney, formatRelative, LineChart, percentChange, StatusBadge, Trend } from '../src';
+import { categoryName, CodeInput, DataTable, formatBps, ImageField, formatMoney, formatRelative, LineChart, Notice, percentChange, StatusBadge, Trend } from '../src';
 import { useState } from 'react';
 import { AdminGate, AdminProviders, AdminShell, can, NotificationBell, NotificationsInbox, PushSettings, useAdmin } from '../src/shell';
 import { pushServiceWorker } from '../src/push-worker';
@@ -419,5 +419,20 @@ describe('image field', () => {
     expect(screen.queryByRole('button', { name: 'Upload' })).toBeNull();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.getByRole('group', { name: 'Logo' })).toBeTruthy();
+  });
+});
+
+describe('Notice', () => {
+  test('an action sits beside the message, inside the same box', () => {
+    const onClick = vi.fn();
+    render(
+      <Notice tone="amber" title="Identity not verified" action={<button onClick={onClick}>Don&apos;t ask for ID</button>}>
+        No check started.
+      </Notice>,
+    );
+    const box = screen.getByRole('status');
+    expect(within(box).getByText('Identity not verified')).toBeTruthy();
+    fireEvent.click(within(box).getByRole('button', { name: "Don't ask for ID" }));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });

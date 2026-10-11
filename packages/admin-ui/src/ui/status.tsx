@@ -157,11 +157,18 @@ export function RefreshFailed({ message, onRetry }: { message: string; onRetry?:
 }
 
 /** A coloured notice for results and warnings inside a page. */
-export function Notice({ tone = 'blue', title, children }: { tone?: Tone; title?: string; children: ReactNode }) {
-  return (
-    <div role={tone === 'red' ? 'alert' : 'status'} className={cn('rounded-xl px-4 py-3 text-sm', tones[tone])}>
+/** A message box; `action` (a button or link) sits on its right, below the text on phones. */
+export function Notice({ tone = 'blue', title, children, action }: { tone?: Tone; title?: string; children: ReactNode; action?: ReactNode }) {
+  const body = (
+    <>
       {title ? <p className="font-semibold">{title}</p> : null}
       <div className={title ? 'mt-0.5' : undefined}>{children}</div>
+    </>
+  );
+  return (
+    <div role={tone === 'red' ? 'alert' : 'status'} className={cn('rounded-xl px-4 py-3 text-sm', tones[tone], action ? 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between' : undefined)}>
+      {action ? <div className="min-w-0">{body}</div> : body}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }

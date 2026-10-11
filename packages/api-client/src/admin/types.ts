@@ -95,6 +95,8 @@ export type ResellerDetail = {
   status: ResellerStatus;
   verified_at: string | null;
   verified_name: string | null;
+  /** An admin let the reseller go live without the identity check: who, when and why. */
+  identity_waiver: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
   plan: Plan;
   members: Array<{ user_id: string; name: string; email: string | null; role: string }>;
   stores: Array<{ id: string; name: string; subdomain: string; status: string }>;

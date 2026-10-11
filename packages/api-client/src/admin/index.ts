@@ -95,6 +95,16 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity', 'Fee'],
     }),
+    /** Operations: lets the reseller go live without the owner's identity check (activating at once if asked). Audited. */
+    waiveResellerIdentity: build.mutation<ResellerDetail, { id: string; reason: string; activate?: boolean }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/identity-waiver`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+    /** Operations: asks for the identity check again; an unverified active reseller goes back to pending. Audited. */
+    removeResellerIdentityWaiver: build.mutation<ResellerDetail, { id: string; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/identity-waiver/remove`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
     resellerWallet: build.query<ResellerWallet, string>({ query: id => `/v1/admin/resellers/${id}/wallet`, providesTags: (_result, _error, id) => [{ type: 'Reseller', id }] }),
     /** Finance: grants the startup allowance (verified reseller, switch on, once only). */
     grantStartupAllowance: build.mutation<StartupAllowance, string>({
@@ -365,6 +375,8 @@ export const {
   useResellerQuery,
   useResellerHistoryQuery,
   useUpdateResellerMutation,
+  useWaiveResellerIdentityMutation,
+  useRemoveResellerIdentityWaiverMutation,
   usePlansQuery,
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,

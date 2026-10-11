@@ -59,6 +59,7 @@ export class PlansService {
       include: { members: { include: { user: true } }, plan: true, stores: true },
     });
     if (!reseller) throw missingReseller();
+    const waivedBy = reseller.identityWaivedBy ? await this.prisma.user.findUnique({ where: { id: reseller.identityWaivedBy }, select: { id: true, name: true } }) : null;
     return {
       object: 'reseller' as const,
       id: reseller.id,
@@ -67,6 +68,10 @@ export class PlansService {
       status: reseller.status,
       verified_at: reseller.verifiedAt?.toISOString() ?? null,
       verified_name: reseller.verifiedName,
+      /** An admin let the reseller go live without the identity check: who, when and why. Null when not waived. */
+      identity_waiver: reseller.identityWaivedAt
+        ? { waived_at: reseller.identityWaivedAt.toISOString(), waived_by: waivedBy ? { id: waivedBy.id, name: waivedBy.name } : null, reason: reseller.identityWaiverReason }
+        : null,
       plan: presentPlan(reseller.plan),
       members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role })),
       stores: reseller.stores.map(s => ({ id: s.id, name: s.name, subdomain: s.subdomain, status: s.status })),
@@ -83,12 +88,43 @@ export class PlansService {
     if (input.plan && !(await this.prisma.plan.findUnique({ where: { code: input.plan } }))) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such plan.', 'plan');
     }
-    // Going live needs the owner's identity check first.
-    if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet.", 'status');
+    // Going live needs the owner's identity check first, unless an admin waived it.
+    if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt && !before.identityWaivedAt) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet. Verify it, or waive the check first.", 'status');
     }
     const after = await this.prisma.reseller.update({ where: { id }, data: { status: input.status, planCode: input.plan } });
     await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
+    return this.resellerDetail(id);
+  }
+
+  /**
+   * Lets a reseller go live without the owner's identity check (operations, audited with the reason), and activates
+   * them at once when asked. Live selling, top-ups and API keys follow the reseller's status as usual; payout bank
+   * accounts (named after the verified owner) and the startup allowance still need the check itself.
+   */
+  async waiveIdentity(actorId: string | null, id: string, input: { reason: string; activate?: boolean }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house) throw missingReseller();
+    if (before.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', "The owner's identity is already verified: there is nothing to waive.");
+    const activate = input.activate === true && before.status === 'pending';
+    const after = await this.prisma.reseller.update({
+      where: { id },
+      data: { identityWaivedAt: before.identityWaivedAt ?? new Date(), identityWaivedBy: actorId, identityWaiverReason: input.reason.trim(), status: activate ? 'active' : undefined },
+    });
+    await this.audit.record({ actorId, action: 'reseller.identity_waived', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    return this.resellerDetail(id);
+  }
+
+  /** Withdraws the waiver (audited). A reseller still unverified and active goes back to pending: they stop selling live. */
+  async restoreIdentityCheck(actorId: string | null, id: string, input: { reason: string }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house) throw missingReseller();
+    if (!before.identityWaivedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_waived', 'The identity check is not waived for this reseller.');
+    const after = await this.prisma.reseller.update({
+      where: { id },
+      data: { identityWaivedAt: null, identityWaivedBy: null, identityWaiverReason: null, status: !before.verifiedAt && before.status === 'active' ? 'pending' : undefined },
+    });
+    await this.audit.record({ actorId, action: 'reseller.identity_waiver_removed', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
     return this.resellerDetail(id);
   }
 
