@@ -777,3 +777,121 @@ export async function fakeStripe() {
   });
   return { ...service, state, env: { STRIPE_SECRET_KEY: 'sk_live_fake', STRIPE_WEBHOOK_SECRET: 'whsec_fake', STRIPE_API_URL: service.url } };
 }
+
+/**
+ * eSIM Access: signed POSTs (`RT-*` headers, checked like the real API), the package lists (fixed plans, day passes and
+ * top-ups), orders by transactionId (a repeat returns the same order, `periodNum` for day passes), the profile query
+ * (by order or eSIM), top-ups (by transactionId, once) and cancelling unused eSIMs (refunded to the balance).
+ * `state.allocating` makes the query answer 200010 (profiles still being allocated); `state.balance` in US dollars x
+ * 10,000 (an order or top-up beyond it is 200007); `state.profiles` holds each eSIM's states by esimTranNo.
+ */
+export async function fakeEsimAccess() {
+  const { createHmac } = await import('node:crypto');
+  const accessCode = 'esim-access-code';
+  const secretKey = 'esim-secret-key';
+  const pkg = (packageCode, slug, name, price, location, volumeGb, days, extra = {}) => ({
+    packageCode, slug, name, price, currencyCode: 'USD', volume: volumeGb * 1024 ** 3, unusedValidTime: 180, duration: days, durationUnit: 'DAY', location, description: name, activeType: 1, dataType: 1, smsStatus: 0, speed: '4G/5G', supportTopUpType: 2,
+    locationNetworkList: location.split(',').map(code => ({ locationName: code, operatorList: [{ operatorName: `${code} Mobile`, networkType: '4G' }] })), ...extra,
+  });
+  const state = {
+    packages: [
+      pkg('CKH491', 'JP_1_7', 'Japan 1GB 7Days', 15050, 'JP', 1, 7),
+      pkg('CKH530', 'EU-42_5_30', 'Europe (42 areas) 5GB 30Days', 89000, 'FR,DE,ES,IT,PT,NL,BE,AT,GR,IE', 5, 30),
+      pkg('CKH999', 'NO_PRICE', 'Broken package', 0, 'GB', 1, 7),
+    ],
+    dayPasses: [pkg('CKH700', 'JP-D_1', 'Japan 1GB/Day', 2000, 'JP', 1, 1, { dataType: 2, supportTopUpType: 3 })],
+    topUpPackages: [pkg('CKT491', 'TOPUP_JP_1_7', 'Japan 1GB 7Days top up', 12000, 'JP', 1, 7)],
+    profiles: {},
+    topUps: {},
+    orders: {},
+    allocating: false,
+    balance: 1_000_000_000,
+    count: 0,
+  };
+  const ok = obj => ({ body: { success: true, errorCode: '0', errorMsg: null, obj } });
+  const error = (errorCode, errorMsg) => ({ body: { success: false, errorCode, errorMsg, obj: null } });
+  const service = await fakeService(({ method, url, headers, raw, body }) => {
+    if (method !== 'POST') return error('000103', 'Method not supported');
+    const signed = createHmac('sha256', secretKey).update(`${headers['rt-timestamp']}${headers['rt-requestid']}${headers['rt-accesscode']}${raw.toString('utf8')}`).digest('hex');
+    if (headers['rt-accesscode'] !== accessCode || headers['rt-signature'] !== signed) return error('101003', 'Request signature mismatch.');
+    const path = url.replace('/api/v1/open/', '');
+    if (path === 'balance/query') return ok({ balance: state.balance });
+    if (path === 'package/list') {
+      if (body.type === 'TOPUP') return ok({ packageList: body.iccid ? state.topUpPackages : [] });
+      return ok({ packageList: String(body.dataType) === '2' ? state.dayPasses : state.packages });
+    }
+    if (path === 'esim/order') {
+      const existing = state.orders[body.transactionId];
+      if (existing) return ok({ orderNo: existing.orderNo, transactionId: body.transactionId });
+      const [line] = body.packageInfoList;
+      const found = [...state.packages, ...state.dayPasses].find(item => item.slug === line.packageCode || item.packageCode === line.packageCode);
+      if (!found) return error('310241', 'The packageCode does not exist.');
+      if (line.price !== undefined && line.price !== found.price) return error('200005', 'Package price error. Check price.');
+      const total = found.price * line.count * (line.periodNum ?? 1);
+      if (body.amount !== undefined && body.amount !== total) return error('200006', 'Order amount error.');
+      if (total > state.balance) return error('200007', 'Insufficient account balance');
+      state.balance -= total;
+      state.count += 1;
+      const orderNo = `B2610110000${String(state.count).padStart(4, '0')}`;
+      state.orders[body.transactionId] = { orderNo, package: found, count: line.count, body, status: 'GOT_RESOURCE' };
+      return ok({ orderNo, transactionId: body.transactionId });
+    }
+    if (path === 'esim/query' && body.esimTranNo) {
+      const profile = state.profiles[body.esimTranNo];
+      if (!profile) return error('310272', 'The esimTranNo does not exist.');
+      return ok({ esimList: [{ esimTranNo: body.esimTranNo, ...profile }] });
+    }
+    if (path === 'esim/topup') {
+      const profile = state.profiles[body.esimTranNo];
+      if (!profile) return error('310272', 'The esimTranNo does not exist.');
+      const found = state.topUpPackages.find(item => item.slug === body.packageCode || item.packageCode === body.packageCode);
+      if (!found) return error('310241', 'The packageCode does not exist.');
+      if (body.amount !== undefined && Number(body.amount) !== found.price) return error('200005', 'Package price error. Check price.');
+      if (!state.topUps[body.transactionId]) {
+        if (found.price > state.balance) return error('200007', 'Insufficient account balance');
+        state.balance -= found.price;
+        profile.totalVolume += found.volume;
+        if (profile.esimStatus === 'USED_UP') profile.esimStatus = 'IN_USE';
+        state.topUps[body.transactionId] = { body, esimTranNo: body.esimTranNo };
+      }
+      return ok({ transactionId: body.transactionId, iccid: profile.iccid, expiredTime: profile.expiredTime, totalVolume: profile.totalVolume, totalDuration: 14, orderUsage: profile.orderUsage });
+    }
+    if (path === 'esim/cancel') {
+      const profile = state.profiles[body.esimTranNo];
+      if (!profile) return error('310272', 'The esimTranNo does not exist.');
+      if (profile.smdpStatus !== 'RELEASED' || profile.esimStatus !== 'GOT_RESOURCE') return error('310403', 'The eSIM cannot be cancelled.');
+      profile.esimStatus = 'CANCEL';
+      state.balance += profile.price;
+      return ok({});
+    }
+    if (path === 'esim/query') {
+      const order = Object.values(state.orders).find(item => item.orderNo === body.orderNo);
+      if (!order) return error('310272', 'The orderNo does not exist.');
+      if (state.allocating) return error('200010', 'Profile is being downloaded for the order.');
+      const esimList = Array.from({ length: order.count }, (_, index) => {
+        const esimTranNo = `${order.orderNo.slice(1)}${index}`;
+        state.profiles[esimTranNo] ??= {
+          orderNo: order.orderNo,
+          iccid: `894310817000${order.orderNo.slice(-4)}${index}`,
+          ac: `LPA:1$rsp-eu.example.com$MATCH${order.orderNo.slice(-4)}${index}`,
+          qrCodeUrl: `https://p.qrsim.net/${order.orderNo}${index}.png`,
+          smdpStatus: 'RELEASED',
+          esimStatus: order.status,
+          apn: 'drei.at',
+          expiredTime: '2027-04-09T18:34:17+0000',
+          totalVolume: order.package.volume,
+          totalDuration: order.package.duration,
+          durationUnit: 'DAY',
+          orderUsage: 0,
+          price: order.package.price * (order.body.packageInfoList[0].periodNum ?? 1),
+        };
+        const profile = { ...state.profiles[esimTranNo] };
+        delete profile.price;
+        return { esimTranNo, ...profile };
+      });
+      return ok({ esimList });
+    }
+    return error('000001', `Fake eSIM Access has no ${path}`);
+  });
+  return { ...service, state, env: { ESIM_ACCESS_ACCESS_CODE: accessCode, ESIM_ACCESS_SECRET_KEY: secretKey, ESIM_ACCESS_API_URL: service.url, ESIM_ACCESS_WEBHOOK_TOKEN: 'esim-webhook-token-0123456789' } };
+}

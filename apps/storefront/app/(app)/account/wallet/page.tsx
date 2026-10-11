@@ -11,7 +11,10 @@ export const metadata: Metadata = { title: "Wallet" };
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
-type Search = { top_up?: string; back?: string; amount?: string };
+type Search = { top_up?: string; back?: string; amount?: string; wallet?: string };
+
+/** "US dollars" or the country's currency code, as the wallet tabs name them. */
+const walletLabel = (currency: string) => (currency === "USD" ? "US dollars" : currency);
 
 /** A top-up just made (back from the payment page, or in the sandbox): where it stands. */
 async function TopUpStatus({ id }: { id: string }) {
@@ -58,8 +61,12 @@ async function TopUpStatus({ id }: { id: string }) {
  */
 export default async function WalletPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
-  const [customer, wallet, activity] = await Promise.all([currentCustomer(), walletFor(), customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20")]);
+  // The country wallet unless `?wallet=USD` chose the US dollar one.
+  const asked = /^[A-Za-z]{3}$/.test(params.wallet ?? "") ? params.wallet!.toUpperCase() : undefined;
+  const [customer, chosen, activity] = await Promise.all([currentCustomer(), walletFor(asked), customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20")]);
+  const wallet = chosen ?? (asked ? await walletFor() : null);
   const back = params.back ? safeNext(params.back, "") : "";
+  const primary = wallet?.wallets.find(item => item.primary)?.currency ?? wallet?.currency;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -83,11 +90,31 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         <p className={card}>Your wallet cannot be shown right now. Try again shortly.</p>
       ) : (
         <>
+          {wallet.wallets.length > 1 ? (
+            <nav aria-label="Your wallets" className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+              {wallet.wallets.map(item => {
+                const active = item.currency === wallet.currency;
+                const query = new URLSearchParams({ ...(item.primary ? {} : { wallet: item.currency }), ...(back ? { back } : {}) }).toString();
+                return (
+                  <Link
+                    key={item.currency}
+                    href={`/account/wallet${query ? `?${query}` : ""}`}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex min-h-14 min-w-0 flex-col justify-center rounded-xl px-3 py-2 ${active ? "bg-white shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-[#070f4c]"}`}
+                  >
+                    <span className="text-xs font-semibold text-slate-500">{walletLabel(item.currency)}</span>
+                    <span className="truncate font-bold text-[#070f4c]">{formatFace(item.balance, item.currency)}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : null}
           <section aria-label="Balance" className="rounded-3xl bg-[#070f4c] p-6 text-white">
             {/* Top row: the label on the left, the customer's own bank account (or the link to get one) top right. */}
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <p className="flex items-center gap-2 text-sm text-white/70">
-                <Wallet className="size-4" aria-hidden="true" /> Wallet balance{wallet.mode === "test" ? " (test)" : ""}
+                <Wallet className="size-4" aria-hidden="true" /> {wallet.wallets.length > 1 ? (wallet.currency === "USD" ? "US dollar wallet" : `${wallet.currency} wallet`) : "Wallet balance"}
+                {wallet.mode === "test" ? " (test)" : ""}
               </p>
               {wallet.enabled && wallet.reserved_accounts_available ? (
                 wallet.reserved_accounts[0] ? (
@@ -107,9 +134,11 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
               <div className="min-w-0">
                 <p className="font-display text-4xl font-extrabold">{formatFace(wallet.balance, wallet.currency)}</p>
                 <p className="mt-2 text-sm text-white/70">
-                  {wallet.enabled
-                    ? "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."
-                    : "This store now takes payment when you buy. You can still spend what is left here."}
+                  {!wallet.enabled
+                    ? "This store now takes payment when you buy. You can still spend what is left here."
+                    : wallet.currency !== primary
+                      ? `Pay for orders in dollars when you choose: prices in ${primary} are converted at our rate, shown before you pay. Spent only in this store; cannot be withdrawn.`
+                      : "You pay for your orders from here. It is spent only in this store and cannot be withdrawn."}
                 </p>
               </div>
               {wallet.enabled ? <AddFunds wallet={wallet} amount={params.amount} open={Boolean(back || params.amount)} /> : null}

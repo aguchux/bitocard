@@ -106,7 +106,13 @@ export type ResellerDetail = {
 };
 /** The $500 startup allowance (US cents): restricted, never cash. */
 export type StartupAllowance = { currency: 'USD'; granted: number; remaining: number; status: 'active' | 'used' | 'revoked'; granted_at: string; revoked_at: string | null };
-export type ResellerWallet = Record<string, unknown> & { currency: string; available: number; startup_allowance: StartupAllowance | null };
+/** One of a reseller's wallets (live): their country's currency, or `USD`; `wallets` lists both. */
+export type ResellerWallet = Record<string, unknown> & {
+  currency: string;
+  available: number;
+  startup_allowance: StartupAllowance | null;
+  wallets: Array<{ currency: string; primary: boolean; available: number; reserved: number }>;
+};
 
 export type VerificationStatus = 'in_progress' | 'approved' | 'declined' | 'in_review' | 'expired';
 export type Verification = {

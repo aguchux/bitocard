@@ -5,11 +5,12 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
+import { FxService } from '../fx/fx.service.js';
 import { type Checkout, type CheckoutStatus, type Order, type OrderDelivery, type Payment, Prisma, type Product, type ProductCategory, type Store } from '../generated/prisma/client.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
-import { WalletService } from '../ledger/wallet.service.js';
+import { currencyNotHeld, WalletService, walletCurrencies } from '../ledger/wallet.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { OrdersService, receiptNumber } from '../orders/orders.service.js';
@@ -53,6 +54,8 @@ export type CheckoutInput = {
   preview?: boolean;
   /** Paying from the wallet: the quote the customer confirmed (from `preview`). */
   quote_id?: string;
+  /** Paying from the wallet: which one (the customer's country's currency by default, or `USD`). */
+  wallet_currency?: string;
 };
 
 const quoteGone = () =>
@@ -92,6 +95,7 @@ export class CheckoutService implements OnModuleInit {
     private readonly identity: IdentityService,
     private readonly inbox: InboxService,
     private readonly customerWallets: CustomerWalletsService,
+    private readonly fx: FxService,
   ) {}
 
   onModuleInit() {
@@ -136,7 +140,12 @@ export class CheckoutService implements OnModuleInit {
       amount: minor(checkout.amountMinor),
       currency: checkout.currency,
       /** Charged by the gateway in another currency (cards in US dollars where Stripe cannot take this one); null otherwise. */
-      charged: checkout.payment?.chargeCurrency && checkout.payment.chargeAmountMinor ? { amount: minor(checkout.payment.chargeAmountMinor), currency: checkout.payment.chargeCurrency } : null,
+      charged:
+        checkout.walletCurrency && checkout.walletAmountMinor
+          ? { amount: minor(checkout.walletAmountMinor), currency: checkout.walletCurrency }
+          : checkout.payment?.chargeCurrency && checkout.payment.chargeAmountMinor
+            ? { amount: minor(checkout.payment.chargeAmountMinor), currency: checkout.payment.chargeCurrency }
+            : null,
       tax: checkout.quote.taxName ? { name: checkout.quote.taxName, amount: minor(checkout.quote.taxMinor) } : null,
       method: isPaymentGateway(checkout.gateway)
         ? presentMethod(checkout.gateway)
@@ -221,7 +230,7 @@ export class CheckoutService implements OnModuleInit {
     // Codes and licence keys are also emailed to the customer, unless they named another address.
     const recipient = { ...input.recipient };
     if (emailedCategories.has(product.category) && !recipient.email) recipient.email = customer.email;
-    if ((input.preview || input.quote_id) && !fromWallet) {
+    if ((input.preview || input.quote_id || input.wallet_currency) && !fromWallet) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Prices are confirmed on the payment page when paying by another method.', input.quote_id ? 'quote_id' : 'preview');
     }
     let quote;
@@ -246,7 +255,9 @@ export class CheckoutService implements OnModuleInit {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before buying this. It takes a few minutes and is needed once.');
     }
 
+    const walletCurrency = fromWallet ? this.walletCurrencyFor(quote.currency, input.wallet_currency) : quote.currency;
     if (input.preview) {
+      const options = await this.walletOptions(customer.id, mode, quote);
       return {
         object: 'checkout_preview' as const,
         quote_id: quote.id,
@@ -254,11 +265,13 @@ export class CheckoutService implements OnModuleInit {
         currency: quote.currency,
         tax: quote.taxName ? { name: quote.taxName, amount: minor(quote.taxMinor) } : null,
         expires_at: quote.expiresAt.toISOString(),
-        wallet_balance: minor(await this.customerWallets.balance(customer.id, mode, quote.currency)),
+        wallet_balance: options.find(option => option.currency === quote.currency)?.balance ?? 0,
+        /** What each wallet would pay: the price in the country wallet, or in US dollars at BitoCard's rate. */
+        wallet_options: options,
       };
     }
     const id = randomUUID();
-    if (fromWallet) return this.payFromWallet({ id, store, customer, seller, mode, quote, productName: product.name });
+    if (fromWallet) return this.payFromWallet({ id, store, customer, seller, mode, quote, productName: product.name, walletCurrency });
     const paymentId = randomUUID();
     let feeChargeId: string | null = null;
     if (option.own) feeChargeId = await this.holdGatewayFee(seller.id, mode, quote, paymentId, product.name);
@@ -305,10 +318,30 @@ export class CheckoutService implements OnModuleInit {
     return this.present((await this.load({ id }))!);
   }
 
+  /** The wallet a purchase is paid from: the price's own currency (the customer's country's) or US dollars. */
+  private walletCurrencyFor(priceCurrency: string, asked?: string) {
+    const currency = asked ? asked.toUpperCase() : priceCurrency;
+    if (!walletCurrencies(priceCurrency).includes(currency)) throw currencyNotHeld(currency);
+    return currency;
+  }
+
+  /** Each wallet's balance and what it would pay for this quote (US dollars at BitoCard's rate; null while rates are paused). */
+  private async walletOptions(customerId: string, mode: Checkout['mode'], quote: { priceMinor: bigint; currency: string }) {
+    return Promise.all(
+      walletCurrencies(quote.currency).map(async currency => {
+        const amount = currency === quote.currency ? quote.priceMinor : ((await this.fx.usdCovering(quote.priceMinor, quote.currency).catch(() => null))?.amount ?? null);
+        const balance = await this.customerWallets.balance(customerId, mode, currency);
+        return { currency, amount: amount === null ? null : minor(amount), balance: minor(balance), enough: amount !== null && balance >= amount };
+      }),
+    );
+  }
+
   /**
    * Pays a checkout from the customer's wallet: in one step the price leaves their wallet for the seller's
    * `customer_payments` (exactly as a gateway payment arrives) and the checkout is paid; then the order is placed as
-   * usual. A wallet too low refuses it, saying how much to add, and nothing is kept.
+   * usual. From the US dollar wallet, the price is converted at BitoCard's rate (`FxService.usdCovering`, rounded up)
+   * through BitoCard's currency exchange accounts, and recorded on the checkout so a refund goes back exactly. A
+   * wallet too low refuses it, saying how much to add, and nothing is kept.
    */
   private async payFromWallet(input: {
     id: string;
@@ -318,28 +351,38 @@ export class CheckoutService implements OnModuleInit {
     mode: Checkout['mode'];
     quote: { id: string; priceMinor: bigint; currency: string; quantity: number };
     productName: string;
+    walletCurrency: string;
   }) {
-    const { id, customer, seller, mode, quote } = input;
-    const balance = await this.customerWallets.balance(customer.id, mode, quote.currency);
+    const { id, customer, seller, mode, quote, walletCurrency } = input;
+    const converted = walletCurrency !== quote.currency;
+    const cost = converted ? (await this.fx.usdCovering(quote.priceMinor, quote.currency)).amount : quote.priceMinor;
+    const balance = await this.customerWallets.balance(customer.id, mode, walletCurrency);
     const short = () =>
       new ApiError(
         HttpStatus.PAYMENT_REQUIRED,
         'invalid_request_error',
         'wallet_balance_low',
-        `Your wallet has ${formatMoney(balance, quote.currency)}. Add ${formatMoney(quote.priceMinor - balance > 0n ? quote.priceMinor - balance : quote.priceMinor, quote.currency)} to buy this.`,
+        `Your ${walletCurrency === quote.currency ? '' : 'US dollar '}wallet has ${formatMoney(balance, walletCurrency)}. Add ${formatMoney(cost - balance > 0n ? cost - balance : cost, walletCurrency)} to buy this.`,
       );
-    if (balance < quote.priceMinor) throw short();
+    if (balance < cost) throw short();
     const entry = await this.ledger.prepare({
       mode,
       type: 'wallet_purchase',
       reference: `wallet_purchase:${id}`,
       resellerId: seller.id,
       description: quote.quantity > 1 ? `Paid from wallet: ${quote.quantity} x ${input.productName}` : `Paid from wallet: ${input.productName}`,
-      metadata: { checkout_id: id },
-      lines: [
-        { account: { kind: 'customer_wallet', currency: quote.currency, customerId: customer.id }, debit: quote.priceMinor },
-        { account: { kind: 'customer_payments', currency: quote.currency, resellerId: seller.id }, credit: quote.priceMinor },
-      ],
+      metadata: converted ? { checkout_id: id, conversion: { from: { amount: String(cost), currency: walletCurrency }, to: { amount: String(quote.priceMinor), currency: quote.currency } } } : { checkout_id: id },
+      lines: converted
+        ? [
+            { account: { kind: 'customer_wallet', currency: walletCurrency, customerId: customer.id }, debit: cost },
+            { account: { kind: 'currency_exchange', currency: walletCurrency }, credit: cost },
+            { account: { kind: 'currency_exchange', currency: quote.currency }, debit: quote.priceMinor },
+            { account: { kind: 'customer_payments', currency: quote.currency, resellerId: seller.id }, credit: quote.priceMinor },
+          ]
+        : [
+            { account: { kind: 'customer_wallet', currency: quote.currency, customerId: customer.id }, debit: quote.priceMinor },
+            { account: { kind: 'customer_payments', currency: quote.currency, resellerId: seller.id }, credit: quote.priceMinor },
+          ],
     });
     try {
       await this.prisma.$transaction(async tx => {
@@ -354,6 +397,7 @@ export class CheckoutService implements OnModuleInit {
             gateway: 'wallet',
             amountMinor: quote.priceMinor,
             currency: quote.currency,
+            ...(converted ? { walletCurrency, walletAmountMinor: cost } : {}),
             status: 'paid',
           },
         });
@@ -467,6 +511,13 @@ export class CheckoutService implements OnModuleInit {
   }
 
   /** One checkout, with its codes once delivered. A checkout still waiting for payment is checked with the gateway first. */
+  /** The order a customer's own checkout placed (its eSIMs, for example); not found until it has one. */
+  async orderFor(customer: CustomerWithStore, id: string) {
+    const checkout = await this.prisma.checkout.findUnique({ where: { id }, select: { customerId: true, orderId: true } });
+    if (!checkout || checkout.customerId !== customer.id || !checkout.orderId) throw notFound();
+    return this.prisma.order.findUniqueOrThrow({ where: { id: checkout.orderId } });
+  }
+
   async get(customer: CustomerWithStore, id: string) {
     let checkout = await this.load({ id });
     if (!checkout || checkout.customerId !== customer.id) throw notFound();
@@ -692,9 +743,18 @@ export class CheckoutService implements OnModuleInit {
           metadata: { checkout_id: checkout.id, payment_id: checkout.paymentId },
           lines: [
             { account: { kind: 'customer_payments', currency: checkout.currency, resellerId: checkout.resellerId }, debit: checkout.amountMinor },
-            toWallet
-              ? { account: { kind: 'customer_wallet', currency: checkout.currency, customerId: checkout.customerId }, credit: checkout.amountMinor }
-              : { account: { kind: 'provider_balance', currency: checkout.currency, provider: checkout.payment!.provider }, credit: checkout.amountMinor },
+            ...(toWallet && checkout.walletCurrency && checkout.walletAmountMinor
+              ? // Paid from the US dollar wallet: exactly what left it goes back, through the same exchange accounts.
+                [
+                  { account: { kind: 'currency_exchange' as const, currency: checkout.currency }, credit: checkout.amountMinor },
+                  { account: { kind: 'currency_exchange' as const, currency: checkout.walletCurrency }, debit: checkout.walletAmountMinor },
+                  { account: { kind: 'customer_wallet' as const, currency: checkout.walletCurrency, customerId: checkout.customerId }, credit: checkout.walletAmountMinor },
+                ]
+              : [
+                  toWallet
+                    ? { account: { kind: 'customer_wallet' as const, currency: checkout.currency, customerId: checkout.customerId }, credit: checkout.amountMinor }
+                    : { account: { kind: 'provider_balance' as const, currency: checkout.currency, provider: checkout.payment!.provider }, credit: checkout.amountMinor },
+                ]),
           ],
         });
     const done = await this.prisma.$transaction(async tx => {
@@ -709,7 +769,7 @@ export class CheckoutService implements OnModuleInit {
     }
     await this.inbox.customer({ customerId: checkout.customerId, storeId: checkout.storeId }, 'customer.order.refunded', {
       subject: checkout.id,
-      title: `${formatMoney(checkout.amountMinor, checkout.currency)} refunded`,
+      title: `${checkout.walletCurrency && checkout.walletAmountMinor ? formatMoney(checkout.walletAmountMinor, checkout.walletCurrency) : formatMoney(checkout.amountMinor, checkout.currency)} refunded`,
       body: toWallet ? 'Your refund is back in your wallet, ready to spend.' : 'Your refund has been sent to how you paid. Banks and mobile money providers can take a few days to show it.',
       link: `/account/orders/${checkout.id}`,
       mode: checkout.mode,

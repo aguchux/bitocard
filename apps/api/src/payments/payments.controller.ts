@@ -1,11 +1,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsUrl, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsUrl, Matches, Max, Min } from 'class-validator';
 import { paymentGateways } from './payment-providers.js';
 import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
-import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
+import { modeHeader, PageDto, WalletCurrencyDto } from '../ledger/wallet.controller.js';
 import { ChargebacksService } from './chargebacks.service.js';
 import { PaymentsService } from './payments.service.js';
 
@@ -24,6 +25,10 @@ class CreateTopUpDto {
   @ApiPropertyOptional({ description: 'HTTPS page the payer returns to after paying.' })
   @IsOptional() @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: false })
   return_url?: string;
+
+  @ApiPropertyOptional({ description: 'Which wallet to top up: `USD`, or your country\'s currency (the default). `amount` is in its minor units.', example: 'USD' })
+  @IsOptional() @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value)) @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
 }
 
 class SimulateTopUpDto {
@@ -62,12 +67,13 @@ export class PaymentsController {
 
   @ApiOperation({
     summary: 'List top-up payment methods',
-    description: 'The ways to top up in your country, best first: card, bank or mobile money, as BitoCard offers them in your market. Empty when none is available yet (reserved bank accounts may still be).',
+    description:
+      'The ways to top up a wallet in your country, best first: card, bank or mobile money, as BitoCard offers them in your market. Pass `currency=USD` for the US dollar wallet (methods that take dollars, usually card). Empty when none is available yet (reserved bank accounts may still be, for the country wallet).',
   })
   @Scopes('wallet:read')
   @Get('payment-methods')
-  topUpMethods(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
-    return this.payments.topUpMethods(resellerOf(caller), mode);
+  topUpMethods(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: WalletCurrencyDto) {
+    return this.payments.topUpMethods(resellerOf(caller), mode, query.currency);
   }
 
   @ApiOperation({

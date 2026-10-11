@@ -1,13 +1,14 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownToLine, Banknote, CircleDollarSign, Clock, CreditCard, Gift, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
+import { ArrowDownToLine, ArrowLeftRight, Banknote, CircleDollarSign, Clock, CreditCard, Gift, Hourglass, Lock, Plus, Send, Wallet as WalletIcon } from "lucide-react";
 import { Button, Card, CardHeader, cn, DataTable, ErrorState, errorMessage, formatDateTime, formatMoney, formatRelative, humanise, LoadMore, Notice, PageHeader, RefreshFailed, StatCard, StatusBadge } from "@bitocard/admin-ui";
 import { type Chargeback, type WalletTransaction, useWalletChargebacksQuery, useWalletQuery, useWalletTransactionsInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { ConvertDialog, walletName, WalletSwitch } from "@/components/wallets";
 
 const primaryLink = "inline-flex min-h-11 items-center gap-2 rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-600";
 const secondaryLink = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-brand-500 bg-white px-4 text-sm font-semibold text-brand-600 hover:bg-brand-50";
@@ -54,16 +55,34 @@ function PaymentReturn() {
 }
 
 export default function WalletPage() {
+  return (
+    <Suspense fallback={null}>
+      <Wallets />
+    </Suspense>
+  );
+}
+
+function Wallets() {
   const { membership, mode } = useReseller();
+  const search = useSearchParams();
+  const router = useRouter();
   const allowed = can(membership, "admin", "finance", "developer");
-  const wallet = useWalletQuery(undefined, { skip: !allowed });
+  // The country wallet unless `?currency=USD` chose the US dollar one.
+  const asked = search.get("currency")?.toUpperCase() || undefined;
+  const wallet = useWalletQuery(asked, { skip: !allowed });
   const chargebacks = useWalletChargebacksQuery(undefined, { skip: !allowed });
   const chargebackRows = chargebacks.data?.data ?? [];
   const holding = chargebackRows.some(row => row.payouts_on_hold);
-  const transactions = useWalletTransactionsInfiniteQuery(undefined, { skip: !allowed });
-  const rows = transactions.data?.pages.flatMap(page => page.data);
   const data = wallet.data;
   const currency = data?.currency ?? "";
+  const transactions = useWalletTransactionsInfiniteQuery(currency || undefined, { skip: !allowed || !currency });
+  const rows = transactions.data?.pages.flatMap(page => page.data);
+  const wallets = data?.wallets ?? [];
+  const primary = wallets.find(item => item.primary)?.currency ?? currency;
+  const dollars = Boolean(data) && currency !== primary;
+  const other = wallets.find(item => item.currency !== currency)?.currency;
+  const [converting, setConverting] = useState(false);
+  const choose = (code: string) => router.replace(code === primary ? "/wallet" : `/wallet?currency=${code}`, { scroll: false });
   const money = (minor: number | undefined) => (data && minor !== undefined ? formatMoney(minor, currency) : "—");
   const loading = wallet.isLoading;
 
@@ -71,16 +90,25 @@ export default function WalletPage() {
     <ShqShell section="wallet" current="/wallet" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Balance" }]}>
       <PageHeader
         title="Wallet"
-        description={mode === "test" ? "Sandbox balances: test money only." : `Your balances${currency ? ` in ${currency}` : ""}. Orders are paid from the available balance.`}
+        description={
+          mode === "test"
+            ? "Sandbox balances: test money only."
+            : "Your wallets: your country's currency and US dollars. Orders are paid from your country wallet, topped up from the US dollar wallet when it runs short."
+        }
         actions={
           <>
             {can(membership, "admin", "finance") ? (
-              <Link href="/wallet/top-ups" className={primaryLink}>
+              <Link href={dollars ? `/wallet/top-ups?currency=${currency}` : "/wallet/top-ups"} className={primaryLink}>
                 <Plus className="size-4" aria-hidden />
                 Top up
               </Link>
             ) : null}
-            {can(membership, "finance") ? (
+            {can(membership, "admin", "finance") && other && data ? (
+              <Button variant="secondary" icon={<ArrowLeftRight className="size-4" aria-hidden />} onClick={() => setConverting(true)}>
+                Convert
+              </Button>
+            ) : null}
+            {can(membership, "finance") && !dollars ? (
               <Link href="/wallet/payouts" className={secondaryLink}>
                 <ArrowDownToLine className="size-4" aria-hidden />
                 Withdraw
@@ -89,9 +117,8 @@ export default function WalletPage() {
           </>
         }
       />
-      <Suspense fallback={null}>
-        <PaymentReturn />
-      </Suspense>
+      <PaymentReturn />
+      {data && other ? <ConvertDialog open={converting} onClose={() => setConverting(false)} from={currency} to={other} available={data.available} /> : null}
 
       {!allowed ? (
         <Notice tone="grey" title="No access to the wallet">
@@ -104,6 +131,27 @@ export default function WalletPage() {
       ) : (
         <>
           {wallet.error && !wallet.isFetching ? <RefreshFailed message={errorMessage(wallet.error, "Could not load your wallet.")} onRetry={wallet.refetch} /> : null}
+          <WalletSwitch wallets={wallets} value={currency} onChange={choose} />
+          {dollars ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StatCard
+                label={`Available in your ${walletName(currency)}`}
+                value={money(data?.available)}
+                icon={<CircleDollarSign aria-hidden />}
+                tone="blue"
+                loading={loading}
+                footer={<p className="text-xs text-muted">{`Top up by card in dollars. Converted into your ${primary} wallet when an order needs it, or by hand with Convert. Cannot be withdrawn.`}</p>}
+              />
+              <StatCard
+                label="Reserved for orders"
+                value={money(data?.reserved)}
+                icon={<Lock aria-hidden />}
+                tone="violet"
+                loading={loading}
+                footer={<p className="text-xs text-muted">Orders are held from your country wallet.</p>}
+              />
+            </div>
+          ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <StatCard
               label="Available to spend"
@@ -126,7 +174,7 @@ export default function WalletPage() {
               icon={<Banknote aria-hidden />}
               tone="green"
               loading={loading}
-              footer={<p className="text-xs text-muted">{data ? `Smallest withdrawal: ${formatMoney(data.minimum_withdrawal, currency)}.` : null}</p>}
+              footer={<p className="text-xs text-muted">{data && data.minimum_withdrawal !== null ? `Smallest withdrawal: ${formatMoney(data.minimum_withdrawal, currency)}.` : null}</p>}
             />
             <StatCard
               label="Earnings on hold"
@@ -159,6 +207,7 @@ export default function WalletPage() {
               footer={<p className="text-xs text-muted">On their way to your bank account.</p>}
             />
           </div>
+          )}
 
           {chargebackRows.length ? (
             <Card>
@@ -238,7 +287,7 @@ export default function WalletPage() {
           ) : null}
 
           <Card>
-            <CardHeader title="Transactions" description="Every change to your wallet, newest first." className="pb-4" />
+            <CardHeader title="Transactions" description={`Every change to your ${currency ? walletName(currency) : "wallet"}, newest first.`} className="pb-4" />
             <DataTable<WalletTransaction>
               caption="Wallet transactions"
               rows={rows}
@@ -248,7 +297,18 @@ export default function WalletPage() {
               rowKey={row => row.id}
               empty="No transactions yet. Top up your wallet to get started."
               columns={[
-                { key: "description", header: "Description", cell: row => <span className="break-words">{row.description}</span> },
+                {
+                  key: "description",
+                  header: "Description",
+                  cell: row => (
+                    <span className="break-words">
+                      {row.description}
+                      {row.conversion ? (
+                        <span className="block text-xs text-muted">{`${formatMoney(row.conversion.from.amount, row.conversion.from.currency)} → ${formatMoney(row.conversion.to.amount, row.conversion.to.currency)}`}</span>
+                      ) : null}
+                    </span>
+                  ),
+                },
                 { key: "type", header: "Type", cell: row => <span className="text-muted">{humanise(row.type)}</span>, hideOnMobile: true },
                 {
                   key: "amount",

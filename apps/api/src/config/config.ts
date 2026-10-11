@@ -178,6 +178,12 @@ export const configSchema = z.object({
   PAWAPAY_PAYOUT_FEE_PERCENT: z.string().optional(),
   /** In the callback address set in the pawaPay dashboard: /v1/webhooks/pawapay?token=<this>. */
   PAWAPAY_CALLBACK_TOKEN: z.string().optional(),
+  /** eSIM Access (eSIM data packages): the access code and secret key from its console (Developer). No sandbox exists. */
+  ESIM_ACCESS_ACCESS_CODE: z.string().optional(),
+  ESIM_ACCESS_SECRET_KEY: z.string().optional(),
+  ESIM_ACCESS_API_URL: z.string().url().default('https://api.esimaccess.com'),
+  /** In the webhook address saved in eSIM Access: /v1/webhooks/esim-access?token=<this>. */
+  ESIM_ACCESS_WEBHOOK_TOKEN: z.string().min(16).optional(),
 
   // File storage (DigitalOcean Spaces, S3-compatible): logos, icons and images uploaded by admins and resellers.
   // Browsers upload straight to the bucket with signed links; uploads are refused until the key, secret and bucket are set.

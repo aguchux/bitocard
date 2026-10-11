@@ -7087,7 +7087,7 @@
     },
     "/v1/wallet": {
       "get": {
-        "description": "Amounts are integer minor units of the wallet currency (for example kobo for NGN). `available` pays wholesale cost; earnings become withdrawable after the payout hold.",
+        "description": "You hold two wallets: your country's currency (orders, earnings and withdrawals) and US dollars. Pass `currency` for one of them (your country's by default); `wallets` lists both. Amounts are integer minor units of the wallet currency (for example kobo for NGN). `available` pays wholesale cost; earnings become withdrawable after the payout hold. An order your country wallet cannot cover is covered from the US dollar wallet, converted at BitoCard's rate.",
         "operationId": "WalletController_wallet",
         "parameters": [
           {
@@ -7096,6 +7096,16 @@
             "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
             "required": false,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "Which wallet: `USD`, or your country's currency (the default).",
+            "schema": {
+              "example": "USD",
               "type": "string"
             }
           }
@@ -7128,6 +7138,39 @@
                     "status": "active",
                     "granted_at": "2026-10-01T12:00:00.000Z",
                     "revoked_at": null
+                  },
+                  "wallets": [
+                    {
+                      "currency": "NGN",
+                      "primary": true,
+                      "available": 12450000,
+                      "reserved": 97000
+                    },
+                    {
+                      "currency": "USD",
+                      "primary": false,
+                      "available": 2500,
+                      "reserved": 0
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
                   }
                 }
               }
@@ -7210,7 +7253,7 @@
     },
     "/v1/wallet/transactions": {
       "get": {
-        "description": "Newest first. `amount` is the change to the available balance.",
+        "description": "Newest first. `amount` is the change to the available balance of the transaction's `currency`.",
         "operationId": "WalletController_transactions",
         "parameters": [
           {
@@ -7239,6 +7282,16 @@
             "in": "query",
             "description": "ID of the last item from the previous page.",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "Only this wallet's transactions: `USD` or your country's currency. A conversion shows in both, each with its own side. Default: every wallet.",
+            "schema": {
+              "example": "USD",
               "type": "string"
             }
           }
@@ -7291,6 +7344,7 @@
                           "id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21"
                         }
                       },
+                      "conversion": null,
                       "id": "6b1d2c3e-4f5a-4b6c-9d7e-8f9a0b1c2d3e",
                       "type": "platform_fee",
                       "description": "BitoCard fee: order through your own supplier",
@@ -7304,10 +7358,35 @@
                       "earnings_on_hold_change": 0,
                       "allowance_change": 0,
                       "fee": null,
+                      "conversion": null,
                       "id": "a7f3e2d1-c0b9-4a8f-9e7d-6c5b4a3f2e1d",
                       "type": "hold",
                       "description": "Order: MTN Nigeria airtime",
                       "created_at": "2026-10-06T09:15:02.250Z"
+                    },
+                    {
+                      "object": "wallet_transaction",
+                      "currency": "NGN",
+                      "amount": 2955000,
+                      "reserved_change": 0,
+                      "earnings_on_hold_change": 0,
+                      "allowance_change": 0,
+                      "fee": null,
+                      "conversion": {
+                        "from": {
+                          "amount": 2000,
+                          "currency": "USD"
+                        },
+                        "to": {
+                          "amount": 2955000,
+                          "currency": "NGN"
+                        },
+                        "rate": "1477.5"
+                      },
+                      "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                      "type": "conversion",
+                      "description": "Converted from your US dollar wallet to your NGN wallet",
+                      "created_at": "2026-10-06T08:30:00.000Z"
                     },
                     {
                       "object": "wallet_transaction",
@@ -7317,6 +7396,7 @@
                       "earnings_on_hold_change": 0,
                       "allowance_change": 0,
                       "fee": null,
+                      "conversion": null,
                       "id": "0e9d8c7b-6a5f-4e4d-8c3b-2a1f0e9d8c7b",
                       "type": "top_up",
                       "description": "Wallet top-up",
@@ -7418,6 +7498,150 @@
         ],
         "x-bitocard-scopes": [
           "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/wallet/conversions": {
+      "post": {
+        "description": "Moves money between your US dollar wallet and your country wallet at BitoCard's exchange rate (see `GET /v1/exchange-rates`): topped-up funds first, then withdrawable earnings. With `preview: true` it only says what would arrive. Converted money arrives as topped-up funds: it pays for orders and cannot be withdrawn.",
+        "operationId": "WalletController_convert",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The conversion made, or with `preview` what would be (`id` null). Both wallets change in one ledger entry (`conversion`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletConversion"
+                },
+                "example": {
+                  "object": "wallet_conversion",
+                  "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                  "mode": "live",
+                  "from": {
+                    "amount": 2000,
+                    "currency": "USD"
+                  },
+                  "to": {
+                    "amount": 2955000,
+                    "currency": "NGN"
+                  },
+                  "rate": "1477.5",
+                  "created_at": "2026-10-06T11:02:44.120Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Convert between your wallets",
+        "tags": [
+          "Wallet"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:write"
         ],
         "x-bitocard-auth": "api_key"
       }
@@ -7702,7 +7926,7 @@
     },
     "/v1/wallet/payment-methods": {
       "get": {
-        "description": "The ways to top up in your country, best first: card, bank or mobile money, as BitoCard offers them in your market. Empty when none is available yet (reserved bank accounts may still be).",
+        "description": "The ways to top up a wallet in your country, best first: card, bank or mobile money, as BitoCard offers them in your market. Pass `currency=USD` for the US dollar wallet (methods that take dollars, usually card). Empty when none is available yet (reserved bank accounts may still be, for the country wallet).",
         "operationId": "PaymentsController_topUpMethods",
         "parameters": [
           {
@@ -7711,6 +7935,16 @@
             "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
             "required": false,
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "Which wallet: `USD`, or your country's currency (the default).",
+            "schema": {
+              "example": "USD",
               "type": "string"
             }
           }
@@ -7759,6 +7993,25 @@
                       "networks": []
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
                 }
               }
             }
@@ -9421,7 +9674,7 @@
                     },
                     "currency": {
                       "type": "string",
-                      "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+                      "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
                     },
                     "bank_code": {
                       "type": "string",
@@ -13849,6 +14102,7 @@
                 "number.expired",
                 "number.deleted",
                 "number.sms_received",
+                "esim.updated",
                 "dispute.opened",
                 "dispute.message_received",
                 "dispute.escalated",
@@ -22525,6 +22779,1047 @@
         ],
         "x-bitocard-auth": "api_key"
       }
+    },
+    "/v1/esims": {
+      "get": {
+        "description": "The eSIMs your orders delivered, newest first, with their status, data use and expiry. Activation codes are only on `GET /v1/orders/{id}`.",
+        "operationId": "EsimsController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order_id",
+            "required": false,
+            "in": "query",
+            "description": "Only the eSIMs this order delivered.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of your eSIMs, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Esim"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "esim",
+                      "id": "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c",
+                      "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                      "mode": "live",
+                      "iccid": "8943108170000826391",
+                      "status": "active",
+                      "data": {
+                        "total": 1073741824,
+                        "used": 412316860,
+                        "remaining": 661424964,
+                        "updated_at": "2026-10-11T08:00:00.000Z"
+                      },
+                      "expires_at": "2026-10-18T09:15:04.000Z",
+                      "top_ups": "data",
+                      "cancellable": false,
+                      "created_at": "2026-10-10T09:15:04.870Z",
+                      "updated_at": "2026-10-11T08:00:00.000Z"
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List eSIMs",
+        "tags": [
+          "eSIMs"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/esims/{id}": {
+      "get": {
+        "description": "Its status, data use and expiry, read again from the supplier when older than ten minutes (suppliers update data use every few hours).",
+        "operationId": "EsimsController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The eSIM.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Esim"
+                },
+                "example": {
+                  "object": "esim",
+                  "id": "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c",
+                  "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                  "mode": "live",
+                  "iccid": "8943108170000826391",
+                  "status": "active",
+                  "data": {
+                    "total": 1073741824,
+                    "used": 412316860,
+                    "remaining": 661424964,
+                    "updated_at": "2026-10-11T08:00:00.000Z"
+                  },
+                  "expires_at": "2026-10-18T09:15:04.000Z",
+                  "top_ups": "data",
+                  "cancellable": false,
+                  "created_at": "2026-10-10T09:15:04.870Z",
+                  "updated_at": "2026-10-11T08:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an eSIM",
+        "tags": [
+          "eSIMs"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/esims/{id}/top-up-options": {
+      "get": {
+        "description": "The top-ups this eSIM can take now, with what each costs you (BitoCard’s price, from your wallet). Empty when it takes none, or once it has expired.",
+        "operationId": "EsimsController_options",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The top-ups it takes now, with BitoCard’s price to you.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EsimTopUpOption"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "esim_top_up_option",
+                      "id": "opt_4f1c2b9a0d7e6c5b3a21",
+                      "name": "Japan 1GB 7Days",
+                      "data": "1GB",
+                      "days": 7,
+                      "amount": 1087500,
+                      "currency": "NGN"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List top-up options",
+        "tags": [
+          "eSIMs"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/esims/{id}/top-ups": {
+      "get": {
+        "description": "Top-ups added to this eSIM (by you or your customer), newest first.",
+        "operationId": "EsimsController_topUps",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Its top-ups, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EsimTopUp"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "esim_top_up",
+                      "id": "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+                      "esim_id": "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c",
+                      "mode": "live",
+                      "name": "Japan 1GB 7Days",
+                      "status": "completed",
+                      "amount": 1087500,
+                      "currency": "NGN",
+                      "paid_by": "reseller",
+                      "failure_reason": null,
+                      "created_at": "2026-10-11T09:02:00.000Z",
+                      "completed_at": "2026-10-11T09:02:03.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List top-ups",
+        "tags": [
+          "eSIMs"
+        ],
+        "x-bitocard-scopes": [
+          "orders:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "post": {
+        "description": "Adds data (or, for a day pass, days) to an eSIM. The price is held from your wallet and taken once the supplier confirms (`completed`); refused, it is returned (`failed`). `pending` means the supplier has not answered clearly yet: it is asked again and you get `esim.updated` once it is added.",
+        "operationId": "EsimsController_topUp",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The top-up: `completed` once the supplier added it, `failed` if refused (nothing taken), `pending` while unclear.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EsimTopUp"
+                },
+                "example": {
+                  "object": "esim_top_up",
+                  "id": "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+                  "esim_id": "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c",
+                  "mode": "live",
+                  "name": "Japan 1GB 7Days",
+                  "status": "completed",
+                  "amount": 1087500,
+                  "currency": "NGN",
+                  "paid_by": "reseller",
+                  "failure_reason": null,
+                  "created_at": "2026-10-11T09:02:00.000Z",
+                  "completed_at": "2026-10-11T09:02:03.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Top up an eSIM",
+        "tags": [
+          "eSIMs"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "orders:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/esims/{id}/cancel": {
+      "post": {
+        "description": "Cancels every eSIM of this eSIM’s order, as long as none was ever installed, and refunds the order (to your wallet, or to your store’s customer). An installed eSIM cannot be cancelled (`esim_in_use`).",
+        "operationId": "EsimsController_cancel",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order’s eSIMs, cancelled, and the order refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EsimCancellation"
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "esim",
+                      "id": "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c",
+                      "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                      "mode": "live",
+                      "iccid": "8943108170000826391",
+                      "status": "cancelled",
+                      "data": {
+                        "total": 1073741824,
+                        "used": 0,
+                        "remaining": 1073741824,
+                        "updated_at": "2026-10-11T09:00:00.000Z"
+                      },
+                      "expires_at": "2026-10-18T09:15:04.000Z",
+                      "top_ups": "data",
+                      "cancellable": false,
+                      "created_at": "2026-10-10T09:15:04.870Z",
+                      "updated_at": "2026-10-11T08:00:00.000Z"
+                    }
+                  ],
+                  "refunded": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel an eSIM for a refund",
+        "tags": [
+          "eSIMs"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "orders:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
     }
   },
   "info": {
@@ -23133,6 +24428,36 @@
           "role"
         ]
       },
+      "ConversionDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "The wallet the money leaves: `USD` or your country's currency.",
+            "example": "USD"
+          },
+          "to": {
+            "type": "string",
+            "description": "The wallet it arrives in: the other one.",
+            "example": "NGN"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Minor units of `from` (for example 2000 = US$20.00).",
+            "minimum": 1,
+            "example": 2000
+          },
+          "preview": {
+            "type": "boolean",
+            "description": "Only work out what would arrive, at today's rate: nothing moves."
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "amount"
+        ]
+      },
       "CreateTopUpDto": {
         "type": "object",
         "properties": {
@@ -23155,6 +24480,11 @@
           "return_url": {
             "type": "string",
             "description": "HTTPS page the payer returns to after paying."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Which wallet to top up: `USD`, or your country's currency (the default). `amount` is in its minor units.",
+            "example": "USD"
           }
         },
         "required": [
@@ -23408,6 +24738,7 @@
                 "number.expired",
                 "number.deleted",
                 "number.sms_received",
+                "esim.updated",
                 "dispute.opened",
                 "dispute.message_received",
                 "dispute.escalated",
@@ -23451,6 +24782,7 @@
                 "number.expired",
                 "number.deleted",
                 "number.sms_received",
+                "esim.updated",
                 "dispute.opened",
                 "dispute.message_received",
                 "dispute.escalated",
@@ -23786,6 +25118,19 @@
         "required": [
           "to",
           "text"
+        ]
+      },
+      "TopUpDto": {
+        "type": "object",
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "description": "One of the options `GET /v1/esims/{id}/top-up-options` lists.",
+            "example": "opt_4f1c2b9a0d7e6c5b3a21"
+          }
+        },
+        "required": [
+          "option_id"
         ]
       },
       "Order": {
@@ -24266,6 +25611,141 @@
           "updated_at": {
             "type": "string",
             "description": "When the number last changed. Use it to ignore an older event that arrives after a newer one.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Esim": {
+        "type": "object",
+        "title": "eSIM",
+        "required": [
+          "object",
+          "id",
+          "order_id",
+          "mode",
+          "iccid",
+          "status",
+          "data",
+          "expires_at",
+          "top_ups",
+          "cancellable",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `esim`.",
+            "const": "esim"
+          },
+          "id": {
+            "type": "string",
+            "description": "eSIM ID.",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "description": "The order that delivered it (its activation code is on the order).",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "iccid": {
+            "type": "string",
+            "description": "Its ICCID."
+          },
+          "status": {
+            "type": "string",
+            "description": "`ready`: delivered, not installed yet; `installed`: on a phone, not used yet; `active`: in use; `used_up`: all its data used (top it up); `expired`: its plan ended; `cancelled`: cancelled before it was installed (refunded); `revoked` or `suspended`: stopped by the network.",
+            "enum": [
+              "ready",
+              "installed",
+              "active",
+              "used_up",
+              "expired",
+              "cancelled",
+              "revoked",
+              "suspended"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "title": "eSIM data",
+            "required": [
+              "total",
+              "used",
+              "remaining",
+              "updated_at"
+            ],
+            "properties": {
+              "total": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Data in its plan, in bytes; null for unlimited plans or before it is reported."
+              },
+              "used": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Data used, in bytes (suppliers update it every few hours); null before it is reported."
+              },
+              "remaining": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Data left, in bytes."
+              },
+              "updated_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the use was last read.",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When its plan ends (before installing: the last day to install it).",
+            "format": "date-time"
+          },
+          "top_ups": {
+            "type": "string",
+            "description": "`data`: takes more data; `days`: a day pass that takes more days; `none`.",
+            "enum": [
+              "none",
+              "data",
+              "days"
+            ]
+          },
+          "cancellable": {
+            "type": "boolean",
+            "description": "Never installed: `POST /v1/esims/{id}/cancel` cancels it (with every eSIM of its order) and refunds the order."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was delivered.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed. Use it to ignore an older event that arrives after a newer one.",
             "format": "date-time"
           }
         },
@@ -25468,6 +26948,65 @@
           }
         }
       },
+      "EsimUpdatedEvent": {
+        "type": "object",
+        "title": "esim.updated event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "esim.updated"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/Esim"
+              }
+            }
+          }
+        }
+      },
       "DisputeOpenedEvent": {
         "type": "object",
         "title": "dispute.opened event",
@@ -26651,6 +28190,175 @@
           }
         }
       },
+      "EsimTopUpOption": {
+        "type": "object",
+        "title": "EsimTopUpOption",
+        "description": "A top-up an eSIM can take now.",
+        "required": [
+          "object",
+          "id",
+          "name",
+          "data",
+          "days",
+          "amount",
+          "currency"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `esim_top_up_option`.",
+            "const": "esim_top_up_option"
+          },
+          "id": {
+            "type": "string",
+            "description": "Pass it as `option_id` to top up."
+          },
+          "name": {
+            "type": "string",
+            "description": "What it adds, for example `1GB, 7 days` or `1GB a day for 3 more days`."
+          },
+          "data": {
+            "type": "string",
+            "description": "The data it adds (`1GB`), or a day pass’s daily allowance (`1GB a day`)."
+          },
+          "days": {
+            "type": "integer",
+            "description": "Days it lasts, or adds to a day pass."
+          },
+          "amount": {
+            "type": "integer",
+            "description": "What it costs you (BitoCard’s price), in minor units of `currency` (for example kobo or cents)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Your wallet currency."
+          }
+        }
+      },
+      "EsimTopUp": {
+        "type": "object",
+        "title": "EsimTopUp",
+        "description": "Data or days added to an eSIM.",
+        "required": [
+          "object",
+          "id",
+          "esim_id",
+          "mode",
+          "name",
+          "status",
+          "amount",
+          "currency",
+          "paid_by",
+          "failure_reason",
+          "created_at",
+          "completed_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `esim_top_up`.",
+            "const": "esim_top_up"
+          },
+          "id": {
+            "type": "string",
+            "description": "Top-up ID.",
+            "format": "uuid"
+          },
+          "esim_id": {
+            "type": "string",
+            "description": "The eSIM.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "What it adds."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending` (the supplier has not confirmed yet: asked again), `completed` (added; paid) or `failed` (nothing taken).",
+            "enum": [
+              "pending",
+              "completed",
+              "failed"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "description": "What it cost: BitoCard’s price to you, or what your customer paid when they topped up from your store, in minor units of `currency` (for example kobo or cents)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency of `amount`."
+          },
+          "paid_by": {
+            "type": "string",
+            "description": "`reseller` (your wallet) or `customer` (your store’s customer, from their wallet).",
+            "enum": [
+              "reseller",
+              "customer"
+            ]
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was asked for.",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was added or failed.",
+            "format": "date-time"
+          }
+        }
+      },
+      "EsimCancellation": {
+        "type": "object",
+        "title": "EsimCancellation",
+        "description": "The order’s eSIMs after cancelling.",
+        "required": [
+          "object",
+          "data",
+          "refunded"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `list`.",
+            "const": "list"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Esim"
+            },
+            "description": "Every eSIM of the order, now `cancelled`."
+          },
+          "refunded": {
+            "type": "boolean",
+            "description": "The order was refunded (see `order.refunded`)."
+          }
+        }
+      },
       "Product": {
         "type": "object",
         "title": "Product",
@@ -27687,13 +29395,14 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "description": "What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over) or `virtual_number` (the number in `serial`).",
+                  "description": "What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`) or `esim` (the LPA activation string in `code`, a secret: whoever holds it can install the eSIM once; the ICCID in `serial`).",
                   "enum": [
                     "gift_card",
                     "licence_key",
                     "token",
                     "confirmation",
-                    "virtual_number"
+                    "virtual_number",
+                    "esim"
                   ]
                 },
                 "code": {
@@ -27933,7 +29642,7 @@
       "Wallet": {
         "type": "object",
         "title": "Wallet",
-        "description": "Your wallet in one mode. Live and sandbox wallets are separate; amounts are integer minor units of `currency`.",
+        "description": "One of your wallets in one mode (`currency`; your country wallet unless you asked for `USD`). Live and sandbox wallets are separate; amounts are integer minor units of `currency`.",
         "required": [
           "object",
           "mode",
@@ -27943,7 +29652,8 @@
           "earnings",
           "payouts_in_progress",
           "minimum_withdrawal",
-          "startup_allowance"
+          "startup_allowance",
+          "wallets"
         ],
         "additionalProperties": false,
         "properties": {
@@ -27962,7 +29672,7 @@
           },
           "currency": {
             "type": "string",
-            "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+            "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
           },
           "available": {
             "type": "integer",
@@ -28005,8 +29715,11 @@
             "description": "Withdrawals on their way to your bank, in minor units of `currency` (for example kobo or cents)."
           },
           "minimum_withdrawal": {
-            "type": "integer",
-            "description": "The smallest withdrawal allowed in your country, in minor units of `currency` (for example kobo or cents)."
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The smallest withdrawal allowed in your country, in minor units. Null on the US dollar wallet: withdrawals are from the country wallet."
           },
           "startup_allowance": {
             "anyOf": [
@@ -28064,6 +29777,128 @@
                 "type": "null"
               }
             ]
+          },
+          "wallets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One of your wallets.",
+              "required": [
+                "currency",
+                "primary",
+                "available",
+                "reserved"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "description": "`USD` or your country's currency."
+                },
+                "primary": {
+                  "type": "boolean",
+                  "description": "Your country wallet: orders, earnings and withdrawals are in it."
+                },
+                "available": {
+                  "type": "integer",
+                  "description": "What it can spend now, in minor units of `currency` (for example kobo or cents)."
+                },
+                "reserved": {
+                  "type": "integer",
+                  "description": "Held from it for orders in progress, in minor units of `currency` (for example kobo or cents)."
+                }
+              }
+            },
+            "description": "Every wallet you hold: your country's currency first, then US dollars (just one where your country uses US dollars)."
+          }
+        }
+      },
+      "WalletConversion": {
+        "type": "object",
+        "title": "WalletConversion",
+        "description": "Money moved between your US dollar wallet and your country wallet, or what would move (`preview`).",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "from",
+          "to",
+          "rate",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `wallet_conversion`.",
+            "const": "wallet_conversion"
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The conversion (a wallet transaction); null for a preview.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "from": {
+            "type": "object",
+            "description": "What leaves the `from` wallet.",
+            "required": [
+              "amount",
+              "currency"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "description": "Amount, in minor units of `currency` (for example kobo or cents)."
+              },
+              "currency": {
+                "type": "string",
+                "description": "Its currency."
+              }
+            }
+          },
+          "to": {
+            "type": "object",
+            "description": "What arrives in the `to` wallet.",
+            "required": [
+              "amount",
+              "currency"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "amount": {
+                "type": "integer",
+                "description": "Amount, in minor units of `currency` (for example kobo or cents)."
+              },
+              "currency": {
+                "type": "string",
+                "description": "Its currency."
+              }
+            }
+          },
+          "rate": {
+            "type": "string",
+            "description": "Units of your country's currency per US dollar used: BitoCard's rate for this direction.",
+            "pattern": "^\\d+(\\.\\d+)?$"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was made; null for a preview.",
+            "format": "date-time"
           }
         }
       },
@@ -28082,6 +29917,7 @@
           "earnings_on_hold_change",
           "allowance_change",
           "fee",
+          "conversion",
           "created_at"
         ],
         "additionalProperties": false,
@@ -28114,7 +29950,8 @@
               "platform_fee_refund",
               "adjustment",
               "allowance_granted",
-              "allowance_revoked"
+              "allowance_revoked",
+              "conversion"
             ]
           },
           "description": {
@@ -28189,6 +30026,63 @@
                   }
                 },
                 "description": "What the fee was on."
+              }
+            }
+          },
+          "conversion": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "For `conversion`: what moved between your wallets. Null otherwise.",
+            "required": [
+              "from",
+              "to",
+              "rate"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "object",
+                "description": "What left one wallet.",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "description": "Amount, in minor units of `currency` (for example kobo or cents)."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Its currency."
+                  }
+                }
+              },
+              "to": {
+                "type": "object",
+                "description": "What arrived in the other.",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "description": "Amount, in minor units of `currency` (for example kobo or cents)."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Its currency."
+                  }
+                }
+              },
+              "rate": {
+                "type": "string",
+                "description": "Units of your country's currency per US dollar used."
               }
             }
           },
@@ -28281,7 +30175,7 @@
           },
           "currency": {
             "type": "string",
-            "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+            "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
           },
           "bank_name": {
             "type": "string",
@@ -28329,7 +30223,7 @@
           },
           "currency": {
             "type": "string",
-            "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+            "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
           }
         }
       },
@@ -28491,7 +30385,7 @@
           },
           "currency": {
             "type": "string",
-            "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+            "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
           },
           "source": {
             "type": "object",
@@ -28651,7 +30545,7 @@
           },
           "currency": {
             "type": "string",
-            "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+            "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
           },
           "fees": {
             "type": "object",
@@ -28944,7 +30838,7 @@
           },
           "currency": {
             "type": "string",
-            "description": "ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`)."
+            "description": "ISO 4217 currency of the amounts: the wallet's, your country's currency (for example `NGN`, `GHS` or `KES`) or `USD`."
           },
           "bank_code": {
             "type": "string",
@@ -29460,6 +31354,7 @@
                 "number.expired",
                 "number.deleted",
                 "number.sms_received",
+                "esim.updated",
                 "dispute.opened",
                 "dispute.message_received",
                 "dispute.escalated",
@@ -29583,6 +31478,7 @@
                 "number.expired",
                 "number.deleted",
                 "number.sms_received",
+                "esim.updated",
                 "dispute.opened",
                 "dispute.message_received",
                 "dispute.escalated",
@@ -29708,6 +31604,7 @@
                   "number.expired",
                   "number.deleted",
                   "number.sms_received",
+                  "esim.updated",
                   "dispute.opened",
                   "dispute.message_received",
                   "dispute.escalated",
@@ -29841,6 +31738,7 @@
                   "number.expired",
                   "number.deleted",
                   "number.sms_received",
+                  "esim.updated",
                   "dispute.opened",
                   "dispute.message_received",
                   "dispute.escalated",
@@ -30005,6 +31903,9 @@
           },
           {
             "$ref": "#/components/schemas/NumberSmsReceivedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/EsimUpdatedEvent"
           },
           {
             "$ref": "#/components/schemas/DisputeOpenedEvent"
@@ -32829,6 +34730,7 @@
               "didww",
               "zendit",
               "pawapay",
+              "esim_access",
               "flutterwave",
               "stripe",
               "monnify"
@@ -32976,6 +34878,7 @@
               "didww",
               "zendit",
               "pawapay",
+              "esim_access",
               "flutterwave",
               "stripe",
               "monnify"
@@ -34621,6 +36524,102 @@
                     "currency": null,
                     "failure_reason": null,
                     "created_at": "2026-10-08T12:01:44.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "esim.updated": {
+      "post": {
+        "operationId": "webhook_esim_updated",
+        "summary": "An eSIM changed",
+        "description": "Fires when an eSIM delivered by one of your orders changes: installed, in use, its data used up, expired, cancelled or stopped by the network (`status`), its data use read again (`data`), or a top-up added data or days (`data.total`, `expires_at`). Suppliers report data use every few hours, so it is not real time.\n\nDoes not fire for eSIMs bought through your own supplier account, and never carries the activation code (it is only on `GET /v1/orders/{id}`).\n\nComes after `order.completed` for the eSIM. Followed by more `esim.updated` events; a `cancelled` eSIM is followed by `order.refunded`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EsimUpdatedEvent"
+              },
+              "example": {
+                "id": "4bf2a3b4-c5d6-4e7f-8a8b-0c1d2e3f4a5b",
+                "object": "event",
+                "type": "esim.updated",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-11T08:00:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "esim",
+                    "id": "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c",
+                    "order_id": "2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21",
+                    "mode": "live",
+                    "iccid": "8943108170000826391",
+                    "status": "active",
+                    "data": {
+                      "total": 1073741824,
+                      "used": 412316860,
+                      "remaining": 661424964,
+                      "updated_at": "2026-10-11T08:00:00.000Z"
+                    },
+                    "expires_at": "2026-10-18T09:15:04.000Z",
+                    "top_ups": "data",
+                    "cancellable": false,
+                    "created_at": "2026-10-10T09:15:04.870Z",
+                    "updated_at": "2026-10-11T08:00:00.000Z"
                   }
                 }
               }

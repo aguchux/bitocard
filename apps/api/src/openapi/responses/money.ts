@@ -23,13 +23,14 @@ const transactionTypes = [
   'adjustment',
   'allowance_granted',
   'allowance_revoked',
+  'conversion',
 ] as const;
 
 const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 const feeKinds = ['supplier_order', 'gateway_payment'] as const;
 const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations'] as const;
 
-const currency = str('ISO 4217 currency of the amounts, your wallet currency (for example `NGN`, `GHS` or `KES`).');
+const currency = str('ISO 4217 currency of the amounts: the wallet\'s, your country\'s currency (for example `NGN`, `GHS` or `KES`) or `USD`.');
 const nano = (description: string) => str(`${description} In billionths of a minor unit, as a string of digits so no precision is lost.`, { pattern: '^\\d+$' });
 const nullableNano = (description: string) => nullableStr(`${description} In billionths of a minor unit, as a string of digits.`, { pattern: '^\\d+$' });
 const ratePpb = int('The rate in parts per billion of the base: 1 is 0.0000001%, 1,000,000 is 0.1%, 100,000,000 (the highest) is 10%.', { minimum: 0, maximum: 100_000_000 });
@@ -66,10 +67,38 @@ const Wallet = objectSchema(
       'Your profit from sales.',
     ),
     payouts_in_progress: money('Withdrawals on their way to your bank'),
-    minimum_withdrawal: money('The smallest withdrawal allowed in your country'),
+    minimum_withdrawal: nullableInt('The smallest withdrawal allowed in your country, in minor units. Null on the US dollar wallet: withdrawals are from the country wallet.'),
     startup_allowance: nullable(startupAllowance),
+    wallets: array(
+      shape(
+        {
+          currency: str('`USD` or your country\'s currency.'),
+          primary: bool('Your country wallet: orders, earnings and withdrawals are in it.'),
+          available: money('What it can spend now'),
+          reserved: money('Held from it for orders in progress'),
+        },
+        'One of your wallets.',
+      ),
+      'Every wallet you hold: your country\'s currency first, then US dollars (just one where your country uses US dollars).',
+    ),
   },
-  'Your wallet in one mode. Live and sandbox wallets are separate; amounts are integer minor units of `currency`.',
+  'One of your wallets in one mode (`currency`; your country wallet unless you asked for `USD`). Live and sandbox wallets are separate; amounts are integer minor units of `currency`.',
+);
+
+const conversionSide = (description: string) => shape({ amount: money('Amount'), currency: str('Its currency.') }, description);
+
+const WalletConversion = objectSchema(
+  'WalletConversion',
+  {
+    object: constant('wallet_conversion'),
+    id: { ...nullableStr('The conversion (a wallet transaction); null for a preview.'), format: 'uuid' },
+    mode,
+    from: conversionSide('What leaves the `from` wallet.'),
+    to: conversionSide('What arrives in the `to` wallet.'),
+    rate: str('Units of your country\'s currency per US dollar used: BitoCard\'s rate for this direction.', { pattern: '^\\d+(\\.\\d+)?$' }),
+    created_at: nullableTime('When it was made; null for a preview.'),
+  },
+  'Money moved between your US dollar wallet and your country wallet, or what would move (`preview`).',
 );
 
 const WalletTransaction = objectSchema(
@@ -98,6 +127,13 @@ const WalletTransaction = objectSchema(
           },
         },
         'For `platform_fee`, `platform_fee_refund` and the hold returned before a fee: the BitoCard fee it belongs to. Null otherwise.',
+      ),
+      type: ['object', 'null'],
+    },
+    conversion: {
+      ...shape(
+        { from: conversionSide('What left one wallet.'), to: conversionSide('What arrived in the other.'), rate: str('Units of your country\'s currency per US dollar used.') },
+        'For `conversion`: what moved between your wallets. Null otherwise.',
       ),
       type: ['object', 'null'],
     },
@@ -373,6 +409,20 @@ const wallet = {
   payouts_in_progress: 0,
   minimum_withdrawal: 1_500_000,
   startup_allowance: { currency: 'USD', granted: 50_000, remaining: 41_250, status: 'active', granted_at: '2026-10-01T12:00:00.000Z', revoked_at: null },
+  wallets: [
+    { currency: 'NGN', primary: true, available: 12_450_000, reserved: 97_000 },
+    { currency: 'USD', primary: false, available: 2_500, reserved: 0 },
+  ],
+};
+
+const conversion = {
+  object: 'wallet_conversion',
+  id: '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a',
+  mode: 'live',
+  from: { amount: 2_000, currency: 'USD' },
+  to: { amount: 2_955_000, currency: 'NGN' },
+  rate: '1477.5',
+  created_at: '2026-10-06T11:02:44.120Z',
 };
 
 const transaction = (overrides: Record<string, unknown>) => ({
@@ -383,12 +433,14 @@ const transaction = (overrides: Record<string, unknown>) => ({
   earnings_on_hold_change: 0,
   allowance_change: 0,
   fee: null,
+  conversion: null,
   ...overrides,
 });
 
 const transactions = [
   transaction({ id: '6b1d2c3e-4f5a-4b6c-9d7e-8f9a0b1c2d3e', type: 'platform_fee', description: 'BitoCard fee: order through your own supplier', amount: -3_087, fee: { id: 'e4d3c2b1-a0f9-4e8d-b7c6-a5b4c3d2e1f0', source: { type: 'order', id: '2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21' } }, created_at: '2026-10-06T09:20:11.402Z' }),
   transaction({ id: 'a7f3e2d1-c0b9-4a8f-9e7d-6c5b4a3f2e1d', type: 'hold', description: 'Order: MTN Nigeria airtime', amount: -97_000, reserved_change: 97_000, created_at: '2026-10-06T09:15:02.250Z' }),
+  transaction({ id: '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a', type: 'conversion', description: 'Converted from your US dollar wallet to your NGN wallet', amount: 2_955_000, conversion: { from: { amount: 2_000, currency: 'USD' }, to: { amount: 2_955_000, currency: 'NGN' }, rate: '1477.5' }, created_at: '2026-10-06T08:30:00.000Z' }),
   transaction({ id: '0e9d8c7b-6a5f-4e4d-8c3b-2a1f0e9d8c7b', type: 'top_up', description: 'Wallet top-up', amount: 5_000_000, created_at: '2026-10-06T08:01:12.000Z' }),
 ];
 
@@ -476,10 +528,16 @@ const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '20
 const noMore = (item: Schema) => list(item, {}, false);
 
 export const moneyDocs: DocsArea = {
-  schemas: { Wallet, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
+  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
   responses: {
     'GET /v1/wallet': { status: 200, description: 'Your wallet in the mode of the key or session.', schema: 'Wallet', example: wallet },
     'GET /v1/wallet/transactions': { status: 200, description: 'Wallet transactions, newest first.', schema: list(ref('WalletTransaction')), example: listExample(transactions, true) },
+    'POST /v1/wallet/conversions': {
+      status: 200,
+      description: 'The conversion made, or with `preview` what would be (`id` null). Both wallets change in one ledger entry (`conversion`).',
+      schema: 'WalletConversion',
+      example: conversion,
+    },
     'GET /v1/wallet/payment-methods': {
       status: 200,
       description: 'The ways to top up in your country, best first. Pass an `id` as `method` when creating a top-up.',

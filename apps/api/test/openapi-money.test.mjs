@@ -87,6 +87,19 @@ describe('sandbox wallet money', () => {
     const transactions = await expect(browser, 'GET', '/v1/wallet/transactions?limit=2', 'GET /v1/wallet/transactions', 200, undefined, sandbox);
     assert.equal(transactions.has_more, true);
   });
+
+  test('the US dollar wallet and conversions between the wallets', async () => {
+    const { browser, resellerId } = await resellerClient(server);
+    await wallets.adjust(null, { resellerId, mode: 'test', balance: 'funding', amount: 3_000_000, reason: 'Test funding' });
+    const preview = await expect(browser, 'POST', '/v1/wallet/conversions', 'POST /v1/wallet/conversions', 200, { from: 'NGN', to: 'USD', amount: 1_500_000, preview: true }, sandbox);
+    assert.equal(preview.id, null);
+    const made = await expect(browser, 'POST', '/v1/wallet/conversions', 'POST /v1/wallet/conversions', 200, { from: 'NGN', to: 'USD', amount: 1_500_000 }, sandbox);
+    assert.ok(made.id && made.to.amount > 0);
+    const dollars = await expect(browser, 'GET', '/v1/wallet?currency=USD', 'GET /v1/wallet', 200, undefined, sandbox);
+    assert.deepEqual([dollars.currency, dollars.available, dollars.wallets.length], ['USD', made.to.amount, 2]);
+    const transactions = await expect(browser, 'GET', '/v1/wallet/transactions?currency=USD', 'GET /v1/wallet/transactions', 200, undefined, sandbox);
+    assert.deepEqual(transactions.data.map(item => [item.type, item.conversion.to.currency]), [['conversion', 'USD']]);
+  });
 });
 
 describe('live wallet money', () => {

@@ -9,24 +9,27 @@ import { customerApi, siteOrigin } from "@/lib/customer";
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
 /**
- * The signed-in customer's wallet: always in their own country's currency (chosen at sign-up and fixed; a reseller's
- * store is the reseller's). Null when signed out, before an older account has chosen its country, or when the API
- * cannot be reached.
+ * One of the signed-in customer's wallets: their own country's currency (chosen at sign-up and fixed; a reseller's
+ * store is the reseller's) unless `USD` is asked for. `wallets` lists both. Null when signed out, before an older
+ * account has chosen its country, or when the API cannot be reached.
  */
-export async function walletFor(): Promise<StoreWallet | null> {
-  const result = await customerApi<StoreWallet>("GET", "/v1/store/wallet");
+export async function walletFor(currency?: string): Promise<StoreWallet | null> {
+  const result = await customerApi<StoreWallet>("GET", `/v1/store/wallet${currency ? `?${new URLSearchParams({ currency }).toString()}` : ""}`);
   return result.ok ? result.data : null;
 }
 
-/** Opens a payment page to top the wallet up; it returns to the wallet with the top-up's ID. */
+/** Opens a payment page to top a wallet up (the country's, or `currency` USD); it returns to that wallet with the top-up's ID. */
 export async function topUpWallet(_state: FormState, form: FormData): Promise<FormState> {
-  const amount = Math.round(Number(text(form, "amount")) * 100);
+  const amount = Math.round(Number(text(form, "amount").replace(/[,\s]/g, "")) * 100);
   if (!Number.isFinite(amount) || amount < 100) return { error: "Enter an amount of at least 1.", field: "amount" };
+  const currency = text(form, "currency") || undefined;
   const back = new URL(`${await siteOrigin()}/account/wallet`);
+  if (currency) back.searchParams.set("wallet", currency);
   const result = await customerApi<StoreWalletTopUp>("POST", "/v1/store/wallet/top-ups", {
     amount,
     method: text(form, "method") || undefined,
     return_url: back.toString(),
+    currency,
   });
   if (!result.ok) {
     if (result.status === 401) redirect(`/signin?next=${encodeURIComponent("/account/wallet")}`);
@@ -35,7 +38,7 @@ export async function topUpWallet(_state: FormState, form: FormData): Promise<Fo
   }
   // Live: to the payment page. The sandbox has none: the wallet page simulates it.
   if (result.data.mode === "live" && result.data.checkout_url) redirect(result.data.checkout_url);
-  redirect(`/account/wallet?${new URLSearchParams({ top_up: result.data.id }).toString()}`);
+  redirect(`/account/wallet?${new URLSearchParams({ ...(currency ? { wallet: currency } : {}), top_up: result.data.id }).toString()}`);
 }
 
 /** Opens the customer's own bank account number for the wallet (Nigeria asks for the BVN, passed to the bank only). */

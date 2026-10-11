@@ -155,17 +155,21 @@ export class PaymentsService {
 
   // -- Checkout top-ups ------------------------------------------------------------------------------------------
 
-  /** The ways a reseller can top up now, best first (the market's methods an admin switched on). */
-  async topUpMethods(resellerId: string, mode: LedgerMode) {
-    const { country } = await this.wallets.currencyOf(resellerId);
-    const offered = await this.methods.offered('wallet_top_up', country, mode);
-    return { object: 'list' as const, data: await Promise.all(offered.map(gateway => this.methods.describe(gateway, country))) };
+  /**
+   * The ways a reseller can top up a wallet now, best first (the market's methods an admin switched on that take the
+   * wallet's currency: their country's, or US dollars).
+   */
+  async topUpMethods(resellerId: string, mode: LedgerMode, asked?: string) {
+    const { country, currency } = await this.wallets.walletCurrency(resellerId, asked);
+    const payer = { code: country.code, currency };
+    const offered = await this.methods.offered('wallet_top_up', payer, mode);
+    return { object: 'list' as const, data: await Promise.all(offered.map(gateway => this.methods.describe(gateway, payer))) };
   }
 
-  async createTopUp(resellerId: string, mode: LedgerMode, payer: { email: string; name: string }, input: { amount: number; method?: string; return_url?: string }) {
-    const { reseller, country, currency } = await this.wallets.currencyOf(resellerId);
+  async createTopUp(resellerId: string, mode: LedgerMode, payer: { email: string; name: string }, input: { amount: number; method?: string; return_url?: string; currency?: string }) {
+    const { reseller, country, currency } = await this.wallets.walletCurrency(resellerId, input.currency);
     if (mode === 'live' && reseller.status !== 'active') throw resellerNotVerified();
-    const gateway = await this.methods.choose('wallet_top_up', country, mode, input.method);
+    const gateway = await this.methods.choose('wallet_top_up', { code: country.code, currency }, mode, input.method);
     const payment = await this.openPayment({
       resellerId,
       mode,

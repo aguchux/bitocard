@@ -748,6 +748,9 @@ enum AccountKind {
   /// A store customer's wallet (what BitoCard owes them): topped up through BitoCard's gateways or their reserved bank
   /// account, spent only on the store's products, never withdrawn. Never below zero.
   customer_wallet
+  /// BitoCard's position from converting between wallets (US dollars and a country's currency): one account per
+  /// currency, posted in pairs at BitoCard's exchange rate. May go either way.
+  currency_exchange
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -1440,6 +1443,7 @@ model Order {
   deliveries                OrderDelivery[]
   access                    OrderAccess?
   virtualNumber             VirtualNumber?
+  esims                     Esim[]
   attempts                  OrderAttempt[]
 
   @@index([resellerId, createdAt])
@@ -2238,37 +2242,41 @@ enum CheckoutStatus {
 
 /// A storefront customer buying one quoted product: the payment, then the order placed once it is paid.
 model Checkout {
-  id              String         @id @default(uuid()) @db.Uuid
-  storeId         String         @map("store_id") @db.Uuid
-  customerId      String         @map("customer_id") @db.Uuid
+  id                String         @id @default(uuid()) @db.Uuid
+  storeId           String         @map("store_id") @db.Uuid
+  customerId        String         @map("customer_id") @db.Uuid
   /// The account selling: the store's reseller, or BitoCard's house account for the market.
-  resellerId      String         @map("reseller_id") @db.Uuid
-  mode            LedgerMode
-  quoteId         String         @unique @map("quote_id") @db.Uuid
-  paymentId       String?        @unique @map("payment_id") @db.Uuid
-  orderId         String?        @unique @map("order_id") @db.Uuid
-  gateway         String
-  status          CheckoutStatus @default(awaiting_payment)
+  resellerId        String         @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  quoteId           String         @unique @map("quote_id") @db.Uuid
+  paymentId         String?        @unique @map("payment_id") @db.Uuid
+  orderId           String?        @unique @map("order_id") @db.Uuid
+  gateway           String
+  status            CheckoutStatus @default(awaiting_payment)
   /// What the customer pays, tax included.
-  amountMinor     BigInt         @map("amount_minor")
-  currency        String         @db.Char(3)
+  amountMinor       BigInt         @map("amount_minor")
+  currency          String         @db.Char(3)
+  /// Paid from the customer's wallet in another currency (their US dollar wallet): what left it, converted at
+  /// BitoCard's rate. Refunds go back there exactly.
+  walletCurrency    String?        @map("wallet_currency") @db.Char(3)
+  walletAmountMinor BigInt?        @map("wallet_amount_minor")
   /// The provider's ID for the refund, once sent.
-  refundReference String?        @map("refund_reference")
-  refundAttempts  Int            @default(0) @map("refund_attempts")
+  refundReference   String?        @map("refund_reference")
+  refundAttempts    Int            @default(0) @map("refund_attempts")
   /// Paid into the reseller's own payment gateway (their connection): BitoCard never holds the money, the order's cost
   /// comes from the reseller's wallet, and BitoCard's `gateway_payment` fee is charged (`feeChargeId`).
-  connectionId    String?        @map("connection_id") @db.Uuid
-  feeChargeId     String?        @map("fee_charge_id") @db.Uuid
+  connectionId      String?        @map("connection_id") @db.Uuid
+  feeChargeId       String?        @map("fee_charge_id") @db.Uuid
   /// Why it was refunded: `undelivered` (the order failed) or `admin` (a delivered order refunded by finance).
-  refundKind      String?        @map("refund_kind")
-  refundedAt      DateTime?      @map("refunded_at")
-  failureReason   String?        @map("failure_reason")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  store           Store          @relation(fields: [storeId], references: [id])
-  customer        Customer       @relation(fields: [customerId], references: [id])
-  reseller        Reseller       @relation(fields: [resellerId], references: [id])
-  payment         Payment?       @relation(fields: [paymentId], references: [id])
+  refundKind        String?        @map("refund_kind")
+  refundedAt        DateTime?      @map("refunded_at")
+  failureReason     String?        @map("failure_reason")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  store             Store          @relation(fields: [storeId], references: [id])
+  customer          Customer       @relation(fields: [customerId], references: [id])
+  reseller          Reseller       @relation(fields: [resellerId], references: [id])
+  payment           Payment?       @relation(fields: [paymentId], references: [id])
 
   @@index([customerId, createdAt])
   @@index([status, updatedAt])
@@ -2338,4 +2346,81 @@ model DisputeMessage {
 
   @@index([disputeId, createdAt])
   @@map("dispute_messages")
+}
+
+/// An eSIM an order delivered, kept after its order for its status, data use, expiry, top-ups and cancelling. It stays
+/// with the supplier that issued it. Its activation code is only on the order's delivery (encrypted); never here.
+model Esim {
+  id              String      @id @default(uuid()) @db.Uuid
+  orderId         String      @map("order_id") @db.Uuid
+  resellerId      String      @map("reseller_id") @db.Uuid
+  mode            LedgerMode
+  productId       String      @map("product_id") @db.Uuid
+  supplierCode    String      @map("supplier_code")
+  /// The supplier's own ID for the eSIM (eSIM Access's esimTranNo: ICCIDs are reused). Internal: never shown.
+  supplierEsimId  String      @map("supplier_esim_id")
+  iccid           String
+  /// ready (not installed yet), installed, active, used_up, expired, cancelled, revoked or suspended.
+  status          String      @default("ready")
+  /// The supplier's own states as last reported (internal, for admins).
+  supplierStatus  String?     @map("supplier_status")
+  profileStatus   String?     @map("profile_status")
+  dataTotalBytes  BigInt?     @map("data_total_bytes")
+  dataUsedBytes   BigInt?     @map("data_used_bytes")
+  usageUpdatedAt  DateTime?   @map("usage_updated_at")
+  expiresAt       DateTime?   @map("expires_at")
+  /// The supplier takes top-ups for it (and whether they extend by days: day passes).
+  topUps          String      @default("none") @map("top_ups")
+  installedAt     DateTime?   @map("installed_at")
+  cancelledAt     DateTime?   @map("cancelled_at")
+  /// The last low-data threshold (percent left) and expiry warning the customer was told about, so each is sent once.
+  lowDataNotified Int?        @map("low_data_notified")
+  expiryNotified  DateTime?   @map("expiry_notified")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  order           Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  topUpOrders     EsimTopUp[]
+
+  @@unique([supplierCode, supplierEsimId])
+  @@index([orderId])
+  @@index([resellerId, mode, createdAt])
+  @@map("esims")
+}
+
+/// More data (or days) added to an eSIM: paid by the reseller's wallet, or by the store's customer from their wallet
+/// (`customer_id`), held while the supplier adds it, taken once it confirms, returned if it refuses.
+model EsimTopUp {
+  id                String     @id @default(uuid()) @db.Uuid
+  esimId            String     @map("esim_id") @db.Uuid
+  resellerId        String     @map("reseller_id") @db.Uuid
+  customerId        String?    @map("customer_id") @db.Uuid
+  mode              LedgerMode
+  /// Our reference, sent to the supplier as its transaction ID (a repeat is the same top-up).
+  reference         String     @unique
+  /// The supplier's package (internal) and what it adds.
+  supplierPackage   String     @map("supplier_package")
+  name              String
+  days              Int?
+  costMinor         BigInt     @map("cost_minor")
+  costCurrency      String     @map("cost_currency") @db.Char(3)
+  /// BitoCard's price to the reseller, and (paid by a customer) the customer's price, in `currency`.
+  wholesaleMinor    BigInt     @map("wholesale_minor")
+  priceMinor        BigInt     @map("price_minor")
+  currency          String     @db.Char(3)
+  /// A customer who paid from their US dollar wallet: what left it.
+  walletCurrency    String?    @map("wallet_currency") @db.Char(3)
+  walletAmountMinor BigInt?    @map("wallet_amount_minor")
+  holdId            String?    @map("hold_id") @db.Uuid
+  /// pending (with the supplier), completed, failed.
+  status            String     @default("pending")
+  failureReason     String?    @map("failure_reason")
+  attempts          Int        @default(0)
+  nextCheckAt       DateTime?  @map("next_check_at")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  completedAt       DateTime?  @map("completed_at")
+  esim              Esim       @relation(fields: [esimId], references: [id], onDelete: Cascade)
+
+  @@index([esimId, createdAt])
+  @@index([status, nextCheckAt])
+  @@map("esim_top_ups")
 }

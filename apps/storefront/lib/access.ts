@@ -5,7 +5,7 @@ import { customerCookie, shopperHeader } from "./customer";
 
 /** One delivered item on an order's page. Codes, PINs and tokens are null (`hidden`) until the customer presses Reveal. */
 export type AccessDelivery = {
-  kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number";
+  kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number" | "esim";
   hidden: boolean;
   code: string | null;
   pin: string | null;
@@ -79,9 +79,21 @@ export type OrderNumber = {
   };
 };
 
-type AccessAction = "" | "/number" | "/reveal" | "/code" | "/verify" | "/messages" | "/number/renew" | "/number/auto-renew";
+type AccessAction =
+  | ""
+  | "/number"
+  | "/reveal"
+  | "/code"
+  | "/verify"
+  | "/messages"
+  | "/number/renew"
+  | "/number/auto-renew"
+  | "/esims"
+  | `/esims/${string}/top-up-options`
+  | `/esims/${string}/top-ups`
+  | `/esims/${string}/cancel`;
 /** Reads; everything else changes something and is a POST. */
-const reads = new Set<AccessAction>(["", "/number"]);
+const reads = new Set<string>(["", "/number", "/esims"]);
 
 /** Calls an order-page endpoint with the customer's proof (their store session, and the pass for this page). Never cached; never throws. */
 export async function accessApi<T>(token: string, action: AccessAction = "", body?: unknown): Promise<AccessResult<T>> {
@@ -89,7 +101,7 @@ export async function accessApi<T>(token: string, action: AccessAction = "", bod
   const jar = await cookies();
   const session = jar.get(customerCookie)?.value;
   const pass = jar.get(passCookie)?.value;
-  const read = reads.has(action);
+  const read = reads.has(action) || action.endsWith("/top-up-options");
   try {
     const res = await fetch(apiUrl(`/v1/store/access/${token}${action}`), {
       method: read ? "GET" : "POST",

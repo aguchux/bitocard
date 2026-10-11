@@ -21,6 +21,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { PushService } from '../notifications/push.service.js';
 import { MediaService } from '../media/media.service.js';
 import { NumbersService } from '../numbers/numbers.service.js';
+import { EsimsService } from '../esims/esims.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -50,6 +51,7 @@ export class CronController {
     media: MediaService,
     checkout: CheckoutService,
     numbers: NumbersService,
+    esims: EsimsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -64,6 +66,7 @@ export class CronController {
       plans: () => billing.renewDue(),
       /** Hourly: virtual number renewals, reminders, pausing at expiry, deletion 15 days later, and old messages. */
       numbers: () => numbers.job(),
+      esims: () => esims.job(),
       /** Every 2 minutes: check orders the suppliers have not confirmed, and repair interrupted completions. */
       orders: () => orders.checkDue(),
       /** Daily: refresh supplier catalogues and costs, BitoCard's and resellers' own. */

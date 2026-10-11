@@ -8,7 +8,7 @@ import type { IntegrationKind } from './definitions.js';
  *
  * The fields follow each supplier's published authentication scheme as far as it is known; confirm them against the
  * credentials the supplier actually issues (and adjust here) before building its adapter. Reloadly, VTpass and DIDWW have
- * their own groups in `definitions.ts`. Flutterwave virtual cards use the Flutterwave group's keys.
+ * their own groups in `definitions.ts`, as do Zendit, pawaPay and eSIM Access. Flutterwave virtual cards use the Flutterwave group's keys.
  */
 export type SupplierCredentialField = { suffix: string; label: string; secret: boolean; kind: IntegrationKind; required: boolean; help?: string };
 export type SupplierCredentialGroup = { code: string; name: string; description: string; fields: SupplierCredentialField[] };
@@ -29,7 +29,6 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   { code: 'ipay_elipa', name: 'iPay Africa / eLipa', description: 'Kenya electricity (KPLC) and TV.', fields: [id('VENDOR_ID', 'Vendor ID'), secret('HASH_KEY', 'Hash key'), address('iPay API base address (sandbox or live)')] },
   // Software and eSIMs (pilots).
   { code: 'nexway', name: 'Nexway Connect', description: 'Downloadable consumer software and antivirus.', fields: [id('PARTNER_ID', 'Partner ID'), secret('SECRET_KEY', 'API secret'), address('Nexway Connect API base address (sandbox or live)')] },
-  { code: 'esim_access', name: 'eSIM Access', description: 'eSIM data packages, top-ups and usage.', fields: [id('ACCESS_CODE', 'Access code'), secret('SECRET_KEY', 'Secret key', 'Signs each request.'), address('Default: https://api.esimaccess.com')] },
   { code: 'esimerge', name: 'eSimerge', description: 'eSIM data packages (second choice).', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('eSimerge API base address (sandbox or live)')] },
   // Software (later).
   { code: 'ingram_micro', name: 'Ingram Micro', description: 'Microsoft and broad software distribution.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), id('CUSTOMER_NUMBER', 'Customer number'), address('Sandbox: https://api.ingrammicro.com:443/sandbox')] },

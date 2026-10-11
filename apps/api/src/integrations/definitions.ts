@@ -97,6 +97,10 @@ const integrationKeyList = [
   'PAWAPAY_SANDBOX',
   'PAWAPAY_PAYOUT_FEE_PERCENT',
   'PAWAPAY_CALLBACK_TOKEN',
+  'ESIM_ACCESS_ACCESS_CODE',
+  'ESIM_ACCESS_SECRET_KEY',
+  'ESIM_ACCESS_API_URL',
+  'ESIM_ACCESS_WEBHOOK_TOKEN',
   'DIDIT_API_KEY',
   'DIDIT_WORKFLOW_ID',
   'DIDIT_WEBHOOK_SECRET',
@@ -341,6 +345,22 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     ],
   },
   {
+    id: 'esim_access',
+    name: 'eSIM Access',
+    description:
+      'eSIM data packages for travellers, ordered on demand from BitoCard’s prepaid eSIM Access balance: every fixed package (country, regional and global). eSIM Access has no sandbox: BitoCard’s sandbox orders are simulated, and without both keys it serves only the sandbox.',
+    webhookPath: '/v1/webhooks/esim-access?token=<webhook token>',
+    fields: [
+      field('ESIM_ACCESS_ACCESS_CODE', 'Access code', { required: true, help: 'eSIM Access console > Developer: the AccessCode (sent with every request).' }),
+      secret('ESIM_ACCESS_SECRET_KEY', 'Secret key', { help: 'eSIM Access console > Developer: the SecretKey, which signs every request. Never sent.' }),
+      field('ESIM_ACCESS_API_URL', 'API address', { kind: 'url', help: 'Default: https://api.esimaccess.com' }),
+      secret('ESIM_ACCESS_WEBHOOK_TOKEN', 'Webhook token', {
+        required: false,
+        help: 'Choose a long random value (at least 16 characters). In the eSIM Access console (Developer > Webhook), set https://api.bitocard.com/v1/webhooks/esim-access?token= followed by this value: eSIMs are then delivered as soon as they are ready. Without it, orders are still checked on schedule.',
+      }),
+    ],
+  },
+  {
     id: 'didit',
     name: 'Didit identity checks',
     description: 'Reseller owners everywhere, and customers outside Nigeria. Switched off until the API key and workflow are set.',
@@ -354,7 +374,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access']);
 
 export const integrationGroups: IntegrationGroup[] = [
   ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),

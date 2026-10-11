@@ -97,6 +97,7 @@ export const notificationTypes = {
   'admin.payment.unmatched_refund_stuck': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Refund of an uncredited payment refused' },
   'admin.tax.rate_unconfirmed': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Sale refused: tax rate not confirmed' },
   'admin.fx.paused': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Conversions paused' },
+  'admin.esim.top_up_unclear': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'eSIM top-up unconfirmed' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------
   'customer.order.completed': { realm: 'customer', severity: 'success', label: 'Order delivered', push: true },
@@ -104,6 +105,8 @@ export const notificationTypes = {
   'customer.dispute.updated': { realm: 'customer', severity: 'info', label: 'Dispute updated', push: true },
   'customer.order.refunded': { realm: 'customer', severity: 'info', label: 'Order refunded', push: true },
   'customer.wallet.credited': { realm: 'customer', severity: 'success', label: 'Money added to your wallet', push: true },
+  'customer.esim.low_data': { realm: 'customer', severity: 'warning', label: 'eSIM data running low', push: true },
+  'customer.esim.expiring': { realm: 'customer', severity: 'warning', label: 'eSIM about to expire', push: true },
   'customer.gift_card_sale.accepted': { realm: 'customer', severity: 'success', label: 'Gift card sale accepted', push: true },
   'customer.gift_card_sale.declined': { realm: 'customer', severity: 'warning', label: 'Gift card sale declined', push: true },
   'customer.verification.updated': { realm: 'customer', severity: 'info', label: 'Identity check updated', push: true },

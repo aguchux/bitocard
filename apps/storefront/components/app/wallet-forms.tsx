@@ -8,11 +8,12 @@ import type { FormState } from "@/lib/account-actions";
 import { openBankAccount, simulateDeposit, topUpWallet } from "@/lib/wallet";
 
 /** Topping the wallet up: an amount, then the payment page of the method chosen. */
-export function TopUpForm({ currency, methods, amount, sandbox }: { currency: string; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean }) {
+export function TopUpForm({ currency, primary = true, methods, amount, sandbox }: { currency: string; primary?: boolean; methods: StorePaymentMethod[]; amount?: string; sandbox: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(topUpWallet, {});
   return (
     <form action={action} className="space-y-4" aria-label="Top up your wallet">
       <FormMessage state={state} />
+      {primary ? null : <input type="hidden" name="currency" value={currency} />}
       <TextField label={`Amount (${currency})`} name="amount" inputMode="decimal" required defaultValue={amount} state={state} hint="Spent only in this store. Wallet money cannot be withdrawn." />
       {methods.length ? (
         <fieldset>
@@ -39,7 +40,7 @@ export function TopUpForm({ currency, methods, amount, sandbox }: { currency: st
           </div>
         </fieldset>
       ) : sandbox ? null : (
-        <p className="text-sm text-slate-600">Card and mobile money top-ups are not open in your country yet.</p>
+        <p className="text-sm text-slate-600">{primary ? "Card and mobile money top-ups are not open in your country yet." : "US dollar top-ups are not open in your country yet."}</p>
       )}
       <Submit pending={pending} className="w-full sm:w-auto">
         <Plus className="size-4" aria-hidden="true" /> {sandbox ? "Add test money" : "Continue to payment"}
@@ -144,14 +145,14 @@ export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3">
           <h2 id="add-funds-title" className="text-lg font-bold">
-            Add funds
+            {wallet.currency === "USD" && wallet.wallets.length > 1 ? "Add US dollars" : "Add funds"}
           </h2>
           <button type="button" aria-label="Close" onClick={() => dialog.current?.close()} className="grid size-11 place-items-center rounded-xl hover:bg-slate-50">
             <X className="size-6" aria-hidden="true" />
           </button>
         </div>
         <div className="space-y-6 p-5">
-          <TopUpForm currency={wallet.currency} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
+          <TopUpForm currency={wallet.currency} primary={wallet.wallets.find(item => item.currency === wallet.currency)?.primary ?? true} methods={wallet.top_up_methods} amount={amount} sandbox={sandbox} />
           {wallet.reserved_accounts_available ? (
             <section aria-labelledby="add-bank" className="border-t border-slate-100 pt-5">
               <h3 id="add-bank" className="mb-1 flex items-center gap-2 font-semibold">

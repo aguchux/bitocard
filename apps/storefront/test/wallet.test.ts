@@ -51,6 +51,13 @@ describe("topping the wallet up", () => {
     expect(await topUpWallet({}, form({ amount: "0.5" }))).toEqual({ error: "Enter an amount of at least 1.", field: "amount" });
   });
 
+  test("the US dollar wallet: its currency is sent and the payment page returns to it", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_top_up", id: "t3", mode: "test", checkout_url: null }, 201));
+    vi.stubGlobal("fetch", fetch);
+    await expect(topUpWallet({}, form({ amount: "1,000", currency: "USD", method: "stripe" }))).rejects.toThrow("redirect:/account/wallet?wallet=USD&top_up=t3");
+    expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toEqual({ amount: 100000, method: "stripe", currency: "USD", return_url: "https://bitocard.com/account/wallet?wallet=USD" });
+  });
+
   test("a bank account number: the BVN goes to the API only, and the page refreshes", async () => {
     const fetch = vi.fn(async () => reply({ object: "list", data: [] }));
     vi.stubGlobal("fetch", fetch);
@@ -71,7 +78,14 @@ describe("paying from the wallet", () => {
     const fetch = vi.fn(async () => reply({ object: "checkout_preview", quote_id: "q1", amount: 3800000, currency: "NGN", wallet_balance: 5000000, expires_at: "2026-10-10T12:10:00Z", tax: null }, 201));
     vi.stubGlobal("fetch", fetch);
     const state = await startCheckout({}, form({ ...product, wallet_required: "1", method: "wallet" }));
-    expect(state.preview).toEqual({ quote_id: "q1", amount: 3800000, currency: "NGN", wallet_balance: 5000000, expires_at: "2026-10-10T12:10:00Z" });
+    expect(state.preview).toEqual({
+      quote_id: "q1",
+      amount: 3800000,
+      currency: "NGN",
+      wallet_balance: 5000000,
+      expires_at: "2026-10-10T12:10:00Z",
+      wallet_options: [{ currency: "NGN", amount: 3800000, balance: 5000000, enough: true }],
+    });
     expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toMatchObject({ preview: true, method: "wallet" });
   });
 
@@ -84,6 +98,20 @@ describe("paying from the wallet", () => {
 
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "wallet_balance_low", message: "Your wallet has NGN 0.00. Add NGN 38,000.00 to buy this.", param: null } }, 402)));
     expect(await startCheckout({}, form({ ...product, wallet_required: "1", quote_id: "q1" }))).toEqual({ error: "Your wallet has NGN 0.00. Add NGN 38,000.00 to buy this.", field: "wallet" });
+  });
+
+  test("both wallets are offered with what each pays; the one chosen pays the quote", async () => {
+    const options = [
+      { currency: "NGN", amount: 3800000, balance: 0, enough: false },
+      { currency: "USD", amount: 2534, balance: 5000, enough: true },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ object: "checkout_preview", quote_id: "q2", amount: 3800000, currency: "NGN", wallet_balance: 0, expires_at: "2026-10-10T12:10:00Z", wallet_options: options }, 201)));
+    expect((await startCheckout({}, form({ ...product, wallet_required: "1" }))).preview?.wallet_options).toEqual(options);
+
+    const fetch = vi.fn(async () => reply({ object: "checkout", id: "c3", mode: "live", checkout_url: null }, 201));
+    vi.stubGlobal("fetch", fetch);
+    await expect(startCheckout({}, form({ ...product, wallet_required: "1", quote_id: "q2", wallet_currency: "USD" }))).rejects.toThrow("redirect:/account/orders/c3");
+    expect(bodyOf((fetch.mock.calls as unknown as Call[])[0])).toMatchObject({ quote_id: "q2", wallet_currency: "USD" });
   });
 
   test("paying by card never asks for a preview", async () => {

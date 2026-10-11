@@ -108,6 +108,34 @@ export const eventObjectSchemas: Record<string, Schema> = {
     }),
     additionalProperties: false,
   },
+  Esim: {
+    ...objectSchema('eSIM', {
+      object: str('Always `esim`.', { const: 'esim' }),
+      id: str('eSIM ID.', { format: 'uuid' }),
+      order_id: str('The order that delivered it (its activation code is on the order).', { format: 'uuid' }),
+      mode,
+      iccid: str('Its ICCID.'),
+      status: str(
+        '`ready`: delivered, not installed yet; `installed`: on a phone, not used yet; `active`: in use; `used_up`: all its data used (top it up); `expired`: its plan ended; `cancelled`: cancelled before it was installed (refunded); `revoked` or `suspended`: stopped by the network.',
+        { enum: ['ready', 'installed', 'active', 'used_up', 'expired', 'cancelled', 'revoked', 'suspended'] },
+      ),
+      data: {
+        ...objectSchema('eSIM data', {
+          total: { type: ['integer', 'null'], description: 'Data in its plan, in bytes; null for unlimited plans or before it is reported.' },
+          used: { type: ['integer', 'null'], description: 'Data used, in bytes (suppliers update it every few hours); null before it is reported.' },
+          remaining: { type: ['integer', 'null'], description: 'Data left, in bytes.' },
+          updated_at: nullableTime('When the use was last read.'),
+        }),
+        additionalProperties: false,
+      },
+      expires_at: nullableTime('When its plan ends (before installing: the last day to install it).'),
+      top_ups: str('`data`: takes more data; `days`: a day pass that takes more days; `none`.', { enum: ['none', 'data', 'days'] }),
+      cancellable: { type: 'boolean', description: 'Never installed: `POST /v1/esims/{id}/cancel` cancels it (with every eSIM of its order) and refunds the order.' },
+      created_at: time('When it was delivered.'),
+      updated_at: time('When it last changed. Use it to ignore an older event that arrives after a newer one.'),
+    }),
+    additionalProperties: false,
+  },
   NumberMessage: {
     ...objectSchema('Number message', {
       object: str('Always `number_message`.', { const: 'number_message' }),
@@ -318,6 +346,22 @@ export const exampleNumberMessage = {
 };
 export const exampleVirtualNumber = exampleNumber('active');
 
+export const exampleEsim = (status = 'active', extra: Record<string, unknown> = {}) => ({
+  object: 'esim',
+  id: '6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c',
+  order_id: '2c7a9e14-5b3d-4f6a-8e1c-0d9b7a5f3e21',
+  mode: 'live',
+  iccid: '8943108170000826391',
+  status,
+  data: { total: 1_073_741_824, used: 412_316_860, remaining: 661_424_964, updated_at: '2026-10-11T08:00:00.000Z' },
+  expires_at: '2026-10-18T09:15:04.000Z',
+  top_ups: 'data',
+  cancellable: status === 'ready',
+  created_at: '2026-10-10T09:15:04.870Z',
+  updated_at: '2026-10-11T08:00:00.000Z',
+  ...extra,
+});
+
 type EventDoc = { schema: string; summary: string; description: string; example: object };
 
 /** When each event fires, when it does not, and what comes before and after it. */
@@ -452,6 +496,16 @@ export const eventDocs: Record<EventType, EventDoc> = {
     ].join('\n\n'),
     example: exampleNumberMessage,
   },
+  'esim.updated': {
+    schema: 'Esim',
+    summary: 'An eSIM changed',
+    description: [
+      'Fires when an eSIM delivered by one of your orders changes: installed, in use, its data used up, expired, cancelled or stopped by the network (`status`), its data use read again (`data`), or a top-up added data or days (`data.total`, `expires_at`). Suppliers report data use every few hours, so it is not real time.',
+      'Does not fire for eSIMs bought through your own supplier account, and never carries the activation code (it is only on `GET /v1/orders/{id}`).',
+      'Comes after `order.completed` for the eSIM. Followed by more `esim.updated` events; a `cancelled` eSIM is followed by `order.refunded`.',
+    ].join('\n\n'),
+    example: exampleEsim('active'),
+  },
   'dispute.opened': {
     schema: 'DisputeSummary',
     summary: 'A dispute was opened',
@@ -550,6 +604,7 @@ const exampleEventIds: Record<EventType, string> = {
   'number.expired': 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
   'number.deleted': 'c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f',
   'number.sms_received': 'd4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a',
+  'esim.updated': '4bf2a3b4-c5d6-4e7f-8a8b-0c1d2e3f4a5b',
   'dispute.opened': 'e5f6a7b8-c9d0-4e1f-8a2b-4c5d6e7f8a9b',
   'dispute.message_received': 'f6a7b8c9-d0e1-4f2a-9b3c-5d6e7f8a9b0c',
   'dispute.escalated': '07b8c9d0-e1f2-4a3b-8c4d-6e7f8a9b0c1d',

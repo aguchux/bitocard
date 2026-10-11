@@ -18,7 +18,7 @@ import { type PricedOffer, PricingService } from './pricing.service.js';
 export const quoteLifetimeMs = 10 * 60 * 1000;
 export const maxQuantity = 10;
 /** Categories bought several at a time (each unit is its own code). */
-const multiples = new Set(['gift_cards', 'software']);
+const multiples = new Set(['gift_cards', 'software', 'esim']);
 /** Sandbox smartcard or meter number that is never recognised, for testing the failure. */
 export const sandboxUnknownAccount = '0000000000';
 
@@ -105,7 +105,7 @@ export class QuotesService {
       throw invalid('This face value is not offered for the product.', 'face_value');
     }
     const quantity = input.quantity ?? 1;
-    if (quantity > 1 && !multiples.has(product.category)) throw invalid('Only gift cards and software licences can be bought several at a time; quote each top-up or payment separately.', 'quantity');
+    if (quantity > 1 && !multiples.has(product.category)) throw invalid('Only gift cards, software licences and eSIMs can be bought several at a time; quote each top-up or payment separately.', 'quantity');
     const recipient: RecipientRecord = {};
     if (product.recipientType === 'phone') recipient.phone = this.phone(product, input.recipient?.phone);
     if (product.recipientType === 'smartcard' || product.recipientType === 'meter') {

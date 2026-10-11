@@ -1,6 +1,6 @@
 import { productFeatureKeys } from '../../catalogue/features.js';
 import { ProductCategory } from '../../generated/prisma/client.js';
-import { eventObjectSchemas, exampleNumberMessage, exampleVirtualNumber } from '../../webhooks/openapi.js';
+import { eventObjectSchemas, exampleEsim, exampleNumberMessage, exampleVirtualNumber } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
@@ -9,7 +9,7 @@ export const categories = Object.values(ProductCategory);
 export const category = (description = 'Product category.') => oneOf(description, categories);
 export const features = array(oneOf('Something the product can do.', productFeatureKeys), 'What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products.');
 const recipientTypes = ['phone', 'smartcard', 'meter', 'none'] as const;
-const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number'] as const;
+const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number', 'esim'] as const;
 
 const product = objectSchema(
   'Product',
@@ -275,7 +275,7 @@ const orderSchema = eventObjectSchemas.Order as { title: string; required: strin
 
 const delivery = shape(
   {
-    kind: oneOf('What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over) or `virtual_number` (the number in `serial`).', deliveryKinds),
+    kind: oneOf('What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`) or `esim` (the LPA activation string in `code`, a secret: whoever holds it can install the eSIM once; the ICCID in `serial`).', deliveryKinds),
     code: nullableStr('The gift card code, licence key or electricity token. A secret: show it only to your customer.'),
     pin: nullableStr('The gift card PIN, where it has one. A secret.'),
     serial: nullableStr('A serial number, or the phone number for `virtual_number`.'),
@@ -437,8 +437,66 @@ const renewalPrice = objectSchema(
 
 const sentMessage = { ...exampleNumberMessage, id: '5e6f7a8b-9c0d-4e1f-9a2b-3c4d5e6f7a8b', direction: 'out', from: '+442071234567', to: '+447700900123', text: 'Your table is ready.', status: 'queued' };
 
+const esimTopUpOption = objectSchema(
+  'EsimTopUpOption',
+  {
+    object: constant('esim_top_up_option'),
+    id: str('Pass it as `option_id` to top up.'),
+    name: str('What it adds, for example `1GB, 7 days` or `1GB a day for 3 more days`.'),
+    data: str('The data it adds (`1GB`), or a day pass’s daily allowance (`1GB a day`).'),
+    days: int('Days it lasts, or adds to a day pass.'),
+    amount: money('What it costs you (BitoCard’s price)'),
+    currency: str('Your wallet currency.'),
+  },
+  'A top-up an eSIM can take now.',
+);
+
+const esimTopUp = objectSchema(
+  'EsimTopUp',
+  {
+    object: constant('esim_top_up'),
+    id: uuid('Top-up ID.'),
+    esim_id: uuid('The eSIM.'),
+    mode,
+    name: str('What it adds.'),
+    status: oneOf('`pending` (the supplier has not confirmed yet: asked again), `completed` (added; paid) or `failed` (nothing taken).', ['pending', 'completed', 'failed']),
+    amount: money('What it cost: BitoCard’s price to you, or what your customer paid when they topped up from your store'),
+    currency: str('ISO 4217 currency of `amount`.'),
+    paid_by: oneOf('`reseller` (your wallet) or `customer` (your store’s customer, from their wallet).', ['reseller', 'customer']),
+    failure_reason: nullableStr('Why it failed.'),
+    created_at: time('When it was asked for.'),
+    completed_at: nullableTime('When it was added or failed.'),
+  },
+  'Data or days added to an eSIM.',
+);
+
+const esimCancellation = objectSchema(
+  'EsimCancellation',
+  {
+    object: constant('list'),
+    data: array(ref('Esim'), 'Every eSIM of the order, now `cancelled`.'),
+    refunded: bool('The order was refunded (see `order.refunded`).'),
+  },
+  'The order’s eSIMs after cancelling.',
+);
+
+const exampleTopUp = {
+  object: 'esim_top_up',
+  id: '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d',
+  esim_id: '6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c',
+  mode: 'live',
+  name: 'Japan 1GB 7Days',
+  status: 'completed',
+  amount: 1_087_500,
+  currency: 'NGN',
+  paid_by: 'reseller',
+  failure_reason: null,
+  created_at: '2026-10-11T09:02:00.000Z',
+  completed_at: '2026-10-11T09:02:03.000Z',
+};
+
 export const commerceDocs: DocsArea = {
-  schemas: { Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
+  schemas: { EsimTopUpOption: esimTopUpOption, EsimTopUp: esimTopUp, EsimCancellation: esimCancellation, Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
   responses: {
     'GET /v1/catalogue/products': {
       status: 200,
@@ -518,6 +576,22 @@ export const commerceDocs: DocsArea = {
       description: 'The message: `queued` until the network reports it, then `sent` (with `charged`) or `failed` (nothing charged).',
       schema: 'NumberMessage',
       example: sentMessage,
+    },
+    'GET /v1/esims': { status: 200, description: 'A page of your eSIMs, newest first.', schema: list(ref('Esim')), example: listExample([exampleEsim('active')], false) },
+    'GET /v1/esims/{id}': { status: 200, description: 'The eSIM.', schema: 'Esim', example: exampleEsim('active') },
+    'GET /v1/esims/{id}/top-up-options': {
+      status: 200,
+      description: 'The top-ups it takes now, with BitoCard’s price to you.',
+      schema: list(ref('EsimTopUpOption'), {}, false),
+      example: { object: 'list', data: [{ object: 'esim_top_up_option', id: 'opt_4f1c2b9a0d7e6c5b3a21', name: 'Japan 1GB 7Days', data: '1GB', days: 7, amount: 1_087_500, currency: 'NGN' }] },
+    },
+    'GET /v1/esims/{id}/top-ups': { status: 200, description: 'Its top-ups, newest first.', schema: list(ref('EsimTopUp'), {}, false), example: { object: 'list', data: [exampleTopUp] } },
+    'POST /v1/esims/{id}/top-ups': { status: 201, description: 'The top-up: `completed` once the supplier added it, `failed` if refused (nothing taken), `pending` while unclear.', schema: 'EsimTopUp', example: exampleTopUp },
+    'POST /v1/esims/{id}/cancel': {
+      status: 200,
+      description: 'The order’s eSIMs, cancelled, and the order refunded.',
+      schema: 'EsimCancellation',
+      example: { object: 'list', data: [exampleEsim('cancelled', { data: { total: 1_073_741_824, used: 0, remaining: 1_073_741_824, updated_at: '2026-10-11T09:00:00.000Z' }, cancellable: false })], refunded: true },
     },
     'POST /v1/orders/{id}/simulate': {
       status: 200,

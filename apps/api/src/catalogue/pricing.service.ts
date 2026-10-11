@@ -277,6 +277,14 @@ export class PricingService {
    * What the reseller pays BitoCard for a supplier cost outside an order (a number's renewal, an SMS): converted to
    * the reseller currency the conservative way, plus BitoCard's margin for the product (never below cost).
    */
+  /**
+   * The reseller's price for something extra on a product (an eSIM top-up): their markup for the product on BitoCard's
+   * wholesale, within the Markup Protection cap. Their fixed price is for the product itself, so it never applies.
+   */
+  resellerPrice(ctx: PricingContext, product: Product, wholesale: bigint) {
+    return addBps(wholesale, Math.min(this.terms(ctx, product).markupBps, ctx.capBps, maxResellerMarkupBps));
+  }
+
   async wholesaleFor(ctx: PricingContext, product: Product, supplierCost: bigint, costCurrency: string, supplierCode: string | null = null) {
     const { amount: cost } = await this.convert(ctx, supplierCost, costCurrency);
     const rule = this.rule(ctx, product, supplierCode, { skipFixed: true });

@@ -18,8 +18,8 @@ const optionClass =
 
 const walletOption: StorePaymentMethod = { object: "payment_method", id: "wallet", label: "Wallet", description: "Pay from your wallet balance", networks: [] };
 
-/** The wallet page (always in the customer's own currency), coming back here. */
-const topUpHref = (back: string) => `/account/wallet?${new URLSearchParams({ back }).toString()}`;
+/** The wallet page (the country wallet, or `wallet` USD), coming back here. */
+const topUpHref = (back: string, wallet?: string) => `/account/wallet?${new URLSearchParams({ ...(wallet ? { wallet } : {}), back }).toString()}`;
 
 /** A value in the customer's own currency first (their prices), with the card's own value beneath. */
 function FaceValue({ value, product }: { value: number; product: StoreProductDetail }) {
@@ -92,6 +92,10 @@ export function BuyForm({
   // The price quoted for paying from the wallet, until the customer changes anything in the form.
   const [dismissed, setDismissed] = useState<string | null>(null);
   const preview = market === tried && state.preview && state.preview.quote_id !== dismissed ? state.preview : null;
+  // Which wallet pays the price shown: chosen by the customer, else the first that covers it, else the country wallet.
+  const [payFrom, setPayFrom] = useState<string | null>(null);
+  const options = preview?.wallet_options ?? [];
+  const payOption = options.find(option => option.currency === payFrom && option.amount !== null) ?? options.find(option => option.enough) ?? options[0];
 
   if (!signedIn) {
     return (
@@ -250,26 +254,65 @@ export function BuyForm({
         </fieldset>
       ) : null}
 
-      {preview ? (
+      {preview && payOption ? (
         <div className="space-y-3 rounded-2xl bg-slate-50 p-4" role="status">
           <p className="text-sm text-slate-600">You pay</p>
           <p className="font-display text-3xl font-extrabold text-[#070f4c]">{formatFace(preview.amount, preview.currency)}</p>
-          <p className="text-sm text-slate-600">
-            From your wallet: {formatFace(preview.wallet_balance, preview.currency)}
-            {preview.wallet_balance >= preview.amount ? `, leaving ${formatFace(preview.wallet_balance - preview.amount, preview.currency)}.` : "."}
-          </p>
-          {preview.wallet_balance >= preview.amount ? (
+          {options.length > 1 ? (
+            // Which wallet pays: kept out of the form's change handler, which would drop the price shown.
+            <fieldset onChange={event => event.stopPropagation()}>
+              <legend className="text-sm font-semibold">Pay from</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {options.map(option => (
+                  <label
+                    key={option.currency}
+                    className={`flex items-start gap-3 rounded-xl border bg-white p-3 ${option.amount === null ? "cursor-not-allowed opacity-60" : "cursor-pointer"} border-slate-200 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50`}
+                  >
+                    <input
+                      type="radio"
+                      name="wallet_currency"
+                      value={option.currency}
+                      checked={payOption.currency === option.currency}
+                      disabled={option.amount === null}
+                      onChange={() => setPayFrom(option.currency)}
+                      className="mt-1 accent-[#ff2382]"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{option.currency === preview.currency ? `${option.currency} wallet` : "US dollar wallet"}</span>
+                      <span className="block text-sm text-[#070f4c]">{option.amount === null ? "Not available right now" : formatFace(option.amount, option.currency)}</span>
+                      <span className={`block text-xs ${option.enough ? "text-slate-500" : "text-amber-700"}`}>Balance {formatFace(option.balance, option.currency)}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {payOption.currency !== preview.currency && payOption.amount !== null ? (
+                <p className="mt-2 text-xs text-slate-500">Converted at our exchange rate. A refund goes back to your US dollar wallet in full.</p>
+              ) : null}
+            </fieldset>
+          ) : (
+            <>
+              <input type="hidden" name="wallet_currency" value={payOption.currency} />
+              <p className="text-sm text-slate-600">
+                From your wallet: {formatFace(payOption.balance, payOption.currency)}
+                {payOption.enough && payOption.amount !== null ? `, leaving ${formatFace(payOption.balance - payOption.amount, payOption.currency)}.` : "."}
+              </p>
+            </>
+          )}
+          {payOption.enough && payOption.amount !== null ? (
             <div className="flex flex-wrap gap-3">
               <Submit pending={pending} className="text-lg">
-                <Wallet className="size-4" aria-hidden="true" /> Pay {formatFace(preview.amount, preview.currency)}
+                <Wallet className="size-4" aria-hidden="true" /> Pay {formatFace(payOption.amount, payOption.currency)}
               </Submit>
               <button type="button" onClick={() => setDismissed(preview.quote_id)} className="inline-flex min-h-12 items-center rounded-xl px-4 font-semibold text-slate-600 hover:text-[#070f4c]">
                 Change
               </button>
             </div>
           ) : (
-            <Link href={topUpHref(back)} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]">
-              <Wallet className="size-4" aria-hidden="true" /> Top up {formatFace(preview.amount - preview.wallet_balance, preview.currency)} or more
+            <Link
+              href={topUpHref(back, payOption.currency === preview.currency ? undefined : payOption.currency)}
+              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]"
+            >
+              <Wallet className="size-4" aria-hidden="true" /> Top up {formatFace((payOption.amount ?? 0) - payOption.balance, payOption.currency)} or more
             </Link>
           )}
         </div>

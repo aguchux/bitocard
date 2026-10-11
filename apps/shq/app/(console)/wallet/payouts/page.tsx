@@ -56,7 +56,8 @@ function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boo
   const [now] = useState(() => Date.now());
 
   if (!wallet.data) return wallet.error ? <Notice tone="red">{errorMessage(wallet.error, "Could not load your wallet.")}</Notice> : <Skeleton className="h-64 w-full" />;
-  const { currency, earnings, minimum_withdrawal: minimum, payouts_in_progress: inProgress } = wallet.data;
+  const { currency, earnings, payouts_in_progress: inProgress } = wallet.data;
+  const minimum = wallet.data.minimum_withdrawal ?? 0;
   const chosen = accounts.find(item => item.id === (accountId || accounts[0]?.id));
   const coolingOff = chosen && !sandbox && new Date(chosen.payouts_available_from).getTime() > now;
   const canWithdraw = earnings.withdrawable >= minimum && earnings.withdrawable > 0;

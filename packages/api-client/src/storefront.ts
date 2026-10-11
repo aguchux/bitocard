@@ -217,7 +217,14 @@ export type StoreWallet = {
   reserved_accounts: StoreReservedAccount[];
   reserved_accounts_available: boolean;
   reserved_account_needs_bvn: boolean;
+  /** Both wallets: the customer's country's currency first (`primary`), then US dollars. */
+  wallets: StoreWalletSummary[];
 };
+
+export type StoreWalletSummary = { currency: string; primary: boolean; balance: number };
+
+/** Paying from the wallet: what each wallet would pay for a quote (US dollars at BitoCard's rate; `amount` null while unavailable). */
+export type StoreWalletOption = { currency: string; amount: number | null; balance: number; enough: boolean };
 
 export type StoreWalletTopUp = {
   object: 'customer_top_up';
@@ -324,3 +331,27 @@ export function formatPrice(minor: number, currency: string) {
     return `${currency} ${(minor / 100).toFixed(2)}`;
   }
 }
+
+/** An eSIM on its order's page: status, data use (bytes) and expiry. Its activation code is on the order. */
+export type StoreEsim = {
+  object: 'esim';
+  id: string;
+  iccid: string;
+  status: 'ready' | 'installed' | 'active' | 'used_up' | 'expired' | 'cancelled' | 'revoked' | 'suspended';
+  data: { total: number | null; used: number | null; remaining: number | null; updated_at: string | null };
+  expires_at: string | null;
+  top_ups: 'none' | 'data' | 'days';
+  /** Never installed: cancelling it refunds the order. */
+  cancellable: boolean;
+};
+
+/** The top-ups an eSIM takes now at the store's price, and the customer's wallets that can pay (`available` false: the store tops it up). */
+export type StoreEsimTopUpOptions = {
+  object: 'list';
+  /** `prices`: what it costs from each wallet (the US dollar price at BitoCard's rate; null while unavailable). */
+  data: Array<{ id: string; name: string; data: string; days: number; amount: number; currency: string; prices: Array<{ currency: string; amount: number | null }> }>;
+  wallets: Array<{ currency: string; primary: boolean; balance: number }>;
+  available: boolean;
+};
+
+export type StoreEsimTopUp = { object: 'esim_top_up'; id: string; name: string; status: 'pending' | 'completed' | 'failed'; amount: number; currency: string; failure_reason: string | null };

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, Clock, LockKeyhole, Phone, Store, XCircle } from "lucide-react";
-import { categoryLabels, formatFace, type ProductCategory, type ProductFeature } from "@bitocard/api-client/storefront";
+import { categoryLabels, formatFace, type ProductCategory, type ProductFeature, type StoreEsim } from "@bitocard/api-client/storefront";
 import { brand } from "@bitocard/ui/site";
 import { RefreshWhile } from "@/components/store/order-status";
 import { FeatureIcons } from "@/components/store/features";
@@ -10,6 +10,7 @@ import { type AccessDelivery, type AccessStore, accessApi, type OrderAccess, typ
 import { Codes } from "./codes";
 import { EmailCodeGate } from "./gate";
 import { NumberLive } from "./number";
+import { EsimManage } from "@/components/store/esim-manage";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
@@ -18,7 +19,7 @@ export const metadata: Metadata = { title: "Your order", robots: { index: false,
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
 const dateTime = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
-const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key", "token"]);
+const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key", "token", "esim"]);
 
 function Shell({ store, children }: { store: AccessStore | null; children: React.ReactNode }) {
   const name = store?.name ?? brand.name;
@@ -130,6 +131,8 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
   // A virtual number's live state (inbox, renewal); the delivery's own details stand in if it cannot be loaded.
   const live = category === "virtual_numbers" ? await accessApi<OrderNumber>(token, "/number") : null;
   const liveNumber = live?.ok ? live.data.number : null;
+  // eSIMs after delivery: status, data use, top-ups (paid by a store customer from their wallet) and cancelling.
+  const tracked = category === "esim" && (order.status === "completed" || order.status === "refunded") ? await accessApi<{ data: StoreEsim[] }>(token, "/esims") : null;
 
   return (
     <Shell store={store}>
@@ -184,6 +187,7 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
           ) : (
             numbers.map((delivery, index) => <NumberPanel key={index} delivery={delivery} features={order.product.features} />)
           )}
+          {tracked?.ok ? <EsimManage source={{ token }} esims={tracked.data.data} store={store.name} /> : null}
           {order.deliveries.some(delivery => delivery.kind === "confirmation" && delivery.details.transaction_id) ? (
             <p className="text-sm text-slate-600">Transaction reference: {order.deliveries.find(delivery => delivery.details.transaction_id)?.details.transaction_id}</p>
           ) : null}

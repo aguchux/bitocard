@@ -1,11 +1,13 @@
 "use client";
 
-import { useId, useState, type FormEvent } from "react";
+import { Suspense, useId, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, CreditCard, ExternalLink, XCircle } from "lucide-react";
 import { Button, Card, CardHeader, currencyDigits, DataTable, errorMessage, Field, formatDateTime, formatMoney, Input, LoadMore, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
 import { type PaymentGateway, type TopUp, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpMethodsQuery, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { walletName, WalletSwitch } from "@/components/wallets";
 
 /** Smallest and largest top-up the API accepts, in minor units. */
 const minAmount = 100;
@@ -33,13 +35,13 @@ const paidWith: Record<TopUp["method"], string> = {
 /** The payment page returns the payer to the wallet; only HTTPS addresses are accepted, so local development uses the API's default. */
 const returnUrl = () => (window.location.protocol === "https:" ? `${window.location.origin}/wallet` : undefined);
 
-function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean }) {
+function NewTopUp({ currency, primary, sandbox }: { currency: string; primary: boolean; sandbox: boolean }) {
   const id = useId();
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState<string | null>(null);
   const [created, setCreated] = useState<TopUp | null>(null);
   const [create, state] = useCreateTopUpMutation();
-  const methods = useTopUpMethodsQuery();
+  const methods = useTopUpMethodsQuery(primary ? undefined : currency, { skip: !currency });
   const offered = methods.data?.data ?? [];
   const [chosen, setChosen] = useState<PaymentGateway | null>(null);
   const method = offered.find(item => item.id === chosen)?.id ?? offered[0]?.id;
@@ -54,7 +56,7 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
     if (amount < minAmount) return setInvalid(`The smallest top-up is ${formatMoney(minAmount, currency)}.`);
     if (amount > maxAmount) return setInvalid(`The largest single top-up is ${formatMoney(maxAmount, currency)}.`);
     setInvalid(null);
-    const topUp = await create({ amount, method, return_url: returnUrl() })
+    const topUp = await create({ amount, method, return_url: returnUrl(), ...(primary ? {} : { currency }) })
       .unwrap()
       .catch(() => null);
     if (!topUp) return;
@@ -71,7 +73,7 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
     <Card className="p-5 sm:p-6">
       <form onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <h2 className="text-lg font-bold text-ink">Add money</h2>
+          <h2 className="text-lg font-bold text-ink">{currency ? `Add money to your ${walletName(currency)}` : "Add money"}</h2>
           <p className="mt-0.5 text-sm text-muted">
             Pay on a secure payment page with any method below. Your wallet is credited once the payment is confirmed. Top-ups pay the wholesale cost of orders and cannot be withdrawn.
           </p>
@@ -79,8 +81,8 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
         {methods.error ? <Notice tone="red">{errorMessage(methods.error, "Could not load the payment methods.")}</Notice> : null}
         {unavailable ? (
-          <Notice tone="grey" title="Payment page top-ups are not available in your country yet">
-            Use your bank transfer accounts (Wallet &gt; Bank transfer accounts) where they are offered, or contact BitoCard support.
+          <Notice tone="grey" title={primary ? "Payment page top-ups are not available in your country yet" : "US dollar top-ups are not available in your country yet"}>
+            {primary ? "Use your bank transfer accounts (Wallet > Bank transfer accounts) where they are offered, or contact BitoCard support." : "Top up your country wallet instead, or contact BitoCard support."}
           </Notice>
         ) : null}
         {offered.length > 0 ? (
@@ -134,10 +136,23 @@ function NewTopUp({ currency, sandbox }: { currency: string; sandbox: boolean })
 }
 
 export default function TopUpsPage() {
+  return (
+    <Suspense fallback={null}>
+      <TopUps />
+    </Suspense>
+  );
+}
+
+function TopUps() {
   const { membership, mode } = useReseller();
+  const search = useSearchParams();
+  const router = useRouter();
   const allowed = can(membership, "admin", "finance");
   const sandbox = mode === "test";
   const wallet = useWalletQuery(undefined, { skip: !allowed });
+  const wallets = wallet.data?.wallets ?? [];
+  const asked = search.get("currency")?.toUpperCase();
+  const chosen = wallets.find(item => item.currency === asked) ?? wallets.find(item => item.primary);
   const topUps = useTopUpsInfiniteQuery(undefined, { skip: !allowed });
   const [simulate, simulateState] = useSimulateTopUpMutation();
   const [busy, setBusy] = useState<string | null>(null);
@@ -161,7 +176,8 @@ export default function TopUpsPage() {
       ) : (
         <>
           {wallet.error ? <Notice tone="red">{errorMessage(wallet.error, "Could not load your wallet.")}</Notice> : null}
-          <NewTopUp currency={wallet.data?.currency ?? ""} sandbox={sandbox} />
+          <WalletSwitch wallets={wallets} value={chosen?.currency ?? ""} onChange={code => router.replace(wallets.find(item => item.currency === code)?.primary ? "/wallet/top-ups" : `/wallet/top-ups?currency=${code}`, { scroll: false })} />
+          <NewTopUp key={chosen?.currency ?? ""} currency={chosen?.currency ?? ""} primary={chosen?.primary ?? true} sandbox={sandbox} />
           {simulateState.error ? <Notice tone="red">{errorMessage(simulateState.error)}</Notice> : null}
           <Card>
             <CardHeader title="Your top-ups" description="Card and bank payments, and bank transfers into your bank transfer accounts, newest first." className="pb-4" />

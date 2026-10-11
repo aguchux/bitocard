@@ -2,8 +2,9 @@ import { bitocardApi } from '../base';
 import { cursorPages, type List, type Mode, params } from './common';
 
 /**
- * The reseller wallet (`/v1/wallet`): balances, ledger transactions, checkout top-ups and reserved bank accounts, plus
- * BitoCard's public exchange rates. Amounts are integer minor units of the wallet currency.
+ * The reseller wallets (`/v1/wallet`): balances, ledger transactions, checkout top-ups, conversions and reserved bank
+ * accounts, plus BitoCard's public exchange rates. Every reseller holds two wallets: their country's currency (orders,
+ * earnings, withdrawals) and US dollars. Amounts are integer minor units of the wallet currency.
  */
 export type Wallet = {
   object: 'wallet';
@@ -23,10 +24,26 @@ export type Wallet = {
   };
   /** Withdrawals on their way to the bank. */
   payouts_in_progress: number;
-  /** The country's smallest withdrawal. */
-  minimum_withdrawal: number;
+  /** The country's smallest withdrawal; null on the US dollar wallet (withdrawals are from the country wallet). */
+  minimum_withdrawal: number | null;
   /** Live only; null if never granted. Never part of `available`. */
   startup_allowance: StartupAllowance | null;
+  /** Both wallets: the country's currency first (`primary`), then US dollars. */
+  wallets: WalletSummary[];
+};
+
+export type WalletSummary = { currency: string; primary: boolean; available: number; reserved: number };
+
+/** Money moved between the wallets (or, for a preview, what would move: `id` null). */
+export type WalletConversion = {
+  object: 'wallet_conversion';
+  id: string | null;
+  mode: Mode;
+  from: { amount: number; currency: string };
+  to: { amount: number; currency: string };
+  /** Units of the country's currency per US dollar. */
+  rate: string;
+  created_at: string | null;
 };
 
 /** Journal entry types the ledger posts against a reseller. */
@@ -47,6 +64,7 @@ export type WalletTransactionType =
   | 'allowance_revoked'
   | 'platform_fee'
   | 'platform_fee_refund'
+  | 'conversion'
   | (string & {});
 
 /** The $500 startup allowance (US cents). Restricted: pays only the wholesale cost of customer-paid orders, never cash. */
@@ -75,6 +93,8 @@ export type WalletTransaction = {
   allowance_change: number;
   /** BitoCard fee entries (and the fee hold returned before them): the fee and what it was on. */
   fee: { id: string; source: { type: string; id: string | null } | null } | null;
+  /** A conversion between the wallets: what left one and arrived in the other. */
+  conversion: { from: { amount: number; currency: string }; to: { amount: number; currency: string }; rate: string } | null;
   created_at: string;
 };
 
@@ -152,12 +172,19 @@ export type Chargeback = {
 
 export const resellerWalletApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
-    wallet: build.query<Wallet, void>({ query: () => '/v1/wallet', providesTags: ['Wallet'] }),
+    /** One wallet: the country's (no argument) or `USD`. */
+    wallet: build.query<Wallet, string | void>({ query: currency => (currency ? { url: '/v1/wallet', params: { currency } } : '/v1/wallet'), providesTags: ['Wallet'] }),
     walletChargebacks: build.query<List<Chargeback>, void>({ query: () => ({ url: '/v1/wallet/chargebacks', params: { limit: 50 } }), providesTags: ['Wallet'] }),
-    walletTransactions: build.infiniteQuery<List<WalletTransaction>, void, string>({
+    /** Every wallet's transactions, or one wallet's (its currency). */
+    walletTransactions: build.infiniteQuery<List<WalletTransaction>, string | void, string>({
       infiniteQueryOptions: cursorPages,
-      query: ({ pageParam }) => ({ url: '/v1/wallet/transactions', params: params({ limit: 25, starting_after: pageParam }) }),
+      query: ({ queryArg, pageParam }) => ({ url: '/v1/wallet/transactions', params: params({ limit: 25, starting_after: pageParam, currency: queryArg || undefined }) }),
       providesTags: ['Wallet'],
+    }),
+    /** Moves money between the wallets at BitoCard's rate; `preview` only says what would arrive. */
+    convertWallet: build.mutation<WalletConversion, { from: string; to: string; amount: number; preview?: boolean }>({
+      query: body => ({ url: '/v1/wallet/conversions', method: 'POST', body }),
+      invalidatesTags: (_result, _error, { preview }) => (preview ? [] : ['Wallet']),
     }),
     exchangeRates: build.query<List<ExchangeRate>, void>({ query: () => '/v1/exchange-rates' }),
 
@@ -167,10 +194,13 @@ export const resellerWalletApi = bitocardApi.injectEndpoints({
       providesTags: [{ type: 'TopUp', id: 'LIST' }],
     }),
     topUp: build.query<TopUp, string>({ query: id => `/v1/wallet/top-ups/${id}`, providesTags: (_result, _error, id) => [{ type: 'TopUp', id }] }),
-    /** The ways to top up in the reseller's market, best first. */
-    topUpMethods: build.query<{ object: 'list'; data: PaymentMethod[] }, void>({ query: () => '/v1/wallet/payment-methods', providesTags: [{ type: 'TopUp', id: 'METHODS' }] }),
-    /** Returns the top-up with its `checkout_url`; send the payer there. `method` is one of `topUpMethods` (default: the first). */
-    createTopUp: build.mutation<TopUp, { amount: number; method?: PaymentGateway; return_url?: string }>({
+    /** The ways to top up a wallet (the country's, or `USD`) in the reseller's market, best first. */
+    topUpMethods: build.query<{ object: 'list'; data: PaymentMethod[] }, string | void>({
+      query: currency => (currency ? { url: '/v1/wallet/payment-methods', params: { currency } } : '/v1/wallet/payment-methods'),
+      providesTags: [{ type: 'TopUp', id: 'METHODS' }],
+    }),
+    /** Returns the top-up with its `checkout_url`; send the payer there. `method` is one of `topUpMethods` (default: the first); `currency` the wallet (default the country's). */
+    createTopUp: build.mutation<TopUp, { amount: number; method?: PaymentGateway; return_url?: string; currency?: string }>({
       query: body => ({ url: '/v1/wallet/top-ups', method: 'POST', body }),
       invalidatesTags: [{ type: 'TopUp', id: 'LIST' }],
     }),
@@ -199,6 +229,7 @@ export const {
   useWalletQuery,
   useWalletChargebacksQuery,
   useWalletTransactionsInfiniteQuery,
+  useConvertWalletMutation,
   useExchangeRatesQuery,
   useTopUpsInfiniteQuery,
   useTopUpQuery,

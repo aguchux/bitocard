@@ -13,7 +13,7 @@ import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { resellerNotVerified, testModeOnly } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
-import type { Delivery, FulfilmentRequest, FulfilmentResult, SuppliedNumber } from '../suppliers/adapter.js';
+import type { Delivery, FulfilmentRequest, FulfilmentResult, SuppliedEsim, SuppliedNumber } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
@@ -449,11 +449,12 @@ export class OrdersService {
   }
 
   /** Records the delivery and takes the held money: wholesale as revenue, tax as tax payable, and the supplier cost. */
-  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[]; reportedCost?: FulfilmentResult['reportedCost'] }) {
+  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[]; esims?: SuppliedEsim[]; reportedCost?: FulfilmentResult['reportedCost'] }) {
     const deliveries = result.deliveries ?? [];
     const reconciled = reconcile(order, result.reportedCost);
     const encryption = deliveries.some(d => d.code || d.pin) ? this.encryption() : null;
     const numbers = await this.numbersOf(order, result.numbers, deliveries);
+    const esims = await this.esimsOf(order, result.esims, deliveries);
     const claimed = await this.prisma.$transaction(async tx => {
       const [{ nextval }] = order.source === 'own' ? [{ nextval: null }] : await tx.$queryRaw<Array<{ nextval: bigint }>>`SELECT nextval('order_receipt_number_seq')`;
       // Only the supplier attempt this delivery came from can complete the order.
@@ -498,6 +499,22 @@ export class OrdersService {
           },
         });
       }
+      for (const esim of esims) {
+        await tx.esim.create({
+          data: {
+            orderId: order.id,
+            resellerId: order.resellerId,
+            mode: order.mode,
+            productId: order.productId,
+            supplierCode: order.supplierCode,
+            supplierEsimId: esim.supplierEsimId,
+            iccid: esim.iccid,
+            expiresAt: esim.expiresAt,
+            dataTotalBytes: esim.totalBytes,
+            topUps: esim.topUps,
+          },
+        });
+      }
       await this.recordEvent(tx, 'order.completed', order.id);
       return true;
     });
@@ -539,6 +556,27 @@ export class OrdersService {
       monthlyCostMinor: BigInt(monthly > 0 ? monthly : 100),
       costCurrency: offer?.costCurrency ?? order.supplierCurrency,
     }));
+  }
+
+  /**
+   * The eSIMs to keep for an order: what the supplier reported, or in the sandbox one simulated per delivered eSIM (so
+   * status, top-ups and cancelling can be tried). Never for a reseller's own supplier (managed in their account).
+   */
+  private async esimsOf(order: Order, reported: SuppliedEsim[] | undefined, deliveries: Delivery[]): Promise<SuppliedEsim[]> {
+    if (order.source === 'own') return [];
+    if (reported?.length) return reported;
+    if (order.mode !== 'test') return [];
+    const offer = await this.prisma.supplierProduct.findUnique({ where: { id: order.supplierProductId }, select: { meta: true } });
+    const meta = (offer?.meta ?? {}) as Record<string, unknown>;
+    return deliveries
+      .filter(delivery => delivery.kind === 'esim' && delivery.serial)
+      .map((delivery, index) => ({
+        supplierEsimId: `sandbox_${order.supplierReference}_${index}`,
+        iccid: delivery.serial!,
+        expiresAt: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+        totalBytes: typeof meta.volume === 'number' ? BigInt(meta.volume) : null,
+        topUps: meta.top_up === 3 ? 'days' : 'data',
+      }));
   }
 
   /**
@@ -965,6 +1003,13 @@ function sandboxDeliveries(category: ProductCategory, quantity: number): Deliver
   if (category === 'gift_cards') return Array.from({ length: quantity }, () => ({ kind: 'gift_card' as const, code: code(), pin: String(1000 + Math.floor(Math.random() * 9000)) }));
   if (category === 'software') return Array.from({ length: quantity }, () => ({ kind: 'licence_key' as const, code: `SANDBOX-${randomBytes(10).toString('hex').toUpperCase().match(/.{5}/g)!.join('-')}` }));
   if (category === 'bills') return [{ kind: 'token', code: '0000-0000-0000-0000-0000', details: { units: '0.0' } }];
+  if (category === 'esim') {
+    // A well-formed LPA string on an address that can never be reached: it installs nothing.
+    return Array.from({ length: quantity }, () => {
+      const iccid = `8999000${String(Math.floor(Math.random() * 1e12)).padStart(12, '0')}`;
+      return { kind: 'esim' as const, code: `LPA:1$smdp.sandbox.invalid$SANDBOX-${randomBytes(8).toString('hex').toUpperCase()}`, serial: iccid, details: { iccid, sandbox: 'true' } };
+    });
+  }
   if (category === 'virtual_numbers') {
     // 555-0100 to 555-0199 are reserved for fiction in North America: never a real subscriber.
     const number = `+120255501${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;

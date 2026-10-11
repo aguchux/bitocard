@@ -1,6 +1,7 @@
 import type { AppConfig } from '../config/config.js';
 import { isTestKey, type Environment } from '../integrations/endpoints.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
+import { EsimAccessAdapter } from '../suppliers/esim-access.adapter.js';
 
 export type ConnectableKind = 'supplier' | 'payment_gateway';
 
@@ -15,7 +16,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -123,6 +124,21 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       await providerRequest('pawapay', `${urls.PAWAPAY_API_URL}/v2/active-conf?operationType=PAYOUT`, { headers: { authorization: `Bearer ${(values.api_token ?? '').trim().replace(/^bearer\s+/i, '')}` } });
     },
     fromSettings: config => ({ api_token: config.PAWAPAY_API_TOKEN, payout_fee_percent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
+  },
+  {
+    id: 'esim_access',
+    kind: 'supplier',
+    name: 'eSIM Access',
+    description: 'eSIM data packages paid from your own eSIM Access balance.',
+    fields: [
+      field('access_code', 'Access code', { help: 'eSIM Access console > Developer: the AccessCode.' }),
+      secret('secret_key', 'Secret key', { help: 'eSIM Access console > Developer: the SecretKey, which signs every request.' }),
+    ],
+    // eSIM Access has no sandbox: both environments check the live account's balance.
+    check: async (values, urls) => {
+      await new EsimAccessAdapter({ accessCode: values.access_code, secretKey: values.secret_key, baseUrl: urls.ESIM_ACCESS_API_URL }).balance();
+    },
+    fromSettings: config => ({ access_code: config.ESIM_ACCESS_ACCESS_CODE, secret_key: config.ESIM_ACCESS_SECRET_KEY }),
   },
   {
     id: 'flutterwave',

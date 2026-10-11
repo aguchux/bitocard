@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsUrl, Matches, Max, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, IsUrl, Matches, Max, Min } from 'class-validator';
 import { Public } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
@@ -10,6 +11,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Country, LedgerMode, Payment, ReservedAccount, Reseller, Store } from '../generated/prisma/client.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { minor } from '../ledger/mode.js';
+import { currencyNotHeld, walletCurrencies } from '../ledger/wallet.service.js';
 import { PaymentMethodsService } from '../payments/payment-methods.service.js';
 import { isPaymentGateway, paymentGateways } from '../payments/payment-providers.js';
 import { PaymentsService, testModeOnly } from '../payments/payments.service.js';
@@ -62,7 +64,8 @@ type WalletContext = { store: Store; mode: LedgerMode; seller: Reseller; country
 
 /**
  * Store customers' wallets (`customer_wallets` switch, on unless an admin switches it off: global, per market or per
- * reseller; bitocard.com follows its market's house account). A customer tops up their wallet in the seller's currency
+ * reseller; bitocard.com follows its market's house account). Every customer has two: their country's currency and US
+ * dollars (paying a price in their country's currency at BitoCard's rate). A customer tops up a wallet in its currency
  * through BitoCard's checkout methods for the market (card, Flutterwave, mobile money) or a transfer into their own
  * Flutterwave account number, and while wallets are on buys only from it. The balance is what BitoCard owes them
  * (`customer_wallet`, never below zero): it is spent only on the store's products and never withdrawn. Purchases move it
@@ -100,30 +103,44 @@ export class CustomerWalletsService {
     return { store, mode: this.stores.mode(store), seller, country: market };
   }
 
-  /** The ways to top up: the market's checkout methods (BitoCard's gateways, never a reseller's own). */
-  private async topUpMethods(context: WalletContext) {
-    const offered = await this.methods.offered('checkout', context.country, context.mode);
-    return Promise.all(offered.map(gateway => this.methods.describe(gateway, context.country)));
+  /** The ways to top up a wallet: the market's checkout methods that take its currency (BitoCard's gateways, never a reseller's own). */
+  private async topUpMethods(context: WalletContext, currency: string) {
+    const payer = { code: context.country.code, currency };
+    const offered = await this.methods.offered('checkout', payer, context.mode);
+    return Promise.all(offered.map(gateway => this.methods.describe(gateway, payer)));
   }
 
-  async get(customer: CustomerWithStore) {
+  /** One of the customer's wallets: their country's currency (the default) or US dollars. */
+  private walletCurrency(context: WalletContext, asked?: string) {
+    const currency = asked ? asked.toUpperCase() : context.country.currency;
+    if (!walletCurrencies(context.country.currency).includes(currency)) throw currencyNotHeld(currency);
+    return currency;
+  }
+
+  async get(customer: CustomerWithStore, asked?: string) {
     const context = await this.context(customer);
     const { mode, country: market } = context;
-    const accounts = await this.payments.customerReservedAccounts(customer.id, mode, market.currency);
+    const currency = this.walletCurrency(context, asked);
+    const local = currency === market.currency;
+    const accounts = local ? await this.payments.customerReservedAccounts(customer.id, mode, market.currency) : [];
     return {
       object: 'customer_wallet' as const,
       mode,
       country: market.code,
-      currency: market.currency,
+      currency,
       /** Wallets are on for this store: purchases are paid only from the wallet. */
       enabled: await this.enabled(context.seller),
-      balance: minor(await this.balance(customer.id, mode, market.currency)),
-      top_up_methods: await this.topUpMethods(context),
-      /** Transfers into these top the wallet up (Flutterwave; where the market offers bank account numbers). */
+      balance: minor(await this.balance(customer.id, mode, currency)),
+      top_up_methods: await this.topUpMethods(context, currency),
+      /** Transfers into these top the country wallet up (Flutterwave; where the market offers bank account numbers). */
       reserved_accounts: accounts.map(presentAccount),
-      reserved_accounts_available: market.reservedAccounts,
+      reserved_accounts_available: local && market.reservedAccounts,
       /** Nigeria: the bank needs the customer's BVN to open an account number (passed on, never kept). */
       reserved_account_needs_bvn: mode === 'live' && market.code === 'NG',
+      /** Both wallets: the country's currency first, then US dollars. */
+      wallets: await Promise.all(
+        walletCurrencies(market.currency).map(async code => ({ currency: code, primary: code === market.currency, balance: minor(await this.balance(customer.id, mode, code)) })),
+      ),
     };
   }
 
@@ -140,11 +157,12 @@ export class CustomerWalletsService {
   }
 
   /** Opens a payment page to top the wallet up; it is credited once the gateway confirms the payment. */
-  async topUp(customer: CustomerWithStore, input: { amount: number; method?: string; return_url: string }) {
+  async topUp(customer: CustomerWithStore, input: { amount: number; method?: string; return_url: string; currency?: string }) {
     this.requireConfirmed(customer);
     const context = await this.context(customer);
     await this.requireEnabled(context);
-    const offered = await this.methods.offered('checkout', context.country, context.mode);
+    const currency = this.walletCurrency(context, input.currency);
+    const offered = await this.methods.offered('checkout', { code: context.country.code, currency }, context.mode);
     let gateway: string;
     if (input.method) {
       if (!offered.includes(input.method as never)) {
@@ -171,7 +189,7 @@ export class CustomerWalletsService {
       reference: `bc_ctu_${id.replaceAll('-', '')}`,
       amount: BigInt(input.amount),
       country: context.country.code,
-      currency: context.country.currency,
+      currency,
       payer: { email: customer.email, name: customer.name },
       returnUrl: returnUrl.toString(),
       description: 'Wallet top-up',
@@ -260,6 +278,8 @@ export class CustomerWalletsService {
   }
 }
 
+const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
+
 class TopUpDto {
   /** Minor units of the wallet's currency. */
   @IsInt() @Min(100) @Max(100_000_000_00)
@@ -271,6 +291,19 @@ class TopUpDto {
   /** The store page the payment page returns to (the top-up's ID is added as `top_up`). */
   @IsUrl({ protocols: ['https', 'http'], require_protocol: true, require_tld: false })
   return_url: string;
+
+  /** Which wallet: `USD`, or the customer's country's currency (the default). */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
+}
+
+class WalletQueryDto {
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
+
+  /** Ignored: the wallet is always in the customer's own country (older storefronts sent it). */
+  @IsOptional() @IsString()
+  country?: string;
 }
 
 class ReservedAccountDto {
@@ -297,8 +330,8 @@ export class CustomerWalletController {
   constructor(private readonly wallets: CustomerWalletsService) {}
 
   @Get()
-  get(@CurrentCustomer() caller: CustomerCaller) {
-    return this.wallets.get(caller.customer);
+  get(@CurrentCustomer() caller: CustomerCaller, @Query() query: WalletQueryDto) {
+    return this.wallets.get(caller.customer, query.currency);
   }
 
   @Get('transactions')

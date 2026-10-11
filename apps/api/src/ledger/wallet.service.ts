@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { type AccountKind, type Hold, type JournalEntry, type LedgerAccount, type LedgerMode, type LedgerPosting, Prisma } from '../generated/prisma/client.js';
+import { FxService } from '../fx/fx.service.js';
 import { allowanceStatus } from './allowance.service.js';
 import { type AccountRef, insufficientFunds, LedgerService } from './ledger.service.js';
 import { minor } from './mode.js';
@@ -15,8 +16,24 @@ const spendable = new Set<AccountKind>(['reseller_funding', 'reseller_earnings']
 
 type EntryWithPostings = JournalEntry & { postings: Array<LedgerPosting & { account: LedgerAccount }> };
 
-export function presentEntry(entry: EntryWithPostings, resellerId: string) {
-  const own = entry.postings.filter(p => p.account.resellerId === resellerId);
+/** The US dollar wallet sits beside the country's: every reseller and customer has both. */
+export const usd = 'USD';
+
+/** The wallets an account holds: its country's currency first, then US dollars (one, where the country uses dollars). */
+export const walletCurrencies = (local: string | null | undefined) => (local && local !== usd ? [local, usd] : [usd]);
+
+export const currencyNotHeld = (currency: string) =>
+  new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', `There is no ${currency} wallet: wallets are in US dollars and your country's currency.`, 'currency');
+
+/**
+ * One ledger entry as a wallet transaction, in one currency (the first it touched in the reseller's balances unless
+ * given): a conversion between the wallets touches both, so it is shown in each wallet with its own side.
+ */
+export function presentEntry(entry: EntryWithPostings, resellerId: string, inCurrency?: string) {
+  const mine = entry.postings.filter(p => p.account.resellerId === resellerId);
+  const currency = inCurrency ?? mine.find(p => spendable.has(p.account.kind))?.account.currency ?? mine[0]?.account.currency ?? null;
+  // The startup allowance is in US dollars whatever the wallet: always reported (as `allowance_change`).
+  const own = mine.filter(p => p.account.currency === currency || p.account.kind === 'reseller_allowance');
   // Reseller accounts grow with credits (negative postings), so the change to a balance is minus the posting.
   const change = (kinds: (kind: AccountKind) => boolean) => own.filter(p => kinds(p.account.kind)).reduce((sum, p) => sum - p.amountMinor, 0n);
   return {
@@ -24,7 +41,7 @@ export function presentEntry(entry: EntryWithPostings, resellerId: string) {
     id: entry.id,
     type: entry.type,
     description: entry.description,
-    currency: own[0]?.account.currency ?? null,
+    currency,
     /** Change to the money available to spend. */
     amount: minor(change(kind => spendable.has(kind))),
     /** Change to money held for orders in progress. */
@@ -35,8 +52,16 @@ export function presentEntry(entry: EntryWithPostings, resellerId: string) {
     allowance_change: minor(change(kind => kind === 'reseller_allowance')),
     /** For BitoCard fees (`platform_fee`, `platform_fee_refund`, and the hold returned before a fee): the fee and what it was on. */
     fee: feeLink(entry),
+    /** A conversion between the wallets: what left one and arrived in the other. */
+    conversion: conversionLink(entry),
     created_at: entry.createdAt.toISOString(),
   };
+}
+
+function conversionLink(entry: JournalEntry) {
+  const meta = (entry.metadata ?? {}) as { conversion?: { from: { amount: string; currency: string }; to: { amount: string; currency: string }; rate: string } };
+  const c = meta.conversion;
+  return c ? { from: { amount: Number(c.from.amount), currency: c.from.currency }, to: { amount: Number(c.to.amount), currency: c.to.currency }, rate: c.rate } : null;
 }
 
 function feeLink(entry: JournalEntry) {
@@ -44,13 +69,18 @@ function feeLink(entry: JournalEntry) {
   return meta.fee_charge_id ? { id: meta.fee_charge_id, source: meta.source_type ? { type: meta.source_type, id: meta.source_id ?? null } : null } : null;
 }
 
-/** A reseller's wallet: what they can spend, what is held for orders, and their earnings. One per mode, in their country's currency. */
+/**
+ * A reseller's wallets: what they can spend, what is held for orders, and their earnings. One per mode and currency:
+ * their country's currency (where orders, earnings and withdrawals are) and US dollars (topped up in dollars, and
+ * converted into the country wallet when needed: by hand, or by an order the country wallet cannot cover).
+ */
 @Injectable()
 export class WalletService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly fx: FxService,
   ) {}
 
   /** The reseller's trading currency and country. Wallets need the business country to be set. */
@@ -62,10 +92,20 @@ export class WalletService {
     return { reseller, country: reseller.countryRef, currency: reseller.countryRef.currency };
   }
 
-  async wallet(resellerId: string, mode: LedgerMode) {
-    const { currency, country } = await this.currencyOf(resellerId);
-    const accounts = await this.prisma.ledgerAccount.findMany({ where: { resellerId, mode, currency } });
+  /** One of the reseller's wallet currencies (their country's by default); any other is refused. */
+  async walletCurrency(resellerId: string, asked?: string | null) {
+    const held = await this.currencyOf(resellerId);
+    const currency = asked ? asked.toUpperCase() : held.currency;
+    if (!walletCurrencies(held.currency).includes(currency)) throw currencyNotHeld(currency);
+    return { ...held, currency, local: held.currency };
+  }
+
+  async wallet(resellerId: string, mode: LedgerMode, asked?: string | null) {
+    const { currency, country, local } = await this.walletCurrency(resellerId, asked);
+    const all = await this.prisma.ledgerAccount.findMany({ where: { resellerId, mode } });
+    const accounts = all.filter(a => a.currency === currency);
     const balance = (kind: AccountKind) => accounts.find(a => a.kind === kind)?.balanceMinor ?? 0n;
+    const sum = (code: string, kinds: AccountKind[]) => all.filter(a => a.currency === code && kinds.includes(a.kind)).reduce((total, a) => total + a.balanceMinor, 0n);
     const nextLot = await this.prisma.earningsLot.findFirst({ where: { resellerId, mode, releasedAt: null }, orderBy: { releaseAt: 'asc' } });
     return {
       object: 'wallet' as const,
@@ -81,22 +121,32 @@ export class WalletService {
         next_release_at: nextLot?.releaseAt.toISOString() ?? null,
       },
       payouts_in_progress: minor(balance('reseller_payouts_pending')),
-      minimum_withdrawal: minor(country.minWithdrawalMinor),
+      /** Withdrawals are from the country wallet only (null on the US dollar wallet). */
+      minimum_withdrawal: currency === local ? minor(country.minWithdrawalMinor) : null,
       /** The startup allowance (live only; null if never granted). Not cash: never part of `available`. */
       startup_allowance: mode === 'live' ? await allowanceStatus(this.prisma, resellerId) : null,
+      /** Every wallet the reseller holds: their country's currency first, then US dollars. */
+      wallets: walletCurrencies(local).map(code => ({
+        currency: code,
+        primary: code === local,
+        available: minor(sum(code, ['reseller_funding', 'reseller_earnings'])),
+        reserved: minor(sum(code, ['reseller_reserved'])),
+      })),
     };
   }
 
-  async transactions(resellerId: string, mode: LedgerMode, page: { limit?: number; starting_after?: string }) {
+  /** Newest first; with `currency`, only that wallet's (a conversion shows in both, each with its own side). */
+  async transactions(resellerId: string, mode: LedgerMode, page: { limit?: number; starting_after?: string; currency?: string }) {
     const limit = page.limit ?? 25;
+    const currency = page.currency ? (await this.walletCurrency(resellerId, page.currency)).currency : undefined;
     const entries = await this.prisma.journalEntry.findMany({
-      where: { resellerId, mode },
+      where: { resellerId, mode, ...(currency ? { postings: { some: { account: { resellerId, currency } } } } : {}) },
       include: { postings: { include: { account: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(page.starting_after ? { cursor: { id: page.starting_after }, skip: 1 } : {}),
     });
-    return { object: 'list' as const, data: entries.slice(0, limit).map(entry => presentEntry(entry, resellerId)), has_more: entries.length > limit };
+    return { object: 'list' as const, data: entries.slice(0, limit).map(entry => presentEntry(entry, resellerId, currency)), has_more: entries.length > limit };
   }
 
   /** Reseller account reference in the reseller's currency. */
@@ -118,6 +168,7 @@ export class WalletService {
     const earningsId = await this.ledger.accountId(input.mode, this.ref(input.resellerId, currency, 'reseller_earnings'));
     const reservedId = await this.ledger.accountId(input.mode, this.ref(input.resellerId, currency, 'reseller_reserved'));
     if (input.from === 'customer') return this.holdFromCustomer({ ...input, currency, reservedId });
+    await this.coverFromUsd({ ...input, currency, fundingId, earningsId });
 
     const run = this.prisma.$transaction(async tx => {
       const balances = await this.ledger.lockBalances(tx, [fundingId, earningsId]);
@@ -152,6 +203,79 @@ export class WalletService {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.hold.findUniqueOrThrow({ where: { reference: input.reference } });
       throw error;
     }
+  }
+
+  /**
+   * Before a hold the country wallet cannot cover: the shortfall is converted from the US dollar wallet's topped-up
+   * funds, if they cover it, at BitoCard's rate (once per hold reference). Otherwise nothing is converted and the hold
+   * is refused as before. The converted money stays in the country wallet if the hold then fails.
+   */
+  private async coverFromUsd(input: { resellerId: string; mode: LedgerMode; amount: bigint; reference: string; currency: string; fundingId: string; earningsId: string }) {
+    if (input.currency === usd) return;
+    const accounts = await this.prisma.ledgerAccount.findMany({ where: { id: { in: [input.fundingId, input.earningsId] } }, select: { balanceMinor: true } });
+    const shortfall = input.amount - accounts.reduce((total, a) => total + a.balanceMinor, 0n);
+    if (shortfall <= 0n) return;
+    const dollars = await this.prisma.ledgerAccount.findFirst({ where: { kind: 'reseller_funding', resellerId: input.resellerId, mode: input.mode, currency: usd }, select: { balanceMinor: true } });
+    if (!dollars || dollars.balanceMinor <= 0n) return;
+    const cover = await this.fx.usdCovering(shortfall, input.currency).catch(() => null);
+    if (!cover || cover.amount > dollars.balanceMinor) return;
+    await this.convert(input.resellerId, input.mode, { from: usd, to: input.currency, amount: Number(cover.amount), reference: `conversion:hold:${input.reference}`, reason: 'for an order' }).catch(() => undefined);
+  }
+
+  /**
+   * Moves money between the reseller's wallets at BitoCard's rate (`FxService.exchange`): topped-up funds first, then
+   * withdrawable earnings, from one; topped-up funds in the other. With `preview` nothing moves. Earnings converted
+   * to US dollars become topped-up funds (spendable, not withdrawable).
+   */
+  async convert(resellerId: string, mode: LedgerMode, input: { from: string; to: string; amount: number; preview?: boolean; reference?: string; reason?: string }) {
+    const { local } = await this.walletCurrency(resellerId, input.from);
+    const from = input.from.toUpperCase();
+    const to = input.to.toUpperCase();
+    if (!walletCurrencies(local).includes(to)) throw currencyNotHeld(to);
+    if (from === to) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Choose two different wallets.', 'to');
+    const amount = BigInt(input.amount);
+    const out = await this.fx.exchange(amount, from, to);
+    if (out.amount <= 0n) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'amount_too_small', 'This amount is too small to convert.', 'amount');
+    const quote = {
+      object: 'wallet_conversion' as const,
+      mode,
+      from: { amount: minor(amount), currency: from },
+      to: { amount: minor(out.amount), currency: to },
+      /** Units of the country's currency per US dollar. */
+      rate: out.rate.toDecimalPlaces(6).toString(),
+    };
+    if (input.preview || (input.reference && (await this.prisma.journalEntry.findUnique({ where: { reference: input.reference } })))) return { ...quote, id: null, created_at: null };
+
+    const fundingId = await this.ledger.accountId(mode, this.ref(resellerId, from, 'reseller_funding'));
+    const earningsId = await this.ledger.accountId(mode, this.ref(resellerId, from, 'reseller_earnings'));
+    const toId = await this.ledger.accountId(mode, this.ref(resellerId, to, 'reseller_funding'));
+    const exchangeFrom = await this.ledger.accountId(mode, { kind: 'currency_exchange', currency: from });
+    const exchangeTo = await this.ledger.accountId(mode, { kind: 'currency_exchange', currency: to });
+    const label = (code: string) => (code === usd ? 'US dollar' : code);
+    const entry = await this.prisma.$transaction(async tx => {
+      const balances = await this.ledger.lockBalances(tx, [fundingId, earningsId]);
+      const funding = balances.get(fundingId) ?? 0n;
+      const earnings = balances.get(earningsId) ?? 0n;
+      if (funding + earnings < amount) throw insufficientFunds();
+      const fromFunding = funding < amount ? funding : amount;
+      const fromEarnings = amount - fromFunding;
+      return this.ledger.write(tx, {
+        mode,
+        type: 'conversion',
+        reference: input.reference ?? `conversion:${randomUUID()}`,
+        resellerId,
+        description: `Converted from your ${label(from)} wallet to your ${label(to)} wallet${input.reason ? ` ${input.reason}` : ''}`,
+        metadata: { conversion: { from: { amount: String(amount), currency: from }, to: { amount: String(out.amount), currency: to }, rate: quote.rate } },
+        postings: [
+          ...(fromFunding > 0n ? [{ accountId: fundingId, kind: 'reseller_funding' as const, amount: fromFunding }] : []),
+          ...(fromEarnings > 0n ? [{ accountId: earningsId, kind: 'reseller_earnings' as const, amount: fromEarnings }] : []),
+          { accountId: exchangeFrom, kind: 'currency_exchange' as const, amount: -amount },
+          { accountId: exchangeTo, kind: 'currency_exchange' as const, amount: out.amount },
+          { accountId: toId, kind: 'reseller_funding' as const, amount: -out.amount },
+        ],
+      });
+    });
+    return { ...quote, id: entry.id, created_at: entry.createdAt.toISOString() };
   }
 
   private async holdFromCustomer(input: { resellerId: string; mode: LedgerMode; amount: bigint; reference: string; description: string; currency: string; reservedId: string }) {

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module.js';
 import { CatalogueModule } from '../catalogue/catalogue.module.js';
 import { FeesModule } from '../fees/fees.module.js';
+import { FxModule } from '../fx/fx.module.js';
+import { EsimsModule } from '../esims/esims.module.js';
 import { CustomerGuard } from '../customers/customer-session.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
@@ -18,7 +20,7 @@ import { StoreSellers } from './store-sellers.js';
 
 /** Store customers (accounts and sign-in) and checkout on hosted stores: bitocard.com and resellers' stores. */
 @Module({
-  imports: [AuthModule, CatalogueModule, FeesModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule],
+  imports: [AuthModule, CatalogueModule, EsimsModule, FeesModule, FxModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule],
   controllers: [CustomerAccountController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController],
   providers: [CustomersService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
   exports: [CheckoutService, HouseService, CustomersService, StoreSellers],

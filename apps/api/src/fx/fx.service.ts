@@ -161,6 +161,27 @@ export class FxService {
     return { amount: BigInt(rate.pay.mul(cents).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)), rate };
   }
 
+  /**
+   * Converting money between a wallet in US dollars and one in another currency (minor units both): US dollars in
+   * at the `receive` rate, out at the `pay` rate, rounded down, so a conversion never gives away more than BitoCard
+   * gets. Returns the amount out and the rate used (units of the other currency per US dollar).
+   */
+  async exchange(amount: bigint, from: string, to: string) {
+    if (from === to) return { amount, rate: new Decimal(1) };
+    if (from !== 'USD' && to !== 'USD') throw new Error('Conversions go to or from US dollars');
+    const rate = await this.rate(from === 'USD' ? to : from);
+    const value = from === 'USD' ? new Decimal(amount.toString()).mul(rate.receive) : new Decimal(amount.toString()).div(rate.pay);
+    return { amount: BigInt(value.toDecimalPlaces(0, Decimal.ROUND_DOWN).toFixed(0)), rate: from === 'USD' ? rate.receive : rate.pay };
+  }
+
+  /** The US cents that pay an amount owed in `currency`: at the `receive` rate, rounded up (at least one cent). */
+  async usdCovering(amount: bigint, currency: string) {
+    if (currency === 'USD') return { amount, rate: new Decimal(1) };
+    const rate = await this.rate(currency);
+    const cents = BigInt(new Decimal(amount.toString()).div(rate.receive).toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0));
+    return { amount: cents > 0n ? cents : 1n, rate: rate.receive };
+  }
+
   async list() {
     const settings = await this.prisma.currencySetting.findMany({ orderBy: { currency: 'asc' } });
     const data = [];

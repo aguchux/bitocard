@@ -24,6 +24,7 @@ import {
 } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
 import { ResellerSwitchesCard } from "@/components/reseller-switches";
+import { ResellerWalletsCard } from "@/components/reseller-wallets";
 import { StartupAllowanceCard } from "@/components/startup-allowance";
 import {
   type ResellerStatus,
@@ -220,6 +221,7 @@ export default function ResellerPage() {
             </Card>
           </div>
 
+          {reseller.country ? <ResellerWalletsCard resellerId={reseller.id} /> : null}
           <StartupAllowanceCard resellerId={reseller.id} verified={Boolean(reseller.verified_at)} switchedOn={Boolean(reseller.features.startup_allowance)} />
 
           <ResellerSwitchesCard resellerId={reseller.id} features={reseller.features} />

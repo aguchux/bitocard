@@ -92,7 +92,7 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 10b | eLipa | Bills, airtime, payouts | Kenya; Uganda, Malawi and Zambia leads | MVP qualify with iPay; regional lead (split from "iPay Africa / eLipa") |
 | 11 | Tupay | DStv, GOtv, Zuku, StarTimes | Kenya | Backup TV provider (no KPLC published) |
 | 12 | Cellulant / Tingg | Bills, pay-TV | Pan-African | Later (expansion) |
-| 13 | eSIM Access | eSIM | Global | Pilot (first) |
+| 13 | eSIM Access | eSIM | Global | Pilot (first). Adapter built (October 2026): fixed packages and day passes (one product per number of days), ordering and delivery, eSIMs kept after their order with status, data use and expiry from its webhooks, top-ups (reseller's wallet, or the store customer's), and cancelling unused eSIMs for a full refund; no sandbox exists, so the pilot runs on the live account with small orders. **To confirm with eSIM Access:** that a repeated top-up `transactionId` is the same top-up (as for orders), and how a day pass's `price` and `amount` combine with `periodNum`. |
 | 14 | eSimerge | eSIM | Global | Pilot (second) |
 | 15 | Airalo Partners | eSIM | Global | Backup |
 | 16 | eSIM Go | eSIM | Global | Backup ($1,000 minimum top-up) |
@@ -417,6 +417,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 
 - **Currencies.** BitoCard's base currency is **USD**: its main treasury wallets are in USD. BitoCard also keeps a **country base wallet** in each local currency (NGN, GHS, KES and others), synced with its local bank accounts in that country. Moving money between the USD wallets and a country wallet uses live market exchange rates, refreshed on a schedule.
 - **Resellers trade in their own country's currency**; their wallet, prices and earnings are in that currency. Selling internationally (other countries or currencies) requires the Premium plan.
+- **Two wallets for everyone (Decided, built October 2026 at the owner's request):** every reseller and every customer holds a US dollar wallet, on from the start, and a wallet in their country's currency, added when they choose the country at sign-up (one wallet where the country uses dollars). Both are seen side by side and either can be topped up (US dollars by the methods that take them, usually card; bank account numbers are for the country wallet). Resellers convert between them at BitoCard's rate (`receive` into the country's currency, `pay` out of it, rounded down) and an order the country wallet cannot cover is covered from the dollars automatically; orders, earnings and withdrawals stay in the country wallet. Customers choose which wallet pays, seeing the dollar price (rounded up) before paying; a refund goes back to the wallet that paid, exactly. Conversions go through BitoCard's `currency_exchange` accounts (one per currency).
 - Each quote locks the exchange rate it used, so the price cannot change between quote and payment.
 
 - **Reseller wallets everywhere.** Topped up through checkout (card or another provider) in any country, plus a reserved bank account where enabled. Wholesale cost must be covered before an order is accepted.

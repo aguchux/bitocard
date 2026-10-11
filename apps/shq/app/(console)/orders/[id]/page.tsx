@@ -27,11 +27,12 @@ import { bitocardApi } from "@bitocard/api-client";
 import { type OrderDelivery, type OrderDetail, useOrderReceiptQuery, useReplaceOrderAccessMutation, useResellerOrderQuery, useSimulateOrderMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { EsimsCard } from "@/components/esims";
 
 /** How often a processing order is checked while its page is open. */
 const orderPollMs = 5000;
 
-const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number" };
+const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number", esim: "eSIM" };
 
 /** A secret (code, PIN, token): masked until revealed, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {
@@ -404,6 +405,8 @@ export default function OrderPage() {
               )}
             </div>
           </Card>
+
+          {order.product.category === "esim" && order.status !== "processing" ? <EsimsCard orderId={order.id} canManage={can(membership, "admin", "support")} /> : null}
 
           <AccessCard order={order} canReplace={can(membership, "admin", "developer")} />
 

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, ExternalLink, KeyRound, MessageSquareWarning } from "lucide-react";
-import { formatFace, formatPrice, type StoreCheckout } from "@bitocard/api-client/storefront";
+import { formatFace, formatPrice, type StoreCheckout, type StoreEsim } from "@bitocard/api-client/storefront";
+import { EsimCard } from "@/components/store/esim-card";
+import { EsimManage } from "@/components/store/esim-manage";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { simulateCheckout } from "@/lib/account-actions";
@@ -21,6 +23,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const order = result.data;
   const waiting = order.status === "awaiting_payment" || order.status === "paid" || order.status === "refund_pending";
   const deliveries = order.order?.deliveries ?? [];
+  const esims = deliveries.length > 0 && deliveries.every(delivery => delivery.kind === "esim");
+  // eSIMs after delivery: status, data use, top-ups and cancelling (also once refunded, to show they were cancelled).
+  const tracked =
+    order.product.category === "esim" && (order.status === "completed" || order.status === "refunded")
+      ? await customerApi<{ data: StoreEsim[] }>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}/esims`)
+      : null;
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -36,7 +44,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </h1>
           <p className="mt-1 text-slate-600">
             {formatFace(order.face_value, order.face_currency)} each · {order.status === "awaiting_payment" || order.status === "failed" ? "price" : "paid"} {formatPrice(order.amount, order.currency)} with {order.method.label.toLowerCase()}
-            {order.charged ? ` (charged as ${formatPrice(order.charged.amount, order.charged.currency)}, as your card is charged in ${order.charged.currency})` : ""}
+            {order.charged
+              ? order.method.id === "wallet"
+                ? ` (${formatPrice(order.charged.amount, order.charged.currency)} from your US dollar wallet)`
+                : ` (charged as ${formatPrice(order.charged.amount, order.charged.currency)}, as your card is charged in ${order.charged.currency})`
+              : ""}
             {order.order?.receipt_number ? ` · Receipt ${order.order.receipt_number}` : ""}
           </p>
         </div>
@@ -91,11 +103,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {deliveries.length ? (
         <section aria-labelledby="codes" className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 id="codes" className="font-display flex items-center gap-2 text-xl font-bold">
-            <KeyRound className="size-5 text-[#ff2382]" aria-hidden="true" /> Your {deliveries.length > 1 ? "codes" : "code"}
+            <KeyRound className="size-5 text-[#ff2382]" aria-hidden="true" /> Your {esims ? (deliveries.length > 1 ? "eSIMs" : "eSIM") : deliveries.length > 1 ? "codes" : "code"}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">Keep these safe: anyone with a code can use it.</p>
+          <p className="mt-1 text-sm text-slate-600">{esims ? "Install before you travel. Keep it private: anyone with the code can install the eSIM, and only once." : "Keep these safe: anyone with a code can use it."}</p>
           <ul className="mt-4 space-y-3">
-            {deliveries.map((delivery, index) => (
+            {deliveries.map((delivery, index) =>
+              delivery.kind === "esim" && delivery.code ? (
+                <li key={index}>
+                  <EsimCard code={delivery.code} iccid={delivery.serial} details={delivery.details} title={`eSIM${deliveries.length > 1 ? ` ${index + 1}` : ""}`} />
+                </li>
+              ) : (
               <li key={index} className="rounded-2xl border border-slate-200 p-4">
                 {delivery.code ? <p className="font-mono text-lg font-bold break-all">{delivery.code}</p> : null}
                 {delivery.pin ? <p className="mt-1 text-sm">PIN: <strong className="font-mono">{delivery.pin}</strong></p> : null}
@@ -108,13 +125,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     </p>
                   ))}
               </li>
-            ))}
+              ),
+            )}
           </ul>
           {order.order?.redeem_instructions ? <p className="mt-4 whitespace-pre-line text-sm text-slate-700">{order.order.redeem_instructions}</p> : null}
         </section>
       ) : order.status === "completed" ? (
         <p className="rounded-2xl bg-emerald-50 p-4 text-emerald-900">Delivered{order.recipient?.phone ? ` to ${order.recipient.phone}` : order.recipient?.account_number ? ` to ${order.recipient.account_number}` : ""}.</p>
       ) : null}
+
+      {tracked?.ok ? <EsimManage source={{ checkout: order.id }} esims={tracked.data.data} store="the store" /> : null}
 
       {canDispute(order.status) ? (
         <Link

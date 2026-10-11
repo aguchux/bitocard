@@ -12,4 +12,5 @@ export * from './identity';
 export * from './integrations';
 export * from './fees';
 export * from './numbers';
+export * from './esims';
 export * from './disputes';

@@ -49,6 +49,10 @@
       "schedule": "20 * * * *"
     },
     {
+      "path": "/v1/cron/esims",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/v1/cron/webhooks",
       "schedule": "*/5 * * * *"
     },

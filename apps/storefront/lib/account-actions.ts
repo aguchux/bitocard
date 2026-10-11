@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { StoreWalletOption } from "@bitocard/api-client/storefront";
 import { type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
@@ -10,7 +11,7 @@ export type FormState = {
   field?: string | null;
   notice?: string;
   /** Paying from the wallet: the price quoted, for the customer to confirm before it is taken. */
-  preview?: { quote_id: string; amount: number; currency: string; wallet_balance: number; expires_at: string };
+  preview?: { quote_id: string; amount: number; currency: string; wallet_balance: number; expires_at: string; wallet_options: StoreWalletOption[] };
 };
 
 type SessionReply = { customer: Customer; session: { token: string } };
@@ -98,7 +99,7 @@ export async function changePassword(_state: FormState, form: FormData): Promise
 }
 
 type Checkout = { object: "checkout"; id: string; mode: "test" | "live"; checkout_url: string | null };
-type Preview = { object: "checkout_preview"; quote_id: string; amount: number; currency: string; wallet_balance: number; expires_at: string };
+type Preview = { object: "checkout_preview"; quote_id: string; amount: number; currency: string; wallet_balance: number; expires_at: string; wallet_options?: StoreWalletOption[] };
 
 /**
  * Opens the payment page for the product chosen; the payment page returns to the order. Paying from the wallet takes two
@@ -116,6 +117,8 @@ export async function startCheckout(_state: FormState, form: FormData): Promise<
   const method = text(form, "method") || undefined;
   const fromWallet = form.get("wallet_required") === "1" || method === "wallet";
   const quoteId = text(form, "quote_id") || undefined;
+  // Which wallet pays the quote: the country's (default) or US dollars.
+  const walletCurrency = text(form, "wallet_currency") || undefined;
   const result = await customerApi<Checkout | Preview>("POST", "/v1/store/checkouts", {
     product_id: text(form, "product_id"),
     face_value: amount,
@@ -124,7 +127,7 @@ export async function startCheckout(_state: FormState, form: FormData): Promise<
     method,
     recipient: Object.keys(recipient).length ? recipient : undefined,
     return_url: `${await siteOrigin()}/checkout/return`,
-    ...(fromWallet ? (quoteId ? { quote_id: quoteId } : { preview: true }) : {}),
+    ...(fromWallet ? (quoteId ? { quote_id: quoteId, wallet_currency: walletCurrency } : { preview: true }) : {}),
   });
   if (!result.ok) {
     if (result.status === 401) redirect(`/signin?next=${encodeURIComponent(safeNext(form.get("back"), "/"))}`);
@@ -136,7 +139,8 @@ export async function startCheckout(_state: FormState, form: FormData): Promise<
   }
   if (result.data.object === "checkout_preview") {
     const { quote_id, amount, currency, wallet_balance, expires_at } = result.data;
-    return { preview: { quote_id, amount, currency, wallet_balance, expires_at } };
+    const wallet_options = result.data.wallet_options ?? [{ currency, amount, balance: wallet_balance, enough: wallet_balance >= amount }];
+    return { preview: { quote_id, amount, currency, wallet_balance, expires_at, wallet_options } };
   }
   // Live: to the payment page. Paid from the wallet, or in the sandbox: straight to the order.
   redirect(result.data.mode === "live" && result.data.checkout_url ? result.data.checkout_url : `/account/orders/${result.data.id}`);

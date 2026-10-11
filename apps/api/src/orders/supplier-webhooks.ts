@@ -18,6 +18,7 @@ import { connectable } from '../reseller-integrations/connectable.js';
 import { ResellerIntegrationsService } from '../reseller-integrations/reseller-integrations.service.js';
 import { didwwNotice, didwwSignatureValid } from '../suppliers/didww.webhooks.js';
 import { reloadlyNotice, reloadlySignatureValid } from '../suppliers/reloadly.webhooks.js';
+import { esimAccessNotice, type EsimNotice, esimAccessWebhookValid } from '../suppliers/esim-access.adapter.js';
 import { pawapayCallbackValid, pawapayNotice } from '../suppliers/pawapay.adapter.js';
 import { zenditNotice, zenditWebhookHeader, zenditWebhookValid } from '../suppliers/zendit.adapter.js';
 import { OrdersService } from './orders.service.js';
@@ -88,6 +89,40 @@ export class SupplierWebhooksService {
       // Stored all the same.
     }
     return this.store('pawapay', rawBody, pawapayNotice(payload));
+  }
+
+  /**
+   * eSIM Access: authenticated by the token in the webhook address (eSIM Access signs nothing). Only ORDER_STATUS names
+   * an order to re-check; the other kinds (SM-DP+ events, usage, the setup health check) are acknowledged and dropped,
+   * never stored, as they come in large numbers and BitoCard does not act on them yet.
+   */
+  /** Who handles notifications about one eSIM (status, data use, expiry): `EsimsService`, registered when it starts. */
+  private esimListener?: (supplierCode: string, notice: EsimNotice) => Promise<unknown>;
+
+  onEsimNotice(listener: (supplierCode: string, notice: EsimNotice) => Promise<unknown>) {
+    this.esimListener = listener;
+  }
+
+  /**
+   * eSIM Access: `ORDER_STATUS` names an order to re-check and is stored like any order notification. Notifications
+   * about one eSIM (status, data use, expiry) are applied at once by `EsimsService` (they repeat harmlessly and are not
+   * stored); the setup health check needs nothing.
+   */
+  async receiveEsimAccess(rawBody: Buffer | undefined, token: string | undefined) {
+    if (!rawBody || !esimAccessWebhookValid(this.integrations.config.ESIM_ACCESS_WEBHOOK_TOKEN, token)) throw untrusted();
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      // Stored all the same, as for the others.
+    }
+    const notice = esimAccessNotice(payload);
+    if (notice.esim) {
+      await this.esimListener?.('esim_access', notice.esim).catch(error => this.logger.error({ err: error }, 'eSIM notification not applied'));
+      return { received: true };
+    }
+    if (payload !== null && !notice.orderUpdate) return { received: true };
+    return this.store('esim_access', rawBody, notice);
   }
 
   /** Reloadly, to a reseller's own connection: signed with the webhook secret they saved on it. */
@@ -356,6 +391,12 @@ export class SupplierWebhooksController {
   @HttpCode(HttpStatus.OK)
   pawapay(@Req() req: Request & { rawBody?: Buffer }, @Query('token') token?: string) {
     return this.webhooks.receivePawapay(req.rawBody, token);
+  }
+
+  @Post('esim-access')
+  @HttpCode(HttpStatus.OK)
+  esimAccess(@Req() req: Request & { rawBody?: Buffer }, @Query('token') token?: string) {
+    return this.webhooks.receiveEsimAccess(req.rawBody, token);
   }
 
   @Post('didww')
