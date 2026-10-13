@@ -3,11 +3,18 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Menu, Store, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Coins, CreditCard, LayoutGrid, Menu, Phone, Store, X, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 
 const catalogueHref = (group: StoreNavigationGroup) => (group.categories.length === 1 ? `/catalogs/${group.categories[0].category}` : `/catalogs/${group.key}`);
+
+/** Straight to what people ask for most, beside the Catalog menu (and at the top of the phone menu). */
+export const quickLinks: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/catalogs/virtual_numbers", label: "Virtual numbers", icon: Phone },
+  { href: "/catalogs/virtual_cards", label: "Virtual cards", icon: CreditCard },
+  { href: "/account/crypto", label: "Crypto", icon: Coins },
+];
 
 /** Closes on Escape or a click outside. */
 function useDismiss(open: boolean, close: () => void) {
@@ -26,57 +33,97 @@ function useDismiss(open: boolean, close: () => void) {
   return ref;
 }
 
-/** One menu group: its categories and top brands in a panel. */
-function NavGroup({ group }: { group: StoreNavigationGroup }) {
+/** One group's categories and top brands: the right-hand side of the Catalog menu. */
+function GroupPanel({ group, close }: { group: StoreNavigationGroup; close: () => void }) {
+  return (
+    <div className="min-w-0 flex-1 p-4">
+      <p className="px-2 pb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">{group.label}</p>
+      <ul className="grid gap-1 sm:grid-cols-2">
+        {group.categories.map(category => (
+          <li key={category.category}>
+            <Link href={`/catalogs/${category.category}`} onClick={close} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
+              <span className="flex min-w-0 items-center gap-2.5">
+                <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-9" />
+                <span className="truncate">{category.label}</span>
+              </span>
+              {category.on_sale ? (
+                <span className="text-xs font-normal text-slate-500">{category.products}</span>
+              ) : (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
+              )}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {group.brands.length ? (
+        <>
+          <p className="mt-3 border-t border-slate-100 px-2 pt-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Popular</p>
+          <ul className="mt-1 grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {group.brands.slice(0, 9).map(brand => (
+              <li key={brand.slug}>
+                <Link href={`/catalogs/${group.key}?brand=${encodeURIComponent(brand.slug)}`} onClick={close} className="block truncate rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                  {brand.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <Link href={catalogueHref(group)} onClick={close} className="mt-3 block rounded-lg bg-pink-50 px-3 py-2 text-center text-sm font-semibold text-[#e0116d]">
+        All {group.label.toLowerCase()}
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * The Catalog menu: every group down the left (pointing at or focusing one shows its categories and brands on the
+ * right; choosing it opens its catalogue), and All products at the bottom.
+ */
+function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
   const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
+  const [active, setActive] = useState(groups[0]?.key ?? "");
+  const close = () => setOpen(false);
+  const ref = useDismiss(open, close);
+  const group = groups.find(item => item.key === active) ?? groups[0];
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className="flex min-h-11 items-center gap-1 rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-[#070f4c] hover:bg-slate-50"
+        className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-[#070f4c] hover:bg-slate-50"
       >
-        {group.label}
+        <LayoutGrid className="size-4" aria-hidden="true" />
+        Catalog
         <ChevronDown className={`size-4 transition ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
-      {open ? (
-        <div className="absolute left-0 z-40 mt-2 w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl">
-          <ul className="space-y-1">
-            {group.categories.map(category => (
-              <li key={category.category}>
-                <Link href={`/catalogs/${category.category}`} onClick={() => setOpen(false)} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-9" />
-                    {category.label}
-                  </span>
-                  {category.on_sale ? (
-                    <span className="text-xs font-normal text-slate-500">{category.products}</span>
-                  ) : (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {group.brands.length ? (
-            <>
-              <p className="mt-3 border-t border-slate-100 px-2 pt-3 text-xs font-semibold tracking-wide text-slate-500 uppercase">Popular</p>
-              <ul className="mt-1 grid grid-cols-2 gap-1">
-                {group.brands.slice(0, 8).map(brand => (
-                  <li key={brand.slug}>
-                    <Link href={`/catalogs/${group.key}?brand=${encodeURIComponent(brand.slug)}`} onClick={() => setOpen(false)} className="block truncate rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-                      {brand.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="mt-3 block rounded-lg bg-pink-50 px-3 py-2 text-center text-sm font-semibold text-[#e0116d]">
-            All {group.label.toLowerCase()}
-          </Link>
+      {open && group ? (
+        <div className="absolute left-0 z-40 mt-2 flex w-[min(46rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
+          <div className="flex w-56 shrink-0 flex-col border-r border-slate-100 bg-slate-50/70 p-2">
+            <ul className="flex-1 space-y-0.5">
+              {groups.map(item => (
+                <li key={item.key}>
+                  <Link
+                    href={catalogueHref(item)}
+                    onClick={close}
+                    onMouseEnter={() => setActive(item.key)}
+                    onFocus={() => setActive(item.key)}
+                    aria-current={item.key === group.key ? "true" : undefined}
+                    className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2 text-sm font-semibold ${item.key === group.key ? "bg-white text-[#070f4c] shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-[#070f4c]"}`}
+                  >
+                    <GroupIcon group={item} className="size-8" />
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {item.on_sale ? <ChevronRight className="size-4 text-slate-400" aria-hidden="true" /> : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Soon</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link href="/catalogs" onClick={close} className="mt-2 flex min-h-11 items-center justify-center rounded-lg text-sm font-semibold text-[#e0116d] hover:bg-white">
+              All products
+            </Link>
+          </div>
+          <GroupPanel group={group} close={close} />
         </div>
       ) : null}
     </div>
@@ -86,8 +133,11 @@ function NavGroup({ group }: { group: StoreNavigationGroup }) {
 export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
   return (
     <nav aria-label="Categories" className="hidden items-center gap-0.5 xl:flex">
-      {groups.map(group => (
-        <NavGroup key={group.key} group={group} />
+      <CatalogMenu groups={groups} />
+      {quickLinks.map(link => (
+        <Link key={link.href} href={link.href} className="flex min-h-11 items-center rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-[#070f4c] hover:bg-slate-50">
+          {link.label}
+        </Link>
       ))}
     </nav>
   );
@@ -132,6 +182,17 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
                   </button>
                 </div>
                 <nav aria-label="Categories" className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
+                  <ul className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-4">
+                    {quickLinks.map(link => (
+                      <li key={link.href}>
+                        <Link href={link.href} onClick={() => setOpen(false)} className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 text-center text-xs font-semibold text-[#070f4c] hover:bg-slate-100">
+                          <link.icon className="size-5 text-[#ff2382]" aria-hidden="true" />
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Catalog</p>
                   {groups.map(group => (
                     <div key={group.key}>
                       <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-[#070f4c]">
