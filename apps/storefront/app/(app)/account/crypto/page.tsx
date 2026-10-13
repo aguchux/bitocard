@@ -44,9 +44,16 @@ export default async function CryptoPage() {
 
       {wallets?.enabled ? (
         <section aria-labelledby="coins" className={card}>
-          <h2 id="coins" className="mb-1 text-lg font-bold">
-            Your coins
-          </h2>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <h2 id="coins" className="text-lg font-bold">
+              Your coins
+            </h2>
+            {!wallets.frozen && wallets.verified ? (
+              <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white">
+                Deposit
+              </Link>
+            ) : null}
+          </div>
           <ul className="divide-y divide-slate-100">
             {wallets.assets.map(asset => (
               <li key={asset.asset} className="flex items-center gap-3 py-3">
@@ -91,7 +98,7 @@ export default async function CryptoPage() {
               <dd className="font-bold break-words">{formatFace(wallets.cash.locked, wallets.cash.currency)}</dd>
             </div>
           </dl>
-          <p className="mt-2 text-xs text-slate-500">Buying spends your P2P money first, then your wallet. Bank withdrawals of P2P money and on-chain deposits open soon.</p>
+          <p className="mt-2 text-xs text-slate-500">Buying spends your P2P money first, then your wallet. Bank withdrawals of P2P money and on-chain withdrawals open soon.</p>
         </section>
       ) : null}
 

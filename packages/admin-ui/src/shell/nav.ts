@@ -83,6 +83,8 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Wallets & freezes', href: '/crypto', icon: Snowflake },
       { label: 'P2P trades', href: '/crypto/trades', icon: ArrowLeftRight },
       { label: 'P2P ads', href: '/crypto/ads', icon: ListChecks },
+      { label: 'Deposits', href: '/crypto/deposits', icon: ArrowLeftRight },
+      { label: 'Chains', href: '/crypto/chains', icon: PlugZap },
       { label: 'Assets', href: '/crypto/assets', icon: Coins },
     ],
   },

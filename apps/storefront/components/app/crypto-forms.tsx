@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Check, Plus, Zap } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, Copy, Plus, Zap } from "lucide-react";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
 import { addTestCrypto, chooseNickname, confirmTrade, findBestPrice, postAd, repriceAd, takeAd } from "@/lib/crypto-actions";
@@ -41,6 +41,21 @@ function AssetSelect({ assets, defaultValue, name = "asset", label = "Coin" }: {
         ))}
       </select>
     </label>
+  );
+}
+
+/** Copies text (an address) with one tap, saying so. */
+export function CopyButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true), () => setCopied(false))}
+      className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-semibold text-[#070f4c] ring-1 ring-slate-300 hover:ring-slate-400"
+    >
+      {copied ? <Check className="size-4 text-emerald-600" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
+      {copied ? "Copied" : label}
+    </button>
   );
 }
 

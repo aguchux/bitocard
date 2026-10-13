@@ -9,6 +9,8 @@ import { Encryption } from '../common/encryption.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { type AppConfig, configSchema } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { checkProvider, checkWalletKeys, providerKeys } from '../crypto/chains/check.js';
+import { chainProvider, walletKeyFields } from '../crypto/chains/providers.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { connectable } from '../reseller-integrations/connectable.js';
 import { integrationGroups, isPlatformKey, type IntegrationField, type IntegrationGroup } from './definitions.js';
@@ -49,6 +51,7 @@ export class IntegrationsAdminService {
   async test(adminId: string, groupId: string) {
     const group = integrationGroups.find(item => item.id === groupId);
     if (!group) throw notFound();
+    if (group.section === 'blockchain') return this.testBlockchain(adminId, group);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -75,6 +78,15 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
     return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** A blockchain provider (the latest block on each chain it is set up for) or the wallet keys (their first addresses). */
+  private async testBlockchain(adminId: string, group: IntegrationGroup) {
+    await this.integrations.refresh(true);
+    const provider = chainProvider(group.id);
+    const outcome = provider ? await checkProvider(provider, this.integrations.values(providerKeys(provider))) : checkWalletKeys(this.integrations.values(walletKeyFields.map(item => item.key)));
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment: outcome.environment, ok: outcome.ok } });
+    return { object: 'integration_test' as const, integration: group.id, environment: outcome.environment, ok: outcome.ok, message: outcome.message, chains: outcome.chains, tested_at: new Date().toISOString() };
   }
 
   /** Which integrations resellers may connect their own accounts to. */
@@ -160,7 +172,7 @@ export class IntegrationsAdminService {
       /** The Sandbox switch: true while BitoCard's account uses the provider's sandbox (never live); null without one. */
       sandbox: sandboxField ? sandboxField.value === true : null,
       /** Whether Test connection can check these credentials (a built adapter with a check). */
-      testable: Boolean(connectable(group.id)),
+      testable: group.section === 'blockchain' || Boolean(connectable(group.id)),
       /** Resellers' own accounts: `available` once BitoCard's adapter can take them, `enabled` when an admin allows it. */
       reseller_access: { available: Boolean(connectable(group.id)), enabled: access.has(group.id) },
       updated_at: updates.sort().at(-1) ?? null,

@@ -4,6 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Encryption } from '../common/encryption.js';
 import { z } from 'zod';
 import { integrationFields, isPlatformKey } from './definitions.js';
+import { parseXpub } from '../crypto/derive.js';
 import { supplierCredentialGroups, supplierCredentialKey } from './supplier-credentials.js';
 
 /** The validation rule for a setting: a platform setting's environment rule, or a supplier credential's kind. */
@@ -11,6 +12,16 @@ export function schemaFor(key: string): z.ZodType | null {
   if (isPlatformKey(key)) return configSchema.shape[key];
   const field = integrationFields.get(key);
   if (!field) return null;
+  if (/^CRYPTO_(TEST_)?XPUB_/.test(key)) {
+    return z.string().refine(value => {
+      try {
+        parseXpub(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'paste an account extended public key (xpub, zpub, tpub or vpub), never a private key');
+  }
   return field.kind === 'url' ? z.string().url() : z.string().min(1);
 }
 
@@ -62,6 +73,11 @@ export class IntegrationsService implements OnModuleInit {
   supplier(code: string): Record<string, string | undefined> {
     const group = supplierCredentialGroups.find(item => item.code === code);
     return Object.fromEntries((group?.fields ?? []).map(field => [field.suffix, this.storedValues.get(supplierCredentialKey(code, field.suffix))?.value]));
+  }
+
+  /** Admin-set values of any fields by key (flags as 'on' or 'off'): blockchain providers and wallet keys. */
+  values(keys: readonly string[]): Record<string, string | undefined> {
+    return Object.fromEntries(keys.map(key => [key, this.storedValues.get(key)?.value]));
   }
 
   async onModuleInit() {

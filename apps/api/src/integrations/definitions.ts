@@ -1,4 +1,5 @@
 import type { AppConfig } from '../config/config.js';
+import { chainProviders, walletKeyFields } from '../crypto/chains/providers.js';
 import { supplierCredentialGroups, supplierCredentialKey } from './supplier-credentials.js';
 
 /**
@@ -31,8 +32,8 @@ export type IntegrationGroup = {
   description: string;
   fields: IntegrationField[];
   webhookPath?: string;
-  /** Platform services, or suppliers from the registry. */
-  section: 'platform' | 'suppliers';
+  /** Platform services, suppliers from the registry, or blockchain providers and BitoCard's wallet keys. */
+  section: 'platform' | 'suppliers' | 'blockchain';
   /** False while the supplier's adapter is a stub: its credentials are stored for later and nothing uses them yet. */
   adapterReady: boolean;
 };
@@ -395,6 +396,24 @@ export const integrationGroups: IntegrationGroup[] = [
         help: `On: the credentials saved are ${group.name}’s sandbox ones. Kept for when BitoCard’s adapter is built, which will then use the sandbox address.`,
       },
     ],
+  })),
+  {
+    id: 'crypto_keys',
+    name: 'Wallet keys',
+    description:
+      'BitoCard’s account public keys (xpubs) for crypto deposits: each customer’s own deposit address is derived from them. Public keys only: they make addresses but can never spend. The private keys stay in the key vault.',
+    section: 'blockchain' as const,
+    adapterReady: true,
+    fields: walletKeyFields,
+  },
+  ...chainProviders.map(provider => ({
+    id: provider.id,
+    name: provider.name,
+    description: provider.description,
+    section: 'blockchain' as const,
+    adapterReady: true,
+    webhookPath: provider.verify ? `/v1/webhooks/chain/${provider.id}?chain=<CHAIN>` : undefined,
+    fields: provider.fields,
   })),
 ];
 

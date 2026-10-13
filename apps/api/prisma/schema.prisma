@@ -2209,6 +2209,8 @@ model Customer {
   p2pAds             P2pAd[]
   p2pBuys            P2pTrade[]               @relation("p2p_buyer")
   p2pSales           P2pTrade[]               @relation("p2p_seller")
+  cryptoAddresses    CryptoAddress[]
+  cryptoDeposits     CryptoDeposit[]
 
   @@unique([storeId, email])
   @@map("customers")
@@ -2575,4 +2577,123 @@ model P2pTrade {
   @@index([sellerId, createdAt])
   @@index([adId])
   @@map("p2p_trades")
+}
+
+/// Where an asset moves on chain: USDT on TRON, BNB on BNB Chain. `decimals` is the token's own (USDT on BNB Chain has
+/// 18); amounts are cut down to the asset's ledger places when credited. Contracts are matched exactly, never by symbol.
+model CryptoNetwork {
+  id             String   @id @default(uuid()) @db.Uuid
+  asset          String   @db.VarChar(10)
+  /// ETHEREUM, BSC, TRON, SOLANA or BITCOIN.
+  chain          String
+  /// The token contract (mainnet), or null for the chain's own coin.
+  contract       String?
+  /// The same token on the chain's testnet (sandbox stores), or null.
+  testContract   String?  @map("test_contract")
+  decimals       Int
+  /// Blocks after the one holding a deposit before it is credited.
+  confirmations  Int
+  depositsEnabled Boolean @default(false) @map("deposits_enabled")
+  /// Deposits at or above this (asset units, decimal string) are confirmed by two different providers first.
+  doubleCheckFrom String  @default("1000") @map("double_check_from")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([asset, chain])
+  @@map("crypto_networks")
+}
+
+/// A customer's own deposit address in a family (bitcoin, evm, tron), derived from BitoCard's xpub at `index`.
+model CryptoAddress {
+  id             String     @id @default(uuid()) @db.Uuid
+  customerId     String     @map("customer_id") @db.Uuid
+  mode           LedgerMode
+  family         String
+  index          Int
+  address        String
+  /// Which xpub made it (a short hash), so a changed key never mixes up old addresses.
+  keyFingerprint String     @map("key_fingerprint")
+  /// Watched for deposits until then: renewed whenever the customer shows it.
+  watchUntil     DateTime   @map("watch_until")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, mode, family])
+  @@unique([mode, family, index])
+  @@unique([mode, family, address])
+  @@index([mode, family, watchUntil])
+  @@map("crypto_addresses")
+}
+
+/// A transfer to a customer's address, seen on chain: pending until it has its confirmations (and, when large, a second
+/// provider agrees), then credited once (`crypto_deposit:<chain>:<tx>:<index>`).
+model CryptoDeposit {
+  id            String     @id @default(uuid()) @db.Uuid
+  customerId    String     @map("customer_id") @db.Uuid
+  mode          LedgerMode
+  chain         String
+  asset         String     @db.VarChar(10)
+  address       String
+  txHash        String     @map("tx_hash")
+  /// The log index (tokens) or output index (Bitcoin); 0 for a plain coin transfer.
+  outputIndex   Int        @map("output_index")
+  /// On-chain units, as text (may exceed a bigint for 18-decimal tokens).
+  rawAmount     String     @map("raw_amount")
+  /// Ledger units credited (the asset's places).
+  amount        BigInt
+  blockNumber   BigInt?    @map("block_number")
+  confirmations Int        @default(0)
+  /// pending, credited, ignored (too small to credit) or failed (no longer on chain).
+  status        String     @default("pending")
+  /// Providers that have confirmed it.
+  confirmedBy   String[]   @default([]) @map("confirmed_by")
+  checkedAt     DateTime?  @map("checked_at")
+  creditedAt    DateTime?  @map("credited_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  customer      Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([chain, txHash, outputIndex])
+  @@index([status, chain])
+  @@index([customerId, createdAt])
+  @@map("crypto_deposits")
+}
+
+/// The order BitoCard asks chain providers for each chain (lower first), and how each last answered.
+model ChainRoute {
+  chain       String
+  provider    String
+  priority    Int       @default(100)
+  enabled     Boolean   @default(true)
+  lastBlock   BigInt?   @map("last_block")
+  lastError   String?   @map("last_error")
+  checkedAt   DateTime? @map("checked_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@id([chain, provider])
+  @@map("chain_routes")
+}
+
+/// A chain provider's notification, kept once per body: only the transactions it names, which are re-read before anything is credited.
+model ChainNotice {
+  id          String    @id @default(uuid()) @db.Uuid
+  provider    String
+  chain       String
+  bodyHash    String    @unique @map("body_hash")
+  hashes      String[]
+  processedAt DateTime? @map("processed_at")
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([processedAt])
+  @@map("chain_notices")
+}
+
+/// How far deposit scanning has read each chain in each mode (block ranges for EVM chains).
+model ChainCursor {
+  chain     String
+  mode      LedgerMode
+  block     BigInt
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@id([chain, mode])
+  @@map("chain_cursors")
 }

@@ -110,6 +110,7 @@ export const notificationTypes = {
   'customer.gift_card_sale.accepted': { realm: 'customer', severity: 'success', label: 'Gift card sale accepted', push: true },
   'customer.gift_card_sale.declined': { realm: 'customer', severity: 'warning', label: 'Gift card sale declined', push: true },
   'customer.p2p.trade_completed': { realm: 'customer', severity: 'success', label: 'P2P trade completed', push: true },
+  'customer.crypto.deposit_credited': { realm: 'customer', severity: 'success', label: 'Crypto deposit arrived', push: true },
   'customer.crypto.frozen': { realm: 'customer', severity: 'warning', label: 'Crypto frozen', push: true, locked: true },
   'customer.verification.updated': { realm: 'customer', severity: 'info', label: 'Identity check updated', push: true },
   'customer.security.password_changed': { realm: 'customer', severity: 'warning', label: 'Password changed', push: true, locked: true },

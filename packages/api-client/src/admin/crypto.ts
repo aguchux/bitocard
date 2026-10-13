@@ -86,6 +86,60 @@ export type P2pTrade = {
   completed_at: string | null;
 };
 
+export type ChainRoute = {
+  object: 'chain_route';
+  chain: string;
+  provider: string;
+  name: string;
+  priority: number;
+  enabled: boolean;
+  /** Credentials saved for this chain (Settings > Integrations > Blockchain). */
+  configured: boolean;
+  /** live: main network for live stores; sandbox: test network for sandbox stores. */
+  environment: 'live' | 'sandbox';
+  lists_deposits: boolean;
+  finds_coin_deposits: boolean;
+  webhooks: boolean;
+  last_block: string | null;
+  last_error: string | null;
+  checked_at: string | null;
+};
+
+export type CryptoNetworkSetting = {
+  object: 'crypto_network_setting';
+  id: string;
+  asset: string;
+  chain: string;
+  contract: string | null;
+  test_contract: string | null;
+  decimals: number;
+  confirmations: number;
+  deposits_enabled: boolean;
+  /** Deposits from this amount wait for a second provider to agree. */
+  double_check_from: string;
+};
+
+export type ChainView = { object: 'chain'; chain: string; name: string; family: string; keys: { live: boolean; test: boolean }; routes: ChainRoute[]; networks: CryptoNetworkSetting[] };
+
+export type CryptoDeposit = {
+  object: 'crypto_deposit';
+  id: string;
+  mode: Mode;
+  asset: string;
+  chain: string;
+  network: string;
+  tx_hash: string;
+  amount: string;
+  status: 'pending' | 'credited' | 'ignored' | 'failed';
+  confirmations: number;
+  confirmations_needed: number | null;
+  address: string;
+  confirmed_by: string[];
+  customer: { id: string; email: string };
+  created_at: string;
+  credited_at: string | null;
+};
+
 export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer_id?: string; limit?: number };
 
 const cryptoApi = bitocardApi.injectEndpoints({
@@ -113,6 +167,17 @@ const cryptoApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/account-freeze`, method: 'PUT', body }),
       invalidatesTags: ['Crypto', 'P2p'],
     }),
+    chains: build.query<List<ChainView>, void>({ query: () => '/v1/admin/crypto/chains', providesTags: ['Crypto'] }),
+    setChainRoutes: build.mutation<List<ChainView>, { chain: string; order: string[]; disabled: string[] }>({
+      query: ({ chain, ...body }) => ({ url: `/v1/admin/crypto/chains/${chain}/routes`, method: 'PUT', body }),
+      invalidatesTags: ['Crypto'],
+    }),
+    checkChains: build.mutation<unknown, void>({ query: () => ({ url: '/v1/admin/crypto/chains/check', method: 'POST' }), invalidatesTags: ['Crypto'] }),
+    updateCryptoNetwork: build.mutation<CryptoNetworkSetting, { id: string; deposits_enabled?: boolean; confirmations?: number; contract?: string | null; test_contract?: string | null; double_check_from?: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/networks/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Crypto'],
+    }),
+    cryptoDeposits: build.query<List<CryptoDeposit>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/deposits', params }), providesTags: ['Crypto'] }),
     p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/ads', params }), providesTags: ['P2p'] }),
     p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/trades', params }), providesTags: ['P2p'] }),
     cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
@@ -134,4 +199,9 @@ export const {
   useP2pAdsQuery,
   useP2pTradesQuery,
   useCancelP2pAdMutation,
+  useChainsQuery,
+  useSetChainRoutesMutation,
+  useCheckChainsMutation,
+  useUpdateCryptoNetworkMutation,
+  useCryptoDepositsQuery,
 } = cryptoApi;

@@ -1,11 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { CryptoDepositsService } from './chains/deposits.service.js';
 import { CryptoWalletsService, presentAsset } from './crypto-wallets.service.js';
 import { type AdSide, P2pService } from './p2p.service.js';
 
@@ -134,13 +137,44 @@ class TradeDto {
   preview?: boolean;
 }
 
-/** A store customer's crypto wallets (sandbox stores can add test crypto). */
+class DepositNetworksDto {
+  @Transform(upper) @assetCode()
+  asset: string;
+}
+
+class DepositAddressDto extends DepositNetworksDto {
+  @Transform(upper) @IsIn(['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'])
+  chain: string;
+}
+
+/** A store customer's crypto wallets: balances, deposit addresses and deposits (sandbox stores can add test crypto). */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('store/crypto')
 export class CustomerCryptoController {
-  constructor(private readonly wallets: CryptoWalletsService) {}
+  constructor(
+    private readonly wallets: CryptoWalletsService,
+    private readonly deposits: CryptoDepositsService,
+  ) {}
+
+  /** The networks an asset can be deposited on now. */
+  @Get('deposit-networks')
+  depositNetworks(@CurrentCustomer() caller: CustomerCaller, @Query() query: DepositNetworksDto) {
+    return this.deposits.depositNetworks(caller.customer, query.asset);
+  }
+
+  /** The customer's own deposit address for an asset on a chain (made once; showing it watches it for a week). */
+  @Post('deposit-addresses')
+  @HttpCode(HttpStatus.OK)
+  depositAddress(@CurrentCustomer() caller: CustomerCaller, @Body() body: DepositAddressDto) {
+    return this.deposits.depositAddress(caller.customer, body);
+  }
+
+  @Get('deposits')
+  depositList(@CurrentCustomer() caller: CustomerCaller) {
+    return this.deposits.customerDeposits(caller.customer);
+  }
 
   @Get()
   overview(@CurrentCustomer() caller: CustomerCaller) {
@@ -369,5 +403,96 @@ export class AdminP2pController {
   @HttpCode(HttpStatus.OK)
   cancel(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {
     return this.p2p.adminCancelAd(adminId(caller), id, body.reason);
+  }
+}
+
+class RoutesDto {
+  /** Provider IDs in the order to ask them; any left out keep their place after these. */
+  @IsArray() @ArrayMaxSize(30) @IsString({ each: true })
+  order: string[];
+
+  @IsArray() @ArrayMaxSize(30) @IsString({ each: true })
+  disabled: string[];
+}
+
+class NetworkDto {
+  @IsOptional() @IsBoolean()
+  deposits_enabled?: boolean;
+
+  @IsOptional() @IsInt() @Min(1) @Max(1000)
+  confirmations?: number;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsString() @Length(20, 100)
+  contract?: string | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsString() @Length(20, 100)
+  test_contract?: string | null;
+
+  @IsOptional() @cryptoAmount()
+  double_check_from?: string;
+}
+
+class DepositListDto {
+  @IsOptional() @IsIn(['live', 'test'])
+  mode?: LedgerMode;
+
+  @IsOptional() @IsIn(['pending', 'credited', 'ignored', 'failed'])
+  status?: string;
+
+  @IsOptional() @IsUUID()
+  customer_id?: string;
+}
+
+/** Admin: chains (providers in order, their health, networks) and deposits. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('operations', 'finance', 'support')
+@Controller('admin/crypto')
+export class AdminChainsController {
+  constructor(private readonly deposits: CryptoDepositsService) {}
+
+  @Get('chains')
+  chains() {
+    return this.deposits.adminChains();
+  }
+
+  @AdminRoles('operations')
+  @Put('chains/:chain/routes')
+  routes(@CurrentCaller() caller: Caller, @Param('chain') chain: string, @Body() body: RoutesDto) {
+    return this.deposits.setRoutes(adminId(caller), chain, body);
+  }
+
+  @AdminRoles('operations')
+  @Post('chains/check')
+  @HttpCode(HttpStatus.OK)
+  check() {
+    return this.deposits.checkAll();
+  }
+
+  @AdminRoles('operations')
+  @Patch('networks/:id')
+  network(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: NetworkDto) {
+    return this.deposits.setNetwork(adminId(caller), id, body);
+  }
+
+  @Get('deposits')
+  depositList(@Query() query: DepositListDto) {
+    return this.deposits.adminDeposits(query);
+  }
+}
+
+/** Blockchain providers' notifications (signature checked per provider; only the transactions named are used). */
+@ApiExcludeController()
+@Public()
+@SkipIdempotency()
+@Controller('webhooks/chain')
+export class ChainWebhooksController {
+  constructor(private readonly deposits: CryptoDepositsService) {}
+
+  @Post(':provider')
+  @HttpCode(HttpStatus.OK)
+  receive(@Req() req: Request & { rawBody?: Buffer }, @Param('provider') provider: string, @Query('chain') chain?: string) {
+    const headers = Object.fromEntries(Object.entries(req.headers).map(([key, value]) => [key.toLowerCase(), Array.isArray(value) ? value[0] : value]));
+    return this.deposits.notice(provider, chain, { headers, body: req.rawBody, url: new URL(req.originalUrl, 'https://api.bitocard.com') });
   }
 }

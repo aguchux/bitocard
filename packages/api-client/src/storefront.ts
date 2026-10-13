@@ -435,6 +435,27 @@ export type StoreP2pTrade = StoreP2pTerms & {
   completed_at: string | null;
 };
 
+/** A network an asset can be deposited on now (`token`: ERC-20, BEP-20, TRC-20; null for the chain's own coin). */
+export type StoreCryptoNetwork = { object: 'crypto_network'; asset: string; chain: string; name: string; token: string | null; confirmations: number };
+
+/** The customer's own deposit address for an asset on a chain. */
+export type StoreCryptoDepositAddress = { object: 'crypto_deposit_address'; mode: 'live' | 'test'; asset: string; chain: string; network: string; address: string; contract: string | null; confirmations: number; watch_until: string };
+
+export type StoreCryptoDeposit = {
+  object: 'crypto_deposit';
+  id: string;
+  asset: string;
+  chain: string;
+  network: string;
+  tx_hash: string;
+  amount: string;
+  status: 'pending' | 'credited' | 'ignored' | 'failed';
+  confirmations: number;
+  confirmations_needed: number | null;
+  created_at: string;
+  credited_at: string | null;
+};
+
 export type StoreP2pProfile = { object: 'p2p_profile'; nickname: string; nickname_chosen: boolean; trades_30d: number; trades_total: number };
 
 /** A crypto amount for people: trailing zeros dropped, at least two places for stablecoins ("49.9", "0.0002"). */

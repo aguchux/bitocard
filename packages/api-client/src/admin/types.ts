@@ -399,7 +399,7 @@ export type Integration = {
   name: string;
   description: string;
   status: 'connected' | 'incomplete' | 'not_connected';
-  section: 'platform' | 'suppliers';
+  section: 'platform' | 'suppliers' | 'blockchain';
   /** False while the supplier's adapter is not built: credentials are saved for later and not used yet. */
   adapter_ready: boolean;
   /** The address to paste into the provider's dashboard, when it sends webhooks. */

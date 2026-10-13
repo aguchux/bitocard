@@ -7,10 +7,12 @@
  * (`internalIntegrations`: settings of BitoCard's own with no provider account). Links are the provider's own pages,
  * https only; a test checks both. Check a link still works when a provider redesigns its dashboard.
  */
+import { chainProviders } from '../crypto/chains/providers.js';
+
 export type IntegrationLink = { label: string; url: string };
 
 /** Integrations without an outside provider account: nothing to sign up for. */
-export const internalIntegrations = new Set(['general', 'web_push', 'checkout']);
+export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys']);
 
 const signUp = (url: string): IntegrationLink => ({ label: 'Sign up', url });
 const keys = (url: string, label = 'Get API keys'): IntegrationLink => ({ label, url });
@@ -68,6 +70,9 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   tupay: [site('https://tupay.africa/')],
   airalo: [site('https://partners.airalo.com/'), docs('https://partners-doc.airalo.com/')],
   esim_go: [site('https://esimgo.com/'), docs('https://docs.esim-go.com/')],
+
+  // Blockchain providers (their links live with their definitions).
+  ...Object.fromEntries(chainProviders.map(provider => [provider.id, provider.links])),
 };
 
 export const linksFor = (id: string) => integrationLinks[id] ?? [];

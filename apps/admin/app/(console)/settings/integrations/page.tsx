@@ -118,7 +118,7 @@ function IntegrationControls({ integration, editable }: { integration: Integrati
       </div>
       {result ? (
         <Notice tone={result.ok ? "green" : "red"}>
-          {result.ok ? `${result.environment === "sandbox" ? "Sandbox" : "Live"} credentials work (${formatRelative(result.tested_at)}).` : result.message}
+          {result.ok ? `${result.environment === "sandbox" ? "Sandbox" : "Live"} credentials work (${formatRelative(result.tested_at)}).${result.message ? ` ${result.message}` : ""}` : result.message}
         </Notice>
       ) : null}
       {testState.error ? <Notice tone="red">{errorMessage(testState.error)}</Notice> : null}
@@ -345,6 +345,7 @@ export default function IntegrationsPage() {
             items={[
               { value: "platform", label: "Platform", count: data.data.filter(item => item.section === "platform").length },
               { value: "suppliers", label: "Suppliers", count: data.data.filter(item => item.section === "suppliers").length },
+              { value: "blockchain", label: "Blockchain", count: data.data.filter(item => item.section === "blockchain").length },
               { value: "resellers", label: "Reseller access", count: data.data.filter(item => item.reseller_access.enabled).length },
             ]}
           />

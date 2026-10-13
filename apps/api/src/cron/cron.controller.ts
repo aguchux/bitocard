@@ -22,6 +22,7 @@ import { PushService } from '../notifications/push.service.js';
 import { MediaService } from '../media/media.service.js';
 import { NumbersService } from '../numbers/numbers.service.js';
 import { EsimsService } from '../esims/esims.service.js';
+import { CryptoDepositsService } from '../crypto/chains/deposits.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -52,6 +53,7 @@ export class CronController {
     checkout: CheckoutService,
     numbers: NumbersService,
     esims: EsimsService,
+    deposits: CryptoDepositsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -83,6 +85,10 @@ export class CronController {
       push: () => push.runDue(),
       /** Daily: delete in-app notifications older than 90 days (and their pushes). */
       'notifications-cleanup': () => inbox.purge(),
+      /** Every 2 minutes: crypto deposits to watched addresses, re-read and credited once confirmed. */
+      crypto: () => deposits.job(),
+      /** Every 15 minutes: every blockchain provider's latest block (Crypto > Chains health). */
+      'chain-health': () => deposits.checkAll(),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),
     };
