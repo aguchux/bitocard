@@ -364,3 +364,103 @@ describe('owners who can no longer trade, changed fees and huge amounts', () => 
     assert.deepEqual([ad.status, ad.json.error.code], [400, 'parameter_invalid']);
   });
 });
+
+describe('paying P2P money out to a bank', () => {
+  before(() => switches(true));
+  after(() => switches(null));
+
+  /** A seller with P2P money from selling 20 USDT at 1,650 NGN (33,000 NGN; Nigeria's smallest payout is 15,000). */
+  async function sellerWithProceeds() {
+    const seller = await customer();
+    const buyer = await customer();
+    await deposit(seller, 'USDT', '20');
+    await fund(buyer, 1_000_000_00);
+    const ad = (await sellAd(seller, { amount: '20', price: 165000 })).json;
+    const trade = await buyer.post('/v1/store/p2p/trades', { ad_id: ad.id, price: 165000, amount: '20' });
+    assert.equal(trade.status, 201, JSON.stringify(trade.json));
+    return seller;
+  }
+
+  test('sale money waits for the payout hold, then goes to the customer’s bank account once', async () => {
+    const seller = await sellerWithProceeds();
+    const held = await seller.get('/v1/store/crypto/cash');
+    assert.deepEqual([held.json.balance, held.json.available, held.json.held, held.json.hold_days], [33_000_00, 0, 33_000_00, 15]);
+
+    const unknown = await seller.post('/v1/store/crypto/cash/bank-accounts', { bank_code: 'SBX001', account_number: '0000000000' });
+    assert.deepEqual([unknown.status, unknown.json.error.code], [400, 'bank_account_invalid']);
+    const added = await seller.post('/v1/store/crypto/cash/bank-accounts', { bank_code: 'SBX001', account_number: '0123456789' });
+    assert.equal(added.status, 201, JSON.stringify(added.json));
+    assert.deepEqual([added.json.bank_name, added.json.account_number_last4], ['Sandbox Bank', '6789']);
+    assert.ok(await prisma.notification.findFirst({ where: { customerId: seller.id, type: 'customer.security.bank_account_added' } }));
+
+    const early = await seller.post('/v1/store/crypto/cash/payouts', { amount: 15_000_00, bank_account_id: added.json.id });
+    assert.deepEqual([early.status, early.json.error.code], [402, 'insufficient_funds'], 'inside the payout hold');
+
+    const country = await prisma.country.findUniqueOrThrow({ where: { code: 'NG' } });
+    await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: 0 } });
+    try {
+      const small = await seller.post('/v1/store/crypto/cash/payouts', { amount: 1, bank_account_id: added.json.id });
+      assert.deepEqual([small.status, small.json.error.code], [400, 'amount_too_small']);
+      const paid = await seller.post('/v1/store/crypto/cash/payouts', { amount: 15_000_00, bank_account_id: added.json.id });
+      assert.deepEqual([paid.status, paid.json.status, paid.json.bank_account.account_number_last4], [201, 'processing', '6789']);
+      assert.equal((await seller.get('/v1/store/crypto/cash')).json.balance, 18_000_00, 'set aside while the transfer runs');
+      const settled = await seller.post(`/v1/store/crypto/cash/payouts/${paid.json.id}/simulate`, { outcome: 'paid' });
+      assert.equal(settled.json.status, 'paid');
+      assert.equal((await seller.post(`/v1/store/crypto/cash/payouts/${paid.json.id}/simulate`, { outcome: 'failed' })).json.status, 'paid', 'final once paid');
+
+      const failed = await seller.post('/v1/store/crypto/cash/payouts', { amount: 18_000_00, bank_account_id: added.json.id });
+      assert.equal((await seller.post(`/v1/store/crypto/cash/payouts/${failed.json.id}/simulate`, { outcome: 'failed' })).json.status, 'failed');
+      assert.equal((await seller.get('/v1/store/crypto/cash')).json.available, 18_000_00, 'a failed payout returns the money');
+      const too = await seller.post('/v1/store/crypto/cash/payouts', { amount: 18_000_01, bank_account_id: added.json.id });
+      assert.deepEqual([too.status, too.json.error.code], [402, 'insufficient_funds']);
+      assert.deepEqual((await seller.get('/v1/store/crypto/cash/payouts')).json.data.map(item => item.status), ['failed', 'paid']);
+      assert.ok(await prisma.notification.findFirst({ where: { customerId: seller.id, type: 'customer.payout.paid' } }));
+      const listed = (await admin.get(`/v1/admin/crypto/payouts?customer_id=${seller.id}`)).json.data;
+      assert.deepEqual(listed.map(item => [item.status, item.account_name]), [['failed', 'SANDBOX ACCOUNT HOLDER'], ['paid', 'SANDBOX ACCOUNT HOLDER']]);
+    } finally {
+      await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: country.payoutHoldDays } });
+    }
+    await ledgerOk();
+  });
+
+  test('a frozen account pays nothing out; money can still be paid out after crypto is switched off', async () => {
+    const seller = await sellerWithProceeds();
+    const account = (await seller.post('/v1/store/crypto/cash/bank-accounts', { bank_code: 'SBX002', account_number: '1234567890' })).json;
+    await admin.put(`/v1/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: true, reason: 'checking a report' });
+    const frozen = await seller.post('/v1/store/crypto/cash/payouts', { amount: 15_000_00, bank_account_id: account.id });
+    assert.deepEqual([frozen.status, frozen.json.error.code], [403, 'crypto_account_frozen']);
+    await admin.put(`/v1/admin/crypto/customers/${seller.id}/account-freeze`, { frozen: false, reason: 'cleared' });
+    await switches(false);
+    try {
+      const cash = await seller.get('/v1/store/crypto/cash');
+      assert.equal(cash.status, 200, 'switching crypto off never traps money');
+      assert.equal(cash.json.balance, 33_000_00);
+    } finally {
+      await switches(true);
+    }
+  });
+
+  test('a transfer notification finds a customer payout; one whose outcome stays unclear is flagged for finance once', async () => {
+    const seller = await sellerWithProceeds();
+    const account = (await seller.post('/v1/store/crypto/cash/bank-accounts', { bank_code: 'SBX001', account_number: '2234567890' })).json;
+    await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: 0 } });
+    let payout;
+    try {
+      payout = (await seller.post('/v1/store/crypto/cash/payouts', { amount: 15_000_00, bank_account_id: account.id })).json;
+    } finally {
+      await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: 15 } });
+    }
+    const row = await prisma.customerPayout.findUniqueOrThrow({ where: { id: payout.id } });
+    const { PayoutsService } = await import('../dist/payouts/payouts.service.js');
+    const found = await server.app.get(PayoutsService).refreshByTransferId('sandbox', row.providerTransferId);
+    assert.deepEqual(found, { handled: true, status: 'processing' }, 'the reseller payout lookup falls back to customer payouts');
+
+    await prisma.customerPayout.update({ where: { id: payout.id }, data: { status: 'pending', createdAt: new Date(Date.now() - 2 * 3_600_000) } });
+    const { CustomerPayoutsService } = await import('../dist/payouts/customer-payouts.service.js');
+    const payouts = server.app.get(CustomerPayoutsService);
+    await payouts.job();
+    await payouts.job();
+    assert.ok((await prisma.customerPayout.findUniqueOrThrow({ where: { id: payout.id } })).needsReviewAt);
+    assert.ok((await prisma.notification.count({ where: { type: 'admin.customer_payout.unclear', dedupeKey: `admin.customer_payout.unclear:${payout.id}` } })) > 0, 'finance is told');
+  });
+});

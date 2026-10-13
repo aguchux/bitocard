@@ -17,6 +17,7 @@ import type { TransferResult } from '../payments/providers.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { accountNameMatches } from '../identity/providers.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { CustomerPayoutsService } from './customer-payouts.service.js';
 
 /** Payouts to a newly added live bank account start after this, so a taken-over account cannot be emptied at once. */
 export const bankAccountCoolingOffMs = 24 * 60 * 60 * 1000;
@@ -88,6 +89,7 @@ export class PayoutsService {
     private readonly email: EmailService,
     private readonly events: EventsService,
     private readonly inbox: InboxService,
+    private readonly customerPayouts: CustomerPayoutsService,
   ) {}
 
   private encryption() {
@@ -367,6 +369,9 @@ export class PayoutsService {
       where: { provider: providerName, OR: [{ providerTransferId: transferId }, ...(result.reference ? [{ reference: result.reference }] : [])] },
     });
     if (!payout) {
+      // Not a reseller's: perhaps a store customer's payout of their P2P money.
+      const status = await this.customerPayouts.refreshByTransfer(providerName, transferId, result);
+      if (status) return { handled: true, status };
       this.logger.warn({ providerName, transferId }, 'Transfer notification for an unknown payout');
       return { handled: false };
     }

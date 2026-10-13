@@ -121,7 +121,9 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
         </ul>
         <p className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-white/10 pt-3 text-sm">
           <span className="text-white/70">P2P money (from your sales)</span>
-          <span className="font-bold">{formatFace(wallets.cash.proceeds, wallets.cash.currency)}</span>
+          <Link href="/account/crypto/cash-out" className="font-bold hover:underline">
+            {formatFace(wallets.cash.proceeds, wallets.cash.currency)} · Cash out
+          </Link>
         </p>
       </section>
       <section aria-labelledby="crypto-activity" className={card}>

@@ -768,6 +768,8 @@ enum AccountKind {
   /// A customer's crypto on its way out in an on-chain withdrawal (the amount plus the network fee): back to the wallet
   /// if the withdrawal fails or is cancelled, out of custody once it is confirmed on chain. Never below zero.
   crypto_withdrawing
+  /// A customer's P2P money on its way to their bank account: back to `customer_withdrawable` if the transfer fails.
+  customer_payouts_pending
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -2216,6 +2218,8 @@ model Customer {
   cryptoDeposits     CryptoDeposit[]
   cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
   cryptoWithdrawals  CryptoWithdrawal[]
+  bankAccounts       CustomerBankAccount[]
+  payouts            CustomerPayout[]
 
   @@unique([storeId, email])
   @@map("customers")
@@ -2636,6 +2640,54 @@ model CryptoWithdrawalAddress {
 
   @@unique([customerId, mode, chain, address])
   @@map("crypto_withdrawal_addresses")
+}
+
+/// A store customer's bank account for their P2P money: in their verified name (live), usable 24 hours after it is added.
+model CustomerBankAccount {
+  id                     String           @id @default(uuid()) @db.Uuid
+  customerId             String           @map("customer_id") @db.Uuid
+  mode                   LedgerMode
+  country                String           @db.Char(2)
+  currency               String           @db.Char(3)
+  bankCode               String           @map("bank_code")
+  bankName               String           @map("bank_name")
+  accountNumberEncrypted String           @map("account_number_encrypted")
+  accountNumberLast4     String           @map("account_number_last4")
+  accountName            String           @map("account_name")
+  payoutsFrom            DateTime         @map("payouts_from")
+  createdAt              DateTime         @default(now()) @map("created_at")
+  removedAt              DateTime?        @map("removed_at")
+  customer               Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  payouts                CustomerPayout[]
+
+  @@index([customerId, mode])
+  @@map("customer_bank_accounts")
+}
+
+/// A store customer's withdrawal of P2P money to their bank account (`customer_withdrawable` to the bank, through BitoCard's
+/// transfer provider): set aside in `customer_payouts_pending` first, returned only if the transfer definitely failed.
+model CustomerPayout {
+  id                 String              @id @default(uuid()) @db.Uuid
+  customerId         String              @map("customer_id") @db.Uuid
+  mode               LedgerMode
+  bankAccountId      String              @map("bank_account_id") @db.Uuid
+  amountMinor        BigInt              @map("amount_minor")
+  currency           String              @db.Char(3)
+  status             PayoutStatus        @default(pending)
+  reference          String              @unique
+  provider           String
+  providerTransferId String?             @map("provider_transfer_id")
+  failureReason      String?             @map("failure_reason")
+  /// Its outcome stayed unclear: admins were told.
+  needsReviewAt      DateTime?           @map("needs_review_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  completedAt        DateTime?           @map("completed_at")
+  customer           Customer            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  bankAccount        CustomerBankAccount @relation(fields: [bankAccountId], references: [id])
+
+  @@index([customerId, createdAt])
+  @@index([status])
+  @@map("customer_payouts")
 }
 
 /// A customer's on-chain withdrawal. Its amount plus BitoCard's network fee is moved to `crypto_withdrawing` when it is

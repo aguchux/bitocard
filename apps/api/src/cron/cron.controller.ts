@@ -10,6 +10,7 @@ import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { FxService } from '../fx/fx.service.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { PaymentsService } from '../payments/payments.service.js';
+import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
 import { PayoutsService } from '../payouts/payouts.service.js';
 import { SuppliersService } from '../suppliers/suppliers.service.js';
 import { OrdersService } from '../orders/orders.service.js';
@@ -56,12 +57,13 @@ export class CronController {
     esims: EsimsService,
     deposits: CryptoDepositsService,
     withdrawals: CryptoWithdrawalsService,
+    customerPayouts: CustomerPayoutsService,
   ) {
     this.jobs = {
       /** Hourly. */
       'exchange-rates': () => fx.refresh(),
       /** Every 10 minutes: settle top-ups, checkout payments and payouts the providers have not notified us about. */
-      payments: async () => ({ top_ups: await payments.requeryPending(), payouts: await payouts.refreshProcessing() }),
+      payments: async () => ({ top_ups: await payments.requeryPending(), payouts: await payouts.refreshProcessing(), customer_payouts: await customerPayouts.job() }),
       /** Every 5 minutes: place orders for paid checkouts the request did not finish, send and check customer refunds. */
       checkout: () => checkout.job(),
       /** Hourly. */

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { StoreCryptoWithdrawal, StoreP2pAd, StoreP2pProfile, StoreP2pQuote, StoreP2pTrade, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
+import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreP2pAd, StoreP2pProfile, StoreP2pQuote, StoreP2pTrade, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
 import type { FormState } from "@/lib/account-actions";
 import { customerApi } from "@/lib/customer";
 
@@ -203,4 +203,48 @@ export async function cancelWithdrawal(form: FormData) {
   await customerApi("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/cancel`);
   revalidatePath(`/account/crypto/withdrawals/${id}`);
   revalidatePath("/account/crypto");
+}
+
+// -- Paying P2P money out to a bank ---------------------------------------------------------------------------------
+
+/** Adds a bank account for P2P money (in the customer's verified name; usable after 24 hours on live stores). */
+export async function addCashOutAccount(_state: FormState, form: FormData): Promise<FormState> {
+  const bankCode = text(form, "bank_code");
+  const accountNumber = text(form, "account_number").replace(/\s/g, "");
+  if (!bankCode) return { error: "Choose your bank.", field: "bank_code" };
+  if (!/^\d{6,20}$/.test(accountNumber)) return { error: "Enter your account number, digits only.", field: "account_number" };
+  const result = await customerApi<StoreCustomerBankAccount>("POST", "/v1/store/crypto/cash/bank-accounts", { bank_code: bankCode, account_number: accountNumber });
+  if (!result.ok) {
+    signInFirst(result.status, "/account/crypto/cash-out");
+    return { error: result.message, field: result.param === "account_number" || result.param === "bank_code" ? result.param : null };
+  }
+  revalidatePath("/account/crypto/cash-out");
+  return { notice: `Added ${result.data.bank_name} ending ${result.data.account_number_last4} (${result.data.account_name}).` };
+}
+
+export async function removeCashOutAccount(form: FormData) {
+  await customerApi("DELETE", `/v1/store/crypto/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
+  revalidatePath("/account/crypto/cash-out");
+}
+
+/** Pays P2P money out to one of the customer's bank accounts (the amount typed in their currency). */
+export async function cashOut(_state: FormState, form: FormData): Promise<FormState> {
+  const amount = toMinor(text(form, "amount"));
+  const account = text(form, "bank_account_id");
+  if (!account) return { error: "Choose the account to pay into.", field: "bank_account_id" };
+  if (!amount) return { error: "Enter how much to pay out.", field: "amount" };
+  const result = await customerApi<StoreCustomerPayout>("POST", "/v1/store/crypto/cash/payouts", { amount, bank_account_id: account });
+  if (!result.ok) {
+    signInFirst(result.status, "/account/crypto/cash-out");
+    return { error: result.message, field: result.param === "amount" ? "amount" : null };
+  }
+  revalidatePath("/account/crypto/cash-out");
+  revalidatePath("/account/crypto");
+  return { notice: result.data.status === "failed" ? `The bank refused it: ${result.data.failure_reason ?? "try another account"}. The money is back in your balance.` : "On its way to your bank." };
+}
+
+/** Sandbox stores only: settles a test payout as paid or failed. */
+export async function simulateCashOut(form: FormData) {
+  await customerApi("POST", `/v1/store/crypto/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
+  revalidatePath("/account/crypto/cash-out");
 }

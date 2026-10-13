@@ -179,6 +179,26 @@ export type CryptoWithdrawal = {
   review_note: string | null;
 };
 
+/** A store customer's payout of their P2P money to their bank account. */
+export type CustomerPayout = {
+  object: 'customer_payout';
+  id: string;
+  mode: Mode;
+  status: 'pending' | 'processing' | 'paid' | 'failed';
+  amount: number;
+  currency: string;
+  bank_account: { bank_name: string; account_number_last4: string } | null;
+  failure_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+  customer: { id: string; email: string };
+  account_name: string;
+  reference: string;
+  provider: string;
+  /** Its outcome stayed unclear for an hour: finance was told. */
+  needs_review: boolean;
+};
+
 export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer_id?: string; limit?: number };
 
 const cryptoApi = bitocardApi.injectEndpoints({
@@ -237,6 +257,7 @@ const cryptoApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Crypto'],
     }),
     recheckCryptoWithdrawal: build.mutation<CryptoWithdrawal, string>({ query: id => ({ url: `/v1/admin/crypto/withdrawals/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
+    customerPayouts: build.query<List<CustomerPayout>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/payouts', params }), providesTags: ['Crypto'] }),
     p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/ads', params }), providesTags: ['P2p'] }),
     p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/trades', params }), providesTags: ['P2p'] }),
     cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
@@ -267,4 +288,5 @@ export const {
   useCryptoWithdrawalsQuery,
   useDecideCryptoWithdrawalMutation,
   useRecheckCryptoWithdrawalMutation,
+  useCustomerPayoutsQuery,
 } = cryptoApi;

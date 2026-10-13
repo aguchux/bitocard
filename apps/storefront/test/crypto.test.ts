@@ -10,7 +10,7 @@ const revalidatePath = vi.fn();
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(path) }));
 
-const { addTestCrypto, addWithdrawalAddress, cancelWithdrawal, changeAd, confirmTrade, confirmWithdrawal, createWithdrawal, findBestPrice, postAd, repriceAd, reviewWithdrawal, takeAd } = await import("@/lib/crypto-actions");
+const { addCashOutAccount, addTestCrypto, addWithdrawalAddress, cancelWithdrawal, cashOut, changeAd, confirmTrade, confirmWithdrawal, createWithdrawal, findBestPrice, postAd, repriceAd, reviewWithdrawal, takeAd } = await import("@/lib/crypto-actions");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 const form = (values: Record<string, string>) => {
@@ -150,5 +150,28 @@ describe("withdrawals", () => {
     expect(await confirmWithdrawal({}, form({ id: "w1", code: "12" }))).toEqual({ error: "Enter the 6-digit code we emailed you.", field: "code" });
     await cancelWithdrawal(form({ id: "w1" }));
     expect(calls(fetch).at(-1)![0]).toBe("http://api.test/v1/store/crypto/withdrawals/w1/cancel");
+  });
+});
+
+describe("cashing out P2P money", () => {
+  const account = "4a0c2a1e-5f6a-4f0e-9a51-0e4f3f0f1a33";
+
+  test("adding a bank account sends the bank and the digits only; the API's reason points at the field", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_bank_account", id: account, bank_name: "Sandbox Bank", account_number_last4: "6789", account_name: "ADA TRADER" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    expect(await addCashOutAccount({}, form({ bank_code: "SBX001", account_number: "0123 456 789" }))).toEqual({ notice: "Added Sandbox Bank ending 6789 (ADA TRADER)." });
+    expect(bodyOf(calls(fetch)[0])).toEqual({ bank_code: "SBX001", account_number: "0123456789" });
+    expect(await addCashOutAccount({}, form({ bank_code: "", account_number: "0123456789" }))).toEqual({ error: "Choose your bank.", field: "bank_code" });
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "account_name_mismatch", message: "This account is in the name of SOMEONE ELSE.", param: "account_number" } }, 400)));
+    expect(await addCashOutAccount({}, form({ bank_code: "SBX001", account_number: "0123456789" }))).toEqual({ error: "This account is in the name of SOMEONE ELSE.", field: "account_number" });
+  });
+
+  test("paying out sends the amount in minor units; a refusal is shown", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_payout", id: "p1", status: "processing" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    expect(await cashOut({}, form({ bank_account_id: account, amount: "15,000.50" }))).toEqual({ notice: "On its way to your bank." });
+    expect(bodyOf(calls(fetch)[0])).toEqual({ amount: 1500050, bank_account_id: account });
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "insufficient_funds", message: "You can pay out up to ₦0.00 now.", param: "amount" } }, 402)));
+    expect(await cashOut({}, form({ bank_account_id: account, amount: "15000" }))).toEqual({ error: "You can pay out up to ₦0.00 now.", field: "amount" });
   });
 });

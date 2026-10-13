@@ -447,3 +447,21 @@ export function cryptoAddressAddedEmail(to: string, input: { store: string; labe
   ].join('');
   return { to, subject: `A withdrawal address was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
 }
+
+/** Tells a customer a bank account was added for their P2P money (payouts to it start after 24 hours). */
+export function customerBankAccountAddedEmail(to: string, input: { store: string; bank: string; last4: string; name: string; payoutsFrom: string }): EmailMessage {
+  const heading = 'A bank account was added';
+  const paragraphs = [
+    `${input.bank} account ending ${input.last4} (${input.name}) was added to your ${input.store} account for your P2P money.`,
+    `Payouts to it can start from ${input.payoutsFrom}.`,
+    `If this was not you, remove it, change your password and contact ${input.store} straight away.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: `A bank account was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
+}

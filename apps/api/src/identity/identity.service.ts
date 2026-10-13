@@ -255,6 +255,12 @@ export class IdentityService {
     return (await this.latestCustomer(resellerId, mode, reference))?.status === 'approved';
   }
 
+  /** The name an approved check verified for the customer (to match their bank account), or null. */
+  async customerVerifiedName(resellerId: string, mode: LedgerMode, reference: string) {
+    const record = await this.latestCustomer(resellerId, mode, reference);
+    return record?.status === 'approved' ? record.verifiedName : null;
+  }
+
   /**
    * Starts a customer's check: BVN consent in Nigeria (the BVN is passed to the provider and never stored), Didit
    * elsewhere. An approved or unfinished check for the same customer is returned instead of starting another.

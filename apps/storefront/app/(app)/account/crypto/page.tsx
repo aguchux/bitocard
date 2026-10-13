@@ -88,7 +88,11 @@ export default async function CryptoPage() {
           <dl className="mt-3 grid gap-2 rounded-2xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
             <div className="flex min-w-0 items-baseline justify-between gap-3 sm:block">
               <dt className="text-xs text-slate-500">P2P money</dt>
-              <dd className="font-bold break-words">{formatFace(wallets.cash.proceeds, wallets.cash.currency)}</dd>
+              <dd className="font-bold break-words">
+                <Link href="/account/crypto/cash-out" className="hover:underline">
+                  {formatFace(wallets.cash.proceeds, wallets.cash.currency)}
+                </Link>
+              </dd>
             </div>
             <div className="flex min-w-0 items-baseline justify-between gap-3 sm:block">
               <dt className="text-xs text-slate-500">Wallet</dt>

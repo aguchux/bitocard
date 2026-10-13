@@ -12,6 +12,7 @@ import { CryptoDepositsService } from './chains/deposits.service.js';
 import { CryptoWalletsService, presentAsset } from './crypto-wallets.service.js';
 import { type AdSide, P2pService } from './p2p.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
+import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 const assetCode = () => Matches(/^[A-Z0-9]{2,10}$/, { message: 'asset must be an asset code such as USDT' });
@@ -292,6 +293,86 @@ export class CustomerWithdrawalsController {
   @HttpCode(HttpStatus.OK)
   cancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.withdrawals.cancel(caller.customer, id);
+  }
+}
+
+class CustomerBankAccountDto {
+  @IsString() @Length(1, 20)
+  bank_code: string;
+
+  @Matches(/^\d{6,20}$/, { message: 'account_number must be the account number, digits only' })
+  account_number: string;
+}
+
+class CustomerPayoutDto {
+  /** Minor units of the customer's currency. */
+  @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  amount: number;
+
+  @IsUUID()
+  bank_account_id: string;
+}
+
+class SimulatePayoutDto {
+  @IsIn(['paid', 'failed'])
+  outcome: 'paid' | 'failed';
+}
+
+/** A store customer's P2P money (from selling crypto) paid out to their own bank account. */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('store/crypto/cash')
+export class CustomerCashController {
+  constructor(
+    private readonly wallets: CryptoWalletsService,
+    private readonly payouts: CustomerPayoutsService,
+  ) {}
+
+  @Get()
+  async balance(@CurrentCustomer() caller: CustomerCaller) {
+    return this.payouts.balance(await this.wallets.requireCashOut(caller.customer));
+  }
+
+  @Get('banks')
+  async banks(@CurrentCustomer() caller: CustomerCaller) {
+    return this.payouts.banks(await this.wallets.requireCashOut(caller.customer));
+  }
+
+  @Get('bank-accounts')
+  async accounts(@CurrentCustomer() caller: CustomerCaller) {
+    const { mode } = await this.wallets.context(caller.customer);
+    return this.payouts.accounts(caller.customer.id, mode);
+  }
+
+  @Post('bank-accounts')
+  async addAccount(@CurrentCustomer() caller: CustomerCaller, @Body() body: CustomerBankAccountDto) {
+    return this.payouts.addAccount(await this.wallets.requireCashOut(caller.customer), body);
+  }
+
+  @Delete('bank-accounts/:id')
+  async removeAccount(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    const { mode } = await this.wallets.context(caller.customer);
+    return this.payouts.removeAccount(caller.customer.id, mode, id);
+  }
+
+  @Get('payouts')
+  async list(@CurrentCustomer() caller: CustomerCaller) {
+    const { mode } = await this.wallets.context(caller.customer);
+    return this.payouts.list(caller.customer.id, mode);
+  }
+
+  @Post('payouts')
+  async create(@CurrentCustomer() caller: CustomerCaller, @Body() body: CustomerPayoutDto) {
+    return this.payouts.create(await this.wallets.requireCashOut(caller.customer), body);
+  }
+
+  /** Sandbox stores only. */
+  @Post('payouts/:id/simulate')
+  @HttpCode(HttpStatus.OK)
+  async simulate(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SimulatePayoutDto) {
+    const { mode } = await this.wallets.context(caller.customer);
+    return this.payouts.simulate(caller.customer.id, mode, id, body.outcome);
   }
 }
 
@@ -653,6 +734,31 @@ export class AdminWithdrawalsController {
   @HttpCode(HttpStatus.OK)
   recheck(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
     return this.withdrawals.recheck(adminId(caller), id);
+  }
+}
+
+class CustomerPayoutListDto {
+  @IsOptional() @IsIn(['live', 'test'])
+  mode?: LedgerMode;
+
+  @IsOptional() @IsIn(['pending', 'processing', 'paid', 'failed'])
+  status?: string;
+
+  @IsOptional() @IsUUID()
+  customer_id?: string;
+}
+
+/** Admin: customers' payouts of their P2P money to their banks. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('operations', 'finance', 'support')
+@Controller('admin/crypto/payouts')
+export class AdminCustomerPayoutsController {
+  constructor(private readonly payouts: CustomerPayoutsService) {}
+
+  @Get()
+  list(@Query() query: CustomerPayoutListDto) {
+    return this.payouts.adminList(query);
   }
 }
 

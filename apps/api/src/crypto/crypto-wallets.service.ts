@@ -106,6 +106,24 @@ export class CryptoWalletsService {
     return context;
   }
 
+  /**
+   * The checks before paying P2P money out to a bank: email confirmed, identity checked (live) and not frozen. Not the
+   * crypto switches: money a customer already has can always be paid out, even after crypto is switched off.
+   */
+  async requireCashOut(customer: CustomerWithStore) {
+    if (!customer.emailVerifiedAt) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
+    }
+    const context = await this.context(customer);
+    const fresh = await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { cryptoFrozenAt: true } });
+    if (fresh.cryptoFrozenAt) throw cryptoFrozen();
+    if (!(await this.verified(context))) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before paying money out.');
+    }
+    const verifiedName = context.mode === 'live' ? await this.identity.customerVerifiedName(context.seller.id, context.mode, customer.id) : null;
+    return { customer, mode: context.mode, sellerId: context.seller.id, country: context.country, currency: context.currency, verifiedName };
+  }
+
   // -- Balances -------------------------------------------------------------------------------------------------
 
   ref(customerId: string, kind: AccountKind, currency: string): AccountRef {

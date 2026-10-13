@@ -5,8 +5,10 @@ import { ArrowDownLeft, ArrowUpRight, Check, Copy, Mail, Plus, Send, Zap } from 
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
 import {
+  addCashOutAccount,
   addTestCrypto,
   addWithdrawalAddress,
+  cashOut,
   chooseNickname,
   confirmTrade,
   confirmWithdrawal,
@@ -284,5 +286,61 @@ export function WithdrawalCodeForm({ id }: { id: string }) {
         </button>
       </form>
     </div>
+  );
+}
+
+const fieldClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-[#070f4c] focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none";
+
+/** Adds a bank account for P2P money: the bank names its holder, who must be the customer. */
+export function CashOutAccountForm({ banks }: { banks: Array<{ code: string; name: string }> }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(addCashOutAccount, {});
+  return (
+    <form action={action} className="space-y-3" aria-label="Add a bank account">
+      <FormMessage state={state} />
+      <label className="block space-y-1.5">
+        <span className="block text-sm font-semibold text-[#070f4c]">Bank</span>
+        <select name="bank_code" required defaultValue="" className={fieldClass} aria-invalid={state.field === "bank_code" || undefined}>
+          <option value="" disabled>
+            Choose your bank
+          </option>
+          {banks.map(bank => (
+            <option key={bank.code} value={bank.code}>
+              {bank.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <TextField label="Account number" name="account_number" inputMode="numeric" autoComplete="off" required state={state} hint="It must be in your own name, as your identity check shows it." />
+      <Submit pending={pending} className="w-full sm:w-auto">
+        <Plus className="size-4" aria-hidden="true" /> Add bank account
+      </Submit>
+    </form>
+  );
+}
+
+/** Pays P2P money out to one of the customer's bank accounts. */
+export function CashOutForm({ accounts, currency, available }: { accounts: Array<{ id: string; label: string; ready: boolean; from: string }>; currency: string; available: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(cashOut, {});
+  const usable = accounts.filter(item => item.ready);
+  return (
+    <form action={action} className="space-y-4" aria-label="Cash out">
+      <FormMessage state={state} />
+      <fieldset className="space-y-2">
+        <legend className="mb-1 text-sm font-semibold text-[#070f4c]">Pay into</legend>
+        {accounts.map(item => (
+          <label key={item.id} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-[#ff2382] ${item.ready ? "cursor-pointer" : "opacity-60"}`}>
+            <input type="radio" name="bank_account_id" value={item.id} disabled={!item.ready} defaultChecked={item.id === usable[0]?.id} className="accent-[#ff2382]" />
+            <span className="min-w-0">
+              <span className="block font-semibold">{item.label}</span>
+              {!item.ready ? <span className="block text-xs text-amber-700">Usable from {item.from}</span> : null}
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <TextField label={`Amount (${currency})`} name="amount" inputMode="decimal" required state={state} hint={`You can pay out ${available} now.`} />
+      <Submit pending={pending} className="w-full">
+        <Send className="size-4" aria-hidden="true" /> Pay out to my bank
+      </Submit>
+    </form>
   );
 }

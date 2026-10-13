@@ -491,6 +491,35 @@ export type StoreCryptoWithdrawal = {
   completed_at: string | null;
 };
 
+/** `GET /v1/store/crypto/cash`: P2P money (minor units): what can be paid out now, and what waits for the payout hold. */
+export type StoreP2pCash = { object: 'p2p_cash'; mode: 'live' | 'test'; currency: string; balance: number; held: number; available: number; hold_days: number; minimum: number };
+
+export type StoreCustomerBankAccount = {
+  object: 'customer_bank_account';
+  id: string;
+  mode: 'live' | 'test';
+  currency: string;
+  bank_name: string;
+  account_number_last4: string;
+  account_name: string;
+  payouts_available_from: string;
+  ready: boolean;
+  created_at: string;
+};
+
+export type StoreCustomerPayout = {
+  object: 'customer_payout';
+  id: string;
+  mode: 'live' | 'test';
+  status: 'pending' | 'processing' | 'paid' | 'failed';
+  amount: number;
+  currency: string;
+  bank_account: { bank_name: string; account_number_last4: string } | null;
+  failure_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
 export type StoreP2pProfile = { object: 'p2p_profile'; nickname: string; nickname_chosen: boolean; trades_30d: number; trades_total: number };
 
 /** A crypto amount for people: trailing zeros dropped, at least two places for stablecoins ("49.9", "0.0002"). */
