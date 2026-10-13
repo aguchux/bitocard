@@ -58,6 +58,3 @@ A change is ready only when both the PGlite and the Docker runs pass.
 Each app is its own Vercel project with Root Directory `apps/<app>`; install, build and ignore commands are in each app's `vercel.json`. The API runs on Vercel Functions and applies database migrations after its build (`apps/api/scripts/migrate-deploy.mjs`). Details are in AGENTS.md.
 
 Admins are set up and reset from the admin app's sign-in page only, for addresses listed in the API's `ADMIN_SETUP_EMAILS` environment variable; there are no admin scripts.
-
-
-https://rpc.ankr.com/multichain/cc6efafeb9635e6fa5694f8e8ec068f21e40408b8925ccf30d12291d33401e84
