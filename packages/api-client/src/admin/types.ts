@@ -317,6 +317,9 @@ export type AdminPricePreview = {
   currency: string;
   face_value: number;
   face_price: number;
+  /** The face values to choose from (minor units of the product's face currency), or null for a range. */
+  face_values: number[] | null;
+  range: { min: number; max: number } | null;
   single_value: boolean;
   current: ResolvedPriceRule;
   trial: ResolvedPriceRule | null;
@@ -324,6 +327,16 @@ export type AdminPricePreview = {
     offer_id: string;
     supplier_code: string;
     supplier_name: string;
+    /** The face value this offer was priced at: the one asked, or its own when it sells one value only. */
+    face_value: number;
+    /** That face value in the market's currency. */
+    face_price: number | null;
+    /** Sells the face value asked; only these can be used for it. */
+    covers: boolean;
+    /** What the supplier charges, in its own currency. */
+    supplier_cost_original: number;
+    supplier_currency: string;
+    /** The same in the market's currency. */
     supplier_cost: number | null;
     supplier_discount_bps: number | null;
     rule: ResolvedPriceRule;

@@ -79,6 +79,22 @@ describe('Zendit catalogue', () => {
     const offer = await prisma.supplierProduct.findUniqueOrThrow({ where: { id: stored.supplierProductId } });
     assert.deepEqual([stored.supplierCode, offer.sku, Number(stored.supplierCostMinor)], ['zendit', 'AMZ-US-50', 4760], 'cost plus the fixed fee');
   });
+
+  test("admins see every offer at its own face value, with the supplier's cost and discount", async () => {
+    const preview = await admin.get(`/v1/admin/pricing-rules/preview?product_id=${await productId(amazon)}&country=NG`);
+    assert.equal(preview.status, 200, JSON.stringify(preview.json));
+    assert.deepEqual([preview.json.face_value, preview.json.face_values, preview.json.range], [2500, [2500, 5000], null], 'the first value, and every value to choose from');
+    const offers = Object.fromEntries(preview.json.offers.map(offer => [offer.face_value, offer]));
+    assert.deepEqual([offers[2500].covers, offers[2500].chosen, offers[5000].covers, offers[5000].chosen], [true, true, false, false], 'only the value asked is used');
+    assert.deepEqual([offers[5000].supplier_cost_original, offers[5000].supplier_currency], [4760, 'USD'], 'the other value still shows what the supplier charges');
+    for (const offer of Object.values(offers)) {
+      assert.ok(offer.supplier_cost > 0 && offer.face_price > 0 && offer.supplier_discount_bps !== null, JSON.stringify(offer));
+    }
+    const fifty = (await admin.get(`/v1/admin/pricing-rules/preview?product_id=${await productId(amazon)}&country=NG&face_value=5000`)).json;
+    assert.deepEqual(fifty.offers.filter(offer => offer.chosen).map(offer => offer.face_value), [5000]);
+    const range = (await admin.get(`/v1/admin/pricing-rules/preview?product_id=${await productId(mtn)}&country=NG`)).json;
+    assert.deepEqual([range.face_values, range.range], [null, { min: 10000, max: 5000000 }]);
+  });
 });
 
 describe('Zendit orders', () => {

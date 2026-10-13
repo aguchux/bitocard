@@ -713,19 +713,32 @@ export class PricingService {
     let chosen: string | null = null;
     let cheapest: bigint | null = null;
     for (const offer of product.supplierProducts) {
+      // An offer for one face value only (Zendit lists each value as its own offer) is shown at its own value, so its
+      // cost and discount are always there; only offers covering the value asked compete to be used.
+      const covers = offerCovers(offer, face);
+      const offerFace = covers ? face : BigInt((offer.meta as { face_value: string }).face_value);
+      const offerFaceLocal = covers ? faceLocal : await this.faceIn(ctx, product, offerFace).catch(() => null);
       const eligible = this.eligibleOffers(ctx, { ...product, supplierProducts: [offer] }).length === 1;
-      const priced = eligible ? await this.priceOffer(ctx, product, face, faceLocal, offer).catch(() => null) : null;
+      const priced = eligible && offerFaceLocal !== null ? await this.priceOffer(ctx, product, offerFace, offerFaceLocal, offer).catch(() => null) : null;
       const rule = this.rule(ctx, product, offer.supplierCode);
-      const discounted = new Decimal(face.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
+      const discounted = new Decimal(offerFace.toString()).mul(offer.costRatio).mul(new Decimal(10_000 - offer.discountBps).div(10_000));
       const supplierCost = BigInt(discounted.toDecimalPlaces(0, Decimal.ROUND_UP).toFixed(0)) + offer.costFeeMinor;
       const cost = priced?.cost ?? (await this.convert(ctx, supplierCost, offer.costCurrency).catch(() => ({ amount: null }))).amount;
-      if (priced && (cheapest === null || priced.cost < cheapest)) [cheapest, chosen] = [priced.cost, offer.id];
+      if (covers && priced && (cheapest === null || priced.cost < cheapest)) [cheapest, chosen] = [priced.cost, offer.id];
       offers.push({
         offer_id: offer.id,
         supplier_code: offer.supplierCode,
         supplier_name: offer.supplier.name,
+        /** The face value this offer was priced at: the one asked, or its own when it sells one value only. */
+        face_value: minor(offerFace),
+        face_price: offerFaceLocal === null ? null : minor(offerFaceLocal),
+        /** Sells the face value asked (only these can be used for it). */
+        covers,
+        /** What the supplier charges, in its own currency (the cost below is in the market's). */
+        supplier_cost_original: minor(supplierCost),
+        supplier_currency: offer.costCurrency,
         supplier_cost: cost === null ? null : minor(cost),
-        supplier_discount_bps: cost === null || faceLocal <= 0n ? null : Number(((faceLocal - cost) * 10_000n) / faceLocal),
+        supplier_discount_bps: cost === null || offerFaceLocal === null || offerFaceLocal <= 0n ? null : Number(((offerFaceLocal - cost) * 10_000n) / offerFaceLocal),
         rule: presentResolved(priced?.rule ?? rule),
         scheme: priced ? (priced.basis === 'discount' ? 'discount' : 'markup') : null,
         sellable: Boolean(priced),
@@ -747,12 +760,26 @@ export class PricingService {
       currency: country.currency,
       face_value: minor(face),
       face_price: minor(faceLocal),
+      /** The face values to choose from (the product's, and every single-value offer's), or null for a range. */
+      face_values: faceChoices(product),
+      range: product.denominationType === 'range' ? { min: minor(product.minValueMinor ?? 0n), max: minor(product.maxValueMinor ?? 0n) } : null,
       single_value: singleValue(product),
       current: presentResolved(trial?.kind ? current : now),
       trial: trial?.kind ? presentResolved(now) : null,
       offers,
     };
   }
+}
+
+/** A product's face values (fixed products, plus each one-value offer's), lowest first; null for a range. */
+function faceChoices(product: ProductWithOffers) {
+  if (product.denominationType === 'range') return null;
+  const values = new Set(product.fixedValues.map(value => value.toString()));
+  for (const offer of product.supplierProducts) {
+    const only = (offer.meta as { face_value?: string } | null)?.face_value;
+    if (only !== undefined) values.add(only);
+  }
+  return [...values].map(value => BigInt(value)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map(minor);
 }
 
 function presentResolved(rule: ResolvedRule) {

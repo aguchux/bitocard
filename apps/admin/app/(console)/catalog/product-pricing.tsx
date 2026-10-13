@@ -48,6 +48,9 @@ const reasons: Record<string, string> = {
   not_priced: "Not priced",
 };
 
+/** Minor units as a plain amount for the input ("25" or "25.5"). */
+const plain = (minor: number) => String(minor / 100);
+
 /**
  * Pricing a product before listing it: what each supplier charges, the rule that applies and what BitoCard makes per
  * sale, with a live preview while the product's own rule is changed. Saving sets (or removes) the product's own rule;
@@ -56,7 +59,11 @@ const reasons: Record<string, string> = {
 export function ProductPricingDialog({ product, open, onClose, finance, operator }: { product: AdminProduct; open: boolean; onClose: () => void; finance: boolean; operator: boolean }) {
   const id = useId();
   const countries = useCountriesQuery();
-  const [country, setCountry] = useState(product.country.length === 2 && product.country !== "WW" ? product.country : "NG");
+  const [asked, setCountry] = useState(product.country);
+  // The product's own country when it is a market, else the first market (a US gift card is priced for a market
+  // that sells it, never for "US", which is not one).
+  const markets = countries.data?.data ?? [];
+  const country = markets.some(item => item.code === asked) ? asked : (markets[0]?.code ?? "");
   const [face, setFace] = useState("");
   const [choice, setChoice] = useState<Choice>("inherit");
   const [discount, setDiscount] = useState("");
@@ -72,7 +79,7 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
     fixed_currency: choice === "fixed" ? fixedCurrency : undefined,
   };
   const args = useDebouncedValue({ product_id: product.id, country, ...(faceMinor ? { face_value: faceMinor } : {}), ...(choice === "inherit" ? {} : trial) });
-  const preview = useAdminPricePreviewQuery(args, { skip: !open });
+  const preview = useAdminPricePreviewQuery(args, { skip: !open || !args.country });
   const [setRule, setState] = useSetPricingRuleMutation();
   const [deleteRule, deleteState] = useDeletePricingRuleMutation();
   const [updateProduct, listState] = useUpdateProductMutation();
@@ -133,9 +140,25 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
               ))}
             </Select>
           </Field>
-          <Field label={`Face value (${product.face_currency})`} htmlFor={`${id}-face`} hint={data ? `Showing ${formatMoney(data.face_value, product.face_currency)}.` : undefined}>
-            <Input id={`${id}-face`} inputMode="decimal" placeholder="The first value" value={face} onChange={event => setFace(event.target.value)} />
-          </Field>
+          {data?.face_values?.length ? (
+            <Field label={`Face value (${product.face_currency})`} htmlFor={`${id}-face`} hint={`${data.face_values.length} value${data.face_values.length === 1 ? "" : "s"}; each supplier's offers are listed below.`}>
+              <Select id={`${id}-face`} value={plain(data.face_value)} onChange={event => setFace(event.target.value)}>
+                {data.face_values.map(value => (
+                  <option key={value} value={plain(value)}>
+                    {formatMoney(value, product.face_currency)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          ) : (
+            <Field
+              label={`Face value (${product.face_currency})`}
+              htmlFor={`${id}-face`}
+              hint={data?.range ? `Any amount from ${formatMoney(data.range.min, product.face_currency)} to ${formatMoney(data.range.max, product.face_currency)}.` : undefined}
+            >
+              <Input id={`${id}-face`} inputMode="decimal" value={face || (data ? plain(data.face_value) : "")} onChange={event => setFace(event.target.value)} />
+            </Field>
+          )}
         </div>
 
         <Field
@@ -198,14 +221,48 @@ export function ProductPricingDialog({ product, open, onClose, finance, operator
                 {`${kindLabels[chosen?.rule.kind ?? shown.kind]}${chosen?.scheme ? ` (${chosen.scheme})` : ""}, from ${levelLabels[chosen?.rule.level ?? shown.level]}.`}
               </p>
             ) : null}
+            {/* Every offer, at the value asked or (one-value offers) its own: face value, what the supplier charges in its
+                own currency and the market's, its discount off face value, and what BitoCard makes. */}
             <ul className="space-y-2">
-              {data.offers.map(offer => (
-                <li key={offer.offer_id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-sm">
-                  <span className="font-medium">{offer.supplier_name}</span>
-                  <span className="text-muted">{offer.sellable ? `Costs ${money(offer.supplier_cost)} · BitoCard makes ${money(offer.bitocard_profit)}` : (reasons[offer.reason ?? ""] ?? "Not sellable")}</span>
-                  {offer.chosen ? <Badge tone="green">Cheapest: used</Badge> : null}
-                </li>
-              ))}
+              {[...data.offers]
+                .sort((a, b) => Number(b.covers) - Number(a.covers) || a.face_value - b.face_value)
+                .map(offer => (
+                  <li key={offer.offer_id} className={`rounded-xl border px-3 py-2 text-sm ${offer.covers ? "border-line" : "border-dashed border-line bg-canvas"}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">
+                        {offer.supplier_name} · {formatMoney(offer.face_value, product.face_currency)}
+                      </span>
+                      {offer.chosen ? (
+                        <Badge tone="green">Cheapest: used</Badge>
+                      ) : !offer.covers ? (
+                        <Button variant="ghost" size="sm" onClick={() => setFace(plain(offer.face_value))}>
+                          Price this value
+                        </Button>
+                      ) : null}
+                    </div>
+                    <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted sm:grid-cols-4">
+                      <div>
+                        <dt>Supplier charges</dt>
+                        <dd className="font-semibold text-ink">
+                          {formatMoney(offer.supplier_cost_original, offer.supplier_currency)}
+                          {offer.supplier_currency !== data.currency && offer.supplier_cost !== null ? ` (${money(offer.supplier_cost)})` : ""}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Supplier discount</dt>
+                        <dd className="font-semibold text-ink">{offer.supplier_discount_bps === null ? "—" : offer.supplier_discount_bps >= 0 ? `${formatBps(offer.supplier_discount_bps)} off face` : `${formatBps(-offer.supplier_discount_bps)} above face`}</dd>
+                      </div>
+                      <div>
+                        <dt>Price to resellers</dt>
+                        <dd className="font-semibold text-ink">{offer.sellable ? money(offer.wholesale) : (reasons[offer.reason ?? ""] ?? "Not sellable")}</dd>
+                      </div>
+                      <div>
+                        <dt>BitoCard makes</dt>
+                        <dd className="font-semibold text-ink">{offer.sellable ? money(offer.bitocard_profit) : "—"}</dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))}
             </ul>
           </>
         )}
