@@ -12,6 +12,7 @@ export function schemaFor(key: string): z.ZodType | null {
   if (isPlatformKey(key)) return configSchema.shape[key];
   const field = integrationFields.get(key);
   if (!field) return null;
+  if (key === 'CRYPTO_SIGNER_SECRET') return z.string().min(32, 'use at least 32 characters');
   if (/^CRYPTO_(TEST_)?XPUB_/.test(key)) {
     return z.string().refine(value => {
       try {

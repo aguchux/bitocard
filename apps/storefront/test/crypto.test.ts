@@ -10,7 +10,7 @@ const revalidatePath = vi.fn();
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(path) }));
 
-const { addTestCrypto, changeAd, confirmTrade, findBestPrice, postAd, repriceAd, takeAd } = await import("@/lib/crypto-actions");
+const { addTestCrypto, addWithdrawalAddress, cancelWithdrawal, changeAd, confirmTrade, confirmWithdrawal, createWithdrawal, findBestPrice, postAd, repriceAd, reviewWithdrawal, takeAd } = await import("@/lib/crypto-actions");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 const form = (values: Record<string, string>) => {
@@ -53,8 +53,10 @@ describe("quick buy and sell", () => {
   test("confirming sends exactly the trade shown (the price seen guards against changes) and opens its receipt", async () => {
     const fetch = vi.fn(async () => reply({ object: "p2p_trade", id: "t1" }, 201));
     vi.stubGlobal("fetch", fetch);
-    await expect(confirmTrade({}, form({ ad_id: ad, price: "165000", fiat: "8250000" }))).rejects.toThrow("redirect:/account/crypto/trades/t1?done=1");
-    expect(bodyOf(calls(fetch)[0])).toEqual({ ad_id: ad, price: 165000, fiat: 8250000 });
+    await expect(confirmTrade({}, form({ ad_id: ad, price: "165000", fee_bps: "20", fiat: "8250000" }))).rejects.toThrow("redirect:/account/crypto/trades/t1?done=1");
+    expect(bodyOf(calls(fetch)[0])).toEqual({ ad_id: ad, price: 165000, fee_bps: 20, fiat: 8250000 });
+    await expect(confirmTrade({}, form({ ad_id: ad, price: "165000", fiat: "8250000" }))).rejects.toThrow("redirect:");
+    expect(bodyOf(calls(fetch)[1])).toEqual({ ad_id: ad, price: 165000, fiat: 8250000 });
   });
 
   test("too little money points to the wallet; a changed price is shown", async () => {
@@ -107,5 +109,46 @@ describe("display", () => {
     expect(appTabs.map(tab => tab.label)).toContain("Crypto");
     expect(activeTab("/account/crypto")).toBe("/account/crypto");
     expect(activeTab("/account/crypto/trades/abc")).toBe("/account/crypto");
+  });
+});
+
+describe("withdrawals", () => {
+  const address = "3f0c2a1e-5f6a-4f0e-9a51-0e4f3f0f1a22";
+
+  test("saving an address sends the chain, address and name; problems point at the field", async () => {
+    const fetch = vi.fn(async () => reply({ object: "crypto_withdrawal_address", id: address, label: "Cold", usable_from: "2026-10-14T10:00:00.000Z" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    const saved = await addWithdrawalAddress({}, form({ chain: "ETHEREUM", address: " 0xabc ", label: "Cold" }));
+    expect(saved.notice).toMatch(/^Saved\. You can send to "Cold" from /);
+    expect(bodyOf(calls(fetch)[0])).toEqual({ chain: "ETHEREUM", address: "0xabc", label: "Cold" });
+    expect(await addWithdrawalAddress({}, form({ chain: "ETHEREUM", address: "", label: "Cold" }))).toEqual({ error: "Paste the address.", field: "address" });
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "address_invalid", message: "This is not a valid Ethereum address.", param: "address" } }, 400)));
+    expect(await addWithdrawalAddress({}, form({ chain: "ETHEREUM", address: "0xabc", label: "Cold" }))).toEqual({ error: "This is not a valid Ethereum address.", field: "address" });
+  });
+
+  test("reviewing previews first and goes to the confirmation; confirming asks for it and opens its page", async () => {
+    const fetch = vi.fn(async () => reply({ object: "crypto_withdrawal_preview" }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(reviewWithdrawal({}, form({ asset: "USDT", chain: "TRON", address_id: address, amount: "1,000.5" }))).rejects.toThrow(
+      `redirect:/account/crypto/withdraw/confirm?asset=USDT&chain=TRON&address=${address}&amount=1000.5`,
+    );
+    expect(bodyOf(calls(fetch)[0])).toEqual({ asset: "USDT", chain: "TRON", address_id: address, amount: "1000.5", preview: true });
+    expect(await reviewWithdrawal({}, form({ asset: "USDT", chain: "TRON", address_id: address, amount: "0" }))).toEqual({ error: "Enter how much to send.", field: "amount" });
+
+    const created = vi.fn(async () => reply({ object: "crypto_withdrawal", id: "w1", status: "awaiting_code" }, 201));
+    vi.stubGlobal("fetch", created);
+    await expect(createWithdrawal({}, form({ asset: "USDT", chain: "TRON", address_id: address, amount: "1000.5" }))).rejects.toThrow("redirect:/account/crypto/withdrawals/w1");
+    expect(bodyOf(calls(created)[0])).toEqual({ asset: "USDT", chain: "TRON", address_id: address, amount: "1000.5" });
+  });
+
+  test("the emailed code confirms it; cancelling posts to the withdrawal", async () => {
+    const fetch = vi.fn(async () => reply({ object: "crypto_withdrawal", id: "w1", status: "review" }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await confirmWithdrawal({}, form({ id: "w1", code: "12 34 56" }))).toEqual({ notice: "Confirmed. BitoCard checks this withdrawal before it is sent." });
+    expect(calls(fetch)[0][0]).toBe("http://api.test/v1/store/crypto/withdrawals/w1/confirm");
+    expect(bodyOf(calls(fetch)[0])).toEqual({ code: "123456" });
+    expect(await confirmWithdrawal({}, form({ id: "w1", code: "12" }))).toEqual({ error: "Enter the 6-digit code we emailed you.", field: "code" });
+    await cancelWithdrawal(form({ id: "w1" }));
+    expect(calls(fetch).at(-1)![0]).toBe("http://api.test/v1/store/crypto/withdrawals/w1/cancel");
   });
 });

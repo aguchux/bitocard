@@ -405,3 +405,45 @@ export function customerCodeEmail(to: string, input: { store: string; code: stri
     text: [heading, '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
   };
 }
+
+/** The code that confirms a crypto withdrawal, naming exactly what it sends and where (under the store's name). */
+export function cryptoWithdrawalCodeEmail(to: string, input: { store: string; code: string; amount: string; asset: string; network: string; address: string }): EmailMessage {
+  const heading = 'Confirm your crypto withdrawal';
+  const paragraphs = [
+    `Enter this code to send ${input.amount} ${input.asset} on ${input.network} to ${input.address}. It expires in 30 minutes.`,
+    'Check the address carefully: crypto sent to the wrong address cannot be got back.',
+    `If you did not ask for this, do not share the code: change your ${input.store} password and contact the store.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-all">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} confirms your ${input.asset} withdrawal at ${input.store}`,
+    html,
+    text: [heading, '', ...paragraphs, '', input.code, '', `Sent for ${input.store}.`].join('\n'),
+  };
+}
+
+/** Tells a customer a withdrawal address was added to their account (usable after 24 hours). */
+export function cryptoAddressAddedEmail(to: string, input: { store: string; label: string; network: string; address: string; usableFrom: string }): EmailMessage {
+  const heading = 'A withdrawal address was added';
+  const paragraphs = [
+    `"${input.label}" (${input.network}, ${input.address}) was added to your ${input.store} crypto account.`,
+    `Withdrawals to it can start from ${input.usableFrom}.`,
+    `If this was not you, remove the address from your crypto settings, change your password and contact ${input.store} straight away.`,
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-all">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: `A withdrawal address was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
+}

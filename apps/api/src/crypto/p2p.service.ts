@@ -179,14 +179,41 @@ export class P2pService {
     return { object: 'list' as const, asset: asset.code, currency: context.currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id)) };
   }
 
-  private book(context: CryptoContext, asset: CryptoAsset, side: AdSide, viewerId: string, take: number) {
+  /**
+   * Whether an ad's owner may still trade: the same checks as for the customer taking it (crypto and P2P switched on
+   * for their store and country, their identity check, their store open, not frozen). An owner who lost any of them
+   * has their ads kept off the market, and taking one is refused.
+   */
+  private async ownerCanTrade(customerId: string, known = new Map<string, Promise<boolean>>()) {
+    if (!known.has(customerId)) {
+      known.set(
+        customerId,
+        (async () => {
+          const owner = await this.prisma.customer.findUnique({ where: { id: customerId }, include: { store: true, market: true } });
+          if (!owner || owner.status !== 'active') return false;
+          try {
+            await this.requireTrader(owner);
+            return true;
+          } catch {
+            return false;
+          }
+        })(),
+      );
+    }
+    return known.get(customerId)!;
+  }
+
+  private async book(context: CryptoContext, asset: CryptoAsset, side: AdSide, viewerId: string, take: number) {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
-    return this.prisma.p2pAd.findMany({
+    const known = new Map<string, Promise<boolean>>();
+    const ads = await this.prisma.p2pAd.findMany({
       where: { mode: context.mode, country: context.country, asset: asset.code, side: adSide, status: 'active', customerId: { not: viewerId }, remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });
+    const able = await Promise.all(ads.map(ad => this.ownerCanTrade(ad.customerId, known)));
+    return ads.filter((_, index) => able[index]);
   }
 
   /** The best ad for buying or selling an amount (fiat or crypto) right now, with the trade it would make. */
@@ -236,6 +263,8 @@ export class P2pService {
       /** What the buyer receives: the amount less BitoCard's fee. */
       received: fromUnits(terms.received, asset.decimals),
       fiat: minor(terms.fiat),
+      /** BitoCard's fee rate the amounts were worked out with: send it back with the trade to refuse a changed fee. */
+      fee_bps: asset.p2pFeeBps,
     };
   }
 
@@ -447,14 +476,17 @@ export class P2pService {
    * transaction with the ad's row locked: the ad's amounts, the crypto (seller's lock or wallet) to the buyer less
    * BitoCard's fee, the fiat (buyer's proceeds then wallet, or their buy ad's lock) to the seller's P2P proceeds.
    */
-  async trade(customer: CustomerWithStore, input: { ad_id: string; price: number; amount?: string; fiat?: number; preview?: boolean }) {
+  async trade(customer: CustomerWithStore, input: { ad_id: string; price: number; fee_bps?: number; amount?: string; fiat?: number; preview?: boolean }) {
     const context = await this.requireTrader(customer);
     if ((input.fiat === undefined) === (input.amount === undefined)) throw invalid('parameter_missing', 'Send either fiat or amount.', 'fiat');
     const found = await this.prisma.p2pAd.findFirst({ where: { id: input.ad_id, mode: context.mode, country: context.country } });
     if (!found || found.status !== 'active') throw adUnavailable();
     if (found.customerId === customer.id) throw conflict('own_ad', 'This is your own ad.', 'ad_id');
+    if (!(await this.ownerCanTrade(found.customerId))) throw adUnavailable();
     const asset = await this.wallets.asset(found.asset);
     if (BigInt(input.price) !== found.priceMinor) throw conflict('price_changed', 'The price of this ad changed. Check the new price and try again.', 'price');
+    // The fee the customer was shown, when they send it: a changed fee is refused like a changed price.
+    if (input.fee_bps !== undefined && input.fee_bps !== asset.p2pFeeBps) throw conflict('fee_changed', 'BitoCard’s fee for this coin changed. Check the new amounts and try again.', 'fee_bps');
     const terms = this.terms(found, asset, input);
     // The viewer's side: taking a sell ad buys, taking a buy ad sells.
     if (input.preview) return { object: 'p2p_quote' as const, side: found.side === 'sell' ? ('buy' as const) : ('sell' as const), ...this.presentTerms(terms, asset, found) };

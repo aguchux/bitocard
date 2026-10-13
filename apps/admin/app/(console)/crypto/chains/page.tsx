@@ -12,7 +12,14 @@ function NetworkRow({ network, editable, ready }: { network: CryptoNetworkSettin
   const [confirmations, setConfirmations] = useState(String(network.confirmations));
   const [doubleCheck, setDoubleCheck] = useState(network.double_check_from);
   const [testContract, setTestContract] = useState(network.test_contract ?? "");
-  const changed = confirmations !== String(network.confirmations) || doubleCheck !== network.double_check_from || (network.contract !== null && testContract !== (network.test_contract ?? ""));
+  const [fee, setFee] = useState(network.withdrawal_fee);
+  const [minimum, setMinimum] = useState(network.min_withdrawal);
+  const changed =
+    confirmations !== String(network.confirmations) ||
+    doubleCheck !== network.double_check_from ||
+    fee !== network.withdrawal_fee ||
+    minimum !== network.min_withdrawal ||
+    (network.contract !== null && testContract !== (network.test_contract ?? ""));
   return (
     <li className="space-y-3 rounded-xl border border-line p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -20,9 +27,17 @@ function NetworkRow({ network, editable, ready }: { network: CryptoNetworkSettin
           {network.asset}
           <span className="ml-2 text-xs font-normal break-all text-muted">{network.contract ?? "the chain’s own coin"}</span>
         </p>
-        <span className="flex items-center gap-2 text-sm">
-          Deposits
-          <Toggle checked={network.deposits_enabled} disabled={!editable} label={`${network.asset} deposits`} onChange={enabled => void update({ id: network.id, deposits_enabled: enabled })} />
+        <span className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="flex items-center gap-2">
+            Deposits
+            <Toggle checked={network.deposits_enabled} disabled={!editable} label={`${network.asset} deposits`} onChange={enabled => void update({ id: network.id, deposits_enabled: enabled })} />
+          </span>
+          {network.chain !== "SOLANA" ? (
+            <span className="flex items-center gap-2">
+              Withdrawals
+              <Toggle checked={network.withdrawals_enabled} disabled={!editable} label={`${network.asset} withdrawals`} onChange={enabled => void update({ id: network.id, withdrawals_enabled: enabled })} />
+            </span>
+          ) : null}
         </span>
       </div>
       {network.deposits_enabled && !ready ? <p className="text-xs text-amber-700">Customers do not see it until this chain has a wallet key and a provider set up.</p> : null}
@@ -41,6 +56,14 @@ function NetworkRow({ network, editable, ready }: { network: CryptoNetworkSettin
             <Input value={testContract} placeholder="None" disabled={!editable} onChange={event => setTestContract(event.target.value)} />
           </label>
         ) : null}
+        <label className="text-xs text-muted">
+          Withdrawal fee ({network.asset})
+          <Input inputMode="decimal" value={fee} disabled={!editable} onChange={event => setFee(event.target.value)} />
+        </label>
+        <label className="text-xs text-muted">
+          Smallest withdrawal ({network.asset})
+          <Input inputMode="decimal" value={minimum} disabled={!editable} onChange={event => setMinimum(event.target.value)} />
+        </label>
       </div>
       {editable && changed ? (
         <Button
@@ -52,6 +75,8 @@ function NetworkRow({ network, editable, ready }: { network: CryptoNetworkSettin
               id: network.id,
               confirmations: Number(confirmations),
               double_check_from: doubleCheck.trim(),
+              withdrawal_fee: fee.trim(),
+              min_withdrawal: minimum.trim(),
               ...(network.contract !== null ? { test_contract: testContract.trim() || null } : {}),
             })
           }

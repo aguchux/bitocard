@@ -359,7 +359,7 @@ export type StoreEsimTopUp = { object: 'esim_top_up'; id: string; name: string; 
 // -- Crypto wallets and P2P ------------------------------------------------------------------------------------------
 
 /** One asset in the customer's crypto wallets. Amounts are decimal strings with every place (`"12.500000"`). */
-export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; available: string; locked: string; frozen: string; total: string };
+export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; available: string; locked: string; frozen: string; withdrawing: string; total: string };
 
 /** `GET /v1/store/crypto`: the customer's crypto wallets, their P2P cash (minor units) and what they can do now. */
 export type StoreCryptoWallets = {
@@ -380,7 +380,7 @@ export type StoreCryptoTransaction = {
   object: 'crypto_transaction';
   id: string;
   type: string;
-  balance: 'available' | 'locked' | 'frozen';
+  balance: 'available' | 'locked' | 'frozen' | 'withdrawing';
   description: string;
   asset: string;
   amount: string;
@@ -417,7 +417,7 @@ export type StoreP2pAd = {
 /** What a trade would be: the crypto, BitoCard's fee, what the buyer receives and the fiat (minor units). */
 export type StoreP2pTerms = { asset: string; currency: string; price: number; amount: string; fee: string; received: string; fiat: number };
 /** `side`: what the viewer does (buy from a sell ad, sell to a buy ad). */
-export type StoreP2pQuote = StoreP2pTerms & { object: 'p2p_quote'; side: 'buy' | 'sell'; ad?: StoreP2pAd };
+export type StoreP2pQuote = StoreP2pTerms & { object: 'p2p_quote'; side: 'buy' | 'sell'; ad?: StoreP2pAd; fee_bps: number };
 
 export type StoreP2pTrade = StoreP2pTerms & {
   object: 'p2p_trade';
@@ -454,6 +454,41 @@ export type StoreCryptoDeposit = {
   confirmations_needed: number | null;
   created_at: string;
   credited_at: string | null;
+};
+
+/** `GET /v1/store/crypto/withdrawal-networks`: where an asset can be sent now, with BitoCard's fee and the minimum. */
+export type StoreWithdrawalNetworks = {
+  object: 'crypto_withdrawal_networks';
+  asset: string;
+  daily_limit: string;
+  remaining_today: string;
+  data: Array<{ object: 'crypto_network'; chain: string; name: string; fee: string; minimum: string; confirmations: number }>;
+};
+
+/** A saved withdrawal address: `ready` once its 24-hour wait is over (`usable_from`). */
+export type StoreWithdrawalAddress = { object: 'crypto_withdrawal_address'; id: string; mode: 'live' | 'test'; chain: string; network: string; address: string; label: string; usable_from: string; ready: boolean; created_at: string };
+
+export type StoreWithdrawalPreview = { object: 'crypto_withdrawal_preview'; mode: 'live' | 'test'; asset: string; chain: string; network: string; address: string; amount: string; fee: string; total: string; needs_approval: boolean };
+
+export type StoreCryptoWithdrawal = {
+  object: 'crypto_withdrawal';
+  id: string;
+  /** CW-000123. */
+  number: string;
+  mode: 'live' | 'test';
+  asset: string;
+  chain: string;
+  network: string;
+  address: string;
+  amount: string;
+  fee: string;
+  total: string;
+  status: 'awaiting_code' | 'review' | 'queued' | 'submitting' | 'broadcast' | 'completed' | 'failed' | 'rejected' | 'cancelled';
+  review_reason: string | null;
+  tx_hash: string | null;
+  confirmations: number;
+  created_at: string;
+  completed_at: string | null;
 };
 
 export type StoreP2pProfile = { object: 'p2p_profile'; nickname: string; nickname_chosen: boolean; trades_30d: number; trades_total: number };

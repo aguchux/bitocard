@@ -74,7 +74,7 @@ const cash = async shopper => (await shopper.get('/v1/store/crypto')).json.cash;
 
 /** Every asset's customer balances plus fees and adjustments equal what BitoCard holds in custody: crypto is never made or lost. */
 async function cryptoConserved() {
-  const accounts = await prisma.ledgerAccount.findMany({ where: { kind: { in: ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_fees', 'crypto_custody', 'adjustments'] } } });
+  const accounts = await prisma.ledgerAccount.findMany({ where: { kind: { in: ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'crypto_fees', 'crypto_custody', 'adjustments'] } } });
   const sums = new Map();
   for (const account of accounts) {
     if (account.kind === 'adjustments' && !['USDT', 'USDC', 'BTC', 'ETH', 'BNB'].includes(account.currency)) continue;
@@ -318,5 +318,49 @@ describe('admin freezes', () => {
     } finally {
       await admin.put('/v1/admin/integrations/checkout', { values: { CHECKOUT_SANDBOX: true }, code: await adminCode(server, admin) });
     }
+  });
+});
+
+describe('owners who can no longer trade, changed fees and huge amounts', () => {
+  before(() => switches(true));
+  after(() => switches(null));
+
+  test('an ad leaves the market when its owner can no longer trade, and cannot be taken', async () => {
+    const seller = await customer();
+    const buyer = await customer();
+    await deposit(seller, 'USDT', '50');
+    await fund(buyer, 1_000_000_00);
+    const ad = (await sellAd(seller, { amount: '50', price: 170000 })).json;
+    const listed = async () => (await buyer.get('/v1/store/p2p/market?asset=USDT&side=buy&limit=100')).json.data.some(item => item.id === ad.id);
+    assert.equal(await listed(), true);
+    await prisma.customer.update({ where: { id: seller.id }, data: { status: 'disabled' } });
+    assert.equal(await listed(), false, 'a disabled account’s ads are off the market');
+    const taken = await buyer.post('/v1/store/p2p/trades', { ad_id: ad.id, price: 170000, fiat: 10_000_00 });
+    assert.deepEqual([taken.status, taken.json.error.code], [409, 'ad_unavailable']);
+    await prisma.customer.update({ where: { id: seller.id }, data: { status: 'active' } });
+    assert.equal(await listed(), true);
+    await ledgerOk();
+  });
+
+  test('a fee changed after the customer saw it is refused, never charged', async () => {
+    const seller = await customer();
+    const buyer = await customer();
+    await deposit(seller, 'USDT', '20');
+    await fund(buyer, 1_000_000_00);
+    const ad = (await sellAd(seller, { amount: '20', price: 171000 })).json;
+    const preview = await buyer.post('/v1/store/p2p/trades', { ad_id: ad.id, price: 171000, fiat: 10_000_00, preview: true });
+    assert.equal(typeof preview.json.fee_bps, 'number');
+    const changed = await buyer.post('/v1/store/p2p/trades', { ad_id: ad.id, price: 171000, fee_bps: preview.json.fee_bps + 1, fiat: 10_000_00 });
+    assert.deepEqual([changed.status, changed.json.error.code], [409, 'fee_changed']);
+    const done = await buyer.post('/v1/store/p2p/trades', { ad_id: ad.id, price: 171000, fee_bps: preview.json.fee_bps, fiat: 10_000_00 });
+    assert.equal(done.status, 201, JSON.stringify(done.json));
+  });
+
+  test('amounts too large for the ledger are refused, never a server error', async () => {
+    const shopper = await customer();
+    const huge = await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '99999999999999999999.5' });
+    assert.deepEqual([huge.status, huge.json.error.code], [400, 'parameter_invalid']);
+    const ad = await sellAd(shopper, { amount: '99999999999999999999' });
+    assert.deepEqual([ad.status, ad.json.error.code], [400, 'parameter_invalid']);
   });
 });

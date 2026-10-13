@@ -11,6 +11,8 @@ import { type AppConfig, configSchema } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { checkProvider, checkWalletKeys, providerKeys } from '../crypto/chains/check.js';
 import { chainProvider, walletKeyFields } from '../crypto/chains/providers.js';
+import { checkScreener, checkSigner } from '../crypto/custody/check.js';
+import { screener } from '../crypto/custody/screening.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { connectable } from '../reseller-integrations/connectable.js';
 import { integrationGroups, isPlatformKey, type IntegrationField, type IntegrationGroup } from './definitions.js';
@@ -84,7 +86,14 @@ export class IntegrationsAdminService {
   private async testBlockchain(adminId: string, group: IntegrationGroup) {
     await this.integrations.refresh(true);
     const provider = chainProvider(group.id);
-    const outcome = provider ? await checkProvider(provider, this.integrations.values(providerKeys(provider))) : checkWalletKeys(this.integrations.values(walletKeyFields.map(item => item.key)));
+    const values = this.integrations.values(group.fields.map(item => item.key));
+    const outcome = provider
+      ? await checkProvider(provider, this.integrations.values(providerKeys(provider)))
+      : group.id === 'crypto_signer'
+        ? await checkSigner(values)
+        : screener(group.id)
+          ? await checkScreener(screener(group.id)!, values)
+          : checkWalletKeys(this.integrations.values(walletKeyFields.map(item => item.key)));
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment: outcome.environment, ok: outcome.ok } });
     return { object: 'integration_test' as const, integration: group.id, environment: outcome.environment, ok: outcome.ok, message: outcome.message, chains: outcome.chains, tested_at: new Date().toISOString() };
   }

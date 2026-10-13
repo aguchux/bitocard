@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Card, DataTable, errorMessage, FilterSelect, formatDateTime, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
-import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
-import { type CryptoDeposit, type Mode, useCryptoDepositsQuery } from "@bitocard/api-client/admin";
+import { Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
+import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { type CryptoDeposit, type Mode, useCryptoDepositsQuery, useRecheckCryptoDepositMutation } from "@bitocard/api-client/admin";
 
 const tones: Record<CryptoDeposit["status"], Tone> = { pending: "amber", credited: "green", ignored: "grey", failed: "red" };
 
-const columns: Array<Column<CryptoDeposit>> = [
+const baseColumns: Array<Column<CryptoDeposit>> = [
   {
     key: "deposit",
     header: "Deposit",
@@ -42,6 +42,25 @@ export default function DepositsPage() {
   const [mode, setMode] = useState<Mode>("live");
   const [status, setStatus] = useState("");
   const deposits = useCryptoDepositsQuery({ mode, ...(status ? { status } : {}) });
+  const admin = useAdmin();
+  const [recheck, rechecking] = useRecheckCryptoDepositMutation();
+  // A deposit the chain stopped showing (or one still waiting) can be read from the chain again now.
+  const columns: Array<Column<CryptoDeposit>> = can(admin, "operations")
+    ? [
+        ...baseColumns,
+        {
+          key: "recheck",
+          header: "",
+          align: "right",
+          cell: deposit =>
+            deposit.status === "failed" || deposit.status === "pending" ? (
+              <Button size="sm" variant="secondary" loading={rechecking.isLoading && rechecking.originalArgs === deposit.id} onClick={() => void recheck(deposit.id)}>
+                Check again
+              </Button>
+            ) : null,
+        },
+      ]
+    : baseColumns;
   return (
     <AdminShell section="crypto" current="/crypto/deposits" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Deposits" }]}>
       <PageHeader title="Deposits" description="Every transfer to a customer's deposit address, read again from the chain before it counts. Credited once it has its confirmations." />
@@ -61,6 +80,11 @@ export default function DepositsPage() {
           ]}
         />
       </div>
+      {rechecking.error ? (
+        <div className="mt-4">
+          <Notice tone="red">{errorMessage(rechecking.error)}</Notice>
+        </div>
+      ) : null}
       <Card className="mt-4">
         <DataTable columns={columns} rows={deposits.data?.data} rowKey={deposit => deposit.id} loading={deposits.isLoading} error={deposits.error ? errorMessage(deposits.error) : null} onRetry={deposits.refetch} empty="No deposits yet." />
       </Card>

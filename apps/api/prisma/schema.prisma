@@ -765,6 +765,9 @@ enum AccountKind {
   crypto_custody
   /// BitoCard's P2P trading fees, taken in crypto (revenue).
   crypto_fees
+  /// A customer's crypto on its way out in an on-chain withdrawal (the amount plus the network fee): back to the wallet
+  /// if the withdrawal fails or is cancelled, out of custody once it is confirmed on chain. Never below zero.
+  crypto_withdrawing
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -2211,6 +2214,8 @@ model Customer {
   p2pSales           P2pTrade[]               @relation("p2p_seller")
   cryptoAddresses    CryptoAddress[]
   cryptoDeposits     CryptoDeposit[]
+  cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
+  cryptoWithdrawals  CryptoWithdrawal[]
 
   @@unique([storeId, email])
   @@map("customers")
@@ -2465,6 +2470,10 @@ model CryptoAsset {
   /// BitoCard's P2P fee in basis points, taken in the asset from what the buyer receives.
   p2pFeeBps Int      @default(20) @map("p2p_fee_bps")
   sortOrder Int      @default(0) @map("sort_order")
+  /// The most one customer can withdraw on chain in 24 hours (asset units, decimal string).
+  withdrawalDailyLimit String @default("0") @map("withdrawal_daily_limit")
+  /// Withdrawals from this amount (asset units, decimal string) wait for an admin's approval.
+  withdrawalReviewFrom String @default("0") @map("withdrawal_review_from")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("crypto_assets")
@@ -2596,10 +2605,86 @@ model CryptoNetwork {
   depositsEnabled Boolean @default(false) @map("deposits_enabled")
   /// Deposits at or above this (asset units, decimal string) are confirmed by two different providers first.
   doubleCheckFrom String  @default("1000") @map("double_check_from")
+  withdrawalsEnabled Boolean @default(false) @map("withdrawals_enabled")
+  /// BitoCard's network fee per withdrawal (asset units, decimal string), taken on top of the amount sent.
+  withdrawalFee  String   @default("0") @map("withdrawal_fee")
+  /// The smallest amount a customer can send (asset units, decimal string).
+  minWithdrawal  String   @default("0") @map("min_withdrawal")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@unique([asset, chain])
   @@map("crypto_networks")
+}
+
+/// An address a customer saved to withdraw crypto to: usable 24 hours after it is added, screened against sanctions lists.
+model CryptoWithdrawalAddress {
+  id          String     @id @default(uuid()) @db.Uuid
+  customerId  String     @map("customer_id") @db.Uuid
+  mode        LedgerMode
+  chain       String
+  address     String
+  label       String
+  /// Withdrawals to it can start from then (24 hours after it was added).
+  usableFrom  DateTime   @map("usable_from")
+  /// clear, flagged or unscreened (no screening provider answered), with who answered and when.
+  screening   String     @default("unscreened")
+  screenedBy  String?    @map("screened_by")
+  screenedAt  DateTime?  @map("screened_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  withdrawals CryptoWithdrawal[]
+
+  @@unique([customerId, mode, chain, address])
+  @@map("crypto_withdrawal_addresses")
+}
+
+/// A customer's on-chain withdrawal. Its amount plus BitoCard's network fee is moved to `crypto_withdrawing` when it is
+/// asked for; it is confirmed with an emailed code, may wait for an admin, is sent by BitoCard's signer (never by the
+/// API, which holds no keys) and is settled once the transfer is confirmed on chain, or returned if it definitely failed.
+model CryptoWithdrawal {
+  id               String     @id @default(uuid()) @db.Uuid
+  /// Shown as CW-000123.
+  number           Int        @unique @default(autoincrement())
+  customerId       String     @map("customer_id") @db.Uuid
+  mode             LedgerMode
+  asset            String     @db.VarChar(10)
+  chain            String
+  addressId        String?    @map("address_id") @db.Uuid
+  address          String
+  /// Ledger units sent to the address, and BitoCard's fee on top.
+  amount           BigInt
+  fee              BigInt
+  /// What the signer sends, in on-chain units (text: 18-decimal tokens exceed a bigint).
+  rawAmount        String     @map("raw_amount")
+  /// awaiting_code, review, queued, submitting, broadcast, completed, failed, rejected or cancelled.
+  status           String     @default("awaiting_code")
+  codeHash         String?    @map("code_hash")
+  codeExpiresAt    DateTime?  @map("code_expires_at")
+  codeAttempts     Int        @default(0) @map("code_attempts")
+  codeSentAt       DateTime?  @map("code_sent_at")
+  /// Why it waits for an admin (amount, screening), and the admin's decision.
+  reviewReason     String?    @map("review_reason")
+  reviewedBy       String?    @map("reviewed_by") @db.Uuid
+  reviewNote       String?    @map("review_note")
+  reviewedAt       DateTime?  @map("reviewed_at")
+  /// The same on every request to the signer, so a repeat never sends twice.
+  signerReference  String     @unique @map("signer_reference")
+  txHash           String?    @map("tx_hash")
+  confirmations    Int        @default(0)
+  attempts         Int        @default(0)
+  nextCheckAt      DateTime?  @map("next_check_at")
+  /// Set once it has waited too long for the signer or the chain (admins were told).
+  needsReviewAt    DateTime?  @map("needs_review_at")
+  error            String?
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  completedAt      DateTime?  @map("completed_at")
+  customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  savedAddress     CryptoWithdrawalAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextCheckAt])
+  @@index([customerId, createdAt])
+  @@map("crypto_withdrawals")
 }
 
 /// A customer's own deposit address in a family (bitcoin, evm, tron), derived from BitoCard's xpub at `index`.

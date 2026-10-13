@@ -21,6 +21,12 @@ export const watchMs = 7 * 86_400_000;
 /** EVM blocks read per scan (providers cap eth_getLogs ranges), and how far back a first scan starts. */
 const evmRangeBlocks = 1_000n;
 const firstScanBlocks = 200n;
+/** Blocks left unscanned at the tip of EVM chains, until every node behind a provider has indexed them. */
+const scanLagBlocks = 2n;
+/** A deposit the chain stops showing is failed only after this long, and only when no provider shows it. */
+const missingFailsAfterMs = 6 * 3_600_000;
+/** Notifications whose transactions could not be read are retried by the job this many times. */
+const maxNoticeAttempts = 20;
 
 type Route = { provider: ChainProvider; client: ChainClient };
 
@@ -95,7 +101,7 @@ export class CryptoDepositsService {
   }
 
   /** Asks each route in turn until one answers; a failure is noted on its route and the next is tried. */
-  private async ask<T>(chain: Chain, routes: Route[], call: (client: ChainClient) => Promise<T>): Promise<{ value: T; provider: string }> {
+  async ask<T>(chain: Chain, routes: Route[], call: (client: ChainClient) => Promise<T>): Promise<{ value: T; provider: string }> {
     let last: unknown = null;
     for (const route of routes) {
       try {
@@ -223,6 +229,7 @@ export class CryptoDepositsService {
         }
       }
     }
+    summary.notices = await this.retryNotices();
     summary.settled = await this.settlePending();
     return summary;
   }
@@ -250,20 +257,33 @@ export class CryptoDepositsService {
     const contracts = networks.flatMap(item => (item.contract ? [item.contract] : []));
     const native = networks.some(item => !item.contract);
 
-    const latest = (await this.ask(chain, routes, client => client.latestBlock())).value;
+    // Tokens and the chain's own coin are listed by the providers that can list each (a standard EVM node finds token
+    // logs but not plain ETH; only TronGrid lists TRON accounts' tokens): asking one that cannot would answer "nothing".
+    const tokenRoutes = routes.filter(route => route.client.scan && route.client.tokenScan);
+    const coinRoutes = routes.filter(route => route.client.scan && route.client.nativeScan);
+    if (contracts.length && !tokenRoutes.length && !native) return { skipped: 'no provider lists token deposits (webhooks only)' };
+    const evm = chain === 'ETHEREUM' || chain === 'BSC';
+    // Scanning stops a few blocks short of the tip: a load-balanced node can report a block its logs do not cover yet.
+    const tip = (await this.ask(chain, routes, client => client.latestBlock())).value;
+    const latest = evm && tip > scanLagBlocks ? tip - scanLagBlocks : tip;
     const cursor = await this.prisma.chainCursor.findUnique({ where: { chain_mode: { chain, mode } } });
     const fromBlock = cursor ? cursor.block + 1n : latest > firstScanBlocks ? latest - firstScanBlocks : 0n;
     const toBlock = fromBlock + evmRangeBlocks - 1n < latest ? fromBlock + evmRangeBlocks - 1n : latest;
-    if (fromBlock > latest) return { scanned: 0 };
-    const scanning = routes.filter(route => route.client.scan && (!native || route.client.nativeScan || contracts.length));
-    const { value: found } = await this.ask(chain, scanning.length ? scanning : routes, async client => (client.scan ? client.scan({ addresses, contracts, native, fromBlock, toBlock }) : []));
-    if (chain === 'ETHEREUM' || chain === 'BSC') {
-      await this.prisma.chainCursor.upsert({ where: { chain_mode: { chain, mode } }, create: { chain, mode, block: toBlock }, update: { block: toBlock } });
-    }
-    const known = new Set((await this.prisma.cryptoDeposit.findMany({ where: { chain, txHash: { in: [...new Set(found.map(item => item.hash))] } }, select: { txHash: true } })).map(item => item.txHash));
+    const notes: string[] = [];
+    if (contracts.length && !tokenRoutes.length) notes.push('token deposits: webhooks only');
+    if (native && !coinRoutes.length) notes.push('coin deposits: webhooks only (no provider here lists them)');
+    if (fromBlock > latest) return { scanned: 0, ...(notes.length ? { notes } : {}) };
+    const found: Transfer[] = [];
+    if (contracts.length && tokenRoutes.length) found.push(...(await this.ask(chain, tokenRoutes, client => client.scan!({ addresses, contracts, native: false, fromBlock, toBlock }))).value);
+    if (native && coinRoutes.length) found.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses, contracts: [], native: true, fromBlock, toBlock }))).value);
+    const known = new Set(
+      (await this.prisma.cryptoDeposit.findMany({ where: { chain, txHash: { in: [...new Set(found.map(item => item.hash))] }, status: { not: 'failed' } }, select: { txHash: true } })).map(item => item.txHash),
+    );
     let recorded = 0;
+    // A transaction that cannot be read now throws before the cursor moves, so the same blocks are scanned again.
     for (const hash of new Set(found.filter(item => !known.has(item.hash)).map(item => item.hash))) recorded += await this.record(chain, mode, hash, routes);
-    return { from: String(fromBlock), to: String(toBlock), seen: found.length, recorded };
+    if (evm) await this.prisma.chainCursor.upsert({ where: { chain_mode: { chain, mode } }, create: { chain, mode, block: toBlock }, update: { block: toBlock } });
+    return { from: String(fromBlock), to: String(toBlock), seen: found.length, recorded, ...(notes.length ? { notes } : {}) };
   }
 
   /**
@@ -312,9 +332,25 @@ export class CryptoDepositsService {
       });
       return 1;
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return 0;
-      throw error;
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+      // Seen before. One marked failed (the chain had stopped showing it) that is back on chain is pending again.
+      const revived = await this.prisma.cryptoDeposit.updateMany({
+        where: { chain, txHash: transfer.hash, outputIndex: transfer.index, status: 'failed', rawAmount: transfer.raw.toString() },
+        data: { status: 'pending', confirmations: 0, blockNumber: inspection.block, confirmedBy: [provider], checkedAt: new Date() },
+      });
+      return revived.count;
     }
+  }
+
+  /** Operations ask for a deposit to be checked again now (a failed one goes back to pending first). */
+  async recheck(adminId: string | null, id: string) {
+    const deposit = await this.prisma.cryptoDeposit.findUnique({ where: { id } });
+    if (!deposit) throw notFound('deposit');
+    if (deposit.status === 'failed') await this.prisma.cryptoDeposit.updateMany({ where: { id, status: 'failed' }, data: { status: 'pending', createdAt: new Date() } });
+    const fresh = await this.prisma.cryptoDeposit.findUniqueOrThrow({ where: { id } });
+    if (fresh.status === 'pending') await this.settle(fresh).catch(error => this.logger.warn({ err: error, deposit: id }, 'Could not check a crypto deposit'));
+    await this.audit.record({ actorId: adminId, action: 'crypto.deposit_rechecked', targetType: 'crypto_deposit', targetId: id, before: { status: deposit.status }, after: null });
+    return (await this.present([await this.prisma.cryptoDeposit.findUniqueOrThrow({ where: { id } })]))[0];
   }
 
   /**
@@ -344,7 +380,14 @@ export class CryptoDepositsService {
     const { inspection, latest } = first.value;
     const same = (found: Inspection | null) => found?.ok && found.transfers.some(item => item.index === deposit.outputIndex && item.raw.toString() === deposit.rawAmount && normaliseAddress(chain, item.to) === normaliseAddress(chain, deposit.address));
     if (!same(inspection)) {
-      if (Date.now() - deposit.createdAt.getTime() > 3_600_000) await this.prisma.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending' }, data: { status: 'failed', checkedAt: new Date() } });
+      // One provider not showing it is not enough (a lagging node, a transaction dropped from one mempool): it fails only
+      // once it has been missing for hours and no provider shows it. A failed deposit seen again is recorded again.
+      if (Date.now() - deposit.createdAt.getTime() > missingFailsAfterMs) {
+        const others = await Promise.all(routes.filter(route => route.provider.id !== first.provider).map(route => route.client.inspect(deposit.txHash).catch(() => undefined)));
+        if (others.every(found => found !== undefined && !same(found))) {
+          await this.prisma.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending' }, data: { status: 'failed', checkedAt: new Date() } });
+        }
+      }
       return false;
     }
     const block = inspection!.block;
@@ -433,8 +476,33 @@ export class CryptoDepositsService {
     const provider = chainProvider(notice.provider)!;
     const mode: LedgerMode = providerInSandbox(provider, this.values(provider)) ? 'test' : 'live';
     const chain = notice.chain as Chain;
-    for (const hash of notice.hashes) await this.record(chain, mode, hash);
+    try {
+      for (const hash of notice.hashes) await this.record(chain, mode, hash);
+    } catch (error) {
+      // Left unprocessed: the job tries again (a provider's own retry has the same body, so it is not stored twice).
+      await this.prisma.chainNotice.update({ where: { id }, data: { attempts: { increment: 1 } } });
+      throw error;
+    }
     await this.prisma.chainNotice.update({ where: { id }, data: { processedAt: new Date(), attempts: { increment: 1 } } });
+  }
+
+  /** Notifications whose transactions could not be read when they came (every provider down), tried again. */
+  private async retryNotices() {
+    const stale = await this.prisma.chainNotice.findMany({
+      where: { processedAt: null, attempts: { lt: maxNoticeAttempts }, createdAt: { lt: new Date(Date.now() - 60_000) } },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+    let processed = 0;
+    for (const notice of stale) {
+      try {
+        await this.processNotice(notice.id);
+        processed += 1;
+      } catch (error) {
+        this.logger.warn({ err: error, notice: notice.id }, 'Could not process a chain notification');
+      }
+    }
+    return { retried: stale.length, processed };
   }
 
   // -- Admin ----------------------------------------------------------------------------------------------------
@@ -498,10 +566,16 @@ export class CryptoDepositsService {
   }
 
   /** Changes a network: deposits on or off, confirmations, contracts, the amount from which two providers must agree. */
-  async setNetwork(adminId: string | null, id: string, input: { deposits_enabled?: boolean; confirmations?: number; contract?: string | null; test_contract?: string | null; double_check_from?: string }) {
+  async setNetwork(
+    adminId: string | null,
+    id: string,
+    input: { deposits_enabled?: boolean; confirmations?: number; contract?: string | null; test_contract?: string | null; double_check_from?: string; withdrawals_enabled?: boolean; withdrawal_fee?: string; min_withdrawal?: string },
+  ) {
     const before = await this.prisma.cryptoNetwork.findUnique({ where: { id } });
     if (!before) throw notFound('network');
-    if (input.double_check_from !== undefined) toUnits(input.double_check_from, 8, 'double_check_from');
+    // Amounts in the asset's own places, so a value it cannot hold is refused here, never when deposits are settled.
+    const { decimals } = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: before.asset }, select: { decimals: true } });
+    for (const key of ['double_check_from', 'withdrawal_fee', 'min_withdrawal'] as const) if (input[key] !== undefined) toUnits(input[key]!, decimals, key);
     const after = await this.prisma.cryptoNetwork.update({
       where: { id },
       data: {
@@ -510,6 +584,9 @@ export class CryptoDepositsService {
         ...(input.contract !== undefined && before.contract !== null ? { contract: input.contract } : {}),
         ...(input.test_contract !== undefined && before.contract !== null ? { testContract: input.test_contract } : {}),
         ...(input.double_check_from !== undefined ? { doubleCheckFrom: input.double_check_from } : {}),
+        ...(input.withdrawals_enabled !== undefined ? { withdrawalsEnabled: input.withdrawals_enabled } : {}),
+        ...(input.withdrawal_fee !== undefined ? { withdrawalFee: input.withdrawal_fee } : {}),
+        ...(input.min_withdrawal !== undefined ? { minWithdrawal: input.min_withdrawal } : {}),
       },
     });
     await this.audit.record({ actorId: adminId, action: 'crypto.network_changed', targetType: 'crypto_network', targetId: id, before: presentNetwork(before), after: presentNetwork(after) });
@@ -560,5 +637,8 @@ export function presentNetwork(network: CryptoNetwork) {
     confirmations: network.confirmations,
     deposits_enabled: network.depositsEnabled,
     double_check_from: network.doubleCheckFrom,
+    withdrawals_enabled: network.withdrawalsEnabled,
+    withdrawal_fee: network.withdrawalFee,
+    min_withdrawal: network.minWithdrawal,
   };
 }

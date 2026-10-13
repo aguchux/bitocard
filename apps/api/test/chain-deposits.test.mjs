@@ -121,9 +121,9 @@ describe('blockchain providers in Settings > Integrations', () => {
     const list = (await admin.get('/v1/admin/integrations')).json.data.filter(item => item.section === 'blockchain');
     assert.deepEqual(
       list.map(item => item.id),
-      ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream'],
+      ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'crypto_signer', 'chainalysis', 'trm'],
     );
-    assert.ok(list.filter(item => item.id !== 'crypto_keys').every(item => item.links.length && item.testable && item.sandbox === false));
+    assert.ok(list.filter(item => item.id !== 'crypto_keys').every(item => item.links.length && item.testable && item.sandbox !== true));
     assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.bitocard.com/v1/webhooks/chain/alchemy?chain=<CHAIN>');
 
     const xprv = testnet.derive("m/44'/60'/0'").privateExtendedKey;
@@ -190,6 +190,7 @@ describe('deposits', () => {
     await cron('crypto');
     const pending = await prisma.cryptoDeposit.findMany({ where: { customerId: shopper.id } });
     assert.deepEqual(pending.map(item => [item.status, item.amount, item.confirmations]), [['pending', 25_500_000n, 6]]);
+    assert.equal(pending[0].outputIndex, 1, 'numbered by its place in the transaction, not the block-wide log index (stable across reorgs)');
     assert.equal(await balance(shopper, 'USDT'), '0.000000');
     chain.state.latest = 310n;
     await cron('crypto');
@@ -294,5 +295,70 @@ describe('deposits', () => {
     const bitcoin = (await admin.get('/v1/admin/crypto/chains')).json.data.find(item => item.chain === 'BITCOIN');
     const mempool = bitcoin.routes.find(item => item.provider === 'mempool');
     assert.deepEqual([mempool.configured, mempool.environment, mempool.last_block, mempool.lists_deposits], [true, 'sandbox', '801', true]);
+  });
+});
+
+describe('deposits are never silently missed', () => {
+  test('a chain whose providers cannot list a kind of deposit says so instead of reporting nothing', async () => {
+    const eth = await network('ETH', 'ETHEREUM');
+    assert.equal((await admin.patch(`/v1/admin/crypto/networks/${eth.id}`, { deposits_enabled: true })).status, 200);
+    try {
+      const run = await cron('crypto');
+      assert.deepEqual(run.result.deposits['test:ETHEREUM'].notes, ['coin deposits: webhooks only (no provider here lists them)'], 'only Alchemy lists plain ETH deposits');
+      assert.equal(run.result.deposits['test:TRON'].skipped, 'no provider lists token deposits (webhooks only)', 'only TronGrid lists TRON token deposits');
+    } finally {
+      await admin.patch(`/v1/admin/crypto/networks/${eth.id}`, { deposits_enabled: false });
+    }
+  });
+
+  test('a deposit is failed only when no provider shows it for hours, and comes back when the chain shows it again', async () => {
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    chain.state.latest += 5n;
+    const block = chain.state.latest - 3n;
+    evmTransfer(chain.state, { hash: txHash(7), to: address, raw: 3_000_000n, block });
+    await cron('crypto');
+    const row = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
+    assert.equal(row.status, 'pending');
+    const saved = chain.state.txs.get(txHash(7));
+    chain.state.txs.delete(txHash(7));
+    await cron('crypto');
+    assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'pending', 'missing for a short while is not failed');
+    await prisma.cryptoDeposit.update({ where: { id: row.id }, data: { createdAt: new Date(Date.now() - 7 * 3_600_000) } });
+    await cron('crypto');
+    assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'failed');
+    chain.state.txs.set(txHash(7), saved);
+    chain.state.latest += 20n;
+    const rechecked = await admin.post(`/v1/admin/crypto/deposits/${row.id}/recheck`);
+    assert.deepEqual([rechecked.status, rechecked.json.status], [200, 'credited']);
+    assert.equal(await balance(shopper, 'USDT'), '3.000000');
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'crypto.deposit_rechecked', targetId: row.id } }));
+    await ledgerOk();
+  });
+
+  test('a webhook that came while every provider was down is processed by the next run', async () => {
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    // Out of the watch window, so only the webhook can find it.
+    await prisma.cryptoAddress.updateMany({ where: { customerId: shopper.id }, data: { watchUntil: new Date(Date.now() - 1000) } });
+    const hash = txHash(8);
+    evmTransfer(chain.state, { hash, to: address, raw: 4_000_000n, block: chain.state.latest - 1n });
+    const body = JSON.stringify({ matchedTransactions: [{ hash }] });
+    const signature = createHmac('sha256', 'qn-secret-value-1234').update(`n8t8${body}`).digest('hex');
+    chain.state.down.add('/evm1');
+    chain.state.down.add('/evm2');
+    try {
+      const res = await fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n8', 'x-qn-timestamp': 't8', 'x-qn-signature': signature }, body });
+      assert.equal(res.status, 200);
+      let notice = null;
+      for (let i = 0; i < 20 && !(notice = await prisma.chainNotice.findFirst({ where: { hashes: { has: hash }, attempts: { gt: 0 } } })); i += 1) await new Promise(resolve => setTimeout(resolve, 100));
+      assert.equal(notice.processedAt, null, 'not processed while every provider is down');
+    } finally {
+      chain.state.down.delete('/evm1');
+      chain.state.down.delete('/evm2');
+    }
+    await prisma.chainNotice.updateMany({ where: { hashes: { has: hash } }, data: { createdAt: new Date(Date.now() - 120_000) } });
+    await cron('crypto');
+    assert.ok(await prisma.cryptoDeposit.findFirst({ where: { customerId: shopper.id, txHash: hash } }), 'recorded by the retry');
   });
 });

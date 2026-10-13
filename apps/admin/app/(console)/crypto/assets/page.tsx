@@ -26,7 +26,27 @@ function FeeField({ asset, editable }: { asset: CryptoAsset; editable: boolean }
   );
 }
 
-/** Crypto > Assets: which coins customers can hold and trade, and BitoCard's P2P fee on each. */
+/** A withdrawal amount in the coin: the 24-hour limit per customer, or the amount from which an admin approves. */
+function AmountField({ asset, field, label, editable }: { asset: CryptoAsset; field: "withdrawal_daily_limit" | "withdrawal_review_from"; label: string; editable: boolean }) {
+  const [update, state] = useUpdateCryptoAssetMutation();
+  const [value, setValue] = useState(asset[field]);
+  const valid = /^\d+(\.\d+)?$/.test(value.trim());
+  if (!editable) return <span>{asset[field]}</span>;
+  return (
+    <span className="flex items-center justify-end gap-2">
+      <label htmlFor={`${field}-${asset.code}`} className="sr-only">
+        {asset.code} {label}
+      </label>
+      <Input id={`${field}-${asset.code}`} inputMode="decimal" className="w-28" value={value} onChange={event => setValue(event.target.value)} />
+      <Button size="sm" variant="secondary" disabled={!valid || value.trim() === asset[field]} loading={state.isLoading} onClick={() => void update({ code: asset.code, [field]: value.trim() })}>
+        Save
+      </Button>
+      {state.error ? <span className="text-xs text-red-700">{errorMessage(state.error)}</span> : null}
+    </span>
+  );
+}
+
+/** Crypto > Assets: which coins customers can hold and trade, BitoCard's P2P fee on each, and withdrawal limits. */
 export default function CryptoAssetsPage() {
   const admin = useAdmin();
   const editable = can(admin, "operations");
@@ -47,6 +67,19 @@ export default function CryptoAssetsPage() {
     },
     { key: "fee", header: "P2P fee", align: "right", cell: asset => <FeeField key={asset.p2p_fee_bps} asset={asset} editable={editable} /> },
     {
+      key: "limit",
+      header: "Withdrawals a day (each customer)",
+      align: "right",
+      cell: asset => <AmountField key={asset.withdrawal_daily_limit} asset={asset} field="withdrawal_daily_limit" label="daily withdrawal limit" editable={editable} />,
+    },
+    {
+      key: "review",
+      header: "Approval from",
+      align: "right",
+      hideOnMobile: true,
+      cell: asset => <AmountField key={asset.withdrawal_review_from} asset={asset} field="withdrawal_review_from" label="withdrawals approved from" editable={editable} />,
+    },
+    {
       key: "enabled",
       header: "Customers can trade it",
       align: "right",
@@ -55,7 +88,10 @@ export default function CryptoAssetsPage() {
   ];
   return (
     <AdminShell section="crypto" current="/crypto/assets" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Assets" }]}>
-      <PageHeader title="Assets" description="Coins customers can hold and trade. BitoCard's P2P fee is taken in the coin from what the buyer receives." />
+      <PageHeader
+        title="Assets"
+        description="Coins customers can hold and trade. BitoCard's P2P fee is taken in the coin from what the buyer receives. Withdrawals from the approval amount wait for finance (0: none do)."
+      />
       <div className="mt-6 space-y-4">
         <Notice tone="amber">
           Crypto and P2P are off until switched on per market or store (

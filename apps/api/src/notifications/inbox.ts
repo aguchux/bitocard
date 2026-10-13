@@ -98,6 +98,9 @@ export const notificationTypes = {
   'admin.tax.rate_unconfirmed': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Sale refused: tax rate not confirmed' },
   'admin.fx.paused': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Conversions paused' },
   'admin.esim.top_up_unclear': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'eSIM top-up unconfirmed' },
+  'admin.crypto.withdrawal_review': { realm: 'admin', roles: ['operations', 'finance'], severity: 'warning', label: 'Crypto withdrawal to approve' },
+  'admin.crypto.withdrawal_stuck': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Crypto withdrawal unconfirmed' },
+  'admin.crypto.address_flagged': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Withdrawal address on a sanctions list' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------
   'customer.order.completed': { realm: 'customer', severity: 'success', label: 'Order delivered', push: true },
@@ -112,6 +115,9 @@ export const notificationTypes = {
   'customer.p2p.trade_completed': { realm: 'customer', severity: 'success', label: 'P2P trade completed', push: true },
   'customer.crypto.deposit_credited': { realm: 'customer', severity: 'success', label: 'Crypto deposit arrived', push: true },
   'customer.crypto.frozen': { realm: 'customer', severity: 'warning', label: 'Crypto frozen', push: true, locked: true },
+  'customer.crypto.withdrawal_sent': { realm: 'customer', severity: 'success', label: 'Crypto withdrawal sent', push: true },
+  'customer.crypto.withdrawal_failed': { realm: 'customer', severity: 'warning', label: 'Crypto withdrawal not sent', push: true },
+  'customer.crypto.address_added': { realm: 'customer', severity: 'warning', label: 'Withdrawal address added', push: true, locked: true },
   'customer.verification.updated': { realm: 'customer', severity: 'info', label: 'Identity check updated', push: true },
   'customer.security.password_changed': { realm: 'customer', severity: 'warning', label: 'Password changed', push: true, locked: true },
   'customer.security.email_changed': { realm: 'customer', severity: 'warning', label: 'Sign-in email changed', push: true, locked: true },

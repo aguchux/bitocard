@@ -49,9 +49,14 @@ export default async function CryptoPage() {
               Your coins
             </h2>
             {!wallets.frozen && wallets.verified ? (
-              <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white">
-                Deposit
-              </Link>
+              <span className="flex gap-2">
+                <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white">
+                  Deposit
+                </Link>
+                <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-semibold text-[#070f4c] ring-1 ring-slate-300">
+                  Withdraw
+                </Link>
+              </span>
             ) : null}
           </div>
           <ul className="divide-y divide-slate-100">

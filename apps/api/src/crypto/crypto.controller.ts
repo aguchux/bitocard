@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
@@ -11,6 +11,7 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { CryptoDepositsService } from './chains/deposits.service.js';
 import { CryptoWalletsService, presentAsset } from './crypto-wallets.service.js';
 import { type AdSide, P2pService } from './p2p.service.js';
+import { CryptoWithdrawalsService } from './withdrawals.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 const assetCode = () => Matches(/^[A-Z0-9]{2,10}$/, { message: 'asset must be an asset code such as USDT' });
@@ -125,6 +126,10 @@ class TradeDto {
   @IsInt() @Min(1)
   price: number;
 
+  /** BitoCard's fee as you saw it (basis points): a changed fee is refused, like a changed price. */
+  @IsOptional() @IsInt() @Min(0) @Max(1000)
+  fee_bps?: number;
+
   /** How much crypto, or (instead) how much fiat to spend or receive, in minor units. */
   @IsOptional() @cryptoAmount()
   amount?: string;
@@ -190,6 +195,103 @@ export class CustomerCryptoController {
   @Post('test-deposits')
   testDeposit(@CurrentCustomer() caller: CustomerCaller, @Body() body: TestDepositDto) {
     return this.wallets.testDeposit(caller.customer, body);
+  }
+}
+
+class WithdrawalAddressDto {
+  @Transform(upper) @IsIn(['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'])
+  chain: string;
+
+  @IsString() @Length(20, 100)
+  address: string;
+
+  @IsString() @Length(1, 40)
+  label: string;
+}
+
+class WithdrawalDto {
+  @Transform(upper) @assetCode()
+  asset: string;
+
+  @Transform(upper) @IsIn(['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'])
+  chain: string;
+
+  @IsUUID()
+  address_id: string;
+
+  @cryptoAmount()
+  amount: string;
+
+  /** Only show what it would send and cost. */
+  @IsOptional() @IsBoolean()
+  preview?: boolean;
+}
+
+class CodeDto {
+  @Matches(/^\d{6}$/, { message: 'code must be the 6 digits we emailed you' })
+  code: string;
+}
+
+/** A store customer's on-chain withdrawals: saved addresses (usable after 24 hours), withdrawals confirmed by an emailed code. */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('store/crypto')
+export class CustomerWithdrawalsController {
+  constructor(private readonly withdrawals: CryptoWithdrawalsService) {}
+
+  @Get('withdrawal-networks')
+  networks(@CurrentCustomer() caller: CustomerCaller, @Query() query: DepositNetworksDto) {
+    return this.withdrawals.networks(caller.customer, query.asset);
+  }
+
+  @Get('withdrawal-addresses')
+  addresses(@CurrentCustomer() caller: CustomerCaller) {
+    return this.withdrawals.addresses(caller.customer);
+  }
+
+  @Post('withdrawal-addresses')
+  addAddress(@CurrentCustomer() caller: CustomerCaller, @Body() body: WithdrawalAddressDto) {
+    return this.withdrawals.addAddress(caller.customer, body);
+  }
+
+  @Delete('withdrawal-addresses/:id')
+  removeAddress(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.removeAddress(caller.customer, id);
+  }
+
+  @Get('withdrawals')
+  withdrawalList(@CurrentCustomer() caller: CustomerCaller) {
+    return this.withdrawals.list(caller.customer);
+  }
+
+  @Get('withdrawals/:id')
+  withdrawal(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.get(caller.customer, id);
+  }
+
+  /** Previews, or asks for a withdrawal (then confirmed with the emailed code). */
+  @Post('withdrawals')
+  withdraw(@CurrentCustomer() caller: CustomerCaller, @Body() body: WithdrawalDto) {
+    return this.withdrawals.create(caller.customer, body);
+  }
+
+  @Post('withdrawals/:id/confirm')
+  @HttpCode(HttpStatus.OK)
+  confirm(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CodeDto) {
+    return this.withdrawals.confirm(caller.customer, id, body.code);
+  }
+
+  @Post('withdrawals/:id/resend-code')
+  @HttpCode(HttpStatus.OK)
+  resend(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.resendCode(caller.customer, id);
+  }
+
+  @Post('withdrawals/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.cancel(caller.customer, id);
   }
 }
 
@@ -264,6 +366,14 @@ class AssetDto {
 
   @IsOptional() @IsInt() @Min(0) @Max(1000)
   p2p_fee_bps?: number;
+
+  /** The most one customer can withdraw on chain in 24 hours. */
+  @IsOptional() @cryptoAmount()
+  withdrawal_daily_limit?: string;
+
+  /** Withdrawals from this amount wait for an admin's approval ("0": none do). */
+  @IsOptional() @cryptoAmount()
+  withdrawal_review_from?: string;
 }
 
 class CustomerSearchDto {
@@ -430,6 +540,16 @@ class NetworkDto {
 
   @IsOptional() @cryptoAmount()
   double_check_from?: string;
+
+  @IsOptional() @IsBoolean()
+  withdrawals_enabled?: boolean;
+
+  /** BitoCard's network fee per withdrawal, on top of the amount sent. */
+  @IsOptional() @cryptoAmount()
+  withdrawal_fee?: string;
+
+  @IsOptional() @cryptoAmount()
+  min_withdrawal?: string;
 }
 
 class DepositListDto {
@@ -478,6 +598,61 @@ export class AdminChainsController {
   @Get('deposits')
   depositList(@Query() query: DepositListDto) {
     return this.deposits.adminDeposits(query);
+  }
+
+  /** Checks a deposit on chain again now; a failed one (the chain had stopped showing it) goes back to pending. */
+  @AdminRoles('operations')
+  @Post('deposits/:id/recheck')
+  @HttpCode(HttpStatus.OK)
+  recheckDeposit(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.deposits.recheck(adminId(caller), id);
+  }
+}
+
+class WithdrawalListDto {
+  @IsOptional() @IsIn(['live', 'test'])
+  mode?: LedgerMode;
+
+  @IsOptional() @IsIn(['awaiting_code', 'review', 'queued', 'submitting', 'broadcast', 'completed', 'failed', 'rejected', 'cancelled'])
+  status?: string;
+
+  @IsOptional() @IsUUID()
+  customer_id?: string;
+}
+
+/** Admin: on-chain withdrawals (approve or reject those waiting for review, recheck stuck ones). */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('operations', 'finance', 'support')
+@Controller('admin/crypto/withdrawals')
+export class AdminWithdrawalsController {
+  constructor(private readonly withdrawals: CryptoWithdrawalsService) {}
+
+  @Get()
+  list(@Query() query: WithdrawalListDto) {
+    return this.withdrawals.adminList(query);
+  }
+
+  /** Finance only: crypto leaves BitoCard. */
+  @AdminRoles('finance')
+  @Post(':id/approve')
+  @HttpCode(HttpStatus.OK)
+  approve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDto) {
+    return this.withdrawals.approve(adminId(caller), id, body.note);
+  }
+
+  @AdminRoles('operations', 'finance')
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  reject(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDto) {
+    return this.withdrawals.reject(adminId(caller), id, body.note);
+  }
+
+  @AdminRoles('operations', 'finance')
+  @Post(':id/recheck')
+  @HttpCode(HttpStatus.OK)
+  recheck(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.withdrawals.recheck(adminId(caller), id);
   }
 }
 

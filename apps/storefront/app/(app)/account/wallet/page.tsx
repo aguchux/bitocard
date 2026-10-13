@@ -83,6 +83,9 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
               <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
                 Deposit
               </Link>
+              <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
+                Withdraw
+              </Link>
               <Link href="/account/crypto" className="inline-flex min-h-10 items-center rounded-xl bg-[#ff2382] px-3 text-sm font-semibold hover:bg-[#e8116d]">
                 Buy or sell
               </Link>

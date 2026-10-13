@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeftRight, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'settings';
 
@@ -83,7 +83,8 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Wallets & freezes', href: '/crypto', icon: Snowflake },
       { label: 'P2P trades', href: '/crypto/trades', icon: ArrowLeftRight },
       { label: 'P2P ads', href: '/crypto/ads', icon: ListChecks },
-      { label: 'Deposits', href: '/crypto/deposits', icon: ArrowLeftRight },
+      { label: 'Deposits', href: '/crypto/deposits', icon: ArrowDownToLine },
+      { label: 'Withdrawals', href: '/crypto/withdrawals', icon: ArrowUpFromLine },
       { label: 'Chains', href: '/crypto/chains', icon: PlugZap },
       { label: 'Assets', href: '/crypto/assets', icon: Coins },
     ],

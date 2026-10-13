@@ -22,7 +22,7 @@ export const cryptoFrozen = () =>
 /** Who a customer is in the crypto market: their store's mode, the seller behind it and their country's currency. */
 export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; seller: Reseller; country: string; currency: string };
 
-const cryptoKinds = ['crypto_wallet', 'crypto_locked', 'crypto_frozen'] as const satisfies AccountKind[];
+const cryptoKinds = ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing'] as const satisfies AccountKind[];
 const fiatKinds = ['customer_withdrawable', 'p2p_fiat_locked', 'customer_wallet'] as const satisfies AccountKind[];
 
 export function presentFreeze(freeze: CryptoFreeze, asset: Pick<CryptoAsset, 'decimals'>) {
@@ -124,6 +124,7 @@ export class CryptoWalletsService {
       const available = balance('crypto_wallet', asset.code);
       const locked = balance('crypto_locked', asset.code);
       const frozen = balance('crypto_frozen', asset.code);
+      const withdrawing = balance('crypto_withdrawing', asset.code);
       return {
         object: 'crypto_balance' as const,
         asset: asset.code,
@@ -132,7 +133,9 @@ export class CryptoWalletsService {
         available: fromUnits(available, asset.decimals),
         locked: fromUnits(locked, asset.decimals),
         frozen: fromUnits(frozen, asset.decimals),
-        total: fromUnits(available + locked + frozen, asset.decimals),
+        /** On its way out in on-chain withdrawals (amount and fee), until each is sent or returned. */
+        withdrawing: fromUnits(withdrawing, asset.decimals),
+        total: fromUnits(available + locked + frozen + withdrawing, asset.decimals),
       };
     });
   }
@@ -215,7 +218,7 @@ export class CryptoWalletsService {
           object: 'crypto_transaction' as const,
           id: posting.id,
           type: posting.entry.type,
-          /** available, locked or frozen: which part of the wallet moved. */
+          /** available, locked, frozen or withdrawing: which part of the wallet moved. */
           balance: posting.account.kind.replace('crypto_', '').replace('wallet', 'available'),
           description: posting.entry.description,
           asset: posting.account.currency,
@@ -232,14 +235,18 @@ export class CryptoWalletsService {
 
   // -- Admin ----------------------------------------------------------------------------------------------------
 
-  async setAsset(adminId: string | null, code: string, input: { enabled?: boolean; p2p_fee_bps?: number }) {
+  async setAsset(adminId: string | null, code: string, input: { enabled?: boolean; p2p_fee_bps?: number; withdrawal_daily_limit?: string; withdrawal_review_from?: string }) {
     const before = await this.prisma.cryptoAsset.findUnique({ where: { code: code.toUpperCase() } });
     if (!before) throw notFound('asset');
+    for (const key of ['withdrawal_daily_limit', 'withdrawal_review_from'] as const) if (input[key] !== undefined) toUnits(input[key]!, before.decimals, key);
     const after = await this.prisma.cryptoAsset.update({
       where: { code: before.code },
-      data: { ...(input.enabled !== undefined ? { enabled: input.enabled } : {}), ...(input.p2p_fee_bps !== undefined ? { p2pFeeBps: input.p2p_fee_bps } : {}) },
+      data: { ...(input.enabled !== undefined ? { enabled: input.enabled } : {}), ...(input.p2p_fee_bps !== undefined ? { p2pFeeBps: input.p2p_fee_bps } : {}),
+        ...(input.withdrawal_daily_limit !== undefined ? { withdrawalDailyLimit: input.withdrawal_daily_limit } : {}),
+        ...(input.withdrawal_review_from !== undefined ? { withdrawalReviewFrom: input.withdrawal_review_from } : {}),
+      },
     });
-    await this.audit.record({ actorId: adminId, action: 'crypto.asset_changed', targetType: 'crypto_asset', targetId: after.code, before: { enabled: before.enabled, p2p_fee_bps: before.p2pFeeBps }, after: { enabled: after.enabled, p2p_fee_bps: after.p2pFeeBps } });
+    await this.audit.record({ actorId: adminId, action: 'crypto.asset_changed', targetType: 'crypto_asset', targetId: after.code, before: presentAsset(before), after: presentAsset(after) });
     return presentAsset(after);
   }
 
@@ -400,5 +407,14 @@ export class CryptoWalletsService {
 }
 
 export function presentAsset(asset: CryptoAsset) {
-  return { object: 'crypto_asset' as const, code: asset.code, name: asset.name, decimals: asset.decimals, enabled: asset.enabled, p2p_fee_bps: asset.p2pFeeBps };
+  return {
+    object: 'crypto_asset' as const,
+    code: asset.code,
+    name: asset.name,
+    decimals: asset.decimals,
+    enabled: asset.enabled,
+    p2p_fee_bps: asset.p2pFeeBps,
+    withdrawal_daily_limit: asset.withdrawalDailyLimit,
+    withdrawal_review_from: asset.withdrawalReviewFrom,
+  };
 }

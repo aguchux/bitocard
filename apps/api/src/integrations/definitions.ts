@@ -1,5 +1,7 @@
 import type { AppConfig } from '../config/config.js';
 import { chainProviders, walletKeyFields } from '../crypto/chains/providers.js';
+import { screeners } from '../crypto/custody/screening.js';
+import { signerFields } from '../crypto/custody/signer.js';
 import { supplierCredentialGroups, supplierCredentialKey } from './supplier-credentials.js';
 
 /**
@@ -415,6 +417,16 @@ export const integrationGroups: IntegrationGroup[] = [
     webhookPath: provider.verify ? `/v1/webhooks/chain/${provider.id}?chain=<CHAIN>` : undefined,
     fields: provider.fields,
   })),
+  {
+    id: 'crypto_signer',
+    name: 'Crypto signer',
+    description:
+      'BitoCard’s signer service, the only thing that can send customers’ crypto: it runs off Vercel in front of the key vault and sends each withdrawal the API asks for, once. The API never holds a private key.',
+    section: 'blockchain' as const,
+    adapterReady: true,
+    fields: signerFields,
+  },
+  ...screeners.map(item => ({ id: item.id, name: item.name, description: item.description, section: 'blockchain' as const, adapterReady: true, fields: item.fields })),
 ];
 
 export const integrationFields = new Map(integrationGroups.flatMap(group => group.fields.map(item => [item.key, item] as const)));

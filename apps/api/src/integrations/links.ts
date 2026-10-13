@@ -8,6 +8,8 @@
  * https only; a test checks both. Check a link still works when a provider redesigns its dashboard.
  */
 import { chainProviders } from '../crypto/chains/providers.js';
+import { screeners } from '../crypto/custody/screening.js';
+import { signerLinks } from '../crypto/custody/signer.js';
 
 export type IntegrationLink = { label: string; url: string };
 
@@ -73,6 +75,8 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
 
   // Blockchain providers (their links live with their definitions).
   ...Object.fromEntries(chainProviders.map(provider => [provider.id, provider.links])),
+  crypto_signer: signerLinks,
+  ...Object.fromEntries(screeners.map(item => [item.id, item.links])),
 };
 
 export const linksFor = (id: string) => integrationLinks[id] ?? [];

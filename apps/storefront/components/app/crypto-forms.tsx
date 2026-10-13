@@ -1,10 +1,23 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Check, Copy, Plus, Zap } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, Copy, Mail, Plus, Send, Zap } from "lucide-react";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
-import { addTestCrypto, chooseNickname, confirmTrade, findBestPrice, postAd, repriceAd, takeAd } from "@/lib/crypto-actions";
+import {
+  addTestCrypto,
+  addWithdrawalAddress,
+  chooseNickname,
+  confirmTrade,
+  confirmWithdrawal,
+  createWithdrawal,
+  findBestPrice,
+  postAd,
+  repriceAd,
+  resendWithdrawalCode,
+  reviewWithdrawal,
+  takeAd,
+} from "@/lib/crypto-actions";
 
 const selectClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-[#070f4c] focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none";
 
@@ -115,12 +128,13 @@ export function TakeAdForm({ adId, price, currency, side, min, max }: { adId: st
 }
 
 /** The final step: confirms exactly the trade shown. */
-export function ConfirmTradeForm({ adId, price, fiat, label }: { adId: string; price: number; fiat: number; label: string }) {
+export function ConfirmTradeForm({ adId, price, feeBps, fiat, label }: { adId: string; price: number; feeBps: number; fiat: number; label: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(confirmTrade, {});
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="ad_id" value={adId} />
       <input type="hidden" name="price" value={price} />
+      <input type="hidden" name="fee_bps" value={feeBps} />
       <input type="hidden" name="fiat" value={fiat} />
       <FormMessage state={state} />
       {state.field === "funds" ? (
@@ -184,5 +198,91 @@ export function NicknameForm({ current }: { current: string }) {
       <TextField label="Nickname" name="nickname" defaultValue={current} pattern="[A-Za-z0-9_]{3,20}" maxLength={20} required state={state} hint="What other traders see instead of your name. 3 to 20 letters, numbers or underscores; you can choose it once." />
       <Submit pending={pending}>Save nickname</Submit>
     </form>
+  );
+}
+
+/** Saves an address to withdraw to on a network: usable 24 hours after it is added. */
+export function AddWithdrawalAddressForm({ chain, network }: { chain: string; network: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(addWithdrawalAddress, {});
+  return (
+    <form action={action} className="space-y-3" aria-label="Add an address">
+      <input type="hidden" name="chain" value={chain} />
+      <FormMessage state={state} />
+      <TextField label={`${network} address`} name="address" autoComplete="off" spellCheck={false} required state={state} />
+      <TextField label="Name" name="label" maxLength={40} placeholder="My wallet" required state={state} hint="New addresses can be used 24 hours after you add them. We email you each time one is added." />
+      <Submit pending={pending} className="w-full sm:w-auto">
+        <Plus className="size-4" aria-hidden="true" /> Save address
+      </Submit>
+    </form>
+  );
+}
+
+/** Where and how much to send: the next step shows the fee and total before anything moves. */
+export function WithdrawForm({ asset, chain, addresses, minimum }: { asset: string; chain: string; addresses: Array<{ id: string; label: string; address: string }>; minimum: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(reviewWithdrawal, {});
+  return (
+    <form action={action} className="space-y-4" aria-label={`Send ${asset}`}>
+      <input type="hidden" name="asset" value={asset} />
+      <input type="hidden" name="chain" value={chain} />
+      <FormMessage state={state} />
+      <fieldset className="space-y-2">
+        <legend className="mb-1 text-sm font-semibold text-[#070f4c]">Send to</legend>
+        {addresses.map((item, index) => (
+          <label key={item.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-[#ff2382]">
+            <input type="radio" name="address_id" value={item.id} defaultChecked={index === 0} className="accent-[#ff2382]" />
+            <span className="min-w-0">
+              <span className="block font-semibold">{item.label}</span>
+              <span className="block truncate font-mono text-xs text-slate-500">{item.address}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <TextField label={`Amount (${asset})`} name="amount" inputMode="decimal" required state={state} hint={`At least ${minimum} ${asset}. BitoCard's network fee is added on top.`} />
+      <Submit pending={pending} className="w-full">
+        <Send className="size-4" aria-hidden="true" /> Review withdrawal
+      </Submit>
+    </form>
+  );
+}
+
+/** Asks for the withdrawal the customer reviewed: the code to confirm it is emailed next. */
+export function CreateWithdrawalForm({ asset, chain, addressId, amount }: { asset: string; chain: string; addressId: string; amount: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(createWithdrawal, {});
+  return (
+    <form action={action} className="space-y-3">
+      <input type="hidden" name="asset" value={asset} />
+      <input type="hidden" name="chain" value={chain} />
+      <input type="hidden" name="address_id" value={addressId} />
+      <input type="hidden" name="amount" value={amount} />
+      <FormMessage state={state} />
+      <Submit pending={pending} className="w-full">
+        <Mail className="size-4" aria-hidden="true" /> Email me the code to send it
+      </Submit>
+    </form>
+  );
+}
+
+/** The 6-digit code from the email, which confirms the withdrawal; or a new code. */
+export function WithdrawalCodeForm({ id }: { id: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(confirmWithdrawal, {});
+  const [resent, resend, resending] = useActionState<FormState, FormData>(resendWithdrawalCode, {});
+  return (
+    <div className="space-y-3">
+      <form action={action} className="space-y-3" aria-label="Confirm the withdrawal">
+        <input type="hidden" name="id" value={id} />
+        <FormMessage state={state} />
+        <TextField label="Code from your email" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required state={state} />
+        <Submit pending={pending} className="w-full">
+          <Check className="size-4" aria-hidden="true" /> Confirm and send
+        </Submit>
+      </form>
+      <form action={resend}>
+        <input type="hidden" name="id" value={id} />
+        <FormMessage state={resent} />
+        <button type="submit" disabled={resending} className="inline-flex min-h-11 items-center font-semibold text-[#ff2382] hover:underline disabled:opacity-60">
+          Send a new code
+        </button>
+      </form>
+    </div>
   );
 }

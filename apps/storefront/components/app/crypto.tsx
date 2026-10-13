@@ -1,8 +1,21 @@
 import Link from "next/link";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreP2pTrade } from "@bitocard/api-client/storefront";
+import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade } from "@bitocard/api-client/storefront";
 
 export const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
+
+/** A withdrawal's status in plain words. */
+export const withdrawalStatus: Record<StoreCryptoWithdrawal["status"], string> = {
+  awaiting_code: "Waiting for your code",
+  review: "Being checked",
+  queued: "Sending",
+  submitting: "Sending",
+  broadcast: "On the network",
+  completed: "Sent",
+  failed: "Not sent",
+  rejected: "Not approved",
+  cancelled: "Cancelled",
+};
 
 const sections = [
   { href: "/account/crypto", label: "Wallets" },

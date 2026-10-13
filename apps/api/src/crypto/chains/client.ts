@@ -38,6 +38,8 @@ export interface ChainClient {
   inspect(hash: string): Promise<Inspection | null>;
   /** Whether `scan` can find the chain's own coin (not only tokens). */
   readonly nativeScan: boolean;
+  /** Whether `scan` can list token transfers (EVM logs, TronGrid's account history). */
+  readonly tokenScan: boolean;
 }
 
 const timeoutMs = 15_000;
@@ -86,6 +88,7 @@ type EvmLog = { transactionHash: string; logIndex: string; blockNumber: string |
 
 /** Ethereum and BNB Chain over standard JSON-RPC (every EVM provider), with Alchemy's transfers API for plain coin deposits. */
 export class EvmClient implements ChainClient {
+  readonly tokenScan = true;
   constructor(private readonly endpoint: Endpoint) {}
 
   get nativeScan() {
@@ -131,11 +134,12 @@ export class EvmClient implements ChainClient {
     const transfers: Transfer[] = [];
     const block = hexBig(receipt?.blockNumber ?? tx.blockNumber);
     if (tx.to && BigInt(tx.value) > 0n) transfers.push({ hash, index: 0, to: tx.to.toLowerCase(), contract: null, raw: BigInt(tx.value), block });
-    for (const log of receipt?.logs ?? []) {
-      if (log.topics[0]?.toLowerCase() !== transferTopic || log.topics.length < 3) continue;
-      // Token transfers use their log index plus one, so they never clash with the coin transfer at 0.
-      transfers.push({ hash, index: Number(BigInt(log.logIndex)) + 1, to: topicAddress(log.topics[2]), contract: log.address.toLowerCase(), raw: BigInt(log.data === '0x' ? 0 : log.data), block });
-    }
+    (receipt?.logs ?? []).forEach((log, position) => {
+      if (log.topics[0]?.toLowerCase() !== transferTopic || log.topics.length < 3) return;
+      // Token transfers are numbered by their place among the transaction's logs, plus one so they never clash with the
+      // coin transfer at 0: unlike the block-wide log index, it stays the same if a reorg puts the transaction in another block.
+      transfers.push({ hash, index: position + 1, to: topicAddress(log.topics[2]), contract: log.address.toLowerCase(), raw: BigInt(log.data === '0x' ? 0 : log.data), block });
+    });
     return { block, ok: receipt ? receipt.status === '0x1' : true, transfers };
   }
 }
@@ -144,6 +148,11 @@ export class EvmClient implements ChainClient {
 export class TronClient implements ChainClient {
   readonly nativeScan = false;
   constructor(private readonly endpoint: Endpoint) {}
+
+  /** Only TronGrid lists an account's token transfers; other TRON nodes read transactions by hash (webhooks). */
+  get tokenScan() {
+    return this.endpoint.flavor === 'trongrid';
+  }
 
   async latestBlock() {
     const block = await request<{ block_header?: { raw_data?: { number?: number } } }>(this.endpoint, '/wallet/getnowblock', { body: {} });
@@ -193,6 +202,7 @@ type EsploraTx = { txid: string; status?: { confirmed?: boolean; block_height?: 
 /** Bitcoin through an Esplora REST API (mempool.space, Blockstream). */
 export class EsploraClient implements ChainClient {
   readonly nativeScan = true;
+  readonly tokenScan = false;
   constructor(private readonly endpoint: Endpoint) {}
 
   async latestBlock() {
@@ -224,6 +234,7 @@ type BlockCypherTx = { hash: string; block_height?: number; outputs: Array<{ add
 /** Bitcoin through BlockCypher's REST API (its token in the query). */
 export class BlockCypherClient implements ChainClient {
   readonly nativeScan = true;
+  readonly tokenScan = false;
   constructor(private readonly endpoint: Endpoint & { token?: string }) {}
 
   private path(path: string) {
@@ -259,6 +270,7 @@ export class BlockCypherClient implements ChainClient {
 /** Bitcoin through Bitcoin Core JSON-RPC (QuickNode, GetBlock, Chainstack, Tatum): reads transactions by hash only. */
 export class BitcoinRpcClient implements ChainClient {
   readonly nativeScan = false;
+  readonly tokenScan = false;
   constructor(private readonly endpoint: Endpoint) {}
 
   async latestBlock() {
@@ -279,6 +291,7 @@ export class BitcoinRpcClient implements ChainClient {
 /** Solana JSON-RPC: the latest slot (deposits come once Solana addresses are issued by the signer). */
 export class SolanaClient implements ChainClient {
   readonly nativeScan = false;
+  readonly tokenScan = false;
   constructor(private readonly endpoint: Endpoint) {}
 
   async latestBlock() {
