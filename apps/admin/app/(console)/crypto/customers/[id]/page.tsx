@@ -21,6 +21,7 @@ const balanceColumns: Array<Column<CryptoBalance>> = [
   { key: "available", header: "Available", cell: row => row.available, align: "right" },
   { key: "locked", header: "Locked (ads)", cell: row => row.locked, align: "right" },
   { key: "frozen", header: "Frozen", cell: row => row.frozen, align: "right" },
+  { key: "withdrawing", header: "Withdrawing", cell: row => row.withdrawing, align: "right", hideOnMobile: true },
   { key: "total", header: "Total", cell: row => <span className="font-semibold">{row.total}</span>, align: "right", hideOnMobile: true },
 ];
 
@@ -28,7 +29,7 @@ const balanceColumns: Array<Column<CryptoBalance>> = [
 const holding = (balances: CryptoBalance[]) => balances.some(row => Number(row.total) > 0);
 const firstMode = (customer: CryptoCustomerDetail): Mode => (holding(customer.balances.live) || !holding(customer.balances.test) ? "live" : "test");
 
-const cashLabels: Record<string, string> = { customer_withdrawable: "P2P money", p2p_fiat_locked: "In buy ads", customer_wallet: "Wallet" };
+const cashLabels: Record<string, string> = { customer_withdrawable: "P2P money", p2p_fiat_locked: "In buy ads", customer_wallet: "Wallet", customer_payouts_pending: "Paying out" };
 
 /** Freezing an amount: which asset and mode, how much, and why (the customer is told). */
 function FreezeDialog({ customer, open, onClose, defaultMode }: { customer: CryptoCustomerDetail; open: boolean; onClose: () => void; defaultMode: Mode }) {
@@ -201,8 +202,11 @@ export default function CryptoCustomerPage({ params }: { params: Promise<{ id: s
                 <DataTable columns={freezeColumns} rows={customer.freezes} rowKey={row => row.id} empty="Nothing has been frozen." />
               </Card>
               <p className="text-sm text-muted">
-                Their trades: <AppLink href={`/crypto/trades?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P trades</AppLink> ·{" "}
-                <AppLink href={`/crypto/ads?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P ads</AppLink>
+                Their activity: <AppLink href={`/crypto/trades?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P trades</AppLink> ·{" "}
+                <AppLink href={`/crypto/ads?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P ads</AppLink> ·{" "}
+                <AppLink href={`/crypto/deposits?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Deposits</AppLink> ·{" "}
+                <AppLink href={`/crypto/withdrawals?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">Withdrawals</AppLink> ·{" "}
+                <AppLink href={`/crypto/payouts?customer=${customer.id}`} className="font-semibold text-brand-600 hover:underline">P2P payouts</AppLink>
               </p>
               {dialog === "freeze" ? <FreezeDialog customer={customer} open onClose={() => setDialog(null)} defaultMode={mode} /> : null}
               <CreditDialog customer={customer} open={dialog === "credit"} onClose={() => setDialog(null)} />

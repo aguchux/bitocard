@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { type ReactNode, useActionState, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Check, Copy, Mail, Plus, Send, Zap } from "lucide-react";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
@@ -14,6 +14,7 @@ import {
   confirmWithdrawal,
   createWithdrawal,
   findBestPrice,
+  type NonceFormState,
   postAd,
   repriceAd,
   resendWithdrawalCode,
@@ -74,6 +75,42 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+/**
+ * One button that changes something (pause an ad, cancel a withdrawal, remove an account), with the API's reason
+ * shown beside it when it is refused.
+ */
+export function ActionButton({
+  action,
+  fields,
+  children,
+  className,
+  label,
+}: {
+  action: (state: FormState, form: FormData) => Promise<FormState>;
+  fields: Record<string, string>;
+  children: ReactNode;
+  className: string;
+  /** The button's accessible name, when it shows only an icon. */
+  label?: string;
+}) {
+  const [state, run, pending] = useActionState<FormState, FormData>(action, {});
+  return (
+    <form action={run} className="inline-flex flex-col items-start gap-1">
+      {Object.entries(fields).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      <button type="submit" disabled={pending} aria-label={label} className={`${className} disabled:opacity-60`}>
+        {children}
+      </button>
+      {state.error ? (
+        <p className="max-w-xs text-sm text-red-700" role="alert">
+          {state.error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 /** One tap to the best price: buy or sell, which coin and how much (in the customer's currency). */
 export function QuickTrade({ assets, currency, defaultAsset, defaultSide = "buy" }: { assets: string[]; currency: string; defaultAsset?: string; defaultSide?: "buy" | "sell" }) {
   const [state, action, pending] = useActionState<FormState, FormData>(findBestPrice, {});
@@ -130,10 +167,12 @@ export function TakeAdForm({ adId, price, currency, side, min, max }: { adId: st
 }
 
 /** The final step: confirms exactly the trade shown. */
-export function ConfirmTradeForm({ adId, price, feeBps, fiat, label }: { adId: string; price: number; feeBps: number; fiat: number; label: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(confirmTrade, {});
+export function ConfirmTradeForm({ adId, price, feeBps, fiat, label, nonce }: { adId: string; price: number; feeBps: number; fiat: number; label: string; nonce: string }) {
+  const [state, action, pending] = useActionState<NonceFormState, FormData>(confirmTrade, {});
   return (
     <form action={action} className="space-y-3">
+      {/* Sent as the Idempotency-Key, so a double tap trades once. */}
+      <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
       <input type="hidden" name="ad_id" value={adId} />
       <input type="hidden" name="price" value={price} />
       <input type="hidden" name="fee_bps" value={feeBps} />
@@ -248,10 +287,12 @@ export function WithdrawForm({ asset, chain, addresses, minimum }: { asset: stri
 }
 
 /** Asks for the withdrawal the customer reviewed: the code to confirm it is emailed next. */
-export function CreateWithdrawalForm({ asset, chain, addressId, amount }: { asset: string; chain: string; addressId: string; amount: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(createWithdrawal, {});
+export function CreateWithdrawalForm({ asset, chain, addressId, amount, nonce }: { asset: string; chain: string; addressId: string; amount: string; nonce: string }) {
+  const [state, action, pending] = useActionState<NonceFormState, FormData>(createWithdrawal, {});
   return (
     <form action={action} className="space-y-3">
+      {/* Sent as the Idempotency-Key, so a double tap asks once. */}
+      <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
       <input type="hidden" name="asset" value={asset} />
       <input type="hidden" name="chain" value={chain} />
       <input type="hidden" name="address_id" value={addressId} />
@@ -319,11 +360,13 @@ export function CashOutAccountForm({ banks }: { banks: Array<{ code: string; nam
 }
 
 /** Pays P2P money out to one of the customer's bank accounts. */
-export function CashOutForm({ accounts, currency, available }: { accounts: Array<{ id: string; label: string; ready: boolean; from: string }>; currency: string; available: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(cashOut, {});
+export function CashOutForm({ accounts, currency, available, nonce }: { accounts: Array<{ id: string; label: string; ready: boolean; from: string }>; currency: string; available: string; nonce: string }) {
+  const [state, action, pending] = useActionState<NonceFormState, FormData>(cashOut, {});
   const usable = accounts.filter(item => item.ready);
   return (
     <form action={action} className="space-y-4" aria-label="Cash out">
+      {/* Sent as the Idempotency-Key, so a double tap pays out once. */}
+      <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
       <FormMessage state={state} />
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm font-semibold text-[#070f4c]">Pay into</legend>

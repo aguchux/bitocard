@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
 import type { IntegrationField } from '../../integrations/definitions.js';
+import { secureUrl } from '../../integrations/integrations.service.js';
 import type { IntegrationLink } from '../../integrations/links.js';
 import type { Chain } from '../chains/client.js';
 
@@ -67,7 +68,10 @@ export class RemoteSigner implements CryptoSigner {
   constructor(
     private readonly url: string,
     private readonly secret: string,
-  ) {}
+  ) {
+    // Set from the environment the address is not validated on save: refuse plain HTTP here too.
+    if (!secureUrl(url)) throw new SignerError('The signer address must be https://.', true);
+  }
 
   private async request(method: 'GET' | 'POST', path: string, body?: unknown) {
     const url = `${this.url.replace(/\/+$/, '')}${path}`;

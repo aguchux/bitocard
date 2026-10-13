@@ -29,9 +29,11 @@ const columns: Array<Column<P2pTrade>> = [
       <span className="block text-xs">
         <AppLink href={`/crypto/customers/${trade.seller.id}`} className="block text-brand-600 hover:underline">
           {trade.seller.email}
+          {trade.taker === "seller" ? " (took the ad)" : " (ad)"}
         </AppLink>
         <AppLink href={`/crypto/customers/${trade.buyer.id}`} className="block text-brand-600 hover:underline">
           {trade.buyer.email}
+          {trade.taker === "buyer" ? " (took the ad)" : " (ad)"}
         </AppLink>
       </span>
     ),

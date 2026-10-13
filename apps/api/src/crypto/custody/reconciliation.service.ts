@@ -9,6 +9,9 @@ import { ledgerUnits } from '../chains/deposits.service.js';
 import { CryptoWithdrawalsService } from '../withdrawals.service.js';
 import type { SignerBalance } from './signer.js';
 
+/** Ledger references of sandbox crypto credited without an on-chain deposit (CryptoWalletsService). */
+const testCreditPrefixes = ['crypto_test_deposit:', 'crypto_admin_credit:'];
+
 export function presentReconciliation(row: CryptoReconciliation, decimals: number) {
   return {
     object: 'crypto_reconciliation' as const,
@@ -26,7 +29,8 @@ export function presentReconciliation(row: CryptoReconciliation, decimals: numbe
 
 /**
  * The daily custody check. For each asset, what the ledger expects BitoCard's wallets to hold on chain (customers'
- * crypto and BitoCard's crypto fees in `crypto_custody`, less withdrawals broadcast but not yet settled, plus deposits
+ * crypto and BitoCard's crypto fees in `crypto_custody`, less withdrawals being sent or broadcast but not yet settled
+ * and, in the sandbox, test crypto credited without a deposit, plus deposits
  * seen but not yet credited) is compared with what the signer reports its wallets hold (deposit addresses, hot, warm
  * and cold; protocol in `docs/crypto-signer.md`). A shortfall means customers' crypto is not all there: finance and
  * operations are told at once. A surplus is BitoCard's own money (a gas float, fees). Sandbox stores' simulated signer
@@ -62,11 +66,25 @@ export class CryptoReconciliationService {
     const matched = new Set<SignerBalance>();
     const rows: CryptoReconciliation[] = [];
     for (const asset of assets) {
-      const custody = (await this.prisma.ledgerAccount.findFirst({ where: { kind: 'crypto_custody', mode, currency: asset.code, ownerKey: 'platform' } }))?.balanceMinor ?? 0n;
-      const sent = (await this.prisma.cryptoWithdrawal.aggregate({ where: { mode, asset: asset.code, status: 'broadcast' }, _sum: { amount: true } }))._sum.amount ?? 0n;
+      const account = await this.prisma.ledgerAccount.findFirst({ where: { kind: 'crypto_custody', mode, currency: asset.code, ownerKey: 'platform' } });
+      const custody = account?.balanceMinor ?? 0n;
+      // In flight: broadcast, or being sent (the signer may have sent it while its answer was unclear). Counting one the
+      // signer never sent shows as a surplus, never a false shortfall.
+      const sent = (await this.prisma.cryptoWithdrawal.aggregate({ where: { mode, asset: asset.code, status: { in: ['submitting', 'broadcast'] } }, _sum: { amount: true } }))._sum.amount ?? 0n;
       const arriving = (await this.prisma.cryptoDeposit.aggregate({ where: { mode, asset: asset.code, status: 'pending' }, _sum: { amount: true } }))._sum.amount ?? 0n;
-      const expected = custody - sent + arriving;
-      const chains: Record<string, string> = {};
+      // Sandbox test crypto (customers' test deposits, admins' test credits) was never on chain: left out of what the
+      // test signer should hold.
+      const simulated =
+        mode === 'test' && account
+          ? ((
+              await this.prisma.ledgerPosting.aggregate({
+                where: { accountId: account.id, entry: { OR: testCreditPrefixes.map(prefix => ({ reference: { startsWith: prefix } })) } },
+                _sum: { amountMinor: true },
+              })
+            )._sum.amountMinor ?? 0n)
+          : 0n;
+      const expected = custody - sent + arriving - simulated;
+      const chains: Record<string, bigint> = {};
       let held = 0n;
       for (const balance of balances ?? []) {
         const network = networks.find(item => {
@@ -79,7 +97,8 @@ export class CryptoReconciliationService {
         matched.add(balance);
         const units = ledgerUnits(BigInt(balance.amount), balance.decimals, asset.decimals);
         held += units;
-        chains[balance.chain] = fromUnits(units, asset.decimals);
+        // A chain can have several wallets (deposit addresses, hot, warm, cold): summed.
+        chains[balance.chain] = (chains[balance.chain] ?? 0n) + units;
       }
       // Assets with nothing on either side are left out, unless the signer could not be asked about money the ledger holds.
       if (expected === 0n && held === 0n) continue;
@@ -89,7 +108,8 @@ export class CryptoReconciliationService {
         custody: fromUnits(custody, asset.decimals),
         withdrawals_in_flight: fromUnits(sent, asset.decimals),
         deposits_arriving: fromUnits(arriving, asset.decimals),
-        chains,
+        ...(simulated ? { test_credits: fromUnits(simulated, asset.decimals) } : {}),
+        chains: Object.fromEntries(Object.entries(chains).map(([chain, units]) => [chain, fromUnits(units, asset.decimals)])),
         ...(error ? { error } : {}),
       };
       const row = await this.prisma.cryptoReconciliation.create({ data: { mode, asset: asset.code, expected, held, difference, status, detail: detail as Prisma.InputJsonValue } });

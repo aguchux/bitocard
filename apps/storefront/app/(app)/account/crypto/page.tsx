@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Lock, Snowflake } from "lucide-react";
+import { ArrowUpRight, Lock, Snowflake } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pProfile, type StoreP2pTrade } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, CryptoNav, TradeRow } from "@/components/app/crypto";
+import { canWithdraw, card, CoinBadge, CryptoGate, CryptoNav, hasP2pMoney, heldAssets, TradeRow, tradableAssets } from "@/components/app/crypto";
 import { NicknameForm, QuickTrade, TestCryptoForm } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Crypto" };
 
 /**
- * Crypto: the customer's coins (available, locked in their ads, frozen), their P2P money, a one-tap buy or sell at
- * the best price on the market, and their latest trades. Sandbox stores can add test crypto.
+ * Crypto: the customer's coins (available, locked in their ads, frozen, on their way out), their P2P money, a one-tap
+ * buy or sell at the best price on the market, and their latest trades. Sandbox stores can add test crypto. With crypto
+ * closed to them, what they still hold stays here to withdraw and cash out.
  */
 export default async function CryptoPage() {
   const [overview, profile, trades] = await Promise.all([
@@ -19,8 +20,12 @@ export default async function CryptoPage() {
     customerApi<StoreList<StoreP2pTrade>>("GET", "/v1/store/p2p/trades?limit=5"),
   ]);
   const wallets = overview.ok ? overview.data : null;
-  const assets = wallets?.assets.map(item => item.asset) ?? [];
+  // Coins that can be traded or deposited: crypto open to them and the coin not switched off.
+  const assets = tradableAssets(wallets);
   const blocked = !wallets || !wallets.p2p_enabled || wallets.frozen || !wallets.verified;
+  // Shown while crypto is open, or while they still hold coins or P2P money (switching crypto off never traps them).
+  const coins = wallets ? (wallets.enabled ? wallets.assets : heldAssets(wallets)) : [];
+  const showHoldings = Boolean(wallets && (wallets.enabled || coins.length > 0 || hasP2pMoney(wallets)));
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -42,25 +47,28 @@ export default async function CryptoPage() {
         </section>
       ) : null}
 
-      {wallets?.enabled ? (
+      {wallets && showHoldings ? (
         <section aria-labelledby="coins" className={card}>
-          <div className="mb-1 flex items-center justify-between gap-3">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
             <h2 id="coins" className="text-lg font-bold">
               Your coins
             </h2>
-            {!wallets.frozen && wallets.verified ? (
-              <span className="flex gap-2">
+            <span className="flex gap-2">
+              {wallets.enabled && !wallets.frozen && wallets.verified ? (
                 <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white">
                   Deposit
                 </Link>
+              ) : null}
+              {canWithdraw(wallets) ? (
                 <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-semibold text-[#070f4c] ring-1 ring-slate-300">
                   Withdraw
                 </Link>
-              </span>
-            ) : null}
+              ) : null}
+            </span>
           </div>
+          {!coins.length ? <p className="py-3 text-sm text-slate-600">You hold no coins.</p> : null}
           <ul className="divide-y divide-slate-100">
-            {wallets.assets.map(asset => (
+            {coins.map(asset => (
               <li key={asset.asset} className="flex items-center gap-3 py-3">
                 <CoinBadge asset={asset.asset} />
                 <span className="min-w-0 flex-1">
@@ -76,6 +84,12 @@ export default async function CryptoPage() {
                         <Snowflake className="size-3" aria-hidden="true" /> {formatCrypto(asset.frozen)} frozen
                       </span>
                     ) : null}
+                    {Number(asset.withdrawing) > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <ArrowUpRight className="size-3" aria-hidden="true" /> {formatCrypto(asset.withdrawing)} on its way out
+                      </span>
+                    ) : null}
+                    {!asset.enabled ? <span>No longer traded here: you can withdraw it</span> : null}
                   </span>
                 </span>
                 <span className="shrink-0 text-right">
@@ -90,8 +104,11 @@ export default async function CryptoPage() {
               <dt className="text-xs text-slate-500">P2P money</dt>
               <dd className="font-bold break-words">
                 <Link href="/account/crypto/cash-out" className="hover:underline">
-                  {formatFace(wallets.cash.proceeds, wallets.cash.currency)}
+                  {formatFace(wallets.cash.proceeds, wallets.cash.currency)} · Cash out
                 </Link>
+                {wallets.cash.paying_out > 0 ? (
+                  <span className="block text-xs font-normal text-slate-500">{formatFace(wallets.cash.paying_out, wallets.cash.currency)} on its way to your bank</span>
+                ) : null}
               </dd>
             </div>
             <div className="flex min-w-0 items-baseline justify-between gap-3 sm:block">
@@ -107,11 +124,11 @@ export default async function CryptoPage() {
               <dd className="font-bold break-words">{formatFace(wallets.cash.locked, wallets.cash.currency)}</dd>
             </div>
           </dl>
-          <p className="mt-2 text-xs text-slate-500">Buying spends your P2P money first, then your wallet. Bank withdrawals of P2P money and on-chain withdrawals open soon.</p>
+          <p className="mt-2 text-xs text-slate-500">Buying spends your P2P money first, then your wallet. Cash out pays your P2P money into your own bank account.</p>
         </section>
       ) : null}
 
-      {wallets?.mode === "test" && !blocked ? (
+      {wallets?.mode === "test" && wallets.enabled && !wallets.frozen && assets.length ? (
         <section aria-labelledby="test" className={card}>
           <h2 id="test" className="mb-3 text-lg font-bold">
             Test crypto

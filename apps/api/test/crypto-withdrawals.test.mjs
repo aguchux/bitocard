@@ -25,7 +25,7 @@ const signerSecret = 'signer-shared-secret-at-least-32-chars';
 
 /** A fake signer, a fake sanctions screener and a fake EVM chain (to read what the signer sent). */
 async function fakeWorld() {
-  const state = { mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0, holdings: [] };
+  const state = { flagged: new Set([flagged.toLowerCase()]), mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0, holdings: [] };
   const verified = call => {
     const header = call.headers['bitocard-signer-signature'] ?? '';
     const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header) ?? [];
@@ -38,11 +38,11 @@ async function fakeWorld() {
     const path = new URL(call.url, 'http://x').pathname;
     if (path.startsWith('/screen/api/v1/address/')) {
       const address = decodeURIComponent(path.split('/').at(-1));
-      return { body: { identifications: address.toLowerCase() === flagged.toLowerCase() ? [{ category: 'sanctions', name: 'SANCTIONS: OFAC SDN' }] : [] } };
+      return { body: { identifications: state.flagged.has(address.toLowerCase()) ? [{ category: 'sanctions', name: 'SANCTIONS: OFAC SDN' }] : [] } };
     }
     if (path === '/evm') {
       const { method, params, id } = call.body;
-      const result = method === 'eth_blockNumber' ? hex(state.latest) : method === 'eth_getTransactionByHash' ? (state.txs.get(params[0])?.tx ?? null) : method === 'eth_getTransactionReceipt' ? (state.txs.get(params[0])?.receipt ?? null) : null;
+      const result = method === 'eth_chainId' ? '0xaa36a7' : method === 'eth_blockNumber' ? hex(state.latest) : method === 'eth_getTransactionByHash' ? (state.txs.get(params[0])?.tx ?? null) : method === 'eth_getTransactionReceipt' ? (state.txs.get(params[0])?.receipt ?? null) : null;
       return { body: { jsonrpc: '2.0', id, result } };
     }
     if (!path.startsWith('/signer/')) return { status: 404, body: {} };
@@ -164,6 +164,13 @@ describe('signer and screening integrations', () => {
     assert.equal(screened.ok, true, screened.message);
     assert.equal(fakes.calls.at(-1).headers['x-api-key'], 'ca-key-1234');
   });
+
+  test('the signer and screeners are reached over HTTPS only', async () => {
+    for (const [id, key] of [['crypto_signer', 'CRYPTO_SIGNER_URL'], ['chainalysis', 'CHAINALYSIS_API_URL']]) {
+      const plain = await admin.put(`/v1/admin/integrations/${id}`, { values: { [key]: 'http://signer.example.com' }, code: await adminCode(server, admin) });
+      assert.deepEqual([plain.status, plain.json.error?.param], [400, `values.${key}`], `${key} over plain HTTP is refused`);
+    }
+  });
 });
 
 describe('withdrawal addresses', () => {
@@ -201,6 +208,25 @@ describe('withdrawal addresses', () => {
     assert.deepEqual(listed.map(item => item.label), ['Cold wallet']);
     assert.equal((await shopper.del(`/v1/store/crypto/withdrawal-addresses/${added.json.id}`)).status, 200);
     assert.equal((await shopper.get('/v1/store/crypto/withdrawal-addresses')).json.data.length, 0);
+  });
+  test('a saved address is screened again once its last check is a day old, and refused if now sanctioned', async () => {
+    const shopper = await customer();
+    const later = '0x00000000219ab540356cbb839cbe05303d7705fa';
+    const address = await readyAddress(shopper, later);
+    fakes.state.flagged.add(later.toLowerCase());
+    try {
+      const recent = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '10' });
+      assert.equal(recent.status, 201, 'checked today: not asked again');
+      await shopper.post(`/v1/store/crypto/withdrawals/${recent.json.id}/cancel`);
+      await prisma.cryptoWithdrawalAddress.update({ where: { id: address.id }, data: { screenedAt: new Date(Date.now() - 25 * 3_600_000) } });
+      const refused = await shopper.post('/v1/store/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: address.id, amount: '10' });
+      assert.deepEqual([refused.status, refused.json.error?.code], [400, 'address_refused']);
+      assert.equal((await prisma.cryptoWithdrawalAddress.findUniqueOrThrow({ where: { id: address.id } })).screening, 'flagged');
+      assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.crypto.address_flagged', body: { contains: shopper.email } } }));
+      assert.equal(await balance(shopper), '1000.000000', 'nothing left the wallet');
+    } finally {
+      fakes.state.flagged.delete(later.toLowerCase());
+    }
   });
 });
 
@@ -362,12 +388,16 @@ describe('withdrawals through BitoCard’s signer', () => {
     await ledgerOk();
   });
 
-  test('the custody check compares the ledger with what the signer holds, and tells admins of a shortfall', async () => {
+  test('the custody check compares the ledger with what the signer holds, and tells admins of a shortfall', async t => {
     const run = async () => {
       const res = await finance.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' });
       assert.equal(res.status, 200, JSON.stringify(res.json));
       return res.json;
     };
+    // A test-network deposit on its way is real crypto the signer must hold; sandbox test credits never reached the chain.
+    const customerId = (await prisma.customer.findFirstOrThrow()).id;
+    const arriving = await prisma.cryptoDeposit.create({ data: { customerId, mode: 'test', chain: 'ETHEREUM', asset: 'USDT', address: outside, txHash: `0x${'f'.repeat(64)}`, outputIndex: 1, rawAmount: '5000000000', amount: 5_000_000_000n } });
+    t.after(() => prisma.cryptoDeposit.delete({ where: { id: arriving.id } }));
     fakes.state.holdings = [];
     const empty = await run();
     const usdt = empty.data.find(item => item.asset === 'USDT');
@@ -390,6 +420,7 @@ describe('withdrawals through BitoCard’s signer', () => {
     const support = await adminClient(server, ['support']);
     assert.equal((await support.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' })).status, 403);
   });
+
   test('live withdrawals are not offered without a live signer', async () => {
     const withdrawals = server.app.get((await import('../dist/crypto/withdrawals.service.js')).CryptoWithdrawalsService);
     assert.equal(withdrawals.signer('live'), null, 'the signer serves the sandbox only');

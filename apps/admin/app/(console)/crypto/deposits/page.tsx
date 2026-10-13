@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type CryptoDeposit, type Mode, useCryptoDepositsQuery, useRecheckCryptoDepositMutation } from "@bitocard/api-client/admin";
@@ -39,9 +40,19 @@ const baseColumns: Array<Column<CryptoDeposit>> = [
 
 /** Crypto > Deposits: transfers to customers' addresses seen on chain, pending until confirmed, then credited once. */
 export default function DepositsPage() {
+  // useSearchParams needs a Suspense boundary (a customer's page links here with ?customer=<id>).
+  return (
+    <Suspense>
+      <Deposits />
+    </Suspense>
+  );
+}
+
+function Deposits() {
+  const customer = useSearchParams().get("customer") ?? undefined;
   const [mode, setMode] = useState<Mode>("live");
   const [status, setStatus] = useState("");
-  const deposits = useCryptoDepositsQuery({ mode, ...(status ? { status } : {}) });
+  const deposits = useCryptoDepositsQuery({ mode, ...(status ? { status } : {}), ...(customer ? { customer_id: customer } : {}) });
   const admin = useAdmin();
   const [recheck, rechecking] = useRecheckCryptoDepositMutation();
   // A deposit the chain stopped showing (or one still waiting) can be read from the chain again now.

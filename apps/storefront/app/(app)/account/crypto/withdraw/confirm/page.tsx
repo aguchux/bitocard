@@ -1,8 +1,9 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, ShieldCheck } from "lucide-react";
 import { formatCrypto, type StoreWithdrawalPreview } from "@bitocard/api-client/storefront";
-import { card, CoinBadge } from "@/components/app/crypto";
+import { card, CoinBadge, CryptoNav } from "@/components/app/crypto";
 import { CreateWithdrawalForm } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
@@ -26,6 +27,7 @@ export default async function ReviewWithdrawalPage({ searchParams }: { searchPar
         <ChevronLeft className="size-4" aria-hidden="true" /> Back
       </Link>
       <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Review your withdrawal</h1>
+      <CryptoNav current="/account/crypto/withdraw" />
       {quote ? (
         <section className={card} aria-label="Withdrawal details">
           <div className="flex items-center gap-3">
@@ -64,7 +66,7 @@ export default async function ReviewWithdrawalPage({ searchParams }: { searchPar
             Check the address: once sent, crypto cannot be got back.
           </p>
           <div className="mt-4">
-            <CreateWithdrawalForm asset={quote.asset} chain={quote.chain} addressId={params.address!} amount={params.amount!} />
+            <CreateWithdrawalForm asset={quote.asset} chain={quote.chain} addressId={params.address!} amount={params.amount!} nonce={randomUUID()} />
           </div>
         </section>
       ) : (

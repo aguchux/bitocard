@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Badge, Card, DataTable, errorMessage, FilterSelect, formatDateTime, formatMoney, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
 import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { type CustomerPayout, type Mode, useCustomerPayoutsQuery } from "@bitocard/api-client/admin";
@@ -55,9 +56,19 @@ const columns: Array<Column<CustomerPayout>> = [
 
 /** Crypto > P2P payouts: store customers' P2P money paid out to their own bank accounts. */
 export default function CustomerPayoutsPage() {
+  // useSearchParams needs a Suspense boundary (a customer's page links here with ?customer=<id>).
+  return (
+    <Suspense>
+      <CustomerPayouts />
+    </Suspense>
+  );
+}
+
+function CustomerPayouts() {
+  const customer = useSearchParams().get("customer") ?? undefined;
   const [mode, setMode] = useState<Mode>("live");
   const [status, setStatus] = useState("");
-  const payouts = useCustomerPayoutsQuery({ mode, ...(status ? { status } : {}) });
+  const payouts = useCustomerPayoutsQuery({ mode, ...(status ? { status } : {}), ...(customer ? { customer_id: customer } : {}) });
   return (
     <AdminShell section="crypto" current="/crypto/payouts" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "P2P payouts" }]}>
       <PageHeader

@@ -23,7 +23,19 @@ export function schemaFor(key: string): z.ZodType | null {
       }
     }, 'paste an account extended public key (xpub, zpub, tpub or vpub), never a private key');
   }
+  // Custody calls carry signed transfer requests and sanctions answers: never over plain HTTP (a local fake in tests aside).
+  if (['CRYPTO_SIGNER_URL', 'CHAINALYSIS_API_URL', 'TRM_API_URL'].includes(key)) return z.string().url().refine(secureUrl, 'use an https:// address');
   return field.kind === 'url' ? z.string().url() : z.string().min(1);
+}
+
+/** HTTPS, or plain HTTP only to this machine (local development and tests). */
+export function secureUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname));
+  } catch {
+    return false;
+  }
 }
 
 /** How long an instance trusts its copy of the admin settings before reading them again. */

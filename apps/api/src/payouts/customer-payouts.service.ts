@@ -254,8 +254,9 @@ export class CustomerPayoutsService {
       });
       return created;
     });
+    let result: TransferResult;
     try {
-      const result = await provider.transfer({
+      result = await provider.transfer({
         reference: payout.reference,
         bankCode: account.bankCode,
         accountNumber: this.encryption().decrypt(account.accountNumberEncrypted),
@@ -263,7 +264,6 @@ export class CustomerPayoutsService {
         currency,
         narration: `${customer.store.name} P2P payout`,
       });
-      return presentCustomerPayout({ ...(await this.apply(payout, result)), bankAccount: account });
     } catch (error) {
       if (error instanceof ProviderError && error.definite) {
         return presentCustomerPayout({ ...(await this.apply(payout, { status: 'failed', providerTransferId: '', fee: 0n, failureReason: 'The bank transfer was refused.' })), bankAccount: account });
@@ -272,6 +272,9 @@ export class CustomerPayoutsService {
       this.logger.error({ err: error, payoutId: payout.id }, 'Customer payout outcome unclear');
       return presentCustomerPayout({ ...payout, bankAccount: account });
     }
+    // The transfer is made: keep its ID first, so the payments job checks it even if recording the result fails now.
+    if (result.providerTransferId) await this.prisma.customerPayout.updateMany({ where: { id: payout.id, status: 'pending' }, data: { status: 'processing', providerTransferId: result.providerTransferId } });
+    return presentCustomerPayout({ ...(await this.apply(payout, result)), bankAccount: account });
   }
 
   /** Applies a transfer result once: paid takes the money out to the bank, failed returns it to the customer's P2P money. */

@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreP2pAd, StoreP2pProfile, StoreP2pQuote, StoreP2pTrade, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
@@ -19,6 +20,15 @@ function cryptoAmount(value: string) {
   const amount = value.replace(/[,\s]/g, "");
   return /^\d+(\.\d+)?$/.test(amount) && Number(amount) > 0 ? amount : null;
 }
+
+/**
+ * A form that moves money carries a nonce made when it was shown, sent as the request's Idempotency-Key, so a double
+ * submit acts once. Every answer that leaves the form on screen carries a fresh one: the API keeps client errors for
+ * a key, so trying again after fixing something must be a new request.
+ */
+export type NonceFormState = FormState & { nonce?: string };
+const nonceOf = (form: FormData) => text(form, "nonce") || undefined;
+const fresh = (state: FormState): NonceFormState => ({ ...state, nonce: randomUUID() });
 
 function signInFirst(status: number, path: string) {
   if (status === 401) redirect(`/signin?next=${encodeURIComponent(path)}`);
@@ -59,15 +69,16 @@ export async function takeAd(_state: FormState, form: FormData): Promise<FormSta
 }
 
 /** The trade the customer confirmed: settled at once from their wallets, then its receipt. */
-export async function confirmTrade(_state: FormState, form: FormData): Promise<FormState> {
+export async function confirmTrade(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
   const fiat = Number(text(form, "fiat"));
   // The fee rate the customer was shown: a changed fee is refused, like a changed price.
   const feeBps = text(form, "fee_bps");
-  const result = await customerApi<StoreP2pTrade>("POST", "/v1/store/p2p/trades", { ad_id: text(form, "ad_id"), price: Number(text(form, "price")), ...(feeBps ? { fee_bps: Number(feeBps) } : {}), fiat });
+  const body = { ad_id: text(form, "ad_id"), price: Number(text(form, "price")), ...(feeBps ? { fee_bps: Number(feeBps) } : {}), fiat };
+  const result = await customerApi<StoreP2pTrade>("POST", "/v1/store/p2p/trades", body, { idempotencyKey: nonceOf(form) });
   if (!result.ok) {
     signInFirst(result.status, "/account/crypto");
-    if (result.code === "insufficient_funds") return { error: result.message, field: "funds" };
-    return { error: result.message };
+    if (result.code === "insufficient_funds") return fresh({ error: result.message, field: "funds" });
+    return fresh({ error: result.message });
   }
   revalidatePath("/account/crypto");
   redirect(`/account/crypto/trades/${result.data.id}?done=1`);
@@ -101,13 +112,17 @@ export async function postAd(_state: FormState, form: FormData): Promise<FormSta
 }
 
 /** Pauses, resumes or closes one of the customer's ads (closing gives back what it locks). */
-export async function changeAd(form: FormData) {
+export async function changeAd(_state: FormState, form: FormData): Promise<FormState> {
   const id = encodeURIComponent(text(form, "id"));
   const op = text(form, "op");
-  if (op === "cancel") await customerApi("POST", `/v1/store/p2p/ads/${id}/cancel`);
-  else await customerApi("PATCH", `/v1/store/p2p/ads/${id}`, { status: op === "resume" ? "active" : "paused" });
+  const result = op === "cancel" ? await customerApi("POST", `/v1/store/p2p/ads/${id}/cancel`) : await customerApi("PATCH", `/v1/store/p2p/ads/${id}`, { status: op === "resume" ? "active" : "paused" });
+  if (!result.ok) {
+    signInFirst(result.status, "/account/crypto/ads");
+    return { error: result.message };
+  }
   revalidatePath("/account/crypto/ads");
   revalidatePath("/account/crypto");
+  return {};
 }
 
 /** Changes an ad's price (a buy ad locks more, or gives back what it no longer needs). */
@@ -145,9 +160,14 @@ export async function addWithdrawalAddress(_state: FormState, form: FormData): P
   return { notice: `Saved. You can send to "${result.data.label}" from ${new Date(result.data.usable_from).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}.` };
 }
 
-export async function removeWithdrawalAddress(form: FormData) {
-  await customerApi("DELETE", `/v1/store/crypto/withdrawal-addresses/${encodeURIComponent(text(form, "id"))}`);
+export async function removeWithdrawalAddress(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi("DELETE", `/v1/store/crypto/withdrawal-addresses/${encodeURIComponent(text(form, "id"))}`);
+  if (!result.ok) {
+    signInFirst(result.status, "/account/crypto/withdraw");
+    return { error: result.message };
+  }
   revalidatePath("/account/crypto/withdraw");
+  return {};
 }
 
 /** Checks the amount and goes to the confirmation, where the customer sees the fee and total before anything moves. */
@@ -166,16 +186,12 @@ export async function reviewWithdrawal(_state: FormState, form: FormData): Promi
 }
 
 /** Asks for the withdrawal: its amount and fee leave the wallet, and a code is emailed to confirm it. */
-export async function createWithdrawal(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi<StoreCryptoWithdrawal>("POST", "/v1/store/crypto/withdrawals", {
-    asset: text(form, "asset"),
-    chain: text(form, "chain"),
-    address_id: text(form, "address_id"),
-    amount: text(form, "amount"),
-  });
+export async function createWithdrawal(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
+  const body = { asset: text(form, "asset"), chain: text(form, "chain"), address_id: text(form, "address_id"), amount: text(form, "amount") };
+  const result = await customerApi<StoreCryptoWithdrawal>("POST", "/v1/store/crypto/withdrawals", body, { idempotencyKey: nonceOf(form) });
   if (!result.ok) {
     signInFirst(result.status, "/account/crypto/withdraw");
-    return { error: result.message };
+    return fresh({ error: result.message });
   }
   revalidatePath("/account/crypto");
   redirect(`/account/crypto/withdrawals/${result.data.id}`);
@@ -198,11 +214,16 @@ export async function resendWithdrawalCode(_state: FormState, form: FormData): P
   return { notice: "A new code is on its way to your email." };
 }
 
-export async function cancelWithdrawal(form: FormData) {
+export async function cancelWithdrawal(_state: FormState, form: FormData): Promise<FormState> {
   const id = text(form, "id");
-  await customerApi("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/cancel`);
+  const result = await customerApi("POST", `/v1/store/crypto/withdrawals/${encodeURIComponent(id)}/cancel`);
+  if (!result.ok) {
+    signInFirst(result.status, `/account/crypto/withdrawals/${id}`);
+    return { error: result.message };
+  }
   revalidatePath(`/account/crypto/withdrawals/${id}`);
   revalidatePath("/account/crypto");
+  return {};
 }
 
 // -- Paying P2P money out to a bank ---------------------------------------------------------------------------------
@@ -222,29 +243,37 @@ export async function addCashOutAccount(_state: FormState, form: FormData): Prom
   return { notice: `Added ${result.data.bank_name} ending ${result.data.account_number_last4} (${result.data.account_name}).` };
 }
 
-export async function removeCashOutAccount(form: FormData) {
-  await customerApi("DELETE", `/v1/store/crypto/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
+export async function removeCashOutAccount(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi("DELETE", `/v1/store/crypto/cash/bank-accounts/${encodeURIComponent(text(form, "id"))}`);
+  if (!result.ok) {
+    signInFirst(result.status, "/account/crypto/cash-out");
+    return { error: result.message };
+  }
   revalidatePath("/account/crypto/cash-out");
+  return {};
 }
 
 /** Pays P2P money out to one of the customer's bank accounts (the amount typed in their currency). */
-export async function cashOut(_state: FormState, form: FormData): Promise<FormState> {
+export async function cashOut(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
   const amount = toMinor(text(form, "amount"));
   const account = text(form, "bank_account_id");
   if (!account) return { error: "Choose the account to pay into.", field: "bank_account_id" };
   if (!amount) return { error: "Enter how much to pay out.", field: "amount" };
-  const result = await customerApi<StoreCustomerPayout>("POST", "/v1/store/crypto/cash/payouts", { amount, bank_account_id: account });
+  const result = await customerApi<StoreCustomerPayout>("POST", "/v1/store/crypto/cash/payouts", { amount, bank_account_id: account }, { idempotencyKey: nonceOf(form) });
   if (!result.ok) {
     signInFirst(result.status, "/account/crypto/cash-out");
-    return { error: result.message, field: result.param === "amount" ? "amount" : null };
+    return fresh({ error: result.message, field: result.param === "amount" ? "amount" : null });
   }
   revalidatePath("/account/crypto/cash-out");
   revalidatePath("/account/crypto");
-  return { notice: result.data.status === "failed" ? `The bank refused it: ${result.data.failure_reason ?? "try another account"}. The money is back in your balance.` : "On its way to your bank." };
+  // A fresh nonce: another payout from the same form is a new request.
+  return fresh({ notice: result.data.status === "failed" ? `The bank refused it: ${result.data.failure_reason ?? "try another account"}. The money is back in your balance.` : "On its way to your bank." });
 }
 
 /** Sandbox stores only: settles a test payout as paid or failed. */
-export async function simulateCashOut(form: FormData) {
-  await customerApi("POST", `/v1/store/crypto/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
+export async function simulateCashOut(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi("POST", `/v1/store/crypto/cash/payouts/${encodeURIComponent(text(form, "id"))}/simulate`, { outcome: text(form, "outcome") === "failed" ? "failed" : "paid" });
+  if (!result.ok) return { error: result.message };
   revalidatePath("/account/crypto/cash-out");
+  return {};
 }

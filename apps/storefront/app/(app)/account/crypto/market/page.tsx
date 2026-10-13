@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pAd } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, CryptoNav } from "@/components/app/crypto";
+import { card, CoinBadge, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/crypto";
 import { TakeAdForm } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
@@ -17,7 +17,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const overview = await customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto");
   const wallets = overview.ok ? overview.data : null;
-  const assets = wallets?.assets.map(item => item.asset) ?? [];
+  const assets = tradableAssets(wallets);
   const asked = (params.asset ?? "").toUpperCase();
   const asset = assets.includes(asked) ? asked : (assets[0] ?? "USDT");
   const side = params.side === "sell" ? "sell" : "buy";

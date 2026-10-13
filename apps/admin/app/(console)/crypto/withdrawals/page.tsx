@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { ActionDialog, Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
@@ -46,10 +47,21 @@ type Decision = { withdrawal: CryptoWithdrawal; decision: "approve" | "reject" }
  * customer). One waiting too long for the signer or the chain is flagged and can be checked again now.
  */
 export default function WithdrawalsPage() {
+  // useSearchParams needs a Suspense boundary (a customer's page links here with ?customer=<id>).
+  return (
+    <Suspense>
+      <Withdrawals />
+    </Suspense>
+  );
+}
+
+function Withdrawals() {
+  const customer = useSearchParams().get("customer") ?? undefined;
   const admin = useAdmin();
   const [mode, setMode] = useState<Mode>("live");
-  const [status, setStatus] = useState("review");
-  const withdrawals = useCryptoWithdrawalsQuery({ mode, ...(status ? { status } : {}) });
+  // One customer's withdrawals: all of them, not only those waiting for review.
+  const [status, setStatus] = useState(customer ? "" : "review");
+  const withdrawals = useCryptoWithdrawalsQuery({ mode, ...(status ? { status } : {}), ...(customer ? { customer_id: customer } : {}) });
   const [decide] = useDecideCryptoWithdrawalMutation();
   const [recheck, rechecking] = useRecheckCryptoWithdrawalMutation();
   const [open, setOpen] = useState<Decision | null>(null);

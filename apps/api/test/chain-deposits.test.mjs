@@ -28,22 +28,26 @@ const hex = value => `0x${BigInt(value).toString(16)}`;
 
 /** One fake chain: EVM JSON-RPC at /evm1 and /evm2 (two providers), TRON's node API at /tron, Esplora at /btc. */
 function fakeChain() {
-  const state = { latest: 100n, logs: [], txs: new Map(), down: new Set(), tronLatest: 5000, tron: new Map(), btcTip: 800, btc: new Map() };
+  // chainIds: what each EVM endpoint says it is on (Sepolia by default); hidden: transactions listed in logs that no
+  // node shows yet (a lagging provider); btcGenesis: the Bitcoin network Esplora is on (testnet4 by default).
+  const state = { latest: 100n, logs: [], txs: new Map(), down: new Set(), tronLatest: 5000, tron: new Map(), btcTip: 800, btc: new Map(), chainIds: {}, hidden: new Set(), btcGenesis: '00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043' };
   const rpc = (prefix, body) => {
     if (state.down.has(prefix)) return { status: 503, body: 'down' };
     const result = (() => {
       switch (body.method) {
         case 'eth_blockNumber':
           return hex(state.latest);
+        case 'eth_chainId':
+          return state.chainIds[prefix] ?? '0xaa36a7';
         case 'eth_getLogs': {
           const [filter] = body.params;
           const to = filter.topics[2];
           return state.logs.filter(log => filter.address.includes(log.address) && to.includes(log.topics[2]) && BigInt(log.blockNumber) >= BigInt(filter.fromBlock) && BigInt(log.blockNumber) <= BigInt(filter.toBlock));
         }
         case 'eth_getTransactionByHash':
-          return state.txs.get(body.params[0])?.tx ?? null;
+          return state.hidden.has(body.params[0]) ? null : (state.txs.get(body.params[0])?.tx ?? null);
         case 'eth_getTransactionReceipt':
-          return state.txs.get(body.params[0])?.receipt ?? null;
+          return state.hidden.has(body.params[0]) ? null : (state.txs.get(body.params[0])?.receipt ?? null);
         default:
           return null;
       }
@@ -52,7 +56,8 @@ function fakeChain() {
   };
   return fakeService(call => {
     const path = new URL(call.url, 'http://x').pathname;
-    if (path === '/evm1' || path === '/evm2') return rpc(path, call.body);
+    if (path === '/evm1' || path === '/evm2' || path === '/evm3') return rpc(path, call.body);
+    if (path === '/btc/block-height/0') return { headers: { 'content-type': 'text/plain' }, body: state.btcGenesis };
     if (path === '/tron/wallet/getnowblock') return { body: { block_header: { raw_data: { number: state.tronLatest } } } };
     if (path === '/tron/wallet/gettransactioninfobyid') return { body: state.tron.get(call.body.value) ?? {} };
     if (path === '/btc/blocks/tip/height') return { headers: { 'content-type': 'text/plain' }, body: String(state.btcTip) };
@@ -189,7 +194,8 @@ describe('deposits', () => {
     evmTransfer(chain.state, { hash: txHash(2), to: address, raw: 99_000_000n, block: 295n, contract: '0x9999999999999999999999999999999999999999' });
     await cron('crypto');
     const pending = await prisma.cryptoDeposit.findMany({ where: { customerId: shopper.id } });
-    assert.deepEqual(pending.map(item => [item.status, item.amount, item.confirmations]), [['pending', 25_500_000n, 6]]);
+    // Settling runs before scanning, so a deposit just found is first checked for confirmations on the next run.
+    assert.deepEqual(pending.map(item => [item.status, item.amount, item.confirmations]), [['pending', 25_500_000n, 0]]);
     assert.equal(pending[0].outputIndex, 1, 'numbered by its place in the transaction, not the block-wide log index (stable across reorgs)');
     assert.equal(await balance(shopper, 'USDT'), '0.000000');
     chain.state.latest = 310n;
@@ -235,6 +241,10 @@ describe('deposits', () => {
     await cron('crypto');
     const waiting = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
     assert.deepEqual([waiting.status, waiting.confirmedBy], ['pending', ['getblock']]);
+    const told = await prisma.notification.findMany({ where: { type: 'admin.crypto.deposit_stuck', dedupeKey: `admin.crypto.deposit_stuck:double_check:${waiting.id}` } });
+    assert.ok(told.length, 'operations are told a large deposit has no second provider');
+    await cron('crypto');
+    assert.equal(await prisma.notification.count({ where: { dedupeKey: `admin.crypto.deposit_stuck:double_check:${waiting.id}` } }), told.length, 'once');
     assert.equal((await admin.put('/v1/admin/crypto/chains/ETHEREUM/routes', { order: ['getblock', 'quicknode'], disabled: [] })).status, 200);
     await cron('crypto');
     const done = await prisma.cryptoDeposit.findFirstOrThrow({ where: { customerId: shopper.id } });
@@ -323,14 +333,21 @@ describe('deposits are never silently missed', () => {
     const saved = chain.state.txs.get(txHash(7));
     chain.state.txs.delete(txHash(7));
     await cron('crypto');
-    assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'pending', 'missing for a short while is not failed');
-    await prisma.cryptoDeposit.update({ where: { id: row.id }, data: { createdAt: new Date(Date.now() - 7 * 3_600_000) } });
+    const missing = await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } });
+    assert.equal(missing.status, 'pending', 'missing for a short while is not failed');
+    assert.ok(missing.missingSince, 'the clock starts when it goes missing');
+    // An old deposit that has only just gone missing is not failed: the 6 hours run from when it went missing.
+    await prisma.cryptoDeposit.update({ where: { id: row.id }, data: { createdAt: new Date(Date.now() - 30 * 3_600_000) } });
+    await cron('crypto');
+    assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'pending');
+    await prisma.cryptoDeposit.update({ where: { id: row.id }, data: { missingSince: new Date(Date.now() - 7 * 3_600_000) } });
     await cron('crypto');
     assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).status, 'failed');
     chain.state.txs.set(txHash(7), saved);
     chain.state.latest += 20n;
     const rechecked = await admin.post(`/v1/admin/crypto/deposits/${row.id}/recheck`);
     assert.deepEqual([rechecked.status, rechecked.json.status], [200, 'credited']);
+    assert.equal((await prisma.cryptoDeposit.findUniqueOrThrow({ where: { id: row.id } })).missingSince, null, 'seen again: no longer missing');
     assert.equal(await balance(shopper, 'USDT'), '3.000000');
     assert.ok(await prisma.auditLog.findFirst({ where: { action: 'crypto.deposit_rechecked', targetId: row.id } }));
     await ledgerOk();
@@ -380,4 +397,182 @@ describe('deposits are never silently missed', () => {
     assert.ok(await prisma.cryptoDeposit.findFirst({ where: { customerId: shopper.id, txHash: hash } }), 'recorded by the retry');
     assert.ok((await prisma.chainNotice.findFirst({ where: { hashes: { has: hash } } })).processedAt, 'the notification is processed');
   });
+
+  test('a transfer a scan lists but no provider shows yet is kept and recorded later; the cursor still moves', async () => {
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const hash = txHash(11);
+    chain.state.latest += 5n;
+    evmTransfer(chain.state, { hash, to: address, raw: 6_000_000n, block: chain.state.latest - 3n });
+    chain.state.hidden.add(hash);
+    const run = await cron('crypto');
+    assert.equal(run.result.deposits['test:ETHEREUM'].deferred, 1, JSON.stringify(run.result.deposits['test:ETHEREUM']));
+    assert.equal(await prisma.cryptoDeposit.count({ where: { txHash: hash } }), 0, 'nothing recorded while no provider shows it');
+    const kept = await prisma.chainNotice.findFirstOrThrow({ where: { provider: 'scan', hashes: { has: hash } } });
+    assert.deepEqual([kept.mode, kept.chain, kept.processedAt], ['test', 'ETHEREUM', null]);
+    const cursor = await prisma.chainCursor.findUniqueOrThrow({ where: { chain_mode: { chain: 'ETHEREUM', mode: 'test' } } });
+    assert.ok(cursor.block >= chain.state.latest - 3n, 'the block range was read');
+    chain.state.hidden.delete(hash);
+    await prisma.chainNotice.update({ where: { id: kept.id }, data: { createdAt: new Date(Date.now() - 120_000) } });
+    await cron('crypto');
+    assert.ok(await prisma.cryptoDeposit.findFirst({ where: { customerId: shopper.id, txHash: hash } }), 'recorded once a provider shows it');
+    assert.ok((await prisma.chainNotice.findUniqueOrThrow({ where: { id: kept.id } })).processedAt);
+  });
+
+  test('a webhook naming a transaction no provider shows yet is kept for the next run, not dropped', async () => {
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    await prisma.cryptoAddress.updateMany({ where: { customerId: shopper.id }, data: { watchUntil: new Date(Date.now() - 1000) } });
+    const hash = txHash(12);
+    evmTransfer(chain.state, { hash, to: address, raw: 1_000_000n, block: chain.state.latest - 1n });
+    chain.state.hidden.add(hash);
+    const body = JSON.stringify({ matchedTransactions: [{ hash }] });
+    const signature = createHmac('sha256', 'qn-secret-value-1234').update(`n12t12${body}`).digest('hex');
+    const res = await fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n12', 'x-qn-timestamp': 't12', 'x-qn-signature': signature }, body });
+    assert.equal(res.status, 200);
+    let notice = null;
+    for (let i = 0; i < 20 && !(notice = await prisma.chainNotice.findFirst({ where: { provider: 'quicknode', hashes: { has: hash }, attempts: { gt: 0 } } })); i += 1) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(notice.processedAt, null, 'not visible yet is not "nothing"');
+    chain.state.hidden.delete(hash);
+    await prisma.chainNotice.update({ where: { id: notice.id }, data: { createdAt: new Date(Date.now() - 120_000) } });
+    await cron('crypto');
+    assert.ok(await prisma.cryptoDeposit.findFirst({ where: { customerId: shopper.id, txHash: hash } }));
+    assert.ok((await prisma.chainNotice.findUniqueOrThrow({ where: { id: notice.id } })).processedAt);
+  });
+
+  test('a hash in another case is the same transaction: never recorded or credited twice', async () => {
+    const { hashesIn } = await import('../dist/crypto/chains/deposits.service.js');
+    assert.deepEqual(hashesIn(`{"a":"0x${'AB'.repeat(32)}","b":"0x${'ab'.repeat(32)}"}`, 'ETHEREUM'), [`0x${'ab'.repeat(32)}`]);
+    assert.deepEqual(hashesIn(`"${'CD'.repeat(32)}"`, 'BITCOIN'), ['cd'.repeat(32)]);
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const hash = txHash(13);
+    chain.state.latest += 5n;
+    evmTransfer(chain.state, { hash, to: address, raw: 2_500_000n, block: chain.state.latest - 3n });
+    await cron('crypto');
+    chain.state.latest += 20n;
+    await cron('crypto');
+    assert.equal(await balance(shopper, 'USDT'), '2.500000');
+    const upper = `0x${hash.slice(2).toUpperCase()}`;
+    const body = JSON.stringify({ matchedTransactions: [{ hash: upper }] });
+    const signature = createHmac('sha256', 'qn-secret-value-1234').update(`n13t13${body}`).digest('hex');
+    assert.equal((await fetch(`${server.base}/v1/webhooks/chain/quicknode?chain=ETHEREUM`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-qn-nonce': 'n13', 'x-qn-timestamp': 't13', 'x-qn-signature': signature }, body })).status, 200);
+    let notice = null;
+    for (let i = 0; i < 20 && !(notice = await prisma.chainNotice.findFirst({ where: { provider: 'quicknode', hashes: { has: hash }, processedAt: { not: null } } })); i += 1) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.ok(notice, 'the notification is kept with the hash in lower case and processed');
+    await cron('crypto');
+    assert.equal(await prisma.cryptoDeposit.count({ where: { txHash: { in: [hash, upper] } } }), 1);
+    assert.equal(await balance(shopper, 'USDT'), '2.500000', 'credited once');
+    await ledgerOk();
+  });
+
+  test('a transfer too large for the ledger is ignored, never credited, and never jams the scan', async () => {
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'BSC' })).json.address;
+    chain.state.latest += 5n;
+    const block = chain.state.latest - 3n;
+    // BEP-20 USDT has 18 places on chain and 6 in the ledger: this is 2^70 ledger units, above a BIGINT.
+    evmTransfer(chain.state, { hash: txHash(14), to: address, raw: 2n ** 70n * 10n ** 12n, block, contract: bscUsdt });
+    evmTransfer(chain.state, { hash: txHash(15), to: address, raw: 3n * 10n ** 18n, block, contract: bscUsdt });
+    const run = await cron('crypto');
+    assert.equal(run.result.deposits['test:BSC'].error, undefined, JSON.stringify(run.result.deposits['test:BSC']));
+    const huge = await prisma.cryptoDeposit.findFirstOrThrow({ where: { txHash: txHash(14) } });
+    assert.deepEqual([huge.status, huge.amount, huge.rawAmount], ['ignored', 0n, String(2n ** 70n * 10n ** 12n)]);
+    chain.state.latest += 20n;
+    await cron('crypto');
+    assert.equal(await balance(shopper, 'USDT'), '3.000000', 'the other deposit in the same blocks is credited');
+    await ledgerOk();
+  });
+
+  test('a deposit that cannot move never holds up the others; operations are told when a mode has no provider', async () => {
+    const shopper = await customer();
+    const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    // 60 old pending sandbox deposits on a chain with no provider: more than one run's batch.
+    const old = new Date(Date.now() - 86_400_000);
+    await prisma.cryptoDeposit.createMany({
+      data: Array.from({ length: 60 }, (_, i) => ({ customerId: shopper.id, mode: 'test', chain: 'SOLANA', asset: 'USDC', address: 'So1anaAddress', txHash: `stuck${i}`, outputIndex: 0, rawAmount: '1', amount: 1n, createdAt: old })),
+    });
+    try {
+      chain.state.latest += 5n;
+      evmTransfer(chain.state, { hash: txHash(16), to: address, raw: 4_500_000n, block: chain.state.latest - 3n });
+      await cron('crypto');
+      chain.state.latest += 20n;
+      await cron('crypto');
+      await cron('crypto');
+      assert.equal(await balance(shopper, 'USDT'), '4.500000', 'credited despite older deposits that cannot move');
+      const stuck = await prisma.cryptoDeposit.findMany({ where: { chain: 'SOLANA', status: 'pending' } });
+      assert.ok(stuck.every(item => item.checkedAt), 'each is tried in turn');
+      const today = new Date().toISOString().slice(0, 10);
+      const told = await prisma.notification.findMany({ where: { type: 'admin.crypto.deposit_stuck', dedupeKey: `admin.crypto.deposit_stuck:no_route:test:SOLANA:${today}` } });
+      assert.ok(told.length, 'operations are told');
+      assert.equal(new Set(told.map(item => item.userId)).size, told.length, 'once per admin');
+    } finally {
+      await prisma.cryptoDeposit.deleteMany({ where: { chain: 'SOLANA', customerId: shopper.id } });
+    }
+  });
+
+  test('the job keeps to its deadline: out of time, it stops scanning instead of running past the function limit', async () => {
+    const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
+    const deposits = server.app.get(CryptoDepositsService);
+    const summary = await deposits.job({ deadline: Date.now() - 1 });
+    assert.deepEqual(summary.settled, { checked: 0, credited: 0 });
+    assert.deepEqual(summary['test:ETHEREUM'], { skipped: 'out of time' });
+    assert.deepEqual(summary.notices, { skipped: 'out of time' });
+  });
+});
+
+describe('providers on the wrong network', () => {
+  test('an endpoint still on a test network never serves live stores; Test connection says why', async () => {
+    const { forgetNetworks } = await import('../dist/crypto/chains/client.js');
+    forgetNetworks();
+    // Sandbox off (live), but the pasted endpoint is on Sepolia.
+    chain.state.chainIds['/evm3'] = '0xaa36a7';
+    await update('chainstack', { CHAINSTACK_ETHEREUM_URL: `${chain.url}/evm3` });
+    const tested = (await admin.post('/v1/admin/integrations/chainstack/test')).json;
+    assert.equal(tested.ok, false);
+    assert.equal(tested.environment, 'live');
+    assert.match(tested.message, /^Ethereum: refused: the endpoint is on a test network \(11155111\)/);
+    const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
+    const deposits = server.app.get(CryptoDepositsService);
+    assert.deepEqual((await deposits.routes('ETHEREUM', 'live')).map(route => route.provider.id), [], 'never routed for live deposits');
+    const route = (await admin.get('/v1/admin/crypto/chains')).json.data.find(item => item.chain === 'ETHEREUM').routes.find(item => item.provider === 'chainstack');
+    assert.match(route.last_error, /test network/);
+
+    // On the main network it serves live stores.
+    chain.state.chainIds['/evm3'] = '0x1';
+    forgetNetworks();
+    assert.equal((await admin.post('/v1/admin/integrations/chainstack/test')).json.ok, true);
+    assert.deepEqual((await deposits.routes('ETHEREUM', 'live')).map(item => item.provider.id), ['chainstack']);
+
+    // A sandbox endpoint on the main network is refused too (real coins never reach sandbox wallets).
+    await update('chainstack', { CHAINSTACK_SANDBOX: true });
+    const sandbox = (await admin.post('/v1/admin/integrations/chainstack/test')).json;
+    assert.deepEqual([sandbox.ok, sandbox.environment], [false, 'sandbox']);
+    assert.match(sandbox.message, /main network/);
+    assert.ok(!(await deposits.routes('ETHEREUM', 'test')).some(item => item.provider.id === 'chainstack'));
+    await update('chainstack', { CHAINSTACK_SANDBOX: false });
+  });
+
+  test('a Bitcoin endpoint is checked by its genesis block', async () => {
+    const { forgetNetworks } = await import('../dist/crypto/chains/client.js');
+    forgetNetworks();
+    // Blockstream switched to live, but pointed at the testnet Esplora.
+    await update('blockstream', { BLOCKSTREAM_ENABLED: true, BLOCKSTREAM_API_URL: `${chain.url}/btc` });
+    const tested = (await admin.post('/v1/admin/integrations/blockstream/test')).json;
+    assert.equal(tested.ok, false);
+    assert.match(tested.message, /test network/);
+    const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
+    assert.deepEqual((await server.app.get(CryptoDepositsService).routes('BITCOIN', 'live')).length, 0);
+    await update('blockstream', { BLOCKSTREAM_ENABLED: false });
+    // mempool.space in the sandbox (testnet4) is fine.
+    assert.equal((await admin.post('/v1/admin/integrations/mempool/test')).json.ok, true);
+  });
+});
+test('request logs never carry query values (webhook tokens, preview links)', async () => {
+  const { loggerParams, redactUrl } = await import('../dist/common/request/logging.js');
+  assert.equal(redactUrl('/v1/webhooks/didww-sms?token=secret&x=1'), '/v1/webhooks/didww-sms?token=[redacted]&x=[redacted]');
+  assert.equal(redactUrl('/v1/health'), '/v1/health');
+  const serialised = loggerParams({ LOG_LEVEL: 'info' }).pinoHttp.serializers.req({ method: 'POST', url: '/v1/webhooks/esim-access?token=abc', query: { token: 'abc' } });
+  assert.deepEqual([serialised.url, serialised.query, serialised.method], ['/v1/webhooks/esim-access?token=[redacted]', { token: '[redacted]' }, 'POST']);
+  assert.ok(!JSON.stringify(serialised).includes('abc'));
 });

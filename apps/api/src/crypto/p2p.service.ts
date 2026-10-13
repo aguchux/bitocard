@@ -240,7 +240,10 @@ export class P2pService {
    * limits; throws a clear refusal otherwise.
    */
   private terms(ad: P2pAd, asset: CryptoAsset, input: { fiat?: number; amount?: string }) {
-    const amount = input.amount !== undefined ? toUnits(input.amount, asset.decimals) : unitsFor(BigInt(input.fiat!), ad.priceMinor, asset.decimals);
+    let amount = input.amount !== undefined ? toUnits(input.amount, asset.decimals) : unitsFor(BigInt(input.fiat!), ad.priceMinor, asset.decimals);
+    // The ad's shown maximum is its rest rounded in the owner's favour, which may buy a part of a unit more than is left:
+    // asking for all of it takes the whole rest.
+    if (input.amount === undefined && amount > ad.remainingAmount && BigInt(input.fiat!) >= this.capacity(ad, asset).available) amount = ad.remainingAmount;
     if (amount <= 0n) throw invalid('amount_too_small', 'This amount is too small to trade.', input.amount !== undefined ? 'amount' : 'fiat');
     if (amount > ad.remainingAmount) throw conflict('amount_unavailable', `This ad has only ${fromUnits(ad.remainingAmount, asset.decimals)} ${asset.code} left.`, 'amount');
     const whole = amount === ad.remainingAmount;
@@ -608,7 +611,7 @@ export class P2pService {
       mode: trade.mode,
       /** From the viewer's side: they bought or sold (admins see the buyer's side). */
       side: viewerId === null || buying ? ('buy' as const) : ('sell' as const),
-      role: viewerId === trade.takerId ? ('taker' as const) : ('maker' as const),
+      role: viewerId === null ? null : viewerId === trade.takerId ? ('taker' as const) : ('maker' as const),
       ad_id: trade.adId,
       asset: trade.asset,
       currency: trade.currency,
@@ -654,7 +657,10 @@ export class P2pService {
       orderBy: { createdAt: 'desc' },
       take: query.limit ?? 100,
     });
-    const listed = await this.presentAds(ads, query.mode ?? 'live');
+    // Each ad's trader stats in its own mode: a list of both modes mixes test and live ads.
+    const [live, test] = await Promise.all((['live', 'test'] as const).map(mode => this.presentAds(ads.filter(ad => ad.mode === mode), mode)));
+    const byId = new Map([...live.data, ...test.data].map(item => [item.id, item]));
+    const listed = { object: 'list' as const, data: ads.map(ad => byId.get(ad.id)!) };
     const owners = await this.prisma.customer.findMany({ where: { id: { in: ads.map(ad => ad.customerId) } }, select: { id: true, email: true } });
     const emails = new Map(owners.map(owner => [owner.id, owner.email]));
     return { ...listed, data: listed.data.map((item, index) => ({ ...item, customer: { id: ads[index].customerId, email: emails.get(ads[index].customerId) ?? null } })) };
@@ -677,6 +683,7 @@ export class P2pService {
       object: 'list' as const,
       data: rows.map(row => ({
         ...this.presentTrade(row, assets.get(row.asset)!, null, names),
+        taker: row.takerId === row.buyerId ? ('buyer' as const) : ('seller' as const),
         buyer: { id: row.buyerId, email: row.buyer.email, nickname: names.get(row.buyerId) ?? null },
         seller: { id: row.sellerId, email: row.seller.email, nickname: names.get(row.sellerId) ?? null },
       })),

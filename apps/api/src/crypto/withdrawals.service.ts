@@ -9,7 +9,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { type CryptoAsset, type CryptoNetwork, type CryptoWithdrawal, type CryptoWithdrawalAddress, type LedgerMode, Prisma } from '../generated/prisma/client.js';
-import { IntegrationsService } from '../integrations/integrations.service.js';
+import { IntegrationsService, secureUrl } from '../integrations/integrations.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
@@ -27,6 +27,8 @@ const minute = 60_000;
 const hour = 60 * minute;
 /** A new address can be withdrawn to 24 hours after it is added. */
 export const addressWaitMs = 24 * hour;
+/** A saved address is screened again before a withdrawal once its last check is this old: lists change. */
+export const rescreenAfterMs = 24 * hour;
 const codeLifetimeMs = 30 * minute;
 const resendAfterMs = minute;
 const maxCodeAttempts = 5;
@@ -129,7 +131,7 @@ export class CryptoWithdrawalsService {
   /** The signer for a mode: the one set up for it (its Sandbox switch on for test), else simulated in test, else none. */
   signer(mode: LedgerMode): CryptoSigner | null {
     const values = this.integrations.values(signerFields.map(item => item.key));
-    if (values.CRYPTO_SIGNER_URL && values.CRYPTO_SIGNER_SECRET && signerInSandbox(values) === (mode === 'test')) return new RemoteSigner(values.CRYPTO_SIGNER_URL, values.CRYPTO_SIGNER_SECRET);
+    if (values.CRYPTO_SIGNER_URL && values.CRYPTO_SIGNER_SECRET && secureUrl(values.CRYPTO_SIGNER_URL) && signerInSandbox(values) === (mode === 'test')) return new RemoteSigner(values.CRYPTO_SIGNER_URL, values.CRYPTO_SIGNER_SECRET);
     return mode === 'test' ? new SimulatedSigner() : null;
   }
 
@@ -157,7 +159,7 @@ export class CryptoWithdrawalsService {
   }
 
   async addAddress(customer: CustomerWithStore, input: { chain: string; address: string; label: string }) {
-    const context = await this.wallets.require(customer);
+    const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
     const chain = input.chain.toUpperCase() as Chain;
     if (!withdrawalChains.includes(chain)) throw unavailable(`Withdrawals on ${chainNames[chain] ?? 'this network'} are not open yet.`, 'chain');
     const address = withdrawalAddress(chain, input.address, context.mode === 'test');
@@ -171,16 +173,7 @@ export class CryptoWithdrawalsService {
       throw invalid('too_many_addresses', `You can save up to ${maxAddresses} addresses. Remove one first.`);
     }
     const screening = await this.screen(address);
-    if (screening.status === 'flagged') {
-      await this.inbox.admins('admin.crypto.address_flagged', {
-        title: 'Withdrawal address on a sanctions list',
-        body: `${customer.email} tried to add ${address} (${chainNames[chain]}), which ${screening.provider} reports: ${screening.detail ?? 'sanctioned'}. It was refused.`,
-        link: `/crypto/customers/${customer.id}`,
-        mode: context.mode,
-        subject: `${customer.id}:${chain}:${address}`,
-      });
-      throw invalid('address_refused', 'This address cannot be used for withdrawals.', 'address');
-    }
+    if (screening.status === 'flagged') await this.refuseFlagged(customer, context.mode, chain, address, screening, 'address');
     const usableFrom = new Date(Date.now() + addressWaitMs);
     let row: CryptoWithdrawalAddress;
     try {
@@ -205,6 +198,31 @@ export class CryptoWithdrawalsService {
     return presentAddress(row);
   }
 
+  /** Admins are told about a sanctioned address, and it is refused. */
+  private async refuseFlagged(customer: CustomerWithStore, mode: LedgerMode, chain: Chain, address: string, screening: { provider: string | null; detail?: string | null }, param: string): Promise<never> {
+    await this.inbox.admins('admin.crypto.address_flagged', {
+      title: 'Withdrawal address on a sanctions list',
+      body: `${customer.email} tried to use ${address} (${chainNames[chain]}), which ${screening.provider} reports: ${screening.detail ?? 'sanctioned'}. It was refused.`,
+      link: `/crypto/customers/${customer.id}`,
+      mode,
+      subject: `${customer.id}:${chain}:${address}`,
+    });
+    throw invalid('address_refused', 'This address cannot be used for withdrawals.', param);
+  }
+
+  /**
+   * A saved address screened over a day ago is screened again before it is used. A flagged answer is kept and refuses
+   * it; when no screener answers, this withdrawal is treated as unscreened (live: reviewed) and the old answer kept.
+   */
+  private async rescreened(customer: CustomerWithStore, row: CryptoWithdrawalAddress): Promise<CryptoWithdrawalAddress> {
+    if (row.screening === 'flagged' || (row.screenedAt && Date.now() - row.screenedAt.getTime() < rescreenAfterMs)) return row;
+    const screening = await this.screen(row.address);
+    if (!screening.provider) return { ...row, screening: 'unscreened' };
+    const fresh = await this.prisma.cryptoWithdrawalAddress.update({ where: { id: row.id }, data: { screening: screening.status, screenedBy: screening.provider, screenedAt: new Date() } });
+    if (fresh.screening === 'flagged') await this.refuseFlagged(customer, row.mode, row.chain as Chain, row.address, screening, 'address_id');
+    return fresh;
+  }
+
   async removeAddress(customer: CustomerWithStore, id: string) {
     const removed = await this.prisma.cryptoWithdrawalAddress.deleteMany({ where: { id, customerId: customer.id } });
     if (!removed.count) throw notFound('address');
@@ -225,8 +243,8 @@ export class CryptoWithdrawalsService {
 
   /** The networks an asset can be withdrawn on now, with their fee and minimum, and the customer's daily limit. */
   async networks(customer: CustomerWithStore, assetCode: string) {
-    const context = await this.wallets.require(customer);
-    const asset = await this.wallets.asset(assetCode);
+    const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
+    const asset = await this.wallets.asset(assetCode, 'asset', true);
     const signer = this.signer(context.mode);
     const networks = await this.prisma.cryptoNetwork.findMany({ where: { asset: asset.code, withdrawalsEnabled: true }, orderBy: { chain: 'asc' } });
     const usable = signer ? networks.filter(item => withdrawalChains.includes(item.chain as Chain) && (!item.contract || this.contractFor(item, context.mode))) : [];
@@ -264,15 +282,16 @@ export class CryptoWithdrawalsService {
 
   /** Previews or asks for a withdrawal; asking moves the amount and fee out of the wallet and emails the code. */
   async create(customer: CustomerWithStore, input: { asset: string; chain: string; address_id: string; amount: string; preview?: boolean }) {
-    const context = await this.wallets.require(customer);
-    const asset = await this.wallets.asset(input.asset);
+    const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
+    const asset = await this.wallets.asset(input.asset, 'asset', true);
     const chain = input.chain.toUpperCase() as Chain;
     const network = chains.includes(chain) ? await this.prisma.cryptoNetwork.findUnique({ where: { asset_chain: { asset: asset.code, chain } } }) : null;
     if (!network?.withdrawalsEnabled || !withdrawalChains.includes(chain)) throw unavailable(`${asset.code} withdrawals on this network are not open.`, 'chain');
     if (network.contract && !this.contractFor(network, context.mode)) throw unavailable(`${asset.code} on ${chainNames[chain]} has no test network token yet.`, 'chain');
     if (!this.signer(context.mode)) throw unavailable('Crypto withdrawals are not open yet.');
-    const address = await this.prisma.cryptoWithdrawalAddress.findFirst({ where: { id: input.address_id, customerId: customer.id, mode: context.mode } });
-    if (!address) throw notFound('address');
+    const saved = await this.prisma.cryptoWithdrawalAddress.findFirst({ where: { id: input.address_id, customerId: customer.id, mode: context.mode } });
+    if (!saved) throw notFound('address');
+    const address = input.preview ? saved : await this.rescreened(customer, saved);
     if (address.chain !== chain) throw invalid('address_wrong_network', `This address is for ${chainNames[address.chain as Chain]}, not ${chainNames[chain]}.`, 'address_id');
     if (address.screening === 'flagged') throw invalid('address_refused', 'This address cannot be used for withdrawals.', 'address_id');
     if (address.usableFrom > new Date()) {
@@ -382,7 +401,7 @@ export class CryptoWithdrawalsService {
 
   /** The emailed code confirms the withdrawal: it then waits for an admin or goes to the signer. */
   async confirm(customer: CustomerWithStore, id: string, code: string) {
-    const context = await this.wallets.require(customer);
+    const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
     const row = await this.own(customer, id);
     if (row.status !== 'awaiting_code' || !row.codeHash) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     if (!row.codeExpiresAt || row.codeExpiresAt <= new Date()) throw invalid('code_expired', 'That code has expired. Ask for a new one.', 'code');
@@ -606,6 +625,8 @@ export class CryptoWithdrawalsService {
     if (!signer) return this.unclear(row, 'No signer is set up for this mode.');
     try {
       const transfer = await signer.status(row.signerReference);
+      // A withdrawal a real signer sent is never settled by the simulated one (its signer removed or switched to live).
+      if (signer.simulated && row.txHash && transfer?.txHash !== row.txHash) return this.unclear(row, 'Sent by a signer that is no longer set up for this mode.');
       if (transfer?.status === 'failed') return void (await this.apply(row, transfer));
       if (transfer?.txHash && transfer.txHash !== row.txHash) {
         await this.prisma.cryptoWithdrawal.update({ where: { id }, data: { txHash: transfer.txHash } });
@@ -672,9 +693,9 @@ export class CryptoWithdrawalsService {
 
   // -- Admin ----------------------------------------------------------------------------------------------------
 
-  async adminList(query: { mode?: LedgerMode; status?: string; customer_id?: string }) {
+  async adminList(query: { mode?: LedgerMode; status?: string; customer_id?: string; id?: string }) {
     const rows = await this.prisma.cryptoWithdrawal.findMany({
-      where: { ...(query.mode ? { mode: query.mode } : {}), ...(query.status ? { status: query.status } : {}), ...(query.customer_id ? { customerId: query.customer_id } : {}) },
+      where: { ...(query.id ? { id: query.id } : {}), ...(query.mode ? { mode: query.mode } : {}), ...(query.status ? { status: query.status } : {}), ...(query.customer_id ? { customerId: query.customer_id } : {}) },
       include: { customer: { select: { email: true } }, savedAddress: { select: { screening: true, screenedBy: true, label: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -705,7 +726,7 @@ export class CryptoWithdrawalsService {
     if (!claimed.count) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_in_review', 'This withdrawal is not waiting for approval.');
     await this.audit.record({ actorId: adminId, action: 'crypto.withdrawal_approved', targetType: 'crypto_withdrawal', targetId: id, before: { status: 'review' }, after: { status: 'queued', note } });
     waitUntil(this.submit(id).catch(error => this.logger.warn({ err: error, withdrawal: id }, 'Could not send a crypto withdrawal')));
-    return (await this.adminList({ customer_id: row.customerId })).data.find(item => item.id === id);
+    return (await this.adminList({ id })).data[0];
   }
 
   /** Operations or finance turn down a withdrawal waiting for review: the money goes back to the customer's wallet. */
@@ -715,18 +736,19 @@ export class CryptoWithdrawalsService {
     const done = await this.release(row, ['review'], 'rejected', null, { adminId, note });
     if (!done) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_in_review', 'This withdrawal is not waiting for approval.');
     await this.audit.record({ actorId: adminId, action: 'crypto.withdrawal_rejected', targetType: 'crypto_withdrawal', targetId: id, before: { status: 'review' }, after: { status: 'rejected', note } });
-    return (await this.adminList({ customer_id: row.customerId })).data.find(item => item.id === id);
+    return (await this.adminList({ id })).data[0];
   }
 
   /** Operations ask the signer and the chain about a withdrawal now (for one flagged as stuck). */
   async recheck(adminId: string | null, id: string) {
     const row = await this.prisma.cryptoWithdrawal.findUnique({ where: { id } });
     if (!row) throw notFound('withdrawal');
-    await this.prisma.cryptoWithdrawal.updateMany({ where: { id, status: { in: ['submitting', 'broadcast'] } }, data: { nextCheckAt: null } });
+    // Ask now unless a run holds it (its claim lasts 3 minutes from its last change): two sends must never run at once.
+    await this.prisma.cryptoWithdrawal.updateMany({ where: { id, status: { in: ['submitting', 'broadcast'] }, updatedAt: { lte: new Date(Date.now() - 3 * minute) } }, data: { nextCheckAt: null } });
     if (row.status === 'broadcast') await this.check(id);
     else if (row.status === 'submitting') await this.submit(id);
     await this.audit.record({ actorId: adminId, action: 'crypto.withdrawal_rechecked', targetType: 'crypto_withdrawal', targetId: id, before: { status: row.status }, after: null });
-    return (await this.adminList({ customer_id: row.customerId })).data.find(item => item.id === id);
+    return (await this.adminList({ id })).data[0];
   }
 
   // -- Presenting -----------------------------------------------------------------------------------------------

@@ -2803,17 +2803,20 @@ model CryptoDeposit {
   amount        BigInt
   blockNumber   BigInt?    @map("block_number")
   confirmations Int        @default(0)
-  /// pending, credited, ignored (too small to credit) or failed (no longer on chain).
+  /// pending, credited, ignored (too small or too large to credit) or failed (no longer on chain).
   status        String     @default("pending")
   /// Providers that have confirmed it.
   confirmedBy   String[]   @default([]) @map("confirmed_by")
   checkedAt     DateTime?  @map("checked_at")
+  /// When the chain stopped showing it (cleared when it is seen again); it fails 6 hours after this.
+  missingSince  DateTime?  @map("missing_since")
   creditedAt    DateTime?  @map("credited_at")
   createdAt     DateTime   @default(now()) @map("created_at")
   customer      Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@unique([chain, txHash, outputIndex])
   @@index([status, chain])
+  @@index([status, mode, checkedAt])
   @@index([customerId, createdAt])
   @@map("crypto_deposits")
 }
@@ -2839,6 +2842,9 @@ model ChainNotice {
   provider    String
   chain       String
   bodyHash    String    @unique @map("body_hash")
+  /// The mode to record in; null for providers' webhooks (their Sandbox switch decides). Set for transactions a scan
+  /// found but no provider could read yet (provider `scan`), kept here to be retried.
+  mode        LedgerMode?
   hashes      String[]
   processedAt DateTime? @map("processed_at")
   attempts    Int       @default(0)

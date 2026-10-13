@@ -23,7 +23,7 @@ export const cryptoFrozen = () =>
 export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; seller: Reseller; country: string; currency: string };
 
 const cryptoKinds = ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing'] as const satisfies AccountKind[];
-const fiatKinds = ['customer_withdrawable', 'p2p_fiat_locked', 'customer_wallet'] as const satisfies AccountKind[];
+const fiatKinds = ['customer_withdrawable', 'p2p_fiat_locked', 'customer_wallet', 'customer_payouts_pending'] as const satisfies AccountKind[];
 
 export function presentFreeze(freeze: CryptoFreeze, asset: Pick<CryptoAsset, 'decimals'>) {
   return {
@@ -65,17 +65,25 @@ export class CryptoWalletsService {
     return this.prisma.cryptoAsset.findMany({ where: all ? {} : { enabled: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
   }
 
-  /** An enabled asset by code (any case). */
-  async asset(code: string, param = 'asset') {
+  /** An enabled asset by code (any case); `held` also finds a switched-off one, for moving out what customers hold. */
+  async asset(code: string, param = 'asset', held = false) {
     const asset = await this.prisma.cryptoAsset.findUnique({ where: { code: code.toUpperCase() } });
-    if (!asset?.enabled) throw assetUnavailable(param);
+    if (!asset || (!asset.enabled && !held)) throw assetUnavailable(param);
     return asset;
   }
 
   // -- Who may use crypto ---------------------------------------------------------------------------------------
 
+  /**
+   * The customer's mode, seller and currency, whether or not their store is open now: what they already hold (balances,
+   * closing ads, withdrawing, cashing out) stays theirs when a reseller's store is unpublished, suspended or unverified.
+   * New business (`require`) also needs the store open.
+   */
   async context(customer: CustomerWithStore): Promise<CryptoContext> {
-    const seller = await this.stores.sellerFor(customer);
+    const seller = this.stores.isHouse(customer.store)
+      ? await this.stores.sellerFor(customer)
+      : await this.prisma.reseller.findUniqueOrThrow({ where: { id: customer.store.resellerId } });
+    if (!seller.country) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
     const market = await this.prisma.country.findUniqueOrThrow({ where: { code: seller.country! }, select: { code: true, currency: true } });
     return { customer, mode: this.stores.mode(customer.store), seller, country: market.code, currency: market.currency };
   }
@@ -89,28 +97,22 @@ export class CryptoWalletsService {
     return context.mode === 'test' || this.identity.isCustomerVerified(context.seller.id, context.mode, context.customer.id);
   }
 
-  /** The checks before any crypto action: email confirmed, crypto on for the store, identity checked live, not frozen. */
+  /** The checks before any new crypto business (deposits, ads, trades): the store open and crypto on for it, then `requireHolder`'s. */
   async require(customer: CustomerWithStore) {
-    if (!customer.emailVerifiedAt) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
-    }
-    const context = await this.context(customer);
+    if (!this.stores.isHouse(customer.store)) await this.stores.seller(customer.store, '');
+    const context = await this.requireHolder(customer, 'using crypto');
     if (!(await this.enabled(context.seller))) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'crypto_not_enabled', 'Crypto is not available in your country yet.');
-    }
-    const fresh = await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { cryptoFrozenAt: true } });
-    if (fresh.cryptoFrozenAt) throw cryptoFrozen();
-    if (!(await this.verified(context))) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before using crypto.');
     }
     return context;
   }
 
   /**
-   * The checks before paying P2P money out to a bank: email confirmed, identity checked (live) and not frozen. Not the
-   * crypto switches: money a customer already has can always be paid out, even after crypto is switched off.
+   * The checks before moving out what a customer already holds (on-chain withdrawals, bank payouts of P2P money):
+   * email confirmed, not frozen, identity checked live. Not the crypto switches nor the store being open: switching
+   * crypto off or closing a store never traps money.
    */
-  async requireCashOut(customer: CustomerWithStore) {
+  async requireHolder(customer: CustomerWithStore, doing = 'moving money out') {
     if (!customer.emailVerifiedAt) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_not_verified', 'Confirm your email first: enter the code we emailed you.');
     }
@@ -118,8 +120,14 @@ export class CryptoWalletsService {
     const fresh = await this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { cryptoFrozenAt: true } });
     if (fresh.cryptoFrozenAt) throw cryptoFrozen();
     if (!(await this.verified(context))) {
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', 'Verify your identity before paying money out.');
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'customer_verification_required', `Verify your identity before ${doing}.`);
     }
+    return context;
+  }
+
+  /** `requireHolder`, plus the name the identity check verified (live) for matching bank accounts. */
+  async requireCashOut(customer: CustomerWithStore) {
+    const context = await this.requireHolder(customer, 'paying money out');
     const verifiedName = context.mode === 'live' ? await this.identity.customerVerifiedName(context.seller.id, context.mode, customer.id) : null;
     return { customer, mode: context.mode, sellerId: context.seller.id, country: context.country, currency: context.currency, verifiedName };
   }
@@ -148,6 +156,8 @@ export class CryptoWalletsService {
         asset: asset.code,
         name: asset.name,
         decimals: asset.decimals,
+        /** False for an asset admins switched off: what is held can still be withdrawn, not traded or deposited. */
+        enabled: asset.enabled,
         available: fromUnits(available, asset.decimals),
         locked: fromUnits(locked, asset.decimals),
         frozen: fromUnits(frozen, asset.decimals),
@@ -161,14 +171,17 @@ export class CryptoWalletsService {
   /** The customer's crypto wallets and P2P cash, with what they can do now. */
   async overview(customer: CustomerWithStore) {
     const context = await this.context(customer);
-    const [enabled, p2p, verified, fresh, assets] = await Promise.all([
+    const [enabled, p2p, verified, fresh, all] = await Promise.all([
       this.enabled(context.seller),
       this.settings.isOn('p2p_trading', context.seller.id),
       this.verified(context),
       this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { cryptoFrozenAt: true } }),
-      this.assets(),
+      this.assets(true),
     ]);
     const balance = await this.accounts(customer.id, context.mode);
+    // A switched-off asset is listed only while the customer still holds some, so they can withdraw it.
+    const held = (code: string) => cryptoKinds.some(kind => balance(kind, code) > 0n);
+    const listed = all.filter(asset => asset.enabled || held(asset.code));
     return {
       object: 'crypto_wallets' as const,
       mode: context.mode,
@@ -178,13 +191,15 @@ export class CryptoWalletsService {
       p2p_enabled: enabled && p2p,
       verified,
       frozen: Boolean(fresh.cryptoFrozenAt),
-      assets: await this.assetBalances(customer.id, context.mode, assets),
+      assets: await this.assetBalances(customer.id, context.mode, listed),
       /** Money in the customer's country currency for P2P: sale proceeds (withdrawable), the wallet (top-ups) and what buy ads lock. */
       cash: {
         currency: context.currency,
         proceeds: minor(balance('customer_withdrawable', context.currency)),
         wallet: minor(balance('customer_wallet', context.currency)),
         locked: minor(balance('p2p_fiat_locked', context.currency)),
+        /** P2P money on its way to the customer's bank, until the transfer is paid or returned. */
+        paying_out: minor(balance('customer_payouts_pending', context.currency)),
       },
     };
   }

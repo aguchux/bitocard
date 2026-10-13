@@ -36,7 +36,7 @@ export type CryptoCustomer = {
 
 export type CryptoCustomerDetail = CryptoCustomer & {
   balances: { live: CryptoBalance[]; test: CryptoBalance[] };
-  /** P2P proceeds (customer_withdrawable), fiat locked in buy ads and the wallet, minor units. */
+  /** P2P proceeds (customer_withdrawable), fiat locked in buy ads (p2p_fiat_locked), the wallet (customer_wallet) and P2P money paying out to a bank (customer_payouts_pending), minor units. */
   cash: Array<{ mode: Mode; kind: string; currency: string; balance: number }>;
   freezes: CryptoFreeze[];
 };
@@ -83,6 +83,10 @@ export type P2pTrade = {
   status: string;
   buyer: { id: string; email: string; nickname: string | null };
   seller: { id: string; email: string; nickname: string | null };
+  /** Admins see both sides, so there is no viewer's role. */
+  role: null;
+  /** Which side took the ad (the other posted it). */
+  taker: 'buyer' | 'seller';
   created_at: string;
   completed_at: string | null;
 };

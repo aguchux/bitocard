@@ -22,12 +22,18 @@ const sections = [
   { href: "/account/crypto/market", label: "Market" },
   { href: "/account/crypto/ads", label: "My ads" },
   { href: "/account/crypto/trades", label: "Trades" },
+  { href: "/account/crypto/deposit", label: "Deposit" },
+  { href: "/account/crypto/withdraw", label: "Withdraw" },
+  { href: "/account/crypto/cash-out", label: "Cash out" },
 ];
 
-/** The crypto section's places, as pills under the page title (scrolls sideways on its own on small phones). */
+/**
+ * The crypto section's places, as pills under the page title. On phones the row scrolls sideways on its own, inside
+ * its own box, so the page never scrolls sideways.
+ */
 export function CryptoNav({ current }: { current: string }) {
   return (
-    <nav aria-label="Crypto" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+    <nav aria-label="Crypto" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
       {sections.map(section => (
         <Link
           key={section.href}
@@ -52,14 +58,43 @@ export function CoinBadge({ asset, size = "size-10" }: { asset: string; size?: s
   );
 }
 
-/** Why the customer cannot trade yet, or null when they can. */
-export function CryptoGate({ wallets, p2p = false }: { wallets: StoreCryptoWallets | null; p2p?: boolean }) {
+/** Coins the customer can deposit and trade now: crypto is open to them and the coin is not switched off. */
+export const tradableAssets = (wallets: StoreCryptoWallets | null) => (wallets?.enabled ? wallets.assets.filter(item => item.enabled).map(item => item.asset) : []);
+
+/** Coins the customer holds (anything available, locked, frozen or on its way out). */
+export const heldAssets = (wallets: StoreCryptoWallets | null) => wallets?.assets.filter(item => Number(item.total) > 0) ?? [];
+
+/**
+ * Coins the customer can withdraw: what they hold, plus every tradable coin while crypto is open. Withdrawing needs no
+ * crypto switch (switching crypto off never traps anyone's coins), only a verified, unfrozen account.
+ */
+export const withdrawableAssets = (wallets: StoreCryptoWallets | null) => {
+  const tradable = new Set(tradableAssets(wallets));
+  return wallets?.assets.filter(item => tradable.has(item.asset) || Number(item.total) > 0).map(item => item.asset) ?? [];
+};
+
+/** Whether the Withdraw button belongs on screen: verified, not frozen, and with available coins. */
+export const canWithdraw = (wallets: StoreCryptoWallets | null) => Boolean(wallets && wallets.verified && !wallets.frozen && wallets.assets.some(item => Number(item.available) > 0));
+
+/** P2P money left from selling: still to pay out, or on its way to the bank. Shown even with crypto switched off. */
+export const hasP2pMoney = (wallets: StoreCryptoWallets | null) => Boolean(wallets && (wallets.cash.proceeds > 0 || wallets.cash.paying_out > 0));
+
+/**
+ * Why the customer cannot use this part of crypto yet, or null when they can. `withdraw`: sending coins out, which
+ * needs no crypto switch while they hold some.
+ */
+export function CryptoGate({ wallets, p2p = false, withdraw = false }: { wallets: StoreCryptoWallets | null; p2p?: boolean; withdraw?: boolean }) {
   if (!wallets) return <p className={card}>Crypto cannot be shown right now. Try again shortly.</p>;
-  if (!wallets.enabled || (p2p && !wallets.p2p_enabled)) {
+  const closed = withdraw ? !wallets.enabled && heldAssets(wallets).length === 0 : !wallets.enabled || (p2p && !wallets.p2p_enabled);
+  if (closed) {
     return (
       <div className={card}>
         <p className="font-semibold">Crypto is not available in your country yet</p>
-        <p className="mt-1 text-sm text-slate-600">We open it country by country. We will tell you when you can hold and trade crypto here.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {heldAssets(wallets).length || hasP2pMoney(wallets)
+            ? "Trading is closed here for now. You can still withdraw the coins you hold and cash out your P2P money."
+            : "We open it country by country. We will tell you when you can hold and trade crypto here."}
+        </p>
       </div>
     );
   }
@@ -69,7 +104,7 @@ export function CryptoGate({ wallets, p2p = false }: { wallets: StoreCryptoWalle
         <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         <div>
           <p className="font-semibold">Your crypto account is frozen</p>
-          <p className="mt-1 text-sm">You cannot trade until BitoCard has looked into your account. Contact support to find out more.</p>
+          <p className="mt-1 text-sm">You cannot trade or withdraw until BitoCard has looked into your account. Contact support to find out more.</p>
         </div>
       </div>
     );

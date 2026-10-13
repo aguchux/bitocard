@@ -23,7 +23,7 @@ import { PushService } from '../notifications/push.service.js';
 import { MediaService } from '../media/media.service.js';
 import { NumbersService } from '../numbers/numbers.service.js';
 import { EsimsService } from '../esims/esims.service.js';
-import { CryptoDepositsService } from '../crypto/chains/deposits.service.js';
+import { CryptoDepositsService, depositBudgetMs } from '../crypto/chains/deposits.service.js';
 import { CryptoReconciliationService } from '../crypto/custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from '../crypto/withdrawals.service.js';
 
@@ -91,8 +91,16 @@ export class CronController {
       push: () => push.runDue(),
       /** Daily: delete in-app notifications older than 90 days (and their pushes). */
       'notifications-cleanup': () => inbox.purge(),
-      /** Every 2 minutes: crypto deposits to watched addresses (re-read, credited once confirmed), then withdrawals (sent, checked on chain, settled). */
-      crypto: async () => ({ deposits: await deposits.job(), withdrawals: await withdrawals.job() }),
+      /**
+       * Every 2 minutes: crypto withdrawals (sent, checked on chain, settled), then deposits (pending ones settled, then
+       * customers' addresses scanned, re-read, credited once confirmed) within a deadline, so the run ends inside the
+       * function's 300 seconds and a slow scan never stops withdrawals or settlement.
+       */
+      crypto: async () => {
+        const deadline = Date.now() + depositBudgetMs;
+        const sent = await withdrawals.job();
+        return { deposits: await deposits.job({ deadline }), withdrawals: sent };
+      },
       /** Every 15 minutes: every blockchain provider's latest block (Crypto > Chains health). */
       'chain-health': () => deposits.checkAll(),
       /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */

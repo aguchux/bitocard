@@ -13,6 +13,20 @@ export function requestId(req: IncomingMessage, res: ServerResponse) {
   return id;
 }
 
+/**
+ * A request address for the logs: query values replaced (`?token=…` on webhook addresses, `?preview=…` links and the
+ * like are secrets), names kept so the log still says what was asked.
+ */
+export function redactUrl(url: string | undefined) {
+  if (!url) return url;
+  const at = url.indexOf('?');
+  if (at < 0) return url;
+  const names = [...new Set(new URLSearchParams(url.slice(at + 1)).keys())];
+  return `${url.slice(0, at)}${names.length ? `?${names.map(name => `${encodeURIComponent(name)}=[redacted]`).join('&')}` : ''}`;
+}
+
+type SerializedRequest = { url?: string; query?: Record<string, unknown> } & Record<string, unknown>;
+
 /** Structured JSON logs, one line per request, with secrets redacted. */
 export function loggerParams(config: AppConfig): Params {
   return {
@@ -29,6 +43,13 @@ export function loggerParams(config: AppConfig): Params {
           'res.headers["set-cookie"]',
         ],
         censor: '[redacted]',
+      },
+      serializers: {
+        req: (req: SerializedRequest) => ({
+          ...req,
+          url: redactUrl(req.url),
+          ...(req.query && typeof req.query === 'object' ? { query: Object.fromEntries(Object.keys(req.query).map(name => [name, '[redacted]'])) } : {}),
+        }),
       },
       autoLogging: { ignore: req => req.url === '/health' },
       customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),

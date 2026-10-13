@@ -9,11 +9,11 @@ import { type ChainRoute, type CryptoAddress, type CryptoDeposit, type CryptoNet
 import { IntegrationsService } from '../../integrations/integrations.service.js';
 import { LedgerService } from '../../ledger/ledger.service.js';
 import { InboxService } from '../../notifications/inbox.service.js';
-import { fromUnits, toUnits } from '../amounts.js';
+import { fromUnits, maxUnits, toUnits } from '../amounts.js';
 import { CryptoWalletsService, notFound } from '../crypto-wallets.service.js';
 import { type AddressFamily, deriveAddress, xpubFingerprint } from '../derive.js';
 import { providerKeys } from './check.js';
-import { type Chain, type ChainClient, chainFamily, chainNames, chains, type Inspection, normaliseAddress, normaliseContract, type Transfer } from './client.js';
+import { type Chain, type ChainClient, ChainError, chainFamily, chainNames, chains, checkNetwork, type Inspection, normaliseAddress, normaliseContract, normaliseHash, type Transfer } from './client.js';
 import { type ChainProvider, chainProvider, chainProviders, providerChains, providerInSandbox } from './providers.js';
 
 /** How long an address shown to a customer is watched for deposits (renewed each time it is shown). */
@@ -29,6 +29,21 @@ const sweepBatch = 50;
 const missingFailsAfterMs = 6 * 3_600_000;
 /** Notifications whose transactions could not be read are retried by the job this many times. */
 const maxNoticeAttempts = 20;
+/** Recently shown addresses read every run per chain and mode; the rest wait for their sweep. */
+const watchBatch = 100;
+/** Addresses per request batch when each address's history is read (time is checked between batches). */
+const addressChunk = 25;
+/** Addresses per eth_getLogs request (providers cap the filter's size). */
+const logChunk = 500;
+/** Pending deposits checked per mode and run, least recently checked first. */
+const settleBatch = 50;
+/** The `crypto` job's time for deposits, inside Vercel's 300-second function limit (withdrawals run first). */
+export const depositBudgetMs = 200_000;
+/** Of that, the most settling pending deposits may take before scanning starts. */
+const settleBudgetMs = 60_000;
+
+/** A transaction a provider listed that no provider can read yet (a lagging node): unclear, never "nothing". */
+class NotVisibleYet extends ChainError {}
 
 type Route = { provider: ChainProvider; client: ChainClient };
 
@@ -42,7 +57,8 @@ export function ledgerUnits(raw: bigint, chainDecimals: number, assetDecimals: n
 /** Transaction hashes in a provider's notification, whatever its shape: 0x… (EVM), 64 hex (TRON, Bitcoin). */
 export function hashesIn(body: string, chain: Chain) {
   const pattern = chain === 'ETHEREUM' || chain === 'BSC' ? /0x[0-9a-fA-F]{64}/g : /\b[0-9a-fA-F]{64}\b/g;
-  return [...new Set(body.match(pattern) ?? [])].slice(0, 100);
+  // In one case, so a hash written in capitals is the same transaction.
+  return [...new Set((body.match(pattern) ?? []).map(normaliseHash))].slice(0, 100);
 }
 
 /**
@@ -87,7 +103,10 @@ export class CryptoDepositsService {
     return rows;
   }
 
-  /** The providers to ask for a chain in a mode, in order: enabled, set up, and in the matching environment. */
+  /**
+   * The providers to ask for a chain in a mode, in order: enabled, set up, in the matching environment, and on the
+   * matching network (a pasted endpoint still on a test network never serves live stores; checked, then cached).
+   */
   async routes(chain: Chain, mode: LedgerMode): Promise<Route[]> {
     const rows = (await this.routeRows(chain)).filter(row => row.enabled).sort((a, b) => a.priority - b.priority);
     const routes: Route[] = [];
@@ -97,9 +116,19 @@ export class CryptoDepositsService {
       const values = this.values(provider);
       if (providerInSandbox(provider, values) !== (mode === 'test')) continue;
       const client = provider.endpoints(values, mode === 'test' ? 'sandbox' : 'live')[chain];
-      if (client) routes.push({ provider, client });
+      if (!client) continue;
+      try {
+        await checkNetwork(chain, client, mode === 'test' ? 'sandbox' : 'live');
+        routes.push({ provider, client });
+      } catch (error) {
+        await this.noteError(chain, provider.id, error);
+      }
     }
     return routes;
+  }
+
+  private async noteError(chain: Chain, provider: string, error: unknown) {
+    await this.prisma.chainRoute.updateMany({ where: { chain, provider }, data: { lastError: (error instanceof Error ? error.message : 'error').slice(0, 300), checkedAt: new Date() } });
   }
 
   /** Asks each route in turn until one answers; a failure is noted on its route and the next is tried. */
@@ -110,7 +139,7 @@ export class CryptoDepositsService {
         return { value: await call(route.client), provider: route.provider.id };
       } catch (error) {
         last = error;
-        await this.prisma.chainRoute.updateMany({ where: { chain, provider: route.provider.id }, data: { lastError: (error instanceof Error ? error.message : 'error').slice(0, 300), checkedAt: new Date() } });
+        await this.noteError(chain, route.provider.id, error);
       }
     }
     throw last ?? new Error(`No provider is set up for ${chain}`);
@@ -218,21 +247,32 @@ export class CryptoDepositsService {
 
   // -- Finding deposits -----------------------------------------------------------------------------------------
 
-  /** The `crypto` job: scan every chain in both modes, then move pending deposits on. Safe to run twice. */
-  async job() {
+  /**
+   * The `crypto` job: pending deposits moved on first (never held up by a slow scan), then every chain in both modes
+   * scanned (starting from a different chain each run, so none is always last), then notifications retried, all
+   * within `deadline` so the run ends inside the function's time limit. Safe to run twice.
+   */
+  async job(input: { deadline?: number } = {}) {
+    const deadline = input.deadline ?? Date.now() + depositBudgetMs;
     const summary: Record<string, unknown> = {};
+    summary.settled = await this.settlePending(Math.min(deadline, Date.now() + settleBudgetMs));
+    const scanned = chains.filter(chain => chain !== 'SOLANA');
+    const start = Math.floor(Date.now() / 120_000) % scanned.length;
+    const order = [...scanned.slice(start), ...scanned.slice(0, start)];
     for (const mode of ['live', 'test'] as const) {
-      for (const chain of chains) {
-        if (chain === 'SOLANA') continue;
+      for (const chain of order) {
+        if (Date.now() >= deadline) {
+          summary[`${mode}:${chain}`] = { skipped: 'out of time' };
+          continue;
+        }
         try {
-          summary[`${mode}:${chain}`] = await this.scan(chain, mode);
+          summary[`${mode}:${chain}`] = await this.scan(chain, mode, deadline);
         } catch (error) {
           summary[`${mode}:${chain}`] = { error: error instanceof Error ? error.message : 'error' };
         }
       }
     }
-    summary.notices = await this.retryNotices();
-    summary.settled = await this.settlePending();
+    summary.notices = Date.now() < deadline ? await this.retryNotices(deadline) : { skipped: 'out of time' };
     return summary;
   }
 
@@ -250,22 +290,25 @@ export class CryptoDepositsService {
    * One chain in one mode: transfers into customers' addresses since the last scan, each re-read before it is recorded.
    * An address is the customer's for good, so none is ever left unread: EVM token logs are filtered by address in the
    * same block range, so every address is scanned; listing an address's own history (plain ETH and BNB, TRON, Bitcoin)
-   * costs a request per address, so those cover the watched addresses (shown in the last week) plus a turn of the
-   * others, oldest sweep first.
+   * costs a request per address, so those cover the most recently shown addresses (up to `watchBatch`) plus a turn of
+   * the others, oldest sweep first. Stops at `deadline`: the EVM cursor moves only once its whole block range was read.
    */
-  async scan(chain: Chain, mode: LedgerMode) {
+  async scan(chain: Chain, mode: LedgerMode, deadline = Date.now() + depositBudgetMs) {
     const family = chainFamily[chain];
     const networks = await this.networksFor(chain, mode);
     if (!networks.length) return { skipped: 'no networks' };
     const evm = chain === 'ETHEREUM' || chain === 'BSC';
-    const watched = await this.prisma.cryptoAddress.findMany({ where: { mode, family, watchUntil: { gt: new Date() } } });
-    const sweep = await this.prisma.cryptoAddress.findMany({ where: { mode, family, watchUntil: { lte: new Date() } }, orderBy: [{ sweptAt: { sort: 'asc', nulls: 'first' } }, { index: 'asc' }], take: sweepBatch });
-    const every = evm ? await this.prisma.cryptoAddress.findMany({ where: { mode, family }, select: { address: true } }) : [];
+    const now = new Date();
+    const watched = await this.prisma.cryptoAddress.findMany({ where: { mode, family, watchUntil: { gt: now } }, orderBy: [{ watchUntil: 'desc' }, { index: 'asc' }], take: watchBatch });
+    // Everything else, including watched addresses beyond the batch, is swept in turn (its whole history is read).
+    const sweep = await this.prisma.cryptoAddress.findMany({
+      where: { mode, family, id: { notIn: watched.map(item => item.id) } },
+      orderBy: [{ sweptAt: { sort: 'asc', nulls: 'first' } }, { index: 'asc' }],
+      take: sweepBatch,
+    });
     if (!watched.length && !sweep.length) return { skipped: 'no addresses' };
     const routes = await this.routes(chain, mode);
     if (!routes.length) return { skipped: 'no provider' };
-    const addresses = [...watched, ...sweep].map(item => normaliseAddress(chain, item.address));
-    const tokenAddresses = evm ? every.map(item => normaliseAddress(chain, item.address)) : addresses;
     const contracts = networks.flatMap(item => (item.contract ? [item.contract] : []));
     const native = networks.some(item => !item.contract);
 
@@ -274,58 +317,144 @@ export class CryptoDepositsService {
     const tokenRoutes = routes.filter(route => route.client.scan && route.client.tokenScan);
     const coinRoutes = routes.filter(route => route.client.scan && route.client.nativeScan);
     if (contracts.length && !tokenRoutes.length && !native) return { skipped: 'no provider lists token deposits (webhooks only)' };
-    // Scanning stops a few blocks short of the tip: a load-balanced node can report a block its logs do not cover yet.
-    const tip = (await this.ask(chain, routes, client => client.latestBlock())).value;
-    const latest = evm && tip > scanLagBlocks ? tip - scanLagBlocks : tip;
-    const cursor = await this.prisma.chainCursor.findUnique({ where: { chain_mode: { chain, mode } } });
-    const fromBlock = cursor ? cursor.block + 1n : latest > firstScanBlocks ? latest - firstScanBlocks : 0n;
-    const toBlock = fromBlock + evmRangeBlocks - 1n < latest ? fromBlock + evmRangeBlocks - 1n : latest;
     const notes: string[] = [];
     if (contracts.length && !tokenRoutes.length) notes.push('token deposits: webhooks only');
     if (native && !coinRoutes.length) notes.push('coin deposits: webhooks only (no provider here lists them)');
     const found: Transfer[] = [];
-    const watchedAddresses = watched.map(item => normaliseAddress(chain, item.address));
-    const sweptAddresses = sweep.map(item => normaliseAddress(chain, item.address));
-    if (fromBlock <= latest) {
-      if (contracts.length && tokenRoutes.length && tokenAddresses.length) {
-        found.push(...(await this.ask(chain, tokenRoutes, client => client.scan!({ addresses: tokenAddresses, contracts, native: false, fromBlock, toBlock }))).value);
+    const timeLeft = () => Date.now() < deadline;
+    /** Reads a list in batches while there is time; returns how many it read. */
+    const batches = async <T>(list: T[], size: number, read: (part: T[]) => Promise<Transfer[]>) => {
+      let done = 0;
+      for (let i = 0; i < list.length && timeLeft(); i += size) {
+        const part = list.slice(i, i + size);
+        found.push(...(await read(part)));
+        done += part.length;
       }
-      if (native && coinRoutes.length && (evm ? watchedAddresses : addresses).length) {
-        found.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses: evm ? watchedAddresses : addresses, contracts: [], native: true, fromBlock, toBlock }))).value);
+      return done;
+    };
+    const swept: string[] = [];
+    let range: { from: bigint; to: bigint; complete: boolean } | null = null;
+
+    if (evm) {
+      // Scanning stops a few blocks short of the tip: a load-balanced node can report a block its logs do not cover yet.
+      const tip = (await this.ask(chain, routes, client => client.latestBlock())).value;
+      const latest = tip > scanLagBlocks ? tip - scanLagBlocks : tip;
+      const cursor = await this.prisma.chainCursor.findUnique({ where: { chain_mode: { chain, mode } } });
+      const fromBlock = cursor ? cursor.block + 1n : latest > firstScanBlocks ? latest - firstScanBlocks : 0n;
+      const toBlock = fromBlock + evmRangeBlocks - 1n < latest ? fromBlock + evmRangeBlocks - 1n : latest;
+      if (fromBlock <= latest) {
+        let complete = true;
+        if (contracts.length && tokenRoutes.length) {
+          const every = (await this.prisma.cryptoAddress.findMany({ where: { mode, family }, select: { address: true } })).map(item => normaliseAddress(chain, item.address));
+          const read = await batches(every, logChunk, async part => (await this.ask(chain, tokenRoutes, client => client.scan!({ addresses: part, contracts, native: false, fromBlock, toBlock }))).value);
+          complete &&= read === every.length;
+        }
+        if (native && coinRoutes.length && watched.length) {
+          const list = watched.map(item => normaliseAddress(chain, item.address));
+          const read = await batches(list, addressChunk, async part => (await this.ask(chain, coinRoutes, client => client.scan!({ addresses: part, contracts: [], native: true, fromBlock, toBlock }))).value);
+          complete &&= read === list.length;
+        }
+        range = { from: fromBlock, to: toBlock, complete };
       }
+      // Plain coin transfers are listed per address over a block range: swept addresses are read over their whole history.
+      if (native && coinRoutes.length) {
+        await batches(sweep, addressChunk, async part => {
+          const value = (await this.ask(chain, coinRoutes, client => client.scan!({ addresses: part.map(item => normaliseAddress(chain, item.address)), contracts: [], native: true, fromBlock: 0n, toBlock: latest }))).value;
+          swept.push(...part.map(item => item.id));
+          return value;
+        });
+      } else {
+        // Token logs already cover every address: nothing more to read for the sweep.
+        swept.push(...sweep.map(item => item.id));
+      }
+    } else {
+      // TRON and Bitcoin list each address's own recent history: watched addresses every run, the rest in turn.
+      const sweptIds = new Set(sweep.map(item => item.id));
+      await batches([...watched, ...sweep], addressChunk, async part => {
+        const addresses = part.map(item => normaliseAddress(chain, item.address));
+        const value: Transfer[] = [];
+        if (contracts.length && tokenRoutes.length) value.push(...(await this.ask(chain, tokenRoutes, client => client.scan!({ addresses, contracts, native: false, fromBlock: 0n, toBlock: 0n }))).value);
+        if (native && coinRoutes.length) value.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses, contracts: [], native: true, fromBlock: 0n, toBlock: 0n }))).value);
+        swept.push(...part.filter(item => sweptIds.has(item.id)).map(item => item.id));
+        return value;
+      });
     }
-    // Plain EVM coin transfers are listed per address over a block range: swept addresses are read over their whole history.
-    if (evm && native && coinRoutes.length && sweptAddresses.length) {
-      found.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses: sweptAddresses, contracts: [], native: true, fromBlock: 0n, toBlock: latest }))).value);
-    }
-    if (fromBlock > latest && !found.length) {
-      await this.markSwept(sweep.map(item => item.id));
-      return { scanned: 0, ...(notes.length ? { notes } : {}) };
-    }
-    const known = new Set(
-      (await this.prisma.cryptoDeposit.findMany({ where: { chain, txHash: { in: [...new Set(found.map(item => item.hash))] }, status: { not: 'failed' } }, select: { txHash: true } })).map(item => item.txHash),
-    );
+    if (!timeLeft()) notes.push('out of time: the rest is read next run');
+
+    const hashes = [...new Set(found.map(item => normaliseHash(item.hash)))];
+    const known = new Set((await this.prisma.cryptoDeposit.findMany({ where: { chain, txHash: { in: hashes }, status: { not: 'failed' } }, select: { txHash: true } })).map(item => item.txHash));
     let recorded = 0;
-    // A transaction that cannot be read now throws before the cursor moves, so the same blocks are scanned again.
-    for (const hash of new Set(found.filter(item => !known.has(item.hash)).map(item => item.hash))) recorded += await this.record(chain, mode, hash, routes);
-    if (evm && fromBlock <= latest) await this.prisma.chainCursor.upsert({ where: { chain_mode: { chain, mode } }, create: { chain, mode, block: toBlock }, update: { block: toBlock } });
-    await this.markSwept(sweep.map(item => item.id));
-    return { from: String(fromBlock), to: String(toBlock), seen: found.length, recorded, swept: sweep.length, ...(notes.length ? { notes } : {}) };
+    let deferred = 0;
+    // A transaction that cannot be read now (every provider down) throws before the cursor moves, so the same blocks
+    // are scanned again. One the providers answer about but none shows yet (a lagging node) is kept to be retried.
+    for (const hash of hashes.filter(item => !known.has(item))) {
+      try {
+        recorded += await this.record(chain, mode, hash, routes);
+      } catch (error) {
+        if (!(error instanceof NotVisibleYet)) throw error;
+        await this.defer(chain, mode, hash);
+        deferred += 1;
+      }
+    }
+    if (range?.complete) await this.prisma.chainCursor.upsert({ where: { chain_mode: { chain, mode } }, create: { chain, mode, block: range.to }, update: { block: range.to } });
+    await this.markSwept(swept);
+    return {
+      ...(range ? { from: String(range.from), to: String(range.to) } : {}),
+      seen: found.length,
+      recorded,
+      ...(deferred ? { deferred } : {}),
+      watched: watched.length,
+      swept: swept.length,
+      ...(notes.length ? { notes } : {}),
+    };
   }
 
   private async markSwept(ids: string[]) {
     if (ids.length) await this.prisma.cryptoAddress.updateMany({ where: { id: { in: ids } }, data: { sweptAt: new Date() } });
   }
 
+  /** A transaction a scan found that no provider shows yet: kept as a notification in its mode, which the job retries. */
+  private async defer(chain: Chain, mode: LedgerMode, hash: string) {
+    const bodyHash = createHash('sha256').update(`scan\n${mode}\n${chain}\n${hash}`).digest('hex');
+    try {
+      await this.prisma.chainNotice.create({ data: { id: randomUUID(), provider: 'scan', chain, mode, bodyHash, hashes: [hash] } });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+    }
+  }
+
   /**
    * Re-reads one transaction and records each transfer in it to a customer's address, in a network whose deposits
-   * are on (the token's contract exactly; the coin itself for coin networks). Returns how many it recorded.
+   * are on (the token's contract exactly; the coin itself for coin networks). Returns how many it recorded. Every
+   * provider is asked until one shows it: one that does not know it yet is not "no transaction" (it may lag), so a
+   * transaction no provider shows throws `NotVisibleYet` and is tried again later.
    */
   async record(chain: Chain, mode: LedgerMode, hash: string, routes?: Route[]) {
     const ways = routes ?? (await this.routes(chain, mode));
-    if (!ways.length) return 0;
-    const { value: inspection, provider } = await this.ask(chain, ways, client => client.inspect(hash));
-    if (!inspection?.ok) return 0;
+    if (!ways.length) throw new ChainError(`No provider is set up for ${chainNames[chain]}`);
+    let inspection: Inspection | null = null;
+    let provider = '';
+    let failed = 0;
+    let last: unknown = null;
+    for (const route of ways) {
+      try {
+        inspection = await route.client.inspect(normaliseHash(hash));
+      } catch (error) {
+        failed += 1;
+        last = error;
+        await this.noteError(chain, route.provider.id, error);
+        continue;
+      }
+      if (inspection) {
+        provider = route.provider.id;
+        break;
+      }
+    }
+    if (!inspection) {
+      if (failed === ways.length) throw last;
+      throw new NotVisibleYet(`No provider shows ${hash} yet`);
+    }
+    if (!inspection.ok) return 0;
     const networks = await this.networksFor(chain, mode);
     const family = chainFamily[chain];
     // EVM addresses are stored checksummed and reported in lower case: compared without case.
@@ -336,14 +465,20 @@ export class CryptoDepositsService {
       const address = byAddress.get(normaliseAddress(chain, transfer.to));
       const match = networks.find(item => (item.contract ? transfer.contract !== null && normaliseContract(chain, transfer.contract) === item.contract : transfer.contract === null));
       if (!address || !match || transfer.raw <= 0n) continue;
-      recorded += await this.upsertDeposit(chain, mode, address, match.network, transfer, inspection, provider);
+      // The hash as the chain gave it (one case), so the same transaction is never recorded twice.
+      recorded += await this.upsertDeposit(chain, mode, address, match.network, { ...transfer, hash: normaliseHash(transfer.hash) }, inspection, provider);
     }
     return recorded;
   }
 
   private async upsertDeposit(chain: Chain, mode: LedgerMode, address: CryptoAddress, network: CryptoNetwork, transfer: Transfer, inspection: Inspection, provider: string) {
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: network.asset } });
-    const amount = ledgerUnits(transfer.raw, network.decimals, asset.decimals);
+    const units = ledgerUnits(transfer.raw, network.decimals, asset.decimals);
+    // More than a ledger account can hold (a worthless token minted in absurd amounts): recorded as ignored, never
+    // credited, so it can never jam the scan.
+    const tooLarge = units > maxUnits;
+    if (tooLarge) this.logger.warn({ chain, tx: transfer.hash, index: transfer.index }, 'A crypto deposit too large to credit was ignored');
+    const amount = tooLarge ? 0n : units;
     try {
       await this.prisma.cryptoDeposit.create({
         data: {
@@ -367,7 +502,7 @@ export class CryptoDepositsService {
       // Seen before. One marked failed (the chain had stopped showing it) that is back on chain is pending again.
       const revived = await this.prisma.cryptoDeposit.updateMany({
         where: { chain, txHash: transfer.hash, outputIndex: transfer.index, status: 'failed', rawAmount: transfer.raw.toString() },
-        data: { status: 'pending', confirmations: 0, blockNumber: inspection.block, confirmedBy: [provider], checkedAt: new Date() },
+        data: { status: 'pending', confirmations: 0, blockNumber: inspection.block, confirmedBy: [provider], checkedAt: new Date(), missingSince: null },
       });
       return revived.count;
     }
@@ -377,7 +512,7 @@ export class CryptoDepositsService {
   async recheck(adminId: string | null, id: string) {
     const deposit = await this.prisma.cryptoDeposit.findUnique({ where: { id } });
     if (!deposit) throw notFound('deposit');
-    if (deposit.status === 'failed') await this.prisma.cryptoDeposit.updateMany({ where: { id, status: 'failed' }, data: { status: 'pending', createdAt: new Date() } });
+    if (deposit.status === 'failed') await this.prisma.cryptoDeposit.updateMany({ where: { id, status: 'failed' }, data: { status: 'pending', missingSince: null } });
     const fresh = await this.prisma.cryptoDeposit.findUniqueOrThrow({ where: { id } });
     if (fresh.status === 'pending') await this.settle(fresh).catch(error => this.logger.warn({ err: error, deposit: id }, 'Could not check a crypto deposit'));
     await this.audit.record({ actorId: adminId, action: 'crypto.deposit_rechecked', targetType: 'crypto_deposit', targetId: id, before: { status: deposit.status }, after: null });
@@ -386,47 +521,84 @@ export class CryptoDepositsService {
 
   /**
    * Moves pending deposits on: each is re-read for its confirmations; once it has enough (and, when large, a second
-   * provider has seen the same transfer), it is credited once. One that the chain no longer knows after an hour fails.
+   * provider has seen the same transfer), it is credited once. One that no provider shows fails 6 hours after it went
+   * missing. Each mode in turn, least recently checked first, so a deposit that cannot move (no provider for its mode,
+   * no second provider for a large one) never holds up the others; operations are told about those once.
    */
-  async settlePending() {
-    const pending = await this.prisma.cryptoDeposit.findMany({ where: { status: 'pending' }, orderBy: { createdAt: 'asc' }, take: 100 });
+  async settlePending(deadline = Date.now() + settleBudgetMs) {
+    let checked = 0;
     let credited = 0;
-    for (const deposit of pending) {
-      try {
-        if (await this.settle(deposit)) credited += 1;
-      } catch (error) {
-        this.logger.warn({ err: error, deposit: deposit.id }, 'Could not check a crypto deposit');
+    for (const mode of ['live', 'test'] as const) {
+      const pending = await this.prisma.cryptoDeposit.findMany({ where: { status: 'pending', mode }, orderBy: [{ checkedAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }], take: settleBatch });
+      for (const deposit of pending) {
+        if (Date.now() >= deadline) break;
+        checked += 1;
+        // Marked before it is read, so the next run starts with others even when this one throws.
+        await this.prisma.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending' }, data: { checkedAt: new Date() } });
+        try {
+          if (await this.settle(deposit)) credited += 1;
+        } catch (error) {
+          this.logger.warn({ err: error, deposit: deposit.id }, 'Could not check a crypto deposit');
+        }
       }
     }
-    return { checked: pending.length, credited };
+    return { checked, credited };
   }
 
   private async settle(deposit: CryptoDeposit) {
     const chain = deposit.chain as Chain;
     const routes = await this.routes(chain, deposit.mode);
-    if (!routes.length) return false;
+    if (!routes.length) {
+      await this.inbox.admins('admin.crypto.deposit_stuck', {
+        subject: `no_route:${deposit.mode}:${chain}:${new Date().toISOString().slice(0, 10)}`,
+        title: `${chainNames[chain]} deposits cannot be checked (${deposit.mode})`,
+        body: `No blockchain provider serves ${chainNames[chain]} for ${deposit.mode === 'live' ? 'live' : 'sandbox'} stores, so pending deposits there wait. Set one up, switched ${deposit.mode === 'live' ? 'off' : 'on'} Sandbox, under Crypto > Chains.`,
+        link: '/crypto/chains',
+        mode: deposit.mode,
+      });
+      return false;
+    }
     const network = await this.prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: deposit.asset, chain } } });
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: deposit.asset } });
-    const first = await this.ask(chain, routes, async client => ({ inspection: await client.inspect(deposit.txHash), latest: await client.latestBlock() }));
-    const { inspection, latest } = first.value;
     const same = (found: Inspection | null) => found?.ok && found.transfers.some(item => item.index === deposit.outputIndex && item.raw.toString() === deposit.rawAmount && normaliseAddress(chain, item.to) === normaliseAddress(chain, deposit.address));
-    if (!same(inspection)) {
-      // One provider not showing it is not enough (a lagging node, a transaction dropped from one mempool): it fails only
-      // once it has been missing for hours and no provider shows it. A failed deposit seen again is recorded again.
-      if (Date.now() - deposit.createdAt.getTime() > missingFailsAfterMs) {
-        const others = await Promise.all(routes.filter(route => route.provider.id !== first.provider).map(route => route.client.inspect(deposit.txHash).catch(() => undefined)));
-        if (others.every(found => found !== undefined && !same(found))) {
-          await this.prisma.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending' }, data: { status: 'failed', checkedAt: new Date() } });
+    // Every provider is asked until one shows it: one not showing it is not enough (a lagging node, a transaction
+    // dropped from one mempool).
+    let seen: { inspection: Inspection; latest: bigint; provider: string } | null = null;
+    let failed = 0;
+    let last: unknown = null;
+    for (const route of routes) {
+      try {
+        const inspection = await route.client.inspect(deposit.txHash);
+        if (same(inspection)) {
+          seen = { inspection: inspection!, latest: await route.client.latestBlock(), provider: route.provider.id };
+          break;
         }
+      } catch (error) {
+        failed += 1;
+        last = error;
+        await this.noteError(chain, route.provider.id, error);
+      }
+    }
+    if (!seen) {
+      if (failed === routes.length) throw last;
+      // Only when every provider answered and none shows it does the clock run; it fails 6 hours after it went missing.
+      if (failed) return false;
+      const since = deposit.missingSince ?? new Date();
+      if (!deposit.missingSince) await this.prisma.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending', missingSince: null }, data: { missingSince: since } });
+      if (Date.now() - since.getTime() > missingFailsAfterMs) {
+        await this.prisma.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending' }, data: { status: 'failed', checkedAt: new Date() } });
       }
       return false;
     }
-    const block = inspection!.block;
+    const { inspection, latest } = seen;
+    const block = inspection.block;
     const confirmations = block === null ? 0 : Number(latest - block + 1n);
-    const confirmedBy = new Set([...deposit.confirmedBy, first.provider]);
+    const confirmedBy = new Set([...deposit.confirmedBy, seen.provider]);
     // Large deposits: a second, different provider must see the same transfer.
-    if (deposit.amount >= toUnits(network.doubleCheckFrom, asset.decimals) && confirmedBy.size < 2) {
-      for (const route of routes.filter(item => !confirmedBy.has(item.provider.id))) {
+    const large = deposit.amount >= toUnits(network.doubleCheckFrom, asset.decimals);
+    const others = routes.filter(item => !confirmedBy.has(item.provider.id));
+    if (large && confirmedBy.size < 2) {
+      for (const route of others) {
         const second = await route.client.inspect(deposit.txHash).catch(() => null);
         if (same(second)) {
           confirmedBy.add(route.provider.id);
@@ -434,8 +606,17 @@ export class CryptoDepositsService {
         }
       }
     }
-    await this.prisma.cryptoDeposit.update({ where: { id: deposit.id }, data: { confirmations, blockNumber: block, confirmedBy: [...confirmedBy], checkedAt: new Date() } });
-    const large = deposit.amount >= toUnits(network.doubleCheckFrom, asset.decimals);
+    await this.prisma.cryptoDeposit.update({ where: { id: deposit.id }, data: { confirmations, blockNumber: block, confirmedBy: [...confirmedBy], checkedAt: new Date(), missingSince: null } });
+    if (large && confirmedBy.size < 2 && !others.length && confirmations >= network.confirmations) {
+      // Confirmed, but no second provider serves this chain and mode to agree on it: it waits for operations.
+      await this.inbox.admins('admin.crypto.deposit_stuck', {
+        subject: `double_check:${deposit.id}`,
+        title: `A large ${deposit.asset} deposit needs a second provider`,
+        body: `A ${fromUnits(deposit.amount, asset.decimals)} ${deposit.asset} deposit on ${chainNames[chain]} is confirmed, but only one blockchain provider serves ${chainNames[chain]} here, and deposits from ${network.doubleCheckFrom} ${deposit.asset} need two to agree. Set up a second provider under Crypto > Chains.`,
+        link: '/crypto/deposits',
+        mode: deposit.mode,
+      });
+    }
     if (confirmations < network.confirmations || (large && confirmedBy.size < 2)) return false;
     return this.credit(deposit, asset.decimals);
   }
@@ -500,25 +681,50 @@ export class CryptoDepositsService {
     return { received: true };
   }
 
-  /** Re-reads every transaction a notification named, in the mode its provider serves. */
+  /**
+   * Re-reads every transaction a notification named, in the mode its provider serves (or the mode a scan kept it
+   * for). A transaction no provider can read or show yet is not "nothing": the notification stays unprocessed, keeping
+   * only those, and the job tries again.
+   */
   async processNotice(id: string) {
     const notice = await this.prisma.chainNotice.findUnique({ where: { id } });
     if (!notice || notice.processedAt) return;
-    const provider = chainProvider(notice.provider)!;
-    const mode: LedgerMode = providerInSandbox(provider, this.values(provider)) ? 'test' : 'live';
+    const provider = chainProvider(notice.provider);
+    const mode: LedgerMode | null = notice.mode ?? (provider ? (providerInSandbox(provider, this.values(provider)) ? 'test' : 'live') : null);
+    if (!mode) return void (await this.prisma.chainNotice.update({ where: { id }, data: { processedAt: new Date(), attempts: { increment: 1 } } }));
     const chain = notice.chain as Chain;
-    try {
-      for (const hash of notice.hashes) await this.record(chain, mode, hash);
-    } catch (error) {
-      // Left unprocessed: the job tries again (a provider's own retry has the same body, so it is not stored twice).
-      await this.prisma.chainNotice.update({ where: { id }, data: { attempts: { increment: 1 } } });
-      throw error;
+    const unresolved: string[] = [];
+    let failure: unknown = null;
+    for (const hash of notice.hashes) {
+      try {
+        await this.record(chain, mode, hash);
+      } catch (error) {
+        unresolved.push(hash);
+        failure ??= error;
+      }
     }
-    await this.prisma.chainNotice.update({ where: { id }, data: { processedAt: new Date(), attempts: { increment: 1 } } });
+    if (!unresolved.length) {
+      await this.prisma.chainNotice.update({ where: { id }, data: { processedAt: new Date(), attempts: { increment: 1 } } });
+      return;
+    }
+    // Left unprocessed: the job tries again (a provider's own retry has the same body, so it is not stored twice).
+    const updated = await this.prisma.chainNotice.update({ where: { id }, data: { attempts: { increment: 1 }, hashes: unresolved } });
+    if (notice.provider === 'scan' && updated.attempts >= maxNoticeAttempts) {
+      // A transfer a scan listed that no provider has shown since: operations look at it (a webhook's other hashes,
+      // block hashes for one, are never transactions, so only scans' are raised).
+      await this.inbox.admins('admin.crypto.deposit_stuck', {
+        subject: `unread:${id}`,
+        title: `A ${chainNames[chain]} transfer could not be read`,
+        body: `A scan listed transaction ${unresolved.join(', ')} to a customer's address, but no provider has shown it since. Check it on a block explorer and recheck the providers under Crypto > Chains.`,
+        link: '/crypto/chains',
+        mode,
+      });
+    }
+    throw failure;
   }
 
-  /** Notifications whose transactions could not be read when they came (every provider down), tried again. */
-  private async retryNotices() {
+  /** Notifications whose transactions could not be read when they came (providers down or lagging), tried again. */
+  private async retryNotices(deadline = Date.now() + depositBudgetMs) {
     const stale = await this.prisma.chainNotice.findMany({
       where: { processedAt: null, attempts: { lt: maxNoticeAttempts }, createdAt: { lt: new Date(Date.now() - 60_000) } },
       orderBy: { createdAt: 'asc' },
@@ -526,6 +732,7 @@ export class CryptoDepositsService {
     });
     let processed = 0;
     for (const notice of stale) {
+      if (Date.now() >= deadline) break;
       try {
         await this.processNotice(notice.id);
         processed += 1;

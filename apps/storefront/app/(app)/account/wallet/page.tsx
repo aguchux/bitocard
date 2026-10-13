@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Coins, Landmark, Lock, Snowflake, Wallet } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoTransaction, type StoreCryptoWallets, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
-import { CoinBadge } from "@/components/app/crypto";
+import { canWithdraw, CoinBadge, hasP2pMoney, heldAssets } from "@/components/app/crypto";
 import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/wallet-forms";
 import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
 import { simulateTopUp, walletFor } from "@/lib/wallet";
@@ -60,15 +60,21 @@ async function TopUpStatus({ id }: { id: string }) {
  * account number), and what went in and out. Spent only in this store, never withdrawn. It is in the customer's own
  * country's currency, chosen at sign-up and fixed (Account shows it); an older account chooses it there first.
  */
-/** "3 coins", or how many wallets there are while none holds anything: the Crypto tab's summary. */
+/** "3 coins", or how many wallets there are while none holds anything (or "P2P money" with crypto closed): the Crypto tab's summary. */
 const coinsSummary = (wallets: StoreCryptoWallets) => {
-  const held = wallets.assets.filter(asset => Number(asset.total) > 0).length;
-  return held ? `${held} coin${held === 1 ? "" : "s"}` : `${wallets.assets.length} wallets`;
+  const held = heldAssets(wallets).length;
+  if (held) return `${held} coin${held === 1 ? "" : "s"}`;
+  return wallets.enabled ? `${wallets.assets.length} wallets` : "P2P money";
 };
 
-/** The Crypto tab: every coin wallet with its balance (available, in ads, frozen), the P2P money, and coin activity. */
+/**
+ * The Crypto tab: every coin wallet with its balance (available, in ads, frozen, on its way out), the P2P money, and
+ * coin activity. With crypto closed to them, only what they still hold, which they can still withdraw or cash out.
+ */
 function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; activity: StoreCryptoTransaction[] | null }) {
   const usable = wallets.enabled && !wallets.frozen && wallets.verified;
+  const withdraw = canWithdraw(wallets);
+  const coins = wallets.enabled ? wallets.assets : heldAssets(wallets);
   // What moved in and out of the spendable balance (an ad's lock shows once, as it leaves).
   const moves = activity?.filter(item => item.balance === "available") ?? [];
   return (
@@ -78,22 +84,29 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
           <p className="flex items-center gap-2 text-sm text-white/70">
             <Coins className="size-4" aria-hidden="true" /> Crypto wallets{wallets.mode === "test" ? " (test)" : ""}
           </p>
-          {usable ? (
-            <span className="flex gap-2">
-              <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
-                Deposit
-              </Link>
-              <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
-                Withdraw
-              </Link>
-              <Link href="/account/crypto" className="inline-flex min-h-10 items-center rounded-xl bg-[#ff2382] px-3 text-sm font-semibold hover:bg-[#e8116d]">
-                Buy or sell
-              </Link>
+          {usable || withdraw ? (
+            <span className="flex flex-wrap gap-2">
+              {usable ? (
+                <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
+                  Deposit
+                </Link>
+              ) : null}
+              {withdraw ? (
+                <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl bg-white/10 px-3 text-sm font-semibold hover:bg-white/20">
+                  Withdraw
+                </Link>
+              ) : null}
+              {usable ? (
+                <Link href="/account/crypto" className="inline-flex min-h-10 items-center rounded-xl bg-[#ff2382] px-3 text-sm font-semibold hover:bg-[#e8116d]">
+                  Buy or sell
+                </Link>
+              ) : null}
             </span>
           ) : null}
         </div>
+        {!wallets.enabled ? <p className="mt-2 text-sm text-white/70">Crypto is closed in your country. You can still withdraw what you hold and cash out your P2P money.</p> : null}
         <ul className="mt-3 divide-y divide-white/10">
-          {wallets.assets.map(asset => (
+          {coins.map(asset => (
             <li key={asset.asset} className="flex items-center gap-3 py-3">
               <CoinBadge asset={asset.asset} />
               <span className="min-w-0 flex-1">
@@ -110,6 +123,11 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
                       <Snowflake className="size-3" aria-hidden="true" /> {formatCrypto(asset.frozen)} frozen
                     </span>
                   ) : null}
+                  {Number(asset.withdrawing) > 0 ? (
+                    <span className="inline-flex items-center gap-1">
+                      <ArrowUpRight className="size-3" aria-hidden="true" /> {formatCrypto(asset.withdrawing)} on its way out
+                    </span>
+                  ) : null}
                 </span>
               </span>
               <span className="shrink-0 text-right">
@@ -119,12 +137,17 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
             </li>
           ))}
         </ul>
-        <p className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-white/10 pt-3 text-sm">
-          <span className="text-white/70">P2P money (from your sales)</span>
-          <Link href="/account/crypto/cash-out" className="font-bold hover:underline">
-            {formatFace(wallets.cash.proceeds, wallets.cash.currency)} · Cash out
-          </Link>
-        </p>
+        {wallets.enabled || hasP2pMoney(wallets) ? (
+          <div className="mt-3 border-t border-white/10 pt-3 text-sm">
+            <p className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <span className="text-white/70">P2P money (from your sales)</span>
+              <Link href="/account/crypto/cash-out" className="font-bold hover:underline">
+                {formatFace(wallets.cash.proceeds, wallets.cash.currency)} · Cash out
+              </Link>
+            </p>
+            {wallets.cash.paying_out > 0 ? <p className="mt-1 text-xs text-white/60">{formatFace(wallets.cash.paying_out, wallets.cash.currency)} on its way to your bank</p> : null}
+          </div>
+        ) : null}
       </section>
       <section aria-labelledby="crypto-activity" className={card}>
         <h2 id="crypto-activity" className="mb-2 text-lg font-bold">
@@ -178,8 +201,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     showCrypto ? customerApi<StoreList<StoreCryptoTransaction>>("GET", "/v1/store/crypto/transactions?limit=40") : null,
   ]);
   const wallet = chosen ?? (asked ? await walletFor() : null);
-  // The Crypto tab is there where the store offers crypto, or while the customer still holds some.
-  const crypto = overview.ok && (overview.data.enabled || overview.data.assets.some(asset => Number(asset.total) > 0)) ? overview.data : null;
+  // The Crypto tab is there where the store offers crypto, or while the customer still holds coins or P2P money.
+  const crypto = overview.ok && (overview.data.enabled || heldAssets(overview.data).length > 0 || hasP2pMoney(overview.data)) ? overview.data : null;
   const cryptoTab = showCrypto && crypto !== null;
   const back = params.back ? safeNext(params.back, "") : "";
   const primary = wallet?.wallets.find(item => item.primary)?.currency ?? wallet?.currency;

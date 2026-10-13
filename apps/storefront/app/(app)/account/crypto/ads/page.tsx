@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pAd } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, CryptoNav } from "@/components/app/crypto";
-import { PostAdForm, RepriceForm } from "@/components/app/crypto-forms";
+import { card, CoinBadge, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/crypto";
+import { ActionButton, PostAdForm, RepriceForm } from "@/components/app/crypto-forms";
 import { changeAd } from "@/lib/crypto-actions";
 import { customerApi } from "@/lib/customer";
 
@@ -12,13 +12,9 @@ const statusTone: Record<StoreP2pAd["status"], string> = { active: "bg-emerald-5
 
 function AdButton({ id, op, children, danger = false }: { id: string; op: "pause" | "resume" | "cancel"; children: string; danger?: boolean }) {
   return (
-    <form action={changeAd}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="op" value={op} />
-      <button type="submit" className={`min-h-12 rounded-xl px-4 text-sm font-semibold ring-1 ${danger ? "text-red-700 ring-red-200 hover:ring-red-300" : "ring-slate-300 hover:ring-slate-400"}`}>
-        {children}
-      </button>
-    </form>
+    <ActionButton action={changeAd} fields={{ id, op }} className={`min-h-12 rounded-xl px-4 text-sm font-semibold ring-1 ${danger ? "text-red-700 ring-red-200 hover:ring-red-300" : "ring-slate-300 hover:ring-slate-400"}`}>
+      {children}
+    </ActionButton>
   );
 }
 
@@ -49,7 +45,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
           <h2 id="post" className="mb-3 text-lg font-bold">
             Post an ad
           </h2>
-          <PostAdForm assets={wallets.assets.map(item => item.asset)} currency={wallets.currency} />
+          <PostAdForm assets={tradableAssets(wallets)} currency={wallets.currency} />
         </section>
       ) : null}
       {ads.length ? (

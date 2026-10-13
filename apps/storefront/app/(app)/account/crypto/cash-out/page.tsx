@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronLeft, ShieldCheck, Trash2 } from "lucide-react";
 import { formatFace, type StoreCustomerBankAccount, type StoreCustomerPayout, type StoreList, type StoreP2pCash } from "@bitocard/api-client/storefront";
-import { card, date } from "@/components/app/crypto";
-import { CashOutAccountForm, CashOutForm } from "@/components/app/crypto-forms";
+import { randomUUID } from "node:crypto";
+import { card, CryptoNav, date } from "@/components/app/crypto";
+import { ActionButton, CashOutAccountForm, CashOutForm } from "@/components/app/crypto-forms";
 import { removeCashOutAccount, simulateCashOut } from "@/lib/crypto-actions";
 import { customerApi } from "@/lib/customer";
 
@@ -29,7 +30,18 @@ export default async function CashOutPage() {
         <ChevronLeft className="size-4" aria-hidden="true" /> Crypto
       </Link>
       <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Cash out{money?.mode === "test" ? " (test)" : ""}</h1>
-      {!cash.ok ? (
+      <CryptoNav current="/account/crypto/cash-out" />
+      {!cash.ok && cash.code === "customer_verification_required" ? (
+        <div className={card}>
+          <p className="flex items-center gap-2 font-semibold">
+            <ShieldCheck className="size-5 text-[#ff2382]" aria-hidden="true" /> Verify your identity to cash out
+          </p>
+          <p className="mt-1 text-sm text-slate-600">We pay P2P money only into an account in your own name, so we need a quick identity check first, once.</p>
+          <Link href="/account/verification" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+            Verify my identity
+          </Link>
+        </div>
+      ) : !cash.ok ? (
         <p className={card} role="alert">
           {cash.message}
         </p>
@@ -52,6 +64,7 @@ export default async function CashOutPage() {
             Pay out
           </h2>
           <CashOutForm
+            nonce={randomUUID()}
             currency={money.currency}
             available={formatFace(money.available, money.currency)}
             accounts={saved.map(item => ({
@@ -78,12 +91,14 @@ export default async function CashOutPage() {
                     </span>
                     <span className="block truncate text-xs text-slate-500">{item.account_name}</span>
                   </span>
-                  <form action={removeCashOutAccount}>
-                    <input type="hidden" name="id" value={item.id} />
-                    <button type="submit" aria-label={`Remove ${item.bank_name} ending ${item.account_number_last4}`} className="inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700">
-                      <Trash2 className="size-4" aria-hidden="true" />
-                    </button>
-                  </form>
+                  <ActionButton
+                    action={removeCashOutAccount}
+                    fields={{ id: item.id }}
+                    label={`Remove ${item.bank_name} ending ${item.account_number_last4}`}
+                    className="inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700"
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </ActionButton>
                 </li>
               ))}
             </ul>
@@ -113,13 +128,9 @@ export default async function CashOutPage() {
                 {item.mode === "test" && (item.status === "pending" || item.status === "processing") ? (
                   <span className="flex w-full gap-2">
                     {(["paid", "failed"] as const).map(outcome => (
-                      <form key={outcome} action={simulateCashOut}>
-                        <input type="hidden" name="id" value={item.id} />
-                        <input type="hidden" name="outcome" value={outcome} />
-                        <button type="submit" className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-semibold ring-1 ring-amber-300 hover:bg-amber-50">
-                          Test: {outcome === "paid" ? "pay it" : "fail it"}
-                        </button>
-                      </form>
+                      <ActionButton key={outcome} action={simulateCashOut} fields={{ id: item.id, outcome }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-semibold ring-1 ring-amber-300 hover:bg-amber-50">
+                        Test: {outcome === "paid" ? "pay it" : "fail it"}
+                      </ActionButton>
                     ))}
                   </span>
                 ) : null}

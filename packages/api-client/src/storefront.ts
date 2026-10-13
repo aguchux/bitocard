@@ -358,8 +358,12 @@ export type StoreEsimTopUp = { object: 'esim_top_up'; id: string; name: string; 
 
 // -- Crypto wallets and P2P ------------------------------------------------------------------------------------------
 
-/** One asset in the customer's crypto wallets. Amounts are decimal strings with every place (`"12.500000"`). */
-export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; available: string; locked: string; frozen: string; withdrawing: string; total: string };
+/**
+ * One asset in the customer's crypto wallets. Amounts are decimal strings with every place (`"12.500000"`).
+ * `enabled` is false for an asset admins switched off that the customer still holds: it can be withdrawn, not traded
+ * or deposited (such assets are listed only while the customer holds some).
+ */
+export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; enabled: boolean; available: string; locked: string; frozen: string; withdrawing: string; total: string };
 
 /** `GET /v1/store/crypto`: the customer's crypto wallets, their P2P cash (minor units) and what they can do now. */
 export type StoreCryptoWallets = {
@@ -372,8 +376,8 @@ export type StoreCryptoWallets = {
   verified: boolean;
   frozen: boolean;
   assets: StoreCryptoBalance[];
-  /** proceeds: P2P sales (withdrawable); wallet: top-ups; locked: behind buy ads. */
-  cash: { currency: string; proceeds: number; wallet: number; locked: number };
+  /** proceeds: P2P sales (withdrawable); wallet: top-ups; locked: behind buy ads; paying_out: on its way to a bank. */
+  cash: { currency: string; proceeds: number; wallet: number; locked: number; paying_out: number };
 };
 
 export type StoreCryptoTransaction = {

@@ -38,8 +38,19 @@ export async function shopperHeader(now = Date.now()): Promise<Record<string, st
   return { [clientHeader]: `t=${t},ip=${ip},v1=${createHmac("sha256", secret).update(`${t}.${ip}`).digest("hex")}` };
 }
 
-/** Calls a customer endpoint with the signed-in customer's session. Never cached; never throws. */
-export async function customerApi<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<CustomerResult<T>> {
+/** An Idempotency-Key a form may name (its nonce): letters, digits, hyphens and underscores, 8 to 128 characters. */
+const idempotencyKeyPattern = /^[A-Za-z0-9_-]{8,128}$/;
+
+/**
+ * Calls a customer endpoint with the signed-in customer's session. Never cached; never throws. Every POST carries a
+ * fresh Idempotency-Key unless `idempotencyKey` names one (a form's nonce, so a double submit acts once).
+ */
+export async function customerApi<T>(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown,
+  options: { idempotencyKey?: string } = {},
+): Promise<CustomerResult<T>> {
   const token = (await cookies()).get(customerCookie)?.value;
   const store = await storeSubdomain();
   try {
@@ -52,7 +63,7 @@ export async function customerApi<T>(method: "GET" | "POST" | "PUT" | "PATCH" | 
         ...(token ? { [sessionHeader]: token } : {}),
         ...(store ? { [storeHeader]: store } : {}),
         ...(await shopperHeader()),
-        ...(method === "POST" ? { "idempotency-key": randomUUID() } : {}),
+        ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });

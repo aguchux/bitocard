@@ -51,6 +51,11 @@ Sends a transfer, or returns the one already made with this reference.
 - **`reference` is the idempotency key.** The API sends the same reference every time it asks about one withdrawal,
   including after a timeout. The signer must never make a second transfer for a reference it has already received: it
   returns that transfer's current state instead.
+- **Record the reference before any slow work.** The signer must store the reference atomically, before it signs or
+  broadcasts anything, so a `GET` for a reference it has received never answers `404`, even while the `POST` that
+  carried it is still being worked on (or its reply was lost). The API returns a frozen account's withdrawal to the
+  customer on a `404`.
+- **HTTPS only.** The API refuses a signer address that is not `https://`.
 
 ### `GET /v1/transfers/{reference}`
 

@@ -2,15 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, Clock, Trash2 } from "lucide-react";
 import { formatCrypto, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreList, type StoreWithdrawalAddress, type StoreWithdrawalNetworks } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, date, withdrawalStatus } from "@/components/app/crypto";
-import { AddWithdrawalAddressForm, WithdrawForm } from "@/components/app/crypto-forms";
+import { card, CoinBadge, CryptoGate, CryptoNav, date, withdrawableAssets, withdrawalStatus } from "@/components/app/crypto";
+import { ActionButton, AddWithdrawalAddressForm, WithdrawForm } from "@/components/app/crypto-forms";
 import { removeWithdrawalAddress } from "@/lib/crypto-actions";
 import { customerApi } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Withdraw crypto" };
 
 type Search = { asset?: string; chain?: string };
-
 
 /**
  * Withdrawing crypto: the coin, its network (with BitoCard's fee and the minimum), then one of the customer's saved
@@ -21,11 +20,13 @@ export default async function WithdrawPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const overview = await customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto");
   const wallets = overview.ok ? overview.data : null;
-  const assets = wallets?.assets.map(item => item.asset) ?? [];
+  // What they hold, plus every tradable coin while crypto is open (a coin switched off can still be withdrawn).
+  const assets = withdrawableAssets(wallets);
   const asked = (params.asset ?? "").toUpperCase();
   const asset = assets.includes(asked) ? asked : (wallets?.assets.find(item => Number(item.available) > 0)?.asset ?? assets[0] ?? "USDT");
   const balance = wallets?.assets.find(item => item.asset === asset);
-  const blocked = !wallets || !wallets.enabled || wallets.frozen || !wallets.verified;
+  // Withdrawing needs no crypto switch while they hold coins: only a verified, unfrozen account.
+  const blocked = !wallets || assets.length === 0 || wallets.frozen || !wallets.verified;
   const networks = blocked ? null : await customerApi<StoreWithdrawalNetworks>("GET", `/v1/store/crypto/withdrawal-networks?asset=${encodeURIComponent(asset)}`);
   const options = networks?.ok ? networks.data.data : [];
   const network = options.find(item => item.chain === (params.chain ?? "").toUpperCase()) ?? (options.length === 1 ? options[0] : null);
@@ -40,7 +41,8 @@ export default async function WithdrawPage({ searchParams }: { searchParams: Pro
         <ChevronLeft className="size-4" aria-hidden="true" /> Crypto
       </Link>
       <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Withdraw crypto{wallets?.mode === "test" ? " (test network)" : ""}</h1>
-      {blocked ? <CryptoGate wallets={wallets} /> : null}
+      <CryptoNav current="/account/crypto/withdraw" />
+      {blocked ? <CryptoGate wallets={wallets} withdraw /> : null}
       {!blocked ? (
         <>
           <nav aria-label="Coin" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
@@ -116,12 +118,14 @@ export default async function WithdrawPage({ searchParams }: { searchParams: Pro
                             </span>
                           ) : null}
                         </span>
-                        <form action={removeWithdrawalAddress}>
-                          <input type="hidden" name="id" value={item.id} />
-                          <button type="submit" aria-label={`Remove ${item.label}`} className="inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700">
-                            <Trash2 className="size-4" aria-hidden="true" />
-                          </button>
-                        </form>
+                        <ActionButton
+                          action={removeWithdrawalAddress}
+                          fields={{ id: item.id }}
+                          label={`Remove ${item.label}`}
+                          className="inline-flex size-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-red-700"
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </ActionButton>
                       </li>
                     ))}
                   </ul>

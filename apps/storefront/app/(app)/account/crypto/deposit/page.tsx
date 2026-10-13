@@ -3,7 +3,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { AlertTriangle, ChevronLeft } from "lucide-react";
 import { formatCrypto, type StoreCryptoDeposit, type StoreCryptoDepositAddress, type StoreCryptoNetwork, type StoreCryptoWallets, type StoreList } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, date } from "@/components/app/crypto";
+import { card, CoinBadge, CryptoGate, CryptoNav, date, tradableAssets } from "@/components/app/crypto";
 import { CopyButton } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
@@ -21,7 +21,8 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const overview = await customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto");
   const wallets = overview.ok ? overview.data : null;
-  const assets = wallets?.assets.map(item => item.asset) ?? [];
+  // Only coins still open for deposits (a coin switched off is listed while held, but takes no deposits).
+  const assets = tradableAssets(wallets);
   const asked = (params.asset ?? "").toUpperCase();
   const asset = assets.includes(asked) ? asked : (assets[0] ?? "USDT");
   const blocked = !wallets || !wallets.enabled || wallets.frozen || !wallets.verified;
@@ -39,6 +40,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
         <ChevronLeft className="size-4" aria-hidden="true" /> Crypto
       </Link>
       <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Deposit crypto{wallets?.mode === "test" ? " (test network)" : ""}</h1>
+      <CryptoNav current="/account/crypto/deposit" />
       {blocked ? <CryptoGate wallets={wallets} /> : null}
       {!blocked ? (
         <>

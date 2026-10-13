@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { formatCrypto, type StoreCryptoWithdrawal } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, date, withdrawalStatus } from "@/components/app/crypto";
-import { CopyButton, WithdrawalCodeForm } from "@/components/app/crypto-forms";
+import { card, CoinBadge, CryptoNav, date, withdrawalStatus } from "@/components/app/crypto";
+import { ActionButton, CopyButton, WithdrawalCodeForm } from "@/components/app/crypto-forms";
 import { cancelWithdrawal } from "@/lib/crypto-actions";
 import { customerApi } from "@/lib/customer";
 
@@ -37,6 +37,7 @@ export default async function WithdrawalPage({ params }: { params: Promise<{ id:
         <ChevronLeft className="size-4" aria-hidden="true" /> Withdraw
       </Link>
       <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Withdrawal {item.number}</h1>
+      <CryptoNav current="/account/crypto/withdraw" />
       <section className={card} aria-label="Withdrawal details">
         <div className="flex items-center gap-3">
           <CoinBadge asset={item.asset} size="size-12" />
@@ -80,12 +81,9 @@ export default async function WithdrawalPage({ params }: { params: Promise<{ id:
         </section>
       ) : null}
       {open ? (
-        <form action={cancelWithdrawal}>
-          <input type="hidden" name="id" value={item.id} />
-          <button type="submit" className="inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-slate-700 ring-1 ring-slate-300 hover:ring-slate-400">
-            Cancel this withdrawal
-          </button>
-        </form>
+        <ActionButton action={cancelWithdrawal} fields={{ id: item.id }} className="inline-flex min-h-11 items-center rounded-xl px-4 font-semibold text-slate-700 ring-1 ring-slate-300 hover:ring-slate-400">
+          Cancel this withdrawal
+        </ActionButton>
       ) : null}
     </div>
   );

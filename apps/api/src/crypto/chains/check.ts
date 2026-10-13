@@ -1,5 +1,5 @@
 import { addressFamilies, deriveAddress, InvalidXpubError, parseXpub } from '../derive.js';
-import { type Chain, ChainError, chainNames } from './client.js';
+import { type Chain, ChainError, chainNames, checkNetwork } from './client.js';
 import { type ChainProvider, type ChainProviderValues, providerInSandbox } from './providers.js';
 
 export type CheckOutcome = { environment: 'live' | 'sandbox'; ok: boolean; message: string | null; chains: Array<{ chain: Chain; ok: boolean; block: string | null; error: string | null }> };
@@ -18,7 +18,10 @@ export async function checkProvider(provider: ChainProvider, values: ChainProvid
   const chains = await Promise.all(
     clients.map(async ([chain, client]) => {
       try {
-        return { chain, ok: true, block: String(await client.latestBlock()), error: null };
+        const block = String(await client.latestBlock());
+        // An endpoint on the wrong network for the Sandbox switch is refused, so test coins never reach live wallets.
+        await checkNetwork(chain, client, environment);
+        return { chain, ok: true, block, error: null };
       } catch (error) {
         const refused = error instanceof ChainError && error.definite;
         return { chain, ok: false, block: null, error: `${refused ? 'refused' : 'unreachable'}: ${error instanceof Error ? error.message : 'error'}` };

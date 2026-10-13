@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, ShieldCheck } from "lucide-react";
@@ -64,7 +65,7 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
             Settled instantly by BitoCard: the coins and the money move together in one step, or not at all.
           </p>
           <div className="mt-4">
-            <ConfirmTradeForm adId={params.ad!} price={price} feeBps={quote.fee_bps} fiat={fiat} label={buying ? `Buy ${quote.asset} now` : `Sell ${quote.asset} now`} />
+            <ConfirmTradeForm adId={params.ad!} price={price} feeBps={quote.fee_bps} fiat={fiat} label={buying ? `Buy ${quote.asset} now` : `Sell ${quote.asset} now`} nonce={randomUUID()} />
           </div>
         </section>
       ) : (

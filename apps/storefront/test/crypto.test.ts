@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { formatCrypto } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
+import type { StoreCryptoWallets } from "@bitocard/api-client/storefront";
+import { canWithdraw, hasP2pMoney, tradableAssets, withdrawableAssets } from "@/components/app/crypto";
 import { activeTab, appTabs } from "@/components/app/tabs";
 
 const redirect = vi.fn((url: string) => {
@@ -10,7 +12,25 @@ const revalidatePath = vi.fn();
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(path) }));
 
-const { addCashOutAccount, addTestCrypto, addWithdrawalAddress, cancelWithdrawal, cashOut, changeAd, confirmTrade, confirmWithdrawal, createWithdrawal, findBestPrice, postAd, repriceAd, reviewWithdrawal, takeAd } = await import("@/lib/crypto-actions");
+const {
+  addCashOutAccount,
+  addTestCrypto,
+  addWithdrawalAddress,
+  cancelWithdrawal,
+  cashOut,
+  changeAd,
+  confirmTrade,
+  confirmWithdrawal,
+  createWithdrawal,
+  findBestPrice,
+  postAd,
+  removeCashOutAccount,
+  removeWithdrawalAddress,
+  repriceAd,
+  reviewWithdrawal,
+  simulateCashOut,
+  takeAd,
+} = await import("@/lib/crypto-actions");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 const form = (values: Record<string, string>) => {
@@ -22,6 +42,9 @@ const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body)
 const calls = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls as unknown as Call[];
 const bodyOf = (call: Call) => JSON.parse(String(call[1].body));
 const ad = "6b0a8f1e-5f6a-4f0e-9a51-0e4f3f0f1a11";
+const nonce = "0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
+const keyOf = (call: Call) => call[1].headers["idempotency-key"];
+const refused = (code: string, message: string, status = 409) => vi.fn(async () => reply({ error: { code, message } }, status));
 
 beforeEach(() => {
   vi.stubEnv("API_URL", "http://api.test");
@@ -61,9 +84,36 @@ describe("quick buy and sell", () => {
 
   test("too little money points to the wallet; a changed price is shown", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "insufficient_funds", message: "Your NGN balance is too low." } }, 402)));
-    expect(await confirmTrade({}, form({ ad_id: ad, price: "1", fiat: "1" }))).toEqual({ error: "Your NGN balance is too low.", field: "funds" });
+    expect(await confirmTrade({}, form({ ad_id: ad, price: "1", fiat: "1" }))).toMatchObject({ error: "Your NGN balance is too low.", field: "funds" });
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "price_changed", message: "The price of this ad changed." } }, 409)));
-    expect(await confirmTrade({}, form({ ad_id: ad, price: "1", fiat: "1" }))).toEqual({ error: "The price of this ad changed." });
+    expect(await confirmTrade({}, form({ ad_id: ad, price: "1", fiat: "1" }))).toMatchObject({ error: "The price of this ad changed." });
+  });
+
+  test("the form's nonce is the Idempotency-Key, so a double tap trades once; a refusal gives the form a fresh one", async () => {
+    const fetch = vi.fn(async () => reply({ object: "p2p_trade", id: "t1" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    const fields = { ad_id: ad, price: "165000", fiat: "8250000", nonce };
+    await expect(confirmTrade({}, form(fields))).rejects.toThrow("redirect:");
+    await expect(confirmTrade({}, form(fields))).rejects.toThrow("redirect:");
+    expect(calls(fetch).map(keyOf)).toEqual([nonce, nonce]);
+
+    const refusal = refused("price_changed", "The price of this ad changed.");
+    vi.stubGlobal("fetch", refusal);
+    const state = await confirmTrade({}, form(fields));
+    expect(keyOf(calls(refusal)[0])).toBe(nonce);
+    expect(state.nonce).toMatch(/^[0-9a-f-]{36}$/);
+    expect(state.nonce).not.toBe(nonce);
+  });
+
+  test("a form without a usable nonce still gets a fresh key per request", async () => {
+    const fetch = vi.fn(async () => reply({ object: "p2p_trade", id: "t1" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    await expect(confirmTrade({}, form({ ad_id: ad, price: "1", fiat: "1", nonce: "bad key!" }))).rejects.toThrow("redirect:");
+    await expect(confirmTrade({}, form({ ad_id: ad, price: "1", fiat: "1" }))).rejects.toThrow("redirect:");
+    const [first, second] = calls(fetch).map(keyOf);
+    expect(first).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second).toMatch(/^[0-9a-f-]{36}$/);
+    expect(first).not.toBe(second);
   });
 });
 
@@ -79,8 +129,8 @@ describe("ads", () => {
   test("pause, resume, close and a new price", async () => {
     const fetch = vi.fn(async () => reply({ object: "p2p_ad", id: ad }));
     vi.stubGlobal("fetch", fetch);
-    await changeAd(form({ id: ad, op: "pause" }));
-    await changeAd(form({ id: ad, op: "cancel" }));
+    expect(await changeAd({}, form({ id: ad, op: "pause" }))).toEqual({});
+    expect(await changeAd({}, form({ id: ad, op: "cancel" }))).toEqual({});
     expect(calls(fetch).map(call => [call[1].method, call[0]])).toEqual([
       ["PATCH", `http://api.test/v1/store/p2p/ads/${ad}`],
       ["POST", `http://api.test/v1/store/p2p/ads/${ad}/cancel`],
@@ -88,6 +138,12 @@ describe("ads", () => {
     expect(bodyOf(calls(fetch)[0])).toEqual({ status: "paused" });
     expect((await repriceAd({}, form({ id: ad, price: "1700" }))).notice).toBe("Price updated.");
     expect(bodyOf(calls(fetch)[2])).toEqual({ price: 170000 });
+  });
+
+  test("a refused pause or close says why", async () => {
+    vi.stubGlobal("fetch", refused("ad_closed", "This ad is already closed."));
+    expect(await changeAd({}, form({ id: ad, op: "cancel" }))).toEqual({ error: "This ad is already closed." });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   test("sandbox test crypto", async () => {
@@ -148,8 +204,31 @@ describe("withdrawals", () => {
     expect(calls(fetch)[0][0]).toBe("http://api.test/v1/store/crypto/withdrawals/w1/confirm");
     expect(bodyOf(calls(fetch)[0])).toEqual({ code: "123456" });
     expect(await confirmWithdrawal({}, form({ id: "w1", code: "12" }))).toEqual({ error: "Enter the 6-digit code we emailed you.", field: "code" });
-    await cancelWithdrawal(form({ id: "w1" }));
+    expect(await cancelWithdrawal({}, form({ id: "w1" }))).toEqual({});
     expect(calls(fetch).at(-1)![0]).toBe("http://api.test/v1/store/crypto/withdrawals/w1/cancel");
+  });
+
+  test("a refused cancel or address removal says why", async () => {
+    vi.stubGlobal("fetch", refused("withdrawal_not_cancellable", "This withdrawal is already on its way."));
+    expect(await cancelWithdrawal({}, form({ id: "w1" }))).toEqual({ error: "This withdrawal is already on its way." });
+    vi.stubGlobal("fetch", refused("resource_missing", "No such address.", 404));
+    expect(await removeWithdrawalAddress({}, form({ id: address }))).toEqual({ error: "No such address." });
+    const removed = vi.fn(async () => reply({ object: "crypto_withdrawal_address", id: address, deleted: true }));
+    vi.stubGlobal("fetch", removed);
+    expect(await removeWithdrawalAddress({}, form({ id: address }))).toEqual({});
+    expect(calls(removed)[0][1].method).toBe("DELETE");
+  });
+
+  test("asking for a withdrawal sends the form's nonce as its Idempotency-Key; a refusal gives a fresh one", async () => {
+    const created = vi.fn(async () => reply({ object: "crypto_withdrawal", id: "w1", status: "awaiting_code" }, 201));
+    vi.stubGlobal("fetch", created);
+    const fields = { asset: "USDT", chain: "TRON", address_id: address, amount: "10", nonce };
+    await expect(createWithdrawal({}, form(fields))).rejects.toThrow("redirect:/account/crypto/withdrawals/w1");
+    expect(keyOf(calls(created)[0])).toBe(nonce);
+    vi.stubGlobal("fetch", refused("withdrawal_limit", "You can send up to 0 USDT more today.", 400));
+    const state = await createWithdrawal({}, form(fields));
+    expect(state).toMatchObject({ error: "You can send up to 0 USDT more today." });
+    expect(state.nonce).not.toBe(nonce);
   });
 });
 
@@ -169,9 +248,68 @@ describe("cashing out P2P money", () => {
   test("paying out sends the amount in minor units; a refusal is shown", async () => {
     const fetch = vi.fn(async () => reply({ object: "customer_payout", id: "p1", status: "processing" }, 201));
     vi.stubGlobal("fetch", fetch);
-    expect(await cashOut({}, form({ bank_account_id: account, amount: "15,000.50" }))).toEqual({ notice: "On its way to your bank." });
+    expect(await cashOut({}, form({ bank_account_id: account, amount: "15,000.50" }))).toMatchObject({ notice: "On its way to your bank." });
     expect(bodyOf(calls(fetch)[0])).toEqual({ amount: 1500050, bank_account_id: account });
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "insufficient_funds", message: "You can pay out up to ₦0.00 now.", param: "amount" } }, 402)));
-    expect(await cashOut({}, form({ bank_account_id: account, amount: "15000" }))).toEqual({ error: "You can pay out up to ₦0.00 now.", field: "amount" });
+    expect(await cashOut({}, form({ bank_account_id: account, amount: "15000" }))).toMatchObject({ error: "You can pay out up to ₦0.00 now.", field: "amount" });
+  });
+
+  test("a double tap pays out once (the form's nonce); after a payout the form gets a fresh nonce for the next one", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_payout", id: "p1", status: "processing" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    const fields = { bank_account_id: account, amount: "100", nonce };
+    const first = await cashOut({}, form(fields));
+    await cashOut({}, form(fields));
+    expect(calls(fetch).map(keyOf)).toEqual([nonce, nonce]);
+    expect(first.nonce).toMatch(/^[0-9a-f-]{36}$/);
+    expect(first.nonce).not.toBe(nonce);
+  });
+
+  test("removing an account and the sandbox's simulated payouts say why when refused", async () => {
+    vi.stubGlobal("fetch", refused("resource_missing", "No such bank account.", 404));
+    expect(await removeCashOutAccount({}, form({ id: account }))).toEqual({ error: "No such bank account." });
+    vi.stubGlobal("fetch", refused("payout_settled", "This payout is already settled."));
+    expect(await simulateCashOut({}, form({ id: "p1", outcome: "failed" }))).toEqual({ error: "This payout is already settled." });
+    const settled = vi.fn(async () => reply({ object: "customer_payout", id: "p1", status: "failed" }));
+    vi.stubGlobal("fetch", settled);
+    expect(await simulateCashOut({}, form({ id: "p1", outcome: "failed" }))).toEqual({});
+    expect(bodyOf(calls(settled)[0])).toEqual({ outcome: "failed" });
+    expect(revalidatePath).toHaveBeenCalledWith("/account/crypto/cash-out");
+  });
+});
+describe("what the crypto pages offer", () => {
+  const coin = (asset: string, available: string, enabled = true) => ({ object: "crypto_balance" as const, asset, name: asset, decimals: 6, enabled, available, locked: "0", frozen: "0", withdrawing: "0", total: available });
+  const wallets = (over: Partial<StoreCryptoWallets>): StoreCryptoWallets => ({
+    object: "crypto_wallets",
+    mode: "live",
+    country: "NG",
+    currency: "NGN",
+    enabled: true,
+    p2p_enabled: true,
+    verified: true,
+    frozen: false,
+    assets: [coin("USDT", "0"), coin("BTC", "0.5"), coin("BNB", "1", false)],
+    cash: { currency: "NGN", proceeds: 0, wallet: 0, locked: 0, paying_out: 0 },
+    ...over,
+  });
+
+  test("a coin switched off is withdrawn, never traded or deposited", () => {
+    expect(tradableAssets(wallets({}))).toEqual(["USDT", "BTC"]);
+    expect(withdrawableAssets(wallets({}))).toEqual(["USDT", "BTC", "BNB"]);
+  });
+
+  test("with crypto switched off, coins held can still be withdrawn and P2P money cashed out", () => {
+    const closed = wallets({ enabled: false, p2p_enabled: false, cash: { currency: "NGN", proceeds: 0, wallet: 0, locked: 0, paying_out: 5000 } });
+    expect(tradableAssets(closed)).toEqual([]);
+    expect(withdrawableAssets(closed)).toEqual(["BTC", "BNB"]);
+    expect(canWithdraw(closed)).toBe(true);
+    expect(hasP2pMoney(closed)).toBe(true);
+  });
+
+  test("withdrawing needs a verified, unfrozen account holding something", () => {
+    expect(canWithdraw(wallets({ verified: false }))).toBe(false);
+    expect(canWithdraw(wallets({ frozen: true }))).toBe(false);
+    expect(canWithdraw(wallets({ assets: [coin("USDT", "0")] }))).toBe(false);
+    expect(hasP2pMoney(wallets({}))).toBe(false);
   });
 });

@@ -48,7 +48,11 @@ function CopyButton({ text }: { text: string }) {
 /** The integration's Sandbox switch field (`RELOADLY_SANDBOX`), if it has one. */
 const sandboxField = (integration: Integration) => integration.fields.find(field => field.kind === "flag" && field.key.endsWith("_SANDBOX")) ?? null;
 
-/** Switching Sandbox on or off changes where BitoCard's credentials are used, so it needs an authenticator code. */
+/**
+ * Switching Sandbox on or off changes where BitoCard's credentials are used, so it needs an authenticator code. For
+ * blockchain providers and the Crypto signer it decides which stores they serve: sandbox stores on test networks, or
+ * live stores on main networks.
+ */
 function SandboxDialog({ integration, on, onClose }: { integration: Integration; on: boolean; onClose: () => void }) {
   const [update] = useUpdateIntegrationMutation();
   const [code, setCode] = useState("");
@@ -59,9 +63,14 @@ function SandboxDialog({ integration, on, onClose }: { integration: Integration;
       onClose={onClose}
       title={on ? `Switch ${integration.name} to its sandbox?` : `Switch ${integration.name} to live?`}
       description={
-        on
-          ? `BitoCard will call ${integration.name}’s sandbox address with the credentials saved here, for Test connection only. While in sandbox it is never synced or used for live orders or payments. Save your sandbox credentials, then use Test connection.`
-          : `BitoCard will call ${integration.name}’s live address and use it for live orders and payments again. Save your live credentials first, then use Test connection.`
+        integration.section === "blockchain"
+          ? // Blockchain providers and the Crypto signer: the switch picks which stores they serve, not a test-only address.
+            on
+            ? `${integration.name} will serve sandbox stores on test networks only, with the credentials saved here. Live stores stop using it for deposits and withdrawals. Save credentials for its test networks, then use Test connection.`
+            : `${integration.name} will serve live stores on main networks, with real customers’ deposits and withdrawals, and stop serving sandbox stores. Save your live credentials first, then use Test connection.`
+          : on
+            ? `BitoCard will call ${integration.name}’s sandbox address with the credentials saved here, for Test connection only. While in sandbox it is never synced or used for live orders or payments. Save your sandbox credentials, then use Test connection.`
+            : `BitoCard will call ${integration.name}’s live address and use it for live orders and payments again. Save your live credentials first, then use Test connection.`
       }
       confirmLabel={on ? "Switch to sandbox" : "Switch to live"}
       requireReason={false}

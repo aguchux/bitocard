@@ -141,9 +141,9 @@ describe('instant P2P trades', () => {
     assert.match(trade.json.number, /^P2P-\d{6}$/);
     assert.deepEqual([trade.json.side, trade.json.role, trade.json.status, trade.json.received, trade.json.fiat], ['buy', 'taker', 'completed', '49.900000', 82_500_00]);
     assert.equal((await balance(buyer, 'USDT')).available, '49.900000');
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 117_500_00, locked: 0 });
+    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 117_500_00, locked: 0, paying_out: 0 });
     assert.equal((await balance(seller, 'USDT')).locked, '150.000000');
-    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 82_500_00, wallet: 0, locked: 0 });
+    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 82_500_00, wallet: 0, locked: 0, paying_out: 0 });
     const sellerView = await seller.get(`/v1/store/p2p/trades/${trade.json.id}`);
     assert.deepEqual([sellerView.json.side, sellerView.json.role], ['sell', 'maker']);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: seller.id, type: 'customer.p2p.trade_completed' } }), 'the seller is told');
@@ -196,26 +196,26 @@ describe('instant P2P trades', () => {
     assert.deepEqual([tooBig.status, tooBig.json.error.code], [402, 'insufficient_funds']);
     const ad = await buyer.post('/v1/store/p2p/ads', { side: 'buy', asset: 'BTC', price: 150_000_000_00, amount: '0.0005', min_fiat: 1000_00, max_fiat: 100_000_00 });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 25_000_00, locked: 75_000_00 });
+    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 25_000_00, locked: 75_000_00, paying_out: 0 });
 
     const sold = await seller.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 150_000_000_00, amount: '0.0002' });
     assert.equal(sold.status, 201, JSON.stringify(sold.json));
     assert.deepEqual([sold.json.side, sold.json.fiat, sold.json.fee], ['sell', 30_000_00, '0.00000040']);
     assert.equal((await balance(seller, 'BTC')).available, '0.00980000');
     assert.equal((await balance(buyer, 'BTC')).available, '0.00019960');
-    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 30_000_00, wallet: 0, locked: 0 });
+    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 30_000_00, wallet: 0, locked: 0, paying_out: 0 });
     assert.equal((await cash(buyer)).locked, 45_000_00);
 
     // A new price locks more (or gives back) in the same step.
     const repriced = await buyer.patch(`/v1/store/p2p/ads/${ad.json.id}`, { price: 140_000_000_00 });
     assert.equal(repriced.status, 200, JSON.stringify(repriced.json));
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 28_000_00, locked: 42_000_00 });
+    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 28_000_00, locked: 42_000_00, paying_out: 0 });
     const stale = await seller.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 150_000_000_00, amount: '0.0001' });
     assert.equal(stale.json.error.code, 'price_changed');
 
     const closed = await buyer.post(`/v1/store/p2p/ads/${ad.json.id}/cancel`);
     assert.deepEqual([closed.status, closed.json.status], [200, 'cancelled']);
-    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 70_000_00, locked: 0 });
+    assert.deepEqual(await cash(buyer), { currency: 'NGN', proceeds: 0, wallet: 70_000_00, locked: 0, paying_out: 0 });
     assert.equal((await buyer.post(`/v1/store/p2p/ads/${ad.json.id}/cancel`)).json.error.code, 'ad_closed', 'closed once');
 
     // The seller spends their P2P proceeds before their wallet.
@@ -223,7 +223,7 @@ describe('instant P2P trades', () => {
     const usdtAd = await sellAd(buyer, { amount: '10' });
     const spent = await seller.post('/v1/store/p2p/trades', { ad_id: usdtAd.json.id, price: 165000, amount: '10' });
     assert.equal(spent.status, 201, JSON.stringify(spent.json));
-    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 13_500_00, wallet: 0, locked: 0 });
+    assert.deepEqual(await cash(seller), { currency: 'NGN', proceeds: 13_500_00, wallet: 0, locked: 0, paying_out: 0 });
     await cryptoConserved();
     await ledgerOk();
   });
@@ -462,5 +462,32 @@ describe('paying P2P money out to a bank', () => {
     await payouts.job();
     assert.ok((await prisma.customerPayout.findUniqueOrThrow({ where: { id: payout.id } })).needsReviewAt);
     assert.ok((await prisma.notification.count({ where: { type: 'admin.customer_payout.unclear', dedupeKey: `admin.customer_payout.unclear:${payout.id}` } })) > 0, 'finance is told');
+  });
+});
+describe('taking all of an ad', () => {
+  before(() => switches(true));
+  after(() => switches(null));
+
+  test("the ad's shown maximum takes its whole rest, though that fiat would buy a part of a unit more", async () => {
+    const seller = await customer();
+    const buyer = await customer();
+    await deposit(seller, 'USDT', '2');
+    const ad = await sellAd(seller, { amount: '1.000001', price: 164999, min_fiat: 1_00 });
+    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    assert.equal(ad.json.max_fiat, 165000, 'the rest, rounded up for the seller');
+    await fund(buyer, 2_000_00);
+    const market = await buyer.get('/v1/store/p2p/market?asset=USDT&side=buy&fiat=165000');
+    assert.ok(market.json.data.some(item => item.id === ad.json.id));
+    const quote = await buyer.get('/v1/store/p2p/quote?asset=USDT&side=buy&fiat=165000');
+    assert.equal(quote.status, 200, JSON.stringify(quote.json));
+    assert.deepEqual([quote.json.ad.id, quote.json.amount, quote.json.fiat], [ad.json.id, '1.000001', 165000]);
+    const trade = await buyer.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 164999, fiat: 165000 });
+    assert.equal(trade.status, 201, JSON.stringify(trade.json));
+    assert.deepEqual([trade.json.amount, trade.json.fiat], ['1.000001', 165000]);
+    assert.equal((await prisma.p2pAd.findUniqueOrThrow({ where: { id: ad.json.id } })).status, 'completed');
+    const listed = (await admin.get(`/v1/admin/p2p/trades?customer_id=${buyer.id}`)).json.data[0];
+    assert.deepEqual([listed.role, listed.taker], [null, 'buyer'], 'admins see who took the ad, not a viewer role');
+    await ledgerOk();
+    await cryptoConserved();
   });
 });
