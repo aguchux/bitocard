@@ -25,7 +25,7 @@ const signerSecret = 'signer-shared-secret-at-least-32-chars';
 
 /** A fake signer, a fake sanctions screener and a fake EVM chain (to read what the signer sent). */
 async function fakeWorld() {
-  const state = { mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0 };
+  const state = { mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0, holdings: [] };
   const verified = call => {
     const header = call.headers['bitocard-signer-signature'] ?? '';
     const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header) ?? [];
@@ -48,6 +48,7 @@ async function fakeWorld() {
     if (!path.startsWith('/signer/')) return { status: 404, body: {} };
     if (!verified(call)) return { status: 401, body: { error: { message: 'bad signature' } } };
     if (path === '/signer/v1/health') return { body: { network: 'testnet' } };
+    if (path === '/signer/v1/balances/testnet') return { body: { network: 'testnet', balances: state.holdings } };
     if (call.method === 'GET') {
       const reference = decodeURIComponent(path.split('/').at(-1));
       const found = state.transfers.get(reference);
@@ -277,6 +278,12 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
     await ledgerOk();
   });
 
+  test('without a real signer the custody check says it could not be asked', async () => {
+    const run = await finance.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' });
+    assert.equal(run.status, 200, JSON.stringify(run.json));
+    assert.match(run.json.error, /No signer/);
+    assert.ok(run.json.data.every(item => item.status === 'unavailable'));
+  });
   test('a frozen account sends nothing more', async () => {
     const shopper = await customer();
     const address = await readyAddress(shopper);
@@ -355,6 +362,34 @@ describe('withdrawals through BitoCard’s signer', () => {
     await ledgerOk();
   });
 
+  test('the custody check compares the ledger with what the signer holds, and tells admins of a shortfall', async () => {
+    const run = async () => {
+      const res = await finance.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' });
+      assert.equal(res.status, 200, JSON.stringify(res.json));
+      return res.json;
+    };
+    fakes.state.holdings = [];
+    const empty = await run();
+    const usdt = empty.data.find(item => item.asset === 'USDT');
+    assert.equal(usdt.status, 'shortfall', 'the signer holds nothing yet');
+    assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.crypto.custody_shortfall' } }));
+    const expected = BigInt(usdt.expected.replace('.', ''));
+    fakes.state.holdings = [
+      { chain: 'ETHEREUM', asset: 'USDT', contract: usdtContract.toUpperCase().replace('0X', '0x'), amount: String(expected), decimals: 6 },
+      { chain: 'ETHEREUM', asset: 'XYZ', contract: '0x9999999999999999999999999999999999999999', amount: '5', decimals: 18 },
+    ];
+    const matched = await run();
+    assert.deepEqual([matched.data.find(item => item.asset === 'USDT').status, matched.data.find(item => item.asset === 'USDT').held], ['matched', usdt.expected]);
+    assert.deepEqual(matched.unmatched.map(item => item.asset), ['XYZ'], 'an unknown token is reported, never counted');
+    fakes.state.holdings[0].amount = String(expected + 2_000_000n);
+    const surplus = (await run()).data.find(item => item.asset === 'USDT');
+    assert.deepEqual([surplus.status, surplus.difference], ['surplus', '2.000000']);
+    const latest = (await admin.get('/v1/admin/crypto/reconciliations?mode=test')).json.data.find(item => item.asset === 'USDT');
+    assert.equal(latest.status, 'surplus');
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'crypto.reconciliation_run' } }));
+    const support = await adminClient(server, ['support']);
+    assert.equal((await support.post('/v1/admin/crypto/reconciliations/run', { mode: 'test' })).status, 403);
+  });
   test('live withdrawals are not offered without a live signer', async () => {
     const withdrawals = server.app.get((await import('../dist/crypto/withdrawals.service.js')).CryptoWithdrawalsService);
     assert.equal(withdrawals.signer('live'), null, 'the signer serves the sandbox only');

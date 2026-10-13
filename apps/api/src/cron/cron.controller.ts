@@ -24,6 +24,7 @@ import { MediaService } from '../media/media.service.js';
 import { NumbersService } from '../numbers/numbers.service.js';
 import { EsimsService } from '../esims/esims.service.js';
 import { CryptoDepositsService } from '../crypto/chains/deposits.service.js';
+import { CryptoReconciliationService } from '../crypto/custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from '../crypto/withdrawals.service.js';
 
 /**
@@ -58,6 +59,7 @@ export class CronController {
     deposits: CryptoDepositsService,
     withdrawals: CryptoWithdrawalsService,
     customerPayouts: CustomerPayoutsService,
+    reconciliation: CryptoReconciliationService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -93,6 +95,8 @@ export class CronController {
       crypto: async () => ({ deposits: await deposits.job(), withdrawals: await withdrawals.job() }),
       /** Every 15 minutes: every blockchain provider's latest block (Crypto > Chains health). */
       'chain-health': () => deposits.checkAll(),
+      /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */
+      'crypto-reconcile': async () => ({ live: await reconciliation.run('live'), test: await reconciliation.run('test') }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),
     };

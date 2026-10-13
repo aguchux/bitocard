@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, DataTable, errorMessage, Input, Notice, PageHeader, Toggle, type Column } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, DataTable, errorMessage, FilterSelect, formatDateTime, Input, Notice, PageHeader, Toggle, type Column, type Tone } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type CryptoAsset, useCryptoAssetsQuery, useUpdateCryptoAssetMutation } from "@bitocard/api-client/admin";
+import { type CryptoAsset, type CryptoReconciliation, type Mode, useCryptoAssetsQuery, useCryptoReconciliationsQuery, useRunCryptoReconciliationMutation, useUpdateCryptoAssetMutation } from "@bitocard/api-client/admin";
 
 /** The fee as a percentage, saved in basis points (0 to 10%). */
 function FeeField({ asset, editable }: { asset: CryptoAsset; editable: boolean }) {
@@ -43,6 +43,54 @@ function AmountField({ asset, field, label, editable }: { asset: CryptoAsset; fi
       </Button>
       {state.error ? <span className="text-xs text-red-700">{errorMessage(state.error)}</span> : null}
     </span>
+  );
+}
+
+const checkTones: Record<CryptoReconciliation["status"], Tone> = { matched: "green", surplus: "blue", shortfall: "red", unavailable: "grey" };
+
+/** The daily custody check: per asset, what the ledger expects on chain against what the signer's wallets hold. */
+function CustodyCheck({ runs }: { runs: boolean }) {
+  const [mode, setMode] = useState<Mode>("live");
+  const checks = useCryptoReconciliationsQuery(mode);
+  const [run, state] = useRunCryptoReconciliationMutation();
+  const columns: Array<Column<CryptoReconciliation>> = [
+    { key: "asset", header: "Asset", cell: item => <span className="font-semibold text-ink">{item.asset}</span> },
+    { key: "expected", header: "Ledger expects", align: "right", cell: item => item.expected },
+    { key: "held", header: "Signer holds", align: "right", cell: item => (item.status === "unavailable" ? "—" : item.held) },
+    {
+      key: "status",
+      header: "Check",
+      align: "right",
+      cell: item => (
+        <span className="flex flex-col items-end gap-1">
+          <Badge tone={checkTones[item.status]}>{item.status === "shortfall" || item.status === "surplus" ? `${item.status} ${item.difference}` : item.status}</Badge>
+          <span className="text-xs text-muted">{formatDateTime(item.created_at)}</span>
+        </span>
+      ),
+    },
+  ];
+  return (
+    <Card>
+      <CardHeader
+        title="Custody check"
+        description="Daily: customers' crypto and BitoCard's fees in custody (less withdrawals on their way, plus deposits arriving) against what the signer's wallets hold. A shortfall is urgent."
+        actions={
+          <span className="flex flex-wrap items-center gap-2">
+            <FilterSelect id="custody-mode" label="Mode" value={mode} onChange={value => setMode(value as Mode)} options={[{ value: "live", label: "Live" }, { value: "test", label: "Test" }]} />
+            {runs ? (
+              <Button size="sm" variant="secondary" loading={state.isLoading} onClick={() => void run(mode)}>
+                Check now
+              </Button>
+            ) : null}
+          </span>
+        }
+      />
+      <div className="space-y-3 p-5 sm:px-6">
+        {state.data?.error ? <Notice tone="amber">{state.data.error}</Notice> : null}
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      </div>
+      <DataTable columns={columns} rows={checks.data?.data} rowKey={item => item.id} loading={checks.isLoading} error={checks.error ? errorMessage(checks.error) : null} onRetry={checks.refetch} empty="No checks yet." />
+    </Card>
   );
 }
 
@@ -104,6 +152,7 @@ export default function CryptoAssetsPage() {
         <Card>
           <DataTable columns={columns} rows={assets.data?.data} rowKey={asset => asset.code} loading={assets.isLoading} error={assets.error ? errorMessage(assets.error) : null} onRetry={assets.refetch} />
         </Card>
+        {can(admin, "operations", "finance") ? <CustodyCheck runs /> : null}
       </div>
     </AdminShell>
   );

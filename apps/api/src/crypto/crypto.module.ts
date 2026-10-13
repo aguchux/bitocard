@@ -4,11 +4,13 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { PayoutsModule } from '../payouts/payouts.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { CryptoDepositsService } from './chains/deposits.service.js';
+import { CryptoReconciliationService } from './custody/reconciliation.service.js';
 import {
   AdminChainsController,
   AdminCryptoController,
   AdminCustomerPayoutsController,
   AdminP2pController,
+  AdminReconciliationsController,
   AdminWithdrawalsController,
   ChainWebhooksController,
   CustomerCashController,
@@ -36,9 +38,10 @@ import { CryptoWithdrawalsService } from './withdrawals.service.js';
     AdminChainsController,
     AdminWithdrawalsController,
     AdminCustomerPayoutsController,
+    AdminReconciliationsController,
     ChainWebhooksController,
   ],
-  providers: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService],
-  exports: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService],
+  providers: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
+  exports: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}

@@ -199,6 +199,21 @@ export type CustomerPayout = {
   needs_review: boolean;
 };
 
+/** One asset's custody check: what the ledger expects on chain against what the signer's wallets hold. */
+export type CryptoReconciliation = {
+  object: 'crypto_reconciliation';
+  id: string;
+  mode: Mode;
+  asset: string;
+  expected: string;
+  held: string;
+  /** held - expected: negative is a shortfall. */
+  difference: string;
+  status: 'matched' | 'surplus' | 'shortfall' | 'unavailable';
+  detail: { custody: string; withdrawals_in_flight: string; deposits_arriving: string; chains: Record<string, string>; error?: string };
+  created_at: string;
+};
+
 export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer_id?: string; limit?: number };
 
 const cryptoApi = bitocardApi.injectEndpoints({
@@ -258,6 +273,11 @@ const cryptoApi = bitocardApi.injectEndpoints({
     }),
     recheckCryptoWithdrawal: build.mutation<CryptoWithdrawal, string>({ query: id => ({ url: `/v1/admin/crypto/withdrawals/${id}/recheck`, method: 'POST' }), invalidatesTags: ['Crypto'] }),
     customerPayouts: build.query<List<CustomerPayout>, { mode?: Mode; status?: string; customer_id?: string }>({ query: params => ({ url: '/v1/admin/crypto/payouts', params }), providesTags: ['Crypto'] }),
+    cryptoReconciliations: build.query<List<CryptoReconciliation>, Mode>({ query: mode => ({ url: '/v1/admin/crypto/reconciliations', params: { mode } }), providesTags: ['Crypto'] }),
+    runCryptoReconciliation: build.mutation<{ object: 'crypto_reconciliation_run'; error: string | null; data: CryptoReconciliation[] }, Mode>({
+      query: mode => ({ url: '/v1/admin/crypto/reconciliations/run', method: 'POST', body: { mode } }),
+      invalidatesTags: ['Crypto'],
+    }),
     p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/ads', params }), providesTags: ['P2p'] }),
     p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/trades', params }), providesTags: ['P2p'] }),
     cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
@@ -289,4 +309,6 @@ export const {
   useDecideCryptoWithdrawalMutation,
   useRecheckCryptoWithdrawalMutation,
   useCustomerPayoutsQuery,
+  useCryptoReconciliationsQuery,
+  useRunCryptoReconciliationMutation,
 } = cryptoApi;

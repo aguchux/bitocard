@@ -86,6 +86,30 @@ If the signer replaces a transaction (for example a fee bump), it reports the ne
 
 Answers `200 { "network": "mainnet" | "testnet" }`. The admin app's Test connection uses it; it sends nothing.
 
+### `GET /v1/balances/{network}`
+
+`network` is `mainnet` or `testnet`. It is a path segment, not a query, so the signature covers it. The answer is
+everything the signer's wallets hold on that network: deposit addresses, hot, warm and cold.
+
+```json
+{
+  "network": "mainnet",
+  "balances": [
+    { "chain": "TRON", "asset": "USDT", "contract": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "amount": "125000000", "decimals": 6 },
+    { "chain": "BITCOIN", "asset": "BTC", "contract": null, "amount": "1500000", "decimals": 8 }
+  ]
+}
+```
+
+Amounts are on-chain units as decimal strings. The API's daily custody check (`crypto-reconcile` job,
+`src/crypto/custody/reconciliation.service.ts`) matches each balance to a network by chain and token contract (never by
+symbol). It compares the total per asset with what the ledger expects: `crypto_custody`, less withdrawals broadcast but
+not settled, plus deposits seen but not credited.
+
+- **Shortfall:** urgent; finance and operations are told at once.
+- **Surplus:** BitoCard's own money, such as a gas float or fees not swept.
+- **Unknown tokens:** listed and never counted.
+
 ### `POST /v1/addresses` (Solana, planned)
 
 Takes `{ "chain": "SOLANA", "network": "mainnet" | "testnet", "index": 12 }` and answers `{ "address": "…" }`. Solana

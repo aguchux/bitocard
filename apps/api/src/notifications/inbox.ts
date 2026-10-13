@@ -102,6 +102,7 @@ export const notificationTypes = {
   'admin.crypto.withdrawal_stuck': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Crypto withdrawal unconfirmed' },
   'admin.crypto.address_flagged': { realm: 'admin', roles: ['operations', 'finance'], severity: 'critical', label: 'Withdrawal address on a sanctions list' },
   'admin.customer_payout.unclear': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Customer bank payout outcome unclear' },
+  'admin.crypto.custody_shortfall': { realm: 'admin', roles: ['finance', 'operations'], severity: 'critical', label: 'Crypto custody shortfall' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------
   'customer.order.completed': { realm: 'customer', severity: 'success', label: 'Order delivered', push: true },

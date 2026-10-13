@@ -49,6 +49,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/v1/cron/crypto-reconcile",
+      "schedule": "40 5 * * *"
+    },
+    {
       "path": "/v1/cron/chain-health",
       "schedule": "*/15 * * * *"
     },

@@ -11,6 +11,7 @@ import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.j
 import { CryptoDepositsService } from './chains/deposits.service.js';
 import { CryptoWalletsService, presentAsset } from './crypto-wallets.service.js';
 import { type AdSide, P2pService } from './p2p.service.js';
+import { CryptoReconciliationService } from './custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
 import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
 
@@ -734,6 +735,31 @@ export class AdminWithdrawalsController {
   @HttpCode(HttpStatus.OK)
   recheck(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
     return this.withdrawals.recheck(adminId(caller), id);
+  }
+}
+
+class ModeDto {
+  @IsOptional() @IsIn(['live', 'test'])
+  mode?: LedgerMode;
+}
+
+/** Admin: the daily custody check (crypto_custody against the signer's wallets), and running it now. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('operations', 'finance')
+@Controller('admin/crypto/reconciliations')
+export class AdminReconciliationsController {
+  constructor(private readonly reconciliation: CryptoReconciliationService) {}
+
+  @Get()
+  latest(@Query() query: ModeDto) {
+    return this.reconciliation.latest(query.mode ?? 'live');
+  }
+
+  @Post('run')
+  @HttpCode(HttpStatus.OK)
+  run(@CurrentCaller() caller: Caller, @Body() body: ModeDto) {
+    return this.reconciliation.runNow(adminId(caller), body.mode ?? 'live');
   }
 }
 

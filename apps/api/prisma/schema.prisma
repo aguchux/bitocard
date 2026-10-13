@@ -2642,6 +2642,27 @@ model CryptoWithdrawalAddress {
   @@map("crypto_withdrawal_addresses")
 }
 
+/// One asset's daily custody check: what the ledger says BitoCard holds for customers (`crypto_custody`, less withdrawals
+/// sent but not yet settled, plus deposits seen but not yet credited) against what the signer's wallets hold on chain.
+model CryptoReconciliation {
+  id          String     @id @default(uuid()) @db.Uuid
+  mode        LedgerMode
+  asset       String     @db.VarChar(10)
+  /// Ledger units: what the ledger expects on chain, and what the signer reported.
+  expected    BigInt
+  held        BigInt
+  /// held - expected: below zero is a shortfall (admins are told); above, a surplus (fees not yet swept, for example).
+  difference  BigInt
+  /// matched, surplus, shortfall or unavailable (the signer could not be asked).
+  status      String
+  /// The parts behind `expected` and `held` (per chain), and any error.
+  detail      Json
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([mode, asset, createdAt])
+  @@map("crypto_reconciliations")
+}
+
 /// A store customer's bank account for their P2P money: in their verified name (live), usable 24 hours after it is added.
 model CustomerBankAccount {
   id                     String           @id @default(uuid()) @db.Uuid

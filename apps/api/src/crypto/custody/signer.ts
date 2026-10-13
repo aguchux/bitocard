@@ -39,7 +39,12 @@ export interface CryptoSigner {
   address?(input: { chain: 'SOLANA'; network: 'mainnet' | 'testnet'; index: number }): Promise<string>;
   /** Whether the signer answers with these credentials (Test connection). */
   health(): Promise<{ network: string | null }>;
+  /** Everything the signer's wallets hold on a network (deposit addresses, hot, warm and cold), for reconciliation. */
+  balances?(network: 'mainnet' | 'testnet'): Promise<SignerBalance[]>;
 }
+
+/** One holding: on-chain units (text, as 18-decimal tokens exceed 64 bits) of a coin or token on a chain. */
+export type SignerBalance = { chain: Chain; asset: string; contract: string | null; amount: string; decimals: number };
 
 const timeoutMs = 20_000;
 const statuses: readonly SignerStatus[] = ['pending', 'broadcast', 'confirmed', 'failed'];
@@ -126,6 +131,18 @@ export class RemoteSigner implements CryptoSigner {
     const reply = (await this.request('GET', '/v1/health')) as { network?: string } | null;
     if (!reply) throw new SignerError('The signer has no health check at /v1/health.', true);
     return { network: reply.network ?? null };
+  }
+
+  async balances(network: 'mainnet' | 'testnet') {
+    const reply = (await this.request('GET', `/v1/balances/${network}`)) as { balances?: unknown } | null;
+    if (!reply || !Array.isArray(reply.balances)) throw new SignerError('The signer gave no balances.');
+    return reply.balances.map(item => {
+      const value = item as Partial<SignerBalance>;
+      if (typeof value.chain !== 'string' || typeof value.asset !== 'string' || typeof value.amount !== 'string' || !/^\d+$/.test(value.amount) || typeof value.decimals !== 'number') {
+        throw new SignerError('The signer gave a balance BitoCard cannot read.');
+      }
+      return { chain: value.chain as Chain, asset: value.asset.toUpperCase(), contract: value.contract ?? null, amount: value.amount, decimals: value.decimals };
+    });
   }
 }
 
