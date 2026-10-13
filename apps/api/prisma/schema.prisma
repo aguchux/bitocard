@@ -751,6 +751,20 @@ enum AccountKind {
   /// BitoCard's position from converting between wallets (US dollars and a country's currency): one account per
   /// currency, posted in pairs at BitoCard's exchange rate. May go either way.
   currency_exchange
+  /// A customer's crypto, one account per asset (USDT, BTC...), in the asset's base units: spendable. Never below zero.
+  crypto_wallet
+  /// A customer's crypto locked for the market (their sell ads) or a withdrawal on its way.
+  crypto_locked
+  /// A customer's crypto frozen by an admin: nobody can move it until it is unfrozen (or seized by finance).
+  crypto_frozen
+  /// A customer's money from P2P sales, in their country's currency: spendable on P2P and withdrawable to their bank.
+  customer_withdrawable
+  /// A customer's money locked behind their P2P buy ads.
+  p2p_fiat_locked
+  /// The crypto BitoCard holds for its customers (on chain, or credited in the sandbox): an asset.
+  crypto_custody
+  /// BitoCard's P2P trading fees, taken in crypto (revenue).
+  crypto_fees
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -789,7 +803,8 @@ model LedgerAccount {
   id           String          @id @default(uuid()) @db.Uuid
   kind         AccountKind
   mode         LedgerMode
-  currency     String          @db.Char(3)
+  /// ISO 4217 for money, or a crypto asset's code (USDT, BTC) for crypto accounts, in that asset's base units.
+  currency     String          @db.VarChar(10)
   /// reseller:<id>, customer:<id>, provider:<name> or platform.
   ownerKey     String          @map("owner_key")
   resellerId   String?         @map("reseller_id") @db.Uuid
@@ -2186,6 +2201,14 @@ model Customer {
   ledgerAccounts   LedgerAccount[]
   payments         Payment[]
   reservedAccounts ReservedAccount[]
+  /// An admin froze the customer's crypto account: no ads, trades or withdrawals until unfrozen.
+  cryptoFrozenAt     DateTime?                @map("crypto_frozen_at")
+  cryptoFrozenReason String?                  @map("crypto_frozen_reason")
+  p2pProfile         P2pProfile?
+  cryptoFreezes      CryptoFreeze[]
+  p2pAds             P2pAd[]
+  p2pBuys            P2pTrade[]               @relation("p2p_buyer")
+  p2pSales           P2pTrade[]               @relation("p2p_seller")
 
   @@unique([storeId, email])
   @@map("customers")
@@ -2423,4 +2446,133 @@ model EsimTopUp {
   @@index([esimId, createdAt])
   @@index([status, nextCheckAt])
   @@map("esim_top_ups")
+}
+
+// ---------------------------------------------------------------------------
+// Crypto wallets and P2P trading
+// ---------------------------------------------------------------------------
+
+/// A crypto asset BitoCard's wallets hold. Balances are kept in the ledger in base units of `decimals` places
+/// (6 for the stablecoins, 8 for BTC, ETH and BNB: ETH's 18 would overflow a bigint).
+model CryptoAsset {
+  code      String   @id @db.VarChar(10)
+  name      String
+  decimals  Int
+  /// Customers can hold and trade it.
+  enabled   Boolean  @default(false)
+  /// BitoCard's P2P fee in basis points, taken in the asset from what the buyer receives.
+  p2pFeeBps Int      @default(20) @map("p2p_fee_bps")
+  sortOrder Int      @default(0) @map("sort_order")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("crypto_assets")
+}
+
+/// An amount of a customer's crypto frozen by an admin (moved to `crypto_frozen`), until released or seized.
+model CryptoFreeze {
+  id          String     @id @default(uuid()) @db.Uuid
+  customerId  String     @map("customer_id") @db.Uuid
+  mode        LedgerMode
+  asset       String     @db.VarChar(10)
+  amount      BigInt
+  reason      String
+  /// frozen, released or seized.
+  status      String     @default("frozen")
+  frozenBy    String?    @map("frozen_by") @db.Uuid
+  resolvedBy  String?    @map("resolved_by") @db.Uuid
+  resolveNote String?    @map("resolve_note")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  resolvedAt  DateTime?  @map("resolved_at")
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, status])
+  @@map("crypto_freezes")
+}
+
+/// A customer's name on the P2P market: a nickname chosen once, never their name, email or store.
+model P2pProfile {
+  customerId  String   @id @map("customer_id") @db.Uuid
+  nickname    String
+  /// Lower-case, for uniqueness.
+  nicknameKey String   @unique @map("nickname_key")
+  /// The customer chose it (a generated one can be changed once).
+  chosen      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("p2p_profiles")
+}
+
+/// An ad on the P2P market (one order book per mode, country and asset). A sell ad locks its crypto when posted; a
+/// buy ad locks the fiat it needs. Partial fills take from `remaining`.
+model P2pAd {
+  id                 String     @id @default(uuid()) @db.Uuid
+  mode               LedgerMode
+  customerId         String     @map("customer_id") @db.Uuid
+  country            String     @db.Char(2)
+  /// The market's fiat currency.
+  currency           String     @db.Char(3)
+  asset              String     @db.VarChar(10)
+  /// sell (the owner sells crypto) or buy.
+  side               String
+  /// Fiat minor units per whole unit of the asset (NGN 1,650.00 per USDT = 165000).
+  priceMinor         BigInt     @map("price_minor")
+  /// Crypto base units.
+  totalAmount        BigInt     @map("total_amount")
+  remainingAmount    BigInt     @map("remaining_amount")
+  filledAmount       BigInt     @default(0) @map("filled_amount")
+  /// Fiat limits per order.
+  minFiatMinor       BigInt     @map("min_fiat_minor")
+  maxFiatMinor       BigInt     @map("max_fiat_minor")
+  /// Buy ads: fiat still locked, and how much of it came from P2P proceeds (spent first) rather than the wallet.
+  fiatLockedMinor    BigInt     @default(0) @map("fiat_locked_minor")
+  fiatFromProceeds   BigInt     @default(0) @map("fiat_from_proceeds")
+  terms              String?
+  /// active, paused, completed or cancelled.
+  status             String     @default("active")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  customer           Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  trades             P2pTrade[]
+
+  @@index([mode, country, asset, side, status, priceMinor])
+  @@index([customerId, status])
+  @@map("p2p_ads")
+}
+
+/// One trade against an ad. Instant trades settle both legs in the transaction that creates them.
+model P2pTrade {
+  id                   String     @id @default(uuid()) @db.Uuid
+  /// Shown as P2P-000123.
+  number               Int        @unique @default(autoincrement())
+  mode                 LedgerMode
+  adId                 String     @map("ad_id") @db.Uuid
+  buyerId              String     @map("buyer_id") @db.Uuid
+  sellerId             String     @map("seller_id") @db.Uuid
+  /// The customer who took the ad (the other is the ad's owner).
+  takerId              String     @map("taker_id") @db.Uuid
+  country              String     @db.Char(2)
+  currency             String     @db.Char(3)
+  asset                String     @db.VarChar(10)
+  priceMinor           BigInt     @map("price_minor")
+  /// Crypto the seller gave, the fee BitoCard took from it and what the buyer received.
+  amount               BigInt
+  feeAmount            BigInt     @map("fee_amount")
+  fiatMinor            BigInt     @map("fiat_minor")
+  /// Where the buyer's fiat came from: P2P proceeds first, then the wallet (top-ups).
+  fiatFromProceeds     BigInt     @default(0) @map("fiat_from_proceeds")
+  fiatFromWallet       BigInt     @default(0) @map("fiat_from_wallet")
+  /// instant (BitoCard wallet) for now; classic (paid off platform) later.
+  settlement           String     @default("instant")
+  status               String     @default("completed")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  completedAt          DateTime?  @map("completed_at")
+  ad                   P2pAd      @relation(fields: [adId], references: [id], onDelete: Restrict)
+  buyer                Customer   @relation("p2p_buyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller               Customer   @relation("p2p_seller", fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([adId])
+  @@map("p2p_trades")
 }

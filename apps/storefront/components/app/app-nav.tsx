@@ -13,7 +13,7 @@ export function AppNav({ desktopNav }: { desktopNav: "rail" | "bottom" }) {
   const rail = desktopNav === "rail";
   return (
     <nav aria-label="Account" className={`fixed inset-x-0 bottom-0 z-30 border-t border-slate-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur ${rail ? "lg:hidden" : ""}`}>
-      <ul className="mx-auto grid h-16 max-w-xl grid-cols-5">
+      <ul className="mx-auto grid h-16 max-w-xl grid-cols-6">
         {appTabs.map(tab => {
           const current = active === tab.href;
           return (
@@ -21,7 +21,7 @@ export function AppNav({ desktopNav }: { desktopNav: "rail" | "bottom" }) {
               <Link
                 href={tab.href}
                 aria-current={current ? "page" : undefined}
-                className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-xs font-semibold ${current ? "text-[#ff2382]" : "text-slate-500 hover:text-[#070f4c]"}`}
+                className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold sm:text-xs ${current ? "text-[#ff2382]" : "text-slate-500 hover:text-[#070f4c]"}`}
               >
                 <tab.icon className="size-6" aria-hidden="true" strokeWidth={current ? 2.4 : 2} />
                 {tab.label}

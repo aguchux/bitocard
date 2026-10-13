@@ -423,7 +423,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 - **Reseller wallets everywhere.** Topped up through checkout (card or another provider) in any country, plus a reserved bank account where enabled. Wholesale cost must be covered before an order is accepted.
 - **Reserved bank accounts through Flutterwave**, starting with Nigeria and Ghana and extending to every country Flutterwave covers (confirm each country first; alternative reserved-account or microfinance bank providers where Flutterwave does not). Every wallet owner, reseller or customer, gets their own account; deposits are matched and synced to the BitoCard wallet once settled.
 - **A customer's country is fixed at sign-up** (October 2026, at the owner's request): bitocard.com asks for it (it sells in many countries), a reseller's store uses the reseller's country. The wallet, top-ups and checkouts are always in that country's currency (or US dollars where a gateway falls back to them), and signed-in customers see products priced in it (face values converted at BitoCard's rate; the exact price is quoted before paying).
-- **Customer wallets only in reserved-account countries.** Elsewhere customers pay each purchase at checkout. A payment is counted once, either as a wallet credit or as a checkout payment, never both.
+- **Customer wallets in every market** (on unless switched off, since October 2026): customers top up through the market's checkout methods everywhere, and also by bank transfer where reserved accounts are offered. A payment is counted once, either as a wallet credit or as a checkout payment, never both.
 - **Payout settings chain:** BitoCard enables options per country (for example gift-card sale proceeds to wallet, bank or both); each reseller chooses from what BitoCard enabled.
 - **Reserved accounts:** Flutterwave first in all three pilot countries; Monnify added in Nigeria as a second source, with failover between them.
 - **Who gets live reserved accounts (Decided):** the country must offer them and an admin switches them on per reseller (or per country, or globally; off by default). In Nigeria the business owner's **BVN is checked** with Flutterwave first and its name must match the owner's verified identity; BitoCard holds the BVN encrypted only until the accounts are opened, then erases it. Bank transfers into the accounts are listed with top-ups.
@@ -482,6 +482,21 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 
 - Calculate and record VAT, GST or sales tax on digital sales by the customer's location, kept separate in the ledger, with compliant receipts. **Decided**
 - **BitoCard is the seller of record** for every customer sale of its own products, in every channel (sales fulfilled by a reseller's own supplier are the reseller's; see Reseller's own integrations), so BitoCard (through the Golojan entity for the region) registers for, collects and pays the tax, and issues the receipts under the reseller's store brand. The reseller's profit is their earnings from the sale. **Decided** Confirm registrations and the reseller's tax position with a tax adviser per country.
+
+## 6b. Crypto wallets and P2P trading
+
+Store customers buy and sell popular coins and stablecoins with each other, safely, with BitoCard holding their crypto in internal wallets it can lock, freeze and release. Off everywhere until legal clearance per market (`crypto_wallets`, `p2p_trading`).
+
+- **Assets:** USDT (TRC20, BEP20, ERC20), USDC (ERC20, BEP20, Solana), BTC, ETH, BNB. Balances live in the ledger in base units (6 places for stablecoins, 8 for the rest).
+- **Who trades:** customers of every store, in one order book per country, shown by nickname only.
+- **Main flow (instant, built):** the seller posts X crypto and it is locked for the market; the buyer pays from their BitoCard wallet; in the same transaction the seller's P2P money is credited and the crypto is released to the buyer (less BitoCard's fee). No seller confirmation is needed: BitoCard moved the money itself. Buy ads work the other way round (the buyer's money is locked).
+- **Built (phase 1 and 3):** assets, crypto ledger accounts, sell and buy ads with partial fills, instant trades, quotes and the market, nicknames and trader stats, admin amount freezes (release, seize) and account freezes, sandbox test crypto, the Crypto tab in the customer app and the admin Crypto section. Race tests cover the faults seen in other P2P systems (two buyers on one ad, cancel against a trade, releasing twice).
+- **Next phases:**
+  1. **Custody with BitoCard's own keys:** a master seed from an offline key ceremony (Shamir backup, kept in a key vault such as Turnkey or Dfns, or an HSM); the API holds only xpubs and derives each customer's deposit address per chain (BTC `m/84'/0'/0'/0/i`, EVM `m/44'/60'/0'/0/i`, TRON `m/44'/195'/0'/0/i`; Solana from the signer); a signer service off Vercel signs withdrawals and sweeps under its own limits; hot (5–10%), warm (2-of-3) and cold wallets; daily reconciliation of `crypto_custody` against chain balances.
+  2. **Chain providers as admin integrations** (Settings > Integrations > Blockchain), rented, never given keys: Alchemy, QuickNode, Infura, Ankr, NodeReal, GetBlock, Moralis, Helius, TronGrid, Tatum, BlockCypher, mempool.space/Blockstream; each with keys, webhook secrets, testnet switch and Test connection; routing per chain with fallback and a second provider confirming large deposits; webhooks re-read through the routing, with a polling backstop. AML screening (Chainalysis, TRM) behind an adapter.
+  3. **Deposits and withdrawals:** credited after confirmations, matched by token contract (never symbol); withdrawals with an address book (24-hour wait for new addresses), emailed codes, limits, admin review above a threshold, "unclear is not failed".
+  4. **Wallet lock during trades and settlement holds** (classic trades and card-funded money), then **classic P2P** (bank or mobile money paid off platform, crypto in escrow, mark paid, release with a code, appeals through disputes, timeouts by a `p2p` job), and **bank payouts of P2P money** (`customer_withdrawable`) to the customer's verified bank account.
+- **Legal:** licensing advice per market, crypto and P2P terms and risk warnings, and the privacy notice before switching anything on.
 
 ## 7. API, docs and webhooks (Decided)
 
@@ -596,7 +611,7 @@ Waiting on others: resell.biz API and supported country endings (.com.ng, .com.g
 | NestJS + Apollo GraphQL; RTK Query over GraphQL | One REST `/v1` API with OpenAPI; RTK Query hooks generated from it; no GraphQL |
 | RabbitMQ for background fulfilment | Vercel Queues and Workflow with a transactional outbox (RabbitMQ only if long-running workers are ever needed) |
 | Reseller API is a later phase (Phase 4) | API-first: built first, used by every BitoCard app |
-| Customers fund accounts and pay from wallets | Customer wallets only in reserved-account countries; checkout elsewhere |
+| Customers fund accounts and pay from wallets | Customer wallets in every market, on unless switched off; reserved accounts where offered |
 | Flutterwave is an evaluation option | Flutterwave chosen for reserved accounts (Nigeria, Ghana and its other countries), with alternatives where it does not cover |
 | Startup credit is recoverable working capital | One-time $500 allowance for customer-paid orders only, no refill, revocable by admins; exposure tracked |
 | Welcome bonus proposed | In the MVP, gated per reseller by admins, funded by BitoCard as marketing |

@@ -1,0 +1,173 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, Check, Plus, Zap } from "lucide-react";
+import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
+import type { FormState } from "@/lib/account-actions";
+import { addTestCrypto, chooseNickname, confirmTrade, findBestPrice, postAd, repriceAd, takeAd } from "@/lib/crypto-actions";
+
+const selectClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-[#070f4c] focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none";
+
+/** Buy or sell, as a two-button switch that works as radios (so the form posts without script). */
+function SideSwitch({ name = "side", value, onChange, labels = { buy: "Buy", sell: "Sell" } }: { name?: string; value: "buy" | "sell"; onChange: (side: "buy" | "sell") => void; labels?: { buy: string; sell: string } }) {
+  return (
+    <fieldset className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
+      <legend className="sr-only">Buy or sell</legend>
+      {(["buy", "sell"] as const).map(side => (
+        <label
+          key={side}
+          className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#ff2382] ${
+            value === side ? (side === "buy" ? "bg-emerald-600 text-white shadow-sm" : "bg-[#ff2382] text-white shadow-sm") : "text-slate-600"
+          }`}
+        >
+          <input type="radio" name={name} value={side} checked={value === side} onChange={() => onChange(side)} className="sr-only" />
+          {side === "buy" ? <ArrowDownLeft className="size-4" aria-hidden="true" /> : <ArrowUpRight className="size-4" aria-hidden="true" />}
+          {labels[side]}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+function AssetSelect({ assets, defaultValue, name = "asset", label = "Coin" }: { assets: string[]; defaultValue?: string; name?: string; label?: string }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="block text-sm font-semibold text-[#070f4c]">{label}</span>
+      <select name={name} defaultValue={defaultValue ?? assets[0]} className={selectClass}>
+        {assets.map(asset => (
+          <option key={asset} value={asset}>
+            {asset}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** One tap to the best price: buy or sell, which coin and how much (in the customer's currency). */
+export function QuickTrade({ assets, currency, defaultAsset, defaultSide = "buy" }: { assets: string[]; currency: string; defaultAsset?: string; defaultSide?: "buy" | "sell" }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(findBestPrice, {});
+  const [side, setSide] = useState<"buy" | "sell">(defaultSide);
+  return (
+    <form action={action} className="space-y-4" aria-label="Quick trade">
+      <SideSwitch value={side} onChange={setSide} />
+      <FormMessage state={state} />
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+        <AssetSelect assets={assets} defaultValue={defaultAsset} />
+        <TextField label={side === "buy" ? `You pay (${currency})` : `You receive (${currency})`} name="fiat" inputMode="decimal" placeholder="50,000" required state={state} />
+      </div>
+      <Submit pending={pending} className="w-full">
+        <Zap className="size-4" aria-hidden="true" /> {side === "buy" ? "Find the best price to buy" : "Find the best price to sell"}
+      </Submit>
+      <p className="text-xs text-slate-500">You see the price, BitoCard&apos;s fee and exactly what you get before you confirm. Trades settle instantly from your BitoCard wallets.</p>
+    </form>
+  );
+}
+
+/** Sandbox stores only: test crypto to try the market. */
+export function TestCryptoForm({ assets }: { assets: string[] }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(addTestCrypto, {});
+  return (
+    <form action={action} className="space-y-3" aria-label="Add test crypto">
+      <FormMessage state={state} />
+      <div className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3">
+        <AssetSelect assets={assets} />
+        <TextField label="Amount" name="amount" inputMode="decimal" defaultValue="100" required state={state} />
+      </div>
+      <Submit pending={pending} className="w-full sm:w-auto">
+        <Plus className="size-4" aria-hidden="true" /> Add test crypto
+      </Submit>
+    </form>
+  );
+}
+
+/** Taking one ad from the market list: an amount in the customer's currency, then the confirmation. */
+export function TakeAdForm({ adId, price, currency, side, min, max }: { adId: string; price: number; currency: string; side: "buy" | "sell"; min: string; max: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(takeAd, {});
+  return (
+    <form action={action} className="flex flex-col gap-2 sm:flex-row sm:items-end" aria-label={side === "buy" ? "Buy from this ad" : "Sell to this ad"}>
+      <input type="hidden" name="ad_id" value={adId} />
+      <input type="hidden" name="price" value={price} />
+      <div className="min-w-0 flex-1">
+        <TextField label={`Amount (${currency})`} name="fiat" inputMode="decimal" placeholder={`${min} – ${max}`} required state={state} />
+      </div>
+      <Submit pending={pending} className={side === "buy" ? "bg-emerald-600 hover:bg-emerald-700" : ""}>
+        {side === "buy" ? "Buy" : "Sell"}
+      </Submit>
+      {state.error ? <p className="text-sm text-red-700" role="alert">{state.error}</p> : null}
+    </form>
+  );
+}
+
+/** The final step: confirms exactly the trade shown. */
+export function ConfirmTradeForm({ adId, price, fiat, label }: { adId: string; price: number; fiat: number; label: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(confirmTrade, {});
+  return (
+    <form action={action} className="space-y-3">
+      <input type="hidden" name="ad_id" value={adId} />
+      <input type="hidden" name="price" value={price} />
+      <input type="hidden" name="fiat" value={fiat} />
+      <FormMessage state={state} />
+      {state.field === "funds" ? (
+        <a href="/account/wallet" className="inline-flex min-h-11 items-center font-semibold text-[#ff2382] hover:underline">
+          Add money to your wallet
+        </a>
+      ) : null}
+      <Submit pending={pending} className="w-full">
+        <Check className="size-4" aria-hidden="true" /> {label}
+      </Submit>
+    </form>
+  );
+}
+
+/** Posting an ad: sell (your crypto is locked for the market) or buy (the money it needs is locked). */
+export function PostAdForm({ assets, currency }: { assets: string[]; currency: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(postAd, {});
+  const [side, setSide] = useState<"buy" | "sell">("sell");
+  return (
+    <form action={action} className="space-y-4" aria-label="Post an ad">
+      <SideSwitch value={side} onChange={setSide} labels={{ buy: "I want to buy", sell: "I want to sell" }} />
+      <FormMessage state={state} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AssetSelect assets={assets} />
+        <TextField label={`Your price per coin (${currency})`} name="price" inputMode="decimal" placeholder="1,650" required state={state} />
+        <TextField label="How much (coins)" name="amount" inputMode="decimal" placeholder="100" required state={state} hint={side === "sell" ? "Locked from your wallet while the ad is open." : "The money for it is locked from your balance while the ad is open."} />
+        <div className="grid grid-cols-2 gap-3">
+          <TextField label={`Min per trade`} name="min_fiat" inputMode="decimal" placeholder="1,000" required state={state} />
+          <TextField label={`Max per trade`} name="max_fiat" inputMode="decimal" placeholder="500,000" required state={state} />
+        </div>
+      </div>
+      <TextField label="Terms (optional)" name="terms" maxLength={500} placeholder="Anything buyers should know" state={state} />
+      <Submit pending={pending} className="w-full sm:w-auto">
+        <Plus className="size-4" aria-hidden="true" /> Post ad
+      </Submit>
+    </form>
+  );
+}
+
+export function RepriceForm({ id, currency, price }: { id: string; currency: string; price: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(repriceAd, {});
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-2" aria-label="Change price">
+      <input type="hidden" name="id" value={id} />
+      <div className="w-40">
+        <TextField label={`New price (${currency})`} name="price" inputMode="decimal" defaultValue={price} required state={state} />
+      </div>
+      <button type="submit" disabled={pending} className="min-h-12 rounded-xl px-4 font-semibold ring-1 ring-slate-300 hover:ring-slate-400 disabled:opacity-60">
+        Save
+      </button>
+      {state.error || state.notice ? <p className={`basis-full text-sm ${state.error ? "text-red-700" : "text-emerald-700"}`}>{state.error ?? state.notice}</p> : null}
+    </form>
+  );
+}
+
+export function NicknameForm({ current }: { current: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(chooseNickname, {});
+  return (
+    <form action={action} className="space-y-3" aria-label="Choose your nickname">
+      <FormMessage state={state} />
+      <TextField label="Nickname" name="nickname" defaultValue={current} pattern="[A-Za-z0-9_]{3,20}" maxLength={20} required state={state} hint="What other traders see instead of your name. 3 to 20 letters, numbers or underscores; you can choose it once." />
+      <Submit pending={pending}>Save nickname</Submit>
+    </form>
+  );
+}

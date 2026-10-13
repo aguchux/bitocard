@@ -1690,6 +1690,8 @@
                     "own_integrations": false,
                     "customer_app_bottom_bar_desktop": false,
                     "customer_wallets": true,
+                    "crypto_wallets": false,
+                    "p2p_trading": false,
                     "manual_reseller_approval": false
                   }
                 }
@@ -28025,6 +28027,8 @@
               "own_integrations",
               "customer_app_bottom_bar_desktop",
               "customer_wallets",
+              "crypto_wallets",
+              "p2p_trading",
               "manual_reseller_approval"
             ],
             "additionalProperties": false,
@@ -28052,6 +28056,14 @@
               "customer_wallets": {
                 "type": "boolean",
                 "description": "Store customers have a wallet: they top it up (card, mobile money, Flutterwave or their own bank account number) and buy only from it, never withdrawing. Off, they pay at checkout instead (any balance left can still be spent). On unless switched off."
+              },
+              "crypto_wallets": {
+                "type": "boolean",
+                "description": "Store customers hold crypto (USDT, USDC, BTC, ETH, BNB) in BitoCard wallets. Off until crypto is cleared to operate in the market."
+              },
+              "p2p_trading": {
+                "type": "boolean",
+                "description": "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too."
               },
               "manual_reseller_approval": {
                 "type": "boolean",

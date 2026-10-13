@@ -33,6 +33,14 @@ export const switchDefinitions = {
     description:
       "Store customers have a wallet: they top it up (card, mobile money, Flutterwave or their own bank account number) and buy only from it, never withdrawing. Off, they pay at checkout instead (any balance left can still be spent). On unless switched off.",
   },
+  crypto_wallets: {
+    scopes: ['global', 'country', 'reseller'],
+    description: "Store customers hold crypto (USDT, USDC, BTC, ETH, BNB) in BitoCard wallets. Off until crypto is cleared to operate in the market.",
+  },
+  p2p_trading: {
+    scopes: ['global', 'country', 'reseller'],
+    description: "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

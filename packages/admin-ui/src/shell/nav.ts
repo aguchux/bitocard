@@ -1,6 +1,6 @@
-import { AlertTriangle, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
-export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'settings';
+export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'settings';
 
 export type NavItem<K extends string = SectionKey> = { key: K; label: string; href: string; icon: LucideIcon };
 
@@ -13,6 +13,7 @@ export const sections: NavItem[] = [
   { key: 'verifications', label: 'Identity', href: '/verifications', icon: ShieldCheck },
   { key: 'activity', label: 'Activity', href: '/activity', icon: History },
   { key: 'storefront', label: 'Storefront', href: '/storefront', icon: LayoutGrid },
+  { key: 'crypto', label: 'Crypto', href: '/crypto', icon: Coins },
   { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -74,6 +75,15 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Media library', href: '/storefront/media', icon: Images },
       { label: 'Customers', href: '/storefront/customers', icon: Users },
       { label: 'Settings', href: '/storefront/settings', icon: Settings },
+    ],
+  },
+  crypto: {
+    title: 'Crypto',
+    items: [
+      { label: 'Wallets & freezes', href: '/crypto', icon: Snowflake },
+      { label: 'P2P trades', href: '/crypto/trades', icon: ArrowLeftRight },
+      { label: 'P2P ads', href: '/crypto/ads', icon: ListChecks },
+      { label: 'Assets', href: '/crypto/assets', icon: Coins },
     ],
   },
   settings: {

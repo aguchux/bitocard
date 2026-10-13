@@ -39,7 +39,7 @@ export async function shopperHeader(now = Date.now()): Promise<Record<string, st
 }
 
 /** Calls a customer endpoint with the signed-in customer's session. Never cached; never throws. */
-export async function customerApi<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<CustomerResult<T>> {
+export async function customerApi<T>(method: "GET" | "POST" | "PUT" | "PATCH", path: string, body?: unknown): Promise<CustomerResult<T>> {
   const token = (await cookies()).get(customerCookie)?.value;
   const store = await storeSubdomain();
   try {

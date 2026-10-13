@@ -355,3 +355,93 @@ export type StoreEsimTopUpOptions = {
 };
 
 export type StoreEsimTopUp = { object: 'esim_top_up'; id: string; name: string; status: 'pending' | 'completed' | 'failed'; amount: number; currency: string; failure_reason: string | null };
+
+// -- Crypto wallets and P2P ------------------------------------------------------------------------------------------
+
+/** One asset in the customer's crypto wallets. Amounts are decimal strings with every place (`"12.500000"`). */
+export type StoreCryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; available: string; locked: string; frozen: string; total: string };
+
+/** `GET /v1/store/crypto`: the customer's crypto wallets, their P2P cash (minor units) and what they can do now. */
+export type StoreCryptoWallets = {
+  object: 'crypto_wallets';
+  mode: 'live' | 'test';
+  country: string;
+  currency: string;
+  enabled: boolean;
+  p2p_enabled: boolean;
+  verified: boolean;
+  frozen: boolean;
+  assets: StoreCryptoBalance[];
+  /** proceeds: P2P sales (withdrawable); wallet: top-ups; locked: behind buy ads. */
+  cash: { currency: string; proceeds: number; wallet: number; locked: number };
+};
+
+export type StoreCryptoTransaction = {
+  object: 'crypto_transaction';
+  id: string;
+  type: string;
+  balance: 'available' | 'locked' | 'frozen';
+  description: string;
+  asset: string;
+  amount: string;
+  trade_id: string | null;
+  ad_id: string | null;
+  created_at: string;
+};
+
+/** An ad on the P2P market. `side: sell` means its trader sells (you buy); `price` is fiat minor units per whole unit. */
+export type StoreP2pAd = {
+  object: 'p2p_ad';
+  id: string;
+  mode: 'live' | 'test';
+  side: 'buy' | 'sell';
+  asset: string;
+  decimals: number;
+  currency: string;
+  country: string;
+  price: number;
+  available: string;
+  total: string;
+  filled: string;
+  min_fiat: number;
+  max_fiat: number;
+  fee_bps: number;
+  terms: string | null;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  mine: boolean;
+  trader: { nickname: string; trades_30d: number; trades_total: number };
+  created_at: string;
+  updated_at: string;
+};
+
+/** What a trade would be: the crypto, BitoCard's fee, what the buyer receives and the fiat (minor units). */
+export type StoreP2pTerms = { asset: string; currency: string; price: number; amount: string; fee: string; received: string; fiat: number };
+/** `side`: what the viewer does (buy from a sell ad, sell to a buy ad). */
+export type StoreP2pQuote = StoreP2pTerms & { object: 'p2p_quote'; side: 'buy' | 'sell'; ad?: StoreP2pAd };
+
+export type StoreP2pTrade = StoreP2pTerms & {
+  object: 'p2p_trade';
+  id: string;
+  /** P2P-000123. */
+  number: string;
+  mode: 'live' | 'test';
+  side: 'buy' | 'sell';
+  role: 'maker' | 'taker';
+  ad_id: string;
+  counterparty: { nickname: string };
+  settlement: 'instant' | 'classic';
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type StoreP2pProfile = { object: 'p2p_profile'; nickname: string; nickname_chosen: boolean; trades_30d: number; trades_total: number };
+
+/** A crypto amount for people: trailing zeros dropped, at least two places for stablecoins ("49.9", "0.0002"). */
+export function formatCrypto(amount: string, asset?: string) {
+  const [whole, fraction = ''] = amount.split('.');
+  let trimmed = fraction.replace(/0+$/, '');
+  if (asset && ['USDT', 'USDC'].includes(asset) && trimmed.length < 2) trimmed = trimmed.padEnd(2, '0');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${grouped}${trimmed ? `.${trimmed}` : ''}${asset ? ` ${asset}` : ''}`;
+}

@@ -1,0 +1,16 @@
+import { Module } from '@nestjs/common';
+import { CheckoutModule } from '../checkout/checkout.module.js';
+import { IdentityModule } from '../identity/identity.module.js';
+import { SettingsModule } from '../settings/settings.module.js';
+import { AdminCryptoController, AdminP2pController, CustomerCryptoController, CustomerP2pController } from './crypto.controller.js';
+import { CryptoWalletsService } from './crypto-wallets.service.js';
+import { P2pService } from './p2p.service.js';
+
+/** Store customers' crypto wallets and the P2P market (instant trades paid from BitoCard wallets). */
+@Module({
+  imports: [CheckoutModule, IdentityModule, SettingsModule],
+  controllers: [CustomerCryptoController, CustomerP2pController, AdminCryptoController, AdminP2pController],
+  providers: [CryptoWalletsService, P2pService],
+  exports: [CryptoWalletsService, P2pService],
+})
+export class CryptoModule {}

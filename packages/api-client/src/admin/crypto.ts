@@ -1,0 +1,137 @@
+import { bitocardApi } from '../base';
+import type { List, Mode } from './types';
+
+/** A crypto asset customers can hold and trade. `p2p_fee_bps`: BitoCard's fee, taken in the asset from the buyer. */
+export type CryptoAsset = { object: 'crypto_asset'; code: string; name: string; decimals: number; enabled: boolean; p2p_fee_bps: number };
+
+/** Crypto amounts are decimal strings with every place ("12.500000"). */
+export type CryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; available: string; locked: string; frozen: string; total: string };
+
+export type CryptoFreeze = {
+  object: 'crypto_freeze';
+  id: string;
+  mode: Mode;
+  asset: string;
+  amount: string;
+  reason: string;
+  status: 'frozen' | 'released' | 'seized';
+  resolve_note: string | null;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export type CryptoCustomer = {
+  object: 'crypto_customer';
+  id: string;
+  email: string;
+  name: string;
+  country: string | null;
+  store: { name: string; subdomain: string };
+  nickname: string | null;
+  frozen: boolean;
+  frozen_reason: string | null;
+  frozen_at: string | null;
+};
+
+export type CryptoCustomerDetail = CryptoCustomer & {
+  balances: { live: CryptoBalance[]; test: CryptoBalance[] };
+  /** P2P proceeds (customer_withdrawable), fiat locked in buy ads and the wallet, minor units. */
+  cash: Array<{ mode: Mode; kind: string; currency: string; balance: number }>;
+  freezes: CryptoFreeze[];
+};
+
+export type P2pAd = {
+  object: 'p2p_ad';
+  id: string;
+  mode: Mode;
+  side: 'buy' | 'sell';
+  asset: string;
+  decimals: number;
+  currency: string;
+  country: string;
+  /** Fiat minor units per whole unit. */
+  price: number;
+  available: string;
+  total: string;
+  filled: string;
+  min_fiat: number;
+  max_fiat: number;
+  fee_bps: number;
+  terms: string | null;
+  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  trader: { nickname: string; trades_30d: number; trades_total: number };
+  customer: { id: string; email: string | null };
+  created_at: string;
+  updated_at: string;
+};
+
+export type P2pTrade = {
+  object: 'p2p_trade';
+  id: string;
+  number: string;
+  mode: Mode;
+  ad_id: string;
+  asset: string;
+  currency: string;
+  price: number;
+  amount: string;
+  fee: string;
+  received: string;
+  fiat: number;
+  settlement: 'instant' | 'classic';
+  status: string;
+  buyer: { id: string; email: string; nickname: string | null };
+  seller: { id: string; email: string; nickname: string | null };
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer_id?: string; limit?: number };
+
+const cryptoApi = bitocardApi.injectEndpoints({
+  endpoints: build => ({
+    cryptoAssets: build.query<List<CryptoAsset>, void>({ query: () => '/v1/admin/crypto/assets', providesTags: ['Crypto'] }),
+    updateCryptoAsset: build.mutation<CryptoAsset, { code: string; enabled?: boolean; p2p_fee_bps?: number }>({
+      query: ({ code, ...body }) => ({ url: `/v1/admin/crypto/assets/${code}`, method: 'PATCH', body }),
+      invalidatesTags: ['Crypto'],
+    }),
+    cryptoCustomers: build.query<List<CryptoCustomer>, { q?: string }>({ query: params => ({ url: '/v1/admin/crypto/customers', params }), providesTags: ['Crypto'] }),
+    cryptoCustomer: build.query<CryptoCustomerDetail, string>({ query: id => `/v1/admin/crypto/customers/${id}`, providesTags: ['Crypto'] }),
+    creditTestCrypto: build.mutation<CryptoCustomerDetail, { id: string; asset: string; amount: string; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/test-credits`, method: 'POST', body }),
+      invalidatesTags: ['Crypto'],
+    }),
+    freezeCrypto: build.mutation<CryptoFreeze, { id: string; asset: string; amount: string; reason: string; mode: Mode }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/freezes`, method: 'POST', body }),
+      invalidatesTags: ['Crypto'],
+    }),
+    resolveCryptoFreeze: build.mutation<CryptoFreeze, { id: string; outcome: 'release' | 'seize'; note: string }>({
+      query: ({ id, outcome, note }) => ({ url: `/v1/admin/crypto/freezes/${id}/${outcome}`, method: 'POST', body: { note } }),
+      invalidatesTags: ['Crypto'],
+    }),
+    setCryptoAccountFrozen: build.mutation<CryptoCustomerDetail, { id: string; frozen: boolean; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/crypto/customers/${id}/account-freeze`, method: 'PUT', body }),
+      invalidatesTags: ['Crypto', 'P2p'],
+    }),
+    p2pAds: build.query<List<P2pAd>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/ads', params }), providesTags: ['P2p'] }),
+    p2pTrades: build.query<List<P2pTrade>, P2pFilter>({ query: params => ({ url: '/v1/admin/p2p/trades', params }), providesTags: ['P2p'] }),
+    cancelP2pAd: build.mutation<P2pAd, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/admin/p2p/ads/${id}/cancel`, method: 'POST', body: { reason } }),
+      invalidatesTags: ['P2p', 'Crypto'],
+    }),
+  }),
+});
+
+export const {
+  useCryptoAssetsQuery,
+  useUpdateCryptoAssetMutation,
+  useCryptoCustomersQuery,
+  useCryptoCustomerQuery,
+  useCreditTestCryptoMutation,
+  useFreezeCryptoMutation,
+  useResolveCryptoFreezeMutation,
+  useSetCryptoAccountFrozenMutation,
+  useP2pAdsQuery,
+  useP2pTradesQuery,
+  useCancelP2pAdMutation,
+} = cryptoApi;

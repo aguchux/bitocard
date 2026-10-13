@@ -112,6 +112,8 @@ export const tagTypes = [
   'Dispute',
   'Stock',
   'Number',
+  'Crypto',
+  'P2p',
   // Both apps
   'Notification',
   'SupplierNotification',
