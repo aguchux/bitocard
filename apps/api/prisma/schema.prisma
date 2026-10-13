@@ -2772,6 +2772,8 @@ model CryptoAddress {
   keyFingerprint String     @map("key_fingerprint")
   /// Watched for deposits until then: renewed whenever the customer shows it.
   watchUntil     DateTime   @map("watch_until")
+  /// Last read outside its watch window (TRON and Bitcoin list each address's history, so unwatched ones are swept in turn).
+  sweptAt        DateTime?  @map("swept_at")
   createdAt      DateTime   @default(now()) @map("created_at")
   customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -2779,6 +2781,7 @@ model CryptoAddress {
   @@unique([mode, family, index])
   @@unique([mode, family, address])
   @@index([mode, family, watchUntil])
+  @@index([mode, family, sweptAt])
   @@map("crypto_addresses")
 }
 

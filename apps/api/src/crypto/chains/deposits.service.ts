@@ -23,6 +23,8 @@ const evmRangeBlocks = 1_000n;
 const firstScanBlocks = 200n;
 /** Blocks left unscanned at the tip of EVM chains, until every node behind a provider has indexed them. */
 const scanLagBlocks = 2n;
+/** Unwatched addresses read per chain and run (TRON and Bitcoin list each address's history): about 36,000 a day. */
+const sweepBatch = 50;
 /** A deposit the chain stops showing is failed only after this long, and only when no provider shows it. */
 const missingFailsAfterMs = 6 * 3_600_000;
 /** Notifications whose transactions could not be read are retried by the job this many times. */
@@ -244,16 +246,26 @@ export class CryptoDepositsService {
     });
   }
 
-  /** One chain in one mode: transfers into watched addresses since the last scan, each re-read before it is recorded. */
+  /**
+   * One chain in one mode: transfers into customers' addresses since the last scan, each re-read before it is recorded.
+   * An address is the customer's for good, so none is ever left unread: EVM token logs are filtered by address in the
+   * same block range, so every address is scanned; listing an address's own history (plain ETH and BNB, TRON, Bitcoin)
+   * costs a request per address, so those cover the watched addresses (shown in the last week) plus a turn of the
+   * others, oldest sweep first.
+   */
   async scan(chain: Chain, mode: LedgerMode) {
     const family = chainFamily[chain];
     const networks = await this.networksFor(chain, mode);
     if (!networks.length) return { skipped: 'no networks' };
+    const evm = chain === 'ETHEREUM' || chain === 'BSC';
     const watched = await this.prisma.cryptoAddress.findMany({ where: { mode, family, watchUntil: { gt: new Date() } } });
-    if (!watched.length) return { skipped: 'no addresses watched' };
+    const sweep = await this.prisma.cryptoAddress.findMany({ where: { mode, family, watchUntil: { lte: new Date() } }, orderBy: [{ sweptAt: { sort: 'asc', nulls: 'first' } }, { index: 'asc' }], take: sweepBatch });
+    const every = evm ? await this.prisma.cryptoAddress.findMany({ where: { mode, family }, select: { address: true } }) : [];
+    if (!watched.length && !sweep.length) return { skipped: 'no addresses' };
     const routes = await this.routes(chain, mode);
     if (!routes.length) return { skipped: 'no provider' };
-    const addresses = watched.map(item => normaliseAddress(chain, item.address));
+    const addresses = [...watched, ...sweep].map(item => normaliseAddress(chain, item.address));
+    const tokenAddresses = evm ? every.map(item => normaliseAddress(chain, item.address)) : addresses;
     const contracts = networks.flatMap(item => (item.contract ? [item.contract] : []));
     const native = networks.some(item => !item.contract);
 
@@ -262,7 +274,6 @@ export class CryptoDepositsService {
     const tokenRoutes = routes.filter(route => route.client.scan && route.client.tokenScan);
     const coinRoutes = routes.filter(route => route.client.scan && route.client.nativeScan);
     if (contracts.length && !tokenRoutes.length && !native) return { skipped: 'no provider lists token deposits (webhooks only)' };
-    const evm = chain === 'ETHEREUM' || chain === 'BSC';
     // Scanning stops a few blocks short of the tip: a load-balanced node can report a block its logs do not cover yet.
     const tip = (await this.ask(chain, routes, client => client.latestBlock())).value;
     const latest = evm && tip > scanLagBlocks ? tip - scanLagBlocks : tip;
@@ -272,18 +283,38 @@ export class CryptoDepositsService {
     const notes: string[] = [];
     if (contracts.length && !tokenRoutes.length) notes.push('token deposits: webhooks only');
     if (native && !coinRoutes.length) notes.push('coin deposits: webhooks only (no provider here lists them)');
-    if (fromBlock > latest) return { scanned: 0, ...(notes.length ? { notes } : {}) };
     const found: Transfer[] = [];
-    if (contracts.length && tokenRoutes.length) found.push(...(await this.ask(chain, tokenRoutes, client => client.scan!({ addresses, contracts, native: false, fromBlock, toBlock }))).value);
-    if (native && coinRoutes.length) found.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses, contracts: [], native: true, fromBlock, toBlock }))).value);
+    const watchedAddresses = watched.map(item => normaliseAddress(chain, item.address));
+    const sweptAddresses = sweep.map(item => normaliseAddress(chain, item.address));
+    if (fromBlock <= latest) {
+      if (contracts.length && tokenRoutes.length && tokenAddresses.length) {
+        found.push(...(await this.ask(chain, tokenRoutes, client => client.scan!({ addresses: tokenAddresses, contracts, native: false, fromBlock, toBlock }))).value);
+      }
+      if (native && coinRoutes.length && (evm ? watchedAddresses : addresses).length) {
+        found.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses: evm ? watchedAddresses : addresses, contracts: [], native: true, fromBlock, toBlock }))).value);
+      }
+    }
+    // Plain EVM coin transfers are listed per address over a block range: swept addresses are read over their whole history.
+    if (evm && native && coinRoutes.length && sweptAddresses.length) {
+      found.push(...(await this.ask(chain, coinRoutes, client => client.scan!({ addresses: sweptAddresses, contracts: [], native: true, fromBlock: 0n, toBlock: latest }))).value);
+    }
+    if (fromBlock > latest && !found.length) {
+      await this.markSwept(sweep.map(item => item.id));
+      return { scanned: 0, ...(notes.length ? { notes } : {}) };
+    }
     const known = new Set(
       (await this.prisma.cryptoDeposit.findMany({ where: { chain, txHash: { in: [...new Set(found.map(item => item.hash))] }, status: { not: 'failed' } }, select: { txHash: true } })).map(item => item.txHash),
     );
     let recorded = 0;
     // A transaction that cannot be read now throws before the cursor moves, so the same blocks are scanned again.
     for (const hash of new Set(found.filter(item => !known.has(item.hash)).map(item => item.hash))) recorded += await this.record(chain, mode, hash, routes);
-    if (evm) await this.prisma.chainCursor.upsert({ where: { chain_mode: { chain, mode } }, create: { chain, mode, block: toBlock }, update: { block: toBlock } });
-    return { from: String(fromBlock), to: String(toBlock), seen: found.length, recorded, ...(notes.length ? { notes } : {}) };
+    if (evm && fromBlock <= latest) await this.prisma.chainCursor.upsert({ where: { chain_mode: { chain, mode } }, create: { chain, mode, block: toBlock }, update: { block: toBlock } });
+    await this.markSwept(sweep.map(item => item.id));
+    return { from: String(fromBlock), to: String(toBlock), seen: found.length, recorded, swept: sweep.length, ...(notes.length ? { notes } : {}) };
+  }
+
+  private async markSwept(ids: string[]) {
+    if (ids.length) await this.prisma.cryptoAddress.updateMany({ where: { id: { in: ids } }, data: { sweptAt: new Date() } });
   }
 
   /**

@@ -336,6 +336,24 @@ describe('deposits are never silently missed', () => {
     await ledgerOk();
   });
 
+  test('an address is the customer’s for good: deposits long after it was last shown are still found', async () => {
+    const shopper = await customer();
+    const evm = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
+    const btc = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'BTC', chain: 'BITCOIN' })).json.address;
+    await prisma.cryptoAddress.updateMany({ where: { customerId: shopper.id }, data: { watchUntil: new Date(Date.now() - 30 * 86_400_000) } });
+    chain.state.latest += 10n;
+    evmTransfer(chain.state, { hash: txHash(9), to: evm, raw: 2_000_000n, block: chain.state.latest - 5n });
+    const id = 'd'.repeat(64);
+    chain.state.btc.set(id, { txid: id, status: { confirmed: true, block_height: chain.state.btcTip - 3 }, vout: [{ scriptpubkey_address: btc, value: 50_000 }] });
+    await cron('crypto');
+    chain.state.latest += 20n;
+    await cron('crypto');
+    assert.equal(await balance(shopper, 'USDT'), '2.000000', 'EVM token logs cover every address');
+    assert.equal(await balance(shopper, 'BTC'), '0.00050000', 'unwatched Bitcoin addresses are swept in turn');
+    const swept = await prisma.cryptoAddress.findFirstOrThrow({ where: { customerId: shopper.id, family: 'bitcoin' } });
+    assert.ok(swept.sweptAt, 'its sweep is recorded');
+  });
+
   test('a webhook that came while every provider was down is processed by the next run', async () => {
     const shopper = await customer();
     const address = (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address;
@@ -360,5 +378,6 @@ describe('deposits are never silently missed', () => {
     await prisma.chainNotice.updateMany({ where: { hashes: { has: hash } }, data: { createdAt: new Date(Date.now() - 120_000) } });
     await cron('crypto');
     assert.ok(await prisma.cryptoDeposit.findFirst({ where: { customerId: shopper.id, txHash: hash } }), 'recorded by the retry');
+    assert.ok((await prisma.chainNotice.findFirst({ where: { hashes: { has: hash } } })).processedAt, 'the notification is processed');
   });
 });
