@@ -128,7 +128,7 @@ describe('blockchain providers in Settings > Integrations', () => {
     const list = (await admin.get('/v1/admin/integrations')).json.data.filter(item => item.section === 'blockchain');
     assert.deepEqual(
       list.map(item => item.id),
-      ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'crypto_signer', 'chainalysis', 'trm'],
+      ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'crypto_signer', 'chainalysis', 'trm', 'crypto_prices'],
     );
     assert.ok(list.filter(item => item.id !== 'crypto_keys').every(item => item.links.length && item.testable && item.sandbox !== true));
     assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.bitocard.com/v1/webhooks/chain/alchemy?chain=<CHAIN>');

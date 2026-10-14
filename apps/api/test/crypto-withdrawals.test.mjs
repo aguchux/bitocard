@@ -169,7 +169,7 @@ const settle = async id => {
 describe('signer and screening integrations', () => {
   test('the signer and both screeners have cards in the Blockchain section; the shared secret must be long', async () => {
     const list = (await admin.get('/v1/admin/integrations')).json.data.filter(item => item.section === 'blockchain').map(item => item.id);
-    assert.deepEqual(list.slice(-3), ['crypto_signer', 'chainalysis', 'trm']);
+    assert.deepEqual(list.slice(-4), ['crypto_signer', 'chainalysis', 'trm', 'crypto_prices']);
     const short = await admin.put('/v1/admin/integrations/crypto_signer', { values: { CRYPTO_SIGNER_SECRET: 'short' }, code: await adminCode(server, admin) });
     assert.deepEqual([short.status, short.json.error.param], [400, 'values.CRYPTO_SIGNER_SECRET']);
     await update('chainalysis', { CHAINALYSIS_API_KEY: 'ca-key-1234', CHAINALYSIS_API_URL: `${fakes.url}/screen` });

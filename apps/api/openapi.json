@@ -1692,6 +1692,7 @@
                     "customer_wallets": true,
                     "crypto_wallets": false,
                     "p2p_trading": false,
+                    "spin_rewards": false,
                     "manual_reseller_approval": false
                   }
                 }
@@ -28029,6 +28030,7 @@
               "customer_wallets",
               "crypto_wallets",
               "p2p_trading",
+              "spin_rewards",
               "manual_reseller_approval"
             ],
             "additionalProperties": false,
@@ -28064,6 +28066,10 @@
               "p2p_trading": {
                 "type": "boolean",
                 "description": "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too."
+              },
+              "spin_rewards": {
+                "type": "boolean",
+                "description": "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared."
               },
               "manual_reseller_approval": {
                 "type": "boolean",
