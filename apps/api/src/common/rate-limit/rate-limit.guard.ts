@@ -63,7 +63,7 @@ function limiterFor(config: AppConfig, limit: number): Limiter {
  * keeps counting in memory instead.
  */
 const sensitivePath =
-  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?)|admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|store\/account\/(signup|signin|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify))(\?|$)/;
+  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?)|admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|store\/account\/(signup|signin|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|kyc\/session)(\?|$)/;
 
 export const isSensitive = (method: string, url: string) => method === 'POST' && sensitivePath.test(url);
 

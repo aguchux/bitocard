@@ -84,7 +84,8 @@ export type ReservedAccountDetails = { bankName: string; accountNumber: string; 
 export interface ReservedAccountProvider {
   readonly name: string;
   supportsReservedAccounts(country: string, currency: string): boolean;
-  createReservedAccount(input: { reference: string; email: string; name: string; currency: string; bvn?: string }): Promise<ReservedAccountDetails[]>;
+  /** `firstName`, `lastName` and `phone` are the holder's, for providers that need them (Flutterwave in Ghana). */
+  createReservedAccount(input: { reference: string; email: string; name: string; currency: string; bvn?: string; firstName?: string; lastName?: string; phone?: string }): Promise<ReservedAccountDetails[]>;
 }
 
 export type TransferResult = { status: 'paid' | 'failed' | 'pending'; providerTransferId: string; fee: bigint; failureReason?: string; reference?: string };

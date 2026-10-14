@@ -31,6 +31,12 @@ class CreateTopUpDto {
   currency?: string;
 }
 
+class ReservedAccountsDto {
+  @ApiPropertyOptional({ description: "Ghana: the phone number the bank opens the account with (+233…). Defaults to the owner's verified phone.", example: '+233241234567' })
+  @IsOptional() @Matches(/^[+\d][\d ]{8,15}$/, { message: 'phone must be a phone number' })
+  phone?: string;
+}
+
 class SimulateTopUpDto {
   @ApiProperty({ enum: ['succeeded', 'failed'] })
   @IsIn(['succeeded', 'failed'])
@@ -121,14 +127,14 @@ export class PaymentsController {
   @ApiOperation({
     summary: 'Create reserved bank accounts',
     description:
-      'Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business and BitoCard to switch them on for you; in Nigeria the owner must pass the BVN check first (`POST /v1/account/bvn`), whose BVN the bank uses.',
+      'Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business and BitoCard to switch them on for you; in Nigeria the owner must pass the BVN check first (`POST /v1/account/bvn`), whose BVN the bank uses; in Ghana the owner must pass the identity check, and the bank needs a phone number (`phone`, else the owner\'s verified one).',
   })
   @Scopes('wallet:write')
   @Post('reserved-accounts')
-  async createReservedAccounts(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+  async createReservedAccounts(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: ReservedAccountsDto) {
     const resellerId = resellerOf(caller);
     const owner = await this.payments.contactFor(resellerId, caller.kind === 'session' ? caller.userId : null);
-    return this.payments.createReservedAccounts(resellerId, mode, owner);
+    return this.payments.createReservedAccounts(resellerId, mode, owner, body);
   }
 
   @ApiOperation({ summary: 'Simulate a bank transfer into a reserved account (test mode)' })

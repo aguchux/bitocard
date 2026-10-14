@@ -272,7 +272,7 @@ export class CustomerAccountController {
     return this.customers.verifyEmail(caller.customer, body.code);
   }
 
-  /** The customer's identity check for a market (BVN in Nigeria, Didit elsewhere), where buying needs one. */
+  /** The customer's identity check for a market (BitoCard Verify across Africa, Didit elsewhere), where buying needs one. */
   @UseGuards(CustomerGuard)
   @Get('verification')
   async verification(@CurrentCustomer() caller: CustomerCaller, @Query() query: CountryQueryDto) {
@@ -281,7 +281,7 @@ export class CustomerAccountController {
     const seller = await this.stores.sellerFor(caller.customer, query.country);
     const verified = await this.identity.isCustomerVerified(seller.id, mode, caller.customer.id);
     const latest = verified ? null : await this.identity.customerVerification(seller.id, mode, caller.customer.id).catch(() => null);
-    return { object: 'customer_verification_status' as const, country: seller.country, verified, latest };
+    return { object: 'customer_verification_status' as const, country: seller.country, provider: await this.identity.providerFor(seller.country), verified, latest };
   }
 
   @UseGuards(CustomerGuard)
@@ -289,7 +289,7 @@ export class CustomerAccountController {
   async startVerification(@CurrentCustomer() caller: CustomerCaller, @Body() body: VerificationDto) {
     const store = caller.customer.store;
     const seller = await this.stores.seller(store, body.country);
-    return this.identity.startCustomerVerification(seller.id, this.stores.mode(store), caller.customer.id, { ...body, country: seller.country! });
+    return this.identity.startCustomerVerification(seller.id, this.stores.mode(store), caller.customer.id, { ...body, country: seller.country! }, { storeId: store.id });
   }
 }
 

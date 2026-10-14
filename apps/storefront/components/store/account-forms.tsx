@@ -243,13 +243,16 @@ export function PasswordForm() {
   );
 }
 
-export function VerificationForm({ country, countryName }: { country: string; countryName: string }) {
+export function VerificationForm({ country, countryName, provider }: { country: string; countryName: string; provider?: "bitocard" | "didit" }) {
   const [state, action, pending] = useActionState(startVerification, empty);
   const [consent, setConsent] = useState(false);
-  const nigeria = country === "NG";
+  // BitoCard Verify needs no BVN; the BVN check is asked only where it does not run.
+  const ours = provider === "bitocard";
+  const nigeria = country === "NG" && !ours;
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="country" value={country} />
+      {provider ? <input type="hidden" name="provider" value={provider} /> : null}
       <FormMessage state={state} />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="First name" name="first_name" autoComplete="given-name" required state={state} />
@@ -266,6 +269,11 @@ export function VerificationForm({ country, countryName }: { country: string; co
           state={state}
           hint="Your 11-digit Bank Verification Number. You approve the check on your bank’s page; we never store your BVN."
         />
+      ) : ours ? (
+        <div className="space-y-2 text-sm text-slate-600">
+          <p>{`We will take you to BitoCard Verify to photograph an ID document from ${countryName}, take a selfie and make two short movements. It takes about five minutes.`}</p>
+          <p>BitoCard reviews your documents. If this store is a registered business that BitoCard has verified, its team may review them instead. They are stored encrypted and never made public.</p>
+        </div>
       ) : (
         <p className="text-sm text-slate-600">We will take you to our verification partner to photograph an ID document and take a selfie, for {countryName}.</p>
       )}

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
+import { IdentityProvider } from "./identity-provider";
 import { PaymentMethods } from "./payment-methods";
 import { TaxRateCard } from "./tax-rate";
 
@@ -137,6 +138,8 @@ function Markets() {
               </Notice>
             </div>
           ) : null}
+          <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Identity checks</h3>
+          <IdentityProvider code={country.code} country={country.name} provider={country.identity_provider} editable={editable} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Tax</h3>
           <TaxRateCard key={`${country.code}:${rate?.updated_at ?? ""}`} country={country.name} code={country.code} rate={rate ?? null} editable={can(admin, "finance")} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Payment methods</h3>

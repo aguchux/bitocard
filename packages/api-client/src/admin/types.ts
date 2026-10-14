@@ -375,8 +375,12 @@ export type Country = {
   markup_cap_percent: number | null;
   payout_hold_days: number;
   min_withdrawal_minor: number;
+  /** Who runs identity checks here: BitoCard Verify (Africa by default) or Didit. Missing on older API versions. */
+  identity_provider?: IdentityProvider;
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;
 };
+
+export type IdentityProvider = 'bitocard' | 'didit';
 
 /** Where a setting's value comes from: set in the admin app, the API's environment, the built-in default, or nowhere. */
 export type IntegrationSource = 'admin' | 'environment' | 'default' | 'unset';

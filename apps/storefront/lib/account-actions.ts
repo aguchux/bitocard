@@ -155,14 +155,18 @@ export async function simulateCheckout(form: FormData) {
 
 type Verification = { url?: string | null; status: string };
 
-/** Starts the identity check (BVN in Nigeria, an ID check elsewhere) and sends the customer to it. */
+/**
+ * Starts the identity check and sends the customer to it: BitoCard Verify (verify.bitocard.com) in its countries, no
+ * BVN asked; else the BVN check in Nigeria and the identity partner elsewhere. It returns to this store's own page.
+ */
 export async function startVerification(_state: FormState, form: FormData): Promise<FormState> {
   const country = text(form, "country");
+  const ours = text(form, "provider") === "bitocard";
   const result = await customerApi<Verification>("POST", "/v1/store/account/verification", {
     country,
     first_name: text(form, "first_name"),
     last_name: text(form, "last_name"),
-    bvn: text(form, "bvn") || undefined,
+    bvn: ours ? undefined : text(form, "bvn") || undefined,
     consent: form.get("consent") === "on",
     redirect_url: `${await siteOrigin()}/account/verification?country=${encodeURIComponent(country)}`,
   });

@@ -45,6 +45,7 @@ const integrationKeyList = [
   'DASHBOARD_URL',
   'PAYMENT_RETURN_URL',
   'STOREFRONT_URL',
+  'VERIFY_URL',
   'ALERT_EMAIL',
   'EMAIL_FROM',
   'RESEND_API_KEY',
@@ -115,6 +116,12 @@ const integrationKeyList = [
   'SPACES_ENDPOINT',
   'SPACES_PUBLIC_URL',
   'SPACES_ROOT',
+  'KYC_SPACES_KEY',
+  'KYC_SPACES_SECRET',
+  'KYC_SPACES_BUCKET',
+  'KYC_SPACES_REGION',
+  'KYC_SPACES_ENDPOINT',
+  'KYC_SPACES_ROOT',
 ] as const satisfies ReadonlyArray<keyof AppConfig>;
 
 export type IntegrationKey = (typeof integrationKeyList)[number];
@@ -141,6 +148,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     fields: [
       field('DASHBOARD_URL', 'Reseller dashboard address', { kind: 'url', help: 'Links in emails point here.' }),
       field('STOREFRONT_URL', 'Store address', { kind: 'url', help: 'BitoCard\'s store. Bundled brand logos are served from it (/brand-icons/). Default: https://bitocard.com' }),
+      field('VERIFY_URL', 'BitoCard Verify address', { kind: 'url', help: 'Where people complete identity checks in Verify countries. Default: https://verify.bitocard.com' }),
       field('PAYMENT_RETURN_URL', 'Payment return address', { kind: 'url', help: 'Where a payment page returns the payer when the caller gives none.' }),
       field('ALERT_EMAIL', 'Alerts email', { kind: 'email', help: 'Operational alerts, for example conversions paused.' }),
     ],
@@ -189,6 +197,20 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       field('SPACES_ENDPOINT', 'API address', { kind: 'url', help: 'Default: https://<region>.digitaloceanspaces.com' }),
       field('SPACES_PUBLIC_URL', 'Public address', { kind: 'url', help: 'The CDN endpoint or custom domain files are served from, for example https://media.bitocard.com. Default: the bucket address.' }),
       field('SPACES_ROOT', 'Top folder', { help: 'Everything is stored under this folder, so environments can share a bucket. Default: bitocard' }),
+    ],
+  },
+  {
+    id: 'kyc_storage',
+    name: 'Identity documents (DigitalOcean Spaces)',
+    description:
+      'BitoCard Verify’s ID photos, selfies, liveness frames and business documents. Use a private bucket of its own (never the public media bucket), in the US with the database. Files are encrypted by the API before they are stored and only ever read back through the API by reviewers. Verify cannot take uploads until the key, secret and bucket are set.',
+    fields: [
+      field('KYC_SPACES_KEY', 'Access key', { required: true, help: 'A Spaces access key limited to this private bucket (DigitalOcean > Spaces Object Storage > Access Keys).' }),
+      secret('KYC_SPACES_SECRET', 'Secret key'),
+      field('KYC_SPACES_BUCKET', 'Bucket', { required: true, help: 'A private bucket used for nothing else: no public files, no CDN, no CORS rule.' }),
+      field('KYC_SPACES_REGION', 'Region', { help: 'Default: nyc3 (keep it in the US with the database).' }),
+      field('KYC_SPACES_ENDPOINT', 'API address', { kind: 'url', help: 'Default: https://<region>.digitaloceanspaces.com' }),
+      field('KYC_SPACES_ROOT', 'Top folder', { help: 'Default: bitocard' }),
     ],
   },
   {

@@ -22,6 +22,8 @@ before(async () => {
   server = await startApp({ env: { ...didit.env, ...flutterwave.env, CRON_SECRET: 'cron-secret', EVENTS_SETTLE_SECONDS: '0' } });
   admin = await adminClient(server);
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  // These tests are about Didit: route every market to it (African markets use BitoCard Verify by default).
+  await prisma.country.updateMany({ data: { identityProvider: 'didit' } });
   email = server.app.get((await import('../dist/notifications/email.service.js')).EmailService);
 });
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { kycDeclineReasons } from "@bitocard/api-client/kyc";
 import { VerificationForm } from "@/components/store/account-forms";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
@@ -9,7 +10,12 @@ import { storeNavigation } from "@/lib/navigation";
 
 export const metadata: Metadata = { title: "Identity check", robots: { index: false, follow: false } };
 
-type Status = { verified: boolean; latest: { status: string; reason: string | null; url: string | null } | null };
+/** `provider`: BitoCard Verify (verify.bitocard.com, African markets) or the identity partner elsewhere. */
+type Status = { verified: boolean; provider?: "bitocard" | "didit"; latest: { status: string; reason: string | null; url: string | null } | null };
+
+/** A declined check's reason in words (BitoCard Verify's codes, and the older ones). */
+const reasonText = (reason: string) =>
+  kycDeclineReasons[reason as keyof typeof kycDeclineReasons] ?? ({ not_verified: "We could not confirm your identity", name_mismatch: "The name did not match", expired: "The check was not finished in time" } as Record<string, string>)[reason] ?? reason;
 
 /** The customer's identity check for their country: needed once before buying some products in some countries. */
 export default async function VerificationPage({ searchParams }: { searchParams: Promise<{ country?: string }> }) {
@@ -48,15 +54,15 @@ export default async function VerificationPage({ searchParams }: { searchParams:
             <ShieldCheck className="size-5" aria-hidden="true" /> You are verified for {name}.
           </p>
         ) : status?.ok && status.data.latest?.status === "in_review" ? (
-          <p className="text-slate-700">Your check is being reviewed. We will let you know by email.</p>
+          <p className="text-slate-700">Your check is being reviewed by a person. We will let you know by email.</p>
         ) : status?.ok && status.data.latest?.status === "in_progress" && status.data.latest.url ? (
           <a href={status.data.latest.url} className="inline-flex min-h-12 items-center rounded-xl bg-[#ff2382] px-5 font-semibold text-white">
             Continue your check
           </a>
         ) : (
           <>
-            {status?.ok && status.data.latest?.reason ? <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your last check did not pass: {status.data.latest.reason}</p> : null}
-            <VerificationForm country={country} countryName={name} />
+            {status?.ok && status.data.latest?.reason ? <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your last check did not pass: {reasonText(status.data.latest.reason)}.</p> : null}
+            <VerificationForm country={country} countryName={name} provider={status?.ok ? status.data.provider : undefined} />
           </>
         )}
       </section>

@@ -1431,6 +1431,7 @@
                       "currency": "GHS",
                       "reseller_signup": true,
                       "reserved_accounts": true,
+                      "identity_provider": "bitocard",
                       "markup_cap_percent": 50,
                       "payout_hold_days": 15,
                       "min_withdrawal_minor": 15000,
@@ -1460,6 +1461,7 @@
                       "currency": "KES",
                       "reseller_signup": true,
                       "reserved_accounts": false,
+                      "identity_provider": "bitocard",
                       "markup_cap_percent": 50,
                       "payout_hold_days": 15,
                       "min_withdrawal_minor": 130000,
@@ -1489,6 +1491,7 @@
                       "currency": "NGN",
                       "reseller_signup": true,
                       "reserved_accounts": true,
+                      "identity_provider": "bitocard",
                       "markup_cap_percent": 50,
                       "payout_hold_days": 15,
                       "min_withdrawal_minor": 1500000,
@@ -1570,6 +1573,7 @@
                   "currency": "NGN",
                   "reseller_signup": true,
                   "reserved_accounts": true,
+                  "identity_provider": "bitocard",
                   "markup_cap_percent": 50,
                   "payout_hold_days": 15,
                   "min_withdrawal_minor": 1500000,
@@ -8905,7 +8909,7 @@
         "x-bitocard-auth": "api_key"
       },
       "post": {
-        "description": "Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business and BitoCard to switch them on for you; in Nigeria the owner must pass the BVN check first (`POST /v1/account/bvn`), whose BVN the bank uses.",
+        "description": "Where your country offers them. Asking again returns the existing accounts. Live accounts need a verified business and BitoCard to switch them on for you; in Nigeria the owner must pass the BVN check first (`POST /v1/account/bvn`), whose BVN the bank uses; in Ghana the owner must pass the identity check, and the bank needs a phone number (`phone`, else the owner's verified one).",
         "operationId": "PaymentsController_createReservedAccounts",
         "parameters": [
           {
@@ -8918,6 +8922,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservedAccountsDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Your reserved bank accounts: newly opened, or the existing ones if you already have them.",
@@ -8958,6 +8972,25 @@
                       "created_at": "2026-10-02T14:30:00.000Z"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
                 }
               }
             }
@@ -14518,6 +14551,10 @@
                 },
                 "example": {
                   "object": "reseller_verification",
+                  "provider": "bitocard",
+                  "kind": "kyb",
+                  "business_type": "registered",
+                  "kyb_verified": true,
                   "reseller_status": "active",
                   "verified": true,
                   "verified_at": "2026-10-02T14:05:00.000Z",
@@ -14619,11 +14656,15 @@
                 },
                 "example": {
                   "object": "reseller_verification",
+                  "provider": "bitocard",
+                  "kind": "kyb",
+                  "business_type": null,
+                  "kyb_verified": false,
                   "reseller_status": "pending",
                   "verified": false,
                   "verified_at": null,
                   "status": "in_progress",
-                  "url": "https://verify.example.com/session/3f9a1c2e",
+                  "url": "https://verify.bitocard.com/s#t=bkh_3f9a1c2e",
                   "reason": null,
                   "started_at": "2026-10-06T10:00:00.000Z"
                 }
@@ -24509,6 +24550,16 @@
           "outcome"
         ]
       },
+      "ReservedAccountsDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Ghana: the phone number the bank opens the account with (+233…). Defaults to the owner's verified phone.",
+            "example": "+233241234567"
+          }
+        }
+      },
       "SimulateDepositDto": {
         "type": "object",
         "properties": {
@@ -27701,6 +27752,10 @@
         "description": "The business owner’s identity check (ID document and face check), needed before the account goes live.",
         "required": [
           "object",
+          "provider",
+          "kind",
+          "business_type",
+          "kyb_verified",
           "reseller_status",
           "verified",
           "verified_at",
@@ -27715,6 +27770,38 @@
             "type": "string",
             "description": "Always `reseller_verification`.",
             "const": "reseller_verification"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Who checks the owner: `bitocard` (BitoCard Verify, with KYB of the business) in African countries, `didit` elsewhere.",
+            "enum": [
+              "bitocard",
+              "didit"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "`kyb` when the business is checked too (BitoCard Verify), else `kyc`.",
+            "enum": [
+              "kyc",
+              "kyb"
+            ]
+          },
+          "business_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`registered` business or `unregistered`, once BitoCard Verify has approved it; null before.",
+            "enum": [
+              "registered",
+              "unregistered",
+              null
+            ]
+          },
+          "kyb_verified": {
+            "type": "boolean",
+            "description": "Whether BitoCard has verified the business (KYB)."
           },
           "reseller_status": {
             "type": "string",
@@ -27866,6 +27953,7 @@
           "currency",
           "reseller_signup",
           "reserved_accounts",
+          "identity_provider",
           "markup_cap_percent",
           "payout_hold_days",
           "min_withdrawal_minor",
@@ -27899,6 +27987,14 @@
           "reserved_accounts": {
             "type": "boolean",
             "description": "Whether reserved bank accounts (wallet top-ups by bank transfer) are offered here."
+          },
+          "identity_provider": {
+            "type": "string",
+            "description": "Who checks identities here: `bitocard` (BitoCard Verify, verify.bitocard.com) or `didit`.",
+            "enum": [
+              "bitocard",
+              "didit"
+            ]
           },
           "markup_cap_percent": {
             "type": "integer",
@@ -34328,6 +34424,7 @@
               "plan.ended",
               "webhook_endpoint.disabled",
               "verification.updated",
+              "kyc.customer_submitted",
               "team.member_joined",
               "startup_allowance.granted",
               "startup_allowance.revoked",
@@ -34505,6 +34602,7 @@
               "plan.ended",
               "webhook_endpoint.disabled",
               "verification.updated",
+              "kyc.customer_submitted",
               "team.member_joined",
               "startup_allowance.granted",
               "startup_allowance.revoked",

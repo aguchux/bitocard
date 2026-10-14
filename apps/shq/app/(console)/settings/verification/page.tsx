@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, RotateCw, ShieldCheck } from "lucide-react";
 import { Button, Card, CardHeader, errorMessage, formatDateTime, KeyValue, Notice, PageHeader, QueryView, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { kycDeclineReasons } from "@bitocard/api-client/kyc";
 import { type Verification, useAccountVerificationQuery, useStartAccountVerificationMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { useReseller } from "@/components/reseller";
@@ -13,6 +14,13 @@ const reasons: Record<string, string> = {
   bvn_consent_declined: "Sharing your BVN record was declined.",
   expired: "The check was not finished in time. Start a new one.",
 };
+
+/** The business as BitoCard Verify sees it. */
+function businessLabel(type: "unregistered" | "registered" | null, verified: boolean) {
+  if (type === "registered") return verified ? "Registered, verified: you can review your customers’ ID checks" : "Registered, not verified yet";
+  if (type === "unregistered") return "Not registered: BitoCard reviews your customers’ ID checks";
+  return "Not chosen yet";
+}
 
 /** The identity provider's page, on another site. */
 function goTo(url: string) {
@@ -37,7 +45,7 @@ function Outcome({ check }: { check: Verification }) {
     case "in_review":
       return <Notice tone="amber" title="Being reviewed">Your check needs a closer look by our team. We will email you the outcome.</Notice>;
     case "declined":
-      return <Notice tone="red" title="Check not passed">{reasons[check.reason ?? "not_verified"] ?? reasons.not_verified} You can start a new check.</Notice>;
+      return <Notice tone="red" title="Check not passed">{reasons[check.reason ?? "not_verified"] ?? (check.reason && check.reason in kycDeclineReasons ? `${kycDeclineReasons[check.reason as keyof typeof kycDeclineReasons]}.` : reasons.not_verified)} You can start a new check.</Notice>;
     case "expired":
       return <Notice tone="grey" title="Check expired">{reasons.expired}</Notice>;
     default:
@@ -65,23 +73,41 @@ function StartCheck({ check }: { check: Verification }) {
     );
   }
 
+  const ours = check.provider === "bitocard";
   return (
     <div className="space-y-4">
       <div className="space-y-2 text-sm text-ink">
         <p className="font-semibold">What happens</p>
-        <ul className="list-disc space-y-1 pl-5 text-muted">
-          <li>You go to our identity partner&apos;s secure page to photograph your ID document and take a selfie.</li>
-          <li>Your selfie is compared with the photo on your document. This face check uses biometric data, which is sensitive personal data.</li>
-          <li>BitoCard keeps only the outcome, your verified name and your document&apos;s country, never the images or document number.</li>
-        </ul>
+        {ours ? (
+          <ul className="list-disc space-y-1 pl-5 text-muted">
+            <li>You go to BitoCard Verify (verify.bitocard.com) and say whether your business is registered.</li>
+            <li>
+              A registered business uploads its registration certificate, a proof of address from the last three months and a document naming its directors or owners. An unregistered business
+              checks only the owner.
+            </li>
+            <li>You photograph your ID, take a selfie and follow two short movements (the liveness check). Your face is compared with your ID: this uses biometric data, which is sensitive personal data.</li>
+            <li>A person at BitoCard reviews everything; nothing is decided automatically. Your documents are stored encrypted and never made public.</li>
+            <li>Once your registered business is verified, you can review your own customers’ ID checks.</li>
+          </ul>
+        ) : (
+          <ul className="list-disc space-y-1 pl-5 text-muted">
+            <li>You go to our identity partner&apos;s secure page to photograph your ID document and take a selfie.</li>
+            <li>Your selfie is compared with the photo on your document. This face check uses biometric data, which is sensitive personal data.</li>
+            <li>BitoCard keeps only the outcome, your verified name and your document&apos;s country, never the images or document number.</li>
+          </ul>
+        )}
       </div>
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
       <label className="flex items-start gap-3 rounded-xl border border-line p-4 text-sm">
         <input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} className="mt-0.5 size-5 shrink-0 accent-brand-500" />
-        <span>I agree to the identity check, including the face check that uses my biometric data, as described in the privacy notice.</span>
+        <span>
+          {ours
+            ? "I agree to BitoCard checking my identity and my business, including the face check that uses my biometric data, as described in the privacy notice."
+            : "I agree to the identity check, including the face check that uses my biometric data, as described in the privacy notice."}
+        </span>
       </label>
       <Button icon={<ShieldCheck className="size-4" aria-hidden />} loading={state.isLoading} disabled={!consent} onClick={begin}>
-        Start the identity check
+        {ours ? "Start BitoCard Verify" : "Start the identity check"}
       </Button>
     </div>
   );
@@ -105,7 +131,7 @@ export default function VerificationPage() {
         </Button>
       }
     >
-      <PageHeader title="Identity check" description="We verify the business owner before the account can take live orders." />
+      <PageHeader title="Identity check" description="We verify the business owner (and, in some countries, the business) before the account can take live orders." />
       <QueryView query={verification} message={error => errorMessage(error, "Could not load your identity check.")} loading={<Skeleton className="h-64 w-full" />}>
         {data => (
           <Card>
@@ -116,6 +142,13 @@ export default function VerificationPage() {
                 items={[
                   { label: "Account", value: <StatusBadge status={data.reseller_status} /> },
                   { label: data.verified ? "Verified" : "Started", value: formatDateTime(data.verified ? data.verified_at : data.started_at) },
+                  ...(data.provider === "bitocard"
+                    ? [
+                        { label: "Checked by", value: "BitoCard Verify" },
+                        { label: "Check", value: data.kind === "kyb" ? "Business and owner" : "Owner’s identity" },
+                        ...(data.kind === "kyb" ? [{ label: "Business", value: businessLabel(data.business_type ?? null, data.kyb_verified ?? false) }] : []),
+                      ]
+                    : []),
                 ]}
               />
               {owner && !data.verified && data.status !== "in_review" ? (

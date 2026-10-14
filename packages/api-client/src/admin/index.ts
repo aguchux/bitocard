@@ -10,6 +10,7 @@ import type {
   AuditEntry,
   Country,
   FeatureRule,
+  IdentityProvider,
   Integration,
   IntegrationTest,
   List,
@@ -285,6 +286,11 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ country, ...body }) => ({ url: `/v1/admin/tax-rates/${country}`, method: 'PUT', body }),
       invalidatesTags: ['Country', 'Activity'],
     }),
+    /** Country-wide settings, such as who runs its identity checks (`identity_provider`). */
+    updateCountry: build.mutation<Country, { code: string; identity_provider?: IdentityProvider }>({
+      query: ({ code, ...body }) => ({ url: `/v1/admin/countries/${code}`, method: 'PATCH', body }),
+      invalidatesTags: ['Country', 'Activity'],
+    }),
     /** Shown at once; the saved country replaces the cached one, so nothing is refetched. */
     updateCountryCategory: build.mutation<Country, { code: string; category: ProductCategory; enabled?: boolean; customer_verification?: boolean; taxable?: boolean }>({
       query: ({ code, category, ...body }) => ({ url: `/v1/admin/countries/${code}/categories/${category}`, method: 'PUT', body }),
@@ -403,6 +409,7 @@ export const {
   useSwitchesQuery,
   useSetSwitchMutation,
   useCountriesQuery,
+  useUpdateCountryMutation,
   useUpdateCountryCategoryMutation,
   useTaxRatesQuery,
   useSetTaxRateMutation,
@@ -418,3 +425,4 @@ export * from './storefront';
 export * from './stock';
 export * from './payment-methods';
 export * from './crypto';
+export * from './kyc';

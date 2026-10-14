@@ -12,3 +12,4 @@ export { amountToMinor, bpsToPercent, percentToBps, PriceBreakdown, PricingSchem
 export { DisputeReply, DisputeThread, disputeActionLabels, disputeKindLabels, disputeOutcomeLabels, disputeTopicLabels, type DisputeThreadMessage } from './ui/disputes';
 export { searchDelayMs, useDebouncedValue } from './ui/hooks';
 export { StoreCustomersTable, StoreCustomerView, type StoreCustomerDetailView, type StoreCustomerPurchase, type StoreCustomerRow } from './ui/store-customers';
+export { ImageViewer, KycCaseActions, KycCaseView, kycCanDecide, useKycDocuments, type KycDocumentFetcher } from './ui/kyc-review';

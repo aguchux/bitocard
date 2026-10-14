@@ -37,6 +37,13 @@ export default function StorefrontCustomerPage() {
             busy={updateState.isLoading || unlockState.isLoading || signOutState.isLoading}
             error={failed ? errorMessage(failed) : null}
             storeChecksOff={settings.data ? !settings.data.customer_verification : false}
+            identityReview={
+              data.identity_case ? (
+                <AppLink href={`/verifications/verify/${data.identity_case.id}`} className="text-sm font-semibold text-brand-600 hover:underline">
+                  Open the BitoCard Verify case
+                </AppLink>
+              ) : null
+            }
             onUpdate={change => void update({ id, ...change })}
             onUnlock={() => void unlock(id)}
             onSignOut={() => void signOut(id)}

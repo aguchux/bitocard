@@ -40,7 +40,7 @@ export const configSchema = z.object({
    * (`<store>.bitocard.com`), so any script on one could act as a signed-in reseller. The storefront calls the API from
    * its server and needs no entry.
    */
-  ALLOWED_ORIGINS: list.prefault('https://shq.bitocard.com,https://admin.bitocard.com,https://docs.bitocard.com'),
+  ALLOWED_ORIGINS: list.prefault('https://shq.bitocard.com,https://admin.bitocard.com,https://docs.bitocard.com,https://verify.bitocard.com'),
   /** Cookie domain shared by the BitoCard apps (.bitocard.com in production); unset means host-only cookies. */
   SESSION_COOKIE_DOMAIN: z.string().optional(),
   /** Secure cookies everywhere except plain-HTTP local development and tests. */
@@ -92,6 +92,8 @@ export const configSchema = z.object({
   DASHBOARD_URL: z.string().url().default('https://shq.bitocard.com'),
   /** BitoCard's store (bitocard.com); bundled brand icons are served from it at /brand-icons/<slug>.svg. */
   STOREFRONT_URL: z.string().url().default('https://bitocard.com'),
+  /** BitoCard Verify, where people complete identity checks in Verify countries. */
+  VERIFY_URL: z.string().url().default('https://verify.bitocard.com'),
 
   // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),
@@ -198,6 +200,13 @@ export const configSchema = z.object({
   SPACES_PUBLIC_URL: z.string().url().optional(),
   /** Top folder for everything this deployment stores, so environments sharing a bucket never mix. */
   SPACES_ROOT: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/).default('bitocard'),
+  /** BitoCard Verify's identity documents: a private bucket of their own, never the public media bucket. */
+  KYC_SPACES_KEY: z.string().optional(),
+  KYC_SPACES_SECRET: z.string().optional(),
+  KYC_SPACES_BUCKET: z.string().optional(),
+  KYC_SPACES_REGION: z.string().default('nyc3'),
+  KYC_SPACES_ENDPOINT: z.string().url().optional(),
+  KYC_SPACES_ROOT: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/).default('bitocard'),
 
   // Identity checks (Didit): reseller owners everywhere, customers outside Nigeria. Unset API key switches Didit off.
   DIDIT_API_KEY: z.string().optional(),

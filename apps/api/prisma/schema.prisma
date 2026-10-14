@@ -419,6 +419,15 @@ model Reseller {
   identityWaiverReason  String?                @map("identity_waiver_reason")
   /// The owner's BVN was checked with Flutterwave and its name matched the verified owner (Nigeria; reserved accounts).
   bvnVerifiedAt         DateTime?              @map("bvn_verified_at")
+  /// KYB (BitoCard Verify): unregistered (a person trading) or a registered business; null until the owner chooses.
+  businessType          ResellerBusinessType?  @map("business_type")
+  /// The registered business's details, set when its KYB is approved (registered businesses only).
+  registeredName        String?                @map("registered_name")
+  registrationNumber    String?                @map("registration_number")
+  businessAddress       String?                @map("business_address")
+  /// When BitoCard approved the business's KYB (registered businesses: documents checked). Registered, KYB-verified,
+  /// active resellers review their own customers' identity checks.
+  kybVerifiedAt         DateTime?              @map("kyb_verified_at")
   /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
   planCode              String                 @default("standard") @map("plan_code")
   createdAt             DateTime               @default(now()) @map("created_at")
@@ -452,6 +461,7 @@ model Reseller {
   feeCharges            FeeCharge[]
   webhookEndpoints      WebhookEndpoint[]
   verifications         IdentityVerification[]
+  kycCases              KycCase[]
   mediaAssets           MediaAsset[]
   listings              ResellerListing[]
   /// BitoCard's own store (bitocard.com): one house account per market sells to its retail customers, and one with no
@@ -548,6 +558,8 @@ model Country {
   payoutHoldDays     Int               @default(15) @map("payout_hold_days")
   /// Smallest withdrawal, in the currency's minor units (for example kobo).
   minWithdrawalMinor BigInt            @map("min_withdrawal_minor")
+  /// Who checks identities here: `bitocard` (BitoCard Verify, every African country) or `didit` (elsewhere).
+  identityProvider   String            @default("didit") @map("identity_provider")
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
   categories         CountryCategory[]
@@ -1785,6 +1797,7 @@ model IdentityVerification {
   lastCheckedAt     DateTime?           @map("last_checked_at")
   createdAt         DateTime            @default(now()) @map("created_at")
   reseller          Reseller            @relation(fields: [resellerId], references: [id])
+  kycCase           KycCase?
 
   @@unique([provider, providerReference])
   @@index([resellerId, subject, mode, customerReference, createdAt])
@@ -2914,4 +2927,114 @@ model Spin {
   @@index([customerId, createdAt])
   @@index([mode, createdAt])
   @@map("spins")
+}
+
+enum ResellerBusinessType {
+  unregistered
+  registered
+}
+
+enum KycCaseStatus {
+  /// Being filled in by the applicant.
+  draft
+  /// Waiting for a reviewer.
+  submitted
+  approved
+  declined
+  /// The reviewer asked for some items again (`resubmit_items`); the applicant fills them in and submits again.
+  resubmit
+}
+
+/// BitoCard Verify (verify.bitocard.com): one person's (KYC) or business's (KYB) application behind an identity check.
+/// Its decision is applied to the identity check (`verification_id`), so every gate reads the check as before.
+/// Documents are stored encrypted in a private bucket (`kyc_documents`); typed ID numbers are encrypted, with an HMAC
+/// fingerprint to find the same ID on other cases.
+model KycCase {
+  id                 String               @id @default(uuid()) @db.Uuid
+  verificationId     String               @unique @map("verification_id") @db.Uuid
+  subject            VerificationSubject
+  /// kyc (a person) or kyb (a reseller's business: unregistered, or registered with its documents).
+  kind               String
+  mode               LedgerMode
+  country            String               @db.Char(2)
+  /// The reseller verified (KYB), or the customer's seller (customer checks).
+  resellerId         String               @map("reseller_id") @db.Uuid
+  /// The reseller's own reference for the customer (customer checks; a store customer's id on hosted stores).
+  customerReference  String?              @map("customer_reference")
+  storeId            String?              @map("store_id") @db.Uuid
+  status             KycCaseStatus        @default(draft)
+  consentAt          DateTime?            @map("consent_at")
+  businessType       ResellerBusinessType? @map("business_type")
+  registeredName     String?              @map("registered_name")
+  registrationNumber String?              @map("registration_number")
+  businessAddress    String?              @map("business_address")
+  idType             String?              @map("id_type")
+  /// Encrypted with ENCRYPTION_KEY; shown in full only to reviewers.
+  idNumberEncrypted  String?              @map("id_number_encrypted")
+  /// HMAC of country, ID type and number: the same ID on other cases.
+  idFingerprint      String?              @map("id_fingerprint")
+  fullName           String?              @map("full_name")
+  dateOfBirth        String?              @map("date_of_birth")
+  /// The liveness steps issued (codes), in order.
+  livenessSteps      String[]             @map("liveness_steps")
+  /// Who reviews it, fixed at submission: admin, or the customer's seller (registered and KYB-verified).
+  reviewer           String?
+  resubmitItems      String[]             @map("resubmit_items")
+  reason             String?
+  note               String?
+  verifiedName       String?              @map("verified_name")
+  decidedById        String?              @map("decided_by_id") @db.Uuid
+  /// admin or reseller.
+  decidedRealm       String?              @map("decided_realm")
+  returnUrl          String?              @map("return_url")
+  submittedAt        DateTime?            @map("submitted_at")
+  decidedAt          DateTime?            @map("decided_at")
+  /// When the documents are deleted (retention), null while it is open.
+  purgeAfter         DateTime?            @map("purge_after")
+  purgedAt           DateTime?            @map("purged_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+  verification       IdentityVerification @relation(fields: [verificationId], references: [id], onDelete: Restrict)
+  reseller           Reseller             @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  documents          KycDocument[]
+  sessions           KycSession[]
+
+  @@index([status, reviewer, submittedAt])
+  @@index([resellerId, subject, status])
+  @@index([idFingerprint])
+  @@index([purgeAfter])
+  @@map("kyc_cases")
+}
+
+/// One uploaded file of a case (ID sides, selfie, liveness frames, business documents), encrypted in the private bucket.
+model KycDocument {
+  id          String    @id @default(uuid()) @db.Uuid
+  caseId      String    @map("case_id") @db.Uuid
+  /// id_front, id_back, selfie, liveness_<step>_<frame>, business_registration, business_address, business_directors.
+  kind        String
+  objectKey   String    @map("object_key")
+  contentType String    @map("content_type")
+  size        Int
+  sha256      String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  case        KycCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, kind])
+  @@map("kyc_documents")
+}
+
+/// Links into verify.bitocard.com (single use, 30 minutes) and the app sessions they become (2 hours idle), by hash.
+model KycSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  caseId      String    @map("case_id") @db.Uuid
+  /// handoff (the link) or session (what the link was exchanged for).
+  kind        String
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  case        KycCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("kyc_sessions")
 }

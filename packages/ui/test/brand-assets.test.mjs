@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
 const root = new URL('../../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const apps = ['storefront', 'docs', 'legals', 'admin', 'shq'];
+const apps = ['storefront', 'docs', 'legals', 'admin', 'shq', 'verify'];
 
 /** Width, height and colour type from a PNG's header. */
 function png(path) {

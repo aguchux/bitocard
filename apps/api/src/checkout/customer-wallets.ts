@@ -216,11 +216,23 @@ export class CustomerWalletsService {
   }
 
   /** Opens the customer's own bank account number for the wallet (Flutterwave), where the market offers them. */
-  async createReservedAccounts(customer: CustomerWithStore, input: { bvn?: string }) {
+  async createReservedAccounts(customer: CustomerWithStore, input: { bvn?: string; phone?: string }) {
     this.requireConfirmed(customer);
     const context = await this.context(customer);
     await this.requireEnabled(context);
-    const accounts = await this.payments.createCustomerReservedAccounts({ customer, sellerId: context.seller.id, mode: context.mode, country: context.country, bvn: input.bvn });
+    // Ghana: the account is opened in the name the identity check verified, when there is one.
+    const verified =
+      context.country.code === 'GH'
+        ? await this.prisma.identityVerification.findFirst({ where: { resellerId: context.seller.id, mode: context.mode, subject: 'customer', customerReference: customer.id, status: 'approved' }, orderBy: { createdAt: 'desc' }, select: { verifiedName: true } })
+        : null;
+    const accounts = await this.payments.createCustomerReservedAccounts({
+      customer,
+      sellerId: context.seller.id,
+      mode: context.mode,
+      country: context.country,
+      bvn: input.bvn,
+      holder: { name: verified?.verifiedName ?? customer.name, phone: input.phone },
+    });
     return { object: 'list' as const, data: accounts.map(presentAccount) };
   }
 
@@ -309,6 +321,10 @@ class WalletQueryDto {
 class ReservedAccountDto {
   @IsOptional() @Matches(/^\d{11}$/, { message: 'bvn must be 11 digits' })
   bvn?: string;
+
+  /** Ghana: the phone number the bank opens the account with. */
+  @IsOptional() @Matches(/^[+\d][\d ]{8,15}$/, { message: 'phone must be a phone number' })
+  phone?: string;
 }
 
 class SimulateTopUpDto {

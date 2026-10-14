@@ -1,4 +1,4 @@
-import { AlertTriangle, Gift, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Gift, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'settings';
 
@@ -63,6 +63,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
     items: [
       { label: 'Needs review', href: '/verifications', icon: ListChecks },
       { label: 'All checks', href: '/verifications/all', icon: ShieldCheck },
+      { label: 'BitoCard Verify', href: '/verifications/verify', icon: ScanFace },
     ],
   },
   activity: { title: 'Activity', items: [{ label: 'Activity log', href: '/activity', icon: History }] },

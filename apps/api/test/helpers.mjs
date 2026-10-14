@@ -151,7 +151,7 @@ export async function fakeService(handler) {
     calls.push(call);
     const reply = await handler(call);
     res.writeHead(reply.status ?? 200, reply.headers ?? { 'content-type': 'application/json' });
-    res.end(typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body ?? {}));
+    res.end(typeof reply.body === 'string' || Buffer.isBuffer(reply.body) ? reply.body : JSON.stringify(reply.body ?? {}));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address();

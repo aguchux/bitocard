@@ -14,6 +14,14 @@ export type Verification = {
   /** `not_verified`, `name_mismatch`, `bvn_consent_declined` or `expired`. */
   reason: string | null;
   started_at: string | null;
+  /** Who runs the check: BitoCard Verify (verify.bitocard.com, in African countries) or Didit elsewhere. Missing on older API versions. */
+  provider?: 'bitocard' | 'didit';
+  /** `kyb` in BitoCard Verify countries: the business is checked too (registered businesses send their documents). */
+  kind?: 'kyc' | 'kyb';
+  /** Chosen in BitoCard Verify; null until then. */
+  business_type?: 'unregistered' | 'registered' | null;
+  /** A registered business whose documents BitoCard has approved: it can review its own customers' ID checks. */
+  kyb_verified?: boolean;
 };
 
 /** Nigeria: the owner's BVN check, needed before live reserved bank accounts (`/v1/account/bvn`). The BVN is never returned. */

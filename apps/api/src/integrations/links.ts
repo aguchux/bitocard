@@ -31,6 +31,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
     { label: 'MailerSend: API tokens', url: 'https://app.mailersend.com/api-tokens' },
   ],
   sms: [site('https://termii.com/'), docs('https://developers.termii.com/')],
+  kyc_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/how-to/manage-access/')],
   file_storage: [signUp('https://cloud.digitalocean.com/registrations/new'), keys('https://cloud.digitalocean.com/spaces/access_keys', 'Spaces access keys'), docs('https://docs.digitalocean.com/products/spaces/')],
   google: [keys('https://console.cloud.google.com/apis/credentials', 'Google Cloud credentials'), docs('https://developers.google.com/identity/protocols/oauth2/web-server')],
   flutterwave: [signUp('https://app.flutterwave.com/register'), keys('https://app.flutterwave.com/dashboard/settings/apis'), docs('https://developer.flutterwave.com/')],

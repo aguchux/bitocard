@@ -160,11 +160,18 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
     return reservedAccountCountries.has(country);
   }
 
-  async createReservedAccount(input: { reference: string; email: string; name: string; currency: string; bvn?: string }): Promise<ReservedAccountDetails[]> {
-    const res = await this.call<{ account_number: string; bank_name: string }>('/virtual-account-numbers', {
-      method: 'POST',
-      body: { email: input.email, is_permanent: true, bvn: input.bvn, tx_ref: input.reference, narration: input.name, currency: input.currency },
-    });
+  /**
+   * A permanent account number. Nigeria (NGN) sends the BVN. Ghana (GHS) takes no BVN but needs the holder's first and
+   * last name and phone number, and is enabled only for Ghanaian merchants unless Flutterwave switches it on
+   * (hi@flutterwavego.com). The narration (shown as the account's name) is at most 35 characters.
+   */
+  async createReservedAccount(input: { reference: string; email: string; name: string; currency: string; bvn?: string; firstName?: string; lastName?: string; phone?: string }): Promise<ReservedAccountDetails[]> {
+    const narration = input.name.slice(0, 35);
+    const body =
+      input.currency === 'GHS'
+        ? { currency: 'GHS', is_permanent: true, email: input.email, firstname: input.firstName, lastname: input.lastName, phonenumber: input.phone, tx_ref: input.reference, narration }
+        : { email: input.email, is_permanent: true, bvn: input.bvn, tx_ref: input.reference, narration, currency: input.currency };
+    const res = await this.call<{ account_number: string; bank_name: string }>('/virtual-account-numbers', { method: 'POST', body });
     return [{ bankName: res.data.bank_name, accountNumber: res.data.account_number, accountName: input.name }];
   }
 

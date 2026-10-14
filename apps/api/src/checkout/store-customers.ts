@@ -94,6 +94,11 @@ export class StoreCustomersService {
       disputes,
       /** The customer's wallet balances (spend only, never withdrawn), per mode and currency. */
       wallet: await this.wallets.balances(id),
+      /**
+       * Their latest BitoCard Verify check at this store: `reviewable` when the store's business reviews it (registered
+       * and KYB-verified) on verify.bitocard.com. Never its documents or details.
+       */
+      identity_case: await this.identityCase(storeId, id),
       purchases_list: checkouts.map(checkout => {
         const quote = quotes.find(row => row.id === checkout.quoteId);
         return {
@@ -165,6 +170,11 @@ export class StoreCustomersService {
     };
   }
 
+  private async identityCase(storeId: string, customerId: string) {
+    const found = await this.prisma.kycCase.findFirst({ where: { storeId, customerReference: customerId, status: { not: 'draft' } }, orderBy: { createdAt: 'desc' }, select: { id: true, status: true, reviewer: true } });
+    return found ? { id: found.id, status: found.status, reviewable: found.reviewer === 'reseller' } : null;
+  }
+
   async setHouseSettings(actorId: string | null, input: { customer_verification?: boolean; grace_days?: number | null; desktop_nav?: 'rail' | 'bottom' | null }) {
     const before = await this.houseSettings();
     await this.prisma.store.update({
@@ -178,8 +188,13 @@ export class StoreCustomersService {
 
   private async present(customers: Customer[]) {
     const ids = customers.map(customer => customer.id);
+    const storeId = customers[0]?.storeId;
+    const store = storeId ? await this.prisma.store.findUnique({ where: { id: storeId }, select: { id: true, resellerId: true, checkoutMode: true } }) : null;
+    // Checks count only under the store's seller (bitocard.com: its market accounts) and in the store's current mode.
+    const seller = store && store.id !== houseStoreId ? { resellerId: store.resellerId } : { reseller: { house: true } };
+    const mode = store && store.id !== houseStoreId ? store.checkoutMode : this.house.mode();
     const [checked, purchases] = await Promise.all([
-      this.prisma.identityVerification.findMany({ where: { subject: 'customer', customerReference: { in: ids }, status: 'approved' }, select: { customerReference: true } }),
+      this.prisma.identityVerification.findMany({ where: { subject: 'customer', customerReference: { in: ids }, status: 'approved', mode, ...seller }, select: { customerReference: true } }),
       this.prisma.checkout.groupBy({ by: ['customerId'], where: { customerId: { in: ids }, status: { in: [...paidStatuses] } }, _count: true }),
     ]);
     const passed = new Set(checked.map(row => row.customerReference));

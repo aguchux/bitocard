@@ -17,6 +17,8 @@ import { EventsService } from '../webhooks/events.service.js';
 import { DiditProvider } from './didit.provider.js';
 import { type CheckResult, namesMatch } from './providers.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { africanCountries } from '../kyc/catalogue.js';
+import { providerName as verifyProvider, VerifyLinks } from '../kyc/links.js';
 
 /** Statuses a provider (or an admin, for in_review) can still change. */
 const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];
@@ -24,6 +26,7 @@ const openStatuses: VerificationStatus[] = ['in_progress', 'in_review'];
 const reuseSessionMs = 24 * 3600 * 1000;
 /** Checks nobody finished are closed after this. */
 const expireAfterMs = 7 * 24 * 3600 * 1000;
+
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such verification.');
 const consentRequired = () =>
@@ -56,9 +59,18 @@ export function presentCustomerVerification(record: IdentityVerification) {
   };
 }
 
-function presentResellerVerification(record: IdentityVerification | null, reseller: { status: string; verifiedAt: Date | null }) {
+function presentResellerVerification(
+  record: IdentityVerification | null,
+  reseller: { status: string; verifiedAt: Date | null; businessType?: string | null; kybVerifiedAt?: Date | null },
+  provider: 'bitocard' | 'didit',
+) {
   return {
     object: 'reseller_verification' as const,
+    /** Who checks: BitoCard Verify (African countries: the business's KYB) or Didit. */
+    provider,
+    kind: provider === 'bitocard' ? ('kyb' as const) : ('kyc' as const),
+    business_type: reseller.businessType ?? null,
+    kyb_verified: Boolean(reseller.kybVerifiedAt),
     reseller_status: reseller.status,
     verified: reseller.verifiedAt !== null,
     verified_at: reseller.verifiedAt?.toISOString() ?? null,
@@ -110,6 +122,7 @@ export class IdentityService {
     private readonly email: EmailService,
     private readonly allowance: AllowanceService,
     private readonly inbox: InboxService,
+    private readonly verify: VerifyLinks,
   ) {
     this.diditClient = integrations.derive(config =>
       config.DIDIT_API_KEY && config.DIDIT_WORKFLOW_ID ? new DiditProvider(config.DIDIT_API_KEY, config.DIDIT_WORKFLOW_ID, config.DIDIT_API_URL, config.DIDIT_WEBHOOK_SECRET) : null,
@@ -129,12 +142,27 @@ export class IdentityService {
     return new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The identity check could not be started. Try again shortly.');
   }
 
+  /** Who checks identities in a country: the market's choice, else BitoCard Verify across Africa and Didit elsewhere. */
+  async providerFor(country: string | null | undefined): Promise<'bitocard' | 'didit'> {
+    const code = (country ?? '').toUpperCase();
+    const market = code ? await this.prisma.country.findUnique({ where: { code }, select: { identityProvider: true } }) : null;
+    if (market) return market.identityProvider === 'bitocard' ? 'bitocard' : 'didit';
+    return africanCountries.has(code) ? 'bitocard' : 'didit';
+  }
+
+  /** An open BitoCard Verify check gets a fresh single-use link (the last one may have been used or expired). */
+  private async freshLink(record: IdentityVerification) {
+    if (record.provider !== verifyProvider || record.status !== 'in_progress') return record;
+    const url = await this.verify.link(record.providerReference);
+    return this.prisma.identityVerification.update({ where: { id: record.id }, data: { url } });
+  }
+
   // -- Resellers -------------------------------------------------------------------------------------------------
 
   async resellerVerification(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const record = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
-    return presentResellerVerification(record, reseller);
+    return presentResellerVerification(record, reseller, await this.providerFor(reseller.country));
   }
 
   /** The business owner's check. Returns the Didit page to send them to; an unfinished session is reused for a day. */
@@ -144,10 +172,32 @@ export class IdentityService {
     if (reseller.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', 'Your identity is already verified.');
     const latest = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
     if (latest?.status === 'in_review') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_in_review', 'Your check is being reviewed. We will email you the outcome.');
-    if (latest?.status === 'in_progress' && latest.url && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentResellerVerification(latest, reseller);
+    const provider = await this.providerFor(reseller.country);
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (provider === 'bitocard') {
+      // BitoCard Verify: the business's KYB (an unregistered business is the owner's own check). An open case continues.
+      if (latest?.status === 'in_progress' && latest.provider === verifyProvider) return presentResellerVerification(await this.freshLink(latest), reseller, provider);
+      const caseId = this.verify.newCaseId();
+      const created = await this.prisma.identityVerification.create({
+        data: {
+          subject: 'reseller',
+          resellerId,
+          mode: 'live',
+          method: 'document',
+          provider: verifyProvider,
+          providerReference: caseId,
+          country: reseller.country ?? 'NG',
+          consentAt: new Date(),
+          expectedName: user.name,
+          requestedById: userId,
+        },
+      });
+      const url = await this.verify.open(created, { kind: 'kyb', returnUrl: `${this.config.DASHBOARD_URL}/verification` });
+      return presentResellerVerification(await this.prisma.identityVerification.update({ where: { id: created.id }, data: { url } }), reseller, provider);
+    }
+    if (latest?.status === 'in_progress' && latest.url && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentResellerVerification(latest, reseller, provider);
     if (!this.didit) throw unavailable('Identity verification');
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     let session: { providerReference: string; url: string };
     try {
       session = await this.didit.createSession({ reference: `reseller:${resellerId}`, callbackUrl: `${this.config.DASHBOARD_URL}/verification`, email: user.email ?? undefined });
@@ -169,7 +219,7 @@ export class IdentityService {
         requestedById: userId,
       },
     });
-    return presentResellerVerification(record, reseller);
+    return presentResellerVerification(record, reseller, provider);
   }
 
   // -- Reseller owner's BVN (reserved accounts in Nigeria) ---------------------------------------------------------
@@ -271,19 +321,42 @@ export class IdentityService {
     mode: LedgerMode,
     reference: string,
     input: { country: string; first_name: string; last_name: string; bvn?: string; redirect_url: string; consent: boolean },
+    options: { storeId?: string | null } = {},
   ) {
     if (!input.consent) throw consentRequired();
     const country = input.country.toUpperCase();
-    const method = country === 'NG' ? 'bvn' : 'document';
+    const viaVerify = (await this.providerFor(country)) === 'bitocard';
+    // BitoCard Verify checks everyone in its countries with an ID document and liveness; the BVN is only for reserved accounts.
+    const method = !viaVerify && country === 'NG' ? 'bvn' : 'document';
     if (method === 'bvn' && !/^\d{11}$/.test(input.bvn ?? '')) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'Nigerian customers are checked with their 11-digit BVN.', 'bvn');
     }
     const latest = await this.latestCustomer(resellerId, mode, reference);
     if (latest?.status === 'approved' || latest?.status === 'in_review') return presentCustomerVerification(latest);
+    if (latest?.status === 'in_progress' && latest.provider === verifyProvider) return presentCustomerVerification(await this.freshLink(latest));
     if (latest?.status === 'in_progress' && latest.createdAt.getTime() > Date.now() - reuseSessionMs) return presentCustomerVerification(latest);
     if (mode === 'live') {
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
       if (reseller.status !== 'active') throw resellerNotVerified();
+    }
+    if (mode === 'live' && viaVerify) {
+      const caseId = this.verify.newCaseId();
+      const created = await this.prisma.identityVerification.create({
+        data: {
+          subject: 'customer',
+          resellerId,
+          mode,
+          customerReference: reference,
+          method: 'document',
+          provider: verifyProvider,
+          providerReference: caseId,
+          country,
+          consentAt: new Date(),
+          expectedName: `${input.first_name} ${input.last_name}`,
+        },
+      });
+      const url = await this.verify.open(created, { kind: 'kyc', storeId: options.storeId ?? null, returnUrl: input.redirect_url });
+      return presentCustomerVerification(await this.prisma.identityVerification.update({ where: { id: created.id }, data: { url } }));
     }
 
     const expectedName = `${input.first_name} ${input.last_name}`;
@@ -360,7 +433,7 @@ export class IdentityService {
    * Applies an outcome once. BVN checks are approved only when the name on the BVN record matches the customer's
    * name. An approved reseller owner makes the reseller verified, and active unless manual approval is switched on.
    */
-  async apply(record: IdentityVerification, result: CheckResult, actorId: string | null = null) {
+  async apply(record: IdentityVerification, result: CheckResult, actorId: string | null = null, options: { trusted?: boolean } = {}) {
     const now = new Date();
     if (result.status === 'in_progress' || (result.status === 'in_review' && record.status === 'in_review')) {
       await this.prisma.identityVerification.update({ where: { id: record.id }, data: { lastCheckedAt: now } });
@@ -369,7 +442,7 @@ export class IdentityService {
     let status = result.status;
     let reason = result.reason ?? null;
     const verifiedName = fullName(result);
-    if (status === 'approved' && record.method === 'bvn' && !(record.expectedName && verifiedName && namesMatch(record.expectedName, verifiedName))) {
+    if (status === 'approved' && record.method === 'bvn' && !options.trusted && !(record.expectedName && verifiedName && namesMatch(record.expectedName, verifiedName))) {
       status = 'declined';
       reason = 'name_mismatch';
     }
@@ -539,13 +612,17 @@ export class IdentityService {
     const record = await this.prisma.identityVerification.findUnique({ where: { id } });
     if (!record) throw notFound();
     if (record.status !== 'in_review') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_not_in_review', 'Only checks waiting for review can be decided.');
+    if (record.provider === verifyProvider) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'use_verify_review', 'Decide BitoCard Verify checks from their case, with its documents.');
+    }
     const name = input.verified_name ?? record.expectedName ?? '';
     const [firstName, ...rest] = name.split(' ');
     await this.apply(
-      // An admin's approval stands on its own; the BVN name rule applies only to provider results.
-      { ...record, method: 'document' },
+      record,
       input.decision === 'approved' ? { status: 'approved', firstName, lastName: rest.join(' ') } : { status: 'declined', reason: input.reason },
       actorId,
+      // An admin's approval stands on its own; the BVN name rule applies only to provider results.
+      { trusted: true },
     );
     await this.prisma.identityVerification.update({ where: { id }, data: { reason: input.reason } });
     return this.adminGet(id);

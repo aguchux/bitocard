@@ -1,3 +1,4 @@
+import { africanCountries } from '../kyc/catalogue.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -19,6 +20,8 @@ export function presentCountry(country: CountryWithCategories) {
     currency: country.currency,
     reseller_signup: country.resellerSignup,
     reserved_accounts: country.reservedAccounts,
+    /** Who checks identities here: BitoCard Verify (`bitocard`, across Africa) or Didit. */
+    identity_provider: country.identityProvider as 'bitocard' | 'didit',
     markup_cap_percent: country.markupCapPercent,
     payout_hold_days: country.payoutHoldDays,
     min_withdrawal_minor: Number(country.minWithdrawalMinor),
@@ -40,6 +43,7 @@ export type CountryUpdate = Partial<{
   name: string;
   reseller_signup: boolean;
   reserved_accounts: boolean;
+  identity_provider: 'bitocard' | 'didit';
   markup_cap_percent: number;
   payout_hold_days: number;
   min_withdrawal_minor: number;
@@ -90,6 +94,7 @@ export class CountriesService {
         name: input.name,
         currency: input.currency.toUpperCase(),
         minWithdrawalMinor: BigInt(input.min_withdrawal_minor),
+        identityProvider: africanCountries.has(code) ? 'bitocard' : 'didit',
         // Money sent to a wallet is a payout: customers verify by default. BitoCard's own software is global: on everywhere.
         categories: { create: productCategories.map(category => ({ category, enabled: category === 'software', customerVerification: category === 'mobile_money' })) },
       },
@@ -109,6 +114,7 @@ export class CountriesService {
         name: input.name,
         resellerSignup: input.reseller_signup,
         reservedAccounts: input.reserved_accounts,
+        identityProvider: input.identity_provider,
         markupCapPercent: input.markup_cap_percent,
         payoutHoldDays: input.payout_hold_days,
         minWithdrawalMinor: input.min_withdrawal_minor === undefined ? undefined : BigInt(input.min_withdrawal_minor),

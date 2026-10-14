@@ -465,3 +465,24 @@ export function customerBankAccountAddedEmail(to: string, input: { store: string
   ].join('');
   return { to, subject: `A bank account was added to your ${input.store} account`, html, text: [heading, '', ...paragraphs, '', `Sent for ${input.store}.`].join('\n') };
 }
+/** BitoCard Verify's outcome for the person checked: approved, declined (with the reason) or asked to send items again. */
+export function verifyOutcomeEmail(to: string, input: { brand: string; outcome: 'approved' | 'declined' | 'resubmit'; reason?: string | null; note?: string | null; link?: string | null }): EmailMessage {
+  const heading = { approved: 'Your identity check is approved', declined: 'Your identity check was not approved', resubmit: 'Please send part of your identity check again' }[input.outcome];
+  const paragraphs = [
+    input.outcome === 'approved'
+      ? `Thank you: your identity is verified for ${input.brand}.`
+      : input.outcome === 'declined'
+        ? (input.reason ?? 'We could not verify your identity.')
+        : `We need a few items again before we can finish checking your identity for ${input.brand}.`,
+    ...(input.note ? [`Note from the reviewer: ${input.note}`] : []),
+    ...(input.link && input.outcome !== 'approved' ? [`Continue here: ${input.link}`] : []),
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p style="font-size:13px;color:#5b6488">Sent by BitoCard Verify for ${escape(input.brand)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', `Sent by BitoCard Verify for ${input.brand}.`].join('\n') };
+}

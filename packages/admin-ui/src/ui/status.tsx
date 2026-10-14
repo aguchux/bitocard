@@ -41,6 +41,8 @@ const statusTones: Record<string, Tone> = {
   incomplete: 'amber',
   unmatched: 'amber',
   received: 'blue',
+  submitted: 'amber',
+  resubmit: 'blue',
   draft: 'grey',
   expired: 'grey',
   disabled: 'grey',

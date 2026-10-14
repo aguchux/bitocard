@@ -17,6 +17,7 @@ import { OrdersService } from '../orders/orders.service.js';
 import { SupplierWebhooksService } from '../orders/supplier-webhooks.js';
 import { WebhookDeliveryService } from '../webhooks/delivery.service.js';
 import { IdentityService } from '../identity/identity.service.js';
+import { KycService } from '../kyc/kyc.service.js';
 import { OwnSuppliersService } from '../reseller-integrations/own-suppliers.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { PushService } from '../notifications/push.service.js';
@@ -48,6 +49,7 @@ export class CronController {
     orders: OrdersService,
     webhooks: WebhookDeliveryService,
     identity: IdentityService,
+    kyc: KycService,
     supplierWebhooks: SupplierWebhooksService,
     ownSuppliers: OwnSuppliersService,
     inbox: InboxService,
@@ -81,8 +83,11 @@ export class CronController {
       catalogue: async () => ({ suppliers: await suppliers.syncAll(), own: await ownSuppliers.syncAll() }),
       /** Every minute: send the outbox and due webhook retries (runs also start right after each change). */
       webhooks: () => webhooks.run(),
-      /** Every 30 minutes: re-read identity checks the providers have not reported, and close abandoned ones. */
-      identity: () => identity.checkOpen(),
+      /**
+       * Every 30 minutes: re-read identity checks the providers have not reported, and close abandoned ones; then delete
+       * BitoCard Verify documents past their retention.
+       */
+      identity: async () => ({ ...(await identity.checkOpen()), verify: await kyc.job() }),
       /** Every 5 minutes: retry supplier notifications that are due, and drop old processed ones. */
       'supplier-webhooks': () => supplierWebhooks.processDue(),
       /** Daily: delete events older than 30 days and expired rotated secrets. */

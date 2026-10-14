@@ -156,5 +156,8 @@ export function callerScope(req: Request) {
   // A store customer's requests come from the store's server: scope them by their session, not the server's address.
   // Only a session the rate limiter has checked counts; an unknown or made-up token is anonymous (limited by address).
   const customer = (req as CustomerScopedRequest).customerSessionId;
-  return customer ? `customer:${customer}` : 'anonymous';
+  if (customer) return `customer:${customer}`;
+  // A BitoCard Verify applicant: their app session (set by its guard, never the token).
+  const kyc = (req as Request & { kycSessionId?: string }).kycSessionId;
+  return kyc ? `kyc:${kyc}` : 'anonymous';
 }

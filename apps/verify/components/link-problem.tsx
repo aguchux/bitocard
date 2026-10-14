@@ -1,0 +1,38 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+import { Link2Off, WifiOff } from "lucide-react";
+import { returnHint } from "@/lib/return-hint";
+
+const noop = () => () => undefined;
+
+/**
+ * No usable link: it expired, was used already, or the session ended. Links are made fresh where the check was started,
+ * so the applicant goes back there. When the referring page was a BitoCard site, it is named and linked.
+ */
+export function LinkProblem({ unreachable }: { unreachable?: boolean }) {
+  const back = useSyncExternalStore(noop, () => returnHint(document.referrer), () => null);
+  if (unreachable) {
+    return (
+      <section className="space-y-3 rounded-3xl border border-line bg-white p-6 text-center shadow-card">
+        <WifiOff className="mx-auto size-10 text-muted" aria-hidden />
+        <h1 className="text-xl font-extrabold">We could not reach BitoCard</h1>
+        <p className="text-muted">Check your connection and reload this page.</p>
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-4 rounded-3xl border border-line bg-white p-6 text-center shadow-card">
+      <Link2Off className="mx-auto size-10 text-muted" aria-hidden />
+      <h1 className="text-xl font-extrabold">This link has expired</h1>
+      <p className="text-muted">
+        {`Links work once and for a short time. Go back to ${back?.name ?? "the store or BitoCard page you came from"} and start the identity check again.`}
+      </p>
+      {back ? (
+        <a href={back.url} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800">
+          {`Back to ${back.name}`}
+        </a>
+      ) : null}
+    </section>
+  );
+}

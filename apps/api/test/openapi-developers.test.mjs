@@ -21,6 +21,9 @@ before(async () => {
   didit = await fakeDidit();
   flutterwave = await fakeFlutterwave();
   server = await startApp({ env: { ...didit.env, ...flutterwave.env, WEBHOOK_ALLOW_PRIVATE_URLS: 'on', EVENTS_SETTLE_SECONDS: '0' } });
+  // These tests are about Didit: route every market to it (African markets use BitoCard Verify by default).
+  const { PrismaService } = await import('../dist/database/prisma.service.js');
+  await server.app.get(PrismaService).country.updateMany({ data: { identityProvider: 'didit' } });
   check = await responseChecker(server.app);
   admin = await adminClient(server);
   delivery = server.app.get((await import('../dist/webhooks/delivery.service.js')).WebhookDeliveryService);

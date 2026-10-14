@@ -37,6 +37,8 @@ export type StoreCustomerDetailView = StoreCustomerRow & {
   locked_until: string | null;
   signed_in_sessions: number;
   disputes: number;
+  /** The latest BitoCard Verify case; `reviewable` when the store's owner reviews it (a registered, KYB-verified business). */
+  identity_case?: { id: string; status: string; reviewable: boolean } | null;
   /** Wallet balances (spend only, never withdrawn), per mode and currency. */
   wallet: Array<{ mode: 'live' | 'test'; currency: string; balance: number }>;
   purchases_list: StoreCustomerPurchase[];
@@ -144,6 +146,7 @@ export function StoreCustomerView({
   onSignOut,
   orderLink,
   storeChecksOff,
+  identityReview,
 }: {
   customer: StoreCustomerDetailView;
   /** Identity check and account status. */
@@ -159,6 +162,8 @@ export function StoreCustomerView({
   orderLink: (purchase: StoreCustomerPurchase) => ReactNode;
   /** The whole store asks nobody, whatever is set for this customer. */
   storeChecksOff?: boolean;
+  /** A link to review the customer's ID check, shown only when the owner may review it (never documents otherwise). */
+  identityReview?: ReactNode;
 }) {
   const disabled = customer.status === 'disabled';
   return (
@@ -227,6 +232,7 @@ export function StoreCustomerView({
                 : 'Not asked, whatever the market requires. This does not mark them as checked.'}
             </p>
             {storeChecksOff ? <Notice tone="grey">Identity checks are off for the whole store, so this customer is not asked either way.</Notice> : null}
+            {identityReview}
           </div>
         </Card>
       </div>

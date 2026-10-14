@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { ScanFace } from "lucide-react";
 import { errorMessage, PageHeader, QueryView, Skeleton, StoreCustomerView } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
@@ -13,6 +14,12 @@ import {
 } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+
+/**
+ * BitoCard Verify's review console, where a registered, KYB-verified business reviews its own customers' ID checks.
+ * Shown only when the API says this customer's case is the store's to review; otherwise nothing about documents.
+ */
+const reviewUrl = (id: string) => `${(process.env.NEXT_PUBLIC_VERIFY_URL ?? "https://verify.bitocard.com").replace(/\/+$/, "")}/review/${encodeURIComponent(id)}`;
 
 function Customer({ store, id }: { store: Store; id: string }) {
   const { membership } = useReseller();
@@ -34,6 +41,14 @@ function Customer({ store, id }: { store: Store; id: string }) {
             busy={updateState.isLoading || unlockState.isLoading || signOutState.isLoading}
             error={failed ? errorMessage(failed) : null}
             storeChecksOff={!store.customer_verification}
+            identityReview={
+              data.identity_case?.reviewable ? (
+                <a href={reviewUrl(data.identity_case.id)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line px-4 text-sm font-semibold text-brand-600 hover:bg-canvas">
+                  <ScanFace className="size-4" aria-hidden />
+                  Review ID
+                </a>
+              ) : null
+            }
             onUpdate={change => void update({ storeId: store.id, id, ...change })}
             onUnlock={() => void unlock({ storeId: store.id, id })}
             onSignOut={() => void signOut({ storeId: store.id, id })}

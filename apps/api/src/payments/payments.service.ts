@@ -90,6 +90,22 @@ export function presentReservedAccount(account: ReservedAccount) {
  * Money coming into reseller wallets: checkout top-ups and transfers into reserved bank accounts.
  * A wallet is credited only after the provider confirms the payment, and each provider transaction exactly once.
  */
+/** A name as the first word and the rest (the bank asks for first and last names). */
+function splitName(name: string) {
+  const [first, ...rest] = name.trim().split(/\s+/);
+  return { firstName: first, lastName: rest.join(' ') || first };
+}
+
+/** A Ghanaian phone number in international form (+233 and nine digits), or the refusal asking for it. */
+export function ghanaPhone(phone: string | null | undefined) {
+  const digits = (phone ?? '').replace(/[^\d+]/g, '');
+  const normalised = digits.startsWith('+233') ? digits : digits.startsWith('233') ? `+${digits}` : digits.startsWith('0') ? `+233${digits.slice(1)}` : digits;
+  if (!/^\+233\d{9}$/.test(normalised)) {
+    throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter a Ghanaian phone number: the bank needs it to open the account.', 'phone');
+  }
+  return normalised;
+}
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger('Payments');
@@ -150,7 +166,7 @@ export class PaymentsService {
     const user = userId
       ? await this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
       : (await this.prisma.resellerMember.findFirstOrThrow({ where: { resellerId, role: 'owner' }, include: { user: true } })).user;
-    return { email: user.email, name: user.name };
+    return { email: user.email, name: user.name, phone: user.phoneVerifiedAt ? user.phone : null };
   }
 
   // -- Checkout top-ups ------------------------------------------------------------------------------------------
@@ -527,7 +543,7 @@ export class PaymentsService {
    * `reserved_accounts` switch on for the reseller, and an active reseller; in Nigeria the owner's BVN check must have
    * passed, and its BVN (held encrypted only for this) goes to the bank and is erased once the accounts exist.
    */
-  async createReservedAccounts(resellerId: string, mode: LedgerMode, owner: { email: string }) {
+  async createReservedAccounts(resellerId: string, mode: LedgerMode, owner: { email: string; phone?: string | null }, input: { phone?: string } = {}) {
     const { reseller, country, currency } = await this.wallets.currencyOf(resellerId);
     if (!country.reservedAccounts) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'reserved_accounts_unavailable', 'Reserved bank accounts are not available in your country yet. Top up through checkout instead.');
@@ -542,12 +558,20 @@ export class PaymentsService {
       }
       if (country.code === 'NG') bvn = await this.verifiedBvn(resellerId);
     }
+    // Ghana: no BVN, but the bank needs the holder's names (the owner's, as their identity check verified) and phone.
+    let holder: { firstName: string; lastName: string; phone: string } | undefined;
+    if (mode === 'live' && country.code === 'GH') {
+      if (!reseller.verifiedAt || !reseller.verifiedName) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', 'Pass the identity check first: the bank opens the account in the verified owner’s name.');
+      }
+      holder = { ...splitName(reseller.verifiedName), phone: ghanaPhone(input.phone ?? owner.phone) };
+    }
 
     let refused = false;
     for (const provider of this.providers.reservedAccounts(mode, country.code, currency)) {
       const reference = `bc_ra_${mode}_${resellerId.replaceAll('-', '')}`;
       try {
-        const accounts = await provider.createReservedAccount({ reference, email: owner.email, name: reseller.name, currency, bvn: bvn?.value });
+        const accounts = await provider.createReservedAccount({ reference, email: owner.email, name: reseller.name, currency, bvn: bvn?.value, ...holder });
         await this.prisma.reservedAccount.createMany({
           data: accounts.map(account => ({ resellerId, mode, provider: provider.name, currency, providerReference: reference, ...account })),
           skipDuplicates: true,
@@ -577,6 +601,8 @@ export class PaymentsService {
     mode: LedgerMode;
     country: { code: string; currency: string; reservedAccounts: boolean };
     bvn?: string;
+    /** Ghana: the holder's names (as verified, else as given) and phone number. */
+    holder?: { name: string; phone?: string };
   }) {
     const { customer, mode, country } = input;
     if (!country.reservedAccounts) {
@@ -587,13 +613,14 @@ export class PaymentsService {
     if (mode === 'live' && country.code === 'NG' && !input.bvn) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your BVN: the bank needs it to open your account number. We do not keep it.', 'bvn');
     }
+    const holder = mode === 'live' && country.code === 'GH' ? { ...splitName(input.holder?.name ?? customer.name), phone: ghanaPhone(input.holder?.phone) } : undefined;
     const providers = mode === 'test' ? this.providers.reservedAccounts(mode, country.code, country.currency) : this.providers.reservedAccounts(mode, country.code, country.currency).filter(provider => provider.name === 'flutterwave');
     if (providers.length === 0) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'Bank account numbers are unavailable right now. Top up with a card or mobile money instead.');
     let refused = false;
     for (const provider of providers) {
       const reference = `bc_rc_${mode}_${customer.id.replaceAll('-', '')}`;
       try {
-        const accounts = await provider.createReservedAccount({ reference, email: customer.email, name: customer.name, currency: country.currency, bvn: input.bvn });
+        const accounts = await provider.createReservedAccount({ reference, email: customer.email, name: customer.name, currency: country.currency, bvn: input.bvn, ...holder });
         await this.prisma.reservedAccount.createMany({
           data: accounts.map(account => ({ resellerId: input.sellerId, customerId: customer.id, mode, provider: provider.name, currency: country.currency, providerReference: reference, ...account })),
           skipDuplicates: true,

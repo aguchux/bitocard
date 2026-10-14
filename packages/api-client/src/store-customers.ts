@@ -24,6 +24,11 @@ export type StoreCustomerDetail = Omit<StoreCustomer, 'object'> & {
   locked_until: string | null;
   signed_in_sessions: number;
   disputes: number;
+  /**
+   * The customer's latest BitoCard Verify case at this store, if any. `reviewable`: the store's owner (a registered,
+   * KYB-verified business) reviews it on verify.bitocard.com; otherwise BitoCard does and the owner never sees documents.
+   */
+  identity_case?: { id: string; status: 'draft' | 'submitted' | 'approved' | 'declined' | 'resubmit'; reviewable: boolean } | null;
   /** Wallet balances (spend only, never withdrawn), per mode and currency. */
   wallet: Array<{ mode: 'live' | 'test'; currency: string; balance: number }>;
   purchases_list: Array<{
