@@ -6,7 +6,8 @@ import { type AccountKind, type LedgerMode, Prisma } from '../generated/prisma/c
 export type Tx = Prisma.TransactionClient;
 
 /** Which account: its kind and currency, and its owner (a reseller, a payment provider, or BitoCard itself). */
-export type AccountRef = { kind: AccountKind; currency: string; resellerId?: string; customerId?: string; provider?: string };
+/** `shard` splits a busy platform account into several rows (balances are their sum), so posts to it do not queue on one row. */
+export type AccountRef = { kind: AccountKind; currency: string; resellerId?: string; customerId?: string; provider?: string; shard?: number };
 
 /** One side of an entry. Exactly one of debit or credit, a positive amount in minor units. */
 export type Line = { account: AccountRef; debit?: bigint; credit?: bigint };
@@ -43,7 +44,8 @@ function ownerKey(ref: AccountRef) {
     if (!ref.resellerId) throw new Error(`${ref.kind} needs a reseller`);
     return `reseller:${ref.resellerId}`;
   }
-  return ref.provider ? `provider:${ref.provider}` : 'platform';
+  if (ref.provider) return `provider:${ref.provider}`;
+  return ref.shard ? `platform:${ref.shard}` : 'platform';
 }
 
 /** Change to an account's natural balance from a posting (positive amount = debit). */

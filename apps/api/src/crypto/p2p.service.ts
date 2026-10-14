@@ -10,7 +10,7 @@ import { minor } from '../ledger/mode.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { feeFor, fiatFor, fromUnits, toUnits, unitsFor } from './amounts.js';
-import { type CryptoContext, CryptoWalletsService, notFound } from './crypto-wallets.service.js';
+import { type CryptoContext, CryptoWalletsService, cryptoFeesRef, notFound } from './crypto-wallets.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
@@ -501,7 +501,7 @@ export class P2pService {
     const account = (id: string, kind: AccountKind, code: string) => this.ledger.accountId(mode, this.wallets.ref(id, kind, code));
     const sellerCrypto = await account(sellerId, ownerSells ? 'crypto_locked' : 'crypto_wallet', asset.code);
     const buyerCrypto = await account(buyerId, 'crypto_wallet', asset.code);
-    const feesId = await this.ledger.accountId(mode, { kind: 'crypto_fees', currency: asset.code });
+    const feesId = await this.ledger.accountId(mode, cryptoFeesRef(asset.code));
     const sellerProceeds = await account(sellerId, 'customer_withdrawable', currency);
     const buyerSources = await this.fiatSources(buyerId, mode, currency);
     const buyerLocked = await account(buyerId, 'p2p_fiat_locked', currency);

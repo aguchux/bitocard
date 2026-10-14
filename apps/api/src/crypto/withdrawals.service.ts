@@ -20,7 +20,7 @@ import { CryptoDepositsService } from './chains/deposits.service.js';
 import { signerInSandbox } from './custody/check.js';
 import { type Screening, screenerKeys, screeners } from './custody/screening.js';
 import { type CryptoSigner, RemoteSigner, SignerError, signerFields, SimulatedSigner, type SignerTransfer } from './custody/signer.js';
-import { CryptoWalletsService, notFound } from './crypto-wallets.service.js';
+import { CryptoWalletsService, cryptoFeesRef, notFound } from './crypto-wallets.service.js';
 import { checksumAddress, tronToHex } from './derive.js';
 
 const minute = 60_000;
@@ -487,7 +487,7 @@ export class CryptoWithdrawalsService {
   private async complete(row: CryptoWithdrawal, confirmations: number) {
     const withdrawingId = await this.ledger.accountId(row.mode, this.wallets.ref(row.customerId, 'crypto_withdrawing', row.asset));
     const custodyId = await this.ledger.accountId(row.mode, { kind: 'crypto_custody', currency: row.asset });
-    const feesId = row.fee > 0n ? await this.ledger.accountId(row.mode, { kind: 'crypto_fees', currency: row.asset }) : null;
+    const feesId = row.fee > 0n ? await this.ledger.accountId(row.mode, cryptoFeesRef(row.asset)) : null;
     const done = await this.prisma.$transaction(async tx => {
       const claimed = await tx.cryptoWithdrawal.updateMany({ where: { id: row.id, status: 'broadcast' }, data: { status: 'completed', confirmations, completedAt: new Date(), nextCheckAt: null, error: null } });
       if (!claimed.count) return null;

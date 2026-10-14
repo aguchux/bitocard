@@ -29,8 +29,9 @@ const hex = value => `0x${BigInt(value).toString(16)}`;
 /** One fake chain: EVM JSON-RPC at /evm1 and /evm2 (two providers), TRON's node API at /tron, Esplora at /btc. */
 function fakeChain() {
   // chainIds: what each EVM endpoint says it is on (Sepolia by default); hidden: transactions listed in logs that no
-  // node shows yet (a lagging provider); btcGenesis: the Bitcoin network Esplora is on (testnet4 by default).
-  const state = { latest: 100n, logs: [], txs: new Map(), down: new Set(), tronLatest: 5000, tron: new Map(), btcTip: 800, btc: new Map(), chainIds: {}, hidden: new Set(), btcGenesis: '00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043' };
+  // node shows yet (a lagging provider); btcGenesis: the Bitcoin network Esplora is on (testnet4 by default);
+  // tronGenesis: the TRON network its node is on (Nile by default).
+  const state = { latest: 100n, logs: [], txs: new Map(), down: new Set(), tronLatest: 5000, tron: new Map(), btcTip: 800, btc: new Map(), chainIds: {}, hidden: new Set(), btcGenesis: '00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043', tronGenesis: '0000000000000000d698d4192c56cb6be724a558448e2684802de4d6cd8690dc' };
   const rpc = (prefix, body) => {
     if (state.down.has(prefix)) return { status: 503, body: 'down' };
     const result = (() => {
@@ -58,6 +59,7 @@ function fakeChain() {
     const path = new URL(call.url, 'http://x').pathname;
     if (path === '/evm1' || path === '/evm2' || path === '/evm3') return rpc(path, call.body);
     if (path === '/btc/block-height/0') return { headers: { 'content-type': 'text/plain' }, body: state.btcGenesis };
+    if (path === '/tron/wallet/getblockbynum') return { body: call.body?.num === 0 ? { blockID: state.tronGenesis } : {} };
     if (path === '/tron/wallet/getnowblock') return { body: { block_header: { raw_data: { number: state.tronLatest } } } };
     if (path === '/tron/wallet/gettransactioninfobyid') return { body: state.tron.get(call.body.value) ?? {} };
     if (path === '/btc/blocks/tip/height') return { headers: { 'content-type': 'text/plain' }, body: String(state.btcTip) };
@@ -566,6 +568,25 @@ describe('providers on the wrong network', () => {
     await update('blockstream', { BLOCKSTREAM_ENABLED: false });
     // mempool.space in the sandbox (testnet4) is fine.
     assert.equal((await admin.post('/v1/admin/integrations/mempool/test')).json.ok, true);
+  });
+
+  test('a TRON endpoint is checked by its genesis block', async () => {
+    const { forgetNetworks } = await import('../dist/crypto/chains/client.js');
+    const { CryptoDepositsService } = await import('../dist/crypto/chains/deposits.service.js');
+    const deposits = server.app.get(CryptoDepositsService);
+    forgetNetworks();
+    // GetBlock switched to live, but its pasted TRON endpoint is on Nile.
+    await update('getblock', { GETBLOCK_TRON_URL: `${chain.url}/tron`, GETBLOCK_SANDBOX: false });
+    const tested = (await admin.post('/v1/admin/integrations/getblock/test')).json;
+    assert.equal(tested.ok, false);
+    assert.match(tested.message, /TRON: refused: the endpoint is on a test network/);
+    assert.ok(!(await deposits.routes('TRON', 'live')).some(item => item.provider.id === 'getblock'), 'never routed for live deposits');
+    chain.state.tronGenesis = '00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc';
+    forgetNetworks();
+    assert.ok((await deposits.routes('TRON', 'live')).some(item => item.provider.id === 'getblock'), 'on mainnet it serves live stores');
+    chain.state.tronGenesis = '0000000000000000d698d4192c56cb6be724a558448e2684802de4d6cd8690dc';
+    forgetNetworks();
+    await update('getblock', { GETBLOCK_SANDBOX: true });
   });
 });
 test('request logs never carry query values (webhook tokens, preview links)', async () => {

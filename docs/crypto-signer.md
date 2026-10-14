@@ -28,6 +28,31 @@ The signer must:
 - refuse a timestamp more than 5 minutes from its own clock;
 - accept HTTPS only.
 
+## Replies
+
+Every reply, errors and `404`s included, carries a signature header too:
+
+```
+BitoCard-Signer-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "reply.<t>.<the request's v1>.<HTTP status>.<raw reply body>", keyed with the shared secret>
+```
+
+- `<the request's v1>` is the hex `v1` value from the request's own signature header, so a reply belongs to exactly one
+  request: an old genuine reply (a `404` from before a transfer was received, a `failed` for another request) cannot
+  be replayed onto a new one.
+- `<raw reply body>` is the exact bytes sent (empty for an empty body).
+
+The API treats a reply with a missing, wrong or stale (over 5 minutes) signature as unclear, whatever its status: it
+never returns a withdrawal's money, or takes a refusal as final, on an unsigned answer, and asks again later. A proxy's
+error page in front of the signer is therefore harmless. Example (Node.js):
+
+```js
+const v1 = /v1=([0-9a-f]{64})/.exec(req.headers['bitocard-signer-signature'])[1];
+const t = Math.floor(Date.now() / 1000);
+const body = JSON.stringify(reply);
+res.setHeader('BitoCard-Signer-Signature', `t=${t},v1=${createHmac('sha256', secret).update(`reply.${t}.${v1}.${status}.${body}`).digest('hex')}`);
+res.status(status).end(body);
+```
+
 ### `POST /v1/transfers`
 
 Sends a transfer, or returns the one already made with this reference.

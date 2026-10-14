@@ -27,6 +27,7 @@ export default function TermsOfUse() {
           <li>Planned features, products, markets, timings and prices may change or may not launch. Availability will vary by country and depends on local law, regulatory approval, payment and verification arrangements, and supplier coverage.</li>
           <li>Setup times, including our five-minute store setup goal, are goals, not promises. Verification, funding and readiness to take orders may take longer.</li>
         </ul>
+        <p>Crypto wallets and peer-to-peer (P2P) trading are not offered in any country yet. Section 4 explains how they will work where we switch them on.</p>
         <p>When a service launches, it will be governed by separate terms, such as reseller and customer agreements, which you will need to accept before using it.</p>
       </Section>
 
@@ -40,11 +41,99 @@ export default function TermsOfUse() {
         <p>We tell you by email or in your account when your problem has a reply or a decision. Reporting a problem does not affect your statutory rights as a consumer, or your right to dispute a card payment with your bank. If you dispute a payment with your bank, we may share your order&apos;s details with the payment provider and the store to respond to it.</p>
       </Section>
 
-      <Section id="no-advice" title="4. No financial advice">
+      <Section id="crypto" title="4. Crypto wallets and P2P trading">
+        <p>This section applies only where we offer crypto wallets and P2P trading. <strong>We do not offer them in any country yet.</strong> We will switch them on country by country, and only after taking legal advice in that country. A store may choose not to offer them even where we do. Where they are not switched on for you, nothing in this section is an offer.</p>
+
+        <h3 id="crypto-who">Who can use them</h3>
+        <ul>
+          <li>You need a customer account at a store on BitoCard, with a confirmed email address, in a country where we offer crypto. You trade in your account&apos;s country and its currency.</li>
+          <li>You must be at least 18 and use your account only for yourself. You must not let anyone else use it, or use anyone else&apos;s.</li>
+          <li>You must pass our identity check first: in Nigeria a BVN check, elsewhere a check of an identity document and a selfie. Our <Link href="/documents/privacy">privacy notice</Link> explains how these work.</li>
+          <li>Stores that are still testing (sandbox stores) show test crypto that has no value and cannot be withdrawn.</li>
+        </ul>
+
+        <h3 id="crypto-custody">How we hold your crypto</h3>
+        <ul>
+          <li>You can hold USDT, USDC, BTC, ETH and BNB, on the networks we show for each coin when you deposit or withdraw. We may add or remove coins and networks.</li>
+          <li>We hold your crypto for you in wallets BitoCard controls. Their keys are kept in a key management service behind our signing service, and you do not hold them: you move your crypto only through BitoCard, as described here. The crypto we hold for customers is held together in BitoCard&apos;s wallets, and how much of it is yours is recorded in our records, which your balance shows.</li>
+          <li>We check every day that our wallets hold what our records say we hold for customers.</li>
+          <li>Your crypto balance is not a bank deposit or e-money. We do not pay interest on it, and we do not lend, stake or invest it.</li>
+        </ul>
+
+        <h3 id="crypto-market">The P2P market</h3>
+        <ul>
+          <li>Customers of every store on BitoCard, including bitocard.com, trade with each other in one market for each country. Prices are set by customers in their ads, not by BitoCard, and each trade is between you and the other customer.</li>
+          <li>Other traders see you only by a nickname, which we create for you and which you can change once, and by how many trades you have completed. They never see your name, email address or store.</li>
+          <li><strong>Ads.</strong> You can post up to 10 open ads to sell or buy a coin at a fixed price, with the smallest and largest trade you accept. A sell ad locks all the crypto it offers. A buy ad locks the money it needs, taken first from your P2P money and then from your wallet; if you change its price, we lock more or give back the difference. Locked amounts cannot be used for anything else while the ad is open. You can pause or close an ad at any time, and closing it gives back whatever is still locked.</li>
+          <li><strong>Ads must be honest.</strong> Do not post ads you do not mean to honour, misleading prices or terms, or ads that ask anyone to pay or talk outside BitoCard.</li>
+          <li><strong>Instant trades.</strong> When you take an ad, you see the price, the amount, our fee and what you will receive before you confirm. When you confirm, the trade completes at once: the seller&apos;s crypto goes to the buyer, less our fee, and the buyer&apos;s money goes to the seller&apos;s P2P money. Either everything moves or nothing does. If the ad&apos;s price or our fee has changed since you saw it, the trade is refused and you are not charged.</li>
+          <li><strong>Completed trades are final.</strong> They cannot be cancelled or reversed. If you believe a trade was made through fraud or an error on our part, contact us and we will look into it.</li>
+          <li><strong>Fees.</strong> Our P2P fee is a percentage of each trade, set for each coin and taken from the crypto the buyer receives. Withdrawals have their own network fee (see below). We show every fee before you confirm.</li>
+        </ul>
+
+        <h3 id="crypto-deposits">Deposits</h3>
+        <ul>
+          <li>You get your own deposit address for each network. Send only the coin shown, on the network shown. A different coin or token, the wrong network, or the wrong address may be lost, and we may not be able to recover it.</li>
+          <li>We credit a deposit only once it has the number of network confirmations we require for that network. Larger deposits are also checked through a second, independent source first. Deposits can take longer when a network is busy or our providers cannot be reached.</li>
+          <li>We record each coin to 6 decimal places (USDT and USDC) or 8 (BTC, ETH and BNB). Anything smaller is not credited.</li>
+        </ul>
+
+        <h3 id="crypto-withdrawals">Withdrawals</h3>
+        <ul>
+          <li>You can withdraw only to an address you have saved. You can use a new address 24 hours after adding it, and we email you every time one is added, so you notice if it was not you.</li>
+          <li>Each withdrawal shows our network fee, which is added to the amount, the minimum for that network and your daily limit for that coin (over any 24 hours). We set the amount and fee aside and email you a code naming the amount, network and address. The withdrawal goes ahead only when you enter the code, within 30 minutes; otherwise it is cancelled and the amount returned. You can cancel it until it is sent.</li>
+          <li>We screen every address against sanctions lists when you add it and again before we send to it, and we refuse addresses that are on them.</li>
+          <li>Our team reviews some withdrawals before they are sent, for example large amounts, addresses we could not screen, and withdrawals soon after a card or mobile money top-up. We may approve or refuse them; a refused withdrawal&apos;s amount and fee are returned to you.</li>
+          <li><strong>Check the address and network.</strong> Once a withdrawal is sent on the blockchain, it cannot be reversed. Crypto sent to a mistyped address or on the wrong network may be lost for good.</li>
+          <li>A withdrawal is complete once the network has confirmed it. If it fails before it is sent, the amount and fee are returned to you.</li>
+        </ul>
+
+        <h3 id="crypto-freezes">Freezes and seizure</h3>
+        <ul>
+          <li>We may freeze an amount of your crypto, or your whole crypto account, for security reasons, if we suspect fraud or a breach of these terms, for legal or sanctions reasons, or where a court or authority requires it. A frozen amount cannot be used. While your account is frozen you cannot trade, post ads or withdraw, and your ads leave the market.</li>
+          <li>We release a freeze when its reason ends. Where the law, a court or an authority requires it, or to make good losses caused by fraud, we may instead take the frozen crypto from your account.</li>
+          <li>We may close any ad that breaks these terms or that we need to stop; whatever it locks goes back to you.</li>
+          <li>We will tell you about a freeze unless the law or an authority prevents us.</li>
+        </ul>
+
+        <h3 id="crypto-closing">If crypto closes in your country or your store closes</h3>
+        <p>We may stop crypto wallets or P2P trading in a country, stop offering a coin, or a store may close. You then cannot post ads or trade, but you can still see what you hold, close your ads (getting back what they lock), withdraw your crypto on chain and cash out your P2P money. Do not send new deposits after we tell you crypto is closing; a deposit to your address that arrives anyway is still credited to you once confirmed, and you can withdraw it.</p>
+
+        <h3 id="crypto-cash-out">Cashing out P2P money to your bank</h3>
+        <p>Money you receive from selling crypto is your P2P money. You can use it to buy crypto or cash it out to your bank:</p>
+        <ul>
+          <li>only to a bank account in the name verified by your identity check, never anyone else&apos;s. You can save up to 3 accounts; a new account can be used 24 hours after you add it, and we email you each time;</li>
+          <li>each sale&apos;s money can be cashed out once your country&apos;s payout hold has passed, so a payment later reversed can still be put right. We show how much is held and the minimum amount;</li>
+          <li>we send the transfer through our bank transfer provider. If the transfer fails, the money returns to your P2P money. If the provider&apos;s answer is unclear, we check with it, and the money stays set aside until we know: this can take longer.</li>
+        </ul>
+        <p>Money you add to your store wallet can be spent on crypto, but cannot itself be cashed out.</p>
+
+        <h3 id="crypto-risks">Risks you should understand</h3>
+        <ul>
+          <li>Crypto prices can rise and fall sharply, and you can lose some or all of the value you hold. Stablecoins such as USDT and USDC aim to track the US dollar but may not.</li>
+          <li>Crypto is not legal tender and not a bank deposit. It is not protected by any deposit protection or investor compensation scheme.</li>
+          <li>Blockchain networks can be congested, change their rules or stop working, and their fees can change. Transfers on them cannot be reversed.</li>
+          <li>Laws on crypto are changing and may require us to limit or stop the service in your country.</li>
+          <li>You are responsible for any tax on your crypto and your trades.</li>
+          <li>We do not give investment advice (see section 5). Only buy crypto you can afford to lose.</li>
+        </ul>
+
+        <h3 id="crypto-prohibited">What you must not do</h3>
+        <ul>
+          <li>launder money, finance terrorism, or deal in the proceeds of crime;</li>
+          <li>commit or help fraud, including with stolen cards, accounts or payments;</li>
+          <li>evade sanctions, or trade for or with anyone under sanctions;</li>
+          <li>use someone else&apos;s account, identity or bank account, or let someone use yours;</li>
+          <li>post misleading ads or manipulate prices.</li>
+        </ul>
+        <p>If you do, we may freeze your crypto and your account, cancel anything not yet completed, and report it to the authorities where the law requires it.</p>
+      </Section>
+
+      <Section id="no-advice" title="5. No financial advice">
         <p>Nothing on these websites is financial, investment, legal or tax advice, and we do not promise any level of income or profit from reselling.</p>
       </Section>
 
-      <Section id="use" title="5. Using the websites">
+      <Section id="use" title="6. Using the websites">
         <p>You may use the websites for lawful, personal or business information purposes. You must not:</p>
         <ul>
           <li>break any law or anyone’s rights while using them;</li>
@@ -56,26 +145,26 @@ export default function TermsOfUse() {
         <p>If you believe you have found a security vulnerability, please report it to <ContactEmail />.</p>
       </Section>
 
-      <Section id="ip" title="6. Intellectual property">
+      <Section id="ip" title="7. Intellectual property">
         <p>The BitoCard name and logo, and the text, design and code of these websites, belong to the Golojan group or its licensors and are protected by intellectual property laws. You may view and share links to our pages, but you may not copy, adapt or use our brand or content for commercial purposes without our written permission.</p>
         <p>Other product and brand names, including gift card brands, belong to their owners. Their mention does not imply endorsement or a relationship with us.</p>
       </Section>
 
-      <Section id="links" title="7. Links to other websites">
+      <Section id="links" title="8. Links to other websites">
         <p>Where we link to other websites, we do so for convenience. We do not control them and are not responsible for their content or practices.</p>
       </Section>
 
-      <Section id="availability" title="8. Availability and changes">
+      <Section id="availability" title="9. Availability and changes">
         <p>We may change, suspend or withdraw any part of the websites at any time. We do not guarantee that they will always be available, uninterrupted or free from errors.</p>
       </Section>
 
-      <Section id="liability" title="9. Our responsibility to you">
+      <Section id="liability" title="10. Our responsibility to you">
         <p>We provide the websites free of charge and “as is”. To the extent the law allows, we make no warranties about their content, accuracy or availability.</p>
         <p>To the extent the law allows, we are not liable for any indirect or consequential loss, or for loss of profit, revenue, business or data, arising from your use of the websites or your reliance on their content.</p>
         <p>Nothing in these terms limits or excludes liability that cannot be limited or excluded by law, including liability for death or personal injury caused by negligence, or for fraud. Nothing in these terms affects your statutory rights as a consumer.</p>
       </Section>
 
-      <Section id="law" title="10. Governing law and disputes">
+      <Section id="law" title="11. Governing law and disputes">
         <p>These terms are governed by the law that applies to the company you contract with:</p>
         <ul>
           {legalEntities.map(entity => (
@@ -86,11 +175,11 @@ export default function TermsOfUse() {
         <p>Before starting formal proceedings, please contact us at <ContactEmail /> so we can try to resolve the issue.</p>
       </Section>
 
-      <Section id="general" title="11. General">
+      <Section id="general" title="12. General">
         <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/documents/privacy">privacy notice</Link> and <Link href="/documents/cookies">cookie notice</Link> explain how we handle personal information.</p>
       </Section>
 
-      <Section id="contact" title="12. Contact us">
+      <Section id="contact" title="13. Contact us">
         <p>Email <ContactEmail /> with any question about these terms.</p>
       </Section>
     </LegalPage>

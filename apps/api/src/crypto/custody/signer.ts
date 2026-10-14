@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { IntegrationField } from '../../integrations/definitions.js';
 import { secureUrl } from '../../integrations/integrations.service.js';
 import type { IntegrationLink } from '../../integrations/links.js';
@@ -55,6 +55,26 @@ export function signerSignature(secret: string, body: string, at = Math.floor(Da
   return `t=${at},v1=${createHmac('sha256', secret).update(`${at}.${body}`).digest('hex')}`;
 }
 
+/** How old a signed reply may be: the same window as the signer allows requests. */
+const replyMaxAgeSeconds = 300;
+
+/**
+ * The signature header on the signer's reply: HMAC-SHA256 of `reply.<t>.<the request's v1>.<HTTP status>.<body>`,
+ * keyed with the same secret. Binding it to the request's own signature means a reply can never be forged, nor an
+ * old genuine reply (a 404 from before a transfer was received, a `failed` for another request) replayed onto it.
+ */
+export function signerReplySignature(secret: string, requestV1: string, status: number, body: string, at = Math.floor(Date.now() / 1000)) {
+  return `t=${at},v1=${createHmac('sha256', secret).update(`reply.${at}.${requestV1}.${status}.${body}`).digest('hex')}`;
+}
+
+/** Whether a reply's signature header is the signer's, for this request and fresh. */
+export function signerReplyValid(secret: string, header: string | null, requestV1: string, status: number, body: string, now = Math.floor(Date.now() / 1000)) {
+  const at = /(?:^|,)t=(\d+)(?:,|$)/.exec(header ?? '')?.[1];
+  if (!header || !at || Math.abs(now - Number(at)) > replyMaxAgeSeconds) return false;
+  const expected = Buffer.from(signerReplySignature(secret, requestV1, status, body, Number(at)).split('v1=')[1], 'hex');
+  return [...header.matchAll(/(?:^|,)v1=([0-9a-f]{64})(?=,|$)/g)].some(([, v1]) => timingSafeEqual(Buffer.from(v1, 'hex'), expected));
+}
+
 function transfer(reply: unknown, reference: string): SignerTransfer {
   const value = reply as { reference?: string; status?: string; tx_hash?: string | null; reason?: string | null };
   if (!value || value.reference !== reference || !statuses.includes(value.status as SignerStatus)) throw new SignerError('The signer gave an answer BitoCard cannot read.');
@@ -77,11 +97,13 @@ export class RemoteSigner implements CryptoSigner {
     const url = `${this.url.replace(/\/+$/, '')}${path}`;
     // A GET signs the path the signer receives (its own base path included); a POST signs its body.
     const text = body === undefined ? new URL(url).pathname : JSON.stringify(body);
+    const signature = signerSignature(this.secret, text);
+    const requestV1 = signature.split('v1=')[1];
     let res: Response;
     try {
       res = await fetch(url, {
         method,
-        headers: { accept: 'application/json', 'bitocard-signer-signature': signerSignature(this.secret, text), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+        headers: { accept: 'application/json', 'bitocard-signer-signature': signature, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
         body: body === undefined ? undefined : text,
         signal: AbortSignal.timeout(timeoutMs),
         redirect: 'error',
@@ -90,6 +112,11 @@ export class RemoteSigner implements CryptoSigner {
       throw new SignerError(`unreachable (${error instanceof Error ? error.name : 'error'})`);
     }
     const reply = await res.text();
+    // Only a reply the signer signed counts, refusals and 404s included (a 404 lets a frozen withdrawal be returned):
+    // anything else (a proxy's error page, a forged answer) is unclear and asked again.
+    if (!signerReplyValid(this.secret, res.headers.get('bitocard-signer-signature'), requestV1, res.status, reply)) {
+      throw new SignerError(`an unsigned or wrongly signed reply (HTTP ${res.status})`);
+    }
     const json = (() => {
       try {
         return reply ? JSON.parse(reply) : null;

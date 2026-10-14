@@ -177,6 +177,12 @@ export class TronClient implements ChainClient {
     return this.endpoint.flavor === 'trongrid';
   }
 
+  /** The genesis block's ID, which names the network (mainnet, Nile, Shasta). */
+  async network() {
+    const block = await request<{ blockID?: string }>(this.endpoint, '/wallet/getblockbynum', { body: { num: 0 } });
+    return typeof block?.blockID === 'string' ? block.blockID.toLowerCase() : null;
+  }
+
   async latestBlock() {
     const block = await request<{ block_header?: { raw_data?: { number?: number } } }>(this.endpoint, '/wallet/getnowblock', { body: {} });
     const number = block?.block_header?.raw_data?.number;
@@ -373,14 +379,16 @@ export function normaliseContract(chain: Chain, contract: string) {
 
 /**
  * Each chain's main network as its endpoints identify it: EVM chain IDs, Bitcoin's genesis block (Esplora, Bitcoin
- * Core) or BlockCypher's chain name. A live endpoint must be on it; a sandbox one must not (test networks vary:
+ * Core), TRON's genesis block or BlockCypher's chain name. A live endpoint must be on it; a sandbox one must not (test networks vary:
  * Sepolia 11155111, BNB testnet 97, Bitcoin testnet3, testnet4, signet), so a pasted endpoint on the wrong network can
- * never credit test coins to live wallets, or real coins to sandbox ones. TRON and Solana endpoints are not checked.
+ * never credit test coins to live wallets, or real coins to sandbox ones. Solana endpoints are not checked yet.
  */
 const mainNetworks: Partial<Record<Chain, string[]>> = {
   ETHEREUM: ['1'],
   BSC: ['56'],
   BITCOIN: ['000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f', 'BTC.main'],
+  // The genesis block ID of TRON's main network (Nile and Shasta have their own).
+  TRON: ['00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc'],
 };
 const networkTtlMs = 10 * 60_000;
 const networks = new Map<string, { network: string | null; at: number }>();

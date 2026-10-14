@@ -25,6 +25,15 @@ export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; sel
 const cryptoKinds = ['crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing'] as const satisfies AccountKind[];
 const fiatKinds = ['customer_withdrawable', 'p2p_fiat_locked', 'customer_wallet', 'customer_payouts_pending'] as const satisfies AccountKind[];
 
+/** BitoCard's crypto fees per mode and asset are spread over this many accounts (`crypto_fees`; totals are their sum). */
+export const cryptoFeeShards = 16;
+
+/**
+ * One of BitoCard's crypto fee accounts, picked at random: every trade and withdrawal credits a fee, and one shared
+ * row would make every trade of an asset, in every market, wait for the one before.
+ */
+export const cryptoFeesRef = (asset: string) => ({ kind: 'crypto_fees' as const, currency: asset, shard: Math.floor(Math.random() * cryptoFeeShards) });
+
 export function presentFreeze(freeze: CryptoFreeze, asset: Pick<CryptoAsset, 'decimals'>) {
   return {
     object: 'crypto_freeze' as const,

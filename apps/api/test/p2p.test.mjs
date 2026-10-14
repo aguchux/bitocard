@@ -149,8 +149,9 @@ describe('instant P2P trades', () => {
     assert.ok(await prisma.notification.findFirst({ where: { customerId: seller.id, type: 'customer.p2p.trade_completed' } }), 'the seller is told');
     assert.equal((await seller.get('/v1/store/p2p/profile')).json.trades_total, 1);
 
-    const fees = await prisma.ledgerAccount.findFirst({ where: { kind: 'crypto_fees', currency: 'USDT', mode: 'test' } });
-    assert.ok(fees.balanceMinor >= 100_000n, 'BitoCard took its fee');
+    // BitoCard's fees are spread over several accounts: their sum.
+    const fees = (await prisma.ledgerAccount.aggregate({ where: { kind: 'crypto_fees', currency: 'USDT', mode: 'test' }, _sum: { balanceMinor: true } }))._sum.balanceMinor;
+    assert.ok(fees >= 100_000n, 'BitoCard took its fee');
     await cryptoConserved();
     await ledgerOk();
   });

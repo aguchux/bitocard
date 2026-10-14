@@ -34,8 +34,21 @@ async function fakeWorld() {
     if (!ok) state.badSignatures += 1;
     return ok;
   };
+  // The signer signs every reply over the request's own signature (docs/crypto-signer.md), unless told to forge one.
+  const signed = (call, reply) => {
+    const body = JSON.stringify(reply.body ?? {});
+    const v1 = /v1=([0-9a-f]{64})/.exec(call.headers['bitocard-signer-signature'] ?? '')?.[1] ?? '';
+    const t = Math.floor(Date.now() / 1000);
+    const secret = state.replySecret ?? signerSecret;
+    const signature = `t=${t},v1=${createHmac('sha256', secret).update(`reply.${t}.${v1}.${reply.status ?? 200}.${body}`).digest('hex')}`;
+    return { ...reply, body, headers: { 'content-type': 'application/json', ...(state.unsignedReplies ? {} : { 'bitocard-signer-signature': signature }) } };
+  };
   const service = await fakeService(call => {
     const path = new URL(call.url, 'http://x').pathname;
+    const reply = answer(call, path);
+    return path.startsWith('/signer/') ? signed(call, reply) : reply;
+  });
+  function answer(call, path) {
     if (path.startsWith('/screen/api/v1/address/')) {
       const address = decodeURIComponent(path.split('/').at(-1));
       return { body: { identifications: state.flagged.has(address.toLowerCase()) ? [{ category: 'sanctions', name: 'SANCTIONS: OFAC SDN' }] : [] } };
@@ -65,7 +78,7 @@ async function fakeWorld() {
     state.transfers.set(body.reference, transfer);
     if (state.mode === 'lost_reply') return { status: 504, body: {} };
     return { body: transfer };
-  });
+  }
   return Object.assign(service, { state });
 }
 
@@ -254,8 +267,9 @@ describe('withdrawals in the sandbox (simulated signer)', () => {
     assert.equal(done.status, 'completed');
     assert.match(done.txHash, /^0x[0-9a-f]{64}$/);
     assert.equal(await balance(shopper), '898.500000', 'settled once');
-    const fees = await prisma.ledgerAccount.findFirst({ where: { kind: 'crypto_fees', mode: 'test', currency: 'USDT' } });
-    assert.ok(fees.balanceMinor >= 1_500_000n);
+    // BitoCard's fees are spread over several accounts: their sum.
+    const fees = (await prisma.ledgerAccount.aggregate({ where: { kind: 'crypto_fees', mode: 'test', currency: 'USDT' }, _sum: { balanceMinor: true } }))._sum.balanceMinor;
+    assert.ok(fees >= 1_500_000n);
     assert.ok(await prisma.notification.findFirst({ where: { customerId: shopper.id, type: 'customer.crypto.withdrawal_sent' } }));
     const listed = (await shopper.get('/v1/store/crypto/withdrawals')).json.data;
     assert.deepEqual(listed.map(item => [item.status, item.total]), [['completed', '101.500000']]);
@@ -385,6 +399,32 @@ describe('withdrawals through BitoCard’s signer', () => {
     assert.equal((await prisma.notification.count({ where: { customerId: shopper.id, type: 'customer.crypto.withdrawal_failed' } })), 2);
     const listed = (await admin.get(`/v1/admin/crypto/withdrawals?customer_id=${shopper.id}`)).json.data;
     assert.deepEqual(listed.map(item => item.status), ['failed', 'failed']);
+    await ledgerOk();
+  });
+
+  test('an unsigned or forged signer reply is unclear: a refusal is taken as final only when the signer signed it', async () => {
+    const shopper = await customer();
+    const address = await readyAddress(shopper);
+    fakes.state.mode = 'refuse';
+    fakes.state.unsignedReplies = true;
+    try {
+      const asked = await withdraw(shopper, address.id, '10');
+      let row = await settle(asked.id);
+      assert.deepEqual([row.status, /unsigned or wrongly signed/.test(row.error)], ['submitting', true], 'an unsigned refusal returns nothing');
+      fakes.state.unsignedReplies = false;
+      fakes.state.replySecret = 'someone-else-secret-at-least-32-characters';
+      row = await settle(asked.id);
+      assert.equal(row.status, 'submitting', 'nor a reply signed with another secret');
+      assert.equal(await balance(shopper), '988.500000', 'the money stays set aside');
+      delete fakes.state.replySecret;
+      row = await settle(asked.id);
+      assert.equal(row.status, 'failed', 'the signer’s signed refusal returns it');
+      assert.equal(await balance(shopper), '1000.000000');
+    } finally {
+      fakes.state.mode = 'ok';
+      fakes.state.unsignedReplies = false;
+      delete fakes.state.replySecret;
+    }
     await ledgerOk();
   });
 

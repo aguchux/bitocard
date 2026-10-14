@@ -11,7 +11,7 @@ export default function PrivacyNotice() {
     <LegalPage
       seo={seo}
       intro={<>
-        <p>This notice explains how BitoCard handles personal information when you visit our websites, create a customer account on our store at bitocard.com, buy from it, or contact us.</p>
+        <p>This notice explains how BitoCard handles personal information when you visit our websites, create a customer account on our store at bitocard.com, buy from it, use crypto wallets and P2P trading where we offer them, or contact us.</p>
         <p>We will update this notice before we launch any other service that collects more.</p>
       </>}
     >
@@ -40,13 +40,26 @@ export default function PrivacyNotice() {
         <h3>When you report a problem with an order</h3>
         <p>If you report a problem with an order (a dispute), we keep what you tell us: the subject, your messages and replies, which order and payment it is about, and when. We also keep the replies and notes of the store you bought from and of BitoCard, how the dispute was handled, and its outcome, such as a refund. The store that sold you the order sees your dispute and answers it first; BitoCard sees it too, and decides it if the store passes it on or if you bought from BitoCard&apos;s own store. Some notes are written only for the store and BitoCard and are not shown to you; you can ask for them as part of a request for your information (see section 10).</p>
         <p>If you dispute a card payment with your bank (a chargeback), the payment provider tells us the amount, its reason code and the outcome, and we keep these with your order and share them with the store that sold it.</p>
+        <h3>When you use crypto wallets and P2P trading</h3>
+        <p>We do not offer crypto wallets or P2P trading in any country yet. Where we switch them on, we keep:</p>
+        <ul>
+          <li>your crypto balances, and what your ads lock or what we have frozen;</li>
+          <li>your deposits: your deposit address for each network, and for each deposit the coin, amount, network, transaction hash, its confirmations and when it was credited;</li>
+          <li>your withdrawals: the addresses you save (with when you added them and the result of their sanctions screening), and for each withdrawal the coin, amount, fee, network, address, transaction hash, its status, any review and its outcome. The code we email to confirm a withdrawal is kept only as a hash and is valid for 30 minutes;</li>
+          <li>your P2P activity: your nickname, your ads, your trades (price, amounts, fee, the other trader&apos;s nickname and when) and your number of completed trades;</li>
+          <li>any freeze of your crypto or your crypto account, its reason, and whether it was released or the crypto taken.</li>
+        </ul>
+        <p>Deposits and withdrawals happen on public blockchains. Anyone can see a blockchain transaction&apos;s addresses, amount and time, and nobody, including us, can change or erase them. On its own this does not show who you are, but it can be linked to you by someone who knows one of your addresses.</p>
+        <p>Other traders see only your nickname, your ads and how many trades you have completed, never your name, email address or store.</p>
+        <h3>When you cash out P2P money to your bank</h3>
+        <p>The bank accounts you add (bank, account name and account number, the number kept encrypted), when you added them, and each payout&apos;s amount, account, status and the transfer provider&apos;s reference. We check that the account is in the name verified by your identity check, and email you each time an account is added.</p>
         <h3>When an identity check is needed</h3>
-        <p>For some products in some countries, the law or our fraud controls require you to verify your identity once before buying. In Nigeria we check your BVN with Flutterwave, after you approve it on your bank&apos;s page; we pass your BVN on and do not keep it. Elsewhere, Didit checks an identity document and compares it with a selfie, which involves biometric data, and we ask for your explicit consent first. We keep only the outcome, your verified name and the document&apos;s country, never images or document numbers.</p>
+        <p>For some products in some countries, and before you use crypto wallets, P2P trading or bank payouts of P2P money, the law or our fraud controls require you to verify your identity once. In Nigeria we check your BVN with Flutterwave, after you approve it on your bank&apos;s page; we pass your BVN on and do not keep it. Elsewhere, Didit checks an identity document and compares it with a selfie, which involves biometric data, and we ask for your explicit consent first. We keep only the outcome, your verified name and the document&apos;s country, never images or document numbers.</p>
         <h3>When you contact us</h3>
         <p>If you email us, we receive your email address, your name if you include it, and the content of your message.</p>
         <h3>What we do not collect</h3>
         <p>We do not collect your full card details or precise location, and we do not use analytics, advertising or tracking cookies. See our <Link href="/documents/cookies">cookie notice</Link>.</p>
-        <p>Apart from biometric data in identity checks, with your explicit consent, we do not collect sensitive personal information, and we do not make decisions about you based solely on automated processing, including profiling. If an identity check fails, you can ask for it to be reviewed by a person.</p>
+        <p>Apart from biometric data in identity checks, with your explicit consent, we do not collect sensitive personal information, and we do not make decisions about you based solely on automated processing, including profiling, except that we automatically refuse a crypto withdrawal address that sanctions screening matches to a sanctions list. If an identity check fails or an address is refused, you can ask for it to be reviewed by a person.</p>
       </Section>
 
       <Section id="use" title="4. How we use it and our legal bases">
@@ -60,6 +73,9 @@ export default function PrivacyNotice() {
               <tr><th scope="row">Handle problems you report with an order, decide them, and refund you or put things right</th><td>Account, order and payment information; your dispute and its messages</td><td>Performance of our contract with you, and our legitimate interests in resolving complaints fairly</td></tr>
               <tr><th scope="row">Respond to card payment disputes (chargebacks) and protect against fraud</th><td>Order and payment information; the dispute&apos;s details from the payment provider</td><td>Our legitimate interests in defending payments and preventing fraud</td></tr>
               <tr><th scope="row">Check your identity where the law or fraud controls require it, and prevent fraud</th><td>Account and order information, identity check results; biometric data during a document check</td><td>Legal obligation, or our legitimate interests in preventing fraud; explicit consent for biometric data</td></tr>
+              <tr><th scope="row">Provide crypto wallets and the P2P market: hold your crypto, credit deposits, send withdrawals, run your ads and trades, and pay out your P2P money</th><td>Account and identity check information; crypto, deposit, withdrawal, trade and ad records; addresses and on-chain data; bank account and payout details</td><td>Performance of our contract with you</td></tr>
+              <tr><th scope="row">Screen withdrawal addresses against sanctions lists, review withdrawals, freeze or take crypto, and report to authorities, to prevent fraud, money laundering and sanctions breaches</th><td>Account and identity check information; crypto, deposit, withdrawal, trade and payout records; addresses and on-chain data</td><td>Legal obligation, or our legitimate interests in preventing fraud and financial crime</td></tr>
+              <tr><th scope="row">Check that our wallets hold what we hold for customers</th><td>Crypto balances and on-chain data</td><td>Legal obligation, or our legitimate interests in keeping customers&apos; crypto safe</td></tr>
               <tr><th scope="row">Keep accounting and tax records</th><td>Order and payment information</td><td>Legal obligation</td></tr>
               <tr><th scope="row">Reply to your enquiries</th><td>Contact details and message</td><td>Our legitimate interests in responding to you, or steps you ask us to take before entering into a contract</td></tr>
               <tr><th scope="row">Meet legal obligations, and establish or defend legal claims</th><td>Any of the above, where relevant</td><td>Legal obligation, or our legitimate interests</td></tr>
@@ -72,7 +88,11 @@ export default function PrivacyNotice() {
       <Section id="share" title="5. Who we share it with">
         <ul>
           <li><strong>Service providers</strong> who act on our instructions. Vercel Inc. hosts our websites and delivers them through its global network, and our database host stores our records in the United States. Resend and MailerSend send our emails, including your codes and receipts. Our email provider handles messages you send us.</li>
-          <li><strong>Payment providers</strong> that take your payment and send refunds: Stripe (cards), Flutterwave (cards, bank transfer and mobile money), Monnify (Nigerian bank transfer and cards) and pawaPay (mobile money), depending on your country and the method you choose. Each also processes your payment under its own privacy notice.</li>
+          <li><strong>Payment providers</strong> that take your payment and send refunds: Stripe (cards), Flutterwave (cards, bank transfer and mobile money), Monnify (Nigerian bank transfer and cards) and pawaPay (mobile money), depending on your country and the method you choose. Flutterwave also sends payouts of P2P money to your bank account. Each also processes your payment under its own privacy notice.</li>
+          <li><strong>Blockchain data providers</strong> that read the blockchains for us, to find and confirm deposits and withdrawals: Alchemy, QuickNode, Infura, Ankr, NodeReal, GetBlock, Chainstack, Moralis, Helius, TronGrid, Tatum, BlockCypher, mempool.space and Blockstream, depending on the network. They receive your deposit and withdrawal addresses and transaction hashes, not your name.</li>
+          <li><strong>Sanctions screening providers</strong>: Chainalysis and TRM Labs receive the crypto withdrawal addresses you save, to check them against sanctions lists.</li>
+          <li><strong>A key management provider</strong> that keeps the keys to BitoCard&apos;s crypto wallets for our signing service, and receives the address and amount of each withdrawal it signs.</li>
+          <li><strong>Other P2P traders</strong>, who see your nickname, your ads and your number of completed trades, and <strong>the public</strong>, who can see blockchain transactions (see section 3).</li>
           <li><strong>Identity check providers</strong>, where a check is needed: Flutterwave (BVN checks in Nigeria) and Didit (document and selfie checks elsewhere).</li>
           <li><strong>The store you bought from</strong>, if it is a reseller&apos;s store: it sees your account details, your orders and your disputes with it, so it can serve you and answer your problems. Each store also has its own privacy notice for what it does with your information.</li>
           <li><strong>The companies that fulfil your order</strong>, such as the mobile network, pay-TV operator or utility, which receive only what they need to deliver it (for example the number to top up).</li>
@@ -85,6 +105,7 @@ export default function PrivacyNotice() {
 
       <Section id="transfers" title="6. International transfers">
         <p>Our group companies are in the United States, the United Kingdom and Nigeria, and our websites are hosted mainly in the United States through a global network. Your information may therefore be processed outside your country.</p>
+        <p>Public blockchains are copied to computers around the world, so deposit and withdrawal transactions are visible everywhere.</p>
         <p>When we transfer personal information, we use the safeguards your local law requires. These include adequacy decisions, the European Commission’s Standard Contractual Clauses, the UK International Data Transfer Addendum, and contractual commitments that meet the Nigerian, South African, Canadian and Asian laws described below. Contact us for more information about these safeguards.</p>
       </Section>
 
@@ -94,13 +115,16 @@ export default function PrivacyNotice() {
           <li>Your account is kept while it is open. Ask us to close it at any time; we then delete your account details within 30 days, except what we must keep for the records below.</li>
           <li>Orders, payments and refunds are kept for as long as accounting and tax laws require, usually six years after the order.</li>
           <li>Disputes and their messages are kept with the order they are about, for as long as we keep the order (usually six years after it), so we can deal with any claim about it.</li>
+          <li>Crypto balances, deposits, withdrawals, trades, ads, freezes and payouts of P2P money are kept like orders and payments, usually six years after the transaction, or longer where anti-money-laundering rules require it.</li>
+          <li>Saved withdrawal addresses and bank accounts are kept until you remove them, and then only with the records of the withdrawals and payouts that used them. Your nickname is kept while your account is open and with the records of your trades.</li>
+          <li>Blockchain transactions stay on the blockchain permanently. We cannot change or erase them.</li>
           <li>Identity check outcomes are kept while your account is open and for up to five years after, where anti-fraud or anti-money-laundering rules require it.</li>
           <li>Correspondence is kept for as long as we need it to deal with your enquiry, then for up to two years, unless a longer period is needed to meet a legal obligation or to establish or defend a legal claim.</li>
         </ul>
       </Section>
 
       <Section id="security" title="8. Security">
-        <p>We use encrypted connections (HTTPS), security headers and access controls, and we choose providers with strong security practices. No method of transmission or storage is completely secure, but we work to protect your information and will notify you and regulators of a breach where the law requires it.</p>
+        <p>We use encrypted connections (HTTPS), security headers and access controls, and we choose providers with strong security practices. The keys to BitoCard&apos;s crypto wallets are kept by a key management provider behind our signing service, never on our websites or in our API, and bank account numbers are encrypted. No method of transmission or storage is completely secure, but we work to protect your information and will notify you and regulators of a breach where the law requires it.</p>
       </Section>
 
       <Section id="children" title="9. Children">
@@ -119,6 +143,7 @@ export default function PrivacyNotice() {
           <li>appeal our decision on your request; and</li>
           <li>complain to a data protection regulator.</li>
         </ul>
+        <p>Some rights are limited by law or by how blockchains work: we cannot erase transactions from a blockchain, and we must keep some records, such as those of your crypto and payouts, for as long as anti-money-laundering, accounting and tax laws require.</p>
         <p>To use these rights, email <ContactEmail />. We may need to verify your identity first. We will not charge a fee or treat you differently for using your rights, and we will reply within the time your local law requires. You can also ask an authorised agent to make a request for you; we may ask for proof that they are authorised.</p>
       </Section>
 
