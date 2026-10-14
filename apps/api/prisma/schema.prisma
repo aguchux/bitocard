@@ -2220,6 +2220,8 @@ model Customer {
   cryptoWithdrawals  CryptoWithdrawal[]
   bankAccounts       CustomerBankAccount[]
   payouts            CustomerPayout[]
+  spinAllowances     SpinAllowance[]
+  spins              Spin[]
 
   @@unique([storeId, email])
   @@map("customers")
@@ -2863,4 +2865,53 @@ model ChainCursor {
 
   @@id([chain, mode])
   @@map("chain_cursors")
+}
+
+/// Spin and win: a customer's one-time $1 in crypto, won over 50 to 100 spins (a few a day). One per person (email) and
+/// mode across every store, so the same person at several stores gets it once. The wins are fixed when it starts.
+model SpinAllowance {
+  id         String     @id @default(uuid()) @db.Uuid
+  customerId String     @map("customer_id") @db.Uuid
+  mode       LedgerMode
+  /// The customer's email in lower case: one allowance per person and mode, whichever store they use.
+  emailKey   String     @map("email_key")
+  /// Each spin's win in US cents, in order (each 1 to 10, adding up to total_cents).
+  schedule   Int[]
+  totalCents Int        @default(100) @map("total_cents")
+  spinsUsed  Int        @default(0) @map("spins_used")
+  wonCents   Int        @default(0) @map("won_cents")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  spins      Spin[]
+
+  @@unique([mode, emailKey])
+  @@index([customerId])
+  @@map("spin_allowances")
+}
+
+/// One spin of the wheel: what it won (US cents), paid in which coin and how much, credited once (ledger `crypto_spin:<id>`).
+model Spin {
+  id          String        @id @default(uuid()) @db.Uuid
+  allowanceId String        @map("allowance_id") @db.Uuid
+  customerId  String        @map("customer_id") @db.Uuid
+  mode        LedgerMode
+  /// 1 for the first spin of the allowance.
+  number      Int
+  cents       Int
+  asset       String        @db.VarChar(10)
+  /// In the asset's base units.
+  amount      BigInt
+  /// The wheel segment it landed on (0 at the top, clockwise).
+  segment     Int
+  /// The coin's US dollar price used (BNB), as text; null for stablecoins counted at $1.
+  priceUsd    String?       @map("price_usd")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  allowance   SpinAllowance @relation(fields: [allowanceId], references: [id], onDelete: Restrict)
+  customer    Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@unique([allowanceId, number])
+  @@index([customerId, createdAt])
+  @@index([mode, createdAt])
+  @@map("spins")
 }

@@ -9,6 +9,7 @@
  */
 import { chainProviders } from '../crypto/chains/providers.js';
 import { screeners } from '../crypto/custody/screening.js';
+import { priceLinks } from '../crypto/price-feed.js';
 import { signerLinks } from '../crypto/custody/signer.js';
 
 export type IntegrationLink = { label: string; url: string };
@@ -77,6 +78,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   ...Object.fromEntries(chainProviders.map(provider => [provider.id, provider.links])),
   crypto_signer: signerLinks,
   ...Object.fromEntries(screeners.map(item => [item.id, item.links])),
+  crypto_prices: priceLinks,
 };
 
 export const linksFor = (id: string) => integrationLinks[id] ?? [];

@@ -10,7 +10,7 @@ import { CryptoWithdrawalsService } from '../withdrawals.service.js';
 import type { SignerBalance } from './signer.js';
 
 /** Ledger references of sandbox crypto credited without an on-chain deposit (CryptoWalletsService). */
-const testCreditPrefixes = ['crypto_test_deposit:', 'crypto_admin_credit:'];
+const testCreditPrefixes = ['crypto_test_deposit:', 'crypto_admin_credit:', 'crypto_spin:'];
 
 export function presentReconciliation(row: CryptoReconciliation, decimals: number) {
   return {

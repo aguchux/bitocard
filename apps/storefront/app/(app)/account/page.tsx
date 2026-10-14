@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
-import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct } from "@bitocard/api-client/storefront";
+import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
+import { showSpinCard, SpinCard } from "@/components/app/crypto";
 import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
@@ -30,13 +31,15 @@ function spent(summary: StoreCustomerSummary | null) {
 
 /** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
 export default async function AccountHome() {
-  const [navigation, summary, popular, recent, wallet] = await Promise.all([
+  const [navigation, summary, popular, recent, wallet, spins] = await Promise.all([
     storeNavigation(),
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
     inMarket("/v1/store/products?sort=popular&limit=8").then(path => storeApi<StoreList<StoreProduct>>(path)),
     customerApi<StoreList<StoreCheckout>>("GET", "/v1/store/checkouts?limit=3"),
     walletFor(),
+    customerApi<StoreSpinRewards>("GET", "/v1/store/spins"),
   ]);
+  const rewards = spins.ok ? spins.data : null;
   const figures = summary.ok ? summary.data : null;
   // Card widths: the next one peeks at every width; on desktops three and a quarter show (exactly three without a wallet).
   const statItem = wallet
@@ -72,6 +75,12 @@ export default async function AccountHome() {
           </li>
         </StatsSlider>
       </section>
+
+      {showSpinCard(rewards) ? (
+        <section aria-label="Spin and win">
+          <SpinCard rewards={rewards} />
+        </section>
+      ) : null}
 
       <section aria-labelledby="shop">
         <SectionTitle id="shop" title="Shop by category" href="/account/catalog" />

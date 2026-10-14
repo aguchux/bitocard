@@ -2,6 +2,7 @@ import type { AppConfig } from '../config/config.js';
 import { chainProviders, walletKeyFields } from '../crypto/chains/providers.js';
 import { screeners } from '../crypto/custody/screening.js';
 import { signerFields } from '../crypto/custody/signer.js';
+import { priceFields } from '../crypto/price-feed.js';
 import { supplierCredentialGroups, supplierCredentialKey } from './supplier-credentials.js';
 
 /**
@@ -427,6 +428,14 @@ export const integrationGroups: IntegrationGroup[] = [
     fields: signerFields,
   },
   ...screeners.map(item => ({ id: item.id, name: item.name, description: item.description, section: 'blockchain' as const, adapterReady: true, fields: item.fields })),
+  {
+    id: 'crypto_prices',
+    name: 'CoinGecko prices',
+    description: 'US dollar prices of BNB, BTC and ETH, used only to size BitoCard’s own crypto rewards (Spin and win pays BNB worth its dollar value). Without a price, a reward pays in a dollar stablecoin instead.',
+    section: 'blockchain' as const,
+    adapterReady: true,
+    fields: priceFields,
+  },
 ];
 
 export const integrationFields = new Map(integrationGroups.flatMap(group => group.fields.map(item => [item.key, item] as const)));

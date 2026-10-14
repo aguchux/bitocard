@@ -12,6 +12,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { checkProvider, checkWalletKeys, providerKeys } from '../crypto/chains/check.js';
 import { chainProvider, walletKeyFields } from '../crypto/chains/providers.js';
 import { checkScreener, checkSigner } from '../crypto/custody/check.js';
+import { checkPrices } from '../crypto/price-feed.js';
 import { screener } from '../crypto/custody/screening.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { connectable } from '../reseller-integrations/connectable.js';
@@ -93,7 +94,9 @@ export class IntegrationsAdminService {
         ? await checkSigner(values)
         : screener(group.id)
           ? await checkScreener(screener(group.id)!, values)
-          : checkWalletKeys(this.integrations.values(walletKeyFields.map(item => item.key)));
+          : group.id === 'crypto_prices'
+            ? await checkPrices(values)
+            : checkWalletKeys(this.integrations.values(walletKeyFields.map(item => item.key)));
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment: outcome.environment, ok: outcome.ok } });
     return { object: 'integration_test' as const, integration: group.id, environment: outcome.environment, ok: outcome.ok, message: outcome.message, chains: outcome.chains, tested_at: new Date().toISOString() };
   }

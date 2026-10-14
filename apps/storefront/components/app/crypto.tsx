@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade } from "@bitocard/api-client/storefront";
+import { ChevronRight, Gift, ShieldAlert, ShieldCheck } from "lucide-react";
+import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade, type StoreSpinRewards } from "@bitocard/api-client/storefront";
+import { usd } from "@/lib/spin";
 
 export const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
@@ -25,6 +26,7 @@ const sections = [
   { href: "/account/crypto/deposit", label: "Deposit" },
   { href: "/account/crypto/withdraw", label: "Withdraw" },
   { href: "/account/crypto/cash-out", label: "Cash out" },
+  { href: "/account/crypto/spin", label: "Spin" },
 ];
 
 /**
@@ -146,6 +148,34 @@ export function TradeRow({ trade }: { trade: StoreP2pTrade }) {
         {bought ? "−" : "+"}
         {formatFace(trade.fiat, trade.currency)}
       </span>
+    </Link>
+  );
+}
+
+/** Whether the Spin and win card belongs on screen: the customer can spin, or their $1 is under way. */
+export const showSpinCard = (rewards: StoreSpinRewards | null): rewards is StoreSpinRewards => Boolean(rewards && (rewards.enabled || (rewards.allowance && !rewards.allowance.finished)));
+
+/** The way into Spin and win, on Home and the Crypto page: what is won so far, and the spins left today. */
+export function SpinCard({ rewards }: { rewards: StoreSpinRewards }) {
+  const allowance = rewards.allowance;
+  const note = !allowance
+    ? "Spin the wheel to collect $1 in crypto, a few cents at a time."
+    : allowance.today_left > 0 && rewards.enabled
+      ? `${usd(allowance.won_usd)} of ${usd(allowance.total_usd)} won · ${allowance.today_left} ${allowance.today_left === 1 ? "spin" : "spins"} left today`
+      : `${usd(allowance.won_usd)} of ${usd(allowance.total_usd)} won · come back tomorrow`;
+  return (
+    <Link href="/account/crypto/spin" className="flex items-center gap-4 rounded-3xl bg-gradient-to-r from-[#070f4c] to-[#2a1466] p-4 text-white ring-1 ring-[#070f4c] hover:to-[#3a1680] sm:p-5">
+      <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#ff2382]">
+        <Gift className="size-6" aria-hidden="true" strokeWidth={2.25} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-lg font-extrabold">Spin and win{rewards.mode === "test" ? " (test)" : ""}</span>
+        <span className="block text-sm text-white/80">{note}</span>
+      </span>
+      <span className="hidden shrink-0 items-center gap-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-[#070f4c] sm:inline-flex">
+        Spin now <ChevronRight className="size-4" aria-hidden="true" />
+      </span>
+      <ChevronRight className="size-5 shrink-0 sm:hidden" aria-hidden="true" />
     </Link>
   );
 }

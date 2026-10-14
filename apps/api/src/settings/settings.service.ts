@@ -41,6 +41,10 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too.",
   },
+  spin_rewards: {
+    scopes: ['global', 'country', 'reseller'],
+    description: "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

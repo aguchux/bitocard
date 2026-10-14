@@ -534,3 +534,48 @@ export function formatCrypto(amount: string, asset?: string) {
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${grouped}${trimmed ? `.${trimmed}` : ''}${asset ? ` ${asset}` : ''}`;
 }
+
+// -- Spin and win ---------------------------------------------------------------------------------------------------
+
+/** The coins the wheel pays in. */
+export type StoreSpinAsset = 'USDT' | 'USDC' | 'BNB';
+
+/** Why a customer cannot spin (null when they can). */
+export type StoreSpinBlock = 'not_enabled' | 'crypto_not_enabled' | 'email_not_verified' | 'customer_verification_required' | 'crypto_account_frozen' | 'claimed_elsewhere';
+
+/** One of the wheel's segments, clockwise from the top (index 0 first). `usd`: its value, "0.05". */
+export type StoreSpinSegment = { index: number; asset: StoreSpinAsset; usd: string };
+
+/**
+ * The customer's one-time $1: spread over `spins_total` spins (fixed by the server, 50 to 100), up to `daily_limit` a
+ * day. `next_spin_at`: when they can spin again, while today's spins are used and some remain.
+ */
+export type StoreSpinAllowance = {
+  total_usd: string;
+  won_usd: string;
+  spins_total: number;
+  spins_used: number;
+  spins_left: number;
+  today_left: number;
+  daily_limit: number;
+  next_spin_at: string | null;
+  finished: boolean;
+};
+
+/** A spin won: `amount` in the coin (a decimal string), `usd` its value, `segment` where the wheel landed. */
+export type StoreSpinWin = { id: string; number: number; asset: StoreSpinAsset | string; amount: string; usd: string; segment: number; created_at: string };
+
+/** `GET /v1/store/spins`: the wheel, whether the customer can spin (and why not), their allowance and latest wins. */
+export type StoreSpinRewards = {
+  object: 'spin_rewards';
+  mode: 'live' | 'test';
+  enabled: boolean;
+  reason: StoreSpinBlock | null;
+  segments: StoreSpinSegment[];
+  /** Null until the first spin. */
+  allowance: StoreSpinAllowance | null;
+  recent: StoreSpinWin[];
+};
+
+/** `POST /v1/store/spins`: the spin's outcome, decided by the server, and the allowance after it. */
+export type StoreSpin = { object: 'spin'; id: string; number: number; segment: number; asset: StoreSpinAsset | string; amount: string; usd: string; allowance: StoreSpinAllowance };

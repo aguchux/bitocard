@@ -127,6 +127,16 @@ export default function TermsOfUse() {
           <li>post misleading ads or manipulate prices.</li>
         </ul>
         <p>If you do, we may freeze your crypto and your account, cancel anything not yet completed, and report it to the authorities where the law requires it.</p>
+
+        <h3 id="crypto-spin">Spin and win</h3>
+        <p>Where we run it, Spin and win is a free BitoCard promotion: nothing is bought to take part. These rules apply:</p>
+        <ul>
+          <li>Each person can win US$1 in crypto in all, once, whichever stores they use: an email address that has had it at one store cannot have it again at another. Opening other accounts to take part again is not allowed.</li>
+          <li>You get between 50 and 100 spins, set when you first spin, and can spin up to five times a day (days start at midnight UTC). Each spin wins between US$0.01 and US$0.10, and your spins add up to exactly US$1. What each spin wins is set by us in advance, not by chance on the wheel: the wheel shows it.</li>
+          <li>Wins are paid at once into your crypto wallet with us, in BNB, USDT or USDC as the wheel shows. USDT and USDC count as one US dollar each. BNB is worth the win at its US dollar price when you spin, rounded down; if we cannot get a price, that spin pays in USDT instead.</li>
+          <li>You need everything our crypto wallets need (section 4): a confirmed email, your identity checked where required, and an account that is not frozen. Test stores pay test crypto with no value.</li>
+          <li>Your winnings are yours like any other crypto you hold with us, and these terms apply to them. We may end or change the promotion at any time, without affecting what you have already won, and take back winnings gained by breaking these rules.</li>
+        </ul>
       </Section>
 
       <Section id="no-advice" title="5. No financial advice">

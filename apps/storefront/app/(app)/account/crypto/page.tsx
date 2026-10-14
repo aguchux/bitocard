@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Lock, Snowflake } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pProfile, type StoreP2pTrade } from "@bitocard/api-client/storefront";
-import { canWithdraw, card, CoinBadge, CryptoGate, CryptoNav, hasP2pMoney, heldAssets, TradeRow, tradableAssets } from "@/components/app/crypto";
+import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pProfile, type StoreP2pTrade, type StoreSpinRewards } from "@bitocard/api-client/storefront";
+import { canWithdraw, card, CoinBadge, CryptoGate, CryptoNav, hasP2pMoney, heldAssets, showSpinCard, SpinCard, TradeRow, tradableAssets } from "@/components/app/crypto";
 import { NicknameForm, QuickTrade, TestCryptoForm } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
@@ -14,11 +14,13 @@ export const metadata: Metadata = { title: "Crypto" };
  * closed to them, what they still hold stays here to withdraw and cash out.
  */
 export default async function CryptoPage() {
-  const [overview, profile, trades] = await Promise.all([
+  const [overview, profile, trades, spins] = await Promise.all([
     customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"),
     customerApi<StoreP2pProfile>("GET", "/v1/store/p2p/profile"),
     customerApi<StoreList<StoreP2pTrade>>("GET", "/v1/store/p2p/trades?limit=5"),
+    customerApi<StoreSpinRewards>("GET", "/v1/store/spins"),
   ]);
+  const rewards = spins.ok ? spins.data : null;
   const wallets = overview.ok ? overview.data : null;
   // Coins that can be traded or deposited: crypto open to them and the coin not switched off.
   const assets = tradableAssets(wallets);
@@ -35,6 +37,7 @@ export default async function CryptoPage() {
       </div>
       <CryptoNav current="/account/crypto" />
       {blocked ? <CryptoGate wallets={wallets} p2p /> : null}
+      {showSpinCard(rewards) ? <SpinCard rewards={rewards} /> : null}
 
       {wallets && !blocked ? (
         <section aria-labelledby="quick" className="rounded-3xl bg-[#070f4c] p-4 text-white sm:p-6">
