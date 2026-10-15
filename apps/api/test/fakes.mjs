@@ -715,7 +715,7 @@ export async function fakeStripe() {
   // idempotency keys to the refund they made, so a repeat returns it, as Stripe does.
   // `disputes` maps a dispute ID to { amount, currency, status, payment_intent, reason }.
   // `refuseCurrencies`: currencies the account cannot take (lower case), refused as Stripe does; `attempts` every session asked for.
-  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), attempts: [] };
+  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), attempts: [], managedPayments: false };
   const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
@@ -727,6 +727,10 @@ export async function fakeStripe() {
       if (state.refuseCurrencies.has(fields['line_items[0][price_data][currency]'])) {
         const currency = fields['line_items[0][price_data][currency]'];
         return { status: 400, body: { error: { type: 'invalid_request_error', message: `Invalid currency: ${currency}. You can change your account to process transactions in ${currency} by adding a bank account for this currency at https://dashboard.stripe.com/account. Your account currently supports these currencies: usd, ngn.` } } };
+      }
+      // Stripe Managed Payments on: every line item needs a product tax code.
+      if (state.managedPayments && !fields['line_items[0][price_data][product_data][tax_code]']) {
+        return { status: 400, body: { error: { type: 'invalid_request_error', message: 'Invalid line_items[0]: the product tax code is missing. Set the tax_code field of the product to an eligible product tax code.' } } };
       }
       const id = `cs_test_${(state.next += 1)}`;
       state.sessions[id] = { fields, status: 'open', payment_status: 'unpaid', payment_intent: `pi_${state.next}`, key: headers.authorization.slice(7) };

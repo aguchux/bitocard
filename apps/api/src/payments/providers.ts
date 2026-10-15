@@ -36,6 +36,8 @@ export type CheckoutInput = {
   name: string;
   returnUrl: string;
   description: string;
+  /** What is paid for: a store checkout's product category; null for wallet top-ups (Stripe picks its tax code from it). */
+  category?: string | null;
 };
 
 export type RefundResult = { status: 'refunded' | 'pending' | 'failed'; providerRefundId: string; failureReason?: string };

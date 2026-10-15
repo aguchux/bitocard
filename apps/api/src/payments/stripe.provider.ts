@@ -56,6 +56,12 @@ export function stripeFee(balance: BalanceTransaction, chargeCurrency: string) {
  * when the page is opened), so checks and notifications find it; the session's `client_reference_id` is our reference.
  * Stripe's fee is read from the charge's balance transaction.
  */
+/**
+ * Stripe product tax codes by what is paid for (Managed Payments requires one, and accepts only digital products):
+ * software is downloadable software for personal use. Other categories get the account's default code, if set.
+ */
+export const stripeTaxCodes: Record<string, string> = { software: 'txcd_10202000' };
+
 export class StripeProvider implements CheckoutProvider {
   readonly name = 'stripe';
   /** Cards are charged in US dollars where the account cannot take the local currency. */
@@ -65,7 +71,14 @@ export class StripeProvider implements CheckoutProvider {
     private readonly secretKey: string,
     private readonly baseUrl: string,
     private readonly webhookSecret?: string,
+    /** The code for payments with none of their own (`STRIPE_TAX_CODE`). */
+    private readonly defaultTaxCode?: string,
   ) {}
+
+  /** The product tax code to send for a payment, or null to send none. */
+  taxCodeFor(category: string | null | undefined) {
+    return (category ? stripeTaxCodes[category] : undefined) ?? this.defaultTaxCode ?? null;
+  }
 
   private call<T>(path: string, init: { method?: string; form?: Record<string, string>; idempotencyKey?: string } = {}) {
     const { idempotencyKey, ...rest } = init;
@@ -117,11 +130,21 @@ export class StripeProvider implements CheckoutProvider {
         refusedCurrencies.set(this.accountKey, refused);
         throw new ProviderError(this.name, `the Stripe account cannot take ${input.currency.toUpperCase()}`, true, 400, 'currency_unsupported');
       }
+      // Managed Payments is on for the account and this payment has no (eligible) tax code: a clear refusal, explained.
+      if (error instanceof ProviderError && error.status === 400 && /tax[ _]code/i.test(error.message)) {
+        throw new ProviderError(
+          this.name,
+          `${error.message.replace(/^stripe: /, '')} Stripe Managed Payments is on for this account and only takes digital products with an eligible tax code. Turn Managed Payments off in the Stripe dashboard to take wallet top-ups, gift cards, airtime and other products; software checkouts send txcd_10202000 and the Stripe integration's Default product tax code covers the rest.`,
+          true,
+          400,
+        );
+      }
       throw error;
     }
   }
 
   private async openSession(input: CheckoutInput) {
+    const taxCode = this.taxCodeFor(input.category);
     const session = await this.call<Session>('/v1/checkout/sessions', {
       method: 'POST',
       form: {
@@ -134,6 +157,7 @@ export class StripeProvider implements CheckoutProvider {
         'line_items[0][price_data][currency]': input.currency.toLowerCase(),
         'line_items[0][price_data][unit_amount]': String(stripeAmount(input.amount, input.currency)),
         'line_items[0][price_data][product_data][name]': input.description,
+        ...(taxCode ? { 'line_items[0][price_data][product_data][tax_code]': taxCode } : {}),
         'metadata[reference]': input.reference,
         'payment_intent_data[metadata][reference]': input.reference,
       },

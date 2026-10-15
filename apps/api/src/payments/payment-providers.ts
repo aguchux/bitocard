@@ -51,7 +51,7 @@ export class PaymentProviders {
           config.MONNIFY_API_KEY && config.MONNIFY_SECRET_KEY && config.MONNIFY_CONTRACT_CODE && !inSandbox(settings, 'monnify')
             ? new MonnifyProvider(config.MONNIFY_API_KEY, config.MONNIFY_SECRET_KEY, config.MONNIFY_CONTRACT_CODE, config.MONNIFY_API_URL)
             : null,
-        stripe: config.STRIPE_SECRET_KEY && !inSandbox(settings, 'stripe') && this.liveKey('stripe', config.STRIPE_SECRET_KEY) ? new StripeProvider(config.STRIPE_SECRET_KEY, config.STRIPE_API_URL, config.STRIPE_WEBHOOK_SECRET) : null,
+        stripe: config.STRIPE_SECRET_KEY && !inSandbox(settings, 'stripe') && this.liveKey('stripe', config.STRIPE_SECRET_KEY) ? new StripeProvider(config.STRIPE_SECRET_KEY, config.STRIPE_API_URL, config.STRIPE_WEBHOOK_SECRET, config.STRIPE_TAX_CODE) : null,
         pawapay: config.PAWAPAY_API_TOKEN && !inSandbox(settings, 'pawapay') ? new PawapayPaymentsProvider(config.PAWAPAY_API_TOKEN, config.PAWAPAY_API_URL, config.PAWAPAY_CALLBACK_TOKEN) : null,
       };
     });

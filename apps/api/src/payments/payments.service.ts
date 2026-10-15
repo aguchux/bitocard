@@ -220,6 +220,8 @@ export class PaymentsService {
     payer: { email: string; name: string };
     returnUrl: string;
     description: string;
+    /** A store checkout's product category (gateways that need a product tax code read it); none for top-ups. */
+    category?: string | null;
     /** A reseller's own gateway: its connection and provider (their account). The payment never enters BitoCard's ledger. */
     own?: { connectionId: string; provider: CheckoutProvider };
     id?: string;
@@ -251,6 +253,7 @@ export class PaymentsService {
         name: input.payer.name,
         returnUrl: input.returnUrl,
         description: input.description,
+        category: input.category ?? null,
       });
     try {
       const fallback = provider.fallbackCurrency && provider.fallbackCurrency !== input.currency.toUpperCase() ? provider.fallbackCurrency : null;

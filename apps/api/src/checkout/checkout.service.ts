@@ -308,6 +308,7 @@ export class CheckoutService implements OnModuleInit {
         payer: { email: customer.email, name: customer.name },
         returnUrl: returnUrl.toString(),
         description: quote.quantity > 1 ? `${quote.quantity} x ${product.name}` : product.name,
+        category: product.category,
       });
       await this.prisma.checkout.update({ where: { id }, data: { paymentId } });
     } catch (error) {

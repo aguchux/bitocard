@@ -114,6 +114,15 @@ export const configSchema = z.object({
   /** The endpoint's signing secret (whsec_…): webhooks are checked against it (Stripe-Signature). */
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_API_URL: z.string().url().default('https://api.stripe.com'),
+  /**
+   * Stripe product tax code for payments with no code of their own (everything but software). Needed only while Stripe
+   * Managed Payments is on for the account, which takes only digital products (software, games, digital media, online
+   * services): wallet top-ups, gift cards, airtime, bills and the like are not eligible.
+   */
+  STRIPE_TAX_CODE: z
+    .string()
+    .regex(/^txcd_\d{8}$/, 'a Stripe tax code looks like txcd_10000000')
+    .optional(),
   /** on: the test secret key (sk_test_…) for checks only; Stripe is never used for live payments. */
   STRIPE_SANDBOX: flag.prefault('off'),
   /** Where the payment page sends the payer back to when the caller gives no return_url. */
