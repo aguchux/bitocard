@@ -782,6 +782,12 @@ enum AccountKind {
   crypto_withdrawing
   /// A customer's P2P money on its way to their bank account: back to `customer_withdrawable` if the transfer fails.
   customer_payouts_pending
+  /// A customer's Spin and win rewards, one account per coin, in its base units: never withdrawn on chain or traded,
+  /// only exchanged into their store wallet (`customer_wallet`). Never below zero.
+  crypto_spin_rewards
+  /// What BitoCard has granted in Spin and win rewards, in each coin (a marketing expense, debit-normal): given back
+  /// when rewards are exchanged, whose cost is then booked in money to `promotions`.
+  crypto_promotions
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -2235,6 +2241,7 @@ model Customer {
   payouts            CustomerPayout[]
   spinAllowances     SpinAllowance[]
   spins              Spin[]
+  spinExchanges      SpinExchange[]
 
   @@unique([storeId, email])
   @@map("customers")
@@ -3037,4 +3044,27 @@ model KycSession {
 
   @@index([caseId])
   @@map("kyc_sessions")
+}
+
+/// Spin and win rewards exchanged into a customer's store wallet (ledger `spin_exchange:<id>`): every coin's rewards at
+/// once, valued in US cents (stablecoins at $1, BNB at its price) and paid in the wallet's currency.
+model SpinExchange {
+  id          String     @id @default(uuid()) @db.Uuid
+  customerId  String     @map("customer_id") @db.Uuid
+  mode        LedgerMode
+  /// What was exchanged, per coin, in base units as text: `{ "USDT": "120000", "BNB": "53000" }`.
+  amounts     Json
+  /// Their value in US cents, rounded down.
+  usdCents    Int        @map("usd_cents")
+  /// The wallet credited and how much, in its minor units.
+  currency    String     @db.VarChar(10)
+  amountMinor BigInt     @map("amount_minor")
+  /// US dollars to the wallet's currency (1 for US dollars), as text.
+  rate        String
+  createdAt   DateTime   @default(now()) @map("created_at")
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([mode, createdAt])
+  @@map("spin_exchanges")
 }

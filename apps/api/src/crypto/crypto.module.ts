@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CheckoutModule } from '../checkout/checkout.module.js';
+import { FxModule } from '../fx/fx.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { PayoutsModule } from '../payouts/payouts.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
@@ -30,7 +31,7 @@ import { CryptoWithdrawalsService } from './withdrawals.service.js';
  * wallets) and bank payouts of P2P money.
  */
 @Module({
-  imports: [CheckoutModule, IdentityModule, PayoutsModule, SettingsModule],
+  imports: [CheckoutModule, FxModule, IdentityModule, PayoutsModule, SettingsModule],
   controllers: [
     CustomerCryptoController,
     CustomerWithdrawalsController,

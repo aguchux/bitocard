@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
-import { showSpinCard, SpinCard } from "@/components/app/crypto";
+import { SpinDialog } from "@/components/app/spin-dialog";
+import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
@@ -30,7 +31,8 @@ function spent(summary: StoreCustomerSummary | null) {
 }
 
 /** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
-export default async function AccountHome() {
+export default async function AccountHome({ searchParams }: { searchParams: Promise<{ spin?: string }> }) {
+  const { spin } = await searchParams;
   const [navigation, summary, popular, recent, wallet, spins] = await Promise.all([
     storeNavigation(),
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
@@ -76,9 +78,9 @@ export default async function AccountHome() {
         </StatsSlider>
       </section>
 
-      {showSpinCard(rewards) ? (
+      {showSpin(rewards) ? (
         <section aria-label="Spin and win">
-          <SpinCard rewards={rewards} />
+          <SpinDialog rewards={rewards} open={spin === "1"} />
         </section>
       ) : null}
 

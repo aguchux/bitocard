@@ -2,8 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { Coins, DollarSign, Gift, Users } from "lucide-react";
-import { Card, DataTable, errorMessage, FilterSelect, formatDateTime, PageHeader, StatCard, type Column } from "@bitocard/admin-ui";
+import { ArrowRightLeft, Coins, DollarSign, Gift, Users } from "lucide-react";
+import { Card, DataTable, errorMessage, FilterSelect, formatDateTime, formatMoney, PageHeader, StatCard, type Column } from "@bitocard/admin-ui";
 import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { type Mode, type SpinReward, useSpinRewardsQuery } from "@bitocard/api-client/admin";
 
@@ -59,7 +59,7 @@ function SpinRewards() {
     <AdminShell section="crypto" current="/crypto/spins" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Spin rewards" }]}>
       <PageHeader
         title="Spin rewards"
-        description="The Spin and win promotion: $1 per person, once, paid in crypto over 50 to 100 spins (up to 5 a day). Each spin is decided by the API and paid into the customer's crypto wallet at once."
+        description="The Spin and win promotion: $1 per person, once, won in crypto over 50 to 100 spins (up to 2 a day; customers are not shown the total). Each spin is decided by the API and credited to the customer's spin rewards, never withdrawn or traded: customers exchange them into their store wallet to buy products."
       />
       <div className="mt-6 flex flex-wrap gap-3">
         <FilterSelect id="spins-mode" label="Mode" value={mode} onChange={value => setMode(value as Mode)} options={[{ value: "live", label: "Live" }, { value: "test", label: "Test" }]} />
@@ -73,6 +73,20 @@ function SpinRewards() {
         <StatCard icon={<DollarSign />} label="Paid out" value={dollars(String(usdTotal))} loading={spins.isLoading} />
         <StatCard icon={<Gift />} tone="blue" label="Spins" value={spinCount.toLocaleString("en-GB")} loading={spins.isLoading} />
         <StatCard icon={<Users />} tone="green" label="Customers started" value={(spins.data?.customers ?? 0).toLocaleString("en-GB")} loading={spins.isLoading} />
+        {(spins.data?.exchanged ?? []).map(item => (
+          <StatCard
+            key={`exchanged-${item.currency}`}
+            icon={<ArrowRightLeft />}
+            tone="pink"
+            label={`Moved to ${item.currency} wallets`}
+            value={formatMoney(item.amount, item.currency)}
+            footer={
+              <span className="text-xs text-muted">
+                {dollars(item.usd)} of rewards · {item.exchanges.toLocaleString("en-GB")} {item.exchanges === 1 ? "exchange" : "exchanges"}
+              </span>
+            }
+          />
+        ))}
         {totals.map(total => (
           <StatCard
             key={total.asset}

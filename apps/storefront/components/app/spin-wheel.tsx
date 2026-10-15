@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
-import { Loader2, Lock } from "lucide-react";
-import { formatCrypto, type StoreSpin, type StoreSpinAllowance, type StoreSpinRewards, type StoreSpinSegment, type StoreSpinWin } from "@bitocard/api-client/storefront";
-import { spinWheel } from "@/lib/spin-actions";
-import { landingAngle, restingAngle, segmentAt, spinBlocks, usd, wonPercent } from "@/lib/spin";
+import { ArrowRightLeft, Loader2, Lock } from "lucide-react";
+import { formatCrypto, formatPrice, type StoreSpin, type StoreSpinAllowance, type StoreSpinExchangePreview, type StoreSpinRewardBalance, type StoreSpinRewards, type StoreSpinSegment, type StoreSpinWin } from "@bitocard/api-client/storefront";
+import { exchangeRewards, previewExchange, spinRewards, spinWheel } from "@/lib/spin-actions";
+import { landingAngle, restingAngle, segmentAt, spinBlocks, usd } from "@/lib/spin";
 
 const navy = "#070f4c";
 const pink = "#e8116d";
@@ -29,7 +29,7 @@ const winDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "
 
 /** Whether the customer can spin now. */
 function canSpin(enabled: boolean, allowance: StoreSpinAllowance | null) {
-  return enabled && (!allowance || (!allowance.finished && allowance.spins_left > 0 && allowance.today_left > 0));
+  return enabled && (!allowance || (!allowance.finished && allowance.today_left > 0));
 }
 
 /** The wheel's face: one wedge per segment, alternating navy and pink, each with its value and coin. */
@@ -86,15 +86,127 @@ function Burst() {
 }
 
 /**
+ * The customer's rewards and the way to use them: never withdrawn or traded, they are exchanged into the store wallet
+ * (their country's currency or US dollars) to buy from the store. The amount is quoted first; exchanging refuses a
+ * lower amount than the one shown.
+ */
+function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewardBalance; onExchanged: () => void }) {
+  const currencies = rewards.exchange_currencies;
+  const [quote, setQuote] = useState<StoreSpinExchangePreview | null>(null);
+  const [state, setState] = useState<"idle" | "quoting" | "exchanging">("idle");
+  const [message, setMessage] = useState<{ tone: "error" | "done"; text: string } | null>(null);
+  const has = Number(rewards.usd) > 0;
+
+  async function quoteFor(code: string) {
+    setMessage(null);
+    setState("quoting");
+    const result = await previewExchange(code);
+    setState("idle");
+    if (result.ok) setQuote(result.data);
+    else {
+      setQuote(null);
+      setMessage({ tone: "error", text: result.message });
+    }
+  }
+
+  async function exchange() {
+    if (!quote) return;
+    setState("exchanging");
+    const result = await exchangeRewards(quote.currency, quote.amount, crypto.randomUUID());
+    setState("idle");
+    setQuote(null);
+    if (result.ok) {
+      setMessage({ tone: "done", text: `${formatPrice(result.data.amount, result.data.currency)} is in your wallet. Spend it on anything in the store.` });
+      onExchanged();
+    } else setMessage({ tone: "error", text: result.message });
+  }
+
+  return (
+    <section aria-labelledby="rewards" className="rounded-3xl bg-white/[0.06] p-5 ring-1 ring-white/10">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="rewards" className="text-lg font-bold">
+          Your rewards
+        </h2>
+        <span className="font-display text-2xl font-extrabold text-[#ffd23f]">{usd(rewards.usd)}</span>
+      </div>
+      {rewards.coins.length ? (
+        <ul className="mt-2 flex flex-wrap gap-2 text-sm">
+          {rewards.coins.map(coin => (
+            <li key={coin.asset} className="rounded-full bg-white/10 px-3 py-1">
+              {formatCrypto(coin.amount, coin.asset)}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-sm text-white/70">What you win collects here.</p>
+      )}
+      <p className="mt-3 text-sm text-white/70">Move your rewards into your wallet and spend them in the store. Rewards cannot be withdrawn or sent anywhere else.</p>
+
+      {has ? (
+        <div className="mt-4 space-y-3">
+          <div role="group" aria-label="Wallet to move them to" className="flex gap-2">
+            {currencies.map(code => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => quoteFor(code)}
+                disabled={state !== "idle"}
+                aria-pressed={quote?.currency === code}
+                className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-bold ring-1 transition-colors ${quote?.currency === code ? "bg-white text-[#070f4c] ring-white" : "bg-white/5 text-white ring-white/25 hover:bg-white/10"}`}
+              >
+                {code === "USD" ? "US dollars" : `${code} wallet`}
+              </button>
+            ))}
+          </div>
+          {state === "quoting" ? <p className="text-sm text-white/70">Working out the rate…</p> : null}
+          {quote ? (
+            <div className="rounded-2xl bg-white p-4 text-[#070f4c]">
+              <p className="text-sm text-slate-600">You get</p>
+              <p className="font-display text-2xl font-extrabold">{formatPrice(quote.amount, quote.currency)}</p>
+              <p className="text-xs text-slate-500">
+                {usd(quote.usd)}
+                {quote.currency === "USD" ? "" : ` at ${Number(quote.rate).toLocaleString("en-GB", { maximumFractionDigits: 2 })} ${quote.currency} to the dollar`}
+              </p>
+              <button
+                type="button"
+                onClick={exchange}
+                disabled={state !== "idle"}
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-bold text-white hover:bg-[#e8116d] disabled:opacity-70"
+              >
+                {state === "exchanging" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ArrowRightLeft className="size-4" aria-hidden="true" />}
+                Move to my wallet
+              </button>
+            </div>
+          ) : state === "idle" && !message ? (
+            <p className="text-sm text-white/70">Choose a wallet to see what you get.</p>
+          ) : null}
+        </div>
+      ) : null}
+      {message ? (
+        <p role={message.tone === "error" ? "alert" : "status"} className={`mt-3 rounded-2xl p-3 text-sm ${message.tone === "error" ? "bg-red-500/15 text-red-100 ring-1 ring-red-400/40" : "bg-emerald-500/15 text-emerald-100 ring-1 ring-emerald-400/40"}`}>
+          {message.text}
+          {message.tone === "done" ? (
+            <Link href="/account/wallet" className="ml-1 font-semibold underline">
+              See my wallet
+            </Link>
+          ) : null}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
  * Spin and win. The server decides each spin's outcome and pays it at once; the wheel only shows it: it waits for the
  * answer (the hub shows it is working), then turns 6 to 8 full turns and slows to a stop with the pointer inside the
  * won segment, never before. The angle only ever grows, so the wheel never snaps back between spins.
  */
-export function SpinWheel({ initial }: { initial: StoreSpinRewards }) {
+export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; onChange?: () => void }) {
   const segments = [...initial.segments].sort((a, b) => a.index - b.index);
   const count = segments.length;
   const [allowance, setAllowance] = useState<StoreSpinAllowance | null>(initial.allowance);
   const [recent, setRecent] = useState<StoreSpinWin[]>(initial.recent);
+  const [rewards, setRewards] = useState<StoreSpinRewardBalance>(initial.rewards);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [blocked, setBlocked] = useState<string | null>(initial.enabled ? null : (initial.reason ?? "not_enabled"));
   const [angle, setAngle] = useState(() => restingAngle(count || 12));
@@ -130,6 +242,14 @@ export function SpinWheel({ initial }: { initial: StoreSpinRewards }) {
     setRecent(list => [{ id: spin.id, number: spin.number, asset: spin.asset, amount: spin.amount, usd: spin.usd, segment: spin.segment, created_at: new Date().toISOString() }, ...list.filter(item => item.id !== spin.id)].slice(0, 10));
     setWin(spin);
     setPhase("idle");
+    void refreshRewards();
+  }
+
+  /** The rewards as the server holds them now (after a win or an exchange). */
+  async function refreshRewards() {
+    const now = await spinRewards().catch(() => null);
+    if (now) setRewards(now.rewards);
+    onChange?.();
   }
 
   /** The pointer flicks each time a segment line passes under it, so the ticks slow down with the wheel. */
@@ -189,12 +309,9 @@ export function SpinWheel({ initial }: { initial: StoreSpinRewards }) {
   const ready = canSpin(enabled, allowance);
   const busy = phase !== "idle";
   const block = blocked ? spinBlocks[blocked] : null;
-  const total = allowance?.total_usd ?? "1.00";
-  const won = allowance?.won_usd ?? "0.00";
-
   return (
-    <div className="space-y-5">
-      <section aria-labelledby="wheel" className="overflow-hidden rounded-3xl bg-gradient-to-b from-[#070f4c] to-[#1a1f6b] p-4 text-white sm:p-6">
+    <div className="space-y-5 text-white">
+      <section aria-labelledby="wheel" className="overflow-hidden p-1 sm:p-2">
         <h2 id="wheel" className="sr-only">
           The wheel
         </h2>
@@ -251,7 +368,7 @@ export function SpinWheel({ initial }: { initial: StoreSpinRewards }) {
           ) : ready ? (
             <p className="py-2.5 text-white/80">Tap Spin to play.</p>
           ) : allowance?.finished ? (
-            <p className="py-2.5 font-semibold">You have collected your whole {usd(total)}. Thank you for playing.</p>
+            <p className="py-2.5 font-semibold">You have had all your spins. Thank you for playing.</p>
           ) : enabled && allowance && allowance.today_left === 0 ? (
             <p className="py-2.5 font-semibold">
               That is today&apos;s spins done.
@@ -264,16 +381,16 @@ export function SpinWheel({ initial }: { initial: StoreSpinRewards }) {
       </section>
 
       {error && !(error.code && spinBlocks[error.code]) ? (
-        <p role="alert" className="rounded-2xl bg-red-50 p-4 text-sm text-red-900 ring-1 ring-red-200">
+        <p role="alert" className="rounded-2xl bg-red-500/15 p-4 text-sm text-red-100 ring-1 ring-red-400/40">
           {error.message}
           {error.code === "spin_limit_today" && allowance?.next_spin_at ? <span suppressHydrationWarning>{` You can spin again from ${nextTime(allowance.next_spin_at)}.`}</span> : null}
         </p>
       ) : null}
 
       {block ? (
-        <div className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70" role={error ? "alert" : undefined}>
+        <div className="rounded-3xl bg-white/[0.06] p-5 ring-1 ring-white/10" role={error ? "alert" : undefined}>
           <p className="font-semibold">{block.title}</p>
-          <p className="mt-1 text-sm text-slate-600">{block.text}</p>
+          <p className="mt-1 text-sm text-white/70">{block.text}</p>
           {block.link ? (
             <Link href={block.link.href} className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
               {block.link.label}
@@ -282,57 +399,42 @@ export function SpinWheel({ initial }: { initial: StoreSpinRewards }) {
         </div>
       ) : null}
 
-      <section aria-labelledby="progress" className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
-        <h2 id="progress" className="text-lg font-bold">
-          Your {usd(total)}
-        </h2>
-        <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
-          <span className="font-semibold">{usd(won)} won</span>
-          <span className="text-slate-500">of {usd(total)}</span>
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <div className="rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/10">
+          <dt className="text-xs text-white/60">Won so far</dt>
+          <dd className="font-display text-lg font-extrabold">{usd(allowance?.won_usd ?? "0.00")}</dd>
         </div>
-        <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Won so far" aria-valuemin={0} aria-valuemax={Number(total)} aria-valuenow={Number(won)} aria-valuetext={`${usd(won)} of ${usd(total)}`}>
-          <div className="h-full origin-left rounded-full bg-gradient-to-r from-[#ff2382] to-[#e8116d] transition-transform duration-700 ease-out" style={{ transform: `scaleX(${wonPercent(won, total) / 100})` }} />
+        <div className="rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/10">
+          <dt className="text-xs text-white/60">Spins today</dt>
+          <dd className="font-display text-lg font-extrabold" suppressHydrationWarning>
+            {allowance?.finished ? "All done" : allowance ? `${allowance.today_left} left` : `${initial.allowance?.daily_limit ?? 2} a day`}
+          </dd>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <div className="rounded-2xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-500">Spins used</dt>
-            <dd className="font-bold">{allowance ? `${allowance.spins_used} of ${allowance.spins_total}` : "0 of 50–100"}</dd>
-          </div>
-          <div className="rounded-2xl bg-slate-50 p-3">
-            <dt className="text-xs text-slate-500">Left today</dt>
-            <dd className="font-bold">{allowance ? `${allowance.today_left} of ${allowance.daily_limit}` : "5 a day"}</dd>
-          </div>
-          <div className="col-span-2 rounded-2xl bg-slate-50 p-3 sm:col-span-1">
-            <dt className="text-xs text-slate-500">Next spin</dt>
-            <dd className="font-bold" suppressHydrationWarning>
-              {allowance?.finished ? "All done" : allowance?.next_spin_at && allowance.today_left === 0 ? nextTime(allowance.next_spin_at) : ready ? "Now" : "—"}
-            </dd>
-          </div>
-        </dl>
-        {!allowance ? <p className="mt-3 text-xs text-slate-500">Your $1 is shared over 50 to 100 spins, set when you first spin. Each spin wins between $0.01 and $0.10.</p> : null}
-      </section>
+      </dl>
 
-      <section aria-labelledby="wins" className="rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
+      <RewardsPanel rewards={rewards} onExchanged={refreshRewards} />
+
+      <section aria-labelledby="wins" className="rounded-3xl bg-white/[0.06] p-5 ring-1 ring-white/10">
         <h2 id="wins" className="mb-1 text-lg font-bold">
           Your wins
         </h2>
         {recent.length ? (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-white/10">
             {recent.map(item => (
               <li key={item.id} className="flex items-center gap-3 py-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-xs font-extrabold text-[#e8116d]">#{item.number}</span>
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#ff2382]/20 text-xs font-extrabold text-[#ff8fc0]">#{item.number}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{formatCrypto(item.amount, item.asset)}</span>
-                  <span className="block truncate text-sm text-slate-500" suppressHydrationWarning>
+                  <span className="block truncate text-sm text-white/60" suppressHydrationWarning>
                     Spin {item.number} · {winDate(item.created_at)}
                   </span>
                 </span>
-                <span className="shrink-0 font-semibold text-emerald-700">+{usd(item.usd)}</span>
+                <span className="shrink-0 font-semibold text-emerald-300">+{usd(item.usd)}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-slate-600">Your wins show here.</p>
+          <p className="text-white/70">Your wins show here.</p>
         )}
       </section>
     </div>

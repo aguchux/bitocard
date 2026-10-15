@@ -1,6 +1,6 @@
-import { Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsUUID, Matches, Min } from 'class-validator';
 import { AdminRoles, Public, RealmOnly } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
@@ -12,6 +12,19 @@ class AdminSpinsQueryDto {
 
   @IsOptional() @IsUUID()
   customer_id?: string;
+}
+
+class SpinExchangeDto {
+  /** The wallet to credit: US dollars or the customer's country's currency (default). */
+  @IsOptional() @Matches(/^[A-Za-z]{3}$/, { message: 'currency must be a currency code' })
+  currency?: string;
+
+  @IsOptional() @IsBoolean()
+  preview?: boolean;
+
+  /** The amount the preview showed (minor units): a lower amount is refused (`rate_changed`). */
+  @IsOptional() @IsInt() @Min(1)
+  expected_amount?: number;
 }
 
 /** Spin and win for store customers (sessions only; hosted stores, so left out of the public OpenAPI document). */
@@ -31,6 +44,13 @@ export class CustomerSpinsController {
   @HttpCode(HttpStatus.OK)
   spin(@CurrentCustomer() caller: CustomerCaller) {
     return this.spins.spin(caller.customer);
+  }
+
+  /** Exchanges the customer's spin rewards into their store wallet (`preview: true` only quotes). */
+  @Post('exchange')
+  @HttpCode(HttpStatus.OK)
+  exchange(@CurrentCustomer() caller: CustomerCaller, @Body() body: SpinExchangeDto) {
+    return this.spins.exchange(caller.customer, body);
   }
 }
 

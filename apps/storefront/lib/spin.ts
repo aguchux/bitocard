@@ -1,3 +1,5 @@
+import type { StoreSpinRewards } from "@bitocard/api-client/storefront";
+
 /**
  * The wheel's geometry, shared by the wheel and its tests. Segments run clockwise from the top: segment `i` covers
  * `[i × width, (i + 1) × width)` degrees clockwise from twelve o'clock, and the pointer is fixed at the top. Turning the
@@ -37,19 +39,20 @@ export function landingAngle({ current, segment, count, turns, offset = 0 }: { c
 /** "$0.05" from "0.05"; the API's dollar strings keep two places. */
 export const usd = (value: string) => `$${Number(value).toFixed(2)}`;
 
-/** How far through the $1 the customer is, 0 to 100. */
-export function wonPercent(won: string, total: string) {
-  const share = Number(total) > 0 ? (Number(won) / Number(total)) * 100 : 0;
-  return Math.max(0, Math.min(100, Number.isFinite(share) ? share : 0));
-}
-
 /** Why the customer cannot spin, in plain words, with where to put it right (if anywhere). */
 export const spinBlocks: Record<string, { title: string; text: string; link?: { href: string; label: string } }> = {
   not_enabled: { title: "Spin and win is not open here yet", text: "We open it store by store and country by country. We will tell you when you can spin." },
   spins_not_enabled: { title: "Spin and win is not open here yet", text: "We open it store by store and country by country. We will tell you when you can spin." },
-  crypto_not_enabled: { title: "Crypto is not available in your country yet", text: "Winnings are paid in crypto, so the wheel opens when crypto does." },
+  crypto_not_enabled: { title: "Crypto is not available in your country yet", text: "Rewards are won in crypto, so the wheel opens when crypto does." },
   email_not_verified: { title: "Confirm your email address first", text: "Enter the code we emailed you, then come back to spin.", link: { href: "/account/verify", label: "Confirm my email" } },
-  customer_verification_required: { title: "Verify your identity to spin", text: "Winnings go into your crypto wallet, which needs a quick identity check, once.", link: { href: "/account/verification", label: "Verify my identity" } },
+  customer_verification_required: { title: "Verify your identity to spin", text: "Rewards are won in crypto, which needs a quick identity check, once.", link: { href: "/account/verification", label: "Verify my identity" } },
   crypto_account_frozen: { title: "Your crypto account is frozen", text: "You cannot spin until BitoCard has looked into your account. Contact support to find out more." },
-  claimed_elsewhere: { title: "You have had your $1 already", text: "It is one $1 per person across every store, and yours started at another store." },
+  claimed_elsewhere: { title: "You have had your spins already", text: "Spin and win is once per person across every store, and yours started at another store." },
 };
+
+/**
+ * Whether Spin and win belongs on Home: the customer can spin, has spins still to come, or holds rewards to move into
+ * their wallet.
+ */
+export const showSpin = (rewards: StoreSpinRewards | null): rewards is StoreSpinRewards =>
+  Boolean(rewards && (rewards.enabled || (rewards.allowance && !rewards.allowance.finished) || Number(rewards.rewards?.usd ?? 0) > 0));

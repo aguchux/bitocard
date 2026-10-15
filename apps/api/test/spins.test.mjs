@@ -1,5 +1,6 @@
 // Spin and win: each customer (one per person across every store) wins exactly $1 in BNB, USDT and USDC over 50 to
-// 100 spins, at most five a day. Wins are fixed on the server and credited once; parallel spins never pay twice.
+// 100 spins, at most two a day, never told the total. Wins are fixed on the server and credited once to spin rewards
+// (never withdrawn or traded); parallel spins never pay twice; rewards are exchanged into the store wallet.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
@@ -20,6 +21,9 @@ before(async () => {
   server = await startApp({ env: { CHECKOUT_SANDBOX: 'on' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
+  for (const source of ['open_exchange_rates', 'flutterwave']) {
+    await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
+  }
   const saved = await admin.put('/v1/admin/integrations/crypto_prices', { values: { COINGECKO_API_URL: coingecko.url, COINGECKO_API_KEY: 'cg-demo-key' }, code: await adminCode(server, admin) });
   assert.equal(saved.status, 200, JSON.stringify(saved.json));
 });
@@ -66,7 +70,7 @@ async function customer(subdomain = null, email = `spin${(counter += 1)}-${Date.
   return shopper;
 }
 
-/** Lets the customer's spins so far count as yesterday's, so today's five are free again. */
+/** Lets the customer's spins so far count as yesterday's, so today's two are free again. */
 const nextDay = shopper => prisma.spin.updateMany({ where: { customerId: shopper.id }, data: { createdAt: new Date(Date.now() - 26 * 3_600_000) } });
 
 describe('the schedule', () => {
@@ -107,39 +111,44 @@ describe('spin and win', () => {
     }
   });
 
-  test('five spins a day, each credited at once; all of them add up to exactly $1', async () => {
+  test('two spins a day, each credited at once to spin rewards; all of them add up to exactly $1, never shown', async () => {
     const shopper = await customer();
     const before = (await shopper.get('/v1/store/spins')).json;
     assert.deepEqual([before.enabled, before.reason, before.allowance], [true, null, null]);
+    assert.ok(before.segments.every(item => Number(item.usd) <= 0.1), 'the wheel shows only what can be won');
 
     const first = await shopper.post('/v1/store/spins');
     assert.equal(first.status, 200, JSON.stringify(first.json));
     assert.equal(first.json.number, 1);
-    const total = first.json.allowance.spins_total;
+    const total = (await prisma.spinAllowance.findFirstOrThrow({ where: { customerId: shopper.id } })).schedule.length;
     assert.ok(total >= 50 && total <= 100, `${total} spins`);
+    for (const hidden of ['total_usd', 'spins_total', 'spins_left']) assert.equal(hidden in first.json.allowance, false, `${hidden} is not shown`);
     const segment = before.segments[first.json.segment];
     assert.equal(segment.usd, first.json.usd, 'it lands on a segment showing what it won');
+    const rewards = (await shopper.get('/v1/store/spins')).json.rewards;
+    assert.deepEqual(rewards.coins.map(item => [item.asset, item.amount]), [[first.json.asset, first.json.amount]], 'credited to spin rewards at once');
+    assert.deepEqual(rewards.exchange_currencies, ['NGN', 'USD']);
     const wallets = (await shopper.get('/v1/store/crypto')).json.assets;
-    assert.equal(wallets.find(item => item.asset === first.json.asset).available, first.json.amount, 'paid into the crypto wallet at once');
+    assert.ok(wallets.every(item => Number(item.available) === 0), 'never in the crypto wallet: rewards cannot be withdrawn or traded');
 
-    for (let spin = 2; spin <= 5; spin += 1) assert.equal((await shopper.post('/v1/store/spins')).status, 200);
+    assert.equal((await shopper.post('/v1/store/spins')).status, 200);
     const limited = await shopper.post('/v1/store/spins');
     assert.deepEqual([limited.status, limited.json.error.code], [409, 'spin_limit_today']);
     const today = (await shopper.get('/v1/store/spins')).json.allowance;
-    assert.deepEqual([today.spins_used, today.today_left, today.daily_limit], [5, 0, 5]);
+    assert.deepEqual([today.spins_used, today.today_left, today.daily_limit], [2, 0, 2]);
     assert.ok(today.next_spin_at, 'tells them when they can spin again');
 
-    let done = 5;
+    let done = 2;
     while (done < total) {
       await nextDay(shopper);
-      for (let spin = 0; spin < 5 && done < total; spin += 1) {
+      for (let spin = 0; spin < 2 && done < total; spin += 1) {
         const res = await shopper.post('/v1/store/spins');
         assert.equal(res.status, 200, JSON.stringify(res.json));
         done += 1;
       }
     }
     const finished = (await shopper.get('/v1/store/spins')).json;
-    assert.deepEqual([finished.enabled, finished.allowance.finished, finished.allowance.won_usd, finished.allowance.spins_left], [false, true, '1.00', 0]);
+    assert.deepEqual([finished.enabled, finished.allowance.finished, finished.allowance.won_usd], [false, true, '1.00']);
     await nextDay(shopper);
     const more = await shopper.post('/v1/store/spins');
     assert.deepEqual([more.status, more.json.error.code], [409, 'spins_finished']);
@@ -162,7 +171,7 @@ describe('spin and win', () => {
     const shopper = await customer();
     const results = await Promise.all(Array.from({ length: 6 }, () => shopper.post('/v1/store/spins')));
     const won = results.filter(res => res.status === 200);
-    assert.ok(won.length >= 1 && won.length <= 5);
+    assert.ok(won.length >= 1 && won.length <= 2);
     assert.ok(results.every(res => res.status === 200 || ['spin_in_progress', 'spin_limit_today'].includes(res.json.error?.code)), JSON.stringify(results.map(res => res.json.error?.code)));
     const spins = await prisma.spin.findMany({ where: { customerId: shopper.id } });
     assert.equal(spins.length, won.length);
@@ -213,6 +222,58 @@ describe('spin and win', () => {
     assert.equal((await shopper.post('/v1/store/spins')).json.error.code, 'crypto_account_frozen');
   });
 
+  test('rewards are exchanged into the store wallet, in US dollars or the local currency, once', async () => {
+    const shopper = await customer();
+    assert.equal((await shopper.post('/v1/store/spins/exchange', { preview: true })).json.error.code, 'nothing_to_exchange');
+    for (let spin = 0; spin < 2; spin += 1) assert.equal((await shopper.post('/v1/store/spins')).status, 200);
+    const cents = (await prisma.spin.findMany({ where: { customerId: shopper.id } })).reduce((sum, item) => sum + item.cents, 0);
+    const rewards = (await shopper.get('/v1/store/spins')).json.rewards;
+    // BNB is paid rounded down, so its value can fall a cent short.
+    assert.ok([cents, cents - 1].includes(Math.round(Number(rewards.usd) * 100)), `${rewards.usd} for ${cents} cents`);
+
+    assert.equal((await shopper.post('/v1/store/spins/exchange', { currency: 'GHS' })).json.error.code, 'currency_unsupported');
+    const preview = await shopper.post('/v1/store/spins/exchange', { currency: 'NGN', preview: true });
+    assert.equal(preview.status, 200, JSON.stringify(preview.json));
+    assert.equal(preview.json.object, 'spin_exchange_preview');
+    const usdCents = Math.round(Number(preview.json.usd) * 100);
+    assert.equal(preview.json.amount, Math.floor(usdCents * Number(preview.json.rate)), 'at BitoCard’s receive rate, rounded down');
+    assert.equal((await shopper.post('/v1/store/spins/exchange', { currency: 'NGN', expected_amount: preview.json.amount + 1 })).json.error.code, 'rate_changed');
+
+    const results = await Promise.all([1, 2].map(() => shopper.post('/v1/store/spins/exchange', { currency: 'NGN', expected_amount: preview.json.amount })));
+    const done = results.filter(res => res.status === 200);
+    assert.equal(done.length, 1, JSON.stringify(results.map(res => res.json)));
+    assert.ok(results.every(res => res.status === 200 || res.json.error.code === 'nothing_to_exchange'));
+    assert.deepEqual([done[0].json.object, done[0].json.currency, done[0].json.amount], ['spin_exchange', 'NGN', preview.json.amount]);
+
+    const wallet = (await shopper.get('/v1/store/wallet?currency=NGN')).json;
+    assert.equal(wallet.balance, preview.json.amount, 'credited to the store wallet');
+    const activity = (await shopper.get('/v1/store/wallet/transactions')).json.data;
+    assert.deepEqual([activity[0].type, activity[0].amount], ['spin_exchange', preview.json.amount]);
+    assert.deepEqual((await shopper.get('/v1/store/spins')).json.rewards.coins, [], 'nothing left in rewards');
+    assert.equal((await shopper.post('/v1/store/spins/exchange', {})).json.error.code, 'nothing_to_exchange');
+
+    // Into US dollars: a stablecoin cent is a cent.
+    // Two spins, so a BNB win paid rounded down still adds up to a whole cent.
+    await nextDay(shopper);
+    for (let spin = 0; spin < 2; spin += 1) await shopper.post('/v1/store/spins');
+    const later = (await shopper.get('/v1/store/spins')).json.rewards;
+    const dollars = await shopper.post('/v1/store/spins/exchange', { currency: 'usd' });
+    assert.equal(dollars.status, 200, JSON.stringify(dollars.json));
+    assert.equal(dollars.json.amount, Math.round(Number(later.usd) * 100));
+    assert.equal((await shopper.get('/v1/store/wallet?currency=USD')).json.balance, dollars.json.amount);
+
+    // Rewards already won are never trapped: exchanging needs no switch.
+    await nextDay(shopper);
+    for (let spin = 0; spin < 2; spin += 1) await shopper.post('/v1/store/spins');
+    await switches(null);
+    try {
+      assert.equal((await shopper.post('/v1/store/spins/exchange', { currency: 'USD' })).status, 200);
+    } finally {
+      await switches(true);
+    }
+    await ledgerOk();
+  });
+
   test('admins see every spin with totals per coin; Test connection reads the BNB price', async () => {
     const list = await admin.get('/v1/admin/crypto/spins?mode=test');
     assert.equal(list.status, 200, JSON.stringify(list.json));
@@ -220,6 +281,7 @@ describe('spin and win', () => {
     assert.ok(list.json.data.every(item => item.customer.email && item.mode === 'test'));
     const usd = list.json.totals.reduce((sum, item) => sum + Number(item.usd), 0);
     assert.ok(usd >= 1, 'at least the finished customer’s $1');
+    assert.ok(list.json.exchanged.some(item => item.currency === 'NGN' && item.exchanges === 1 && item.amount > 0), JSON.stringify(list.json.exchanged));
     const support = await adminClient(server, ['support']);
     assert.equal((await support.get('/v1/admin/crypto/spins')).status, 200);
     const tested = (await admin.post('/v1/admin/integrations/crypto_prices/test')).json;

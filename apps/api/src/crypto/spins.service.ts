@@ -8,6 +8,8 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { fromUnits } from './amounts.js';
 import { type CryptoContext, CryptoWalletsService } from './crypto-wallets.service.js';
+import { FxService } from '../fx/fx.service.js';
+import { walletCurrencies } from '../ledger/wallet.service.js';
 import { CryptoPricesService, unitsForCents } from './prices.js';
 
 /** What every customer can win in all, in US cents. */
@@ -15,7 +17,7 @@ export const spinTotalCents = 100;
 /** How many spins a customer gets, chosen at random when they start (inclusive). */
 export const spinCount = { min: 50, max: 100 } as const;
 /** Spins a customer may take per day (UTC). */
-export const spinDailyLimit = 5;
+export const spinDailyLimit = 2;
 
 /** The coins Spin and win pays: dollar stablecoins at $1, BNB at CoinGecko's price. */
 type SpinAsset = 'USDT' | 'USDC' | 'BNB';
@@ -80,10 +82,11 @@ const gateCodes = ['crypto_not_enabled', 'email_not_verified', 'customer_verific
 
 /**
  * Spin and win (`spin_rewards` switch, off by default; needs crypto wallets): each customer, once per person (email)
- * and mode across every store, wins $1 in BNB, USDT and USDC over 50 to 100 spins, at most five a day. The wins are
- * fixed on the server when they start; the wheel only shows them. Each win is credited at once from what BitoCard holds
- * (`crypto_custody` to the customer's `crypto_wallet`, reference `crypto_spin:<id>`), so live wins are backed by
- * BitoCard's own crypto in its wallets (the custody check shows a shortfall until it is).
+ * and mode across every store, wins $1 in BNB, USDT and USDC over 50 to 100 spins, at most two a day. The wins are
+ * fixed on the server when they start; the wheel only shows them, and customers are not shown the total. Each win is
+ * credited at once to the customer's **spin rewards** (`crypto_promotions` to `crypto_spin_rewards`, reference
+ * `crypto_spin:<id>`): kept apart from their own crypto, never withdrawn on chain or traded, only exchanged into their
+ * store wallet (`exchange`) to buy the store's products. No crypto leaves BitoCard, so nothing is paid out of custody.
  */
 @Injectable()
 export class SpinsService {
@@ -93,6 +96,7 @@ export class SpinsService {
     private readonly wallets: CryptoWalletsService,
     private readonly settings: SettingsService,
     private readonly prices: CryptoPricesService,
+    private readonly fx: FxService,
   ) {}
 
   /** The customer's crypto context once every gate passes; throws the gate's refusal otherwise. */
@@ -110,21 +114,48 @@ export class SpinsService {
     return new Map((await this.prisma.cryptoAsset.findMany({ where: { code: { in: ['USDT', 'USDC', 'BNB'] }, enabled: true } })).map(asset => [asset.code, asset]));
   }
 
+  /** The customer's progress, without the total or how many spins are left: what they have won and today's spins. */
   private present(allowance: SpinAllowance | null, today: number) {
     if (!allowance) return null;
-    const total = allowance.schedule.length;
-    const left = total - allowance.spinsUsed;
+    const left = allowance.schedule.length - allowance.spinsUsed;
     const todayLeft = left > 0 ? Math.max(0, Math.min(spinDailyLimit - today, left)) : 0;
     return {
-      total_usd: usd(allowance.totalCents),
       won_usd: usd(allowance.wonCents),
-      spins_total: total,
       spins_used: allowance.spinsUsed,
-      spins_left: left,
       today_left: todayLeft,
       daily_limit: spinDailyLimit,
       next_spin_at: left > 0 && todayLeft === 0 ? nextDay().toISOString() : null,
       finished: left === 0,
+    };
+  }
+
+  /**
+   * The customer's spin rewards per coin and their value now, in 1e-8 US dollars (stablecoins at $1, BNB at its price;
+   * BNB without a price cannot be valued, so it waits).
+   */
+  private async rewards(customerId: string, mode: LedgerMode) {
+    const [accounts, assets] = await Promise.all([
+      this.prisma.ledgerAccount.findMany({ where: { kind: 'crypto_spin_rewards', customerId, mode, balanceMinor: { gt: 0 } }, orderBy: { currency: 'asc' } }),
+      this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } }),
+    ]);
+    const decimals = new Map(assets.map(asset => [asset.code, asset.decimals]));
+    const bnb = accounts.some(account => account.currency === 'BNB') ? await this.prices.usd('BNB') : null;
+    const coins = accounts.map(account => {
+      const places = decimals.get(account.currency) ?? 8;
+      const priceE8 = stablecoins.includes(account.currency as SpinAsset) ? 100_000_000n : account.currency === 'BNB' ? (bnb?.e8 ?? null) : null;
+      const usdE8 = priceE8 === null ? null : (account.balanceMinor * priceE8) / 10n ** BigInt(places);
+      return { asset: account.currency, units: account.balanceMinor, amount: fromUnits(account.balanceMinor, places), usdE8 };
+    });
+    const valued = coins.filter(coin => coin.usdE8 !== null);
+    const usdE8 = valued.reduce((sum, coin) => sum + coin.usdE8!, 0n);
+    return { coins, valued, cents: Number(usdE8 / 1_000_000n) };
+  }
+
+  private presentRewards(rewards: Awaited<ReturnType<SpinsService['rewards']>>, currencies: string[]) {
+    return {
+      coins: rewards.coins.map(coin => ({ asset: coin.asset, amount: coin.amount, usd: coin.usdE8 === null ? null : usd(Number(coin.usdE8 / 1_000_000n)) })),
+      usd: usd(rewards.cents),
+      exchange_currencies: currencies,
     };
   }
 
@@ -157,6 +188,7 @@ export class SpinsService {
       mode = (await this.wallets.context(customer).catch(() => null))?.mode ?? 'live';
     }
     const allowance = await this.prisma.spinAllowance.findFirst({ where: { customerId: customer.id, mode } });
+    const market = await this.wallets.context(customer).catch(() => null);
     const recent = allowance ? await this.prisma.spin.findMany({ where: { allowanceId: allowance.id }, orderBy: { number: 'desc' }, take: 10 }) : [];
     const assets = await this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } });
     return {
@@ -167,6 +199,7 @@ export class SpinsService {
       segments,
       allowance: this.present(allowance, allowance ? await this.spinsToday(allowance.id) : 0),
       recent: recent.map(spin => this.presentSpin(spin, new Map(assets.map(asset => [asset.code, asset])))),
+      rewards: this.presentRewards(await this.rewards(customer.id, mode), walletCurrencies(market?.currency)),
     };
   }
 
@@ -204,7 +237,7 @@ export class SpinsService {
     return { segment: segment.index, asset: stable, amount: BigInt(cents) * 10n ** BigInt(stable.decimals - 2), priceUsd: null };
   }
 
-  /** One spin: the next win of the customer's schedule, paid into their crypto wallet at once. Once per number. */
+  /** One spin: the next win of the customer's schedule, credited to their spin rewards at once. Once per number. */
   async spin(customer: CustomerWithStore) {
     const context = await this.gate(customer);
     const allowance = await this.allowanceFor(customer, context.mode);
@@ -221,8 +254,8 @@ export class SpinsService {
       description: `Spin and win: ${fromUnits(win.amount, win.asset.decimals)} ${win.asset.code}`,
       metadata: { spin_id: id, asset: win.asset.code, usd: usd(cents) },
       lines: [
-        { account: { kind: 'crypto_custody', currency: win.asset.code }, debit: win.amount },
-        { account: this.wallets.ref(customer.id, 'crypto_wallet', win.asset.code), credit: win.amount },
+        { account: { kind: 'crypto_promotions', currency: win.asset.code }, debit: win.amount },
+        { account: this.wallets.ref(customer.id, 'crypto_spin_rewards', win.asset.code), credit: win.amount },
       ],
     });
     const spin = await this.prisma.$transaction(async tx => {
@@ -248,17 +281,87 @@ export class SpinsService {
     };
   }
 
+  /**
+   * Exchanges every spin reward the customer holds into their store wallet in US dollars or their country's currency:
+   * valued in US cents (stablecoins at $1, BNB at CoinGecko's price; rounded down), then at BitoCard's `receive` rate for
+   * the country's currency (rounded down), the rate of wallet conversions. One entry moves the coins back to
+   * `crypto_promotions` and books the money from `promotions` to the customer's `customer_wallet`. `preview` only
+   * quotes; `expected_amount` (what the preview showed) refuses a lower amount (`rate_changed`). Needs no switch:
+   * rewards already won are never trapped (`requireHolder`).
+   */
+  async exchange(customer: CustomerWithStore, input: { currency?: string; preview?: boolean; expected_amount?: number }) {
+    const context = await this.wallets.requireHolder(customer, 'exchanging your rewards');
+    const currencies = walletCurrencies(context.currency);
+    const currency = (input.currency ?? context.currency).toUpperCase();
+    if (!currencies.includes(currency)) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', `Rewards go to your ${currencies.join(' or ')} wallet.`, 'currency');
+    }
+    const rewards = await this.rewards(customer.id, context.mode);
+    if (rewards.cents < 1) {
+      const message = !rewards.coins.length
+        ? 'You have no rewards to exchange yet.'
+        : rewards.valued.length < rewards.coins.length
+          ? 'Your rewards cannot be valued right now. Try again shortly.'
+          : 'Your rewards are too small to exchange yet: keep spinning.';
+      throw conflict('nothing_to_exchange', message);
+    }
+    const converted = await this.fx.exchange(BigInt(rewards.cents), 'USD', currency);
+    if (converted.amount < 1n) throw conflict('nothing_to_exchange', 'Your rewards are too small to exchange yet.');
+    const quote = { usd: usd(rewards.cents), currency, amount: Number(converted.amount), rate: converted.rate.toString() };
+    if (input.preview) return { object: 'spin_exchange_preview' as const, ...quote, coins: this.presentRewards(rewards, currencies).coins };
+    if (input.expected_amount !== undefined && converted.amount < BigInt(input.expected_amount)) {
+      throw conflict('rate_changed', 'The rate changed. Check the new amount and try again.');
+    }
+    const id = randomUUID();
+    const entry = await this.ledger.prepare({
+      mode: context.mode,
+      type: 'spin_exchange',
+      reference: `spin_exchange:${id}`,
+      description: 'Spin and win rewards',
+      metadata: { spin_exchange_id: id, usd: usd(rewards.cents) },
+      lines: [
+        ...rewards.valued.flatMap(coin => [
+          { account: this.wallets.ref(customer.id, 'crypto_spin_rewards', coin.asset), debit: coin.units },
+          { account: { kind: 'crypto_promotions' as const, currency: coin.asset }, credit: coin.units },
+        ]),
+        { account: { kind: 'promotions', currency }, debit: converted.amount },
+        { account: { kind: 'customer_wallet', currency, customerId: customer.id }, credit: converted.amount },
+      ],
+    });
+    const created = await this.prisma.$transaction(async tx => {
+      const row = await tx.spinExchange.create({
+        data: {
+          id,
+          customerId: customer.id,
+          mode: context.mode,
+          amounts: Object.fromEntries(rewards.valued.map(coin => [coin.asset, coin.units.toString()])),
+          usdCents: rewards.cents,
+          currency,
+          amountMinor: converted.amount,
+          rate: converted.rate.toString(),
+        },
+      });
+      // A parallel exchange already moved them: the rewards account's balance check refuses this one.
+      await this.ledger.write(tx, entry).catch((error: unknown) => {
+        throw error instanceof ApiError && error.code === 'insufficient_funds' ? conflict('nothing_to_exchange', 'Your rewards were just exchanged.') : error;
+      });
+      return row;
+    });
+    return { object: 'spin_exchange' as const, id: created.id, ...quote, created_at: created.createdAt.toISOString() };
+  }
+
   // -- Admin ----------------------------------------------------------------------------------------------------
 
   /** Spins in a mode (newest first), totals per coin and how many customers have started. */
   async adminList(query: { mode?: LedgerMode; customer_id?: string }) {
     const mode = query.mode ?? 'live';
     const where = { mode, ...(query.customer_id ? { customerId: query.customer_id } : {}) };
-    const [rows, totals, customers, assets] = await Promise.all([
+    const [rows, totals, customers, assets, exchanged] = await Promise.all([
       this.prisma.spin.findMany({ where, include: { customer: { select: { email: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
       this.prisma.spin.groupBy({ by: ['asset'], where, _sum: { amount: true, cents: true }, _count: { _all: true } }),
       this.prisma.spinAllowance.count({ where: { mode, ...(query.customer_id ? { customerId: query.customer_id } : {}) } }),
       this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } }),
+      this.prisma.spinExchange.groupBy({ by: ['currency'], where, _sum: { usdCents: true, amountMinor: true }, _count: { _all: true } }),
     ]);
     const decimals = new Map(assets.map(asset => [asset.code, asset]));
     return {
@@ -266,6 +369,7 @@ export class SpinsService {
       data: rows.map(row => ({ ...this.presentSpin(row, decimals), mode: row.mode, customer: { id: row.customerId, email: row.customer.email } })),
       totals: totals.map(item => ({ mode, asset: item.asset, amount: fromUnits(item._sum.amount ?? 0n, decimals.get(item.asset)?.decimals ?? 8), usd: usd(item._sum.cents ?? 0), spins: item._count._all })),
       customers,
+      exchanged: exchanged.map(item => ({ currency: item.currency, amount: Number(item._sum.amountMinor ?? 0n), usd: usd(item._sum.usdCents ?? 0), exchanges: item._count._all })),
     };
   }
 }

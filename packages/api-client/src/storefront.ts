@@ -547,19 +547,27 @@ export type StoreSpinBlock = 'not_enabled' | 'crypto_not_enabled' | 'email_not_v
 export type StoreSpinSegment = { index: number; asset: StoreSpinAsset; usd: string };
 
 /**
- * The customer's one-time $1: spread over `spins_total` spins (fixed by the server, 50 to 100), up to `daily_limit` a
- * day. `next_spin_at`: when they can spin again, while today's spins are used and some remain.
+ * The customer's spins: what they have won so far and today's spins (up to `daily_limit` a day). The total and the
+ * number of spins are never shown. `next_spin_at`: when they can spin again, while today's spins are used and some
+ * remain; `finished` once they have had them all.
  */
 export type StoreSpinAllowance = {
-  total_usd: string;
   won_usd: string;
-  spins_total: number;
   spins_used: number;
-  spins_left: number;
   today_left: number;
   daily_limit: number;
   next_spin_at: string | null;
   finished: boolean;
+};
+
+/**
+ * What the customer holds in spin rewards: per coin (`usd` its value now, null while BNB has no price) and in all.
+ * Rewards are never withdrawn or traded: they are exchanged into the store wallet, in `exchange_currencies`.
+ */
+export type StoreSpinRewardBalance = {
+  coins: Array<{ asset: StoreSpinAsset | string; amount: string; usd: string | null }>;
+  usd: string;
+  exchange_currencies: string[];
 };
 
 /** A spin won: `amount` in the coin (a decimal string), `usd` its value, `segment` where the wheel landed. */
@@ -575,7 +583,14 @@ export type StoreSpinRewards = {
   /** Null until the first spin. */
   allowance: StoreSpinAllowance | null;
   recent: StoreSpinWin[];
+  rewards: StoreSpinRewardBalance;
 };
 
 /** `POST /v1/store/spins`: the spin's outcome, decided by the server, and the allowance after it. */
 export type StoreSpin = { object: 'spin'; id: string; number: number; segment: number; asset: StoreSpinAsset | string; amount: string; usd: string; allowance: StoreSpinAllowance };
+
+/** `POST /v1/store/spins/exchange { preview: true }`: what the rewards are worth in a wallet's currency now. */
+export type StoreSpinExchangePreview = { object: 'spin_exchange_preview'; usd: string; currency: string; amount: number; rate: string; coins: StoreSpinRewardBalance['coins'] };
+
+/** `POST /v1/store/spins/exchange`: the rewards moved into the store wallet (`amount` in its minor units). */
+export type StoreSpinExchange = { object: 'spin_exchange'; id: string; usd: string; currency: string; amount: number; rate: string; created_at: string };

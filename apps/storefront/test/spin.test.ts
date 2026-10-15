@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { StoreSpinAllowance, StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
-import { showSpinCard } from "@/components/app/crypto";
-import { landingAngle, restingAngle, segmentAt, segmentWidth, spinBlocks, usd, wonPercent } from "@/lib/spin";
+import { spinNote } from "@/components/app/spin-dialog";
+import { landingAngle, restingAngle, segmentAt, segmentWidth, showSpin, spinBlocks, usd } from "@/lib/spin";
 
 const redirect = vi.fn((url: string) => {
   throw new Error(`redirect:${url}`);
 });
-vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
+vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url), useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
 
-const { spinWheel } = await import("@/lib/spin-actions");
+const { exchangeRewards, previewExchange, spinWheel } = await import("@/lib/spin-actions");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const calls = (fetch: ReturnType<typeof vi.fn>) => fetch.mock.calls as unknown as Call[];
 
-const allowance: StoreSpinAllowance = { total_usd: "1.00", won_usd: "0.35", spins_total: 64, spins_used: 8, spins_left: 56, today_left: 2, daily_limit: 5, next_spin_at: null, finished: false };
-const spin = { object: "spin", id: "spn_1", number: 9, segment: 4, asset: "BNB", amount: "0.000081", usd: "0.05", allowance: { ...allowance, won_usd: "0.40", spins_used: 9, spins_left: 55, today_left: 1 } };
+const allowance: StoreSpinAllowance = { won_usd: "0.35", spins_used: 8, today_left: 2, daily_limit: 2, next_spin_at: null, finished: false };
+const spin = { object: "spin", id: "spn_1", number: 9, segment: 4, asset: "BNB", amount: "0.000081", usd: "0.05", allowance: { ...allowance, won_usd: "0.40", spins_used: 9, today_left: 1 } };
 const nonce = "0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
 
 beforeEach(() => {
@@ -76,7 +76,28 @@ describe("spinning", () => {
 
   test("signed out: sent to sign in, back to the wheel", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "authentication_required", message: "Sign in." } }, 401)));
-    await expect(spinWheel(nonce)).rejects.toThrow(`redirect:/signin?next=${encodeURIComponent("/account/crypto/spin")}`);
+    await expect(spinWheel(nonce)).rejects.toThrow(`redirect:/signin?next=${encodeURIComponent("/account?spin=1")}`);
+  });
+});
+
+describe("exchanging rewards", () => {
+  const preview = { object: "spin_exchange_preview", usd: "0.37", currency: "NGN", amount: 55_500, rate: "1500", coins: [] };
+
+  test("a preview asks for the quote only; exchanging sends the amount shown and the button's nonce", async () => {
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => reply(JSON.parse(String(init.body)).preview ? preview : { object: "spin_exchange", id: "x", usd: "0.37", currency: "NGN", amount: 55_500, rate: "1500", created_at: "" }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await previewExchange("NGN")).toEqual({ ok: true, data: preview });
+    expect((await exchangeRewards("NGN", 55_500, nonce)).ok).toBe(true);
+    const [first, second] = calls(fetch);
+    expect(first[0]).toBe("http://api.test/v1/store/spins/exchange");
+    expect(JSON.parse(String(first[1].body))).toEqual({ currency: "NGN", preview: true });
+    expect(JSON.parse(String(second[1].body))).toEqual({ currency: "NGN", expected_amount: 55_500 });
+    expect(second[1].headers["idempotency-key"]).toBe(nonce);
+  });
+
+  test("a changed rate comes back as the API's message, never thrown", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { code: "rate_changed", message: "The rate changed." } }, 409)));
+    expect(await exchangeRewards("NGN", 55_500, nonce)).toEqual({ ok: false, code: "rate_changed", message: "The rate changed." });
   });
 });
 
@@ -117,24 +138,39 @@ describe("the wheel's geometry", () => {
     expect(landingAngle({ current: -90, segment: 2, count: 12, turns: 6 })).toBeGreaterThan(-90 + 6 * 360);
   });
 
-  test("money and progress", () => {
+  test("money", () => {
     expect(usd("0.05")).toBe("$0.05");
     expect(usd("1")).toBe("$1.00");
-    expect(wonPercent("0.35", "1.00")).toBeCloseTo(35);
-    expect(wonPercent("2", "1.00")).toBe(100);
-    expect(wonPercent("0", "0")).toBe(0);
   });
 });
 
 describe("where Spin and win shows", () => {
-  const rewards = (patch: Partial<StoreSpinRewards>): StoreSpinRewards => ({ object: "spin_rewards", mode: "live", enabled: true, reason: null, segments: [], allowance: null, recent: [], ...patch });
+  const none = { coins: [], usd: "0.00", exchange_currencies: ["NGN", "USD"] };
+  const rewards = (patch: Partial<StoreSpinRewards>): StoreSpinRewards => ({ object: "spin_rewards", mode: "live", enabled: true, reason: null, segments: [], allowance: null, recent: [], rewards: none, ...patch });
 
-  test("on Home and Crypto while the customer can spin, or their $1 is under way", () => {
-    expect(showSpinCard(null)).toBe(false);
-    expect(showSpinCard(rewards({}))).toBe(true);
-    expect(showSpinCard(rewards({ enabled: false, reason: "crypto_not_enabled" }))).toBe(false);
-    expect(showSpinCard(rewards({ enabled: false, reason: "customer_verification_required", allowance }))).toBe(true);
-    expect(showSpinCard(rewards({ enabled: false, reason: "not_enabled", allowance: { ...allowance, finished: true } }))).toBe(false);
+  test("on Home while the customer can spin, has spins to come, or rewards to move to the wallet", () => {
+    expect(showSpin(null)).toBe(false);
+    expect(showSpin(rewards({}))).toBe(true);
+    expect(showSpin(rewards({ enabled: false, reason: "crypto_not_enabled" }))).toBe(false);
+    expect(showSpin(rewards({ enabled: false, reason: "customer_verification_required", allowance }))).toBe(true);
+    expect(showSpin(rewards({ enabled: false, reason: "not_enabled", allowance: { ...allowance, finished: true } }))).toBe(false);
+    expect(showSpin(rewards({ enabled: false, reason: "not_enabled", allowance: { ...allowance, finished: true }, rewards: { ...none, usd: "0.12" } }))).toBe(true);
+  });
+
+  test("the card never names a total", () => {
+    const notes = [
+      spinNote(rewards({})),
+      spinNote(rewards({ allowance })),
+      spinNote(rewards({ allowance: { ...allowance, today_left: 0 } })),
+      spinNote(rewards({ allowance: { ...allowance, finished: true }, rewards: { ...none, usd: "0.40" } })),
+    ];
+    expect(notes).toEqual([
+      "Spin the wheel and win crypto rewards to spend in the store.",
+      "$0.35 won · 2 spins left today",
+      "$0.35 won · come back tomorrow",
+      "$0.40 of rewards to move to your wallet",
+    ]);
+    expect(notes.join(" ")).not.toMatch(/\$1\b|of \$|total/i);
   });
 
   test("every reason the API gives has words, and verification links to the check", () => {
