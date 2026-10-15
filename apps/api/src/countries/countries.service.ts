@@ -33,6 +33,7 @@ export function presentCountry(country: CountryWithCategories) {
 export function presentCountryAdmin(country: CountryWithCategories) {
   return {
     ...presentCountry(country),
+    spin_daily_limit: country.spinDailyLimit,
     categories: country.categories
       .sort((a, b) => productCategories.indexOf(a.category) - productCategories.indexOf(b.category))
       .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification, taxable: c.taxable })),
@@ -47,6 +48,7 @@ export type CountryUpdate = Partial<{
   markup_cap_percent: number;
   payout_hold_days: number;
   min_withdrawal_minor: number;
+  spin_daily_limit: number;
 }>;
 
 /** Markets: which countries are open, their currency, money rules and the product categories sold there. */
@@ -117,6 +119,7 @@ export class CountriesService {
         identityProvider: input.identity_provider,
         markupCapPercent: input.markup_cap_percent,
         payoutHoldDays: input.payout_hold_days,
+        spinDailyLimit: input.spin_daily_limit,
         minWithdrawalMinor: input.min_withdrawal_minor === undefined ? undefined : BigInt(input.min_withdrawal_minor),
       },
       include: { categories: true },

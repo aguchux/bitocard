@@ -580,6 +580,8 @@ export type StoreSpinRewards = {
   enabled: boolean;
   reason: StoreSpinBlock | null;
   segments: StoreSpinSegment[];
+  /** Spins a day in the customer's market (admins set it per market). */
+  daily_limit: number;
   /** Null until the first spin. */
   allowance: StoreSpinAllowance | null;
   recent: StoreSpinWin[];

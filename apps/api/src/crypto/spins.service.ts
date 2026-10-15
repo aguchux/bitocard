@@ -16,7 +16,7 @@ import { CryptoPricesService, unitsForCents } from './prices.js';
 export const spinTotalCents = 100;
 /** How many spins a customer gets, chosen at random when they start (inclusive). */
 export const spinCount = { min: 50, max: 100 } as const;
-/** Spins a customer may take per day (UTC). */
+/** Spins a customer may take per day (UTC) where the market sets none (admins set it per market: `countries.spin_daily_limit`). */
 export const spinDailyLimit = 2;
 
 /** The coins Spin and win pays: dollar stablecoins at $1, BNB at CoinGecko's price. */
@@ -82,7 +82,8 @@ const gateCodes = ['crypto_not_enabled', 'email_not_verified', 'customer_verific
 
 /**
  * Spin and win (`spin_rewards` switch, off by default; needs crypto wallets): each customer, once per person (email)
- * and mode across every store, wins $1 in BNB, USDT and USDC over 50 to 100 spins, at most two a day. The wins are
+ * and mode across every store, wins $1 in BNB, USDT and USDC over 50 to 100 spins, at most the market's daily limit
+ * (two unless admins change it). The wins are
  * fixed on the server when they start; the wheel only shows them, and customers are not shown the total. Each win is
  * credited at once to the customer's **spin rewards** (`crypto_promotions` to `crypto_spin_rewards`, reference
  * `crypto_spin:<id>`): kept apart from their own crypto, never withdrawn on chain or traded, only exchanged into their
@@ -115,15 +116,15 @@ export class SpinsService {
   }
 
   /** The customer's progress, without the total or how many spins are left: what they have won and today's spins. */
-  private present(allowance: SpinAllowance | null, today: number) {
+  private present(allowance: SpinAllowance | null, today: number, limit: number) {
     if (!allowance) return null;
     const left = allowance.schedule.length - allowance.spinsUsed;
-    const todayLeft = left > 0 ? Math.max(0, Math.min(spinDailyLimit - today, left)) : 0;
+    const todayLeft = left > 0 ? Math.max(0, Math.min(limit - today, left)) : 0;
     return {
       won_usd: usd(allowance.wonCents),
       spins_used: allowance.spinsUsed,
       today_left: todayLeft,
-      daily_limit: spinDailyLimit,
+      daily_limit: limit,
       next_spin_at: left > 0 && todayLeft === 0 ? nextDay().toISOString() : null,
       finished: left === 0,
     };
@@ -171,6 +172,13 @@ export class SpinsService {
     };
   }
 
+  /** The market's spins per day (`countries.spin_daily_limit`, set by admins on Settings > Markets). */
+  private async dailyLimit(country: string | null | undefined) {
+    if (!country) return spinDailyLimit;
+    const market = await this.prisma.country.findUnique({ where: { code: country }, select: { spinDailyLimit: true } });
+    return market?.spinDailyLimit ?? spinDailyLimit;
+  }
+
   private spinsToday(allowanceId: string, db: Prisma.TransactionClient | PrismaService = this.prisma) {
     return db.spin.count({ where: { allowanceId, createdAt: { gte: startOfDay() } } });
   }
@@ -189,6 +197,7 @@ export class SpinsService {
     }
     const allowance = await this.prisma.spinAllowance.findFirst({ where: { customerId: customer.id, mode } });
     const market = await this.wallets.context(customer).catch(() => null);
+    const limit = await this.dailyLimit(market?.country);
     const recent = allowance ? await this.prisma.spin.findMany({ where: { allowanceId: allowance.id }, orderBy: { number: 'desc' }, take: 10 }) : [];
     const assets = await this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } });
     return {
@@ -197,7 +206,8 @@ export class SpinsService {
       enabled: reason === null && (!allowance || allowance.spinsUsed < allowance.schedule.length),
       reason,
       segments,
-      allowance: this.present(allowance, allowance ? await this.spinsToday(allowance.id) : 0),
+      daily_limit: limit,
+      allowance: this.present(allowance, allowance ? await this.spinsToday(allowance.id) : 0, limit),
       recent: recent.map(spin => this.presentSpin(spin, new Map(assets.map(asset => [asset.code, asset])))),
       rewards: this.presentRewards(await this.rewards(customer.id, mode), walletCurrencies(market?.currency)),
     };
@@ -241,6 +251,7 @@ export class SpinsService {
   async spin(customer: CustomerWithStore) {
     const context = await this.gate(customer);
     const allowance = await this.allowanceFor(customer, context.mode);
+    const limit = await this.dailyLimit(context.country);
     const number = allowance.spinsUsed + 1;
     if (number > allowance.schedule.length) throw conflict('spins_finished', 'You have used all your spins.');
     const cents = allowance.schedule[number - 1];
@@ -263,8 +274,8 @@ export class SpinsService {
       await tx.$queryRaw`SELECT id FROM spin_allowances WHERE id = ${allowance.id}::uuid FOR UPDATE`;
       const fresh = await tx.spinAllowance.findUniqueOrThrow({ where: { id: allowance.id } });
       if (fresh.spinsUsed !== number - 1) throw conflict('spin_in_progress', 'Your last spin is still being counted. Try again.');
-      if ((await this.spinsToday(allowance.id, tx)) >= spinDailyLimit) {
-        throw conflict('spin_limit_today', `You have used today’s ${spinDailyLimit} spins. Come back from ${nextDay().toISOString()}.`);
+      if ((await this.spinsToday(allowance.id, tx)) >= limit) {
+        throw conflict('spin_limit_today', `You have used today’s ${limit === 1 ? 'spin' : `${limit} spins`}. Come back from ${nextDay().toISOString()}.`);
       }
       const created = await tx.spin.create({
         data: { id, allowanceId: allowance.id, customerId: customer.id, mode: context.mode, number, cents, asset: win.asset.code, amount: win.amount, segment: win.segment, priceUsd: win.priceUsd },
@@ -277,7 +288,7 @@ export class SpinsService {
     return {
       object: 'spin' as const,
       ...this.presentSpin(spin, assets),
-      allowance: this.present(updated, await this.spinsToday(allowance.id))!,
+      allowance: this.present(updated, await this.spinsToday(allowance.id), limit)!,
     };
   }
 

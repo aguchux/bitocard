@@ -34,6 +34,8 @@ class UpdateCountryDto {
   @IsOptional() @IsIn(['bitocard', 'didit']) identity_provider?: 'bitocard' | 'didit';
   @IsOptional() @IsInt() @Min(0) @Max(100) markup_cap_percent?: number;
   @IsOptional() @IsInt() @Min(0) @Max(90) payout_hold_days?: number;
+  /** Spin and win: spins per customer per day in this market. */
+  @IsOptional() @IsInt() @Min(1) @Max(10) spin_daily_limit?: number;
   @IsOptional() @IsInt() @Min(0) min_withdrawal_minor?: number;
 }
 

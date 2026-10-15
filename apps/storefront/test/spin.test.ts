@@ -146,7 +146,7 @@ describe("the wheel's geometry", () => {
 
 describe("where Spin and win shows", () => {
   const none = { coins: [], usd: "0.00", exchange_currencies: ["NGN", "USD"] };
-  const rewards = (patch: Partial<StoreSpinRewards>): StoreSpinRewards => ({ object: "spin_rewards", mode: "live", enabled: true, reason: null, segments: [], allowance: null, recent: [], rewards: none, ...patch });
+  const rewards = (patch: Partial<StoreSpinRewards>): StoreSpinRewards => ({ object: "spin_rewards", mode: "live", enabled: true, reason: null, segments: [], daily_limit: 2, allowance: null, recent: [], rewards: none, ...patch });
 
   test("on Home while the customer can spin, has spins to come, or rewards to move to the wallet", () => {
     expect(showSpin(null)).toBe(false);

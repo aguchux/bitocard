@@ -94,7 +94,7 @@ export function SpinDialog({ rewards, open: openOnArrival = false }: { rewards: 
               <div className="mx-auto max-w-xl">
                 <SpinWheel initial={rewards} onChange={() => router.refresh()} />
                 <p className="mt-5 text-center text-xs text-white/50">
-                  A BitoCard promotion, two spins a day. {rewards.mode === "test" ? "Test stores pay test rewards, which have no value. " : ""}Rewards are spent in the store and cannot be withdrawn.{" "}
+                  A BitoCard promotion, {rewards.daily_limit === 1 ? "one spin" : `${rewards.daily_limit} spins`} a day. {rewards.mode === "test" ? "Test stores pay test rewards, which have no value. " : ""}Rewards are spent in the store and cannot be withdrawn.{" "}
                   <a href={appUrl("legals", "/documents/terms")} className="font-semibold text-white/70 underline hover:text-white">
                     Terms apply
                   </a>

@@ -167,6 +167,29 @@ describe('spin and win', () => {
     await ledgerOk();
   });
 
+  test('admins set the spins per day per market on Settings > Markets', async () => {
+    const ops = await adminClient(server, ['support']);
+    assert.equal((await ops.patch('/v1/admin/countries/NG', { spin_daily_limit: 3 })).status, 403, 'operations only');
+    for (const bad of [0, 11, 2.5]) assert.equal((await admin.patch('/v1/admin/countries/NG', { spin_daily_limit: bad })).status, 400);
+    const saved = await admin.patch('/v1/admin/countries/NG', { spin_daily_limit: 3 });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.equal(saved.json.spin_daily_limit, 3);
+    assert.equal('spin_daily_limit' in (await fetch(`${server.base}/v1/countries`).then(res => res.json())).data[0], false, 'not in the public market view');
+    try {
+      const shopper = await customer();
+      assert.equal((await shopper.get('/v1/store/spins')).json.daily_limit, 3);
+      for (let spin = 0; spin < 3; spin += 1) assert.equal((await shopper.post('/v1/store/spins')).status, 200);
+      const limited = await shopper.post('/v1/store/spins');
+      assert.deepEqual([limited.status, limited.json.error.code], [409, 'spin_limit_today']);
+      assert.deepEqual([(await shopper.get('/v1/store/spins')).json.allowance.today_left, (await shopper.get('/v1/store/spins')).json.allowance.daily_limit], [0, 3]);
+      // Lowered below what was spun today: nothing more today, never a negative count.
+      assert.equal((await admin.patch('/v1/admin/countries/NG', { spin_daily_limit: 1 })).status, 200);
+      assert.equal((await shopper.get('/v1/store/spins')).json.allowance.today_left, 0);
+    } finally {
+      assert.equal((await admin.patch('/v1/admin/countries/NG', { spin_daily_limit: 2 })).status, 200);
+    }
+  });
+
   test('spins sent at once are paid once each, never twice', async () => {
     const shopper = await customer();
     const results = await Promise.all(Array.from({ length: 6 }, () => shopper.post('/v1/store/spins')));

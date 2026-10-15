@@ -7,6 +7,7 @@ import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
 import { IdentityProvider } from "./identity-provider";
 import { PaymentMethods } from "./payment-methods";
+import { SpinLimit } from "./spin-limit";
 import { TaxRateCard } from "./tax-rate";
 
 const fields = [
@@ -140,6 +141,8 @@ function Markets() {
           ) : null}
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Identity checks</h3>
           <IdentityProvider code={country.code} country={country.name} provider={country.identity_provider} editable={editable} />
+          <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Spin and win</h3>
+          <SpinLimit code={country.code} country={country.name} limit={country.spin_daily_limit} editable={editable} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Tax</h3>
           <TaxRateCard key={`${country.code}:${rate?.updated_at ?? ""}`} country={country.name} code={country.code} rate={rate ?? null} editable={can(admin, "finance")} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Payment methods</h3>

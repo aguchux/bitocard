@@ -560,6 +560,8 @@ model Country {
   minWithdrawalMinor BigInt            @map("min_withdrawal_minor")
   /// Who checks identities here: `bitocard` (BitoCard Verify, every African country) or `didit` (elsewhere).
   identityProvider   String            @default("didit") @map("identity_provider")
+  /// Spin and win: spins each customer may take per day (UTC) in this market, 1 to 10.
+  spinDailyLimit     Int      @default(2) @map("spin_daily_limit")
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
   categories         CountryCategory[]

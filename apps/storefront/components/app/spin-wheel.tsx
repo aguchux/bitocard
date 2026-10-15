@@ -407,7 +407,7 @@ export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; on
         <div className="rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/10">
           <dt className="text-xs text-white/60">Spins today</dt>
           <dd className="font-display text-lg font-extrabold" suppressHydrationWarning>
-            {allowance?.finished ? "All done" : allowance ? `${allowance.today_left} left` : `${initial.allowance?.daily_limit ?? 2} a day`}
+            {allowance?.finished ? "All done" : allowance ? `${allowance.today_left} left` : `${initial.daily_limit} a day`}
           </dd>
         </div>
       </dl>

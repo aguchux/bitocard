@@ -377,6 +377,8 @@ export type Country = {
   min_withdrawal_minor: number;
   /** Who runs identity checks here: BitoCard Verify (Africa by default) or Didit. Missing on older API versions. */
   identity_provider?: IdentityProvider;
+  /** Spin and win: spins per customer per day here (1 to 10). Missing on older API versions. */
+  spin_daily_limit?: number;
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;
 };
 
