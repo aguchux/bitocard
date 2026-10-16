@@ -21,11 +21,11 @@ export function AppNav({ desktopNav }: { desktopNav: "rail" | "bottom" }) {
               <Link
                 href={tab.href}
                 aria-current={current ? "page" : undefined}
-                className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold sm:text-xs ${current ? "text-[#ff2382]" : "text-slate-500 hover:text-[#070f4c]"}`}
+                className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold sm:text-xs ${current ? "text-brand-500" : "text-slate-500 hover:text-navy-900"}`}
               >
                 <tab.icon className="size-6" aria-hidden="true" strokeWidth={current ? 2.4 : 2} />
                 {tab.label}
-                {current ? <span aria-hidden="true" className="absolute bottom-1.5 h-0.5 w-8 rounded-full bg-[#ff2382]" /> : null}
+                {current ? <span aria-hidden="true" className="absolute bottom-1.5 h-0.5 w-8 rounded-full bg-brand-500" /> : null}
               </Link>
             </li>
           );
@@ -51,7 +51,7 @@ export function AppRail() {
               <Link
                 href={tab.href}
                 aria-current={current ? "page" : undefined}
-                className={`flex min-h-12 items-center gap-3 rounded-2xl px-4 font-semibold ${current ? "bg-pink-50 text-[#ff2382]" : "text-slate-600 hover:bg-slate-50 hover:text-[#070f4c]"}`}
+                className={`flex min-h-12 items-center gap-3 rounded-2xl px-4 font-semibold ${current ? "bg-pink-50 text-brand-500" : "text-slate-600 hover:bg-slate-50 hover:text-navy-900"}`}
               >
                 <tab.icon className="size-5" aria-hidden="true" />
                 {tab.label}

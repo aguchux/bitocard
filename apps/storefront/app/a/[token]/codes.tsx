@@ -43,7 +43,7 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
   return (
     <section aria-labelledby="codes" className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
       <h2 id="codes" className="flex items-center gap-2 text-xl font-bold">
-        <KeyRound className="size-5 text-[#ff2382]" aria-hidden="true" /> Your {shown.length > 1 ? `${names[shown[0].kind].toLowerCase()}s` : names[shown[0].kind].toLowerCase()}
+        <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {shown.length > 1 ? `${names[shown[0].kind].toLowerCase()}s` : names[shown[0].kind].toLowerCase()}
       </h2>
       <p className="mt-1 text-sm text-slate-600">
         {shown[0].kind === "esim" ? `Reveal to install ${shown.length > 1 ? "them" : "it"}. Keep ${shown.length > 1 ? "them" : "it"} private: anyone with the code can install the eSIM.` : `Keep ${shown.length > 1 ? "them" : "it"} safe: anyone with a code can use it.`}
@@ -85,7 +85,7 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
                 key === "redemption_url" && /^https:\/\//.test(value) ? (
                   <p key={key} className="mt-1 text-sm text-slate-600">
                     {detailLabels[key]}:{" "}
-                    <a href={value} rel="noreferrer noopener" target="_blank" className="font-semibold text-[#2477ff] break-all hover:underline">
+                    <a href={value} rel="noreferrer noopener" target="_blank" className="font-semibold text-azure-500 break-all hover:underline">
                       {value}
                     </a>
                   </p>
@@ -102,7 +102,7 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
       {hidden ? (
         <form action={reveal} className="mt-4">
           <input type="hidden" name="token" value={token} />
-          <button type="submit" disabled={pending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766] disabled:opacity-60 sm:w-auto">
+          <button type="submit" disabled={pending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800 disabled:opacity-60 sm:w-auto">
             <Eye className="size-5" aria-hidden="true" /> {pending ? "Revealing…" : shown[0].kind === "esim" ? (shown.length > 1 ? "Show eSIMs" : "Show eSIM") : shown.length > 1 ? "Reveal codes" : "Reveal code"}
           </button>
         </form>

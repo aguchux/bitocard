@@ -23,14 +23,14 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   return (
     <div className="mx-auto grid max-w-xl gap-5 py-6 sm:py-12">
       <div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#070f4c] sm:text-4xl">Create an account</h1>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">Create an account</h1>
         <p className="mt-2 text-slate-600">Free. Your codes, receipts and orders stay in your account.</p>
       </div>
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
         <SignUpForm next={next} markets={countries} market={market} />
         <p className="mt-6 text-sm text-slate-600">
           Already have an account?{" "}
-          <Link href={`/signin?next=${encodeURIComponent(next)}`} className="font-semibold text-[#2477ff] hover:underline">
+          <Link href={`/signin?next=${encodeURIComponent(next)}`} className="font-semibold text-azure-500 hover:underline">
             Sign in
           </Link>
         </p>

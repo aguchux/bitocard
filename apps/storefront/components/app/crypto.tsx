@@ -39,7 +39,7 @@ export function CryptoNav({ current }: { current: string }) {
           key={section.href}
           href={section.href}
           aria-current={section.href === current ? "page" : undefined}
-          className="inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 aria-[current=page]:bg-[#070f4c] aria-[current=page]:text-white aria-[current=page]:ring-[#070f4c]"
+          className="inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 aria-[current=page]:bg-navy-900 aria-[current=page]:text-white aria-[current=page]:ring-navy-900"
         >
           {section.label}
         </Link>
@@ -49,7 +49,7 @@ export function CryptoNav({ current }: { current: string }) {
 }
 
 /** A coin's round badge: its code's first letters on its colour (no outside images). */
-const coinColours: Record<string, string> = { USDT: "bg-emerald-500", USDC: "bg-blue-600", BTC: "bg-orange-500", ETH: "bg-indigo-600", BNB: "bg-yellow-400 text-[#070f4c]" };
+const coinColours: Record<string, string> = { USDT: "bg-emerald-500", USDC: "bg-blue-600", BTC: "bg-orange-500", ETH: "bg-indigo-600", BNB: "bg-yellow-400 text-navy-900" };
 export function CoinBadge({ asset, size = "size-10" }: { asset: string; size?: string }) {
   return (
     <span className={`grid ${size} shrink-0 place-items-center rounded-full text-[11px] font-extrabold text-white ${coinColours[asset] ?? "bg-slate-500"}`} aria-hidden="true">
@@ -113,10 +113,10 @@ export function CryptoGate({ wallets, p2p = false, withdraw = false }: { wallets
     return (
       <div className={card}>
         <p className="flex items-center gap-2 font-semibold">
-          <ShieldCheck className="size-5 text-[#ff2382]" aria-hidden="true" /> Verify your identity to use crypto
+          <ShieldCheck className="size-5 text-brand-500" aria-hidden="true" /> Verify your identity to use crypto
         </p>
         <p className="mt-1 text-sm text-slate-600">Crypto needs a quick identity check, once. It keeps the market safe for everyone.</p>
-        <Link href="/account/verification" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+        <Link href="/account/verification" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
           Verify my identity
         </Link>
       </div>
@@ -142,7 +142,7 @@ export function TradeRow({ trade }: { trade: StoreP2pTrade }) {
           {trade.number} · {bought ? "from" : "to"} {trade.counterparty.nickname} · {date(trade.created_at)}
         </span>
       </span>
-      <span className={`shrink-0 font-semibold ${bought ? "text-[#070f4c]" : "text-emerald-700"}`}>
+      <span className={`shrink-0 font-semibold ${bought ? "text-navy-900" : "text-emerald-700"}`}>
         {bought ? "−" : "+"}
         {formatFace(trade.fiat, trade.currency)}
       </span>

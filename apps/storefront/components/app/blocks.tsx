@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronRight, Gift, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup, StoreProduct } from "@bitocard/api-client/storefront";
+import { colors } from "@bitocard/ui/tokens";
 import { GroupIcon } from "@/components/store/category-icon";
 import { groupIcon } from "@/components/store/theme";
 import { BrandImage } from "@/components/store/brand-image";
@@ -14,10 +15,10 @@ export const appProductBase = "/account/p";
 /** A tinted figure card at the top of Home (as in the mockups): icon tile, label, large figure. */
 export function StatCard({ icon: Icon, label, value, note, tone }: { icon: LucideIcon; label: string; value: string; note?: string; tone: "pink" | "blue" | "green" | "navy" }) {
   const colours = {
-    pink: { card: "bg-pink-50", tile: "bg-pink-100 text-[#ff2382]" },
-    blue: { card: "bg-blue-50", tile: "bg-blue-100 text-[#2477ff]" },
+    pink: { card: "bg-pink-50", tile: "bg-pink-100 text-brand-500" },
+    blue: { card: "bg-blue-50", tile: "bg-blue-100 text-azure-500" },
     green: { card: "bg-emerald-50", tile: "bg-emerald-100 text-emerald-600" },
-    navy: { card: "bg-indigo-50", tile: "bg-indigo-100 text-[#070f4c]" },
+    navy: { card: "bg-indigo-50", tile: "bg-indigo-100 text-navy-900" },
   }[tone];
   return (
     // As in the mockups: the icon tile beside the label and figure at every width.
@@ -26,8 +27,8 @@ export function StatCard({ icon: Icon, label, value, note, tone }: { icon: Lucid
         <Icon className="size-7 md:size-6 lg:size-8" aria-hidden="true" strokeWidth={2.25} />
       </span>
       <div className="min-w-0">
-        <p className="text-[15px] font-semibold text-[#070f4c] md:text-sm lg:text-base">{label}</p>
-        <p className="text-[28px] leading-tight font-extrabold tracking-tight break-words text-[#070f4c] md:text-[22px] lg:text-[26px] xl:text-[32px]">{value}</p>
+        <p className="text-[15px] font-semibold text-navy-900 md:text-sm lg:text-base">{label}</p>
+        <p className="text-[28px] leading-tight font-extrabold tracking-tight break-words text-navy-900 md:text-[22px] lg:text-[26px] xl:text-[32px]">{value}</p>
         {note ? <p className="text-xs text-slate-500">{note}</p> : null}
       </div>
     </div>
@@ -60,7 +61,7 @@ export function CategoryEntry({ group }: { group: StoreNavigationGroup }) {
     <>
       {uploaded ? <GroupIcon group={group} className="size-14 rounded-2xl md:size-12 lg:size-16" ink={tint.ink} tile={tint.tile} /> : <SolidGroupIcon group={group} tint={tint} />}
       <span className="min-w-0 flex-1">
-        <span className="block text-xl leading-tight font-bold text-[#070f4c] md:text-lg lg:text-xl">{group.label}</span>
+        <span className="block text-xl leading-tight font-bold text-navy-900 md:text-lg lg:text-xl">{group.label}</span>
         <span className="mt-0.5 block truncate text-sm text-slate-500 lg:text-[15px]">{group.on_sale ? tint.subtitle : "Coming soon"}</span>
       </span>
       {group.on_sale ? (
@@ -85,19 +86,19 @@ export function ProductLine({ product }: { product: StoreProduct }) {
   return (
     <Link href={productHref(product, appProductBase)} className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-sm ring-1 ring-slate-200/70 transition hover:shadow-md">
       {/* The brand's logo on a white tile over its colour (the card art is padded for big cards, too much at this size). */}
-      <span className="grid h-[52px] w-20 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: product.brand.color ?? "#070f4c" }}>
+      <span className="grid h-[52px] w-20 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: product.brand.color ?? colors.navy900 }}>
         <span className="grid size-10 place-items-center overflow-hidden rounded-lg bg-white p-1.5 shadow-sm">
           {product.brand.logo_url ? (
-            <BrandImage src={product.brand.logo_url} className="size-7 object-contain" fallback={<span className="text-xs font-extrabold text-[#070f4c]">{product.brand.initials}</span>} />
+            <BrandImage src={product.brand.logo_url} className="size-7 object-contain" fallback={<span className="text-xs font-extrabold text-navy-900">{product.brand.initials}</span>} />
           ) : (
-            <span className="text-xs font-extrabold text-[#070f4c]">{product.brand.initials}</span>
+            <span className="text-xs font-extrabold text-navy-900">{product.brand.initials}</span>
           )}
         </span>
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-bold text-[#070f4c]">{product.name}</span>
+        <span className="block truncate font-bold text-navy-900">{product.name}</span>
         <span className="block truncate text-sm text-slate-500">{product.global ? product.category_label : `${product.category_label} · ${product.country_name}`}</span>
-        <span className="block text-sm font-extrabold text-[#070f4c]">{priceLabel(product)}</span>
+        <span className="block text-sm font-extrabold text-navy-900">{priceLabel(product)}</span>
       </span>
       <ChevronRight className="size-5 shrink-0 text-slate-400" aria-hidden="true" />
     </Link>
@@ -108,11 +109,11 @@ export function ProductLine({ product }: { product: StoreProduct }) {
 export function SectionTitle({ id, title, href, action = "See all" }: { id: string; title: string; href?: string; action?: string }) {
   return (
     <div className="mb-3 flex items-end justify-between gap-3">
-      <h2 id={id} className="text-xl font-extrabold tracking-tight text-[#070f4c]">
+      <h2 id={id} className="text-xl font-extrabold tracking-tight text-navy-900">
         {title}
       </h2>
       {href ? (
-        <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-[#ff2382] hover:underline">
+        <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-500 hover:underline">
           {action} <ChevronRight className="size-4" aria-hidden="true" />
         </Link>
       ) : null}

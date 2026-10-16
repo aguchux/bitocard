@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { X } from "lucide-react";
 import type { StoreBrand, StoreList, StoreProduct } from "@bitocard/api-client/storefront";
+import { colors } from "@bitocard/ui/tokens";
 import { appProductBase, Carousel, CarouselItem, SectionTitle } from "@/components/app/blocks";
 import { BrandImage } from "@/components/store/brand-image";
 import { ProductCard } from "@/components/store/product-card";
@@ -24,7 +25,7 @@ function Chip({ href, active, children }: { href: string; active: boolean; child
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
-      className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold whitespace-nowrap ${active ? "bg-[#070f4c] text-white" : "bg-white text-[#070f4c] ring-1 ring-slate-200 hover:ring-slate-300"}`}
+      className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold whitespace-nowrap ${active ? "bg-navy-900 text-white" : "bg-white text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300"}`}
     >
       {children}
     </Link>
@@ -35,14 +36,14 @@ function Chip({ href, active, children }: { href: string; active: boolean; child
 function BrandTile({ brand }: { brand: StoreBrand }) {
   return (
     <Link href={`/account/catalog?brand=${encodeURIComponent(brand.slug)}`} className="flex flex-col items-center gap-2 rounded-2xl p-2 text-center hover:bg-white">
-      <span className="grid size-16 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style={brand.logo_url ? undefined : { backgroundColor: brand.color ?? "#070f4c" }}>
+      <span className="grid size-16 place-items-center overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70" style={brand.logo_url ? undefined : { backgroundColor: brand.color ?? colors.navy900 }}>
         {brand.logo_url ? (
-          <BrandImage src={brand.logo_url} className="h-10 w-10 object-contain" fallback={<span className="font-extrabold text-[#070f4c]">{brand.initials}</span>} />
+          <BrandImage src={brand.logo_url} className="h-10 w-10 object-contain" fallback={<span className="font-extrabold text-navy-900">{brand.initials}</span>} />
         ) : (
           <span className="font-extrabold text-white">{brand.initials}</span>
         )}
       </span>
-      <span className="line-clamp-2 text-xs font-semibold text-[#070f4c]">{brand.name}</span>
+      <span className="line-clamp-2 text-xs font-semibold text-navy-900">{brand.name}</span>
     </Link>
   );
 }
@@ -112,7 +113,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           ) : (
             <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">
               Nothing matches yet.{" "}
-              <Link href="/account/catalog" className="font-semibold text-[#2477ff] hover:underline">
+              <Link href="/account/catalog" className="font-semibold text-azure-500 hover:underline">
                 See everything
               </Link>
             </p>

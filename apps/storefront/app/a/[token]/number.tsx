@@ -13,7 +13,7 @@ function Message({ message }: { message: NumberMessage }) {
   const incoming = message.direction === "in";
   return (
     <li className={`flex ${incoming ? "justify-start" : "justify-end"}`}>
-      <div className={`max-w-[90%] min-w-0 rounded-2xl p-3 sm:max-w-[80%] ${incoming ? "rounded-tl-sm border border-slate-200 bg-white" : "rounded-tr-sm bg-[#070f4c] text-white"}`}>
+      <div className={`max-w-[90%] min-w-0 rounded-2xl p-3 sm:max-w-[80%] ${incoming ? "rounded-tl-sm border border-slate-200 bg-white" : "rounded-tr-sm bg-navy-900 text-white"}`}>
         <p className={`text-xs font-semibold ${incoming ? "text-slate-500" : "text-white/75"}`}>
           {incoming ? `From ${message.from}` : `To ${message.to}`}
         </p>
@@ -24,7 +24,7 @@ function Message({ message }: { message: NumberMessage }) {
             {incoming ? null : (
               <>
                 {" · "}
-                <span className={message.status === "failed" ? "font-semibold text-[#ff8fbd]" : undefined}>{sentStatus[message.status] ?? message.status}</span>
+                <span className={message.status === "failed" ? "font-semibold text-brand-300" : undefined}>{sentStatus[message.status] ?? message.status}</span>
               </>
             )}
           </span>
@@ -46,7 +46,7 @@ export function NumberLive({ token, data, features }: { token: string; data: Non
     <section aria-labelledby="number" className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
       <RefreshWhile active={!deleted} everyMs={15000} />
       <h2 id="number" className="flex items-center gap-2 text-xl font-bold">
-        <Phone className="size-5 text-[#ff2382]" aria-hidden="true" /> Your number
+        <Phone className="size-5 text-brand-500" aria-hidden="true" /> Your number
       </h2>
       <p className={`mt-3 font-mono text-2xl font-extrabold tracking-wide break-all sm:text-3xl ${deleted ? "text-slate-400 line-through" : ""}`}>{data.number}</p>
 
@@ -87,18 +87,18 @@ export function NumberLive({ token, data, features }: { token: string; data: Non
         <>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-5">
             <h3 className="flex items-center gap-2 font-bold">
-              <Inbox className="size-5 text-[#ff2382]" aria-hidden="true" /> Messages
+              <Inbox className="size-5 text-brand-500" aria-hidden="true" /> Messages
             </h3>
             <RefreshInbox />
           </div>
           {data.messages.length ? (
-            <ul aria-label="Messages, newest first" className="mt-4 grid gap-3 rounded-2xl bg-[#f8f9fc] p-3 sm:p-4">
+            <ul aria-label="Messages, newest first" className="mt-4 grid gap-3 rounded-2xl bg-canvas p-3 sm:p-4">
               {data.messages.map((message, index) => (
                 <Message key={`${message.created_at}-${index}`} message={message} />
               ))}
             </ul>
           ) : (
-            <p className="mt-4 rounded-2xl bg-[#f8f9fc] p-4 text-sm text-slate-600">No messages yet. Messages sent to this number appear here.</p>
+            <p className="mt-4 rounded-2xl bg-canvas p-4 text-sm text-slate-600">No messages yet. Messages sent to this number appear here.</p>
           )}
           {data.can_send ? <SendMessage token={token} /> : null}
         </>

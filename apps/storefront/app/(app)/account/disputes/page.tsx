@@ -25,7 +25,7 @@ export default async function DisputesPage() {
       {!result.ok ? <p className="rounded-2xl bg-red-50 p-4 text-sm text-red-800">{result.message}</p> : null}
       {result.ok && !disputes.length ? (
         <p className="rounded-2xl bg-white p-6 text-slate-600 ring-1 ring-slate-100">
-          No disputes. To report a problem, open the order from <Link href="/account/orders" className="font-semibold text-[#ff2382] hover:underline">your orders</Link>.
+          No disputes. To report a problem, open the order from <Link href="/account/orders" className="font-semibold text-brand-500 hover:underline">your orders</Link>.
         </p>
       ) : null}
       <ul className="space-y-3">
@@ -33,7 +33,7 @@ export default async function DisputesPage() {
           <li key={dispute.id}>
             <Link href={`/account/disputes/${dispute.id}`} className="flex min-h-16 items-center gap-4 rounded-2xl bg-white p-4 ring-1 ring-slate-100 hover:ring-slate-300">
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-[#070f4c]">{dispute.subject}</p>
+                <p className="truncate font-semibold text-navy-900">{dispute.subject}</p>
                 <p className="text-sm text-slate-500">
                   {dispute.reference} · {date(dispute.created_at)}
                 </p>

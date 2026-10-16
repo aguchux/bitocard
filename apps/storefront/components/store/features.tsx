@@ -37,7 +37,7 @@ export function FeatureIcons({ features, compact = false }: { features: ProductF
             <span className="sr-only">{label}</span>
           </li>
         ) : (
-          <li key={feature} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-sm font-semibold text-[#070f4c]">
+          <li key={feature} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-sm font-semibold text-navy-900">
             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-50 text-sky-700">
               <Icon className="size-[18px]" aria-hidden="true" />
             </span>

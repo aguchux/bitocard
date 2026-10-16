@@ -36,10 +36,10 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href="/account/crypto" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/crypto" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Crypto
       </Link>
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Deposit crypto{wallets?.mode === "test" ? " (test network)" : ""}</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">Deposit crypto{wallets?.mode === "test" ? " (test network)" : ""}</h1>
       <CryptoNav current="/account/crypto/deposit" />
       {blocked ? <CryptoGate wallets={wallets} /> : null}
       {!blocked ? (
@@ -50,7 +50,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
                 key={code}
                 href={`/account/crypto/deposit?asset=${code}`}
                 aria-current={code === asset ? "page" : undefined}
-                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-[#070f4c]"
+                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-navy-900"
               >
                 <CoinBadge asset={code} size="size-8" /> {code}
               </Link>
@@ -67,7 +67,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
                     key={item.chain}
                     href={`/account/crypto/deposit?asset=${asset}&chain=${item.chain}`}
                     aria-current={item.chain === chain ? "true" : undefined}
-                    className="flex min-h-12 flex-col justify-center rounded-xl px-3 py-2 ring-1 ring-slate-200 aria-[current=true]:bg-pink-50 aria-[current=true]:ring-2 aria-[current=true]:ring-[#ff2382]"
+                    className="flex min-h-12 flex-col justify-center rounded-xl px-3 py-2 ring-1 ring-slate-200 aria-[current=true]:bg-pink-50 aria-[current=true]:ring-2 aria-[current=true]:ring-brand-500"
                   >
                     <span className="font-semibold">{item.name}</span>
                     <span className="text-xs text-slate-500">{item.token ?? `${asset} itself`}</span>

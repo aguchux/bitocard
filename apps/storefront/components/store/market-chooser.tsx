@@ -34,7 +34,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
   // Signed in, the market is the customer's own country (chosen at sign-up and fixed): shown, not changed.
   if (locked) {
     return (
-      <span title="Your account's country" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-[15px] font-semibold text-[#070f4c] sm:px-3">
+      <span title="Your account's country" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-[15px] font-semibold text-navy-900 sm:px-3">
         <Flag code={market} className="h-4 w-6" />
         <span className="hidden max-w-28 truncate sm:inline">{current?.name ?? market}</span>
         <span className="sr-only">, your account&apos;s country</span>
@@ -48,7 +48,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
         type="button"
         onClick={() => dialog.current?.showModal()}
         aria-label={current ? `Shopping in ${current.name}. Change country` : "Shopping globally. Choose your country"}
-        className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-[15px] font-semibold text-[#070f4c] hover:bg-slate-50 sm:px-3"
+        className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-[15px] font-semibold text-navy-900 hover:bg-slate-50 sm:px-3"
       >
         <Flag code={current?.code ?? null} className="h-4 w-6" />
         <span className="hidden max-w-28 truncate sm:inline">{current ? current.name : "Global"}</span>
@@ -57,7 +57,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
       <dialog
         ref={dialog}
         aria-labelledby={titleId}
-        className="m-auto w-[min(92vw,30rem)] rounded-2xl p-0 text-[#070f4c] shadow-2xl backdrop:bg-[#070f4c]/50"
+        className="m-auto w-[min(92vw,30rem)] rounded-2xl p-0 text-navy-900 shadow-2xl backdrop:bg-navy-900/50"
         onClose={() => setFilter("")}
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
@@ -81,7 +81,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
                 value={filter}
                 onChange={event => setFilter(event.target.value)}
                 placeholder="Find your country"
-                className="min-h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-[15px] focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15"
+                className="min-h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-[15px] focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15"
               />
             </label>
           ) : null}
@@ -97,7 +97,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
                 >
                   <Flag code={country.code} className="h-4 w-6" />
                   <span className="flex-1">{country.name}</span>
-                  {market === country.code ? <Check className="size-4 text-[#ff2382]" aria-hidden="true" /> : null}
+                  {market === country.code ? <Check className="size-4 text-brand-500" aria-hidden="true" /> : null}
                 </button>
               </li>
             ))}
@@ -113,7 +113,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
           >
             <Globe2 className="size-5" aria-hidden="true" />
             Stay global: show everything
-            {market === "global" ? <Check className="size-4 text-[#ff2382]" aria-hidden="true" /> : null}
+            {market === "global" ? <Check className="size-4 text-brand-500" aria-hidden="true" /> : null}
           </button>
         </div>
       </dialog>

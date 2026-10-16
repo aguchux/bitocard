@@ -91,7 +91,7 @@ export function SendMessage({ token }: { token: string }) {
           value={to}
           onChange={event => setTo(event.target.value)}
           aria-describedby={`${id}-to-help`}
-          className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 px-3 text-base focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15"
+          className="min-h-12 w-full min-w-0 rounded-xl border border-slate-200 px-3 text-base focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15"
         />
         <p id={`${id}-to-help`} className="text-xs text-slate-500">
           In international format, starting with + and the country code.
@@ -115,7 +115,7 @@ export function SendMessage({ token }: { token: string }) {
           onChange={event => setText(event.target.value)}
           aria-describedby={`${id}-count ${id}-text-help`}
           aria-invalid={over || undefined}
-          className="w-full min-w-0 resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-base focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15"
+          className="w-full min-w-0 resize-y rounded-xl border border-slate-200 px-3 py-2.5 text-base focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15"
         />
         <p id={`${id}-text-help`} className="text-xs text-slate-500">
           One text of up to 160 characters, or 70 with emoji or other special characters.
@@ -129,7 +129,7 @@ export function SendMessage({ token }: { token: string }) {
       <button
         type="submit"
         disabled={pending || over || !text.trim() || !to.trim()}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766] disabled:opacity-60 sm:justify-self-start"
+        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800 disabled:opacity-60 sm:justify-self-start"
       >
         <Send className="size-4" aria-hidden="true" />
         {pending ? "Sending" : "Send"}
@@ -148,7 +148,7 @@ export function RenewNumber({ token }: { token: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e01a72] disabled:opacity-60 sm:justify-self-start"
+        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60 sm:justify-self-start"
       >
         <Repeat className="size-4" aria-hidden="true" />
         {pending ? "Renewing" : "Renew for a month"}
@@ -187,7 +187,7 @@ export function AutoRenew({ token, enabled }: { token: string; enabled: boolean 
           aria-labelledby={`${id}-label`}
           aria-describedby={`${id}-help`}
           disabled={pending}
-          className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-70 ${shown ? "bg-[#070f4c]" : "bg-slate-300"}`}
+          className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:opacity-70 ${shown ? "bg-navy-900" : "bg-slate-300"}`}
         >
           <span aria-hidden="true" className={`inline-block size-6 rounded-full bg-white shadow transition-transform ${shown ? "translate-x-7" : "translate-x-1"}`} />
         </button>

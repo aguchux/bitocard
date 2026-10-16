@@ -22,7 +22,7 @@ import {
   takeAd,
 } from "@/lib/crypto-actions";
 
-const selectClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-[#070f4c] focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none";
+const selectClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-navy-900 focus:border-brand-500 focus:ring-2 focus:ring-pink-100 focus:outline-none";
 
 /** Buy or sell, as a two-button switch that works as radios (so the form posts without script). */
 function SideSwitch({ name = "side", value, onChange, labels = { buy: "Buy", sell: "Sell" } }: { name?: string; value: "buy" | "sell"; onChange: (side: "buy" | "sell") => void; labels?: { buy: string; sell: string } }) {
@@ -32,8 +32,8 @@ function SideSwitch({ name = "side", value, onChange, labels = { buy: "Buy", sel
       {(["buy", "sell"] as const).map(side => (
         <label
           key={side}
-          className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#ff2382] ${
-            value === side ? (side === "buy" ? "bg-emerald-600 text-white shadow-sm" : "bg-[#ff2382] text-white shadow-sm") : "text-slate-600"
+          className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 ${
+            value === side ? (side === "buy" ? "bg-emerald-600 text-white shadow-sm" : "bg-brand-500 text-white shadow-sm") : "text-slate-600"
           }`}
         >
           <input type="radio" name={name} value={side} checked={value === side} onChange={() => onChange(side)} className="sr-only" />
@@ -48,7 +48,7 @@ function SideSwitch({ name = "side", value, onChange, labels = { buy: "Buy", sel
 function AssetSelect({ assets, defaultValue, name = "asset", label = "Coin" }: { assets: string[]; defaultValue?: string; name?: string; label?: string }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-sm font-semibold text-[#070f4c]">{label}</span>
+      <span className="block text-sm font-semibold text-navy-900">{label}</span>
       <select name={name} defaultValue={defaultValue ?? assets[0]} className={selectClass}>
         {assets.map(asset => (
           <option key={asset} value={asset}>
@@ -67,7 +67,7 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
     <button
       type="button"
       onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true), () => setCopied(false))}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-semibold text-[#070f4c] ring-1 ring-slate-300 hover:ring-slate-400"
+      className="inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400"
     >
       {copied ? <Check className="size-4 text-emerald-600" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
       {copied ? "Copied" : label}
@@ -179,7 +179,7 @@ export function ConfirmTradeForm({ adId, price, feeBps, fiat, label, nonce }: { 
       <input type="hidden" name="fiat" value={fiat} />
       <FormMessage state={state} />
       {state.field === "funds" ? (
-        <a href="/account/wallet" className="inline-flex min-h-11 items-center font-semibold text-[#ff2382] hover:underline">
+        <a href="/account/wallet" className="inline-flex min-h-11 items-center font-semibold text-brand-500 hover:underline">
           Add money to your wallet
         </a>
       ) : null}
@@ -267,10 +267,10 @@ export function WithdrawForm({ asset, chain, addresses, minimum }: { asset: stri
       <input type="hidden" name="chain" value={chain} />
       <FormMessage state={state} />
       <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-semibold text-[#070f4c]">Send to</legend>
+        <legend className="mb-1 text-sm font-semibold text-navy-900">Send to</legend>
         {addresses.map((item, index) => (
-          <label key={item.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-[#ff2382]">
-            <input type="radio" name="address_id" value={item.id} defaultChecked={index === 0} className="accent-[#ff2382]" />
+          <label key={item.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-brand-500">
+            <input type="radio" name="address_id" value={item.id} defaultChecked={index === 0} className="accent-brand-500" />
             <span className="min-w-0">
               <span className="block font-semibold">{item.label}</span>
               <span className="block truncate font-mono text-xs text-slate-500">{item.address}</span>
@@ -322,7 +322,7 @@ export function WithdrawalCodeForm({ id }: { id: string }) {
       <form action={resend}>
         <input type="hidden" name="id" value={id} />
         <FormMessage state={resent} />
-        <button type="submit" disabled={resending} className="inline-flex min-h-11 items-center font-semibold text-[#ff2382] hover:underline disabled:opacity-60">
+        <button type="submit" disabled={resending} className="inline-flex min-h-11 items-center font-semibold text-brand-500 hover:underline disabled:opacity-60">
           Send a new code
         </button>
       </form>
@@ -330,7 +330,7 @@ export function WithdrawalCodeForm({ id }: { id: string }) {
   );
 }
 
-const fieldClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-[#070f4c] focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none";
+const fieldClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-navy-900 focus:border-brand-500 focus:ring-2 focus:ring-pink-100 focus:outline-none";
 
 /** Adds a bank account for P2P money: the bank names its holder, who must be the customer. */
 export function CashOutAccountForm({ banks }: { banks: Array<{ code: string; name: string }> }) {
@@ -339,7 +339,7 @@ export function CashOutAccountForm({ banks }: { banks: Array<{ code: string; nam
     <form action={action} className="space-y-3" aria-label="Add a bank account">
       <FormMessage state={state} />
       <label className="block space-y-1.5">
-        <span className="block text-sm font-semibold text-[#070f4c]">Bank</span>
+        <span className="block text-sm font-semibold text-navy-900">Bank</span>
         <select name="bank_code" required defaultValue="" className={fieldClass} aria-invalid={state.field === "bank_code" || undefined}>
           <option value="" disabled>
             Choose your bank
@@ -369,10 +369,10 @@ export function CashOutForm({ accounts, currency, available, nonce }: { accounts
       <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
       <FormMessage state={state} />
       <fieldset className="space-y-2">
-        <legend className="mb-1 text-sm font-semibold text-[#070f4c]">Pay into</legend>
+        <legend className="mb-1 text-sm font-semibold text-navy-900">Pay into</legend>
         {accounts.map(item => (
-          <label key={item.id} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-[#ff2382] ${item.ready ? "cursor-pointer" : "opacity-60"}`}>
-            <input type="radio" name="bank_account_id" value={item.id} disabled={!item.ready} defaultChecked={item.id === usable[0]?.id} className="accent-[#ff2382]" />
+          <label key={item.id} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-slate-200 has-[:checked]:bg-pink-50 has-[:checked]:ring-2 has-[:checked]:ring-brand-500 ${item.ready ? "cursor-pointer" : "opacity-60"}`}>
+            <input type="radio" name="bank_account_id" value={item.id} disabled={!item.ready} defaultChecked={item.id === usable[0]?.id} className="accent-brand-500" />
             <span className="min-w-0">
               <span className="block font-semibold">{item.label}</span>
               {!item.ready ? <span className="block text-xs text-amber-700">Usable from {item.from}</span> : null}

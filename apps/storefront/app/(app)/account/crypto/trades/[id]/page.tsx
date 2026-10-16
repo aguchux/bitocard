@@ -30,7 +30,7 @@ export default async function TradePage({ params, searchParams }: { params: Prom
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href="/account/crypto/trades" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/crypto/trades" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> All trades
       </Link>
       {done ? (
@@ -42,7 +42,7 @@ export default async function TradePage({ params, searchParams }: { params: Prom
         <div className="flex items-center gap-3">
           <CoinBadge asset={trade.asset} size="size-12" />
           <div>
-            <h1 className="font-display text-xl font-extrabold text-[#070f4c]">
+            <h1 className="font-display text-xl font-extrabold text-navy-900">
               {bought ? "Bought" : "Sold"} {formatCrypto(bought ? trade.received : trade.amount, trade.asset)}
             </h1>
             <p className="text-sm text-slate-500">{trade.status === "completed" ? "Completed instantly" : trade.status}</p>
@@ -57,7 +57,7 @@ export default async function TradePage({ params, searchParams }: { params: Prom
           ))}
         </dl>
       </section>
-      <Link href="/account/crypto" className="inline-flex min-h-11 items-center rounded-xl bg-[#070f4c] px-4 font-semibold text-white">
+      <Link href="/account/crypto" className="inline-flex min-h-11 items-center rounded-xl bg-navy-900 px-4 font-semibold text-white">
         Back to crypto
       </Link>
     </div>

@@ -54,7 +54,7 @@ export function hrefWith(path: string, params: CatalogueParams, change: Partial<
 const chipRow = "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden";
 
 /** Fields at 16px on phones: iOS zooms the page into any smaller field when it is focused. */
-const field = "min-h-11 w-full rounded-xl border border-slate-200 bg-white text-base text-[#070f4c] focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none sm:text-sm";
+const field = "min-h-11 w-full rounded-xl border border-slate-200 bg-white text-base text-navy-900 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 focus:outline-none sm:text-sm";
 
 /** Country and sort, with Apply (a plain form, so it works without script). `compact`: one row, labels for screen readers only. */
 function Filters({ path, params, countries, compact = false }: { path: string; params: CatalogueParams; countries: StoreCountry[]; compact?: boolean }) {
@@ -87,7 +87,7 @@ function Filters({ path, params, countries, compact = false }: { path: string; p
           <option value="new">Newest</option>
         </select>
       </label>
-      <button type="submit" className="min-h-11 rounded-xl bg-[#070f4c] px-4 font-semibold text-white group-data-auto:hidden hover:bg-[#121a6b]">
+      <button type="submit" className="min-h-11 rounded-xl bg-navy-900 px-4 font-semibold text-white group-data-auto:hidden hover:bg-navy-800">
         Apply
       </button>
     </form>
@@ -110,7 +110,7 @@ function FeatureFilters({ path, params }: { path: string; params: CatalogueParam
             <Link
               href={hrefWith(path, params, { features: next.size ? [...next].join(",") : undefined })}
               aria-current={on ? "true" : undefined}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold whitespace-nowrap transition ${on ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-[#070f4c]"}`}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold whitespace-nowrap transition ${on ? "border-sky-600 bg-sky-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-navy-900"}`}
             >
               <Icon className="size-4" aria-hidden="true" />
               {productFeatureLabels[feature]}
@@ -165,7 +165,7 @@ export function CatalogueView({
       {/* The sidebar is for desktops; phones and tablets get the same choices under the title. */}
       <aside className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
         <nav aria-label="Catalogue">
-          <Link href="/catalogs" aria-current={active === undefined ? "page" : undefined} className={`block rounded-lg px-3 py-2 font-semibold ${active === undefined ? "bg-pink-50 text-[#e0116d]" : "text-[#070f4c] hover:bg-slate-50"}`}>
+          <Link href="/catalogs" aria-current={active === undefined ? "page" : undefined} className={`block rounded-lg px-3 py-2 font-semibold ${active === undefined ? "bg-pink-50 text-brand-600" : "text-navy-900 hover:bg-slate-50"}`}>
             Everything
           </Link>
           {groups.map(group => {
@@ -177,7 +177,7 @@ export function CatalogueView({
                 <Link
                   href={href}
                   aria-current={current ? "page" : undefined}
-                  className={`block rounded-md px-2 py-1 text-sm font-bold ${current ? "text-[#e0116d]" : "text-[#070f4c] hover:text-[#e0116d]"}`}
+                  className={`block rounded-md px-2 py-1 text-sm font-bold ${current ? "text-brand-600" : "text-navy-900 hover:text-brand-600"}`}
                 >
                   {group.label}
                 </Link>
@@ -187,7 +187,7 @@ export function CatalogueView({
                       <Link
                         href={`/catalogs/${category.category}`}
                         aria-current={active === category.category ? "page" : undefined}
-                        className={`flex items-center justify-between rounded-md px-2 py-1 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#070f4c]"}`}
+                        className={`flex items-center justify-between rounded-md px-2 py-1 text-sm ${active === category.category ? "bg-pink-50 font-semibold text-brand-600" : "text-slate-600 hover:bg-slate-50 hover:text-navy-900"}`}
                       >
                         <span className="flex min-w-0 items-center gap-2">
                           <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-5 rounded" ink="text-slate-500" tile="bg-slate-100" />
@@ -212,7 +212,7 @@ export function CatalogueView({
       <div className="min-w-0">
         {banner ? (
           // The banner as background, darkened on the left behind the title.
-          <header className="relative isolate overflow-hidden rounded-2xl bg-[#070f4c] shadow-sm">
+          <header className="relative isolate overflow-hidden rounded-2xl bg-navy-900 shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element -- banners uploaded by admins, served from the storage CDN */}
             <img src={banner} alt="" className="absolute inset-0 -z-10 size-full object-cover object-right" />
             <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(7,15,76,.92),rgba(7,15,76,.7)_45%,rgba(7,15,76,.15)_75%)]" />
@@ -236,7 +236,7 @@ export function CatalogueView({
                 <Link
                   href={href}
                   aria-current={current ? "page" : undefined}
-                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border py-1 pr-3.5 pl-1.5 text-sm whitespace-nowrap ${current ? "border-[#ff2382] bg-pink-50 font-semibold text-[#e0116d]" : "border-slate-200 bg-white text-slate-700"}`}
+                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border py-1 pr-3.5 pl-1.5 text-sm whitespace-nowrap ${current ? "border-brand-500 bg-pink-50 font-semibold text-brand-600" : "border-slate-200 bg-white text-slate-700"}`}
                 >
                   <GroupIcon group={group} className="size-7" />
                   {group.label}
@@ -255,7 +255,7 @@ export function CatalogueView({
           <ul className="mt-4 flex flex-wrap gap-2" aria-label="Active filters">
             {chips.map(chip => (
               <li key={chip.label}>
-                <Link href={hrefWith(path, params, chip.change)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-pink-50 px-3 text-sm font-semibold text-[#e0116d]">
+                <Link href={hrefWith(path, params, chip.change)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-pink-50 px-3 text-sm font-semibold text-brand-600">
                   {chip.label}
                   <X className="size-4" aria-label="Remove" />
                 </Link>

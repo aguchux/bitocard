@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
 import { currentCustomer } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 /** On a reseller's store: its name in every title, and its own address as the canonical one. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -31,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   const { store, missing } = await currentStore();
-  const shell = `${inter.variable} store min-h-svh overflow-x-clip bg-[#fcfdff] font-[family-name:var(--font-inter)] text-[#070f4c]`;
+  const shell = "store min-h-svh overflow-x-clip bg-page text-navy-900";
   if (missing) {
     return (
       <div className={shell}>

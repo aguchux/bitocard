@@ -14,7 +14,7 @@ const multiples = new Set(["gift_cards", "software"]);
 const emailed = new Set(["gift_cards", "software"]);
 
 const optionClass =
-  "flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-display font-bold text-[#070f4c] has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#ff2382]/40";
+  "flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-display font-bold text-navy-900 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500/40";
 
 const walletOption: StorePaymentMethod = { object: "payment_method", id: "wallet", label: "Wallet", description: "Pay from your wallet balance", networks: [] };
 
@@ -103,10 +103,10 @@ export function BuyForm({
         <p className="font-semibold">Sign in to buy</p>
         <p className="mt-1 text-sm text-slate-600">You need a free account, so your codes and receipts are kept safe for you.</p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href={`/signin?next=${encodeURIComponent(back)}`} className="inline-flex min-h-12 items-center rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e8116d]">
+          <Link href={`/signin?next=${encodeURIComponent(back)}`} className="inline-flex min-h-12 items-center rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
             Sign in
           </Link>
-          <Link href={`/signup?next=${encodeURIComponent(back)}`} className="inline-flex min-h-12 items-center rounded-xl border border-slate-200 px-5 font-semibold text-[#070f4c] hover:border-slate-300">
+          <Link href={`/signup?next=${encodeURIComponent(back)}`} className="inline-flex min-h-12 items-center rounded-xl border border-slate-200 px-5 font-semibold text-navy-900 hover:border-slate-300">
             Create an account
           </Link>
         </div>
@@ -122,7 +122,7 @@ export function BuyForm({
       {preview ? <input type="hidden" name="quote_id" value={preview.quote_id} /> : null}
       {market === tried ? <FormMessage state={state} /> : null}
       {market === tried && state.field === "wallet" ? (
-        <Link href={topUpHref(back)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white hover:bg-[#0b1766]">
+        <Link href={topUpHref(back)} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800">
           <Wallet className="size-4" aria-hidden="true" /> Top up your wallet
         </Link>
       ) : null}
@@ -220,18 +220,18 @@ export function BuyForm({
           <legend className="text-sm font-semibold">Pay with</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {offered.map((method, index) => (
-              <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50">
-                <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-[#ff2382]" />
+              <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
+                <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-brand-500" />
                 <span>
                   <span className="block text-sm font-semibold">{method.label}</span>
                   <span className="block text-xs text-slate-500">{method.description}</span>
                   {method.id === "wallet" && shown.wallet ? (
                     <span className="mt-1.5 block text-xs">
-                      <span className="font-semibold text-[#070f4c]">Balance {formatFace(shown.wallet.balance, shown.wallet.currency)}</span>
+                      <span className="font-semibold text-navy-900">Balance {formatFace(shown.wallet.balance, shown.wallet.currency)}</span>
                       {shown.wallet.enabled ? (
                         <>
                           {" · "}
-                          <Link href={topUpHref(back)} className="font-semibold text-[#ff2382] underline-offset-2 hover:underline">
+                          <Link href={topUpHref(back)} className="font-semibold text-brand-500 underline-offset-2 hover:underline">
                             Top up
                           </Link>
                         </>
@@ -257,7 +257,7 @@ export function BuyForm({
       {preview && payOption ? (
         <div className="space-y-3 rounded-2xl bg-slate-50 p-4" role="status">
           <p className="text-sm text-slate-600">You pay</p>
-          <p className="font-display text-3xl font-extrabold text-[#070f4c]">{formatFace(preview.amount, preview.currency)}</p>
+          <p className="font-display text-3xl font-extrabold text-navy-900">{formatFace(preview.amount, preview.currency)}</p>
           {options.length > 1 ? (
             // Which wallet pays: kept out of the form's change handler, which would drop the price shown.
             <fieldset onChange={event => event.stopPropagation()}>
@@ -266,7 +266,7 @@ export function BuyForm({
                 {options.map(option => (
                   <label
                     key={option.currency}
-                    className={`flex items-start gap-3 rounded-xl border bg-white p-3 ${option.amount === null ? "cursor-not-allowed opacity-60" : "cursor-pointer"} border-slate-200 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50`}
+                    className={`flex items-start gap-3 rounded-xl border bg-white p-3 ${option.amount === null ? "cursor-not-allowed opacity-60" : "cursor-pointer"} border-slate-200 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50`}
                   >
                     <input
                       type="radio"
@@ -275,11 +275,11 @@ export function BuyForm({
                       checked={payOption.currency === option.currency}
                       disabled={option.amount === null}
                       onChange={() => setPayFrom(option.currency)}
-                      className="mt-1 accent-[#ff2382]"
+                      className="mt-1 accent-brand-500"
                     />
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold">{option.currency === preview.currency ? `${option.currency} wallet` : "US dollar wallet"}</span>
-                      <span className="block text-sm text-[#070f4c]">{option.amount === null ? "Not available right now" : formatFace(option.amount, option.currency)}</span>
+                      <span className="block text-sm text-navy-900">{option.amount === null ? "Not available right now" : formatFace(option.amount, option.currency)}</span>
                       <span className={`block text-xs ${option.enough ? "text-slate-500" : "text-amber-700"}`}>Balance {formatFace(option.balance, option.currency)}</span>
                     </span>
                   </label>
@@ -303,14 +303,14 @@ export function BuyForm({
               <Submit pending={pending} className="text-lg">
                 <Wallet className="size-4" aria-hidden="true" /> Pay {formatFace(payOption.amount, payOption.currency)}
               </Submit>
-              <button type="button" onClick={() => setDismissed(preview.quote_id)} className="inline-flex min-h-12 items-center rounded-xl px-4 font-semibold text-slate-600 hover:text-[#070f4c]">
+              <button type="button" onClick={() => setDismissed(preview.quote_id)} className="inline-flex min-h-12 items-center rounded-xl px-4 font-semibold text-slate-600 hover:text-navy-900">
                 Change
               </button>
             </div>
           ) : (
             <Link
               href={topUpHref(back, payOption.currency === preview.currency ? undefined : payOption.currency)}
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]"
+              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800"
             >
               <Wallet className="size-4" aria-hidden="true" /> Top up {formatFace((payOption.amount ?? 0) - payOption.balance, payOption.currency)} or more
             </Link>

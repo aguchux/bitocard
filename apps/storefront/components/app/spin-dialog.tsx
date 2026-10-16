@@ -54,16 +54,16 @@ export function SpinDialog({ rewards, open: openOnArrival = false }: { rewards: 
       <button
         type="button"
         onClick={show}
-        className="flex w-full items-center gap-4 rounded-3xl bg-gradient-to-r from-[#070f4c] to-[#2a1466] p-4 text-left text-white ring-1 ring-[#070f4c] hover:to-[#3a1680] sm:p-5"
+        className="flex w-full items-center gap-4 rounded-3xl bg-gradient-to-r from-navy-900 to-plum-900 p-4 text-left text-white ring-1 ring-navy-900 hover:to-plum-800 sm:p-5"
       >
-        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#ff2382]">
+        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-brand-500">
           <Gift className="size-6" aria-hidden="true" strokeWidth={2.25} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-display text-lg font-extrabold">Spin and win{rewards.mode === "test" ? " (test)" : ""}</span>
           <span className="block text-sm text-white/80">{spinNote(rewards)}</span>
         </span>
-        <span className="hidden shrink-0 items-center gap-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-[#070f4c] sm:inline-flex">
+        <span className="hidden shrink-0 items-center gap-1 rounded-xl bg-white px-3 py-2 text-sm font-bold text-navy-900 sm:inline-flex">
           {rewards.enabled ? "Spin now" : "Open"} <ChevronRight className="size-4" aria-hidden="true" />
         </span>
         <ChevronRight className="size-5 shrink-0 sm:hidden" aria-hidden="true" />
@@ -73,7 +73,7 @@ export function SpinDialog({ rewards, open: openOnArrival = false }: { rewards: 
         ref={dialog}
         aria-labelledby="spin-title"
         onClose={() => setOpen(false)}
-        className="m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden bg-[#040829] p-0 text-white backdrop:bg-black/90"
+        className="m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden bg-navy-950 p-0 text-white backdrop:bg-black/90"
       >
         {open ? (
           <div className="flex h-full flex-col bg-[radial-gradient(ellipse_at_top,#1d1f6e_0%,#070f4c_45%,#040829_100%)]">

@@ -71,7 +71,7 @@ export function EsimCard({ code, iccid, details, title }: { code: string; iccid:
         <div className="min-w-0 space-y-3">
           {install ? (
             <div className="flex flex-wrap gap-2">
-              <a href={install.apple} rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white hover:bg-[#0b1766]">
+              <a href={install.apple} rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800">
                 <Smartphone className="size-4" aria-hidden="true" /> Install on iPhone
               </a>
               <a href={install.android} rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold hover:border-slate-300">

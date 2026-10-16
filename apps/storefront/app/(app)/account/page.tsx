@@ -130,7 +130,7 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
         ) : (
           <p className="rounded-3xl bg-white p-5 text-slate-600 ring-1 ring-slate-200/70">
             Your orders show here.{" "}
-            <Link href="/account/catalog" className="font-semibold text-[#2477ff] hover:underline">
+            <Link href="/account/catalog" className="font-semibold text-azure-500 hover:underline">
               Find something to buy
             </Link>
           </p>

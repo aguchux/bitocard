@@ -32,7 +32,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-3xl font-extrabold tracking-tight">Orders</h1>
-        <Link href="/account/disputes" className="text-sm font-semibold text-[#ff2382] hover:underline">
+        <Link href="/account/disputes" className="text-sm font-semibold text-brand-500 hover:underline">
           Your disputes
         </Link>
       </div>
@@ -42,7 +42,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             key={key}
             href={`/account/orders${key === "all" ? "" : `?show=${key}`}`}
             aria-current={filter === key ? "true" : undefined}
-            className={`inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold ${filter === key ? "bg-[#070f4c] text-white" : "bg-white text-[#070f4c] ring-1 ring-slate-200 hover:ring-slate-300"}`}
+            className={`inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold ${filter === key ? "bg-navy-900 text-white" : "bg-white text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300"}`}
           >
             {filters[key].label}
           </Link>
@@ -54,7 +54,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       ) : orders.length === 0 ? (
         <p className="rounded-3xl bg-white p-6 text-slate-600 ring-1 ring-slate-200/70">
           {filter === "all" ? "No orders yet." : "No orders here."}{" "}
-          <Link href="/account/catalog" className="font-semibold text-[#2477ff] hover:underline">
+          <Link href="/account/catalog" className="font-semibold text-azure-500 hover:underline">
             Browse the catalog
           </Link>
         </p>

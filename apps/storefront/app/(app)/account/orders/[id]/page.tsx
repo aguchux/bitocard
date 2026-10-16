@@ -33,12 +33,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
       <RefreshWhile active={waiting && !(order.mode === "test" && order.status === "awaiting_payment")} />
-      <Link href="/account/orders" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/orders" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Your orders
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-[#070f4c] sm:text-3xl">
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">
             {order.quantity > 1 ? `${order.quantity} × ` : ""}
             {order.product.name}
           </h1>
@@ -84,7 +84,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           ) : order.checkout_url ? (
             <>
               <p className="text-slate-700">We have not received your payment yet. If you have paid, this page updates by itself.</p>
-              <a href={order.checkout_url} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e8116d]">
+              <a href={order.checkout_url} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
                 Go to the payment page <ExternalLink className="size-4" aria-hidden="true" />
               </a>
             </>
@@ -103,7 +103,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {deliveries.length ? (
         <section aria-labelledby="codes" className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 id="codes" className="font-display flex items-center gap-2 text-xl font-bold">
-            <KeyRound className="size-5 text-[#ff2382]" aria-hidden="true" /> Your {esims ? (deliveries.length > 1 ? "eSIMs" : "eSIM") : deliveries.length > 1 ? "codes" : "code"}
+            <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {esims ? (deliveries.length > 1 ? "eSIMs" : "eSIM") : deliveries.length > 1 ? "codes" : "code"}
           </h2>
           <p className="mt-1 text-sm text-slate-600">{esims ? "Install before you travel. Keep it private: anyone with the code can install the eSIM, and only once." : "Keep these safe: anyone with a code can use it."}</p>
           <ul className="mt-4 space-y-3">
@@ -139,7 +139,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {canDispute(order.status) ? (
         <Link
           href={`/account/disputes/new?order=${order.id}`}
-          className="inline-flex min-h-11 items-center gap-2 justify-self-start rounded-xl border border-slate-200 px-4 text-sm font-semibold text-[#070f4c] hover:border-slate-300"
+          className="inline-flex min-h-11 items-center gap-2 justify-self-start rounded-xl border border-slate-200 px-4 text-sm font-semibold text-navy-900 hover:border-slate-300"
         >
           <MessageSquareWarning className="size-4" aria-hidden="true" /> Report a problem with this order
         </Link>

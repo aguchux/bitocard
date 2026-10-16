@@ -30,18 +30,18 @@ export default async function CryptoPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div>
-        <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Crypto{wallets?.mode === "test" ? " (test)" : ""}</h1>
+        <h1 className="font-display text-2xl font-extrabold text-navy-900">Crypto{wallets?.mode === "test" ? " (test)" : ""}</h1>
         <p className="text-sm text-slate-600">Buy and sell with other people, paid instantly from your BitoCard wallet.</p>
       </div>
       <CryptoNav current="/account/crypto" />
       {blocked ? <CryptoGate wallets={wallets} p2p /> : null}
 
       {wallets && !blocked ? (
-        <section aria-labelledby="quick" className="rounded-3xl bg-[#070f4c] p-4 text-white sm:p-6">
+        <section aria-labelledby="quick" className="rounded-3xl bg-navy-900 p-4 text-white sm:p-6">
           <h2 id="quick" className="mb-3 font-display text-lg font-bold">
             Quick buy or sell
           </h2>
-          <div className="rounded-2xl bg-white p-4 text-[#070f4c]">
+          <div className="rounded-2xl bg-white p-4 text-navy-900">
             <QuickTrade assets={assets} currency={wallets.currency} />
           </div>
         </section>
@@ -55,12 +55,12 @@ export default async function CryptoPage() {
             </h2>
             <span className="flex gap-2">
               {wallets.enabled && !wallets.frozen && wallets.verified ? (
-                <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white">
+                <Link href="/account/crypto/deposit" className="inline-flex min-h-10 items-center rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white">
                   Deposit
                 </Link>
               ) : null}
               {canWithdraw(wallets) ? (
-                <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-semibold text-[#070f4c] ring-1 ring-slate-300">
+                <Link href="/account/crypto/withdraw" className="inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300">
                   Withdraw
                 </Link>
               ) : null}
@@ -143,7 +143,7 @@ export default async function CryptoPage() {
             <h2 id="recent" className="text-lg font-bold">
               Latest trades
             </h2>
-            <Link href="/account/crypto/trades" className="text-sm font-semibold text-[#ff2382] hover:underline">
+            <Link href="/account/crypto/trades" className="text-sm font-semibold text-brand-500 hover:underline">
               See all
             </Link>
           </div>

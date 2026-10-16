@@ -33,10 +33,10 @@ export default async function WithdrawalPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href={`/account/crypto/withdraw?asset=${item.asset}&chain=${item.chain}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href={`/account/crypto/withdraw?asset=${item.asset}&chain=${item.chain}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Withdraw
       </Link>
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Withdrawal {item.number}</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">Withdrawal {item.number}</h1>
       <CryptoNav current="/account/crypto/withdraw" />
       <section className={card} aria-label="Withdrawal details">
         <div className="flex items-center gap-3">

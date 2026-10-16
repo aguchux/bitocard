@@ -16,10 +16,10 @@ export function EmailCodeGate({ token, emailHint }: { token: string; emailHint: 
   return (
     <section aria-labelledby="prove" className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
       <h1 id="prove" className="flex items-center gap-2 text-xl font-bold">
-        <Mail className="size-5 text-[#ff2382]" aria-hidden="true" /> Confirm it is you
+        <Mail className="size-5 text-brand-500" aria-hidden="true" /> Confirm it is you
       </h1>
       <p className="mt-2 text-slate-600">
-        To keep your order safe, we email a code to <strong className="text-[#070f4c]">{emailHint}</strong>, the address on the order.
+        To keep your order safe, we email a code to <strong className="text-navy-900">{emailHint}</strong>, the address on the order.
       </p>
       {waitingForCode ? (
         <form action={check} className="mt-5 grid gap-3 sm:max-w-sm">
@@ -36,9 +36,9 @@ export function EmailCodeGate({ token, emailHint }: { token: string; emailHint: 
             maxLength={7}
             required
             autoFocus
-            className="min-h-12 rounded-xl border border-slate-200 px-4 font-mono text-xl tracking-[0.4em] outline-none focus:border-slate-400 focus:ring-4 focus:ring-[#070f4c]/10"
+            className="min-h-12 rounded-xl border border-slate-200 px-4 font-mono text-xl tracking-[0.4em] outline-none focus:border-slate-400 focus:ring-4 focus:ring-navy-900/10"
           />
-          <button type="submit" disabled={checking} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766] disabled:opacity-60">
+          <button type="submit" disabled={checking} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800 disabled:opacity-60">
             {checking ? "Checking…" : "Open my order"}
           </button>
         </form>
@@ -50,8 +50,8 @@ export function EmailCodeGate({ token, emailHint }: { token: string; emailHint: 
           disabled={sending}
           className={
             waitingForCode
-              ? "min-h-11 text-sm font-semibold text-[#2477ff] hover:underline disabled:opacity-60"
-              : "inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766] disabled:opacity-60 sm:w-auto"
+              ? "min-h-11 text-sm font-semibold text-azure-500 hover:underline disabled:opacity-60"
+              : "inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800 disabled:opacity-60 sm:w-auto"
           }
         >
           {sending ? "Sending…" : waitingForCode ? "Send a new code" : "Email me a code"}

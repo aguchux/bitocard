@@ -41,7 +41,7 @@ function GroupPanel({ group, close }: { group: StoreNavigationGroup; close: () =
       <ul className="grid gap-1 sm:grid-cols-2">
         {group.categories.map(category => (
           <li key={category.category}>
-            <Link href={`/catalogs/${category.category}`} onClick={close} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-[#070f4c] hover:bg-slate-50">
+            <Link href={`/catalogs/${category.category}`} onClick={close} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-navy-900 hover:bg-slate-50">
               <span className="flex min-w-0 items-center gap-2.5">
                 <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-9" />
                 <span className="truncate">{category.label}</span>
@@ -69,7 +69,7 @@ function GroupPanel({ group, close }: { group: StoreNavigationGroup; close: () =
           </ul>
         </>
       ) : null}
-      <Link href={catalogueHref(group)} onClick={close} className="mt-3 block rounded-lg bg-pink-50 px-3 py-2 text-center text-sm font-semibold text-[#e0116d]">
+      <Link href={catalogueHref(group)} onClick={close} className="mt-3 block rounded-lg bg-pink-50 px-3 py-2 text-center text-sm font-semibold text-brand-600">
         All {group.label.toLowerCase()}
       </Link>
     </div>
@@ -92,7 +92,7 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(value => !value)}
-        className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-[#070f4c] hover:bg-slate-50"
+        className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-navy-900 hover:bg-slate-50"
       >
         <LayoutGrid className="size-4" aria-hidden="true" />
         Catalog
@@ -110,7 +110,7 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                     onMouseEnter={() => setActive(item.key)}
                     onFocus={() => setActive(item.key)}
                     aria-current={item.key === group.key ? "true" : undefined}
-                    className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2 text-sm font-semibold ${item.key === group.key ? "bg-white text-[#070f4c] shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-[#070f4c]"}`}
+                    className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2 text-sm font-semibold ${item.key === group.key ? "bg-white text-navy-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-navy-900"}`}
                   >
                     <GroupIcon group={item} className="size-8" />
                     <span className="flex-1 truncate">{item.label}</span>
@@ -119,7 +119,7 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
                 </li>
               ))}
             </ul>
-            <Link href="/catalogs" onClick={close} className="mt-2 flex min-h-11 items-center justify-center rounded-lg text-sm font-semibold text-[#e0116d] hover:bg-white">
+            <Link href="/catalogs" onClick={close} className="mt-2 flex min-h-11 items-center justify-center rounded-lg text-sm font-semibold text-brand-600 hover:bg-white">
               All products
             </Link>
           </div>
@@ -135,7 +135,7 @@ export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
     <nav aria-label="Categories" className="hidden items-center gap-0.5 xl:flex">
       <CatalogMenu groups={groups} />
       {quickLinks.map(link => (
-        <Link key={link.href} href={link.href} className="flex min-h-11 items-center rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-[#070f4c] hover:bg-slate-50">
+        <Link key={link.href} href={link.href} className="flex min-h-11 items-center rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-navy-900 hover:bg-slate-50">
           {link.label}
         </Link>
       ))}
@@ -166,18 +166,18 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
   }, [open]);
   return (
     <div className="xl:hidden">
-      <button ref={trigger} type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
+      <button ref={trigger} type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50">
         <Menu className="size-6" aria-hidden="true" />
       </button>
       {open
         ? createPortal(
             <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Menu">
-              <button type="button" tabIndex={-1} aria-hidden="true" className="flex-1 bg-[#070f4c]/50" onClick={() => setOpen(false)} />
+              <button type="button" tabIndex={-1} aria-hidden="true" className="flex-1 bg-navy-900/50" onClick={() => setOpen(false)} />
               {/* The categories scroll; sign in and the reseller link stay at the bottom, in reach of a thumb. */}
               <div className="flex h-dvh w-[min(22rem,88vw)] flex-col bg-white shadow-2xl">
                 <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 pr-3 pl-5">
-                  <p className="font-display text-lg font-bold text-[#070f4c]">Shop</p>
-                  <button ref={closeButton} type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50">
+                  <p className="font-display text-lg font-bold text-navy-900">Shop</p>
+                  <button ref={closeButton} type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50">
                     <X className="size-6" aria-hidden="true" />
                   </button>
                 </div>
@@ -185,8 +185,8 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
                   <ul className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-4">
                     {quickLinks.map(link => (
                       <li key={link.href}>
-                        <Link href={link.href} onClick={() => setOpen(false)} className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 text-center text-xs font-semibold text-[#070f4c] hover:bg-slate-100">
-                          <link.icon className="size-5 text-[#ff2382]" aria-hidden="true" />
+                        <Link href={link.href} onClick={() => setOpen(false)} className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 text-center text-xs font-semibold text-navy-900 hover:bg-slate-100">
+                          <link.icon className="size-5 text-brand-500" aria-hidden="true" />
                           {link.label}
                         </Link>
                       </li>
@@ -195,7 +195,7 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
                   <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Catalog</p>
                   {groups.map(group => (
                     <div key={group.key}>
-                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-[#070f4c]">
+                      <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-navy-900">
                         <GroupIcon group={group} className="size-10" />
                         <span className="flex-1">{group.label}</span>
                         {/* A group of one category is that category: no list repeating its name. */}
@@ -223,12 +223,12 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
                   <Link
                     href={signedIn ? "/account" : "/signin"}
                     onClick={() => setOpen(false)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-[#070f4c]"
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-semibold text-navy-900"
                   >
                     {signedIn ? "Account" : "Sign in"}
                   </Link>
                   {reseller ? (
-                    <Link href="/resellers" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-semibold text-white">
+                    <Link href="/resellers" onClick={() => setOpen(false)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white">
                       <Store className="size-5" aria-hidden="true" />
                       Start Reselling
                     </Link>

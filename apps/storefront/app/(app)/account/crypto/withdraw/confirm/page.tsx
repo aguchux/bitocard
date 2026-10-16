@@ -23,10 +23,10 @@ export default async function ReviewWithdrawalPage({ searchParams }: { searchPar
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href={back} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href={back} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Back
       </Link>
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Review your withdrawal</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">Review your withdrawal</h1>
       <CryptoNav current="/account/crypto/withdraw" />
       {quote ? (
         <section className={card} aria-label="Withdrawal details">
@@ -73,7 +73,7 @@ export default async function ReviewWithdrawalPage({ searchParams }: { searchPar
         <div className={card} role="alert">
           <p className="font-semibold">This withdrawal cannot be made</p>
           <p className="mt-1 text-sm text-slate-600">{preview && !preview.ok ? preview.message : "Check the amount and address and try again."}</p>
-          <Link href={back} className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+          <Link href={back} className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
             Back to withdraw
           </Link>
         </div>

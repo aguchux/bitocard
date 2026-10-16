@@ -60,25 +60,25 @@ export async function ProductDetail({ product, inApp = false }: { product: Store
   return (
     <div className="space-y-8 sm:space-y-12">
       {inApp ? (
-        <Link href={`/account/catalog?group=${encodeURIComponent(navigation.groups.find(group => group.categories.some(item => item.category === product.category))?.key ?? "")}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+        <Link href={`/account/catalog?group=${encodeURIComponent(navigation.groups.find(group => group.categories.some(item => item.category === product.category))?.key ?? "")}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
           <ChevronLeft className="size-4" aria-hidden="true" /> {product.category_label}
         </Link>
       ) : (
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
             <li>
-              <Link href="/" className="hover:text-[#070f4c]">
+              <Link href="/" className="hover:text-navy-900">
                 Home
               </Link>
             </li>
             <ChevronRight className="size-3.5" aria-hidden="true" />
             <li>
-              <Link href={`/catalogs/${product.category}`} className="hover:text-[#070f4c]">
+              <Link href={`/catalogs/${product.category}`} className="hover:text-navy-900">
                 {product.category_label}
               </Link>
             </li>
             <ChevronRight className="size-3.5" aria-hidden="true" />
-            <li aria-current="page" className="font-semibold text-[#070f4c]">
+            <li aria-current="page" className="font-semibold text-navy-900">
               {product.name}
             </li>
           </ol>

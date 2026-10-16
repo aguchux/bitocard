@@ -26,18 +26,18 @@ export default async function CashOutPage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href="/account/crypto" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/crypto" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Crypto
       </Link>
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Cash out{money?.mode === "test" ? " (test)" : ""}</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">Cash out{money?.mode === "test" ? " (test)" : ""}</h1>
       <CryptoNav current="/account/crypto/cash-out" />
       {!cash.ok && cash.code === "customer_verification_required" ? (
         <div className={card}>
           <p className="flex items-center gap-2 font-semibold">
-            <ShieldCheck className="size-5 text-[#ff2382]" aria-hidden="true" /> Verify your identity to cash out
+            <ShieldCheck className="size-5 text-brand-500" aria-hidden="true" /> Verify your identity to cash out
           </p>
           <p className="mt-1 text-sm text-slate-600">We pay P2P money only into an account in your own name, so we need a quick identity check first, once.</p>
-          <Link href="/account/verification" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+          <Link href="/account/verification" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
             Verify my identity
           </Link>
         </div>

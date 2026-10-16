@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { brand, manifestIcons } from "@bitocard/ui/site";
+import { colors } from "@bitocard/ui/tokens";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -8,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Shop gift cards, top up mobile, pay bills and explore digital essentials, delivered digitally.",
     start_url: "/",
     display: "browser",
-    background_color: "#fcfdff",
-    theme_color: "#fcfdff",
+    background_color: colors.page,
+    theme_color: colors.page,
     icons: [...manifestIcons],
   };
 }

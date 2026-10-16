@@ -65,14 +65,14 @@ export function CountryPicker({ countries, value = "", className = "" }: { count
         aria-controls={`${id}-list`}
         aria-label={`Country: ${current.label}`}
         onClick={() => setOpen(value => !value)}
-        className="flex h-full w-full min-w-0 items-center gap-2.5 px-4 text-left text-[15px] font-medium text-[#070f4c]"
+        className="flex h-full w-full min-w-0 items-center gap-2.5 px-4 text-left text-[15px] font-medium text-navy-900"
       >
         <Flag code={current.flag} className="h-4 w-6" />
         <span className="min-w-0 flex-1 truncate">{current.label}</span>
         <ChevronDown className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
       </button>
       {open ? (
-        <div className="absolute top-[calc(100%+8px)] right-0 left-0 z-40 min-w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white text-[#070f4c] shadow-2xl sm:left-auto sm:w-72">
+        <div className="absolute top-[calc(100%+8px)] right-0 left-0 z-40 min-w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white text-navy-900 shadow-2xl sm:left-auto sm:w-72">
           <label className="flex items-center gap-2 border-b border-slate-100 px-3 focus-within:bg-slate-50">
             <Search className="size-4 text-slate-400" aria-hidden="true" />
             <span className="sr-only">Find a country</span>
@@ -86,7 +86,7 @@ export function CountryPicker({ countries, value = "", className = "" }: { count
                   <button type="button" onClick={() => choose(option)} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm hover:bg-slate-50 ${active ? "font-semibold" : ""}`}>
                     <Flag code={option.flag} className="h-4 w-6" />
                     <span className="flex-1">{option.label}</span>
-                    {active ? <Check className="size-4 text-[#ff2382]" aria-hidden="true" /> : null}
+                    {active ? <Check className="size-4 text-brand-500" aria-hidden="true" /> : null}
                   </button>
                 </li>
               );

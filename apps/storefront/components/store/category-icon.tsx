@@ -32,7 +32,7 @@ export function CategoryIcon({ category, iconUrl, className = "size-8", ink, til
  * A menu group's icon: the first uploaded icon among its categories (its own, for a one-category group), else the
  * group's built-in icon.
  */
-export function GroupIcon({ group, className = "size-8", ink = "text-[#e0116d]", tile = "bg-pink-50" }: { group: StoreNavigationGroup; className?: string; ink?: string; tile?: string }) {
+export function GroupIcon({ group, className = "size-8", ink = "text-brand-600", tile = "bg-pink-50" }: { group: StoreNavigationGroup; className?: string; ink?: string; tile?: string }) {
   const uploaded = group.categories.find(category => category.icon_url)?.icon_url;
   return <Tile src={uploaded} Icon={groupIcon[group.key] ?? Gift} className={className} ink={ink} tile={tile} />;
 }

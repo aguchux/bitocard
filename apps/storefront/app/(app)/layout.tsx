@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { StoreApp } from "@bitocard/api-client/storefront";
@@ -12,8 +11,6 @@ import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
 import { pathHeader } from "@/lib/path-header";
 import { currentStore, storeSubdomain } from "@/lib/store";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export async function generateMetadata(): Promise<Metadata> {
   const subdomain = await storeSubdomain();
@@ -33,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [{ store, missing }, customer] = await Promise.all([currentStore(), currentCustomer()]);
-  const shell = `${inter.variable} min-h-svh overflow-x-clip bg-white font-[family-name:var(--font-inter)] text-[#070f4c]`;
+  const shell = "min-h-svh overflow-x-clip bg-white text-navy-900";
   if (missing) {
     return (
       <div className={shell}>
@@ -70,7 +67,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           store ? (
             <StoreName store={store} />
           ) : (
-            <span className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] sm:text-[30px]">
+            <span className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
               <Brand />
             </span>
           )

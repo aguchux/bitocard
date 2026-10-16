@@ -1,7 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import { brand, siteUrl } from "@bitocard/ui/site";
+import { colors } from "@bitocard/ui/tokens";
 import "@bitocard/ui/styles/brand-lockup.css";
 import "./globals.css";
+
+// Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 const title = "BitoCard – Gift cards, airtime, data, bills and more";
 const description = "Shop digital gift cards, top up mobile airtime and data, pay bills and TV, and explore eSIMs and software, delivered digitally. Or open your own reseller store.";
@@ -20,8 +25,12 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false, email: false, address: false },
 };
 
-export const viewport: Viewport = { themeColor: "#fcfdff" };
+export const viewport: Viewport = { themeColor: colors.page };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en-GB"><body>{children}</body></html>;
+  return (
+    <html lang="en-GB" className={inter.variable}>
+      <body>{children}</body>
+    </html>
+  );
 }

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, Clock, LockKeyhole, Phone, Store, XCircle } from "lucide-react";
 import { categoryLabels, formatFace, type ProductCategory, type ProductFeature, type StoreEsim } from "@bitocard/api-client/storefront";
@@ -12,7 +11,6 @@ import { EmailCodeGate } from "./gate";
 import { NumberLive } from "./number";
 import { EsimManage } from "@/components/store/esim-manage";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 // The link opens the order: never indexed, and no Referer to other sites (it would carry the link).
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -24,7 +22,7 @@ const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key",
 function Shell({ store, children }: { store: AccessStore | null; children: React.ReactNode }) {
   const name = store?.name ?? brand.name;
   return (
-    <div className={`${inter.variable} min-h-svh bg-[#f8f9fc] font-[family-name:var(--font-inter)] text-[#070f4c]`}>
+    <div className="min-h-svh bg-canvas text-navy-900">
       <header className="border-b border-slate-100 bg-white">
         <div className="mx-auto flex h-16 max-w-3xl items-center gap-3 px-4 sm:px-6">
           {store?.logo_url ? (
@@ -57,7 +55,7 @@ function NumberPanel({ delivery, features }: { delivery: AccessDelivery; feature
   return (
     <section aria-labelledby="number" className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
       <h2 id="number" className="flex items-center gap-2 text-xl font-bold">
-        <Phone className="size-5 text-[#ff2382]" aria-hidden="true" /> Your number
+        <Phone className="size-5 text-brand-500" aria-hidden="true" /> Your number
       </h2>
       {number ? <p className="mt-3 font-mono text-2xl font-extrabold tracking-wide sm:text-3xl">{number}</p> : null}
       {expires && !Number.isNaN(Date.parse(expires)) ? (
@@ -103,17 +101,17 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
         ) : access.method === "customer" ? (
           <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
             <h1 className="flex items-center gap-2 text-xl font-bold">
-              <LockKeyhole className="size-5 text-[#ff2382]" aria-hidden="true" /> Sign in to see your order
+              <LockKeyhole className="size-5 text-brand-500" aria-hidden="true" /> Sign in to see your order
             </h1>
             <p className="mt-2 text-slate-600">Only the account that bought this order can open it. Sign in to {store.name} with that account.</p>
-            <Link href={`/signin?next=${encodeURIComponent(passPath(token))}`} className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-[#070f4c] px-5 font-semibold text-white hover:bg-[#0b1766]">
+            <Link href={`/signin?next=${encodeURIComponent(passPath(token))}`} className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800">
               Sign in
             </Link>
           </section>
         ) : (
           <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
             <h1 className="flex items-center gap-2 text-xl font-bold">
-              <Store className="size-5 text-[#ff2382]" aria-hidden="true" /> Your order is with {store.name}
+              <Store className="size-5 text-brand-500" aria-hidden="true" /> Your order is with {store.name}
             </h1>
             <p className="mt-2 text-slate-600">{store.name} delivers this order to you directly. Contact them for your codes and its details.</p>
           </section>

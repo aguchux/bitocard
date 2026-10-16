@@ -24,18 +24,18 @@ export default async function DisputePage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
-      <Link href="/account/disputes" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/disputes" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Your disputes
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="font-display text-2xl font-extrabold tracking-tight break-words text-[#070f4c] sm:text-3xl">{dispute.subject}</h1>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight break-words text-navy-900 sm:text-3xl">{dispute.subject}</h1>
           <p className="mt-1 text-slate-600">
             {dispute.reference}
             {dispute.checkout_id ? (
               <>
                 {" · "}
-                <Link href={`/account/orders/${dispute.checkout_id}`} className="font-semibold text-[#ff2382] hover:underline">
+                <Link href={`/account/orders/${dispute.checkout_id}`} className="font-semibold text-brand-500 hover:underline">
                   View the order
                 </Link>
               </>
@@ -54,7 +54,7 @@ export default async function DisputePage({ params }: { params: Promise<{ id: st
 
       <ol className="space-y-3" aria-label="Messages">
         {dispute.messages.map(message => (
-          <li key={message.id} className={`rounded-2xl p-4 ${message.author === "customer" ? "bg-[#070f4c] text-white" : message.author === "system" ? "border border-dashed border-slate-200 bg-slate-50" : "bg-white ring-1 ring-slate-100"}`}>
+          <li key={message.id} className={`rounded-2xl p-4 ${message.author === "customer" ? "bg-navy-900 text-white" : message.author === "system" ? "border border-dashed border-slate-200 bg-slate-50" : "bg-white ring-1 ring-slate-100"}`}>
             <p className={`mb-1 text-xs ${message.author === "customer" ? "text-white/70" : "text-slate-500"}`}>
               <strong>{disputeAuthor(message.author, store)}</strong> · {date(message.created_at)}
             </p>

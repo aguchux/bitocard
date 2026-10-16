@@ -46,9 +46,9 @@ const StoreArt = () => (
       <span className="art-logo">A</span>
       <strong>Ada Digital</strong>
       <span className="art-swatches">
-        <i style={{ background: "#070f4c" }} />
-        <i style={{ background: "#ff2382" }} />
-        <i style={{ background: "#2477ff" }} />
+        <i style={{ background: "var(--color-navy-900)" }} />
+        <i style={{ background: "var(--color-brand-500)" }} />
+        <i style={{ background: "var(--color-azure-500)" }} />
       </span>
     </div>
     <div className="art-tiles">

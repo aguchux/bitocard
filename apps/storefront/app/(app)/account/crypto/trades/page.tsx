@@ -15,7 +15,7 @@ export default async function TradesPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Trades</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">Trades</h1>
       <CryptoNav current="/account/crypto/trades" />
       <section className={card} aria-label="Your trades">
         {trades.length ? (
@@ -28,7 +28,7 @@ export default async function TradesPage({ searchParams }: { searchParams: Promi
           <p className="text-slate-600">{result.ok ? "No trades yet. Buy or sell on the market and they show here." : "Your trades cannot be shown right now. Try again shortly."}</p>
         )}
         {result.ok && result.data.has_more ? (
-          <Link href={`/account/crypto/trades?after=${trades[trades.length - 1].id}`} className="mt-3 inline-flex min-h-11 items-center font-semibold text-[#ff2382] hover:underline">
+          <Link href={`/account/crypto/trades?after=${trades[trades.length - 1].id}`} className="mt-3 inline-flex min-h-11 items-center font-semibold text-brand-500 hover:underline">
             Older trades
           </Link>
         ) : null}

@@ -32,7 +32,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">My ads</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">My ads</h1>
       <CryptoNav current="/account/crypto/ads" />
       {params.posted ? (
         <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status">
@@ -69,7 +69,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[ad.status]}`}>{statusLabel[ad.status]}</span>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
-                  <div className="h-full rounded-full bg-[#ff2382]" style={{ width: `${Math.min(100, (Number(ad.filled) / Number(ad.total)) * 100)}%` }} />
+                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, (Number(ad.filled) / Number(ad.total)) * 100)}%` }} />
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {formatCrypto(ad.filled, ad.asset)} filled · {formatCrypto(ad.available, ad.asset)} left

@@ -52,14 +52,14 @@ function TopUp({ source, esim, store }: { source: EsimSource; esim: StoreEsim; s
 
   return (
     <>
-      <button type="button" onClick={open} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#070f4c] px-4 text-sm font-semibold text-white hover:bg-[#0b1766]">
+      <button type="button" onClick={open} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800">
         <Plus className="size-4" aria-hidden="true" /> Top up
       </button>
       <dialog
         ref={dialog}
         aria-labelledby={`top-up-${esim.id}`}
         onClick={event => event.target === dialog.current && dialog.current?.close()}
-        className="m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-[#070f4c] shadow-2xl backdrop:bg-[#070f4c]/50"
+        className="m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-navy-900 shadow-2xl backdrop:bg-navy-900/50"
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
           <h2 id={`top-up-${esim.id}`} className="text-lg font-bold">
@@ -84,9 +84,9 @@ function TopUp({ source, esim, store }: { source: EsimSource; esim: StoreEsim; s
                 <legend className="text-sm font-semibold">Add</legend>
                 <div className="mt-2 grid gap-2">
                   {options.data.map(item => (
-                    <label key={item.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50">
+                    <label key={item.id} className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
                       <span className="flex items-center gap-3">
-                        <input type="radio" name={`option-${esim.id}`} checked={selected?.id === item.id} onChange={() => setChosen(item.id)} className="accent-[#ff2382]" />
+                        <input type="radio" name={`option-${esim.id}`} checked={selected?.id === item.id} onChange={() => setChosen(item.id)} className="accent-brand-500" />
                         <span className="text-sm font-semibold">{item.name}</span>
                       </span>
                       <span className="shrink-0 text-sm font-semibold">{formatFace(item.amount, item.currency)}</span>
@@ -99,8 +99,8 @@ function TopUp({ source, esim, store }: { source: EsimSource; esim: StoreEsim; s
                   <legend className="text-sm font-semibold">Pay from</legend>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {wallets.map(item => (
-                      <label key={item.currency} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50">
-                        <input type="radio" name={`wallet-${esim.id}`} checked={payFrom?.currency === item.currency} onChange={() => setWallet(item.currency)} className="mt-1 accent-[#ff2382]" />
+                      <label key={item.currency} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
+                        <input type="radio" name={`wallet-${esim.id}`} checked={payFrom?.currency === item.currency} onChange={() => setWallet(item.currency)} className="mt-1 accent-brand-500" />
                         <span>
                           <span className="block text-sm font-semibold">{item.currency === "USD" ? "US dollar wallet" : `${item.currency} wallet`}</span>
                           <span className="block text-sm">{costIn(item.currency) === null ? "Not available now" : formatFace(costIn(item.currency)!, item.currency)}</span>
@@ -129,7 +129,7 @@ function TopUp({ source, esim, store }: { source: EsimSource; esim: StoreEsim; s
                     );
                   })
                 }
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e8116d] disabled:opacity-60 sm:w-auto"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60 sm:w-auto"
               >
                 {pending ? "Paying…" : selected && payFrom && cost !== null ? `Pay ${formatFace(cost, payFrom.currency)} from your wallet` : "Top up"}
               </button>
@@ -156,7 +156,7 @@ function Cancel({ source, esim, many }: { source: EsimSource; esim: StoreEsim; m
             if (!result.ok) setError(result.error);
           });
         }}
-        className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-[#070f4c] disabled:opacity-60"
+        className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-navy-900 disabled:opacity-60"
       >
         <Ban className="size-4" aria-hidden="true" /> {pending ? "Cancelling…" : "Cancel for a refund"}
       </button>
@@ -174,7 +174,7 @@ export function EsimManage({ source, esims, store }: { source: EsimSource; esims
   return (
     <section aria-labelledby="esim-manage" className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
       <h2 id="esim-manage" className="flex items-center gap-2 text-xl font-bold">
-        <Smartphone className="size-5 text-[#ff2382]" aria-hidden="true" /> Data and top-ups
+        <Smartphone className="size-5 text-brand-500" aria-hidden="true" /> Data and top-ups
       </h2>
       <ul className="mt-4 grid gap-4">
         {esims.map((esim, index) => {
@@ -191,7 +191,7 @@ export function EsimManage({ source, esims, store }: { source: EsimSource; esims
               {share !== null ? (
                 <div className="mt-3">
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Data used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
-                    <div className={`h-full rounded-full ${share > 0.9 ? "bg-amber-500" : "bg-[#ff2382]"}`} style={{ width: `${share * 100}%` }} />
+                    <div className={`h-full rounded-full ${share > 0.9 ? "bg-amber-500" : "bg-brand-500"}`} style={{ width: `${share * 100}%` }} />
                   </div>
                   <p className="mt-1 text-sm text-slate-600">
                     {size(Math.max(total! - used!, 0))} left of {size(total!)}

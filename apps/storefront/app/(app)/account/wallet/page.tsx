@@ -79,7 +79,7 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
   const moves = activity?.filter(item => item.balance === "available") ?? [];
   return (
     <>
-      <section aria-label="Crypto wallets" className="rounded-3xl bg-[#070f4c] p-6 text-white">
+      <section aria-label="Crypto wallets" className="rounded-3xl bg-navy-900 p-6 text-white">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="flex items-center gap-2 text-sm text-white/70">
             <Coins className="size-4" aria-hidden="true" /> Crypto wallets{wallets.mode === "test" ? " (test)" : ""}
@@ -97,7 +97,7 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
                 </Link>
               ) : null}
               {usable ? (
-                <Link href="/account/crypto" className="inline-flex min-h-10 items-center rounded-xl bg-[#ff2382] px-3 text-sm font-semibold hover:bg-[#e8116d]">
+                <Link href="/account/crypto" className="inline-flex min-h-10 items-center rounded-xl bg-brand-500 px-3 text-sm font-semibold hover:bg-brand-600">
                   Buy or sell
                 </Link>
               ) : null}
@@ -172,7 +172,7 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
                     )}
                     <span className="block text-sm text-slate-500">{date(item.created_at)}</span>
                   </span>
-                  <span className={`shrink-0 font-semibold ${credit ? "text-emerald-700" : "text-[#070f4c]"}`}>
+                  <span className={`shrink-0 font-semibold ${credit ? "text-emerald-700" : "text-navy-900"}`}>
                     {credit ? "+" : "−"}
                     {formatCrypto(item.amount.replace(/^-/, ""), item.asset)}
                   </span>
@@ -211,7 +211,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="sr-only">Wallet</h1>
       {back ? (
-        <Link href={back} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+        <Link href={back} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
           <ChevronLeft className="size-4" aria-hidden="true" /> Back to your purchase
         </Link>
       ) : null}
@@ -221,7 +221,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         <div className={card}>
           <p className="font-semibold">Choose your country first</p>
           <p className="mt-1 text-sm text-slate-600">Your wallet is in your country&apos;s currency. Choose it once in your account; it then stays the same.</p>
-          <Link href="/account/profile#country" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+          <Link href="/account/profile#country" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
             Choose your country
           </Link>
         </div>
@@ -239,10 +239,10 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                     key={item.currency}
                     href={`/account/wallet${query ? `?${query}` : ""}`}
                     aria-current={active ? "page" : undefined}
-                    className={`flex min-h-14 min-w-0 flex-col justify-center rounded-xl px-3 py-2 ${active ? "bg-white shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-[#070f4c]"}`}
+                    className={`flex min-h-14 min-w-0 flex-col justify-center rounded-xl px-3 py-2 ${active ? "bg-white shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-navy-900"}`}
                   >
                     <span className="text-xs font-semibold text-slate-500">{walletLabel(item.currency)}</span>
-                    <span className="truncate font-bold text-[#070f4c]">{formatFace(item.balance, item.currency)}</span>
+                    <span className="truncate font-bold text-navy-900">{formatFace(item.balance, item.currency)}</span>
                   </Link>
                 );
               })}
@@ -250,10 +250,10 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                 <Link
                   href={`/account/wallet?${new URLSearchParams({ wallet: "crypto", ...(back ? { back } : {}) }).toString()}`}
                   aria-current={cryptoTab ? "page" : undefined}
-                  className={`flex min-h-14 min-w-0 flex-col justify-center rounded-xl px-3 py-2 ${cryptoTab ? "bg-white shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-[#070f4c]"}`}
+                  className={`flex min-h-14 min-w-0 flex-col justify-center rounded-xl px-3 py-2 ${cryptoTab ? "bg-white shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:text-navy-900"}`}
                 >
                   <span className="text-xs font-semibold text-slate-500">Crypto</span>
-                  <span className="truncate font-bold text-[#070f4c]">{coinsSummary(crypto)}</span>
+                  <span className="truncate font-bold text-navy-900">{coinsSummary(crypto)}</span>
                 </Link>
               ) : null}
             </nav>
@@ -262,7 +262,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             <CryptoWallets wallets={crypto} activity={cryptoActivity?.ok ? cryptoActivity.data.data : null} />
           ) : (
           <>
-          <section aria-label="Balance" className="rounded-3xl bg-[#070f4c] p-6 text-white">
+          <section aria-label="Balance" className="rounded-3xl bg-navy-900 p-6 text-white">
             {/* Top row: the label on the left, the customer's own bank account (or the link to get one) top right. */}
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <p className="flex items-center gap-2 text-sm text-white/70">
@@ -327,7 +327,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                   )}
                   <span className="block text-sm text-slate-500">{date(item.created_at)}</span>
                 </span>
-                <span className={`shrink-0 font-semibold ${item.amount >= 0 ? "text-emerald-700" : "text-[#070f4c]"}`}>
+                <span className={`shrink-0 font-semibold ${item.amount >= 0 ? "text-emerald-700" : "text-navy-900"}`}>
                   {item.amount >= 0 ? "+" : "−"}
                   {formatFace(Math.abs(item.amount), item.currency)}
                 </span>

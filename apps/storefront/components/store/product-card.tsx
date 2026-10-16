@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatFace, type StoreBrand, type StoreProduct } from "@bitocard/api-client/storefront";
+import { colors } from "@bitocard/ui/tokens";
 import { BrandImage } from "./brand-image";
 import { FeatureIcons } from "./features";
 import { Flag } from "./flag";
@@ -21,7 +22,7 @@ function inkOn(color: string | null) {
   const hex = color?.match(/^#([0-9a-f]{6})$/i)?.[1];
   if (!hex) return "#ffffff";
   const [r, g, b] = [0, 2, 4].map(at => parseInt(hex.slice(at, at + 2), 16) / 255);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 ? "#070f4c" : "#ffffff";
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 ? colors.navy900 : "#ffffff";
 }
 
 /** The brand's initials, when it has no logo (or its logo fails to load). */
@@ -50,7 +51,7 @@ export function BrandArt({ brand, product, className = "" }: { brand: StoreBrand
         // Sized by the art's width, so the flag and its label fit small cards in phone grids too.
         <span className="flex w-full flex-col items-center gap-[6%]">
           <Flag code={product.country} className="aspect-[3/2] h-auto w-[34%] max-w-24 rounded-md shadow-lg" />
-          <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.55em] font-bold tracking-wide text-[#070f4c] uppercase">{brand.name} number</span>
+          <span className="rounded-full bg-white/90 px-2.5 py-0.5 text-[0.55em] font-bold tracking-wide text-navy-900 uppercase">{brand.name} number</span>
         </span>
       ) : brand.logo_url ? (
         <BrandImage
@@ -80,7 +81,7 @@ export function ProductCard({ product, base }: { product: StoreProduct; base?: s
         <BrandArt brand={product.brand} product={product} className="text-[13px] @[14rem]:text-base" />
       </div>
       <div className="flex flex-1 flex-col px-0.5 pt-2.5 @[14rem]:px-1 @[14rem]:pt-3">
-        <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-[#070f4c] @[14rem]:text-lg">{product.name}</h3>
+        <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-navy-900 @[14rem]:text-lg">{product.name}</h3>
         <p className="mt-0.5 line-clamp-2 text-xs text-slate-500 @[14rem]:text-sm">{product.description ?? `${product.category_label}${product.global ? "" : ` · ${product.country_name}`}`}</p>
         {product.features?.length ? (
           <div className="mt-2 @[14rem]:mt-2.5">
@@ -89,9 +90,9 @@ export function ProductCard({ product, base }: { product: StoreProduct; base?: s
         ) : null}
         <div className="mt-auto flex items-end justify-between gap-2 pt-2.5 @[14rem]:pt-3">
           <p className="min-w-0 text-sm text-slate-500">
-            <span className="font-display text-base font-extrabold text-[#070f4c] @[14rem]:text-lg">{priceLabel(product)}</span>
+            <span className="font-display text-base font-extrabold text-navy-900 @[14rem]:text-lg">{priceLabel(product)}</span>
           </p>
-          <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white @[14rem]:grid">
+          <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-brand-500 transition group-hover:bg-brand-500 group-hover:text-white @[14rem]:grid">
             <ArrowRight className="size-5" />
           </span>
         </div>
@@ -109,16 +110,16 @@ export function ProductRow({ product, base }: { product: StoreProduct; base?: st
       </div>
       <div className="min-w-0 flex-1">
         {/* Two lines on phones rather than cutting the name after a word or two. */}
-        <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-[#070f4c] sm:line-clamp-1 sm:text-lg">{product.name}</h3>
+        <h3 className="font-display line-clamp-2 text-[15px] leading-snug font-bold text-navy-900 sm:line-clamp-1 sm:text-lg">{product.name}</h3>
         <p className="truncate text-sm text-slate-500">{product.description ?? `${product.category_label} · ${product.country_name}`}</p>
         {product.features?.length ? (
           <div className="mt-1.5">
             <FeatureIcons features={product.features} compact />
           </div>
         ) : null}
-        <p className="mt-1 font-display text-base font-extrabold text-[#070f4c]">{priceLabel(product)}</p>
+        <p className="mt-1 font-display text-base font-extrabold text-navy-900">{priceLabel(product)}</p>
       </div>
-      <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-[#ff2382] transition group-hover:bg-[#ff2382] group-hover:text-white min-[400px]:grid">
+      <span aria-hidden="true" className="hidden size-10 shrink-0 place-items-center rounded-full bg-pink-50 text-brand-500 transition group-hover:bg-brand-500 group-hover:text-white min-[400px]:grid">
         <ArrowRight className="size-5" />
       </span>
     </Link>

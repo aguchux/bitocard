@@ -5,8 +5,8 @@
 export type GroupTint = { card: string; tile: string; ink: string; chevron: string; subtitle: string };
 
 const tints: Record<string, GroupTint> = {
-  "gift-cards": { card: "bg-pink-50", tile: "bg-pink-100", ink: "text-[#ff2382]", chevron: "bg-pink-100 text-[#ff2382]", subtitle: "Popular brands" },
-  mobile: { card: "bg-blue-50", tile: "bg-blue-100", ink: "text-[#2477ff]", chevron: "bg-blue-100 text-[#2477ff]", subtitle: "Airtime and data" },
+  "gift-cards": { card: "bg-pink-50", tile: "bg-pink-100", ink: "text-brand-500", chevron: "bg-pink-100 text-brand-500", subtitle: "Popular brands" },
+  mobile: { card: "bg-blue-50", tile: "bg-blue-100", ink: "text-azure-500", chevron: "bg-blue-100 text-azure-500", subtitle: "Airtime and data" },
   bills: { card: "bg-emerald-50", tile: "bg-emerald-100", ink: "text-emerald-600", chevron: "bg-emerald-100 text-emerald-600", subtitle: "Electricity and TV" },
   esims: { card: "bg-violet-50", tile: "bg-violet-100", ink: "text-violet-600", chevron: "bg-violet-100 text-violet-600", subtitle: "Travel data" },
   software: { card: "bg-amber-50", tile: "bg-amber-100", ink: "text-amber-600", chevron: "bg-amber-100 text-amber-600", subtitle: "Licences and keys" },

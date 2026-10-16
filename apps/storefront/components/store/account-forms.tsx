@@ -19,7 +19,7 @@ import {
 import type { Market } from "@/lib/countries";
 
 const empty: FormState = {};
-const inputClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-[#070f4c] focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15 aria-[invalid=true]:border-red-400";
+const inputClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400";
 
 export function FormMessage({ state }: { state: FormState }) {
   if (state.error) {
@@ -53,7 +53,7 @@ export function TextField({
   const wrong = state?.field === name;
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-semibold text-[#070f4c]">
+      <label htmlFor={id} className="block text-sm font-semibold text-navy-900">
         {label}
       </label>
       <input id={id} name={name} className={inputClass} aria-invalid={wrong || undefined} aria-describedby={hint ? `${id}-hint` : undefined} {...props} />
@@ -71,7 +71,7 @@ export function Submit({ pending, children, className = "" }: { pending: boolean
     <button
       type="submit"
       disabled={pending}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e8116d] disabled:opacity-60 ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600 disabled:opacity-60 ${className}`}
     >
       {pending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
       {children}
@@ -91,7 +91,7 @@ export function SignInForm({ next }: { next: string }) {
       <TextField label="Password" name="password" type="password" autoComplete="current-password" required state={state} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Submit pending={pending}>Sign in</Submit>
-        <Link href="/forgot-password" className="text-sm font-semibold text-[#2477ff] hover:underline">
+        <Link href="/forgot-password" className="text-sm font-semibold text-azure-500 hover:underline">
           Forgot your password?
         </Link>
       </div>
@@ -107,7 +107,7 @@ export function CountryField({ markets, defaultValue, state }: { markets: Market
   const id = useId();
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-semibold text-[#070f4c]">
+      <label htmlFor={id} className="block text-sm font-semibold text-navy-900">
         Your country
       </label>
       <select
@@ -176,7 +176,7 @@ export function VerifyForm({ next, email }: { next: string; email: string }) {
       </form>
       <form action={resend}>
         <FormMessage state={resent} />
-        <button type="submit" disabled={resending} className="mt-2 text-sm font-semibold text-[#2477ff] hover:underline disabled:opacity-60">
+        <button type="submit" disabled={resending} className="mt-2 text-sm font-semibold text-azure-500 hover:underline disabled:opacity-60">
           Send a new code
         </button>
       </form>
@@ -278,7 +278,7 @@ export function VerificationForm({ country, countryName, provider }: { country: 
         <p className="text-sm text-slate-600">We will take you to our verification partner to photograph an ID document and take a selfie, for {countryName}.</p>
       )}
       <label className="flex items-start gap-3 text-sm text-slate-700">
-        <input type="checkbox" name="consent" checked={consent} onChange={event => setConsent(event.target.checked)} className="mt-1 size-4 accent-[#ff2382]" />
+        <input type="checkbox" name="consent" checked={consent} onChange={event => setConsent(event.target.checked)} className="mt-1 size-4 accent-brand-500" />
         <span>
           I agree to BitoCard checking my identity{nigeria ? " with my BVN" : ", including a check of my face against my ID (biometric data)"}, as the privacy notice explains.
         </span>

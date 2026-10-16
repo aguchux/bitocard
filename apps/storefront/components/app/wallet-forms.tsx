@@ -20,8 +20,8 @@ export function TopUpForm({ currency, primary = true, methods, amount, sandbox }
           <legend className="text-sm font-semibold">Pay with</legend>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {methods.map((method, index) => (
-              <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-[#ff2382] has-[:checked]:bg-pink-50">
-                <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-[#ff2382]" />
+              <label key={method.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-pink-50">
+                <input type="radio" name="method" value={method.id} defaultChecked={index === 0} className="mt-1 accent-brand-500" />
                 <span>
                   <span className="block text-sm font-semibold">{method.label}</span>
                   <span className="block text-xs text-slate-500">{method.description}</span>
@@ -80,7 +80,7 @@ export function BankAccountLink({ tone = "dark", from }: { tone?: "dark" | "ligh
     <button
       type="button"
       onClick={() => openBankDialog(from?.())}
-      className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold underline-offset-2 hover:underline ${tone === "light" ? "text-pink-200 hover:text-white" : "text-[#ff2382]"}`}
+      className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold underline-offset-2 hover:underline ${tone === "light" ? "text-pink-200 hover:text-white" : "text-brand-500"}`}
     >
       <Landmark className="size-4" aria-hidden="true" /> Get a free account number
     </button>
@@ -99,7 +99,7 @@ export function BankAccountDialog({ needsBvn }: { needsBvn: boolean }) {
       id={bankDialogId}
       aria-labelledby={`${bankDialogId}-title`}
       onClick={event => event.target === dialog.current && dialog.current?.close()}
-      className="m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-[#070f4c] shadow-2xl backdrop:bg-[#070f4c]/50"
+      className="m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-navy-900 shadow-2xl backdrop:bg-navy-900/50"
     >
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
         <h2 id={`${bankDialogId}-title`} className="flex items-center gap-2 text-lg font-bold">
@@ -133,7 +133,7 @@ export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet
       <button
         type="button"
         onClick={() => dialog.current?.showModal()}
-        className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e8116d]"
+        className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600"
       >
         <Plus className="size-5" aria-hidden="true" /> Add funds
       </button>
@@ -141,7 +141,7 @@ export function AddFunds({ wallet, amount, open = false }: { wallet: StoreWallet
         ref={dialog}
         aria-labelledby="add-funds-title"
         onClick={event => event.target === dialog.current && dialog.current?.close()}
-        className="m-auto max-h-[90dvh] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-[#070f4c] shadow-2xl backdrop:bg-[#070f4c]/50"
+        className="m-auto max-h-[90dvh] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl bg-white p-0 text-navy-900 shadow-2xl backdrop:bg-navy-900/50"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3">
           <h2 id="add-funds-title" className="text-lg font-bold">

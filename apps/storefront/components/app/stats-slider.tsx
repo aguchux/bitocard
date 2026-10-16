@@ -29,7 +29,7 @@ export function Slider({ label, children }: { label?: string; children: React.Re
     if (!el || !first) return;
     el.scrollBy({ left: direction * (first.getBoundingClientRect().width + parseFloat(getComputedStyle(el).columnGap || "0")), behavior: "smooth" });
   };
-  const arrow = "absolute top-1/2 z-10 hidden size-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#070f4c] shadow-lg ring-1 ring-slate-200 hover:bg-slate-50 lg:grid";
+  const arrow = "absolute top-1/2 z-10 hidden size-11 -translate-y-1/2 place-items-center rounded-full bg-white text-navy-900 shadow-lg ring-1 ring-slate-200 hover:bg-slate-50 lg:grid";
   return (
     <div className="relative">
       <ul

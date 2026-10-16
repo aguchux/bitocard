@@ -20,11 +20,11 @@ export default async function NewDisputePage({ searchParams }: { searchParams: P
 
   return (
     <div className="mx-auto grid max-w-2xl gap-6">
-      <Link href={`/account/orders/${order.id}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href={`/account/orders/${order.id}`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Back to the order
       </Link>
       <div>
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-[#070f4c] sm:text-3xl">Report a problem</h1>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-900 sm:text-3xl">Report a problem</h1>
         <p className="mt-1 text-slate-600">
           About your order: {order.quantity > 1 ? `${order.quantity} × ` : ""}
           {order.product.name}. The store will reply here, and can pass it to BitoCard if it needs to.

@@ -57,7 +57,7 @@ export default async function ProfilePage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="sr-only">Account</h1>
       <section className="flex items-center gap-4 rounded-3xl bg-white p-5 ring-1 ring-slate-200/70">
-        <span aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-full bg-pink-50 text-xl font-extrabold text-[#ff2382]">
+        <span aria-hidden="true" className="grid size-16 shrink-0 place-items-center rounded-full bg-pink-50 text-xl font-extrabold text-brand-500">
           {initials(customer.name) || "?"}
         </span>
         <div className="min-w-0">
@@ -113,7 +113,7 @@ export default async function ProfilePage() {
       </section>
 
       <form action={signOut}>
-        <button type="submit" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white font-semibold text-[#070f4c] ring-1 ring-slate-200 hover:ring-slate-300">
+        <button type="submit" className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white font-semibold text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300">
           <LogOut className="size-5" aria-hidden="true" /> Sign out
         </button>
       </form>

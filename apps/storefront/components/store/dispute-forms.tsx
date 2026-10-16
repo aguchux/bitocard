@@ -6,13 +6,13 @@ import { openDispute, replyToDispute } from "@/lib/dispute-actions";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 
 const empty: FormState = {};
-const areaClass = "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] text-[#070f4c] focus:border-[#070f4c] focus:ring-2 focus:ring-[#070f4c]/15 aria-[invalid=true]:border-red-400";
+const areaClass = "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400";
 
 function MessageField({ label, name, state, hint }: { label: string; name: string; state: FormState; hint?: string }) {
   const id = useId();
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-semibold text-[#070f4c]">
+      <label htmlFor={id} className="block text-sm font-semibold text-navy-900">
         {label}
       </label>
       <textarea id={id} name={name} rows={5} required minLength={3} maxLength={5000} className={areaClass} aria-invalid={state.field === name || undefined} />

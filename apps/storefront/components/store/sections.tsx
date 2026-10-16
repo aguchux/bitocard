@@ -22,11 +22,11 @@ function Heading({ title, subtitle, href, children }: { title: string; subtitle?
   return (
     <div className="mb-4 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-x-6">
       <div className="min-w-0 sm:mr-auto">
-        <h2 className="font-display text-[22px] leading-tight font-extrabold tracking-tight text-[#070f4c] sm:text-3xl">{title}</h2>
+        <h2 className="font-display text-[22px] leading-tight font-extrabold tracking-tight text-navy-900 sm:text-3xl">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm text-slate-500 sm:text-base">{subtitle}</p> : null}
       </div>
       {href ? (
-        <Link href={href} className="-mr-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-semibold whitespace-nowrap text-[#e0116d] hover:bg-pink-50 sm:order-last sm:mr-0 sm:min-h-10 sm:self-end sm:text-base">
+        <Link href={href} className="-mr-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-lg px-2 text-sm font-semibold whitespace-nowrap text-brand-600 hover:bg-pink-50 sm:order-last sm:mr-0 sm:min-h-10 sm:self-end sm:text-base">
           View all <ArrowRight className="size-4" aria-hidden="true" />
         </Link>
       ) : null}
@@ -44,7 +44,7 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
   return (
     <section
       aria-labelledby={`hero-${section.id}`}
-      className={`relative isolate bg-[#050a33] text-white ${bleed ? "ml-[calc(50%-50vw)] w-screen overflow-x-clip" : "overflow-x-clip rounded-3xl"}`}
+      className={`relative isolate bg-navy-950 text-white ${bleed ? "ml-[calc(50%-50vw)] w-screen overflow-x-clip" : "overflow-x-clip rounded-3xl"}`}
     >
       {/* The banner: a lit globe with orbits on the right, darkened behind the text so it stays readable. */}
       <Image src="/hero/globe.webp" alt="" aria-hidden="true" fill priority sizes="100vw" className="-z-20 object-cover object-[72%_center] lg:object-right" />
@@ -57,13 +57,13 @@ function Hero({ section, groups, countries, bleed = false }: { section: Extract<
             {section.accent ? (
               <>
                 <br />
-                <span className="text-[#ff2382]">{section.accent}</span>
+                <span className="text-brand-500">{section.accent}</span>
               </>
             ) : null}
           </h1>
           {section.subtitle ? <p className="mt-3 max-w-2xl text-base text-slate-200 sm:mt-4 sm:text-xl">{section.subtitle}</p> : null}
           {section.search ? (
-            <div className="mt-6 max-w-3xl text-[#070f4c] sm:mt-7">
+            <div className="mt-6 max-w-3xl text-navy-900 sm:mt-7">
               <SearchForm countries={countries} />
             </div>
           ) : null}
@@ -96,16 +96,16 @@ function HeroArt({ featured }: { featured: StoreBrand[] }) {
         <FloatingTile key={brand.slug} brand={brand} index={index} />
       ))}
       {/* Small category badges around the globe. */}
-      <span className="absolute top-[30%] left-[2%] grid size-12 -rotate-12 place-items-center rounded-xl bg-[#2477ff] shadow-xl ring-1 ring-white/30">
+      <span className="absolute top-[30%] left-[2%] grid size-12 -rotate-12 place-items-center rounded-xl bg-azure-500 shadow-xl ring-1 ring-white/30">
         <Smartphone className="size-6 text-white" />
       </span>
-      <span className="absolute top-[4%] right-[2%] grid size-14 rotate-12 place-items-center rounded-2xl bg-[#ff2382] shadow-xl ring-1 ring-white/30">
+      <span className="absolute top-[4%] right-[2%] grid size-14 rotate-12 place-items-center rounded-2xl bg-brand-500 shadow-xl ring-1 ring-white/30">
         <Gift className="size-7 text-white" />
       </span>
-      <span className="absolute right-[0%] bottom-[8%] grid size-12 rotate-12 place-items-center rounded-xl bg-[#2477ff] shadow-xl ring-1 ring-white/30">
+      <span className="absolute right-[0%] bottom-[8%] grid size-12 rotate-12 place-items-center rounded-xl bg-azure-500 shadow-xl ring-1 ring-white/30">
         <CreditCard className="size-6 text-white" />
       </span>
-      <span className="absolute top-[58%] left-[6%] size-9 rotate-12 rounded-lg bg-[#ff5ca8] shadow-xl" />
+      <span className="absolute top-[58%] left-[6%] size-9 rotate-12 rounded-lg bg-brand-400 shadow-xl" />
     </div>
   );
 }
@@ -133,7 +133,7 @@ function ProductRail({ section }: { section: Extract<ResolvedSection, { type: "p
       <Heading title={section.title} subtitle={section.subtitle} href={section.viewAllHref}>
         {section.filters ? (
           <nav aria-label={`${section.title} filters`} className={`${sideScroll} gap-2 md:flex-wrap`}>
-            <Link href="/catalogs" className={`${chip} border-[#ff2382] font-semibold text-[#e0116d]`}>
+            <Link href="/catalogs" className={`${chip} border-brand-500 font-semibold text-brand-600`}>
               All
             </Link>
             <Link href="/catalogs?country=global" className={`${chip} border-slate-200 text-slate-600 hover:border-slate-300`}>
@@ -200,7 +200,7 @@ function CategoryGrid({ section }: { section: Extract<ResolvedSection, { type: "
               <Link href={`/catalogs/${category.category}`} className="flex h-full flex-col items-start gap-2.5 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:p-4">
                 <CategoryIcon category={category.category} iconUrl={category.icon_url} className="size-11 rounded-xl sm:size-14" />
                 <span className="min-w-0">
-                  <span className="font-display block leading-snug font-bold text-[#070f4c]">{category.label}</span>
+                  <span className="font-display block leading-snug font-bold text-navy-900">{category.label}</span>
                   <span className="text-sm text-slate-500">{category.on_sale ? `${category.products} ${category.products === 1 ? "product" : "products"}` : "Coming soon"}</span>
                 </span>
               </Link>
@@ -224,7 +224,7 @@ function BrandGrid({ section }: { section: Extract<ResolvedSection, { type: "bra
                 <BrandArt brand={brand} className="text-lg" />
               </div>
               <p className="flex items-center justify-between px-3 py-2.5 text-sm">
-                <span className="font-display truncate font-bold text-[#070f4c]">{brand.name}</span>
+                <span className="font-display truncate font-bold text-navy-900">{brand.name}</span>
                 <span className="text-slate-500">{brand.products}</span>
               </p>
             </Link>
@@ -236,11 +236,11 @@ function BrandGrid({ section }: { section: Extract<ResolvedSection, { type: "bra
 }
 
 const promoThemes = {
-  pink: "bg-gradient-to-br from-pink-50 via-pink-100 to-fuchsia-100 text-[#070f4c]",
-  sky: "bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 text-[#070f4c]",
-  navy: "bg-gradient-to-br from-[#070f4c] to-[#1a1f7a] text-white",
-  light: "bg-white text-[#070f4c] ring-1 ring-slate-100",
-  sunset: "bg-gradient-to-br from-amber-100 via-orange-100 to-pink-100 text-[#070f4c]",
+  pink: "bg-gradient-to-br from-pink-50 via-pink-100 to-fuchsia-100 text-navy-900",
+  sky: "bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 text-navy-900",
+  navy: "bg-gradient-to-br from-navy-900 to-navy-700 text-white",
+  light: "bg-white text-navy-900 ring-1 ring-slate-100",
+  sunset: "bg-gradient-to-br from-amber-100 via-orange-100 to-pink-100 text-navy-900",
 } as const;
 
 function PromoArt({ illustration }: { illustration: Extract<ResolvedSection, { type: "promo" }>["illustration"] }) {
@@ -260,7 +260,7 @@ function PromoArt({ illustration }: { illustration: Extract<ResolvedSection, { t
   }
   const Icon = illustration === "esim" ? Signal : illustration === "gift" ? Gift : Globe2;
   return (
-    <div aria-hidden="true" className="mx-auto grid h-28 w-24 shrink-0 rotate-6 place-items-center rounded-3xl bg-gradient-to-br from-[#ff2382] to-[#c51065] text-white shadow-xl">
+    <div aria-hidden="true" className="mx-auto grid h-28 w-24 shrink-0 rotate-6 place-items-center rounded-3xl bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-xl">
       <Icon className="size-12" />
     </div>
   );
@@ -285,7 +285,7 @@ function Promo({ section }: { section: Extract<ResolvedSection, { type: "promo" 
             <ul className="mt-3 space-y-1.5 text-sm">
               {section.bullets.map(item => (
                 <li key={item} className="flex items-center gap-2">
-                  <span className="grid size-5 place-items-center rounded-full bg-[#ff2382] text-white">
+                  <span className="grid size-5 place-items-center rounded-full bg-brand-500 text-white">
                     <Check className="size-3.5" aria-hidden="true" />
                   </span>
                   {item}
@@ -297,7 +297,7 @@ function Promo({ section }: { section: Extract<ResolvedSection, { type: "promo" 
             <Link
               href={section.cta.href}
               {...(external ? { rel: "noopener" } : {})}
-              className={`mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl px-5 font-semibold shadow-sm ${section.theme === "sky" || section.theme === "light" ? "bg-white text-[#070f4c] ring-1 ring-slate-200 hover:bg-slate-50" : "bg-[#ff2382] text-white hover:bg-[#e8116d]"}`}
+              className={`mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl px-5 font-semibold shadow-sm ${section.theme === "sky" || section.theme === "light" ? "bg-white text-navy-900 ring-1 ring-slate-200 hover:bg-slate-50" : "bg-brand-500 text-white hover:bg-brand-600"}`}
             >
               {section.cta.label}
               <ArrowRight className="size-4" aria-hidden="true" />
@@ -324,11 +324,11 @@ function TrustBar({ section }: { section: Extract<ResolvedSection, { type: "trus
           return (
             // Phones: the icon above the text, so two columns keep a readable line length.
             <li key={item.title} className="flex flex-col items-start gap-2.5 sm:flex-row sm:gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-pink-100 text-[#e0116d]">
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-pink-100 text-brand-600">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               <span>
-                <span className="font-display block text-sm font-bold text-[#070f4c] sm:text-base">{item.title}</span>
+                <span className="font-display block text-sm font-bold text-navy-900 sm:text-base">{item.title}</span>
                 {item.body ? <span className="text-sm text-slate-500">{item.body}</span> : null}
               </span>
             </li>

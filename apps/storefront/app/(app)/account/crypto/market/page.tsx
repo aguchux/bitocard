@@ -27,7 +27,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">P2P market</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">P2P market</h1>
       <CryptoNav current="/account/crypto/market" />
       {blocked ? <CryptoGate wallets={wallets} p2p /> : null}
       {!blocked ? (
@@ -39,7 +39,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
                   key={item}
                   href={href({ side: item })}
                   aria-current={side === item ? "page" : undefined}
-                  className={`flex min-h-11 items-center justify-center rounded-xl text-sm font-bold ${side === item ? (item === "buy" ? "bg-emerald-600 text-white" : "bg-[#ff2382] text-white") : "text-slate-600"}`}
+                  className={`flex min-h-11 items-center justify-center rounded-xl text-sm font-bold ${side === item ? (item === "buy" ? "bg-emerald-600 text-white" : "bg-brand-500 text-white") : "text-slate-600"}`}
                 >
                   {item === "buy" ? `Buy ${asset}` : `Sell ${asset}`}
                 </Link>
@@ -51,7 +51,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
                   key={code}
                   href={href({ asset: code })}
                   aria-current={code === asset ? "page" : undefined}
-                  className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-[#070f4c]"
+                  className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-navy-900"
                 >
                   <CoinBadge asset={code} size="size-8" /> {code}
                 </Link>
@@ -66,14 +66,14 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
                     <div className="min-w-0">
                       <p className="flex items-center gap-1.5 font-semibold">
                         {ad.trader.nickname}
-                        {ad.trader.trades_total >= 10 ? <BadgeCheck className="size-4 text-[#ff2382]" aria-label="Experienced trader" /> : null}
+                        {ad.trader.trades_total >= 10 ? <BadgeCheck className="size-4 text-brand-500" aria-label="Experienced trader" /> : null}
                       </p>
                       <p className="text-xs text-slate-500">
                         {ad.trader.trades_30d} {ad.trader.trades_30d === 1 ? "trade" : "trades"} in 30 days · {ad.trader.trades_total} in all
                       </p>
                     </div>
                     <p className="text-right">
-                      <span className="block font-display text-xl font-extrabold text-[#070f4c]">{formatFace(ad.price, ad.currency)}</span>
+                      <span className="block font-display text-xl font-extrabold text-navy-900">{formatFace(ad.price, ad.currency)}</span>
                       <span className="block text-xs text-slate-500">per {ad.asset}</span>
                     </p>
                   </div>
@@ -100,7 +100,7 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
             <div className={card}>
               <p className="font-semibold">{side === "buy" ? `Nobody is selling ${asset} right now` : `Nobody is buying ${asset} right now`}</p>
               <p className="mt-1 text-sm text-slate-600">Post your own ad and other traders come to you.</p>
-              <Link href="/account/crypto/ads" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+              <Link href="/account/crypto/ads" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
                 Post an ad
               </Link>
             </div>

@@ -13,7 +13,9 @@
     "./seo": "./src/seo.tsx",
     "./site": "./src/site.ts",
     "./styles/workspace.css": "./src/styles/workspace.css",
-    "./styles/interactive.css": "./src/styles/interactive.css"
+    "./styles/interactive.css": "./src/styles/interactive.css",
+    "./styles/tokens.css": "./src/styles/tokens.css",
+    "./tokens": "./src/tokens.ts"
   },
   "scripts": {
     "lint": "eslint .",

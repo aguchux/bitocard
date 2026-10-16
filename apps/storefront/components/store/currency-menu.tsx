@@ -40,7 +40,7 @@ export function CurrencyMenu() {
         aria-expanded={open}
         aria-label={`Currency: ${current.code}`}
         onClick={() => setOpen(value => !value)}
-        className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold whitespace-nowrap text-[#070f4c] hover:border-slate-300"
+        className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold whitespace-nowrap text-navy-900 hover:border-slate-300"
       >
         <Flag code={current.flag} className="h-3.5 w-5" />
         {current.code}
@@ -48,7 +48,7 @@ export function CurrencyMenu() {
         <ChevronDown className="size-4 text-slate-500" aria-hidden="true" />
       </button>
       {open ? (
-        <div className="absolute top-[calc(100%+8px)] right-0 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-1.5 text-[#070f4c] shadow-2xl">
+        <div className="absolute top-[calc(100%+8px)] right-0 z-40 w-72 rounded-2xl border border-slate-200 bg-white p-1.5 text-navy-900 shadow-2xl">
           <ul role="listbox" aria-label="Currency">
             {currencies.map(item => (
               <li key={item.code} role="option" aria-selected={item.code === selected}>
@@ -64,7 +64,7 @@ export function CurrencyMenu() {
                   <span className="flex-1">
                     {item.code} <span className="text-slate-500">· {item.name}</span>
                   </span>
-                  {item.code === selected ? <Check className="size-4 text-[#ff2382]" aria-hidden="true" /> : null}
+                  {item.code === selected ? <Check className="size-4 text-brand-500" aria-hidden="true" /> : null}
                 </button>
               </li>
             ))}

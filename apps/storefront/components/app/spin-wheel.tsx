@@ -5,10 +5,11 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { ArrowRightLeft, Loader2, Lock } from "lucide-react";
 import { formatCrypto, formatPrice, type StoreSpin, type StoreSpinAllowance, type StoreSpinExchangePreview, type StoreSpinRewardBalance, type StoreSpinRewards, type StoreSpinSegment, type StoreSpinWin } from "@bitocard/api-client/storefront";
 import { exchangeRewards, previewExchange, spinRewards, spinWheel } from "@/lib/spin-actions";
+import { colors } from "@bitocard/ui/tokens";
 import { landingAngle, restingAngle, segmentAt, spinBlocks, usd } from "@/lib/spin";
 
-const navy = "#070f4c";
-const pink = "#e8116d";
+const navy = colors.navy900;
+const pink = colors.brand600;
 /** Long, smooth slow-down after a fast start, as a casino wheel. */
 const easing = "cubic-bezier(0.12, 0.8, 0.12, 1)";
 const spinMs = 5000;
@@ -60,7 +61,7 @@ function WheelFace({ segments }: { segments: StoreSpinSegment[] }) {
       {/* The rim's lights. */}
       {Array.from({ length: 24 }, (_, i) => {
         const [x, y] = point(i * 15 + 7.5, 191).split(" ");
-        return <circle key={i} cx={x} cy={y} r={3.2} fill={i % 2 ? "#ff8fc0" : "#ffffff"} />;
+        return <circle key={i} cx={x} cy={y} r={3.2} fill={i % 2 ? colors.brand300 : "#ffffff"} />;
       })}
       <circle cx={centre} cy={centre} r={radius} fill="none" stroke="#ffffff" strokeOpacity={0.8} strokeWidth={2} />
     </svg>
@@ -77,7 +78,7 @@ function Burst() {
         return (
           <span
             key={i}
-            style={{ "--x": `${Math.round(Math.cos(angle) * distance)}px`, "--y": `${Math.round(Math.sin(angle) * distance)}px`, background: i % 2 ? "#ff2382" : "#ffd23f", animationDelay: `${(i % 4) * 40}ms` } as CSSProperties}
+            style={{ "--x": `${Math.round(Math.cos(angle) * distance)}px`, "--y": `${Math.round(Math.sin(angle) * distance)}px`, background: i % 2 ? colors.brand500 : colors.gold400, animationDelay: `${(i % 4) * 40}ms` } as CSSProperties}
           />
         );
       })}
@@ -127,7 +128,7 @@ function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewardBalanc
         <h2 id="rewards" className="text-lg font-bold">
           Your rewards
         </h2>
-        <span className="font-display text-2xl font-extrabold text-[#ffd23f]">{usd(rewards.usd)}</span>
+        <span className="font-display text-2xl font-extrabold text-gold-400">{usd(rewards.usd)}</span>
       </div>
       {rewards.coins.length ? (
         <ul className="mt-2 flex flex-wrap gap-2 text-sm">
@@ -152,7 +153,7 @@ function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewardBalanc
                 onClick={() => quoteFor(code)}
                 disabled={state !== "idle"}
                 aria-pressed={quote?.currency === code}
-                className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-bold ring-1 transition-colors ${quote?.currency === code ? "bg-white text-[#070f4c] ring-white" : "bg-white/5 text-white ring-white/25 hover:bg-white/10"}`}
+                className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-bold ring-1 transition-colors ${quote?.currency === code ? "bg-white text-navy-900 ring-white" : "bg-white/5 text-white ring-white/25 hover:bg-white/10"}`}
               >
                 {code === "USD" ? "US dollars" : `${code} wallet`}
               </button>
@@ -160,7 +161,7 @@ function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewardBalanc
           </div>
           {state === "quoting" ? <p className="text-sm text-white/70">Working out the rate…</p> : null}
           {quote ? (
-            <div className="rounded-2xl bg-white p-4 text-[#070f4c]">
+            <div className="rounded-2xl bg-white p-4 text-navy-900">
               <p className="text-sm text-slate-600">You get</p>
               <p className="font-display text-2xl font-extrabold">{formatPrice(quote.amount, quote.currency)}</p>
               <p className="text-xs text-slate-500">
@@ -171,7 +172,7 @@ function RewardsPanel({ rewards, onExchanged }: { rewards: StoreSpinRewardBalanc
                 type="button"
                 onClick={exchange}
                 disabled={state !== "idle"}
-                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff2382] px-4 font-bold text-white hover:bg-[#e8116d] disabled:opacity-70"
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 font-bold text-white hover:bg-brand-600 disabled:opacity-70"
               >
                 {state === "exchanging" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ArrowRightLeft className="size-4" aria-hidden="true" />}
                 Move to my wallet
@@ -319,7 +320,7 @@ export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; on
           {/* The fixed pointer at the top. */}
           <div ref={pointer} className="absolute top-[-6px] left-1/2 z-10 -ml-[18px] origin-[50%_20%]" aria-hidden="true">
             <svg width="36" height="46" viewBox="0 0 36 46">
-              <path d="M18 44 L3 10 A15 15 0 1 1 33 10 Z" fill="#ff2382" stroke="#ffffff" strokeWidth="3" strokeLinejoin="round" />
+              <path d="M18 44 L3 10 A15 15 0 1 1 33 10 Z" fill={colors.brand500} stroke="#ffffff" strokeWidth="3" strokeLinejoin="round" />
               <circle cx="18" cy="14" r="5" fill="#ffffff" />
             </svg>
           </div>
@@ -342,12 +343,12 @@ export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; on
                   onClick={spin}
                   disabled={busy || !ready}
                   aria-busy={busy}
-                  className="grid size-[26%] place-items-center rounded-full bg-white text-lg font-extrabold text-[#070f4c] shadow-lg ring-4 ring-[#ff2382] transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-90 disabled:hover:scale-100 sm:text-xl"
+                  className="grid size-[26%] place-items-center rounded-full bg-white text-lg font-extrabold text-navy-900 shadow-lg ring-4 ring-brand-500 transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-90 disabled:hover:scale-100 sm:text-xl"
                 >
-                  {phase === "pending" ? <Loader2 className="size-7 animate-spin text-[#ff2382]" aria-label="Spinning" /> : phase === "spinning" ? <span aria-label="Spinning">…</span> : "Spin"}
+                  {phase === "pending" ? <Loader2 className="size-7 animate-spin text-brand-500" aria-label="Spinning" /> : phase === "spinning" ? <span aria-label="Spinning">…</span> : "Spin"}
                 </button>
               ) : (
-                <span className="grid size-[26%] place-items-center rounded-full bg-white text-[#070f4c] shadow-lg ring-4 ring-slate-300">
+                <span className="grid size-[26%] place-items-center rounded-full bg-white text-navy-900 shadow-lg ring-4 ring-slate-300">
                   <Lock className="size-7" aria-label="Closed" />
                 </span>
               )}
@@ -358,7 +359,7 @@ export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; on
 
         <div className="mt-4 min-h-14 text-center" aria-live="polite">
           {win && phase === "idle" ? (
-            <p key={win.id} className="spin-pop inline-block rounded-2xl bg-white px-4 py-2.5 font-display text-lg font-extrabold text-[#070f4c]">
+            <p key={win.id} className="spin-pop inline-block rounded-2xl bg-white px-4 py-2.5 font-display text-lg font-extrabold text-navy-900">
               You won {formatCrypto(win.amount, win.asset)} ({usd(win.usd)})
             </p>
           ) : phase === "pending" ? (
@@ -392,7 +393,7 @@ export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; on
           <p className="font-semibold">{block.title}</p>
           <p className="mt-1 text-sm text-white/70">{block.text}</p>
           {block.link ? (
-            <Link href={block.link.href} className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+            <Link href={block.link.href} className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
               {block.link.label}
             </Link>
           ) : null}
@@ -422,7 +423,7 @@ export function SpinWheel({ initial, onChange }: { initial: StoreSpinRewards; on
           <ul className="divide-y divide-white/10">
             {recent.map(item => (
               <li key={item.id} className="flex items-center gap-3 py-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#ff2382]/20 text-xs font-extrabold text-[#ff8fc0]">#{item.number}</span>
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-500/20 text-xs font-extrabold text-brand-300">#{item.number}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{formatCrypto(item.amount, item.asset)}</span>
                   <span className="block truncate text-sm text-white/60" suppressHydrationWarning>

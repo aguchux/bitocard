@@ -25,7 +25,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<R
 
   return (
     <div className="space-y-8">
-      <div className="rounded-3xl bg-[#060b3a] p-5 sm:p-8">
+      <div className="rounded-3xl bg-navy-950 p-5 sm:p-8">
         <h1 className="font-display mb-4 text-2xl font-extrabold text-white sm:text-3xl">{q ? `Results for “${q}”` : "Search the store"}</h1>
         <SearchForm countries={countries} q={q} country={validCountry} size="md" />
       </div>
@@ -36,7 +36,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<R
       ) : found === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-slate-500">
           Nothing matches {`“${q}”`}. Try a brand name, or browse the{" "}
-          <Link href="/catalogs" className="font-semibold text-[#e0116d] underline">
+          <Link href="/catalogs" className="font-semibold text-brand-600 underline">
             catalogue
           </Link>
           .

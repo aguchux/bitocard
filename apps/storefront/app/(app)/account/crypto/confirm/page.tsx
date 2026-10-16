@@ -26,10 +26,10 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link href="/account/crypto/market" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/crypto/market" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Back to the market
       </Link>
-      <h1 className="font-display text-2xl font-extrabold text-[#070f4c]">Confirm your trade</h1>
+      <h1 className="font-display text-2xl font-extrabold text-navy-900">Confirm your trade</h1>
       {quote ? (
         <section className={card} aria-label="Trade details">
           <div className="flex items-center gap-3">
@@ -72,7 +72,7 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
         <div className={card} role="alert">
           <p className="font-semibold">This trade is not available</p>
           <p className="mt-1 text-sm text-slate-600">{preview && !preview.ok ? preview.message : "The ad changed or the amount is outside its limits."}</p>
-          <Link href="/account/crypto/market" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#ff2382] px-4 font-semibold text-white hover:bg-[#e8116d]">
+          <Link href="/account/crypto/market" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
             Choose another ad
           </Link>
         </div>

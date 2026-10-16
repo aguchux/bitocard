@@ -27,10 +27,10 @@ export default async function VerificationPage({ searchParams }: { searchParams:
 
   return (
     <div className="mx-auto grid max-w-xl gap-5">
-      <Link href="/account/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-[#070f4c]">
+      <Link href="/account/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> Your account
       </Link>
-      <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#070f4c]">Identity check</h1>
+      <h1 className="font-display text-3xl font-extrabold tracking-tight text-navy-900">Identity check</h1>
       <p className="text-slate-600">Some products, such as gift cards in some countries, need a one-time identity check before you can buy them. It protects you and us from fraud.</p>
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
         {!country ? (
@@ -45,7 +45,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
                 </option>
               ))}
             </select>
-            <button type="submit" className="inline-flex min-h-12 items-center rounded-xl bg-[#070f4c] px-5 font-semibold text-white">
+            <button type="submit" className="inline-flex min-h-12 items-center rounded-xl bg-navy-900 px-5 font-semibold text-white">
               Continue
             </button>
           </form>
@@ -56,7 +56,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         ) : status?.ok && status.data.latest?.status === "in_review" ? (
           <p className="text-slate-700">Your check is being reviewed by a person. We will let you know by email.</p>
         ) : status?.ok && status.data.latest?.status === "in_progress" && status.data.latest.url ? (
-          <a href={status.data.latest.url} className="inline-flex min-h-12 items-center rounded-xl bg-[#ff2382] px-5 font-semibold text-white">
+          <a href={status.data.latest.url} className="inline-flex min-h-12 items-center rounded-xl bg-brand-500 px-5 font-semibold text-white">
             Continue your check
           </a>
         ) : (

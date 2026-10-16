@@ -53,13 +53,13 @@ export function StoreHeader({
             <StoreName store={store} />
           </Link>
         ) : (
-          <Link href="/" aria-label="Bitocard home" className="wordmark mr-2 inline-flex min-h-11 items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] no-underline sm:text-[32px]">
+          <Link href="/" aria-label="Bitocard home" className="wordmark mr-2 inline-flex min-h-11 items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 no-underline sm:text-[32px]">
             <Brand />
           </Link>
         )}
         <DesktopNav groups={groups} />
         <div className="-mr-2 ml-auto flex items-center gap-1 sm:mr-0 sm:gap-3">
-          <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-[#070f4c] hover:bg-slate-50 xl:hidden">
+          <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
           </Link>
           {store ? null : (
@@ -72,14 +72,14 @@ export function StoreHeader({
           )}
           <Link
             href={signedIn ? "/account" : "/signin"}
-            className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-[#070f4c] hover:border-slate-300 lg:inline-flex"
+            className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-slate-300 lg:inline-flex"
           >
             {signedIn ? "Account" : "Sign in"}
           </Link>
           {store ? null : (
             <Link
               href="/resellers"
-              className="hidden min-h-11 items-center gap-2 rounded-xl bg-[#ff2382] px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-[#e8116d] sm:inline-flex"
+              className="hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex"
             >
               <Store className="size-5" aria-hidden="true" />
               Start Reselling
@@ -101,13 +101,13 @@ export function SearchForm({ countries, q = "", country = "", size = "lg" }: { c
   return (
     <form action="/search" method="get" role="search" className={`flex w-full flex-col gap-2 rounded-2xl bg-white p-1.5 shadow-lg ring-1 ring-slate-200 sm:flex-row sm:items-stretch sm:gap-0 ${tall}`}>
       <label className="flex min-h-12 flex-1 items-center gap-3 rounded-xl px-3 transition-colors focus-within:bg-slate-50 sm:px-4">
-        <Search className="size-5 shrink-0 text-[#070f4c]" aria-hidden="true" />
+        <Search className="size-5 shrink-0 text-navy-900" aria-hidden="true" />
         <span className="sr-only">Search</span>
-        <input name="q" type="search" autoComplete="off" defaultValue={q} placeholder="Find a product, brand or service" className="w-full min-w-0 bg-transparent text-base text-[#070f4c] outline-none placeholder:text-slate-400 sm:text-[17px]" />
+        <input name="q" type="search" autoComplete="off" defaultValue={q} placeholder="Find a product, brand or service" className="w-full min-w-0 bg-transparent text-base text-navy-900 outline-none placeholder:text-slate-400 sm:text-[17px]" />
       </label>
       <div className="flex items-stretch gap-1.5 border-t border-slate-100 pt-1.5 sm:border-t-0 sm:pt-0">
         <CountryPicker countries={countries} value={country} className="min-h-12 flex-1 sm:w-52 sm:flex-none sm:border-l sm:border-slate-200" />
-        <button type="submit" aria-label="Search" className="grid min-h-12 w-16 shrink-0 place-items-center rounded-xl bg-[#ff2382] text-white hover:bg-[#e8116d] sm:w-20">
+        <button type="submit" aria-label="Search" className="grid min-h-12 w-16 shrink-0 place-items-center rounded-xl bg-brand-500 text-white hover:bg-brand-600 sm:w-20">
           <Search className="size-6" aria-hidden="true" />
         </button>
       </div>
@@ -126,18 +126,18 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
               <StoreName store={store} size="md" />
             </Link>
           ) : (
-            <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-[#070f4c] no-underline">
+            <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 no-underline">
               <Brand />
             </Link>
           )}
           <p className="mt-3 max-w-xs text-sm text-slate-500">Gift cards, mobile top-ups, bills and digital essentials, delivered digitally.</p>
         </div>
         <nav aria-label="Shop" className="text-sm">
-          <p className="font-semibold text-[#070f4c]">Shop</p>
+          <p className="font-semibold text-navy-900">Shop</p>
           <ul className="mt-2">
             {groups.map(group => (
               <li key={group.key}>
-                <Link href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="inline-flex min-h-10 items-center text-slate-600 hover:text-[#070f4c]">
+                <Link href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
                   {group.label}
                 </Link>
               </li>
@@ -146,15 +146,15 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
         </nav>
         {store ? null : (
         <nav aria-label="Business" className="text-sm">
-          <p className="font-semibold text-[#070f4c]">Business</p>
+          <p className="font-semibold text-navy-900">Business</p>
           <ul className="mt-2">
             <li>
-              <Link href="/resellers" className="inline-flex min-h-10 items-center text-slate-600 hover:text-[#070f4c]">
+              <Link href="/resellers" className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
                 Open a reseller store
               </Link>
             </li>
             <li>
-              <a href={appUrl("shq", "/signin")} className="inline-flex min-h-10 items-center text-slate-600 hover:text-[#070f4c]">
+              <a href={appUrl("shq", "/signin")} className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
                 Reseller sign in
               </a>
             </li>
@@ -162,11 +162,11 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
         </nav>
         )}
         <nav aria-label="Legal" className="text-sm">
-          <p className="font-semibold text-[#070f4c]">Legal</p>
+          <p className="font-semibold text-navy-900">Legal</p>
           <ul className="mt-2">
             {legalDocuments.map(doc => (
               <li key={doc.href}>
-                <a href={appUrl("legals", doc.href)} className="inline-flex min-h-10 items-center text-slate-600 hover:text-[#070f4c]">
+                <a href={appUrl("legals", doc.href)} className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
                   {doc.short}
                 </a>
               </li>
