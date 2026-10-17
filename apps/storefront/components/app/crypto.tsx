@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade } from "@bitocard/api-client/storefront";
 import { cryptoSections } from "./sub-menus";
 
@@ -40,23 +40,97 @@ export function CryptoNav({ current }: { current: string }) {
   );
 }
 
-/** A coin's round badge: its code's first letters on its colour (no outside images). */
-const coinColours: Record<string, string> = {
-  USDT: "bg-emerald-500",
-  USDC: "bg-blue-600",
-  BTC: "bg-orange-500",
-  ETH: "bg-indigo-600",
-  BNB: "bg-yellow-400 text-navy-900",
-  POL: "bg-violet-600",
-  TRX: "bg-red-600",
-  LTC: "bg-slate-600",
-  DOGE: "bg-amber-500 text-navy-900",
+/**
+ * Each coin's colour and mark (its currency sign where it has one, else its first letter), drawn here: no outside
+ * images. The mark stays legible at every badge size, where a 4-letter code never fitted.
+ */
+const coinMarks: Record<string, { colour: string; glyph: string }> = {
+  USDT: { colour: "bg-emerald-500 text-white", glyph: "₮" },
+  USDC: { colour: "bg-blue-600 text-white", glyph: "$" },
+  BTC: { colour: "bg-orange-500 text-white", glyph: "₿" },
+  ETH: { colour: "bg-indigo-600 text-white", glyph: "Ξ" },
+  BNB: { colour: "bg-yellow-400 text-navy-900", glyph: "B" },
+  POL: { colour: "bg-violet-600 text-white", glyph: "P" },
+  TRX: { colour: "bg-red-600 text-white", glyph: "T" },
+  LTC: { colour: "bg-slate-600 text-white", glyph: "Ł" },
+  DOGE: { colour: "bg-amber-500 text-navy-900", glyph: "Ð" },
 };
+export const coinMark = (asset: string) => coinMarks[asset] ?? { colour: "bg-slate-500 text-white", glyph: asset.slice(0, 1) };
+
+/** The mark's size for each badge size used. */
+const glyphSizes: Record<string, string> = { "size-8": "text-sm", "size-9": "text-base", "size-10": "text-lg", "size-12": "text-xl" };
+
+/** A coin's round badge: its mark on its colour, with a soft inner shade. */
 export function CoinBadge({ asset, size = "size-10" }: { asset: string; size?: string }) {
+  const mark = coinMark(asset);
   return (
-    <span className={`grid ${size} shrink-0 place-items-center rounded-full text-[11px] font-extrabold text-white ${coinColours[asset] ?? "bg-slate-500"}`} aria-hidden="true">
-      {asset.slice(0, asset.length === 4 ? 4 : 3)}
+    <span
+      className={`grid ${size} shrink-0 place-items-center rounded-full font-extrabold leading-none shadow-[inset_0_-2px_0_rgb(0_0_0/0.14)] ring-1 ring-black/5 ${glyphSizes[size] ?? "text-lg"} ${mark.colour}`}
+      aria-hidden="true"
+    >
+      {mark.glyph}
     </span>
+  );
+}
+
+/**
+ * Choosing a coin: every coin as a tile (its badge, code, and its name or the balance), all in view at once, never
+ * hidden off the side of a scrolling row. Three to a row on phones (stacked tiles), as many as fit from tablets up.
+ * The chosen one is filled navy with a pink tick. `show: "available"` puts each coin's available balance under its code
+ * (withdrawing); otherwise its name.
+ */
+export function CoinPicker({
+  assets,
+  wallets,
+  current,
+  href,
+  label = "Coin",
+  show = "name",
+}: {
+  assets: string[];
+  wallets: StoreCryptoWallets | null;
+  current: string;
+  href: (asset: string) => string;
+  label?: string;
+  show?: "name" | "available";
+}) {
+  const balances = new Map(wallets?.assets.map(item => [item.asset, item]) ?? []);
+  return (
+    <nav aria-labelledby="coin-picker" className="space-y-2">
+      <h2 id="coin-picker" className="text-xs font-bold tracking-wider text-slate-500 uppercase">
+        {label}
+      </h2>
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))]">
+        {assets.map(code => {
+          const balance = balances.get(code);
+          const chosen = code === current;
+          const note = show === "available" ? (balance ? formatCrypto(balance.available) : "0") : (balance?.name ?? code);
+          return (
+            <li key={code} className="min-w-0">
+              <Link
+                href={href(code)}
+                aria-current={chosen ? "page" : undefined}
+                title={balance?.name ?? code}
+                className={`group relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-center transition sm:flex-row sm:justify-start sm:gap-2.5 sm:px-3 sm:text-left ${
+                  chosen ? "bg-navy-900 text-white shadow-md ring-2 ring-navy-900" : "bg-white text-navy-900 ring-1 ring-slate-200 hover:-translate-y-px hover:shadow-sm hover:ring-slate-300"
+                }`}
+              >
+                <CoinBadge asset={code} size="size-9" />
+                <span className="min-w-0 leading-tight sm:flex-1">
+                  <span className="block text-sm font-bold">{code}</span>
+                  <span className={`block truncate text-[11px] sm:text-xs ${chosen ? "text-white/70" : "text-slate-500"}`}>{note}</span>
+                </span>
+                {chosen ? (
+                  <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-brand-500 text-white ring-2 ring-white">
+                    <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 

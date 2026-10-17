@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ChevronLeft, Clock, Trash2 } from "lucide-react";
 import { formatCrypto, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreList, type StoreWithdrawalAddress, type StoreWithdrawalNetworks } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, CryptoNav, date, withdrawableAssets, withdrawalStatus } from "@/components/app/crypto";
+import { card, CoinBadge, CoinPicker, CryptoGate, CryptoNav, date, withdrawableAssets, withdrawalStatus } from "@/components/app/crypto";
 import { ActionButton, AddWithdrawalAddressForm, WithdrawForm } from "@/components/app/crypto-forms";
 import { removeWithdrawalAddress } from "@/lib/crypto-actions";
 import { customerApi } from "@/lib/customer";
@@ -45,18 +45,7 @@ export default async function WithdrawPage({ searchParams }: { searchParams: Pro
       {blocked ? <CryptoGate wallets={wallets} withdraw /> : null}
       {!blocked ? (
         <>
-          <nav aria-label="Coin" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-            {assets.map(code => (
-              <Link
-                key={code}
-                href={`/account/crypto/withdraw?asset=${code}`}
-                aria-current={code === asset ? "page" : undefined}
-                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-navy-900"
-              >
-                <CoinBadge asset={code} size="size-8" /> {code}
-              </Link>
-            ))}
-          </nav>
+          <CoinPicker assets={assets} wallets={wallets} current={asset} href={code => `/account/crypto/withdraw?asset=${code}`} label="Coin to withdraw · available" show="available" />
           {balance ? (
             <p className="text-sm text-slate-600">
               Available: <span className="font-semibold text-navy-900">{formatCrypto(balance.available, asset)}</span>

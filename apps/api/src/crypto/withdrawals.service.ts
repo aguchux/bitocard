@@ -702,7 +702,37 @@ export class CryptoWithdrawalsService {
         this.logger.warn({ err: error, withdrawal: row.id }, 'Could not move a crypto withdrawal on');
       }
     }
-    return { expired: expired.length, checked: sent };
+    return { expired: expired.length, checked: sent, tracked: (await this.trackDeposits('live')) + (await this.trackDeposits('test')) };
+  }
+
+  /**
+   * Tells the mode's signer about the addresses deposits arrived at, once each, so it sweeps them to its hot wallet
+   * and counts them in its balances (the custody check). A signer that refuses an address (its keys and the API's
+   * xpub differ) is logged loudly and asked again next run; nothing else waits on it.
+   */
+  async trackDeposits(mode: LedgerMode) {
+    const signer = this.signer(mode);
+    if (!signer?.track || signer.simulated) return 0;
+    const rows = await this.prisma.cryptoDeposit.findMany({ where: { mode, signerTrackedAt: null, status: { in: ['pending', 'credited'] } }, orderBy: { createdAt: 'asc' }, take: 50 });
+    let tracked = 0;
+    const done = new Set<string>();
+    for (const row of rows) {
+      const chain = row.chain as Chain;
+      if (done.has(`${chain}:${row.address}`)) continue;
+      done.add(`${chain}:${row.address}`);
+      const family = chainFamily[chain];
+      const address = family ? await this.prisma.cryptoAddress.findFirst({ where: { mode, family, address: row.address }, select: { index: true } }) : null;
+      if (!address) continue;
+      try {
+        await signer.track({ chain, network: mode === 'live' ? 'mainnet' : 'testnet', index: address.index, address: row.address });
+        // Every deposit to the same address on the same chain is covered by the one call.
+        const marked = await this.prisma.cryptoDeposit.updateMany({ where: { mode, chain: row.chain, address: row.address, signerTrackedAt: null, status: { in: ['pending', 'credited'] } }, data: { signerTrackedAt: new Date() } });
+        tracked += marked.count;
+      } catch (error) {
+        this.logger.error({ err: error, deposit: row.id, chain }, 'The signer did not take a deposit address');
+      }
+    }
+    return tracked;
   }
 
   // -- Admin ----------------------------------------------------------------------------------------------------

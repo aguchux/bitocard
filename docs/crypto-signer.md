@@ -114,7 +114,15 @@ If the signer replaces a transaction (for example a fee bump), it reports the ne
 
 ### `GET /v1/health`
 
-Answers `200 { "network": "mainnet" | "testnet" }`. The admin app's Test connection uses it; it sends nothing.
+Answers `200 { "network": "mainnet" | "testnet", "vault": "turnkey", "hot_wallets": { "TRON": "T…", … } }`. The admin
+app's Test connection uses it; it sends nothing. Fund the hot wallets shown here.
+
+### `POST /v1/deposit-addresses`
+
+Takes `{ "chain": "TRON", "network": "mainnet", "index": 12, "address": "T…" }` and answers `{ chain, index, address }`.
+The API's `crypto` job sends it once for each address a deposit arrived at (`crypto_deposits.signer_tracked_at`), so
+the signer sweeps it and counts it in its balances. The signer works the address out from its own keys and refuses
+(`422`) one that differs: the API's xpub and the signer's keys are then not the same keys, and nothing is kept.
 
 ### `GET /v1/balances/{network}`
 
@@ -145,12 +153,75 @@ not settled, plus deposits seen but not credited.
 Takes `{ "chain": "SOLANA", "network": "mainnet" | "testnet", "index": 12 }` and answers `{ "address": "…" }`. Solana
 keys are hardened only, so only the signer can make customers' Solana deposit addresses.
 
+## BitoCard's signer (`apps/signer`)
+
+A plain Node service (no framework) with its own Postgres database, deployed with `apps/signer/Dockerfile` on a host
+off Vercel (for example DigitalOcean App Platform) behind HTTPS. Run **one instance per network**: a `mainnet` signer
+for live stores and a `testnet` one for sandbox stores. Settings are environment variables, listed in
+`apps/signer/.env.example`, all checked at start.
+
+- **Keys (`src/vault`).** `turnkey`: the recovery phrase is imported into one Turnkey wallet and never leaves it. Turnkey
+  exports no xpubs, so the signer is given the same account xpubs as the admin app (`SIGNER_XPUB_<FAMILY>`) and works
+  out public keys itself. Each path is added to the wallet as an account (compressed public key format) the first time
+  it signs, and every signature Turnkey returns is checked against the xpub's key: a Turnkey wallet that is not the
+  one behind the xpubs can never sign. Requests carry Turnkey's `X-Stamp` (P-256 over the exact body).
+  `local` (`SIGNER_MNEMONIC`) is for test networks only; it is refused for mainnet.
+- **What is signed.** The signer computes every digest itself and asks the vault only to sign it
+  (`HASH_FUNCTION_NO_OP`). Transactions are built locally, never taken from a node:
+  - **EVM** (every EVM network): legacy EIP-155 transactions at 20% over the node's gas price; `eth_chainId` is checked
+    against the network first. Nonces follow the signer's own unconfirmed transactions, so two never share one.
+  - **TRON**: the protobuf is built field by field (a dishonest node could change the destination in its own
+    `createtransaction`); TRC-20 transfers may burn up to 100 TRX. One that expires unmined is `failed`.
+  - **Bitcoin and Litecoin** (native SegWit) and **Dogecoin** (legacy, each input proved by its whole previous
+    transaction, so a lying indexer cannot inflate the fee): confirmed outputs first, change back to the hot wallet,
+    fee rates clamped. Outputs spent by the signer's own unconfirmed transactions are never spent again.
+- **The hot wallet** is the internal chain's first key, `<account>/1/0`, on every family (no customer ever gets it).
+  Withdrawals are paid from it.
+- **Transfers.** Recorded under the reference before anything else; the signed bytes are kept before broadcasting, so
+  a retry, a restart or a dropped transaction always sends exactly those bytes. `failed` only for a clear refusal before
+  signing (a bad address, too little in the hot wallet, a limit) or a transaction the chain shows can never send
+  (reverted, expired).
+- **Limits (`SIGNER_LIMITS`).** A JSON list, one entry per coin or token, in on-chain units:
+  `{ "chain": "TRON", "asset": "USDT", "contract": "TR7N…", "decimals": 6, "per_transfer": "5000000000",
+  "daily": "20000000000", "sweep_min": "20000000" }`. Anything without an entry is refused, so the list is also what
+  the signer may send. The daily limit counts withdrawals of the last 24 hours, never sweeps.
+- **Sweeps.** Every pass (`SIGNER_WORKER_INTERVAL_MS`, default 15 seconds) looks at up to 100 tracked deposit addresses
+  and moves one step on each: a token at or above its `sweep_min` gets the chain's coin for gas from the hot wallet
+  first (EVM: the estimate with a margin; TRON: 30 TRX), then is swept once that has arrived; then the coin itself
+  (everything less the fee). Nothing starts while the address has a transfer on its way. Assets without `sweep_min`
+  are not swept.
+- **Balances** add the hot wallet and every tracked deposit address, per coin and token in `SIGNER_LIMITS`.
+- **Tests**: `apps/signer/test` (published address vectors, the EIP-155 example transaction byte for byte, Bitcoin
+  transactions identical to btc-signer's own signing, the transfer lifecycle on PGlite, request and reply signatures,
+  the Turnkey client against a fake).
+
+### Setting it up
+
+1. **Turnkey.** Create an organisation. Import the recovery phrase into one wallet: in Turnkey's dashboard, or with
+   their `@turnkey/sdk-server` import flow on an offline machine. Note the organisation ID and wallet ID.
+2. **An API key for the signer.** In Turnkey, create an API-only user with a P-256 key pair. Give it a policy that
+   allows only signing (`ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2`) and creating wallet accounts on that one wallet. Set its
+   public and private keys as `TURNKEY_API_PUBLIC_KEY` and `TURNKEY_API_PRIVATE_KEY`.
+3. **The xpubs.** Set `SIGNER_XPUB_EVM`, `_TRON`, `_BITCOIN`, `_LITECOIN` and `_DOGECOIN` to exactly the values in the
+   admin app.
+4. **Nodes.** One HTTPS endpoint per chain the signer sends on (they can be the same providers as the API's), and
+   `SIGNER_BLOCKCYPHER_TOKEN` for Dogecoin's main network.
+5. **Limits** for every coin and token, then deploy behind HTTPS with its own Postgres.
+6. **The admin app.** Settings > Integrations > Blockchain > Crypto signer: the address and the same secret, the
+   Sandbox switch on for the `testnet` signer. Test connection shows its hot wallets: fund them, starting small.
+7. **Test networks first.** Run a `testnet` signer (`SIGNER_VAULT=local` is fine there) against Sepolia, Nile and the
+   Bitcoin and Litecoin testnets, with a sandbox store, before any live withdrawal.
+
+Each signature is one Turnkey signature (priced per signature beyond the plan's allowance): a Bitcoin-style
+transaction takes one per input, and a token sweep needs a gas transfer too.
+
 ## What the signer owns
 
 - **Keys.** The keys come from the offline key ceremony, with a Shamir backup. They live only in the vault or HSM and
   are never exported.
 - **Wallet tiers and limits.** A hot wallet holds 5 to 10% of custody, warm wallets are 2-of-3, and cold storage holds
-  the rest. Per-transfer and daily limits are refused with `422`.
+  the rest (warm and cold are moved by hand, outside the signer, for now). Per-transfer and daily limits are reported
+  as `failed` with the reason.
 - **Fees.** It pays network fees from the hot wallet. BitoCard's withdrawal fee, charged to the customer, is booked
   separately by the API.
 - **Sweeps.** It moves funds from customers' deposit addresses to the hot wallet. Address `m/…/0/i` belongs to

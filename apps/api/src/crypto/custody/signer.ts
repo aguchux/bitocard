@@ -42,6 +42,8 @@ export interface CryptoSigner {
   health(): Promise<{ network: string | null }>;
   /** Everything the signer's wallets hold on a network (deposit addresses, hot, warm and cold), for reconciliation. */
   balances?(network: 'mainnet' | 'testnet'): Promise<SignerBalance[]>;
+  /** Tells the signer a customer's deposit address has received money, so it sweeps it and counts it in its balances. */
+  track?(input: { chain: Chain; network: 'mainnet' | 'testnet'; index: number; address: string }): Promise<void>;
 }
 
 /** One holding: on-chain units (text, as 18-decimal tokens exceed 64 bits) of a coin or token on a chain. */
@@ -156,6 +158,11 @@ export class RemoteSigner implements CryptoSigner {
     const reply = (await this.request('POST', '/v1/addresses', input)) as { address?: string } | null;
     if (!reply?.address) throw new SignerError('The signer did not return an address.');
     return reply.address;
+  }
+
+  async track(input: { chain: Chain; network: 'mainnet' | 'testnet'; index: number; address: string }) {
+    const reply = (await this.request('POST', '/v1/deposit-addresses', input)) as { address?: string } | null;
+    if (!reply?.address) throw new SignerError('The signer did not confirm the address.');
   }
 
   async health() {

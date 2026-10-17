@@ -1,0 +1,30 @@
+{
+  "name": "@bitocard/signer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "dev": "tsc -p tsconfig.build.json && node --env-file-if-exists=.env dist/main.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.build.json && node --test \"test/*.test.mjs\""
+  },
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip32": "^2.4.0",
+    "@scure/bip39": "^2.4.0",
+    "@scure/btc-signer": "^2.4.1",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@bitocard/eslint-config": "*",
+    "@electric-sql/pglite": "^0.4.3",
+    "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "typescript": "^6.0.2"
+  }
+}

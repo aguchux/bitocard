@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { formatCrypto } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
 import type { StoreCryptoWallets } from "@bitocard/api-client/storefront";
-import { canWithdraw, hasP2pMoney, tradableAssets, withdrawableAssets } from "@/components/app/crypto";
+import { canWithdraw, coinMark, hasP2pMoney, tradableAssets, withdrawableAssets } from "@/components/app/crypto";
 import { activeTab, appTabs } from "@/components/app/tabs";
 
 const redirect = vi.fn((url: string) => {
@@ -304,6 +304,14 @@ describe("what the crypto pages offer", () => {
     expect(withdrawableAssets(closed)).toEqual(["BTC", "BNB"]);
     expect(canWithdraw(closed)).toBe(true);
     expect(hasP2pMoney(closed)).toBe(true);
+  });
+
+  test("every coin has its own colour and a one-character mark, unknown ones a fallback", () => {
+    const codes = ["USDT", "USDC", "BTC", "ETH", "BNB", "POL", "TRX", "LTC", "DOGE"];
+    for (const code of codes) expect([...coinMark(code).glyph]).toHaveLength(1);
+    expect(new Set(codes.map(code => coinMark(code).colour)).size).toBe(codes.length);
+    expect(coinMark("BTC").glyph).toBe("₿");
+    expect(coinMark("SOL")).toEqual({ colour: "bg-slate-500 text-white", glyph: "S" });
   });
 
   test("withdrawing needs a verified, unfrozen account holding something", () => {

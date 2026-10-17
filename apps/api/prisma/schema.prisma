@@ -2835,6 +2835,8 @@ model CryptoDeposit {
   /// When the chain stopped showing it (cleared when it is seen again); it fails 6 hours after this.
   missingSince  DateTime?  @map("missing_since")
   creditedAt    DateTime?  @map("credited_at")
+  /// When the signer was told about the deposit's address (so it sweeps it and counts it in its balances).
+  signerTrackedAt DateTime? @map("signer_tracked_at")
   createdAt     DateTime   @default(now()) @map("created_at")
   customer      Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
 

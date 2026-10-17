@@ -3,7 +3,7 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { AlertTriangle, ChevronLeft } from "lucide-react";
 import { formatCrypto, type StoreCryptoDeposit, type StoreCryptoDepositAddress, type StoreCryptoNetwork, type StoreCryptoWallets, type StoreList } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, CryptoNav, date, tradableAssets } from "@/components/app/crypto";
+import { card, CoinBadge, CoinPicker, CryptoGate, CryptoNav, date, tradableAssets } from "@/components/app/crypto";
 import { CopyButton } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
@@ -44,18 +44,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
       {blocked ? <CryptoGate wallets={wallets} /> : null}
       {!blocked ? (
         <>
-          <nav aria-label="Coin" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-            {assets.map(code => (
-              <Link
-                key={code}
-                href={`/account/crypto/deposit?asset=${code}`}
-                aria-current={code === asset ? "page" : undefined}
-                className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-navy-900"
-              >
-                <CoinBadge asset={code} size="size-8" /> {code}
-              </Link>
-            ))}
-          </nav>
+          <CoinPicker assets={assets} wallets={wallets} current={asset} href={code => `/account/crypto/deposit?asset=${code}`} label="Coin to deposit" />
           {options.length ? (
             <section className={card} aria-labelledby="network">
               <h2 id="network" className="mb-3 font-bold">

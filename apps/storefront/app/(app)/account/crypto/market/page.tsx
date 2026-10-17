@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pAd } from "@bitocard/api-client/storefront";
-import { card, CoinBadge, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/crypto";
+import { card, CoinPicker, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/crypto";
 import { TakeAdForm } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
 
@@ -39,25 +39,14 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
                   key={item}
                   href={href({ side: item })}
                   aria-current={side === item ? "page" : undefined}
-                  className={`flex min-h-11 items-center justify-center rounded-xl text-sm font-bold ${side === item ? (item === "buy" ? "bg-emerald-600 text-white" : "bg-brand-500 text-white") : "text-slate-600"}`}
+                  className={`flex min-h-11 items-center justify-center rounded-xl text-sm font-bold transition-colors ${side === item ? (item === "buy" ? "bg-emerald-600 text-white shadow-sm" : "bg-brand-500 text-white shadow-sm") : "text-slate-600 hover:bg-white/70 hover:text-navy-900"}`}
                 >
                   {item === "buy" ? `Buy ${asset}` : `Sell ${asset}`}
                 </Link>
               ))}
             </nav>
-            <nav aria-label="Coin" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-              {assets.map(code => (
-                <Link
-                  key={code}
-                  href={href({ asset: code })}
-                  aria-current={code === asset ? "page" : undefined}
-                  className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full bg-white pr-3 pl-1 text-sm font-semibold ring-1 ring-slate-200 aria-[current=page]:ring-2 aria-[current=page]:ring-navy-900"
-                >
-                  <CoinBadge asset={code} size="size-8" /> {code}
-                </Link>
-              ))}
-            </nav>
           </div>
+          <CoinPicker assets={assets} wallets={wallets} current={asset} href={code => href({ asset: code })} label={side === "buy" ? "Coin to buy" : "Coin to sell"} />
           {book?.ok && book.data.data.length ? (
             <ul className="space-y-3">
               {book.data.data.map(ad => (

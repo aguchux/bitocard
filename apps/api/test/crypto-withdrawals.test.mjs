@@ -25,7 +25,7 @@ const signerSecret = 'signer-shared-secret-at-least-32-chars';
 
 /** A fake signer, a fake sanctions screener and a fake EVM chain (to read what the signer sent). */
 async function fakeWorld() {
-  const state = { flagged: new Set([flagged.toLowerCase()]), mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0, holdings: [] };
+  const state = { flagged: new Set([flagged.toLowerCase()]), mode: 'ok', transfers: new Map(), latest: 100n, txs: new Map(), sent: [], badSignatures: 0, holdings: [], tracked: [] };
   const verified = call => {
     const header = call.headers['bitocard-signer-signature'] ?? '';
     const [, t, v1] = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(header) ?? [];
@@ -62,6 +62,10 @@ async function fakeWorld() {
     if (!verified(call)) return { status: 401, body: { error: { message: 'bad signature' } } };
     if (path === '/signer/v1/health') return { body: { network: 'testnet' } };
     if (path === '/signer/v1/balances/testnet') return { body: { network: 'testnet', balances: state.holdings } };
+    if (path === '/signer/v1/deposit-addresses') {
+      state.tracked.push(call.body);
+      return { body: { chain: call.body.chain, index: call.body.index, address: call.body.address } };
+    }
     if (call.method === 'GET') {
       const reference = decodeURIComponent(path.split('/').at(-1));
       const found = state.transfers.get(reference);
@@ -370,6 +374,22 @@ describe('withdrawals through BitoCard’s signer', () => {
     assert.equal(await balance(shopper), '948.500000');
     assert.equal(fakes.state.badSignatures, 0);
     await ledgerOk();
+  });
+
+  test('the signer is told once about each address a deposit arrived at, so it sweeps it', async () => {
+    const shopper = await customer();
+    const address = await prisma.cryptoAddress.create({
+      data: { customerId: shopper.id, mode: 'test', family: 'evm', index: 4242, address: '0x00000000000000000000000000000000000042aa', keyFingerprint: 'test', watchUntil: new Date() },
+    });
+    for (const [tx, status] of [['0xaa01', 'credited'], ['0xaa02', 'pending'], ['0xaa03', 'failed']]) {
+      await prisma.cryptoDeposit.create({ data: { customerId: shopper.id, mode: 'test', chain: 'ETHEREUM', asset: 'USDT', address: address.address, txHash: tx, outputIndex: 0, rawAmount: '1', amount: 1n, status } });
+    }
+    await cron('crypto');
+    await cron('crypto');
+    const told = fakes.state.tracked.filter(item => item.address === address.address);
+    assert.deepEqual(told, [{ chain: 'ETHEREUM', network: 'testnet', index: 4242, address: address.address }], 'once, whatever the number of deposits or runs');
+    const rows = await prisma.cryptoDeposit.findMany({ where: { address: address.address }, orderBy: { txHash: 'asc' } });
+    assert.deepEqual(rows.map(row => row.signerTrackedAt !== null), [true, true, false], 'a failed deposit is not a reason to sweep');
   });
 
   test('a transfer to another address or for another amount on chain is never settled', async () => {
