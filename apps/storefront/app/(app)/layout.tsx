@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import type { StoreApp } from "@bitocard/api-client/storefront";
 import { Brand } from "@bitocard/ui/brand";
@@ -10,6 +11,7 @@ import { SubRail } from "@/components/app/sub-rail";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
+import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
 import { currentStore, storeSubdomain } from "@/lib/store";
 
@@ -48,7 +50,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!customer.email_verified) redirect(`/account/verify?next=${next}`);
 
   // The store's choice (else BitoCard's default); the side rail if the API cannot be reached.
-  const app = store ? store.app : await storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined));
+  const [app, navigation] = await Promise.all([
+    store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
+    storeNavigation(),
+  ]);
+  // What the desktop sub rails list: the catalogue's groups on sale (as the Catalog page's chips) and the customer's wallets.
+  const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency };
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";
   const rail = desktopNav === "rail";
   const name = store?.name ?? brand.name;
@@ -77,8 +84,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppNav desktopNav={desktopNav} />
       <div className="lg:flex">
         {rail ? <AppRail /> : null}
-        {/* Desktop: a tab's own places (Crypto, Account screens) as a second rail; pills elsewhere. */}
-        <SubRail />
+        {/* Desktop: a tab's own places (Catalog, Orders, Wallet, Crypto, Account screens) as a second rail; pills elsewhere. */}
+        <Suspense fallback={null}>
+          <SubRail context={subMenus} />
+        </Suspense>
         <div className={`min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
           <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
             {children}

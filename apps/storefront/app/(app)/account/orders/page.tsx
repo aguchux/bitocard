@@ -32,11 +32,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-3xl font-extrabold tracking-tight">Orders</h1>
-        <Link href="/account/disputes" className="text-sm font-semibold text-brand-500 hover:underline">
+        {/* On desktop the sub rail lists the filters and the disputes. */}
+        <Link href="/account/disputes" className="text-sm font-semibold text-brand-500 hover:underline lg:hidden">
           Your disputes
         </Link>
       </div>
-      <nav aria-label="Show" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <nav aria-label="Show" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:hidden">
         {(Object.keys(filters) as Filter[]).map(key => (
           <Link
             key={key}

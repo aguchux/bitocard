@@ -73,8 +73,8 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         <p className="mt-1 text-slate-600">Everything you can buy, grouped to find it fast.</p>
       </div>
 
-      {/* Group chips: a sideways row on phones, wrapping on wider screens. */}
-      <nav aria-label="Categories" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-wrap lg:px-0">
+      {/* Group chips: a sideways row on phones and tablets; on desktop the sub rail lists the groups. */}
+      <nav aria-label="Categories" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:hidden">
         <Chip href={href({ q })} active={!group}>
           All
         </Chip>

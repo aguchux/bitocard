@@ -216,6 +216,12 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         </Link>
       ) : null}
       {params.top_up ? <TopUpStatus id={params.top_up} /> : null}
+      {/* The sub rail's Crypto item where the store offers no crypto and nothing is held: say so above the money wallet. */}
+      {showCrypto && overview.ok && !crypto ? (
+        <p className={`${card} text-slate-600`} role="status">
+          Crypto wallets are not offered in your country yet. Your money wallet is below.
+        </p>
+      ) : null}
 
       {customer && !customer.country ? (
         <div className={card}>
@@ -230,7 +236,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       ) : (
         <>
           {wallet.wallets.length > 1 || crypto ? (
-            <nav aria-label="Your wallets" className={`grid gap-1 rounded-2xl bg-slate-100 p-1 sm:gap-2 ${wallet.wallets.length + (crypto ? 1 : 0) >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+            // On desktop the sub rail lists the wallets instead.
+            <nav aria-label="Your wallets" className={`grid gap-1 rounded-2xl bg-slate-100 p-1 sm:gap-2 lg:hidden ${wallet.wallets.length + (crypto ? 1 : 0) >= 3 ? "grid-cols-3" : "grid-cols-2"}`}>
               {wallet.wallets.map(item => {
                 const active = !cryptoTab && item.currency === wallet.currency;
                 const query = new URLSearchParams({ ...(item.primary ? {} : { wallet: item.currency }), ...(back ? { back } : {}) }).toString();

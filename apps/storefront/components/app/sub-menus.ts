@@ -1,7 +1,27 @@
-import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, History, Landmark, Megaphone, Wallet, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  CircleCheck,
+  Coins,
+  DollarSign,
+  Gift,
+  History,
+  Landmark,
+  LayoutGrid,
+  ListOrdered,
+  Megaphone,
+  MessageSquareWarning,
+  RotateCcw,
+  Truck,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import { groupIcon } from "@/components/store/theme";
 import { accountSections, activeAccountSection } from "./account-sections";
 
 export type SubMenuItem = {
+  /** A path, or a path and the one query parameter that picks it on the tab's page (`/account/orders?show=delivered`). */
   href: string;
   label: string;
   icon: LucideIcon;
@@ -11,7 +31,22 @@ export type SubMenuItem = {
   also?: string[];
 };
 
-export type SubMenu = { key: "crypto" | "account"; label: string; href: string; items: SubMenuItem[] };
+export type SubMenuKey = "catalog" | "orders" | "wallet" | "crypto" | "account";
+
+export type SubMenu = {
+  key: SubMenuKey;
+  label: string;
+  /** The tab's page; the rail's heading leads back to it. */
+  href: string;
+  /** On the tab's page, the query parameter that picks the item (`show`, `group`, `wallet`); without it, or with a value no item has, the item without it is current. */
+  param?: string;
+  /** Paths whose pages show this rail. */
+  owns: string[];
+  items: SubMenuItem[];
+};
+
+/** What the rails need from the signed-in customer and the store: the catalogue's groups and the customer's wallet currency. */
+export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null };
 
 /** The Crypto tab's places: pills under the title on phones and tablets, the sub rail on desktop. */
 export const cryptoSections: SubMenuItem[] = [
@@ -24,32 +59,83 @@ export const cryptoSections: SubMenuItem[] = [
   { href: "/account/crypto/cash-out", label: "Cash out", icon: Landmark },
 ];
 
-/** The tabs with screens of their own, shown as a second rail beside the app's rail on desktop. */
-export const subMenus: SubMenu[] = [
-  { key: "crypto", label: "Crypto", href: "/account/crypto", items: cryptoSections },
-  { key: "account", label: "Account", href: "/account/profile", items: accountSections.map(({ href, label, icon, soon }) => ({ href, label, icon, soon })) },
+/** The Orders tab: its filters (the API's `?show=` groups, as the page's chips) and the customer's disputes. */
+export const orderSections: SubMenuItem[] = [
+  { href: "/account/orders", label: "All orders", icon: ListOrdered },
+  { href: "/account/orders?show=progress", label: "On the way", icon: Truck },
+  { href: "/account/orders?show=delivered", label: "Delivered", icon: CircleCheck },
+  { href: "/account/orders?show=refunded", label: "Refunded", icon: RotateCcw },
+  { href: "/account/disputes", label: "Your disputes", icon: MessageSquareWarning },
 ];
+
+/** The Catalog tab: everything, then each menu group on sale (as the page's chips). */
+export const catalogSections = (groups: SubMenuContext["groups"]): SubMenuItem[] => [
+  { href: "/account/catalog", label: "All products", icon: LayoutGrid },
+  ...groups.map(group => ({ href: `/account/catalog?group=${encodeURIComponent(group.key)}`, label: group.label, icon: groupIcon[group.key] ?? Gift })),
+];
+
+/**
+ * The Wallet tab: the country's wallet (the page's default), the US dollar wallet and the coins (`?wallet=`, as the
+ * page's tabs). A country that uses dollars has one money wallet; an account still without a country has its default.
+ */
+export const walletSections = (currency: string | null): SubMenuItem[] => [
+  { href: "/account/wallet", label: !currency ? "Your wallet" : currency === "USD" ? "US dollars" : `${currency} wallet`, icon: Wallet },
+  ...(currency && currency !== "USD" ? [{ href: "/account/wallet?wallet=USD", label: "US dollars", icon: DollarSign }] : []),
+  { href: "/account/wallet?wallet=crypto", label: "Crypto", icon: Coins },
+];
+
+/** The tabs with places of their own, in the app's tab order, shown as a second rail beside the app's rail on desktop. */
+export function subMenusFor(context: SubMenuContext): SubMenu[] {
+  return [
+    { key: "catalog", label: "Catalog", href: "/account/catalog", param: "group", owns: ["/account/catalog", "/account/p"], items: catalogSections(context.groups) },
+    { key: "orders", label: "Orders", href: "/account/orders", param: "show", owns: ["/account/orders", "/account/disputes"], items: orderSections },
+    { key: "wallet", label: "Wallet", href: "/account/wallet", param: "wallet", owns: ["/account/wallet"], items: walletSections(context.currency) },
+    { key: "crypto", label: "Crypto", href: "/account/crypto", owns: ["/account/crypto"], items: cryptoSections },
+    // Shown only on its screens (activeAccountSection), not on the Account page, whose rows are its menu.
+    { key: "account", label: "Account", href: "/account/profile", owns: [], items: accountSections.map(({ href, label, icon, soon }) => ({ href, label, icon, soon })) },
+  ];
+}
 
 const clean = (pathname: string) => pathname.split(/[?#]/)[0]!.replace(/\/+$/, "") || "/";
 const under = (path: string, base: string) => path === base || path.startsWith(`${base}/`);
+const split = (href: string) => {
+  const [path, search = ""] = href.split("?");
+  return { path: path!, params: new URLSearchParams(search) };
+};
+
+/** The current item of a menu on a path (null when none is, as on an order's own page or a trade's confirmation). */
+function activeItem(menu: SubMenu, path: string, params: URLSearchParams): string | null {
+  const base = clean(menu.href);
+  if (menu.param && path === base) {
+    // The tab's own page: the item whose parameter matches (case aside), else the one without it.
+    const value = params.get(menu.param)?.toLowerCase() ?? null;
+    const onBase = menu.items.filter(item => split(item.href).path === base);
+    const picked = onBase.find(item => (split(item.href).params.get(menu.param!)?.toLowerCase() ?? null) === value) ?? onBase.find(item => !split(item.href).params.has(menu.param!));
+    return picked?.href ?? null;
+  }
+  // Elsewhere the most specific item wins; the tab's own page is current only on itself.
+  return (
+    menu.items
+      .filter(item => {
+        const own = split(item.href).path;
+        return own === base ? path === own : [own, ...(item.also ?? [])].some(prefix => under(path, prefix));
+      })
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
+  );
+}
 
 /**
- * Which sub menu a path shows, and its current item (null when none is current, as on a trade's confirmation). The
- * Crypto rail shows on every crypto page; the Account rail only on its screens, not on the Account page, whose rows are
- * the menu. Elsewhere: none.
+ * Which sub menu a page shows, and its current item. `search` is the page's query string (the Orders, Catalog and
+ * Wallet items are picked by it). Home and the Account page have none.
  */
-export function subMenuFor(pathname: string): { menu: SubMenu; active: string | null } | null {
+export function subMenuFor(
+  pathname: string,
+  search: string | URLSearchParams = "",
+  context: SubMenuContext = { groups: [], currency: null },
+): { menu: SubMenu; active: string | null } | null {
   const path = clean(pathname);
-  if (under(path, "/account/crypto")) {
-    const menu = subMenus[0]!;
-    // The most specific item wins; Wallets is the crypto home only.
-    const active =
-      menu.items
-        .filter(item => (item.href === "/account/crypto" ? path === item.href : [item.href, ...(item.also ?? [])].some(base => under(path, base))))
-        .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null;
-    return { menu, active };
-  }
-  const section = activeAccountSection(path);
-  if (section) return { menu: subMenus[1]!, active: accountSections.find(item => item.key === section)!.href };
-  return null;
+  const params = typeof search === "string" ? new URLSearchParams(search.replace(/^\?/, "")) : search;
+  const menus = subMenusFor(context);
+  const menu = activeAccountSection(path) ? menus.find(item => item.key === "account")! : menus.find(item => item.owns.some(prefix => under(path, prefix)));
+  return menu ? { menu, active: activeItem(menu, path, params) } : null;
 }

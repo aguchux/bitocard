@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { subMenuFor } from "./sub-menus";
+import { usePathname, useSearchParams } from "next/navigation";
+import { subMenuFor, type SubMenuContext } from "./sub-menus";
 
 /**
- * Desktop only: a tab's own places (Crypto's Wallets, Market…; Account's Profile, Security…) as a second rail beside
- * the app's rail, sticky below the header like it. The tab's name heads it and leads back to the tab. Phones and tablets
- * keep the pills under the page title instead.
+ * Desktop only: a tab's own places (Catalog's groups, Orders' filters, the wallets, Crypto's Wallets, Market…, Account's
+ * Profile, Security…) as a second rail beside the app's rail, sticky below the header like it. The tab's name heads it
+ * and leads back to the tab. Phones and tablets keep the pills, chips or tabs on the page instead.
  */
-export function SubRail() {
-  const found = subMenuFor(usePathname());
+export function SubRail({ context }: { context: SubMenuContext }) {
+  const found = subMenuFor(usePathname(), useSearchParams(), context);
   if (!found) return null;
   const { menu, active } = found;
   return (
