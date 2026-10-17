@@ -15,7 +15,7 @@ import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { cryptoAddressAddedEmail, cryptoWithdrawalCodeEmail } from '../notifications/templates.js';
 import { fromUnits, toUnits } from './amounts.js';
-import { type Chain, chainFamily, chainNames, chains, normaliseAddress, normaliseContract } from './chains/client.js';
+import { type Chain, chainFamily, chainNames, chains, isEvm, normaliseAddress, normaliseContract } from './chains/client.js';
 import { CryptoDepositsService } from './chains/deposits.service.js';
 import { signerInSandbox } from './custody/check.js';
 import { type Screening, screenerKeys, screeners } from './custody/screening.js';
@@ -40,7 +40,7 @@ const checkScheduleMs = [minute, 2 * minute, 5 * minute, 10 * minute, 30 * minut
 /** Admins are told once a withdrawal has waited this long for the signer or the chain. */
 const stuckAfterMs = 2 * hour;
 /** Withdrawals go on the chains BitoCard can check them on (Solana waits for its chain reader). */
-export const withdrawalChains: readonly Chain[] = ['ETHEREUM', 'BSC', 'TRON', 'BITCOIN'];
+export const withdrawalChains: readonly Chain[] = ['ETHEREUM', 'BSC', 'POLYGON', 'ARBITRUM', 'BASE', 'OPTIMISM', 'TRON', 'BITCOIN', 'LITECOIN', 'DOGECOIN'];
 
 const unavailable = (message: string, param?: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawals_unavailable', message, param);
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -50,14 +50,27 @@ const open = ['awaiting_code', 'review', 'queued', 'submitting', 'broadcast', 'c
 const bitcoinCheck = base58check(sha256Bytes);
 
 /**
+ * Each Bitcoin-style chain's address forms on its main and test networks: the SegWit prefix (none for Dogecoin, which
+ * has no SegWit) and the base58check version bytes of its legacy pay-to-key-hash and script-hash addresses.
+ */
+const utxoForms: Record<'BITCOIN' | 'LITECOIN' | 'DOGECOIN', { live: { hrp: string | null; versions: number[] }; test: { hrp: string | null; versions: number[] } }> = {
+  BITCOIN: { live: { hrp: 'bc', versions: [0x00, 0x05] }, test: { hrp: 'tb', versions: [0x6f, 0xc4] } },
+  // Litecoin: L… and M… (and the old 3…); testnet m/n… and Q….
+  LITECOIN: { live: { hrp: 'ltc', versions: [0x30, 0x32, 0x05] }, test: { hrp: 'tltc', versions: [0x6f, 0x3a, 0xc4] } },
+  // Dogecoin: D… and A…/9…; testnet n… and 2….
+  DOGECOIN: { live: { hrp: null, versions: [0x1e, 0x16] }, test: { hrp: null, versions: [0x71, 0xc4] } },
+};
+
+/**
  * A withdrawal address in its standard form, or null when it is not a valid address on that chain's network (main
  * networks for live stores, test networks for sandbox stores): EVM checksummed (a mixed-case address must have a valid
- * checksum), TRON base58check, Bitcoin SegWit (bech32), Taproot (bech32m) and legacy (base58check), Solana base58.
+ * checksum), TRON base58check, Bitcoin and Litecoin SegWit (bech32), Taproot (bech32m) and legacy (base58check),
+ * Dogecoin legacy, Solana base58.
  */
 export function withdrawalAddress(chain: Chain, input: string, testnet: boolean): string | null {
   const address = input.trim();
   try {
-    if (chain === 'ETHEREUM' || chain === 'BSC') {
+    if (isEvm(chain)) {
       if (!/^0x[0-9a-fA-F]{40}$/.test(address) || /^0x0{40}$/.test(address)) return null;
       const lower = address === address.toLowerCase() || address === `0x${address.slice(2).toUpperCase()}`;
       if (!lower && checksumAddress(address) !== address) return null;
@@ -65,9 +78,11 @@ export function withdrawalAddress(chain: Chain, input: string, testnet: boolean)
     }
     if (chain === 'TRON') return tronToHex(address) ? address : null;
     if (chain === 'SOLANA') return base58.decode(address).length === 32 ? address : null;
+    if (chain !== 'BITCOIN' && chain !== 'LITECOIN' && chain !== 'DOGECOIN') return null;
+    const forms = utxoForms[chain][testnet ? 'test' : 'live'];
     const lower = address.toLowerCase();
-    const hrp = testnet ? 'tb' : 'bc';
-    if (lower.startsWith(`${hrp}1`)) {
+    const hrp = forms.hrp;
+    if (hrp && lower.startsWith(`${hrp}1`)) {
       if (address !== lower && address !== address.toUpperCase()) return null;
       const version = (() => {
         try {
@@ -84,8 +99,7 @@ export function withdrawalAddress(chain: Chain, input: string, testnet: boolean)
       return lower;
     }
     const bytes = bitcoinCheck.decode(address);
-    const versions = testnet ? [0x6f, 0xc4] : [0x00, 0x05];
-    return bytes.length === 21 && versions.includes(bytes[0]) ? address : null;
+    return bytes.length === 21 && forms.versions.includes(bytes[0]) ? address : null;
   } catch {
     return null;
   }

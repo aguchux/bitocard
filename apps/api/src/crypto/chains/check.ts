@@ -51,7 +51,7 @@ export function checkWalletKeys(values: ChainProviderValues): CheckOutcome {
       if (!xpub) continue;
       try {
         const { testnet } = parseXpub(xpub);
-        if (testnet !== (mode === 'test') && family === 'bitcoin') throw new InvalidXpubError(mode === 'test' ? 'a mainnet key where a testnet key belongs' : 'a testnet key where a mainnet key belongs');
+        if (testnet !== (mode === 'test') && ['bitcoin', 'litecoin', 'dogecoin'].includes(family)) throw new InvalidXpubError(mode === 'test' ? 'a mainnet key where a testnet key belongs' : 'a testnet key where a mainnet key belongs');
         lines.push(`${family} ${mode}: first address ${deriveAddress(family, xpub, 0)}`);
       } catch (error) {
         ok = false;

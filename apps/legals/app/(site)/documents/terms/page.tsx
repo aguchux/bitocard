@@ -54,7 +54,7 @@ export default function TermsOfUse() {
 
         <h3 id="crypto-custody">How we hold your crypto</h3>
         <ul>
-          <li>You can hold USDT, USDC, BTC, ETH and BNB, on the networks we show for each coin when you deposit or withdraw. We may add or remove coins and networks.</li>
+          <li>You can hold USDT, USDC, BTC, ETH, BNB, POL, TRX, LTC and DOGE, on the networks we show for each coin when you deposit or withdraw. Some coins come on several networks (for example ETH on Ethereum, Arbitrum, Base and OP Mainnet): your balance is the same whichever network it arrived on, but send each deposit only on a network we show for it. We may add or remove coins and networks.</li>
           <li>We hold your crypto for you in wallets BitoCard controls. Their keys are kept in a key management service behind our signing service, and you do not hold them: you move your crypto only through BitoCard, as described here. The crypto we hold for customers is held together in BitoCard&apos;s wallets, and how much of it is yours is recorded in our records, which your balance shows.</li>
           <li>We check every day that our wallets hold what our records say we hold for customers.</li>
           <li>Your crypto balance is not a bank deposit or e-money. We do not pay interest on it, and we do not lend, stake or invest it.</li>
@@ -75,7 +75,7 @@ export default function TermsOfUse() {
         <ul>
           <li>You get your own deposit address for each network. Send only the coin shown, on the network shown. A different coin or token, the wrong network, or the wrong address may be lost, and we may not be able to recover it.</li>
           <li>We credit a deposit only once it has the number of network confirmations we require for that network. Larger deposits are also checked through a second, independent source first. Deposits can take longer when a network is busy or our providers cannot be reached.</li>
-          <li>We record each coin to 6 decimal places (USDT and USDC) or 8 (BTC, ETH and BNB). Anything smaller is not credited.</li>
+          <li>We record each coin to 6 decimal places (USDT, USDC and TRX) or 8 (BTC, ETH, BNB, POL, LTC and DOGE). Anything smaller is not credited.</li>
         </ul>
 
         <h3 id="crypto-withdrawals">Withdrawals</h3>

@@ -3,7 +3,7 @@ import { keccak_256 } from '@noble/hashes/sha3.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { IntegrationField } from '../../integrations/definitions.js';
 import type { IntegrationLink } from '../../integrations/links.js';
-import { BitcoinRpcClient, BlockCypherClient, type Chain, type ChainClient, type Endpoint, EsploraClient, EvmClient, SolanaClient, TronClient } from './client.js';
+import { BitcoinRpcClient, BlockCypherClient, type Chain, type ChainClient, chainNames, type Endpoint, EsploraClient, EvmClient, SolanaClient, TronClient } from './client.js';
 
 /**
  * The blockchain providers BitoCard rents to read chains (Settings > Integrations > Blockchain). Each is an
@@ -56,67 +56,92 @@ export function same(a: string | undefined, b: string | undefined) {
 const hmac = (algorithm: 'sha256' | 'sha512', key: string, body: string, encoding: 'hex' | 'base64') => createHmac(algorithm, key).update(body).digest(encoding);
 
 /** Per-chain address fields for providers that give one address per chain and network (QuickNode, GetBlock, Chainstack). */
-const perChain = (id: string, chainsOffered: Chain[], where: string) =>
-  chainsOffered.map(chain => url(`${id}_${chain}_URL`, `${chain === 'BSC' ? 'BNB Chain' : chain.charAt(0) + chain.slice(1).toLowerCase()} endpoint`, `${where} With the Sandbox switch on, paste the test network’s endpoint instead.`));
+const perChain = (id: string, chainsOffered: readonly Chain[], where: string) =>
+  chainsOffered.map(chain => url(`${id}_${chain}_URL`, `${chainNames[chain]} endpoint`, `${where} With the Sandbox switch on, paste the test network’s endpoint instead.`));
+
+/** The EVM networks beyond Ethereum and BNB Chain, which the same customer address serves. */
+const moreEvm = ['POLYGON', 'ARBITRUM', 'BASE', 'OPTIMISM'] as const satisfies readonly Chain[];
+/** Each chain's client for pasted endpoints (one per chain), by protocol. */
+const pastedClients = (values: ChainProviderValues, id: string, chainsOffered: readonly Chain[]) =>
+  Object.fromEntries(
+    chainsOffered.map(chain => {
+      const endpoint = pasted(values[`${id}_${chain}_URL`]);
+      const client = ['TRON'].includes(chain) ? tron(endpoint) : chain === 'SOLANA' ? solana(endpoint) : ['BITCOIN', 'LITECOIN', 'DOGECOIN'].includes(chain) ? bitcoinRpc(endpoint) : evm(endpoint);
+      return [chain, client];
+    }),
+  ) as Partial<Record<Chain, ChainClient | null>>;
+
+const quicknodeChains = ['ETHEREUM', 'BSC', ...moreEvm, 'TRON', 'BITCOIN', 'SOLANA'] as const satisfies readonly Chain[];
+const getblockChains = ['ETHEREUM', 'BSC', ...moreEvm, 'TRON', 'BITCOIN', 'LITECOIN', 'DOGECOIN', 'SOLANA'] as const satisfies readonly Chain[];
+const chainstackChains = ['ETHEREUM', 'BSC', ...moreEvm, 'TRON', 'BITCOIN', 'SOLANA'] as const satisfies readonly Chain[];
 
 export const chainProviders: ChainProvider[] = [
   {
     id: 'alchemy',
     name: 'Alchemy',
-    description: 'Ethereum, BNB Chain and Solana. Also finds plain ETH and BNB deposits (its transfers API), which standard nodes cannot list.',
+    description: 'Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism and Solana. Also finds plain coin deposits (ETH, BNB, POL; its transfers API), which standard nodes cannot list.',
     fields: [
-      secret('ALCHEMY_API_KEY', 'API key', 'Alchemy dashboard > Apps > your app > API key. Enable Ethereum, BNB Smart Chain and Solana on the app.'),
+      secret('ALCHEMY_API_KEY', 'API key', 'Alchemy dashboard > Apps > your app > API key. Enable Ethereum, BNB Smart Chain, Polygon PoS, Arbitrum, Base, OP Mainnet and Solana on the app.'),
       secret('ALCHEMY_WEBHOOK_SIGNING_KEY', 'Webhook signing key', 'Alchemy dashboard > Webhooks > your Address Activity webhook > Signing key.', false),
-      sandbox('ALCHEMY', 'On: Sepolia, BNB testnet and Solana devnet (sandbox stores). Off: main networks (live).'),
+      sandbox('ALCHEMY', 'On: the test networks (Sepolia and its rollups, BNB testnet, Polygon Amoy, Solana devnet; sandbox stores). Off: main networks (live).'),
     ],
     links: [{ label: 'Sign up', url: 'https://dashboard.alchemy.com/signup' }, { label: 'Webhooks', url: 'https://dashboard.alchemy.com/webhooks' }, { label: 'API docs', url: 'https://docs.alchemy.com/' }],
     endpoints: (values, environment) => {
       const key = values.ALCHEMY_API_KEY;
       const at = (live: string, test: string): Endpoint | null => (key ? { url: `https://${environment === 'live' ? live : test}.g.alchemy.com/v2/${key}`, flavor: 'alchemy' } : null);
-      return { ETHEREUM: evm(at('eth-mainnet', 'eth-sepolia')), BSC: evm(at('bnb-mainnet', 'bnb-testnet')), SOLANA: solana(at('solana-mainnet', 'solana-devnet')) };
+      return {
+        ETHEREUM: evm(at('eth-mainnet', 'eth-sepolia')),
+        BSC: evm(at('bnb-mainnet', 'bnb-testnet')),
+        POLYGON: evm(at('polygon-mainnet', 'polygon-amoy')),
+        ARBITRUM: evm(at('arb-mainnet', 'arb-sepolia')),
+        BASE: evm(at('base-mainnet', 'base-sepolia')),
+        OPTIMISM: evm(at('opt-mainnet', 'opt-sepolia')),
+        SOLANA: solana(at('solana-mainnet', 'solana-devnet')),
+      };
     },
     verify: ({ headers, body }, values) => Boolean(values.ALCHEMY_WEBHOOK_SIGNING_KEY) && same(header(headers, 'x-alchemy-signature'), hmac('sha256', values.ALCHEMY_WEBHOOK_SIGNING_KEY!, body, 'hex')),
-    webhookHelp: 'Create an Address Activity webhook per network pointing here (add ?chain=ETHEREUM or ?chain=BSC).',
+    webhookHelp: 'Create an Address Activity webhook per network pointing here (add ?chain=ETHEREUM, BSC, POLYGON, ARBITRUM, BASE or OPTIMISM).',
   },
   {
     id: 'quicknode',
     name: 'QuickNode',
-    description: 'Every chain BitoCard uses: Ethereum, BNB Chain, TRON, Bitcoin and Solana, each through its own endpoint.',
+    description: 'Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism, TRON, Bitcoin and Solana, each through its own endpoint.',
     fields: [
-      ...perChain('QUICKNODE', ['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'], 'QuickNode dashboard > Endpoints > the endpoint’s HTTP Provider address (it includes your token).'),
+      ...perChain('QUICKNODE', quicknodeChains, 'QuickNode dashboard > Endpoints > the endpoint’s HTTP Provider address (it includes your token).'),
       secret('QUICKNODE_WEBHOOK_SECRET', 'Streams security token', 'QuickNode > Streams > your stream > Security token.', false),
       sandbox('QUICKNODE', 'On: the endpoints pasted are test network endpoints (sandbox stores). Off: main networks (live).'),
     ],
     links: [{ label: 'Sign up', url: 'https://dashboard.quicknode.com/' }, { label: 'API docs', url: 'https://www.quicknode.com/docs' }],
-    endpoints: values => ({
-      ETHEREUM: evm(pasted(values.QUICKNODE_ETHEREUM_URL)),
-      BSC: evm(pasted(values.QUICKNODE_BSC_URL)),
-      TRON: tron(pasted(values.QUICKNODE_TRON_URL)),
-      BITCOIN: bitcoinRpc(pasted(values.QUICKNODE_BITCOIN_URL)),
-      SOLANA: solana(pasted(values.QUICKNODE_SOLANA_URL)),
-    }),
+    endpoints: values => pastedClients(values, 'QUICKNODE', quicknodeChains),
     verify: ({ headers, body }, values) =>
       Boolean(values.QUICKNODE_WEBHOOK_SECRET) &&
       same(header(headers, 'x-qn-signature'), hmac('sha256', values.QUICKNODE_WEBHOOK_SECRET!, `${header(headers, 'x-qn-nonce') ?? ''}${header(headers, 'x-qn-timestamp') ?? ''}${body}`, 'hex')),
-    webhookHelp: 'Create a Stream per chain with this destination (add ?chain=ETHEREUM, BSC, TRON or BITCOIN).',
+    webhookHelp: 'Create a Stream per chain with this destination (add ?chain= and the chain, for example ETHEREUM, POLYGON, TRON or BITCOIN).',
   },
   {
     id: 'infura',
     name: 'Infura',
-    description: 'Ethereum and BNB Chain nodes (standard JSON-RPC). No webhooks: deposits are found by scanning.',
-    fields: [secret('INFURA_API_KEY', 'API key', 'Infura dashboard > API keys > your key. Enable Ethereum and BNB Smart Chain.'), sandbox('INFURA', 'On: Sepolia and BNB testnet (sandbox stores). Off: main networks (live).')],
+    description: 'Ethereum, BNB Chain, Polygon, Arbitrum, Base and Optimism nodes (standard JSON-RPC). No webhooks: deposits are found by scanning.',
+    fields: [secret('INFURA_API_KEY', 'API key', 'Infura dashboard > API keys > your key. Enable Ethereum, BNB Smart Chain, Polygon, Arbitrum, Base and Optimism.'), sandbox('INFURA', 'On: the test networks (Sepolia and its rollups, BNB testnet, Polygon Amoy; sandbox stores). Off: main networks (live).')],
     links: [{ label: 'Sign up', url: 'https://app.infura.io/register' }, { label: 'API docs', url: 'https://docs.metamask.io/services/' }],
     endpoints: (values, environment) => {
       const key = values.INFURA_API_KEY;
       const at = (live: string, test: string): Endpoint | null => (key ? { url: `https://${environment === 'live' ? live : test}.infura.io/v3/${key}` } : null);
-      return { ETHEREUM: evm(at('mainnet', 'sepolia')), BSC: evm(at('bsc-mainnet', 'bsc-testnet')) };
+      return {
+        ETHEREUM: evm(at('mainnet', 'sepolia')),
+        BSC: evm(at('bsc-mainnet', 'bsc-testnet')),
+        POLYGON: evm(at('polygon-mainnet', 'polygon-amoy')),
+        ARBITRUM: evm(at('arbitrum-mainnet', 'arbitrum-sepolia')),
+        BASE: evm(at('base-mainnet', 'base-sepolia')),
+        OPTIMISM: evm(at('optimism-mainnet', 'optimism-sepolia')),
+      };
     },
   },
   {
     id: 'ankr',
     name: 'Ankr',
-    description: 'Low-cost nodes for Ethereum, BNB Chain, TRON and Solana.',
-    fields: [secret('ANKR_API_KEY', 'API key', 'Ankr RPC dashboard > your project token.'), sandbox('ANKR', 'On: Sepolia, BNB testnet and Solana devnet (sandbox stores). Off: main networks (live).')],
+    description: 'Low-cost nodes for Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism, TRON and Solana.',
+    fields: [secret('ANKR_API_KEY', 'API key', 'Ankr RPC dashboard > your project token.'), sandbox('ANKR', 'On: the test networks (Sepolia and its rollups, BNB testnet, Polygon Amoy, Solana devnet; sandbox stores). Off: main networks (live).')],
     links: [{ label: 'Sign up', url: 'https://www.ankr.com/rpc/' }, { label: 'API docs', url: 'https://www.ankr.com/docs/rpc-service/' }],
     endpoints: (values, environment) => {
       const key = values.ANKR_API_KEY;
@@ -124,6 +149,10 @@ export const chainProviders: ChainProvider[] = [
       return {
         ETHEREUM: evm(at('eth', 'eth_sepolia')),
         BSC: evm(at('bsc', 'bsc_testnet_chapel')),
+        POLYGON: evm(at('polygon', 'polygon_amoy')),
+        ARBITRUM: evm(at('arbitrum', 'arbitrum_sepolia')),
+        BASE: evm(at('base', 'base_sepolia')),
+        OPTIMISM: evm(at('optimism', 'optimism_sepolia')),
         SOLANA: solana(at('solana', 'solana_devnet')),
         TRON: tron(key && environment === 'live' ? { url: `https://rpc.ankr.com/premium-http/tron/${key}` } : null),
       };
@@ -144,44 +173,32 @@ export const chainProviders: ChainProvider[] = [
   {
     id: 'getblock',
     name: 'GetBlock',
-    description: 'Shared or dedicated nodes for every chain BitoCard uses, each through its own endpoint.',
-    fields: [...perChain('GETBLOCK', ['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'], 'GetBlock dashboard > Endpoints > the endpoint address (it includes your access token).'), sandbox('GETBLOCK', 'On: the endpoints pasted are test network endpoints (sandbox stores). Off: main networks (live).')],
+    description: 'Shared or dedicated nodes for every chain BitoCard uses (Litecoin and Dogecoin included), each through its own endpoint.',
+    fields: [...perChain('GETBLOCK', getblockChains, 'GetBlock dashboard > Endpoints > the endpoint address (it includes your access token).'), sandbox('GETBLOCK', 'On: the endpoints pasted are test network endpoints (sandbox stores). Off: main networks (live).')],
     links: [{ label: 'Sign up', url: 'https://account.getblock.io/sign-up' }, { label: 'API docs', url: 'https://docs.getblock.io/' }],
-    endpoints: values => ({
-      ETHEREUM: evm(pasted(values.GETBLOCK_ETHEREUM_URL)),
-      BSC: evm(pasted(values.GETBLOCK_BSC_URL)),
-      TRON: tron(pasted(values.GETBLOCK_TRON_URL)),
-      BITCOIN: bitcoinRpc(pasted(values.GETBLOCK_BITCOIN_URL)),
-      SOLANA: solana(pasted(values.GETBLOCK_SOLANA_URL)),
-    }),
+    endpoints: values => pastedClients(values, 'GETBLOCK', getblockChains),
   },
   {
     id: 'chainstack',
     name: 'Chainstack',
-    description: 'Dedicated or shared nodes for every chain BitoCard uses, each through its own endpoint.',
-    fields: [...perChain('CHAINSTACK', ['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'], 'Chainstack console > your node > Access and credentials > HTTPS endpoint.'), sandbox('CHAINSTACK', 'On: the endpoints pasted are test network endpoints (sandbox stores). Off: main networks (live).')],
+    description: 'Dedicated or shared nodes for the EVM networks, TRON, Bitcoin and Solana, each through its own endpoint.',
+    fields: [...perChain('CHAINSTACK', chainstackChains, 'Chainstack console > your node > Access and credentials > HTTPS endpoint.'), sandbox('CHAINSTACK', 'On: the endpoints pasted are test network endpoints (sandbox stores). Off: main networks (live).')],
     links: [{ label: 'Sign up', url: 'https://console.chainstack.com/user/account/create' }, { label: 'API docs', url: 'https://docs.chainstack.com/' }],
-    endpoints: values => ({
-      ETHEREUM: evm(pasted(values.CHAINSTACK_ETHEREUM_URL)),
-      BSC: evm(pasted(values.CHAINSTACK_BSC_URL)),
-      TRON: tron(pasted(values.CHAINSTACK_TRON_URL)),
-      BITCOIN: bitcoinRpc(pasted(values.CHAINSTACK_BITCOIN_URL)),
-      SOLANA: solana(pasted(values.CHAINSTACK_SOLANA_URL)),
-    }),
+    endpoints: values => pastedClients(values, 'CHAINSTACK', chainstackChains),
   },
   {
     id: 'moralis',
     name: 'Moralis',
-    description: 'Ethereum and BNB Chain nodes, and Streams: webhooks for transfers to watched addresses.',
+    description: 'EVM nodes (Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism), and Streams: webhooks for transfers to watched addresses.',
     fields: [
-      ...perChain('MORALIS', ['ETHEREUM', 'BSC'], 'Moralis admin > Nodes > the node address.'),
+      ...perChain('MORALIS', ['ETHEREUM', 'BSC', ...moreEvm], 'Moralis admin > Nodes > the node address.'),
       secret('MORALIS_STREAM_SECRET', 'Streams secret', 'Moralis admin > Settings > Secrets (verifies Streams webhooks).', false),
       sandbox('MORALIS', 'On: the nodes pasted are test network nodes (sandbox stores). Off: main networks (live).'),
     ],
     links: [{ label: 'Sign up', url: 'https://admin.moralis.com/register' }, { label: 'API docs', url: 'https://docs.moralis.com/' }],
-    endpoints: values => ({ ETHEREUM: evm(pasted(values.MORALIS_ETHEREUM_URL)), BSC: evm(pasted(values.MORALIS_BSC_URL)) }),
+    endpoints: values => pastedClients(values, 'MORALIS', ['ETHEREUM', 'BSC', ...moreEvm]),
     verify: ({ headers, body }, values) => Boolean(values.MORALIS_STREAM_SECRET) && same(header(headers, 'x-signature'), `0x${bytesToHex(keccak_256(new TextEncoder().encode(body + values.MORALIS_STREAM_SECRET)))}`),
-    webhookHelp: 'Create a Stream per chain with this webhook address (add ?chain=ETHEREUM or ?chain=BSC).',
+    webhookHelp: 'Create a Stream per chain with this webhook address (add ?chain=ETHEREUM, BSC, POLYGON, ARBITRUM, BASE or OPTIMISM).',
   },
   {
     id: 'helius',
@@ -200,7 +217,7 @@ export const chainProviders: ChainProvider[] = [
   {
     id: 'trongrid',
     name: 'TronGrid',
-    description: 'TRON’s own API (USDT on TRON). Lists each address’s token deposits, so TRON deposits are found quickly.',
+    description: 'TRON’s own API (TRX and USDT on TRON). Lists each address’s TRX and token deposits, so TRON deposits are found quickly.',
     fields: [secret('TRONGRID_API_KEY', 'API key', 'TronGrid dashboard > API keys (sent as TRON-PRO-API-KEY).'), sandbox('TRONGRID', 'On: the Nile test network (sandbox stores). Off: mainnet (live).')],
     links: [{ label: 'Sign up', url: 'https://www.trongrid.io/register' }, { label: 'API docs', url: 'https://developers.tron.network/reference' }],
     endpoints: (values, environment) => ({
@@ -234,18 +251,21 @@ export const chainProviders: ChainProvider[] = [
   {
     id: 'blockcypher',
     name: 'BlockCypher',
-    description: 'Bitcoin (address history and webhooks). Lists each address’s deposits.',
+    description: 'Bitcoin, Litecoin and Dogecoin (address history and webhooks). Lists each address’s deposits. Its test networks are Bitcoin’s only.',
     fields: [
       secret('BLOCKCYPHER_TOKEN', 'API token', 'BlockCypher accounts > your token.'),
       secret('BLOCKCYPHER_WEBHOOK_TOKEN', 'Webhook token', 'Choose a long random value; BitoCard adds it to the webhook address it gives BlockCypher (BlockCypher signs nothing).', false),
       sandbox('BLOCKCYPHER', 'On: Bitcoin testnet (sandbox stores). Off: mainnet (live).'),
     ],
     links: [{ label: 'Sign up', url: 'https://accounts.blockcypher.com/signup' }, { label: 'API docs', url: 'https://www.blockcypher.com/dev/bitcoin/' }],
-    endpoints: (values, environment) => ({
-      BITCOIN: values.BLOCKCYPHER_TOKEN ? new BlockCypherClient({ url: `https://api.blockcypher.com/v1/btc/${environment === 'live' ? 'main' : 'test3'}`, token: values.BLOCKCYPHER_TOKEN }) : null,
-    }),
+    endpoints: (values, environment) => {
+      const token = values.BLOCKCYPHER_TOKEN;
+      const at = (coin: string, test: string | null) => (token && (environment === 'live' || test) ? new BlockCypherClient({ url: `https://api.blockcypher.com/v1/${coin}/${environment === 'live' ? 'main' : test}`, token }) : null);
+      // BlockCypher has no Litecoin or Dogecoin test network.
+      return { BITCOIN: at('btc', 'test3'), LITECOIN: at('ltc', null), DOGECOIN: at('doge', null) };
+    },
     verify: ({ url: address }, values) => same(address.searchParams.get('token') ?? undefined, values.BLOCKCYPHER_WEBHOOK_TOKEN),
-    webhookHelp: 'Add a webhook for each address with this URL plus &token=<webhook token> (add ?chain=BITCOIN).',
+    webhookHelp: 'Add a webhook for each address with this URL plus &token=<webhook token> (add ?chain=BITCOIN, LITECOIN or DOGECOIN).',
   },
   {
     id: 'mempool',
@@ -267,14 +287,24 @@ export const chainProviders: ChainProvider[] = [
       BITCOIN: values.BLOCKSTREAM_ENABLED === 'on' ? new EsploraClient({ url: values.BLOCKSTREAM_API_URL || (environment === 'live' ? 'https://blockstream.info/api' : 'https://blockstream.info/testnet/api') }) : null,
     }),
   },
+  {
+    id: 'litecoinspace',
+    name: 'litecoinspace.org',
+    description: 'Litecoin (Esplora API, mempool.space’s Litecoin explorer): address history, so Litecoin deposits are found by scanning. Needs no account.',
+    fields: [enabled('LITECOINSPACE'), field('LITECOINSPACE_API_URL', 'API address', { kind: 'url', help: 'Default: https://litecoinspace.org/api (sandbox: https://litecoinspace.org/testnet/api).' }), sandbox('LITECOINSPACE', 'On: Litecoin testnet (sandbox stores). Off: mainnet (live).')],
+    links: [{ label: 'Website', url: 'https://litecoinspace.org/' }, { label: 'API docs (Esplora, as mempool.space)', url: 'https://mempool.space/docs/api/rest' }],
+    endpoints: (values, environment) => ({
+      LITECOIN: values.LITECOINSPACE_ENABLED === 'on' ? new EsploraClient({ url: values.LITECOINSPACE_API_URL || (environment === 'live' ? 'https://litecoinspace.org/api' : 'https://litecoinspace.org/testnet/api') }) : null,
+    }),
+  },
 ];
 
 /** BitoCard's wallet keys: account xpubs (public: they make addresses, never spend). */
 export const walletKeyFields: IntegrationField[] = [
-  ...(['BITCOIN', 'EVM', 'TRON'] as const).flatMap(family => {
-    const path = { BITCOIN: "m/84'/0'/0' (zpub or xpub)", EVM: "m/44'/60'/0'", TRON: "m/44'/195'/0'" }[family];
-    const testPath = { BITCOIN: "m/84'/1'/0' (vpub or tpub)", EVM: "m/44'/60'/0'", TRON: "m/44'/195'/0'" }[family];
-    const name = { BITCOIN: 'Bitcoin', EVM: 'Ethereum and BNB Chain', TRON: 'TRON' }[family];
+  ...(['BITCOIN', 'EVM', 'TRON', 'LITECOIN', 'DOGECOIN'] as const).flatMap(family => {
+    const path = { BITCOIN: "m/84'/0'/0' (zpub or xpub)", EVM: "m/44'/60'/0'", TRON: "m/44'/195'/0'", LITECOIN: "m/84'/2'/0' (Ltub, Mtub or xpub)", DOGECOIN: "m/44'/3'/0' (dgub or xpub)" }[family];
+    const testPath = { BITCOIN: "m/84'/1'/0' (vpub or tpub)", EVM: "m/44'/60'/0'", TRON: "m/44'/195'/0'", LITECOIN: "m/84'/1'/0' (ttub or tpub)", DOGECOIN: "m/44'/1'/0' (tgub or tpub)" }[family];
+    const name = { BITCOIN: 'Bitcoin', EVM: 'EVM networks (Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism)', TRON: 'TRON', LITECOIN: 'Litecoin', DOGECOIN: 'Dogecoin' }[family];
     return [
       secret(`CRYPTO_XPUB_${family}`, `${name} account key (live)`, `The account extended public key at ${path}, exported from the key vault. Customers' live addresses are derived from it. Changing it gives new customers new addresses; addresses already issued stay watched.`, false),
       secret(`CRYPTO_TEST_XPUB_${family}`, `${name} account key (sandbox)`, `A test network key at ${testPath}, for sandbox stores. Never a live key.`, false),

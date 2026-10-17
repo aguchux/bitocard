@@ -41,11 +41,21 @@ export function CryptoNav({ current }: { current: string }) {
 }
 
 /** A coin's round badge: its code's first letters on its colour (no outside images). */
-const coinColours: Record<string, string> = { USDT: "bg-emerald-500", USDC: "bg-blue-600", BTC: "bg-orange-500", ETH: "bg-indigo-600", BNB: "bg-yellow-400 text-navy-900" };
+const coinColours: Record<string, string> = {
+  USDT: "bg-emerald-500",
+  USDC: "bg-blue-600",
+  BTC: "bg-orange-500",
+  ETH: "bg-indigo-600",
+  BNB: "bg-yellow-400 text-navy-900",
+  POL: "bg-violet-600",
+  TRX: "bg-red-600",
+  LTC: "bg-slate-600",
+  DOGE: "bg-amber-500 text-navy-900",
+};
 export function CoinBadge({ asset, size = "size-10" }: { asset: string; size?: string }) {
   return (
     <span className={`grid ${size} shrink-0 place-items-center rounded-full text-[11px] font-extrabold text-white ${coinColours[asset] ?? "bg-slate-500"}`} aria-hidden="true">
-      {asset.slice(0, asset === "USDT" || asset === "USDC" ? 4 : 3)}
+      {asset.slice(0, asset.length === 4 ? 4 : 3)}
     </span>
   );
 }

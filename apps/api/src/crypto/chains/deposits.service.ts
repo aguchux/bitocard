@@ -13,7 +13,7 @@ import { fromUnits, maxUnits, toUnits } from '../amounts.js';
 import { CryptoWalletsService, notFound } from '../crypto-wallets.service.js';
 import { type AddressFamily, deriveAddress, xpubFingerprint } from '../derive.js';
 import { providerKeys } from './check.js';
-import { type Chain, type ChainClient, ChainError, chainFamily, chainNames, chains, checkNetwork, type Inspection, normaliseAddress, normaliseContract, normaliseHash, type Transfer } from './client.js';
+import { type Chain, type ChainClient, ChainError, chainFamily, chainNames, chains, checkNetwork, type Inspection, isEvm, normaliseAddress, normaliseContract, normaliseHash, tokenStandard, type Transfer } from './client.js';
 import { type ChainProvider, chainProvider, chainProviders, providerChains, providerInSandbox } from './providers.js';
 
 /** How long an address shown to a customer is watched for deposits (renewed each time it is shown). */
@@ -54,9 +54,9 @@ export function ledgerUnits(raw: bigint, chainDecimals: number, assetDecimals: n
   return chainDecimals >= assetDecimals ? raw / 10n ** BigInt(chainDecimals - assetDecimals) : raw * 10n ** BigInt(assetDecimals - chainDecimals);
 }
 
-/** Transaction hashes in a provider's notification, whatever its shape: 0x… (EVM), 64 hex (TRON, Bitcoin). */
+/** Transaction hashes in a provider's notification, whatever its shape: 0x… (EVM), 64 hex (TRON, Bitcoin, Litecoin, Dogecoin). */
 export function hashesIn(body: string, chain: Chain) {
-  const pattern = chain === 'ETHEREUM' || chain === 'BSC' ? /0x[0-9a-fA-F]{64}/g : /\b[0-9a-fA-F]{64}\b/g;
+  const pattern = isEvm(chain) ? /0x[0-9a-fA-F]{64}/g : /\b[0-9a-fA-F]{64}\b/g;
   // In one case, so a hash written in capitals is the same transaction.
   return [...new Set((body.match(pattern) ?? []).map(normaliseHash))].slice(0, 100);
 }
@@ -164,7 +164,7 @@ export class CryptoDepositsService {
       if (family === 'solana') continue;
       if (network.contract && !(context.mode === 'live' ? network.contract : network.testContract)) continue;
       if (!this.xpub(family, context.mode) || !(await this.routes(chain, context.mode)).length) continue;
-      usable.push({ object: 'crypto_network' as const, asset: found.code, chain, name: chainNames[chain], token: network.contract ? (chain === 'TRON' ? 'TRC-20' : chain === 'BSC' ? 'BEP-20' : 'ERC-20') : null, confirmations: network.confirmations });
+      usable.push({ object: 'crypto_network' as const, asset: found.code, chain, name: chainNames[chain], token: network.contract ? tokenStandard(chain) : null, confirmations: network.confirmations });
     }
     return { object: 'list' as const, data: usable };
   }
@@ -297,7 +297,7 @@ export class CryptoDepositsService {
     const family = chainFamily[chain];
     const networks = await this.networksFor(chain, mode);
     if (!networks.length) return { skipped: 'no networks' };
-    const evm = chain === 'ETHEREUM' || chain === 'BSC';
+    const evm = isEvm(chain);
     const now = new Date();
     const watched = await this.prisma.cryptoAddress.findMany({ where: { mode, family, watchUntil: { gt: now } }, orderBy: [{ watchUntil: 'desc' }, { index: 'asc' }], take: watchBatch });
     // Everything else, including watched addresses beyond the batch, is swept in turn (its whole history is read).
@@ -368,7 +368,7 @@ export class CryptoDepositsService {
         swept.push(...sweep.map(item => item.id));
       }
     } else {
-      // TRON and Bitcoin list each address's own recent history: watched addresses every run, the rest in turn.
+      // TRON and the Bitcoin-style chains list each address's own recent history: watched addresses every run, the rest in turn.
       const sweptIds = new Set(sweep.map(item => item.id));
       await batches([...watched, ...sweep], addressChunk, async part => {
         const addresses = part.map(item => normaliseAddress(chain, item.address));

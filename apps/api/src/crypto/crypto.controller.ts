@@ -8,6 +8,7 @@ import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { chains } from './chains/client.js';
 import { CryptoDepositsService } from './chains/deposits.service.js';
 import { CryptoWalletsService, presentAsset } from './crypto-wallets.service.js';
 import { type AdSide, P2pService } from './p2p.service.js';
@@ -150,7 +151,7 @@ class DepositNetworksDto {
 }
 
 class DepositAddressDto extends DepositNetworksDto {
-  @Transform(upper) @IsIn(['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'])
+  @Transform(upper) @IsIn([...chains])
   chain: string;
 }
 
@@ -201,7 +202,7 @@ export class CustomerCryptoController {
 }
 
 class WithdrawalAddressDto {
-  @Transform(upper) @IsIn(['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'])
+  @Transform(upper) @IsIn([...chains])
   chain: string;
 
   @IsString() @Length(20, 100)
@@ -215,7 +216,7 @@ class WithdrawalDto {
   @Transform(upper) @assetCode()
   asset: string;
 
-  @Transform(upper) @IsIn(['ETHEREUM', 'BSC', 'TRON', 'BITCOIN', 'SOLANA'])
+  @Transform(upper) @IsIn([...chains])
   chain: string;
 
   @IsUUID()

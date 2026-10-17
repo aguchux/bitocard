@@ -93,7 +93,7 @@ describe('switched off', () => {
     const shopper = await customer();
     const overview = await shopper.get('/v1/store/crypto');
     assert.deepEqual([overview.status, overview.json.enabled, overview.json.p2p_enabled, overview.json.mode], [200, false, false, 'test']);
-    assert.deepEqual(overview.json.assets.map(item => item.asset), ['USDT', 'USDC', 'BTC', 'ETH', 'BNB']);
+    assert.deepEqual(overview.json.assets.map(item => item.asset), ['USDT', 'USDC', 'BTC', 'ETH', 'BNB', 'POL', 'TRX', 'LTC', 'DOGE']);
     const market = await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy');
     assert.deepEqual([market.status, market.json.error.code], [409, 'crypto_not_enabled']);
     assert.equal((await shopper.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '1' })).json.error.code, 'crypto_not_enabled');

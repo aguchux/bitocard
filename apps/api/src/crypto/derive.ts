@@ -13,15 +13,31 @@ import { HDKey } from '@scure/bip32';
  *
  * Each family's xpub is the account key, and customer `i` gets the external chain's child `0/i`:
  * Bitcoin m/84'/0'/0' (native SegWit, bc1…; testnet m/84'/1'/0', tb1…), EVM m/44'/60'/0' (one 0x… address for
- * Ethereum and BNB Chain), TRON m/44'/195'/0' (T…). Solana keys are hardened only, so its addresses come from the
- * signer, never from an xpub.
+ * every EVM network: Ethereum, BNB Chain, Polygon, Arbitrum, Base, Optimism), TRON m/44'/195'/0' (T…), Litecoin
+ * m/84'/2'/0' (native SegWit, ltc1…; testnet tltc1…) and Dogecoin m/44'/3'/0' (legacy, D…; testnet n…). Solana keys
+ * are hardened only, so its addresses come from the signer, never from an xpub.
  */
-export type AddressFamily = 'bitcoin' | 'evm' | 'tron';
-export const addressFamilies: readonly AddressFamily[] = ['bitcoin', 'evm', 'tron'];
+export type AddressFamily = 'bitcoin' | 'evm' | 'tron' | 'litecoin' | 'dogecoin';
+export const addressFamilies: readonly AddressFamily[] = ['bitcoin', 'evm', 'tron', 'litecoin', 'dogecoin'];
 
-/** Version bytes of the extended public key prefixes people paste: xpub/zpub (mainnet), tpub/vpub (testnet). */
-const versions: Record<string, number> = { xpub: 0x0488b21e, zpub: 0x04b24746, ypub: 0x049d7cb2, tpub: 0x043587cf, vpub: 0x045f1cf6, upub: 0x044a5262 };
-const testnetPrefixes = new Set(['tpub', 'vpub', 'upub']);
+/**
+ * Version bytes of the extended public key prefixes people paste: xpub/ypub/zpub (mainnet), tpub/upub/vpub (testnet),
+ * and the coins' own: Litecoin Ltub/Mtub (testnet ttub), Dogecoin dgub (testnet tgub).
+ */
+const versions: Record<string, number> = {
+  xpub: 0x0488b21e,
+  zpub: 0x04b24746,
+  ypub: 0x049d7cb2,
+  tpub: 0x043587cf,
+  vpub: 0x045f1cf6,
+  upub: 0x044a5262,
+  Ltub: 0x019da462,
+  Mtub: 0x01b26ef6,
+  ttub: 0x0436f6e1,
+  dgub: 0x02facafd,
+  tgub: 0x0432a9a8,
+};
+const testnetPrefixes = new Set(['tpub', 'vpub', 'upub', 'ttub', 'tgub']);
 
 export class InvalidXpubError extends Error {}
 
@@ -30,7 +46,7 @@ export function parseXpub(xpub: string) {
   const text = xpub.trim();
   const prefix = text.slice(0, 4);
   const version = versions[prefix];
-  if (!version) throw new InvalidXpubError('Paste an extended public key starting xpub, zpub, tpub or vpub.');
+  if (!version) throw new InvalidXpubError('Paste an extended public key starting xpub, zpub, tpub or vpub (or Litecoin’s Ltub or Mtub, Dogecoin’s dgub).');
   try {
     const key = HDKey.fromExtendedKey(text, { private: 0, public: version });
     if (key.privateKey) throw new InvalidXpubError('This is a private key. Paste the extended public key only.');
@@ -53,6 +69,19 @@ export function childPublicKey(xpub: string, index: number) {
 export function bitcoinAddress(publicKey: Uint8Array, testnet: boolean) {
   const program = ripemd160(sha256(publicKey));
   return bech32.encode(testnet ? 'tb' : 'bc', [0, ...bech32.toWords(program)]);
+}
+
+const hash160 = (publicKey: Uint8Array) => ripemd160(sha256(publicKey));
+const legacyCheck = base58check(sha256);
+
+/** Litecoin native SegWit (P2WPKH): ltc1… on mainnet, tltc1… on testnet. */
+export function litecoinAddress(publicKey: Uint8Array, testnet: boolean) {
+  return bech32.encode(testnet ? 'tltc' : 'ltc', [0, ...bech32.toWords(hash160(publicKey))]);
+}
+
+/** Dogecoin pay-to-public-key-hash (Dogecoin has no SegWit): D… on mainnet (version 0x1e), n… on testnet (0x71). */
+export function dogecoinAddress(publicKey: Uint8Array, testnet: boolean) {
+  return legacyCheck.encode(Uint8Array.from([testnet ? 0x71 : 0x1e, ...hash160(publicKey)]));
 }
 
 /** The last 20 bytes of keccak256 over the uncompressed key (without its 0x04 prefix). */
@@ -98,6 +127,8 @@ export function deriveAddress(family: AddressFamily, xpub: string, index: number
   const { publicKey, testnet } = childPublicKey(xpub, index);
   if (family === 'bitcoin') return bitcoinAddress(publicKey, testnet);
   if (family === 'evm') return evmAddress(publicKey);
+  if (family === 'litecoin') return litecoinAddress(publicKey, testnet);
+  if (family === 'dogecoin') return dogecoinAddress(publicKey, testnet);
   return tronAddress(publicKey);
 }
 
@@ -115,6 +146,14 @@ export function validAddress(family: AddressFamily | 'solana', address: string) 
     }
     if (family === 'evm') return /^0x[0-9a-fA-F]{40}$/.test(address) && (address === address.toLowerCase() || checksumAddress(address) === address);
     if (family === 'tron') return tronToHex(address).length === 42;
+    if (family === 'litecoin') {
+      const decoded = bech32.decode(address as `${string}1${string}`);
+      return ['ltc', 'tltc'].includes(decoded.prefix) && decoded.words[0] === 0;
+    }
+    if (family === 'dogecoin') {
+      const bytes = legacyCheck.decode(address);
+      return bytes.length === 21 && [0x1e, 0x71].includes(bytes[0]);
+    }
     return base58.decode(address).length === 32;
   } catch {
     return false;

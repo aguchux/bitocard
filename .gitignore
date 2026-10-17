@@ -50,3 +50,8 @@ apps/api/src/generated/
 
 # source archives (the unpacked folders are committed)
 assets/*.zip
+
+
+# Bitocard keys
+keys.mjs
+bitocard-keys/

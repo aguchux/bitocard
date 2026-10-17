@@ -70,7 +70,7 @@ Sends a transfer, or returns the one already made with this reference.
 }
 ```
 
-- `chain` is `ETHEREUM`, `BSC`, `TRON` or `BITCOIN`; `network` is `mainnet` or `testnet`.
+- `chain` is `ETHEREUM`, `BSC`, `POLYGON`, `ARBITRUM`, `BASE`, `OPTIMISM`, `TRON`, `BITCOIN`, `LITECOIN` or `DOGECOIN`; `network` is `mainnet` or `testnet`. Every EVM network uses the same keys (m/44'/60'/0'); Litecoin's are at m/84'/2'/0' (native SegWit) and Dogecoin's at m/44'/3'/0' (legacy). Gas on Polygon is POL, on Arbitrum, Base and OP Mainnet ETH.
 - `contract` is the token contract, or `null` for the chain's own coin.
 - `amount` is a decimal string of **on-chain units**: 18-decimal tokens exceed 64 bits.
 - **`reference` is the idempotency key.** The API sends the same reference every time it asks about one withdrawal,

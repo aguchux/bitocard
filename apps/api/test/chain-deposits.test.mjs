@@ -128,7 +128,7 @@ describe('blockchain providers in Settings > Integrations', () => {
     const list = (await admin.get('/v1/admin/integrations')).json.data.filter(item => item.section === 'blockchain');
     assert.deepEqual(
       list.map(item => item.id),
-      ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'crypto_signer', 'chainalysis', 'trm', 'crypto_prices'],
+      ['crypto_keys', 'alchemy', 'quicknode', 'infura', 'ankr', 'nodereal', 'getblock', 'chainstack', 'moralis', 'helius', 'trongrid', 'tatum', 'blockcypher', 'mempool', 'blockstream', 'litecoinspace', 'crypto_signer', 'chainalysis', 'trm', 'crypto_prices'],
     );
     assert.ok(list.filter(item => item.id !== 'crypto_keys').every(item => item.links.length && item.testable && item.sandbox !== true));
     assert.equal(list.find(item => item.id === 'alchemy').webhook_url, 'https://api.bitocard.com/v1/webhooks/chain/alchemy?chain=<CHAIN>');
@@ -185,6 +185,25 @@ describe('deposits', () => {
     assert.match(btc.json.address, /^tb1q/);
     const usdc = await first.post('/v1/store/crypto/deposit-addresses', { asset: 'USDC', chain: 'SOLANA' });
     assert.deepEqual([usdc.status, usdc.json.error.code], [409, 'deposits_unavailable']);
+  });
+
+  test('Polygon, Arbitrum, Base and Optimism give the customer the same EVM address as Ethereum', async () => {
+    await update('getblock', { GETBLOCK_POLYGON_URL: `${chain.url}/evm2` });
+    const usdc = await network('USDC', 'POLYGON');
+    assert.equal((await admin.patch(`/v1/admin/crypto/networks/${usdc.id}`, { deposits_enabled: true })).status, 200);
+    try {
+      const shopper = await customer();
+      const networks = (await shopper.get('/v1/store/crypto/deposit-networks?asset=USDC')).json.data;
+      assert.deepEqual(networks.find(item => item.chain === 'POLYGON'), { object: 'crypto_network', asset: 'USDC', chain: 'POLYGON', name: 'Polygon', token: 'ERC-20', confirmations: 256 });
+      const polygon = await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDC', chain: 'POLYGON' });
+      assert.equal(polygon.status, 200, JSON.stringify(polygon.json));
+      assert.equal(polygon.json.address, (await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' })).json.address, 'one EVM address');
+      assert.equal(polygon.json.contract, usdc.testContract, 'the test network token in the sandbox');
+      // Arbitrum is switched off: not offered.
+      assert.equal((await shopper.post('/v1/store/crypto/deposit-addresses', { asset: 'USDC', chain: 'ARBITRUM' })).json.error.code, 'deposits_unavailable');
+    } finally {
+      await admin.patch(`/v1/admin/crypto/networks/${usdc.id}`, { deposits_enabled: false });
+    }
   });
 
   test('a token deposit is found by scanning, credited only after its confirmations, and only once', async () => {
