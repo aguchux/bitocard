@@ -12,6 +12,7 @@ import {
   ListOrdered,
   Megaphone,
   MessageSquareWarning,
+  ReceiptText,
   RotateCcw,
   Truck,
   Wallet,
@@ -76,12 +77,14 @@ export const catalogSections = (groups: SubMenuContext["groups"]): SubMenuItem[]
 
 /**
  * The Wallet tab: the country's wallet (the page's default), the US dollar wallet and the coins (`?wallet=`, as the
- * page's tabs). A country that uses dollars has one money wallet; an account still without a country has its default.
+ * page's tabs), then all their activity (its own screen, reached on phones by each activity card's View all). A
+ * country that uses dollars has one money wallet; an account still without a country has its default.
  */
 export const walletSections = (currency: string | null): SubMenuItem[] => [
   { href: "/account/wallet", label: !currency ? "Your wallet" : currency === "USD" ? "US dollars" : `${currency} wallet`, icon: Wallet },
   ...(currency && currency !== "USD" ? [{ href: "/account/wallet?wallet=USD", label: "US dollars", icon: DollarSign }] : []),
   { href: "/account/wallet?wallet=crypto", label: "Crypto", icon: Coins },
+  { href: "/account/wallet/activity", label: "Activity", icon: ReceiptText },
 ];
 
 /** The tabs with places of their own, in the app's tab order, shown as a second rail beside the app's rail on desktop. */

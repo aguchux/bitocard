@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, Clock, Coins, Landmark, Lock, Snowflake, Wallet } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, Clock, Coins, Landmark, Lock, Snowflake, Wallet } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoTransaction, type StoreCryptoWallets, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
 import { canWithdraw, CoinBadge, hasP2pMoney, heldAssets } from "@/components/app/crypto";
+import { ActivityHeading, CryptoActivityList, MoneyActivityList } from "@/components/app/wallet-activity";
 import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/wallet-forms";
+import { activityHref, cryptoMoves, recentItems } from "@/lib/activity";
 import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
 import { simulateTopUp, walletFor } from "@/lib/wallet";
 
 export const metadata: Metadata = { title: "Wallet" };
 
-const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
 type Search = { top_up?: string; back?: string; amount?: string; wallet?: string };
@@ -69,14 +70,15 @@ const coinsSummary = (wallets: StoreCryptoWallets) => {
 
 /**
  * The Crypto tab: every coin wallet with its balance (available, in ads, frozen, on its way out), the P2P money, and
- * coin activity. With crypto closed to them, only what they still hold, which they can still withdraw or cash out.
+ * the last 24 hours of coin activity (a few, View all for the rest). With crypto closed to them, only what they still
+ * hold, which they can still withdraw or cash out.
  */
 function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; activity: StoreCryptoTransaction[] | null }) {
   const usable = wallets.enabled && !wallets.frozen && wallets.verified;
   const withdraw = canWithdraw(wallets);
   const coins = wallets.enabled ? wallets.assets : heldAssets(wallets);
-  // What moved in and out of the spendable balance (an ad's lock shows once, as it leaves).
-  const moves = activity?.filter(item => item.balance === "available") ?? [];
+  const moves = cryptoMoves(activity ?? []);
+  const recent = recentItems(moves);
   return (
     <>
       <section aria-label="Crypto wallets" className="rounded-3xl bg-navy-900 p-6 text-white">
@@ -150,38 +152,11 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
         ) : null}
       </section>
       <section aria-labelledby="crypto-activity" className={card}>
-        <h2 id="crypto-activity" className="mb-2 text-lg font-bold">
-          Activity
-        </h2>
-        {moves.length ? (
-          <ul className="divide-y divide-slate-100">
-            {moves.map(item => {
-              const credit = !item.amount.startsWith("-");
-              return (
-                <li key={item.id} className="flex items-center gap-3 py-3">
-                  <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${credit ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                    {credit ? <ArrowDownLeft className="size-5" aria-hidden="true" /> : <ArrowUpRight className="size-5" aria-hidden="true" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    {item.trade_id ? (
-                      <Link href={`/account/crypto/trades/${item.trade_id}`} className="block truncate font-semibold hover:underline">
-                        {item.description}
-                      </Link>
-                    ) : (
-                      <span className="block truncate font-semibold">{item.description}</span>
-                    )}
-                    <span className="block text-sm text-slate-500">{date(item.created_at)}</span>
-                  </span>
-                  <span className={`shrink-0 font-semibold ${credit ? "text-emerald-700" : "text-navy-900"}`}>
-                    {credit ? "+" : "−"}
-                    {formatCrypto(item.amount.replace(/^-/, ""), item.asset)}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+        <ActivityHeading id="crypto-activity" note="Last 24 hours" viewAll={activityHref("crypto")} />
+        {recent.length ? (
+          <CryptoActivityList items={recent} />
         ) : (
-          <p className="text-slate-600">Deposits and trades show here.</p>
+          <p className="text-slate-600">{moves.length ? "Nothing in the last 24 hours. View all for older activity." : "Deposits and trades show here."}</p>
         )}
       </section>
     </>
@@ -198,7 +173,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     walletFor(asked),
     showCrypto ? null : customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20"),
     customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"),
-    showCrypto ? customerApi<StoreList<StoreCryptoTransaction>>("GET", "/v1/store/crypto/transactions?limit=40") : null,
+    // Enough to find the last 24 hours' few once lock moves are left out.
+    showCrypto ? customerApi<StoreList<StoreCryptoTransaction>>("GET", "/v1/store/crypto/transactions?limit=30") : null,
   ]);
   const wallet = chosen ?? (asked ? await walletFor() : null);
   // The Crypto tab is there where the store offers crypto, or while the customer still holds coins or P2P money.
@@ -314,33 +290,9 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       {cryptoTab ? null : (
       <section aria-labelledby="activity" className={card}>
-        <h2 id="activity" className="mb-2 text-lg font-bold">
-          Activity
-        </h2>
+        <ActivityHeading id="activity" viewAll={activityHref("money")} />
         {activity?.ok && activity.data.data.length ? (
-          <ul className="divide-y divide-slate-100">
-            {activity.data.data.map(item => (
-              <li key={item.id} className="flex items-center gap-3 py-3">
-                <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${item.amount >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-                  {item.amount >= 0 ? <ArrowDownLeft className="size-5" aria-hidden="true" /> : <ArrowUpRight className="size-5" aria-hidden="true" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  {item.checkout_id ? (
-                    <Link href={`/account/orders/${item.checkout_id}`} className="block truncate font-semibold hover:underline">
-                      {item.description}
-                    </Link>
-                  ) : (
-                    <span className="block truncate font-semibold">{item.description}</span>
-                  )}
-                  <span className="block text-sm text-slate-500">{date(item.created_at)}</span>
-                </span>
-                <span className={`shrink-0 font-semibold ${item.amount >= 0 ? "text-emerald-700" : "text-navy-900"}`}>
-                  {item.amount >= 0 ? "+" : "−"}
-                  {formatFace(Math.abs(item.amount), item.currency)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <MoneyActivityList items={activity.data.data} />
         ) : (
           <p className="text-slate-600">Top-ups and purchases show here.</p>
         )}
