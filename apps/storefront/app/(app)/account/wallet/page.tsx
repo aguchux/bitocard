@@ -221,7 +221,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         <div className={card}>
           <p className="font-semibold">Choose your country first</p>
           <p className="mt-1 text-sm text-slate-600">Your wallet is in your country&apos;s currency. Choose it once in your account; it then stays the same.</p>
-          <Link href="/account/profile#country" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
+          <Link href="/account/profile/details#country" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
             Choose your country
           </Link>
         </div>

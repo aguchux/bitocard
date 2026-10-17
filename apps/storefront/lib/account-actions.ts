@@ -78,7 +78,8 @@ export async function resetPassword(_state: FormState, form: FormData): Promise<
 export async function updateName(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { name: text(form, "name") });
   if (!result.ok) return failed(result);
-  revalidatePath("/account");
+  // Every account screen shows the name (the Account page, Profile, the header's menu).
+  revalidatePath("/account", "layout");
   return { notice: "Saved." };
 }
 

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { kycDeclineReasons } from "@bitocard/api-client/kyc";
+import { accountCard, AccountScreen } from "@/components/app/account-menu";
 import { VerificationForm } from "@/components/store/account-forms";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
@@ -17,7 +17,10 @@ type Status = { verified: boolean; provider?: "bitocard" | "didit"; latest: { st
 const reasonText = (reason: string) =>
   kycDeclineReasons[reason as keyof typeof kycDeclineReasons] ?? ({ not_verified: "We could not confirm your identity", name_mismatch: "The name did not match", expired: "The check was not finished in time" } as Record<string, string>)[reason] ?? reason;
 
-/** The customer's identity check for their country: needed once before buying some products in some countries. */
+/**
+ * The customer's identity check for their country: needed once before buying some products in some countries. One of
+ * the Account screens (pills on top), keeping its own address, which checkout and the identity partners return to.
+ */
 export default async function VerificationPage({ searchParams }: { searchParams: Promise<{ country?: string }> }) {
   if (!(await currentCustomer())) redirect("/signin?next=/account/verification");
   const [{ countries }, market, asked] = await Promise.all([storeNavigation(), currentMarket(), searchParams]);
@@ -26,13 +29,8 @@ export default async function VerificationPage({ searchParams }: { searchParams:
   const status = country ? await customerApi<Status>("GET", `/v1/store/account/verification?country=${encodeURIComponent(country)}`) : null;
 
   return (
-    <div className="mx-auto grid max-w-xl gap-5">
-      <Link href="/account/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
-        <ChevronLeft className="size-4" aria-hidden="true" /> Your account
-      </Link>
-      <h1 className="font-display text-3xl font-extrabold tracking-tight text-navy-900">Identity check</h1>
-      <p className="text-slate-600">Some products, such as gift cards in some countries, need a one-time identity check before you can buy them. It protects you and us from fraud.</p>
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
+    <AccountScreen title="Identity check" lead="Some products, such as gift cards in some countries, need a one-time identity check before you can buy them. It protects you and us from fraud.">
+      <section className={accountCard}>
         {!country ? (
           <form className="space-y-3">
             <label htmlFor="country" className="block text-sm font-semibold">
@@ -66,6 +64,6 @@ export default async function VerificationPage({ searchParams }: { searchParams:
           </>
         )}
       </section>
-    </div>
+    </AccountScreen>
   );
 }
