@@ -6,6 +6,7 @@ import { Brand } from "@bitocard/ui/brand";
 import { brand } from "@bitocard/ui/site";
 import { AppHeader } from "@/components/app/app-header";
 import { AppNav, AppRail } from "@/components/app/app-nav";
+import { SubRail } from "@/components/app/sub-rail";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
@@ -74,8 +75,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }
       />
       <AppNav desktopNav={desktopNav} />
-      <div className={rail ? "lg:flex" : undefined}>
+      <div className="lg:flex">
         {rail ? <AppRail /> : null}
+        {/* Desktop: a tab's own places (Crypto, Account screens) as a second rail; pills elsewhere. */}
+        <SubRail />
         <div className={`min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
           <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
             {children}

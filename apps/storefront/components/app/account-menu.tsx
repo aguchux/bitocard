@@ -51,13 +51,13 @@ export function AccountList({ label, children }: { label: string; children: Reac
 }
 
 /**
- * An account screen: back to the Account page, the pills to move between screens, the title and a short lead, then the
- * screen's own cards.
+ * An account screen: back to the Account page and the pills to move between screens (phones and tablets; desktops
+ * have the sub rail beside the app's rail instead), the title and a short lead, then the screen's own cards.
  */
 export function AccountScreen({ title, lead, children }: { title: string; lead?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="space-y-3">
+      <div className="space-y-3 lg:hidden">
         <Link href="/account/profile" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
           <ChevronLeft className="size-4" aria-hidden="true" /> Your account
         </Link>

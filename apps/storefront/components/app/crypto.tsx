@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade } from "@bitocard/api-client/storefront";
+import { cryptoSections } from "./sub-menus";
 
 export const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
@@ -17,24 +18,15 @@ export const withdrawalStatus: Record<StoreCryptoWithdrawal["status"], string> =
   cancelled: "Cancelled",
 };
 
-const sections = [
-  { href: "/account/crypto", label: "Wallets" },
-  { href: "/account/crypto/market", label: "Market" },
-  { href: "/account/crypto/ads", label: "My ads" },
-  { href: "/account/crypto/trades", label: "Trades" },
-  { href: "/account/crypto/deposit", label: "Deposit" },
-  { href: "/account/crypto/withdraw", label: "Withdraw" },
-  { href: "/account/crypto/cash-out", label: "Cash out" },
-];
-
 /**
- * The crypto section's places, as pills under the page title. On phones the row scrolls sideways on its own, inside
- * its own box, so the page never scrolls sideways.
+ * The crypto section's places (`cryptoSections`), as pills under the page title on phones and tablets; desktops have
+ * the sub rail beside the app's rail instead (`SubRail`). On phones the row scrolls sideways on its own, inside its own
+ * box, so the page never scrolls sideways.
  */
 export function CryptoNav({ current }: { current: string }) {
   return (
-    <nav aria-label="Crypto" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-      {sections.map(section => (
+    <nav aria-label="Crypto" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:hidden">
+      {cryptoSections.map(section => (
         <Link
           key={section.href}
           href={section.href}

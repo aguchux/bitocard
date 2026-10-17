@@ -1,0 +1,47 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { subMenuFor } from "./sub-menus";
+
+/**
+ * Desktop only: a tab's own places (Crypto's Wallets, Market…; Account's Profile, Security…) as a second rail beside
+ * the app's rail, sticky below the header like it. The tab's name heads it and leads back to the tab. Phones and tablets
+ * keep the pills under the page title instead.
+ */
+export function SubRail() {
+  const found = subMenuFor(usePathname());
+  if (!found) return null;
+  const { menu, active } = found;
+  return (
+    <nav
+      aria-label={`${menu.label} menu`}
+      className="sticky top-[72px] hidden h-[calc(100svh-72px)] w-56 shrink-0 self-start overflow-y-auto border-r border-slate-100 bg-slate-50/60 px-3 py-5 lg:block xl:w-60"
+    >
+      <Link href={menu.href} className="mb-2 flex min-h-9 items-center rounded-lg px-3 text-xs font-bold tracking-[0.14em] text-slate-500 uppercase hover:text-navy-900">
+        {menu.label}
+      </Link>
+      <ul className="space-y-1">
+        {menu.items.map(item => {
+          const current = item.href === active;
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={current ? "page" : undefined}
+                className={`group relative flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors ${
+                  current ? "bg-white text-navy-900 shadow-sm ring-1 ring-slate-200/80" : "text-slate-600 hover:bg-white hover:text-navy-900"
+                }`}
+              >
+                {current ? <span aria-hidden="true" className="absolute top-2.5 bottom-2.5 left-0 w-1 rounded-full bg-brand-500" /> : null}
+                <item.icon className={`size-[18px] shrink-0 ${current ? "text-brand-500" : "text-slate-400 group-hover:text-slate-600"}`} aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {item.soon ? <span className="shrink-0 rounded-full bg-slate-200/70 px-1.5 py-0.5 text-[10px] leading-none font-bold tracking-wide text-slate-500 uppercase">Soon</span> : null}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
