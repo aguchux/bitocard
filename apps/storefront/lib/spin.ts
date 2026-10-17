@@ -67,6 +67,20 @@ export function todayLights(allowance: StoreSpinAllowance | null, dailyLimit: nu
   return { lit, total };
 }
 
+/** Wins shown at a time in the dialog's history; the rest are a page away. */
+export const winsPerPage = 6;
+
+/**
+ * Which wins a page of the history shows: `page` (0 is the newest) kept within the pages there are, and the slice
+ * `start` to `end` of the list, newest first.
+ */
+export function winsPage(count: number, page: number, size = winsPerPage) {
+  const pages = Math.max(1, Math.ceil(count / size));
+  const current = Math.min(Math.max(0, page), pages - 1);
+  const start = current * size;
+  return { pages, current, start, end: Math.min(count, start + size) };
+}
+
 /** Why the customer cannot spin, in plain words, with where to put it right (if anywhere). */
 export const spinBlocks: Record<string, { title: string; text: string; link?: { href: string; label: string } }> = {
   not_enabled: { title: "Spin and win is not open here yet", text: "We open it store by store and country by country. We will tell you when you can spin." },

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { History, Loader2, Lock, Sparkles } from "lucide-react";
-import { formatCrypto, type StoreSpin, type StoreSpinAllowance, type StoreSpinRewardBalance, type StoreSpinRewards, type StoreSpinWin } from "@bitocard/api-client/storefront";
+import { Loader2, Lock, Sparkles } from "lucide-react";
+import type { StoreSpin, StoreSpinAllowance, StoreSpinRewardBalance, StoreSpinRewards, StoreSpinWin } from "@bitocard/api-client/storefront";
 import { CoinBurst, Confetti, WinPlaque } from "@/components/app/spin/celebration";
-import { CoinToken } from "@/components/app/spin/coin-token";
 import { RewardsPanel } from "@/components/app/spin/rewards-panel";
+import { WinsPanel } from "@/components/app/spin/wins-panel";
 import styles from "@/components/app/spin/spin.module.css";
 import type { SpinSound } from "@/components/app/spin/use-spin-sound";
 import { Pointer, WheelDisc, WheelFrame } from "@/components/app/spin/wheel";
@@ -19,7 +19,6 @@ const spinMs = 5000;
 const reducedSpinMs = 600;
 
 const nextTime = (iso: string) => new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
-const winDate = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
 
 /** Whether the customer can spin now. */
 function canSpin(enabled: boolean, allowance: StoreSpinAllowance | null) {
@@ -82,7 +81,7 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
     window.cancelAnimationFrame(done.frame);
     const { spin } = done;
     setAllowance(spin.allowance);
-    setRecent(list => [{ id: spin.id, number: spin.number, asset: spin.asset, amount: spin.amount, usd: spin.usd, segment: spin.segment, created_at: new Date().toISOString() }, ...list.filter(item => item.id !== spin.id)].slice(0, 10));
+    setRecent(list => [{ id: spin.id, number: spin.number, asset: spin.asset, amount: spin.amount, usd: spin.usd, segment: spin.segment, created_at: new Date().toISOString() }, ...list.filter(item => item.id !== spin.id)]);
     setWin(spin);
     setPhase("idle");
     sound?.win();
@@ -265,30 +264,7 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
 
         <RewardsPanel rewards={rewards} onExchanged={refreshRewards} />
 
-        <section aria-labelledby="wins" className={`${styles.panel} p-5 sm:p-6`}>
-          <h2 id="wins" className="mb-1 flex items-center gap-2 text-lg font-bold">
-            <History className="size-5 text-gold-400" aria-hidden="true" />
-            Your wins
-          </h2>
-          {recent.length ? (
-            <ul className="divide-y divide-white/10">
-              {recent.map(item => (
-                <li key={item.id} className="flex items-center gap-3 py-3">
-                  <CoinToken asset={item.asset} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{formatCrypto(item.amount, item.asset)}</span>
-                    <span className="block truncate text-sm text-white/55" suppressHydrationWarning>
-                      Spin {item.number} · {winDate(item.created_at)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-emerald-400/10 px-2.5 py-1 text-sm font-bold text-emerald-300 tabular-nums ring-1 ring-emerald-400/25">+{usd(item.usd)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-white/65">Your wins show here.</p>
-          )}
-        </section>
+        <WinsPanel wins={recent} />
       </div>
     </div>
   );

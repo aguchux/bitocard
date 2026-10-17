@@ -149,6 +149,7 @@ describe('spin and win', () => {
     }
     const finished = (await shopper.get('/v1/store/spins')).json;
     assert.deepEqual([finished.enabled, finished.allowance.finished, finished.allowance.won_usd], [false, true, '1.00']);
+    assert.deepEqual(finished.recent.map(item => item.number), Array.from({ length: total }, (_, i) => total - i), 'every win, newest first');
     await nextDay(shopper);
     const more = await shopper.post('/v1/store/spins');
     assert.deepEqual([more.status, more.json.error.code], [409, 'spins_finished']);

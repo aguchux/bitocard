@@ -198,7 +198,8 @@ export class SpinsService {
     const allowance = await this.prisma.spinAllowance.findFirst({ where: { customerId: customer.id, mode } });
     const market = await this.wallets.context(customer).catch(() => null);
     const limit = await this.dailyLimit(market?.country);
-    const recent = allowance ? await this.prisma.spin.findMany({ where: { allowanceId: allowance.id }, orderBy: { number: 'desc' }, take: 10 }) : [];
+    // Every win, newest first: an allowance has at most 100 spins, so the dialog pages through them all.
+    const recent = allowance ? await this.prisma.spin.findMany({ where: { allowanceId: allowance.id }, orderBy: { number: 'desc' }, take: 100 }) : [];
     const assets = await this.prisma.cryptoAsset.findMany({ select: { code: true, decimals: true } });
     return {
       object: 'spin_rewards' as const,

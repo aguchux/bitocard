@@ -238,6 +238,9 @@
   box-shadow: 0 0 10px color-mix(in srgb, var(--color-gold-400) 75%, transparent);
 }
 
+/* A page of wins sliding in (wins-panel.tsx). */
+.pageIn { animation: page-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
 /* A coin token, in the coin's own colour (`--coin`). */
 .coin {
   display: inline-grid;
@@ -299,9 +302,10 @@
 @keyframes pop { 0% { transform: scale(0.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes shine { to { transform: translateX(120%); } }
 @keyframes mini-spin { to { transform: rotate(360deg); } }
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .enter, .bulb, .bulbAlt, .winWedge, .hub[data-ready]::after, .plaque, .plaque::after, .miniWheel,
+  .enter, .pageIn, .bulb, .bulbAlt, .winWedge, .hub[data-ready]::after, .plaque, .plaque::after, .miniWheel,
   .stage[data-phase] .bulb, .stage[data-phase] .halo { animation: none; }
   .winWedge { opacity: 0.3; }
   .burst, .confetti { display: none; }

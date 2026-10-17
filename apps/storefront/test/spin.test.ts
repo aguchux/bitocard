@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { StoreSpinAllowance, StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
 import { spinNote } from "@/components/app/spin-dialog";
-import { coinFor, landingAngle, restingAngle, segmentAt, segmentTones, segmentWidth, showSpin, spinBlocks, todayLights, usd } from "@/lib/spin";
+import { coinFor, landingAngle, restingAngle, segmentAt, segmentTones, segmentWidth, showSpin, spinBlocks, todayLights, usd, winsPage, winsPerPage } from "@/lib/spin";
 
 const redirect = vi.fn((url: string) => {
   throw new Error(`redirect:${url}`);
@@ -162,6 +162,18 @@ describe("the wheel's look", () => {
     expect(todayLights({ ...allowance, today_left: 1 }, 2)).toEqual({ lit: 1, total: 2 });
     expect(todayLights({ ...allowance, finished: true }, 2)).toEqual({ lit: 0, total: 2 });
     expect(todayLights({ ...allowance, daily_limit: 3, today_left: 9 }, 2)).toEqual({ lit: 3, total: 3 });
+  });
+
+  test("the wins history shows six at a time, newest first, paging through the rest", () => {
+    expect(winsPerPage).toBe(6);
+    expect(winsPage(0, 0)).toEqual({ pages: 1, current: 0, start: 0, end: 0 });
+    expect(winsPage(4, 0)).toEqual({ pages: 1, current: 0, start: 0, end: 4 });
+    expect(winsPage(10, 0)).toEqual({ pages: 2, current: 0, start: 0, end: 6 });
+    expect(winsPage(10, 1)).toEqual({ pages: 2, current: 1, start: 6, end: 10 });
+    // Out of range (the list shrank, or a stale page): kept within the pages there are.
+    expect(winsPage(10, 5)).toMatchObject({ current: 1, start: 6 });
+    expect(winsPage(10, -1)).toMatchObject({ current: 0, start: 0 });
+    expect(winsPage(100, 16)).toEqual({ pages: 17, current: 16, start: 96, end: 100 });
   });
 });
 
