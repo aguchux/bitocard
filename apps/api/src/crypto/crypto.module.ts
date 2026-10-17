@@ -20,6 +20,10 @@ import {
   CustomerWithdrawalsController,
 } from './crypto.controller.js';
 import { CryptoWalletsService } from './crypto-wallets.service.js';
+import { AdminExchangeController, CustomerExchangeController, ResellerExchangeController } from './exchange/exchange.controller.js';
+import { ExchangeService } from './exchange/exchange.service.js';
+import { ResellerDeskService } from './exchange/reseller-desk.service.js';
+import { ReservesService } from './exchange/reserves.service.js';
 import { P2pService } from './p2p.service.js';
 import { CryptoPricesService } from './prices.js';
 import { AdminSpinsController, CustomerSpinsController } from './spins.controller.js';
@@ -38,7 +42,10 @@ import { CryptoWithdrawalsService } from './withdrawals.service.js';
     CustomerCashController,
     CustomerP2pController,
     CustomerSpinsController,
+    CustomerExchangeController,
+    ResellerExchangeController,
     AdminCryptoController,
+    AdminExchangeController,
     AdminSpinsController,
     AdminP2pController,
     AdminChainsController,
@@ -47,7 +54,7 @@ import { CryptoWithdrawalsService } from './withdrawals.service.js';
     AdminReconciliationsController,
     ChainWebhooksController,
   ],
-  providers: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, SpinsService],
+  providers: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, SpinsService, ExchangeService, ResellerDeskService, ReservesService],
   exports: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}

@@ -406,6 +406,46 @@ export function customerCodeEmail(to: string, input: { store: string; code: stri
   };
 }
 
+/** The code an admin enters to confirm their own manual top-up, naming exactly what it adds and to whom. */
+export function manualTopUpCodeEmail(to: string, input: { code: string; number: string; amount: string; target: string; source: 'received' | 'goodwill'; sandbox: boolean }): EmailMessage {
+  const heading = `Confirm manual top-up ${input.number}`;
+  const paragraphs = [
+    `Enter this code in the admin app to add ${input.amount}${input.sandbox ? ' (sandbox)' : ''} to the wallet of ${input.target}, as ${input.source === 'received' ? 'money received by BitoCard' : 'a goodwill credit from BitoCard'}. It expires in 10 minutes.`,
+    'Nothing moves until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
+  ];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5;word-break:break-word">${escape(paragraph)}</p>`),
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:6px">${escape(input.code)}</p>`,
+    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    '</div>',
+  ].join('');
+  return {
+    to,
+    subject: `${input.code} confirms ${input.number}: ${input.amount}${input.sandbox ? ' (sandbox)' : ''} top-up`,
+    html,
+    text: [heading, '', ...paragraphs, '', input.code, '', 'BitoCard, a Golojan Ltd venture.'].join('\n'),
+  };
+}
+
+/** The code an admin enters to fund or draw down one of BitoCard's exchange reserves. */
+export function reserveMovementCodeEmail(to: string, input: { code: string; number: string; action: 'fund' | 'withdraw'; amount: string; reserve: string; sandbox: boolean }): EmailMessage {
+  const verb = input.action === 'fund' ? `add ${input.amount} to` : `take ${input.amount} out of`;
+  return {
+    to,
+    subject: `${input.code} confirms ${input.number}: ${input.action === 'fund' ? 'fund' : 'draw down'} the ${input.reserve}${input.sandbox ? ' (sandbox)' : ''}`,
+    ...layout(
+      `Confirm reserve movement ${input.number}`,
+      [
+        `Enter this code in the admin app to ${verb} BitoCard's ${input.reserve}${input.sandbox ? ' (sandbox)' : ''}. It expires in 10 minutes.`,
+        'Nothing moves until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
+      ],
+      input.code,
+    ),
+  };
+}
+
 /** The code that confirms a crypto withdrawal, naming exactly what it sends and where (under the store's name). */
 export function cryptoWithdrawalCodeEmail(to: string, input: { store: string; code: string; amount: string; asset: string; network: string; address: string }): EmailMessage {
   const heading = 'Confirm your crypto withdrawal';

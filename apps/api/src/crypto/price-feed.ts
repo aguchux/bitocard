@@ -2,9 +2,9 @@ import type { IntegrationField } from '../integrations/definitions.js';
 import type { IntegrationLink } from '../integrations/links.js';
 
 /**
- * Crypto prices in US dollars from CoinGecko, for pricing promotions paid in coins that are not dollar stablecoins
- * (Spin and win's BNB). A free demo key raises the rate limit; a Pro key (with the Pro API address) is used as such.
- * Never used to move customers' money at a rate: only to size BitoCard's own rewards.
+ * Crypto prices in US dollars from CoinGecko: the market base of every coin on the instant exchange (stablecoins
+ * included, never assumed to be $1; BitoCard only adds its markup), and the size of Spin and win's BNB rewards. A free
+ * demo key raises the rate limit; a Pro key (with the Pro API address) is used as such.
  */
 export const priceFields: IntegrationField[] = [
   { key: 'COINGECKO_API_KEY', label: 'API key', secret: true, kind: 'text', required: false, help: 'CoinGecko > Developer dashboard > API keys. A free Demo key works; without one the public rate limit applies.' },
@@ -16,15 +16,32 @@ export const priceLinks: IntegrationLink[] = [
   { label: 'API docs', url: 'https://docs.coingecko.com/reference/simple-price' },
 ];
 
-/** CoinGecko's ids for the coins BitoCard holds that are not priced at $1. */
-export const coinIds: Record<string, string> = { BNB: 'binancecoin', BTC: 'bitcoin', ETH: 'ethereum' };
-/** A price this recent is used without asking again. */
+/** CoinGecko's ids for every coin BitoCard holds. */
+export const coinIds: Record<string, string> = {
+  USDT: 'tether',
+  USDC: 'usd-coin',
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  BNB: 'binancecoin',
+  POL: 'polygon-ecosystem-token',
+  TRX: 'tron',
+  LTC: 'litecoin',
+  DOGE: 'dogecoin',
+};
+/** A price this recent is used without asking again (promotions). */
 export const freshMs = 5 * 60_000;
 /** A price older than this is never used: the reward falls back to a stablecoin instead. */
 export const staleMs = 30 * 60_000;
+/** The exchange asks again once its price is a minute old. */
+export const liveMs = 60_000;
+/** The exchange never trades on a price CoinGecko itself last updated longer ago than this. */
+export const marketMaxAgeMs = 5 * 60_000;
 
-/** A US dollar price as an integer number of 1e-8 dollars (exact maths with BigInt). */
-export type UsdPrice = { asset: string; e8: bigint; text: string; at: number };
+/**
+ * A US dollar price as an integer number of 1e-8 dollars (exact maths with BigInt). `at` is when BitoCard fetched it,
+ * `updatedAt` when CoinGecko last updated it (null when it did not say), `change24h` its 24-hour change in per cent.
+ */
+export type UsdPrice = { asset: string; e8: bigint; text: string; at: number; updatedAt: number | null; change24h: number | null };
 
 export function priceE8(value: number): bigint | null {
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -46,19 +63,31 @@ export async function fetchPrices(values: Record<string, string | undefined>, as
   if (key) headers[base.includes('pro-api') ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key'] = key;
   let res: Response;
   try {
-    res = await fetch(`${base}/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd`, { headers, signal: AbortSignal.timeout(10_000), redirect: 'error' });
+    const query = `ids=${ids.join(',')}&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true`;
+    res = await fetch(`${base}/api/v3/simple/price?${query}`, { headers, signal: AbortSignal.timeout(10_000), redirect: 'error' });
   } catch (error) {
     throw new Error(`unreachable (${error instanceof Error ? error.name : 'error'})`);
   }
   if (res.status === 401 || res.status === 403) throw new Error(`refused the API key (HTTP ${res.status})`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = (await res.json()) as Record<string, { usd?: number }>;
+  const body = (await res.json()) as Record<string, { usd?: number; usd_24h_change?: number; last_updated_at?: number }>;
   const at = Date.now();
   const prices: UsdPrice[] = [];
   for (const asset of assets) {
-    const usd = body?.[coinIds[asset]]?.usd;
+    const row = body?.[coinIds[asset]];
+    const usd = row?.usd;
     const e8 = typeof usd === 'number' ? priceE8(usd) : null;
-    if (e8) prices.push({ asset, e8, text: usd!.toFixed(8).replace(/\.?0+$/, ''), at });
+    if (!e8) continue;
+    const change = row?.usd_24h_change;
+    const updated = row?.last_updated_at;
+    prices.push({
+      asset,
+      e8,
+      text: usd!.toFixed(8).replace(/\.?0+$/, ''),
+      at,
+      updatedAt: typeof updated === 'number' && updated > 0 ? updated * 1000 : null,
+      change24h: typeof change === 'number' && Number.isFinite(change) ? Math.round(change * 100) / 100 : null,
+    });
   }
   return prices;
 }

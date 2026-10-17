@@ -221,7 +221,7 @@ export default function ResellerPage() {
             </Card>
           </div>
 
-          {reseller.country ? <ResellerWalletsCard resellerId={reseller.id} /> : null}
+          {reseller.country ? <ResellerWalletsCard resellerId={reseller.id} resellerName={reseller.name} /> : null}
           <StartupAllowanceCard resellerId={reseller.id} verified={Boolean(reseller.verified_at)} switchedOn={Boolean(reseller.features.startup_allowance)} />
 
           <ResellerSwitchesCard resellerId={reseller.id} features={reseller.features} />

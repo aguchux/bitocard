@@ -526,6 +526,77 @@ export type StoreCustomerPayout = {
 
 export type StoreP2pProfile = { object: 'p2p_profile'; nickname: string; nickname_chosen: boolean; trades_30d: number; trades_total: number };
 
+// -- Instant exchange -------------------------------------------------------------------------------------------------
+
+/** One side of a coin on the exchange: BitoCard's price (fiat minor units per whole coin), limits and what its reserve allows. */
+export type StoreExchangeSide = { price: number; markup_bps: number; min_fiat: number; max_fiat: number | null; available_amount: string; available_fiat: number };
+
+/** A coin on the exchange: its live market price, BitoCard's buy and sell sides, or why it is closed. */
+export type StoreExchangeAsset = {
+  desk: { id: string; name: string };
+  asset: string;
+  name: string;
+  decimals: number;
+  /** The customer's available balance of the coin. */
+  holding: string;
+  market: { usd: string; change_24h: number | null; updated_at: string | null; price: number | null } | null;
+  closed: 'not_offered' | 'price_unavailable' | 'conversion_unavailable' | null;
+  buy: StoreExchangeSide | null;
+  sell: StoreExchangeSide | null;
+};
+
+/** `GET /v1/store/exchange`: what the customer can trade with BitoCard now. */
+export type StoreExchange = {
+  object: 'exchange';
+  mode: 'live' | 'test';
+  currency: string;
+  desk: { id: string; name: string };
+  enabled: boolean;
+  reason: string | null;
+  message: string | null;
+  quote_seconds: number;
+  balances: { proceeds: number; wallet: number };
+  assets: StoreExchangeAsset[];
+};
+
+/** A price held for `quote_seconds`: exactly what the trade moves. */
+export type StoreExchangeQuote = {
+  object: 'exchange_quote';
+  id: string;
+  mode: 'live' | 'test';
+  side: 'buy' | 'sell';
+  asset: string;
+  currency: string;
+  amount: string;
+  fiat: number;
+  price: number;
+  markup_bps: number;
+  market_usd: string;
+  market_updated_at: string | null;
+  fx_rate: string;
+  expires_at: string;
+  created_at: string;
+};
+
+export type StoreExchangeTrade = {
+  object: 'exchange_trade';
+  id: string;
+  /** EX-000123. */
+  number: string;
+  mode: 'live' | 'test';
+  desk: { id: string; name: string };
+  side: 'buy' | 'sell';
+  asset: string;
+  currency: string;
+  amount: string;
+  fiat: number;
+  price: number;
+  markup_bps: number;
+  from_proceeds: number;
+  from_wallet: number;
+  created_at: string;
+};
+
 /** A crypto amount for people: trailing zeros dropped, at least two places for stablecoins ("49.9", "0.0002"). */
 export function formatCrypto(amount: string, asset?: string) {
   const [whole, fraction = ''] = amount.split('.');

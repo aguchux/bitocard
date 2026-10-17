@@ -41,6 +41,19 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Store customers buy and sell crypto with each other on the P2P market, paid from their BitoCard wallets. Needs crypto wallets on too.",
   },
+  crypto_exchange: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "Instant exchange: store customers buy coins with their money wallet and sell coins for P2P money, straight from BitoCard's reserves at the live market price plus BitoCard's markup. Needs crypto wallets on too. Off until cleared in the market.",
+  },
+  reseller_exchange: {
+    scopes: ['global', 'country', 'reseller'],
+    description: 'Resellers buy or sell coins directly with BitoCard using their fiat wallet and their own coin wallet. Needs crypto wallets enabled too.',
+  },
+  reseller_desks: {
+    scopes: ['global', 'country', 'reseller'],
+    description: 'Resellers may run a funded instant exchange desk for their own store customers. Off until cleared in the market.',
+  },
   spin_rewards: {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared.",

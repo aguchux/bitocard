@@ -7,6 +7,7 @@ import {
   Building,
   Code2,
   CreditCard,
+  ArrowLeftRight,
   FileClock,
   House,
   KeyRound,
@@ -75,6 +76,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     title: "Wallet",
     items: [
       { label: "Balance", href: "/wallet", icon: Wallet },
+      { label: "Exchange", href: "/wallet/exchange", icon: ArrowLeftRight },
       { label: "Top-ups", href: "/wallet/top-ups", icon: CreditCard },
       { label: "Bank transfer accounts", href: "/wallet/reserved-accounts", icon: Landmark },
       { label: "Withdrawals", href: "/wallet/payouts", icon: Banknote },

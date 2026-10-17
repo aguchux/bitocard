@@ -4,6 +4,7 @@ export * from './session';
 export * from './catalogue';
 export * from './orders';
 export * from './wallet';
+export * from './exchange';
 export * from './payouts';
 export * from './developers';
 export * from './store';

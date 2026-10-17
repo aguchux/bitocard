@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { errorMessage, PageHeader, QueryView, Skeleton, StoreCustomerView } from "@bitocard/admin-ui";
+import { Card, CardHeader, errorMessage, PageHeader, QueryView, Skeleton, StoreCustomerView } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   useSignOutStorefrontCustomerMutation,
@@ -10,6 +10,16 @@ import {
   useUnlockStorefrontCustomerMutation,
   useUpdateStorefrontCustomerMutation,
 } from "@bitocard/api-client/admin";
+import { WalletTopUp } from "@/components/wallet-top-up";
+
+/** The customer's two wallets: their country's currency (named once they have held it) and US dollars. */
+function customerWallets(wallet: Array<{ currency: string }>) {
+  const local = wallet.find(item => item.currency !== "USD")?.currency ?? null;
+  return [
+    { code: null, currency: local ?? "", label: local ? `${local} (their country)` : "Their country's currency" },
+    { code: "USD", currency: "USD", label: "US dollars" },
+  ];
+}
 
 /** One bitocard.com customer: account, identity check and purchases, with operations' and support's actions (audited). */
 export default function StorefrontCustomerPage() {
@@ -30,6 +40,7 @@ export default function StorefrontCustomerPage() {
       <PageHeader title={customer.data?.name ?? "Customer"} description="A bitocard.com customer." />
       <QueryView query={customer} message={error => errorMessage(error)} loading={<Skeleton className="h-96 w-full" />}>
         {data => (
+          <div className="space-y-6">
           <StoreCustomerView
             customer={data}
             canChange={can(admin, "operations")}
@@ -57,6 +68,18 @@ export default function StorefrontCustomerPage() {
               )
             }
           />
+          <Card>
+            <CardHeader title="Wallet top-ups" description="Money added by BitoCard by hand. Spend only: it is never withdrawn." />
+            <div className="px-5 pb-5 sm:px-6">
+              <WalletTopUp
+                target={{ type: "customer", id }}
+                targetName={data.name}
+                currencies={customerWallets(data.wallet)}
+                modeNote="The wallet is topped up in the store's own mode (live, or the sandbox while checkout is in sandbox): the only one the customer sees."
+              />
+            </div>
+          </Card>
+          </div>
         )}
       </QueryView>
     </AdminShell>

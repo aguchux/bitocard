@@ -44,6 +44,10 @@ export default async function CryptoPage() {
           <div className="rounded-2xl bg-white p-4 text-navy-900">
             <QuickTrade assets={assets} currency={wallets.currency} />
           </div>
+          <Link href="/account/crypto/exchange" className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 text-sm font-semibold hover:bg-white/15">
+            <span>Or trade instantly with BitoCard at the live market price</span>
+            <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
+          </Link>
         </section>
       ) : null}
 

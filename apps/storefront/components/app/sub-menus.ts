@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Truck,
   Wallet,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { groupIcon } from "@/components/store/theme";
@@ -52,6 +53,7 @@ export type SubMenuContext = { groups: Array<{ key: string; label: string }>; cu
 /** The Crypto tab's places: pills under the title on phones and tablets, the sub rail on desktop. */
 export const cryptoSections: SubMenuItem[] = [
   { href: "/account/crypto", label: "Wallets", icon: Wallet },
+  { href: "/account/crypto/exchange", label: "Exchange", icon: Zap },
   { href: "/account/crypto/market", label: "Market", icon: ArrowLeftRight },
   { href: "/account/crypto/ads", label: "My ads", icon: Megaphone },
   { href: "/account/crypto/trades", label: "Trades", icon: History },

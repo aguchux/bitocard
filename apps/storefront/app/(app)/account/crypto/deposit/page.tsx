@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import QRCode from "qrcode";
-import { AlertTriangle, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { formatCrypto, type StoreCryptoDeposit, type StoreCryptoDepositAddress, type StoreCryptoNetwork, type StoreCryptoWallets, type StoreList } from "@bitocard/api-client/storefront";
 import { card, CoinBadge, CoinPicker, CryptoGate, CryptoNav, date, tradableAssets } from "@/components/app/crypto";
-import { CopyButton } from "@/components/app/crypto-forms";
+import { DepositAddress } from "@/components/app/deposit-address";
 import { customerApi } from "@/lib/customer";
+import { addressQr } from "@/lib/qr";
 
 export const metadata: Metadata = { title: "Deposit crypto" };
 
@@ -30,7 +30,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   const options = networks?.ok ? networks.data.data : [];
   const chain = options.find(item => item.chain === (params.chain ?? "").toUpperCase())?.chain ?? (options.length === 1 ? options[0].chain : null);
   const address = chain ? await customerApi<StoreCryptoDepositAddress>("POST", "/v1/store/crypto/deposit-addresses", { asset, chain }) : null;
-  const qr = address?.ok ? await QRCode.toString(address.data.address, { type: "svg", margin: 1, errorCorrectionLevel: "M" }).catch(() => null) : null;
+  const qr = address?.ok ? await addressQr(address.data.address) : null;
   const deposits = blocked ? null : await customerApi<StoreList<StoreCryptoDeposit>>("GET", "/v1/store/crypto/deposits");
   const network = options.find(item => item.chain === chain);
 
@@ -73,27 +73,16 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
             </p>
           ) : null}
           {address?.ok && network ? (
-            <section className={card} aria-labelledby="your-address">
-              <h2 id="your-address" className="font-bold">
-                Your {asset} address on {network.name}
-              </h2>
-              {qr ? <div role="img" aria-label={`QR code of your ${asset} address`} className="mx-auto mt-4 w-48 rounded-xl bg-white p-1 ring-1 ring-slate-200 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: qr }} /> : null}
-              <p className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-center font-mono text-sm break-all">{address.data.address}</p>
-              <div className="mt-2 flex justify-center">
-                <CopyButton text={address.data.address} label="Copy address" />
-              </div>
-              <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                <li className="flex gap-2 rounded-xl bg-amber-50 px-3 py-2 text-amber-900">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <span>
-                    Send only {asset} on {network.name}
-                    {network.token ? ` (${network.token})` : ""}. Anything else sent here, or on another network, may be lost.
-                  </span>
-                </li>
-                {address.data.contract ? <li className="break-all text-xs text-slate-500">Token contract: {address.data.contract}</li> : null}
-                <li>It arrives after {network.confirmations} confirmations on the network. This address stays yours.</li>
-              </ul>
-            </section>
+            <DepositAddress
+              key={`${asset}:${network.chain}`}
+              asset={asset}
+              network={network.name}
+              token={network.token ?? null}
+              address={address.data.address}
+              contract={address.data.contract ?? null}
+              confirmations={network.confirmations}
+              qr={qr}
+            />
           ) : null}
           {deposits?.ok && deposits.data.data.length ? (
             <section className={card} aria-labelledby="recent">

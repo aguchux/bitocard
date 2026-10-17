@@ -1,6 +1,7 @@
 {
   "extends": "@bitocard/typescript-config/nextjs.json",
   "compilerOptions": {
+    "target": "ES2020",
     "paths": {
       "@/*": [
         "./*"

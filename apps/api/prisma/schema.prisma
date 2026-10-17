@@ -468,6 +468,7 @@ model Reseller {
   /// country owns the store itself. Never a real reseller.
   house                 Boolean                @default(false)
   checkouts             Checkout[]
+  manualTopUps          ManualTopUp[]
 
   @@map("resellers")
 }
@@ -790,6 +791,14 @@ enum AccountKind {
   /// What BitoCard has granted in Spin and win rewards, in each coin (a marketing expense, debit-normal): given back
   /// when rewards are exchanged, whose cost is then booked in money to `promotions`.
   crypto_promotions
+  /// An exchange desk's money reserve in one currency (BitoCard's: each market's house account): what it pays out
+  /// when customers sell coins to it, and where their money goes when they buy. Never below zero.
+  reserve_fiat
+  /// An exchange desk's coin reserve in one asset's base units (BitoCard's: the root house account, shared by every
+  /// market): what customers buy from, and where coins they sell go. Never below zero.
+  reserve_crypto
+  /// A reseller's own coins bought from BitoCard, before they fund their customer-facing desk.
+  reseller_crypto
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -2244,6 +2253,9 @@ model Customer {
   spinAllowances     SpinAllowance[]
   spins              Spin[]
   spinExchanges      SpinExchange[]
+  manualTopUps       ManualTopUp[]
+  exchangeQuotes     ExchangeQuote[]
+  exchangeTrades     ExchangeTrade[]
 
   @@unique([storeId, email])
   @@map("customers")
@@ -2738,6 +2750,216 @@ model CustomerPayout {
 /// A customer's on-chain withdrawal. Its amount plus BitoCard's network fee is moved to `crypto_withdrawing` when it is
 /// asked for; it is confirmed with an emailed code, may wait for an admin, is sent by BitoCard's signer (never by the
 /// API, which holds no keys) and is settled once the transfer is confirmed on chain, or returned if it definitely failed.
+/// A finance admin's manual top-up of a reseller's or a store customer's wallet. Nothing moves until the admin who asked
+/// enters the 6-digit code emailed to their own address (10 minutes, 5 attempts, a resend a minute); then one ledger
+/// entry (`manual_top_up:<id>`) credits the wallet from the provider balance (`received`: money BitoCard received outside
+/// its gateways, such as a bank transfer) or from `adjustments` (`goodwill`: BitoCard's expense).
+model ManualTopUp {
+  id                String     @id @default(uuid()) @db.Uuid
+  /// Shown as MT-000123.
+  number            Int        @unique @default(autoincrement())
+  mode              LedgerMode
+  /// Exactly one of the two (database check).
+  resellerId        String?    @map("reseller_id") @db.Uuid
+  customerId        String?    @map("customer_id") @db.Uuid
+  currency          String     @db.Char(3)
+  amountMinor       BigInt     @map("amount_minor")
+  /// received or goodwill.
+  source            String
+  /// The bank transfer or payment reference for received money.
+  externalReference String?    @map("external_reference")
+  reason            String
+  /// awaiting_code, completed or cancelled (an unconfirmed one past its code's expiry is shown as expired).
+  status            String     @default("awaiting_code")
+  /// The admin who asked: only they receive and enter the code.
+  requestedBy       String     @map("requested_by") @db.Uuid
+  cancelledBy       String?    @map("cancelled_by") @db.Uuid
+  codeHash          String?    @map("code_hash")
+  codeExpiresAt     DateTime?  @map("code_expires_at")
+  codeAttempts      Int        @default(0) @map("code_attempts")
+  codeSentAt        DateTime?  @map("code_sent_at")
+  entryId           String?    @map("entry_id") @db.Uuid
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  completedAt       DateTime?  @map("completed_at")
+  reseller          Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  customer          Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([resellerId, createdAt])
+  @@index([customerId, createdAt])
+  @@index([status, createdAt])
+  @@map("manual_top_ups")
+}
+
+/// An exchange desk's markup on the live market price of one coin in one currency, per mode (`desk` is `bitocard`;
+/// resellers' desks later). Its price is the coin's US dollar market price x the currency's mid rate x (1 + buy markup)
+/// when the customer buys, x (1 - sell markup) when they sell. Off until enabled.
+model ExchangeMarkup {
+  id            String     @id @default(uuid()) @db.Uuid
+  desk          String     @default("bitocard")
+  mode          LedgerMode
+  asset         String     @db.VarChar(10)
+  currency      String     @db.Char(3)
+  buyMarkupBps  Int        @default(150) @map("buy_markup_bps")
+  sellMarkupBps Int        @default(150) @map("sell_markup_bps")
+  /// Per-trade limits in the currency's minor units (no maximum when null).
+  minFiatMinor  BigInt     @default(0) @map("min_fiat_minor")
+  maxFiatMinor  BigInt?    @map("max_fiat_minor")
+  enabled       Boolean    @default(false)
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  @@unique([desk, mode, asset, currency])
+  @@map("exchange_markups")
+}
+
+/// A price held for 30 seconds for one customer: used once, by the trade it quotes.
+model ExchangeQuote {
+  id          String     @id @default(uuid()) @db.Uuid
+  desk        String     @default("bitocard")
+  mode        LedgerMode
+  customerId  String     @map("customer_id") @db.Uuid
+  /// buy (the customer buys coins) or sell.
+  side        String
+  asset       String     @db.VarChar(10)
+  currency    String     @db.Char(3)
+  /// Base units of the coin, and fiat minor units.
+  amount      BigInt
+  fiatMinor   BigInt     @map("fiat_minor")
+  /// Fiat minor units per whole coin, after the markup.
+  priceMinor  BigInt     @map("price_minor")
+  /// The market price it was built on (US dollars x 1e8), when CoinGecko updated it, the mid rate and the markup.
+  marketUsdE8 BigInt     @map("market_usd_e8")
+  marketAt    DateTime?  @map("market_at")
+  fxMid       Decimal    @map("fx_mid") @db.Decimal(24, 10)
+  markupBps   Int        @map("markup_bps")
+  expiresAt   DateTime   @map("expires_at")
+  usedAt      DateTime?  @map("used_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+  @@map("exchange_quotes")
+}
+
+/// An instant trade with an exchange desk, settled in one ledger entry (`exchange_trade:<id>`). Shown as EX-000123.
+model ExchangeTrade {
+  id             String     @id @default(uuid()) @db.Uuid
+  number         Int        @unique @default(autoincrement())
+  quoteId        String     @unique @map("quote_id") @db.Uuid
+  desk           String     @default("bitocard")
+  mode           LedgerMode
+  customerId     String     @map("customer_id") @db.Uuid
+  side           String
+  asset          String     @db.VarChar(10)
+  currency       String     @db.Char(3)
+  amount         BigInt
+  fiatMinor      BigInt     @map("fiat_minor")
+  priceMinor     BigInt     @map("price_minor")
+  marketUsdE8    BigInt     @map("market_usd_e8")
+  fxMid          Decimal    @map("fx_mid") @db.Decimal(24, 10)
+  markupBps      Int        @map("markup_bps")
+  /// The desk's margin in fiat minor units: what the trade made over the market price (never negative).
+  markupMinor    BigInt     @map("markup_minor")
+  /// Buying: how much came from P2P money and from the store wallet.
+  fromProceeds   BigInt     @default(0) @map("from_proceeds")
+  fromWallet     BigInt     @default(0) @map("from_wallet")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([customerId, createdAt])
+  @@index([mode, createdAt])
+  @@map("exchange_trades")
+}
+
+/// A reseller's held price to trade its own fiat and coin reserve directly with BitoCard.
+model ExchangeDesk {
+  resellerId          String   @id @map("reseller_id") @db.Uuid
+  fallbackToBitocard   Boolean  @default(true) @map("fallback_to_bitocard")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("exchange_desks")
+}
+
+/// A reseller's held price to trade its own fiat and coin reserve directly with BitoCard.
+model ResellerDeskQuote {
+  id          String     @id @default(uuid()) @db.Uuid
+  resellerId  String     @map("reseller_id") @db.Uuid
+  mode        LedgerMode
+  side        String
+  asset       String     @db.VarChar(10)
+  currency    String     @db.Char(3)
+  amount      BigInt
+  fiatMinor   BigInt     @map("fiat_minor")
+  priceMinor  BigInt     @map("price_minor")
+  marketUsdE8 BigInt     @map("market_usd_e8")
+  fxMid       Decimal    @map("fx_mid") @db.Decimal(24, 10)
+  markupBps   Int        @map("markup_bps")
+  expiresAt   DateTime   @map("expires_at")
+  usedAt      DateTime?  @map("used_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([resellerId, mode, createdAt])
+  @@map("reseller_desk_quotes")
+}
+
+/// The reseller-to-BitoCard trade: one quote, one balanced ledger entry, no customer account involved.
+model ResellerDeskTrade {
+  id          String     @id @default(uuid()) @db.Uuid
+  number      Int        @unique @default(autoincrement())
+  quoteId     String     @unique @map("quote_id") @db.Uuid
+  resellerId  String     @map("reseller_id") @db.Uuid
+  mode        LedgerMode
+  side        String
+  asset       String     @db.VarChar(10)
+  currency    String     @db.Char(3)
+  amount      BigInt
+  fiatMinor   BigInt     @map("fiat_minor")
+  priceMinor  BigInt     @map("price_minor")
+  markupMinor BigInt     @map("markup_minor")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([resellerId, mode, createdAt])
+  @@map("reseller_desk_trades")
+}
+
+/// A finance admin funding or drawing down one of BitoCard's exchange reserves. Nothing moves until the admin who asked
+/// enters the code emailed to them (10 minutes, 5 attempts, a resend a minute). Fiat: from or to the provider balance
+/// (`manual`), into the market's house account; coins: from or to `crypto_custody` (coins BitoCard holds on chain),
+/// into the root house account.
+model ReserveMovement {
+  id                String     @id @default(uuid()) @db.Uuid
+  /// Shown as RM-000123.
+  number            Int        @unique @default(autoincrement())
+  mode              LedgerMode
+  /// fund or withdraw.
+  kind              String
+  /// fiat or crypto.
+  reserve           String
+  /// The asset code, or the fiat currency.
+  currency          String     @db.VarChar(10)
+  /// Fiat reserves: the market whose house account holds it.
+  country           String?    @db.Char(2)
+  amount            BigInt
+  externalReference String?    @map("external_reference")
+  reason            String
+  /// awaiting_code, completed or cancelled.
+  status            String     @default("awaiting_code")
+  requestedBy       String     @map("requested_by") @db.Uuid
+  cancelledBy       String?    @map("cancelled_by") @db.Uuid
+  codeHash          String?    @map("code_hash")
+  codeExpiresAt     DateTime?  @map("code_expires_at")
+  codeAttempts      Int        @default(0) @map("code_attempts")
+  codeSentAt        DateTime?  @map("code_sent_at")
+  entryId           String?    @map("entry_id") @db.Uuid
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  completedAt       DateTime?  @map("completed_at")
+
+  @@index([status, createdAt])
+  @@map("reserve_movements")
+}
+
 model CryptoWithdrawal {
   id               String     @id @default(uuid()) @db.Uuid
   /// Shown as CW-000123.

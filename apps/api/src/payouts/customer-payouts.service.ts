@@ -115,7 +115,7 @@ export class CustomerPayoutsService {
   private async held(accountId: string, holdDays: number) {
     if (holdDays <= 0) return 0n;
     const recent = await this.prisma.ledgerPosting.aggregate({
-      where: { accountId, amountMinor: { lt: 0n }, entry: { type: 'p2p_trade', createdAt: { gt: new Date(Date.now() - holdDays * dayMs) } } },
+      where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['p2p_trade', 'exchange_trade'] }, createdAt: { gt: new Date(Date.now() - holdDays * dayMs) } } },
       _sum: { amountMinor: true },
     });
     return -(recent._sum.amountMinor ?? 0n);

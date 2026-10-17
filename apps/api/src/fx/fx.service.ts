@@ -155,6 +155,19 @@ export class FxService {
     };
   }
 
+  /**
+   * The market rate for a currency, in units per US dollar: the average of the fresh sources, without BitoCard's
+   * conversion margin (the instant exchange adds only its own markup). Refused like `rate` while paused or stale.
+   */
+  async mid(currency: string): Promise<Decimal> {
+    if (currency === 'USD') return new Decimal(1);
+    const setting = await this.prisma.currencySetting.findUnique({ where: { currency } });
+    if (!setting || setting.paused) throw conversionUnavailable(currency);
+    const rates = await this.freshRates(currency);
+    if (rates.length === 0) throw conversionUnavailable(currency);
+    return rates.reduce((sum, rate) => sum.plus(rate.unitsPerUsd), new Decimal(0)).div(rates.length);
+  }
+
   /** What to charge in `currency` (minor units, rounded up) for a price in US cents. Returns the rate used. */
   async chargeForUsdCents(cents: number, currency: string) {
     const rate = await this.rate(currency);

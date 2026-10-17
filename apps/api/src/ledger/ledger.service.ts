@@ -28,7 +28,19 @@ export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ acco
 
 /** Assets and expenses grow with debits; every other account (what BitoCard owes, revenue, tax) grows with credits. */
 const debitNormal = new Set<AccountKind>(['provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales', 'promotions', 'crypto_custody', 'crypto_promotions']);
-const resellerKinds = new Set<AccountKind>(['reseller_funding', 'reseller_earnings', 'reseller_earnings_held', 'reseller_reserved', 'reseller_payouts_pending', 'reseller_allowance', 'customer_payments']);
+const resellerKinds = new Set<AccountKind>([
+  'reseller_funding',
+  'reseller_earnings',
+  'reseller_earnings_held',
+  'reseller_reserved',
+  'reseller_payouts_pending',
+  'reseller_allowance',
+  'customer_payments',
+  // Exchange desks' reserves (BitoCard's sit on its house accounts).
+  'reserve_fiat',
+  'reserve_crypto',
+  'reseller_crypto',
+]);
 /** A store customer's own money and crypto: their wallets, P2P proceeds and what they have locked or an admin froze, never below zero. */
 const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards']);
 

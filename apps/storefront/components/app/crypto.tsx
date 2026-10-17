@@ -31,7 +31,7 @@ export function CryptoNav({ current }: { current: string }) {
           key={section.href}
           href={section.href}
           aria-current={section.href === current ? "page" : undefined}
-          className="inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 aria-[current=page]:bg-navy-900 aria-[current=page]:text-white aria-[current=page]:ring-navy-900"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:text-brand-600 focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700 aria-[current=page]:ring-brand-500"
         >
           {section.label}
         </Link>
@@ -111,14 +111,14 @@ export function CoinPicker({
                 href={href(code)}
                 aria-current={chosen ? "page" : undefined}
                 title={balance?.name ?? code}
-                className={`group relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-center transition sm:flex-row sm:justify-start sm:gap-2.5 sm:px-3 sm:text-left ${
-                  chosen ? "bg-navy-900 text-white shadow-md ring-2 ring-navy-900" : "bg-white text-navy-900 ring-1 ring-slate-200 hover:-translate-y-px hover:shadow-sm hover:ring-slate-300"
+                className={`group relative flex min-h-16 min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-2.5 text-center transition focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700 sm:flex-row sm:justify-start sm:gap-2.5 sm:px-3 sm:text-left ${
+                  chosen ? "bg-brand-50 text-brand-700 shadow-sm ring-2 ring-brand-500" : "bg-white text-navy-900 ring-1 ring-slate-200 hover:-translate-y-px hover:shadow-sm hover:ring-slate-300"
                 }`}
               >
                 <CoinBadge asset={code} size="size-9" />
                 <span className="min-w-0 leading-tight sm:flex-1">
                   <span className="block text-sm font-bold">{code}</span>
-                  <span className={`block truncate text-[11px] sm:text-xs ${chosen ? "text-white/70" : "text-slate-500"}`}>{note}</span>
+                  <span className={`block truncate text-[11px] sm:text-xs ${chosen ? "text-brand-700" : "text-slate-500"}`}>{note}</span>
                 </span>
                 {chosen ? (
                   <span className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full bg-brand-500 text-white ring-2 ring-white">

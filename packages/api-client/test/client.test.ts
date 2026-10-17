@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { adminApi, adminChargebacksApi, parseStockCodes, percentToPpb } from '../src/admin';
+import { adminApi, adminChargebacksApi, adminTopUpsApi, parseStockCodes, percentToPpb } from '../src/admin';
 import { resellerCatalogueApi, resellerFeesApi, resellerWalletApi, resellerNumbersApi, resellerOrdersApi, resellerPayoutsApi, resellerSessionApi, smsLimit } from '../src/reseller';
 import { keepUnusedSeconds, makeStore, notificationsApi, pushApi, readTimeoutMs, revalidateAfterSeconds, setRequestContext, toApiError, uploadMedia } from '../src';
 
@@ -150,6 +150,26 @@ describe('base query', () => {
     await store.dispatch(adminApi.endpoints.decideVerification.initiate({ id: 'v1', decision: 'approved', reason: 'Checked by hand' }));
     await vi.waitFor(() => expect(calls.filter(call => call.url.includes('/v1/admin/verifications?')).length).toBe(2));
     subscription.unsubscribe();
+  });
+});
+
+describe('manual top-ups', () => {
+  test("asking emails a code; confirming refreshes the reseller's wallet and the top-ups list", async () => {
+    const store = makeStore();
+    const confirmed = { object: 'manual_top_up', id: 'mt1', number: 'MT-000001', status: 'completed', target: { type: 'reseller', id: 'rs1', name: 'Ada', email: null, store: null } };
+    reply = call => (call.method === 'POST' ? Response.json(call.url.endsWith('/confirm') ? confirmed : { ...confirmed, status: 'awaiting_code' }) : Response.json({ object: 'list', data: [], available: 0, wallets: [] }));
+    const wallet = store.dispatch(adminApi.endpoints.resellerWallet.initiate('rs1'));
+    const list = store.dispatch(adminTopUpsApi.endpoints.manualTopUps.initiate({ reseller_id: 'rs1' }));
+    await Promise.all([wallet, list]);
+    await store.dispatch(adminTopUpsApi.endpoints.requestResellerTopUp.initiate({ id: 'rs1', amount: 5000, source: 'goodwill', reason: 'Goodwill' }));
+    await store.dispatch(adminTopUpsApi.endpoints.confirmTopUp.initiate({ id: 'mt1', code: '123456' }));
+    const posts = calls.filter(call => call.method === 'POST');
+    expect(posts.map(call => call.url)).toEqual(['http://api.test/v1/admin/resellers/rs1/top-ups', 'http://api.test/v1/admin/top-ups/mt1/confirm']);
+    expect(JSON.parse(posts[1].body!)).toEqual({ code: '123456' });
+    await vi.waitFor(() => expect(calls.filter(call => call.url.endsWith('/v1/admin/resellers/rs1/wallet'))).toHaveLength(2));
+    await vi.waitFor(() => expect(calls.filter(call => call.url.includes('/v1/admin/top-ups?')).length).toBe(3));
+    wallet.unsubscribe();
+    list.unsubscribe();
   });
 });
 
