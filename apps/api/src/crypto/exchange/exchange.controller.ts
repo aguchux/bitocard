@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes } from '../../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, SessionOnly } from '../../auth/caller.js';
 import { adminId } from '../../countries/countries.controller.js';
 import { ApiError } from '../../common/errors/api-error.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../../customers/customer-session.js';
@@ -61,6 +61,18 @@ class TradesFilterDto extends ModeDto {
 
   @IsOptional() @IsUUID()
   customer_id?: string;
+
+  /** `bitocard`, or a reseller's ID for their own desk. */
+  @IsOptional() @Matches(/^(bitocard|[0-9a-f-]{36})$/, { message: 'desk must be bitocard or a reseller ID' })
+  desk?: string;
+}
+
+class ResellerTradesFilterDto extends ModeDto {
+  @IsOptional() @Transform(upper) @assetCode()
+  asset?: string;
+
+  @IsOptional() @IsUUID()
+  reseller_id?: string;
 }
 
 class MovementsFilterDto extends ModeDto {
@@ -130,8 +142,12 @@ class MovementDto {
 }
 
 class ConfirmDto {
-  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code from the email' })
+  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code from your authenticator app or the email' })
   code: string;
+
+  /** authenticator (the admin's app, when set up) or email (the code we emailed; the default). */
+  @IsOptional() @IsIn(['authenticator', 'email'])
+  method?: 'authenticator' | 'email';
 }
 
 class ReserveTransferDto {
@@ -196,6 +212,8 @@ class ResellerQuoteDto extends ResellerOverviewDto {
 @ApiTags('Exchange')
 @ApiBearerAuth()
 @modeHeader
+// SHQ sessions only: an API key must never move reserves, set prices or trade the wallet.
+@SessionOnly()
 @Controller('exchange')
 export class ResellerExchangeController {
   constructor(private readonly exchange: ExchangeService, private readonly desk: ResellerDeskService) {}
@@ -268,6 +286,13 @@ export class ResellerExchangeController {
     return this.exchange.setResellerDesk(resellerOf(caller), body.fallback_to_bitocard);
   }
 
+  @ApiOperation({ summary: 'List your customers’ trades at your desk', description: 'Newest first, with the customer and the markup you earned on each.' })
+  @Scopes('wallet:read')
+  @Get('desk/trades')
+  deskTrades(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: PageDto) {
+    return this.exchange.deskTrades(resellerOf(caller), mode, query);
+  }
+
   @ApiOperation({ summary: 'List your customer exchange prices', description: 'Per coin and wallet currency, including whether the offer is enabled.' })
   @Scopes('wallet:read')
   @Get('markups')
@@ -328,6 +353,7 @@ export class AdminExchangeController {
   constructor(
     private readonly exchange: ExchangeService,
     private readonly reserves: ReservesService,
+    private readonly desk: ResellerDeskService,
   ) {}
 
   @Get('reserves')
@@ -350,7 +376,7 @@ export class AdminExchangeController {
   @Post('reserves/movements/:id/confirm')
   @HttpCode(HttpStatus.OK)
   confirmMovement(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ConfirmDto) {
-    return this.reserves.confirm(adminId(caller)!, id, body.code);
+    return this.reserves.confirm(adminId(caller)!, id, body.code, body.method);
   }
 
   @AdminRoles('finance')
@@ -381,5 +407,17 @@ export class AdminExchangeController {
   @Get('trades')
   trades(@Query() query: TradesFilterDto) {
     return this.exchange.adminTrades(query);
+  }
+
+  /** Resellers' own trades with BitoCard's desk (they buy and sell coins in SHQ). */
+  @Get('reseller-trades')
+  resellerTrades(@Query() query: ResellerTradesFilterDto) {
+    return this.desk.adminTrades(query);
+  }
+
+  /** Every reseller running a desk, its pairs and its reserves. */
+  @Get('desks')
+  desks(@Query() query: ModeDto) {
+    return this.exchange.adminDesks(query.mode ?? 'live');
   }
 }

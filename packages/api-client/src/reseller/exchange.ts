@@ -1,5 +1,5 @@
 import { bitocardApi } from '../base';
-import type { List, Mode } from './common';
+import { cursorPages, type List, type Mode, params } from './common';
 
 export type ExchangeReserves = {
   object: 'exchange_reserves';
@@ -26,12 +26,12 @@ export type ExchangeMarkup = {
 };
 
 export type ExchangeMarkupInput = Pick<ExchangeMarkup, 'asset' | 'currency' | 'enabled' | 'buy_markup_bps' | 'sell_markup_bps' | 'min_fiat' | 'max_fiat'> & { mode: Mode };
-export type ExchangeDeskSettings = { object: 'exchange_desk'; enabled: boolean; fallback_to_bitocard: boolean };
+export type ExchangeDeskSettings = { object: 'exchange_desk'; enabled: boolean; fallback_to_bitocard: boolean; markup_cap_bps: number };
 
 export type ResellerExchangeAsset = {
   asset: string; name: string; decimals: number; market_usd: string; buy_price: number; sell_price: number;
   available_to_buy: string; available_to_sell_for: number; your_coins: string; your_wallet: number;
-} | { asset: string; name: string; decimals: number; closed: string };
+} | { asset: string; name: string; decimals: number; closed: string; your_coins: string };
 export type ResellerExchangeOverview = {
   object: 'reseller_exchange'; mode: Mode; currency: string; desk: { id: string; name: string }; quote_seconds: number;
   assets: ResellerExchangeAsset[];
@@ -44,6 +44,14 @@ export type ResellerExchangeTrade = {
   object: 'reseller_exchange_trade'; id: string; number: string; mode: Mode; side: 'buy' | 'sell'; asset: string; currency: string;
   amount: string; fiat: number; price: number; markup: number; created_at: string;
 };
+
+/** A customer's trade at the reseller's own desk (`GET /v1/exchange/desk/trades`): the markup is the reseller's. */
+export type DeskTrade = {
+  object: 'desk_trade'; id: string; number: string; mode: Mode; side: 'buy' | 'sell'; asset: string; currency: string;
+  amount: string; fiat: number; price: number; markup: number; customer: { id: string; name: string; email: string }; created_at: string;
+};
+/** Coins moved between the reseller's coin wallet and its customer desk reserve. */
+export type ResellerCoinBalance = { object: 'reseller_coin_balance'; mode: Mode; asset: string; wallet: string; reserve: string };
 
 export const resellerExchangeApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
@@ -60,12 +68,24 @@ export const resellerExchangeApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Exchange', 'Wallet'],
     }),
     resellerExchangeTrades: build.query<List<ResellerExchangeTrade>, void>({ query: () => '/v1/exchange/trades', providesTags: ['Exchange'] }),
+    /** Every trade with BitoCard, newest first, a page at a time. */
+    resellerExchangeTradePages: build.infiniteQuery<List<ResellerExchangeTrade>, void, string>({
+      infiniteQueryOptions: cursorPages,
+      query: ({ pageParam }) => ({ url: '/v1/exchange/trades', params: params({ limit: 25, starting_after: pageParam }) }),
+      providesTags: ['Exchange'],
+    }),
+    /** Customers' trades at the reseller's own desk, newest first, a page at a time. */
+    resellerDeskTrades: build.infiniteQuery<List<DeskTrade>, void, string>({
+      infiniteQueryOptions: cursorPages,
+      query: ({ pageParam }) => ({ url: '/v1/exchange/desk/trades', params: params({ limit: 25, starting_after: pageParam }) }),
+      providesTags: ['Exchange'],
+    }),
     resellerExchangeReserves: build.query<ExchangeReserves, void>({ query: () => '/v1/exchange/reserves', providesTags: ['Exchange'] }),
     transferExchangeReserve: build.mutation<ExchangeReserves, { currency: string; amount: number; direction: 'fund' | 'withdraw' }>({
       query: body => ({ url: '/v1/exchange/reserves/transfers', method: 'POST', body }),
       invalidatesTags: ['Exchange', 'Wallet'],
     }),
-    transferExchangeCoins: build.mutation<{ object: 'reseller_coin_balance'; wallet: string; reserve: string }, { asset: string; amount: string; direction: 'fund' | 'withdraw' }>({
+    transferExchangeCoins: build.mutation<ResellerCoinBalance, { asset: string; amount: string; direction: 'fund' | 'withdraw' }>({
       query: body => ({ url: '/v1/exchange/reserves/coins/transfers', method: 'POST', body }), invalidatesTags: ['Exchange'],
     }),
     resellerExchangeMarkups: build.query<List<ExchangeMarkup>, void>({ query: () => '/v1/exchange/markups', providesTags: ['Exchange'] }),
@@ -78,4 +98,4 @@ export const resellerExchangeApi = bitocardApi.injectEndpoints({
 
 export const { useResellerExchangeOverviewQuery, useQuoteResellerExchangeMutation, useTradeResellerExchangeMutation, useResellerExchangeTradesQuery,
   useResellerExchangeReservesQuery, useTransferExchangeReserveMutation, useTransferExchangeCoinsMutation, useResellerExchangeMarkupsQuery, useSetResellerExchangeMarkupMutation,
-  useResellerExchangeDeskQuery, useSetResellerExchangeDeskMutation } = resellerExchangeApi;
+  useResellerExchangeDeskQuery, useSetResellerExchangeDeskMutation, useResellerExchangeTradePagesInfiniteQuery, useResellerDeskTradesInfiniteQuery } = resellerExchangeApi;

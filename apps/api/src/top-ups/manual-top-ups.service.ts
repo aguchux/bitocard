@@ -1,3 +1,5 @@
+import { type ConfirmMethod, confirmMethods } from '../auth/confirm-methods.js';
+import { AdminAuthService } from '../auth/admin-auth.service.js';
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -14,6 +16,8 @@ import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney, manualTopUpCodeEmail } from '../notifications/templates.js';
 
+/** Codes one request may be sent (the first and four resends): at most 25 guesses at it in all. */
+const maxCodeSends = 5;
 const minute = 60_000;
 /** The emailed code works for 10 minutes: this moves money. */
 export const topUpCodeLifetimeMs = 10 * minute;
@@ -49,6 +53,7 @@ export class ManualTopUpsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly adminAuth: AdminAuthService,
     private readonly ledger: LedgerService,
     private readonly wallets: WalletService,
     private readonly stores: StoreSellers,
@@ -105,7 +110,7 @@ export class ManualTopUpsService {
     });
     await this.audit.record({ actorId: admin.id, action: 'wallet.manual_top_up_requested', targetType: target.type, targetId: target.type === 'reseller' ? target.resellerId : target.customerId, after: this.auditView(row) });
     await this.sendCode(admin.email, row, code);
-    return this.present(row, { [admin.id]: admin.name });
+    return { ...this.present(row, { [admin.id]: admin.name }), confirm_with: await confirmMethods(this.prisma, admin.id) };
   }
 
   /** A fresh code for the admin who asked, at most once a minute; the attempts start again. */
@@ -115,10 +120,12 @@ export class ManualTopUpsService {
     if (row.codeSentAt && Date.now() - row.codeSentAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
     }
+    // A few codes per request at most: each resend gives new attempts, so the sends themselves are capped.
+    if (row.codeSends >= maxCodeSends) throw invalid('code_resend_limit', 'Too many codes for this request. Cancel it and start again.', 'code');
     const code = numericCode();
     const updated = await this.prisma.manualTopUp.updateMany({
-      where: { id: row.id, status: 'awaiting_code' },
-      data: { codeHash: codeDigest(row.id, code), codeExpiresAt: new Date(Date.now() + topUpCodeLifetimeMs), codeAttempts: 0, codeSentAt: new Date() },
+      where: { id: row.id, status: 'awaiting_code', codeSends: { lt: maxCodeSends } },
+      data: { codeHash: codeDigest(row.id, code), codeExpiresAt: new Date(Date.now() + topUpCodeLifetimeMs), codeAttempts: 0, codeSentAt: new Date(), codeSends: { increment: 1 } },
     });
     if (!updated.count) throw notWaiting();
     const admin = await this.admin(adminId);
@@ -128,14 +135,23 @@ export class ManualTopUpsService {
   }
 
   /** The admin who asked enters the emailed code: the wallet is credited once, in the same transaction as the claim. */
-  async confirm(adminId: string, id: string, code: string) {
+  /**
+   * Confirms with the admin's own authenticator app (when they have one; a wrong code counts towards their sign-in
+   * lockout, and a code is used once) or with the emailed code (the fallback, which every admin can use).
+   */
+  async confirm(adminId: string, id: string, code: string, method: ConfirmMethod = 'email') {
     const row = await this.own(adminId, id);
     if (row.status !== 'awaiting_code' || !row.codeHash) throw notWaiting();
-    if (!row.codeExpiresAt || row.codeExpiresAt <= new Date()) throw invalid('code_expired', 'That code has expired. Ask for a new one.', 'code');
-    // Claim an attempt before comparing, in one statement, so parallel guesses never get past the limit.
-    const attempt = await this.prisma.manualTopUp.updateMany({ where: { id: row.id, status: 'awaiting_code', codeAttempts: { lt: maxCodeAttempts } }, data: { codeAttempts: { increment: 1 } } });
-    if (!attempt.count) throw invalid('code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
-    if (!sameDigest(row.codeHash, codeDigest(row.id, code))) throw invalid('code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
+    if (method === 'authenticator') {
+      if (!(await confirmMethods(this.prisma, adminId)).includes('authenticator')) throw invalid('authenticator_not_set_up', 'Set up your authenticator app first, or use the code we emailed you.', 'method');
+      await this.adminAuth.confirmCode(adminId, code);
+    } else {
+      if (!row.codeExpiresAt || row.codeExpiresAt <= new Date()) throw invalid('code_expired', 'That code has expired. Ask for a new one.', 'code');
+      // Claim an attempt before comparing, in one statement, so parallel guesses never get past the limit.
+      const attempt = await this.prisma.manualTopUp.updateMany({ where: { id: row.id, status: 'awaiting_code', codeAttempts: { lt: maxCodeAttempts } }, data: { codeAttempts: { increment: 1 } } });
+      if (!attempt.count) throw invalid('code_attempts_exceeded', 'Too many wrong attempts. Ask for a new code.', 'code');
+      if (!sameDigest(row.codeHash, codeDigest(row.id, code))) throw invalid('code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
+    }
 
     const target = this.targetAccount(row);
     const counterpart: AccountRef = row.source === 'received' ? { kind: 'provider_balance', currency: row.currency, provider: 'manual' } : { kind: 'adjustments', currency: row.currency };

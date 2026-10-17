@@ -21758,10 +21758,10 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-scopes": [
           "wallet:read"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/exchange/quotes": {
@@ -21896,14 +21896,14 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-roles": [
           "admin",
           "finance"
         ],
         "x-bitocard-scopes": [
           "wallet:write"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/exchange/trades": {
@@ -22039,14 +22039,14 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-roles": [
           "admin",
           "finance"
         ],
         "x-bitocard-scopes": [
           "wallet:write"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       },
       "get": {
         "operationId": "ResellerExchangeController_trades",
@@ -22218,10 +22218,10 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-scopes": [
           "wallet:read"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/exchange/reserves": {
@@ -22340,10 +22340,10 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-scopes": [
           "wallet:read"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/exchange/reserves/transfers": {
@@ -22491,14 +22491,14 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-roles": [
           "admin",
           "finance"
         ],
         "x-bitocard-scopes": [
           "wallet:write"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/exchange/reserves/coins/transfers": {
@@ -22626,14 +22626,14 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-roles": [
           "admin",
           "finance"
         ],
         "x-bitocard-scopes": [
           "wallet:write"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/exchange/desk": {
@@ -22661,7 +22661,8 @@
                 "example": {
                   "object": "exchange_desk",
                   "enabled": true,
-                  "fallback_to_bitocard": true
+                  "fallback_to_bitocard": true,
+                  "markup_cap_bps": 500
                 }
               }
             }
@@ -22730,10 +22731,10 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-scopes": [
           "wallet:read"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       },
       "put": {
         "operationId": "ResellerExchangeController_setDesk",
@@ -22769,7 +22770,8 @@
                 "example": {
                   "object": "exchange_desk",
                   "enabled": true,
-                  "fallback_to_bitocard": true
+                  "fallback_to_bitocard": true,
+                  "markup_cap_bps": 500
                 }
               }
             }
@@ -22857,14 +22859,197 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-roles": [
           "admin",
           "finance"
         ],
         "x-bitocard-scopes": [
           "wallet:write"
+        ]
+      }
+    },
+    "/v1/exchange/desk/trades": {
+      "get": {
+        "description": "Newest first, with the customer and the markup you earned on each.",
+        "operationId": "ResellerExchangeController_deskTrades",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "x-bitocard-auth": "api_key"
+        "responses": {
+          "200": {
+            "description": "Your customers’ trades at your desk.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DeskTrade"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "desk_trade",
+                      "id": "2c9a4c1e-4b1f-4f1c-9a43-1b2d1c0f7a11",
+                      "number": "EX-000124",
+                      "mode": "test",
+                      "side": "buy",
+                      "asset": "BTC",
+                      "currency": "NGN",
+                      "amount": "0.01000000",
+                      "fiat": 91350000,
+                      "price": 9135000000,
+                      "markup": 900000,
+                      "customer": {
+                        "id": "0b6f3a52-6a0b-4b7e-9b52-3b6f6c1d2e33",
+                        "name": "Ada Trader",
+                        "email": "ada@example.com"
+                      },
+                      "created_at": "2026-10-17T11:31:00.000Z"
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your customers’ trades at your desk",
+        "tags": [
+          "Exchange"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ]
       }
     },
     "/v1/exchange/markups": {
@@ -23005,10 +23190,10 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-scopes": [
           "wallet:read"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       },
       "put": {
         "description": "Set your buy and sell markup and per-trade limits for a coin in your local or US dollar currency.",
@@ -23143,14 +23328,14 @@
         "tags": [
           "Exchange"
         ],
+        "x-bitocard-auth": "session",
         "x-bitocard-roles": [
           "admin",
           "finance"
         ],
         "x-bitocard-scopes": [
           "wallet:write"
-        ],
-        "x-bitocard-auth": "api_key"
+        ]
       }
     },
     "/v1/numbers": {
@@ -36041,6 +36226,7 @@
               "store.checkout_refused",
               "number.expiring",
               "number.renewal_failed",
+              "exchange.reserve_low",
               "number.expired",
               "number.deleted",
               "payout.paid",
@@ -36219,6 +36405,7 @@
               "store.checkout_refused",
               "number.expiring",
               "number.renewal_failed",
+              "exchange.reserve_low",
               "number.expired",
               "number.deleted",
               "payout.paid",
@@ -37047,7 +37234,8 @@
         "required": [
           "object",
           "enabled",
-          "fallback_to_bitocard"
+          "fallback_to_bitocard",
+          "markup_cap_bps"
         ],
         "additionalProperties": false,
         "properties": {
@@ -37063,6 +37251,10 @@
           "fallback_to_bitocard": {
             "type": "boolean",
             "description": "Whether customers may use BitoCard when the reseller does not offer the pair."
+          },
+          "markup_cap_bps": {
+            "type": "integer",
+            "description": "The most markup your market allows on each side, in basis points."
           }
         }
       },
@@ -37376,7 +37568,8 @@
                     "asset",
                     "name",
                     "decimals",
-                    "closed"
+                    "closed",
+                    "your_coins"
                   ],
                   "additionalProperties": false,
                   "properties": {
@@ -37395,6 +37588,10 @@
                     "closed": {
                       "type": "string",
                       "description": "Reason the pair is unavailable."
+                    },
+                    "your_coins": {
+                      "type": "string",
+                      "description": "Coin amount, as a decimal string in the asset’s units."
                     }
                   }
                 }
@@ -37560,6 +37757,111 @@
           "created_at": {
             "type": "string",
             "description": "Trade creation.",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeskTrade": {
+        "type": "object",
+        "title": "DeskTrade",
+        "required": [
+          "object",
+          "id",
+          "number",
+          "mode",
+          "side",
+          "asset",
+          "currency",
+          "amount",
+          "fiat",
+          "price",
+          "markup",
+          "customer",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `desk_trade`.",
+            "const": "desk_trade"
+          },
+          "id": {
+            "type": "string",
+            "description": "Trade ID.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Receipt number shown to the customer."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "side": {
+            "type": "string",
+            "description": "Buy coins with money, or sell coins for money.",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Three-letter fiat currency."
+          },
+          "amount": {
+            "type": "string",
+            "description": "Coin amount, as a decimal string in the asset’s units."
+          },
+          "fiat": {
+            "type": "integer",
+            "description": "Fiat in minor units."
+          },
+          "price": {
+            "type": "integer",
+            "description": "Fiat price per whole coin, in minor units."
+          },
+          "markup": {
+            "type": "integer",
+            "description": "Your markup earned, in fiat minor units."
+          },
+          "customer": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "email"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Customer ID.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "Customer name."
+              },
+              "email": {
+                "type": "string",
+                "description": "Customer email."
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Trade time.",
             "format": "date-time"
           }
         }

@@ -1,4 +1,4 @@
-import type { StoreExchangeAsset, StoreExchangeSide } from "@bitocard/api-client/storefront";
+import { formatCrypto, formatFace, type StoreExchange, type StoreExchangeAsset, type StoreExchangeQuote, type StoreExchangeSide } from "@bitocard/api-client/storefront";
 
 /**
  * The exchange screen's maths, mirroring the API's (`src/crypto/exchange/pricing.ts`) so the screen shows what the quote
@@ -93,3 +93,54 @@ export function usdText(usd: string) {
 
 /** A markup in per cent for the screen ("1%", "1.5%"). */
 export const percent = (bps: number) => `${(bps / 100).toLocaleString("en-GB", { maximumFractionDigits: 2 })}%`;
+
+/** The exchange screen for a coin and side, optionally with an amount of money (minor units) to start from. */
+export function exchangeHref(input: { asset: string; side: Side; fiat?: bigint | number | null }) {
+  const query = new URLSearchParams({ asset: input.asset, side: input.side });
+  if (input.fiat !== undefined && input.fiat !== null && BigInt(input.fiat) > 0n) query.set("fiat", String(input.fiat));
+  return `/account/crypto/exchange?${query.toString()}`;
+}
+
+/** `?fiat=` on the exchange screen: whole minor units only, else null (never a guess). */
+export function fiatParam(value: string | undefined): bigint | null {
+  if (!value || !/^\d{1,15}$/.test(value)) return null;
+  const minor = BigInt(value);
+  return minor > 0n ? minor : null;
+}
+
+/**
+ * The Buy and Sell links a coin's wallet row gets: only where the exchange is offered to the customer and that side is
+ * open for the coin; Sell only while they hold some of it to sell.
+ */
+export function walletExchangeLinks(exchange: StoreExchange | null, asset: string, available: string) {
+  const pair = exchange?.enabled ? exchange.assets.find(item => item.asset === asset) : undefined;
+  if (!pair) return { buy: null, sell: null };
+  const holds = (parseCoin(available, pair.decimals) ?? 0n) > 0n;
+  return {
+    buy: pair.buy ? exchangeHref({ asset, side: "buy" }) : null,
+    sell: pair.sell && holds ? exchangeHref({ asset, side: "sell" }) : null,
+  };
+}
+
+/** The reserve's price per coin and side (fiat minor units per whole coin), null where closed; nothing while the exchange is off. */
+export type ReservePrices = Record<string, { buy: number | null; sell: number | null }>;
+
+export function reservePrices(exchange: StoreExchange | null): ReservePrices {
+  if (!exchange?.enabled) return {};
+  return Object.fromEntries(exchange.assets.map(item => [item.asset, { buy: item.buy?.price ?? null, sell: item.sell?.price ?? null }]));
+}
+
+/** Where Quick buy or sell starts: BitoCard's reserve when it has a price for the coin and side, else the traders. */
+export const initialSource = (prices: ReservePrices, asset: string, side: Side): "reserve" | "p2p" => (prices[asset]?.[side] ? "reserve" : "p2p");
+
+/**
+ * What the review says about the reserve: "Up to 0.42 BTC available from BitoCard." (buying) or the money it can pay
+ * (selling), and, when the quote is exactly that most, that it is.
+ */
+export function availabilityText(quote: Pick<StoreExchangeQuote, "side" | "asset" | "currency" | "available" | "capped">, desk: string) {
+  const most = quote.side === "buy" ? formatCrypto(quote.available.amount, quote.asset) : formatFace(quote.available.fiat, quote.currency);
+  return {
+    line: `Up to ${most} available from ${desk}.`,
+    capped: quote.capped ? `This quote is the most ${desk} has available right now.` : null,
+  };
+}

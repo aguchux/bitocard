@@ -1,13 +1,16 @@
 "use client";
 
-import { type ReactNode, useActionState, useState } from "react";
+import { type ChangeEvent, type ReactNode, useActionState, useEffect, useState } from "react";
+import { formatFace } from "@bitocard/api-client/storefront";
 import { ArrowDownLeft, ArrowUpRight, Check, Copy, Mail, Plus, Send, Zap } from "lucide-react";
+import { initialSource, type ReservePrices } from "@/lib/exchange";
 import { FormMessage, Submit, TextField } from "@/components/store/account-forms";
 import type { FormState } from "@/lib/account-actions";
 import {
   addCashOutAccount,
   addTestCrypto,
   addWithdrawalAddress,
+  bestP2pPrice,
   cashOut,
   chooseNickname,
   confirmTrade,
@@ -45,11 +48,12 @@ function SideSwitch({ name = "side", value, onChange, labels = { buy: "Buy", sel
   );
 }
 
-function AssetSelect({ assets, defaultValue, name = "asset", label = "Coin" }: { assets: string[]; defaultValue?: string; name?: string; label?: string }) {
+function AssetSelect({ assets, defaultValue, name = "asset", label = "Coin", value, onChange }: { assets: string[]; defaultValue?: string; name?: string; label?: string; value?: string; onChange?: (asset: string) => void }) {
+  const controlled = value !== undefined ? { value, onChange: (event: ChangeEvent<HTMLSelectElement>) => onChange?.(event.target.value) } : { defaultValue: defaultValue ?? assets[0] };
   return (
     <label className="block space-y-1.5">
       <span className="block text-sm font-semibold text-navy-900">{label}</span>
-      <select name={name} defaultValue={defaultValue ?? assets[0]} className={selectClass}>
+      <select name={name} {...controlled} className={selectClass}>
         {assets.map(asset => (
           <option key={asset} value={asset}>
             {asset}
@@ -111,22 +115,97 @@ export function ActionButton({
   );
 }
 
-/** One tap to the best price: buy or sell, which coin and how much (in the customer's currency). */
-export function QuickTrade({ assets, currency, defaultAsset, defaultSide = "buy" }: { assets: string[]; currency: string; defaultAsset?: string; defaultSide?: "buy" | "sell" }) {
+type Source = "reserve" | "p2p";
+
+/**
+ * Quick buy or sell: buy or sell, the coin, where from (BitoCard's reserve, the instant exchange at its live price, or
+ * traders on the P2P market at the best ad's price; both shown with their price, nothing hidden) and how much in the
+ * customer's currency. The reserve opens the exchange with the amount filled in; traders go to the best ad's confirmation.
+ */
+export function QuickTrade({
+  assets,
+  currency,
+  defaultAsset,
+  defaultSide = "buy",
+  reserve = {},
+  desk = "BitoCard",
+}: {
+  assets: string[];
+  currency: string;
+  defaultAsset?: string;
+  defaultSide?: "buy" | "sell";
+  /** The reserve's prices per coin and side (`reservePrices`); empty where the instant exchange is not offered. */
+  reserve?: ReservePrices;
+  desk?: string;
+}) {
   const [state, action, pending] = useActionState<FormState, FormData>(findBestPrice, {});
   const [side, setSide] = useState<"buy" | "sell">(defaultSide);
+  const [asset, setAsset] = useState(defaultAsset && assets.includes(defaultAsset) ? defaultAsset : (assets[0] ?? ""));
+  const reservePrice = reserve[asset]?.[side] ?? null;
+  const [chosen, setChosen] = useState<Source | null>(null);
+  // The reserve while it has a price for this coin and side (unless the customer chose traders), else traders.
+  const source: Source = reservePrice === null ? "p2p" : (chosen ?? initialSource(reserve, asset, side));
+  // The best P2P price per coin and side, asked once each (undefined while asking, null with no ad).
+  const [p2p, setP2p] = useState<Record<string, number | null>>({});
+  const key = `${asset}:${side}`;
+  // Where the store offers no instant exchange, traders are the only source and the choice is not shown.
+  const offered = Object.keys(reserve).length > 0;
+  useEffect(() => {
+    if (!offered || !asset || key in p2p) return;
+    let current = true;
+    void bestP2pPrice(asset, side).then(
+      price => current && setP2p(prices => ({ ...prices, [key]: price })),
+      () => current && setP2p(prices => ({ ...prices, [key]: null })),
+    );
+    return () => {
+      current = false;
+    };
+  }, [offered, asset, side, key, p2p]);
+  const p2pPrice = p2p[key];
+  const priceText = (price: number | null | undefined, none: string) => (price === undefined ? "Checking the price…" : price === null ? none : `${formatFace(price, currency)} per ${asset}`);
+  const options: { value: Source; title: string; note: string; price: string; disabled: boolean }[] = [
+    { value: "reserve", title: `From ${desk}'s reserve`, note: "Instant, at the live market price", price: priceText(reservePrice, "Not available for this coin right now"), disabled: reservePrice === null },
+    { value: "p2p", title: "From traders (P2P)", note: side === "buy" ? "The cheapest ad for your amount" : "The best-paying ad for your amount", price: priceText(p2pPrice, "No ads right now"), disabled: false },
+  ];
+
   return (
     <form action={action} className="space-y-4" aria-label="Quick trade">
       <SideSwitch value={side} onChange={setSide} />
       <FormMessage state={state} />
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
-        <AssetSelect assets={assets} defaultValue={defaultAsset} />
-        <TextField label={side === "buy" ? `You pay (${currency})` : `You receive (${currency})`} name="fiat" inputMode="decimal" placeholder="50,000" required state={state} />
-      </div>
+      <AssetSelect assets={assets} value={asset} onChange={setAsset} />
+      {offered ? (
+      <fieldset className="space-y-2">
+        <legend className="mb-1.5 text-sm font-semibold text-navy-900">Where from</legend>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {options.map(option => (
+            <label
+              key={option.value}
+              className={`flex min-h-11 min-w-0 items-start gap-3 rounded-2xl p-3 ring-1 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 ${
+                option.disabled ? "cursor-not-allowed opacity-60 ring-slate-200" : source === option.value ? "cursor-pointer bg-brand-50 ring-brand-300" : "cursor-pointer ring-slate-200 hover:ring-slate-300"
+              }`}
+            >
+              <input type="radio" name="source" value={option.value} checked={source === option.value} disabled={option.disabled} onChange={() => setChosen(option.value)} className="mt-1 size-4 shrink-0 accent-brand-500" />
+              <span className="min-w-0">
+                <span className="block font-semibold">{option.title}</span>
+                <span className="block text-xs text-slate-500">{option.note}</span>
+                <span className="mt-1 block text-sm font-semibold break-words text-navy-900 tabular-nums" aria-live="polite">
+                  {option.price}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      ) : null}
+      <TextField label={side === "buy" ? `You pay (${currency})` : `You receive (${currency})`} name="fiat" inputMode="decimal" placeholder="50,000" required state={state} />
       <Submit pending={pending} className="w-full">
-        <Zap className="size-4" aria-hidden="true" /> {side === "buy" ? "Find the best price to buy" : "Find the best price to sell"}
+        <Zap className="size-4" aria-hidden="true" /> {source === "reserve" ? (side === "buy" ? `Buy from ${desk}` : `Sell to ${desk}`) : side === "buy" ? "Find the best price to buy" : "Find the best price to sell"}
       </Submit>
-      <p className="text-xs text-slate-500">You see the price, BitoCard&apos;s fee and exactly what you get before you confirm. Trades settle instantly from your BitoCard wallets.</p>
+      <p className="text-xs text-slate-500">
+        {source === "reserve"
+          ? `Next you see ${desk}'s held price and exactly what you get before you confirm.`
+          : "You see the price, BitoCard's fee and exactly what you get before you confirm. Trades settle instantly from your BitoCard wallets."}
+      </p>
     </form>
   );
 }

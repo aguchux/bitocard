@@ -11,6 +11,7 @@ import { FxService } from '../../fx/fx.service.js';
 import { type AccountRef, LedgerService, type PreparedEntry } from '../../ledger/ledger.service.js';
 import { minor } from '../../ledger/mode.js';
 import { formatMoney } from '../../notifications/templates.js';
+import { InboxService } from '../../notifications/inbox.service.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import { fromUnits, toUnits } from '../amounts.js';
 import { type CryptoContext, CryptoWalletsService, notFound } from '../crypto-wallets.service.js';
@@ -43,6 +44,8 @@ type Pair = {
   closed: ClosedReason | null;
   reserveCoins: bigint;
   reserveFiat: bigint;
+  /** The most markup the desk may charge now: a reseller desk is held to its market's cap whenever it prices. */
+  capBps: number;
 };
 
 /**
@@ -64,6 +67,7 @@ export class ExchangeService {
     private readonly fx: FxService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly inbox: InboxService,
   ) {}
 
   // -- Who may trade -------------------------------------------------------------------------------------------------
@@ -85,22 +89,30 @@ export class ExchangeService {
   /** Each coin's market price, markup and reserves in one currency, and why it is closed when it is. */
   private async desk(context: CryptoContext, asset?: string, currency = context.currency) {
     const house = this.stores.isHouse(context.customer.store);
-    if (house) return { id: bitocardDesk, name: 'BitoCard', fiatOwner: context.seller.id, coinOwner: houseRootId, enabled: true };
+    if (house) return { id: bitocardDesk, name: 'BitoCard', fiatOwner: context.seller.id, coinOwner: houseRootId, enabled: true, capBps: maxMarkupBps };
     const resellerId = context.seller.id;
     const [allowed, ownMarkup, choice] = await Promise.all([
       this.settings.isOn('reseller_desks', resellerId),
       asset ? this.prisma.exchangeMarkup.findUnique({ where: { desk_mode_asset_currency: { desk: resellerId, mode: context.mode, asset, currency } }, select: { enabled: true } }) : null,
       this.prisma.exchangeDesk.findUnique({ where: { resellerId } }),
     ]);
-    if (allowed && (!asset || ownMarkup?.enabled)) return { id: resellerId, name: context.customer.store.name, fiatOwner: resellerId, coinOwner: resellerId, enabled: true };
+    if (allowed && (!asset || ownMarkup?.enabled)) {
+      return { id: resellerId, name: context.customer.store.name, fiatOwner: resellerId, coinOwner: resellerId, enabled: true, capBps: await this.markupCap(context.country) };
+    }
     if (choice?.fallbackToBitocard ?? true) {
       const market = await this.house.resellerFor(context.country);
-      return { id: bitocardDesk, name: 'BitoCard', fiatOwner: market.id, coinOwner: houseRootId, enabled: true };
+      return { id: bitocardDesk, name: 'BitoCard', fiatOwner: market.id, coinOwner: houseRootId, enabled: true, capBps: maxMarkupBps };
     }
-    return { id: resellerId, name: context.customer.store.name, fiatOwner: resellerId, coinOwner: resellerId, enabled: false };
+    return { id: resellerId, name: context.customer.store.name, fiatOwner: resellerId, coinOwner: resellerId, enabled: false, capBps: 0 };
   }
 
-  private async pairs(mode: LedgerMode, currency: string, fiatOwner: string | null, deskId: string, coinOwner: string, assets: CryptoAsset[]): Promise<Pair[]> {
+  /** The most a reseller desk may mark up in a market: the market's markup cap, never above BitoCard's 20%. */
+  private async markupCap(country: string) {
+    const market = await this.prisma.country.findUnique({ where: { code: country }, select: { exchangeMarkupCapBps: true } });
+    return Math.min(maxMarkupBps, market?.exchangeMarkupCapBps ?? 0);
+  }
+
+  private async pairs(mode: LedgerMode, currency: string, fiatOwner: string | null, deskId: string, coinOwner: string, assets: CryptoAsset[], capBps = maxMarkupBps): Promise<Pair[]> {
     const [markets, markups] = await Promise.all([
       this.prices.live(assets.map(asset => asset.code)),
       this.prisma.exchangeMarkup.findMany({ where: { desk: deskId, mode, currency, asset: { in: assets.map(asset => asset.code) } } }),
@@ -117,14 +129,15 @@ export class ExchangeService {
       const markup = markups.find(row => row.asset === asset.code) ?? null;
       const market = markets.get(asset.code) ?? null;
       const closed: ClosedReason | null = !markup?.enabled || !asset.enabled ? 'not_offered' : !market ? 'price_unavailable' : !fxMid ? 'conversion_unavailable' : null;
-      pairs.push({ asset, market, fxMid, markup, closed, reserveCoins: await this.balance(mode, cryptoReserveRef(asset.code, coinOwner)), reserveFiat });
+      pairs.push({ asset, market, fxMid, markup, closed, reserveCoins: await this.balance(mode, cryptoReserveRef(asset.code, coinOwner)), reserveFiat, capBps });
     }
     return pairs;
   }
 
   private side(pair: Pair, side: ExchangeSide) {
     if (pair.closed || !pair.market || !pair.fxMid || !pair.markup) return null;
-    const markupBps = side === 'buy' ? pair.markup.buyMarkupBps : pair.markup.sellMarkupBps;
+    // A cap lowered after a markup was saved still holds: the price never carries more than the cap allows.
+    const markupBps = Math.min(side === 'buy' ? pair.markup.buyMarkupBps : pair.markup.sellMarkupBps, pair.capBps);
     const price = deskPrice(pair.market.e8, pair.fxMid, markupBps, side);
     const most = available(side, price, pair.asset.decimals, side === 'buy' ? pair.reserveCoins : pair.reserveFiat);
     return { price, markupBps, most };
@@ -182,7 +195,7 @@ export class ExchangeService {
     const desks = await Promise.all(assets.map(asset => this.desk(context, asset.code, currency)));
     const pairs = reason ? [] : await Promise.all(assets.map(async (asset, index) => {
       const desk = desks[index]!;
-      const [pair] = await this.pairs(context.mode, currency, desk.enabled ? desk.fiatOwner : null, desk.id, desk.coinOwner, [asset]);
+      const [pair] = await this.pairs(context.mode, currency, desk.enabled ? desk.fiatOwner : null, desk.id, desk.coinOwner, [asset], desk.capBps);
       return { ...pair, closed: desk.enabled ? pair.closed : 'not_offered' as ClosedReason };
     }));
     const desk = desks[0] ?? await this.desk(context);
@@ -212,7 +225,7 @@ export class ExchangeService {
     const asset = await this.wallets.asset(input.asset);
     const desk = await this.desk(context, asset.code);
     if (!desk.enabled) throw conflict('pair_unavailable', 'This store does not offer this exchange pair.');
-    const [pair] = await this.pairs(context.mode, context.currency, desk.fiatOwner, desk.id, desk.coinOwner, [asset]);
+    const [pair] = await this.pairs(context.mode, context.currency, desk.fiatOwner, desk.id, desk.coinOwner, [asset], desk.capBps);
     const terms = this.side(pair, input.side);
     if (!terms) throw this.closedError(pair.closed ?? 'not_offered', asset.code, desk.name);
     const { amount, fiat } = tradeTerms(input.side, terms.price, asset.decimals, input.amount !== undefined ? { amount: toUnits(input.amount, asset.decimals) } : { fiat: BigInt(input.fiat!) });
@@ -239,7 +252,7 @@ export class ExchangeService {
         expiresAt: new Date(Date.now() + quoteLifetimeMs),
       },
     });
-    return this.presentQuote(quote, asset);
+    return { ...this.presentQuote(quote, asset), available: { amount: fromUnits(terms.most.amount, asset.decimals), fiat: minor(terms.most.fiat) }, capped: input.side === 'buy' ? amount === terms.most.amount : fiat === terms.most.fiat };
   }
 
   /** Settles a quote at once: claimed, every account locked, the reserve and the customer's balance checked, one entry. */
@@ -255,7 +268,8 @@ export class ExchangeService {
     const { mode, currency } = context;
     const side = quote.side as ExchangeSide;
     const ids = {
-      reserveFiat: await this.ledger.accountId(mode, fiatReserveRef(context.seller.id, currency)),
+      // The desk's own fiat reserve: on a fallback to BitoCard that is the market's house account, never the store's reseller.
+      reserveFiat: await this.ledger.accountId(mode, fiatReserveRef(desk.fiatOwner, currency)),
       reserveCoins: await this.ledger.accountId(mode, cryptoReserveRef(asset.code, desk.coinOwner)),
       coins: await this.ledger.accountId(mode, this.wallets.ref(customer.id, 'crypto_wallet', asset.code)),
       proceeds: await this.ledger.accountId(mode, this.wallets.ref(customer.id, 'customer_withdrawable', currency)),
@@ -270,6 +284,10 @@ export class ExchangeService {
       // Every account the trade touches, locked at once in one order, so parallel trades never deadlock.
       const balances = await this.ledger.lockBalances(tx, Object.values(ids));
       const has = (accountId: string) => balances.get(accountId) ?? 0n;
+      // The customer's coin account is locked, so their parallel trades in this coin are counted one at a time.
+      await exchangeDailyLimit(asset, quote.amount, async since =>
+        (await tx.exchangeTrade.aggregate({ _sum: { amount: true }, where: { customerId: customer.id, mode, asset: asset.code, createdAt: { gte: since } } }))._sum.amount ?? 0n,
+      );
       let fromProceeds = 0n;
       let fromWallet = 0n;
       const postings: PreparedEntry['postings'] = [];
@@ -328,9 +346,50 @@ export class ExchangeService {
         metadata: { exchange_trade_id: id, quote_id: quote.id, side, asset: asset.code },
         postings,
       });
-      return row;
+      return { row, reserveAfter: side === 'buy' ? has(ids.reserveCoins) - quote.amount : has(ids.reserveFiat) - quote.fiatMinor };
     });
-    return this.presentTrade(trade, asset, desk.name);
+    // Told after the trade commits; a failed notice never undoes it.
+    await this.afterTrade(customer, context, desk, asset, trade.row, trade.reserveAfter);
+    return this.presentTrade(trade.row, asset, desk.name);
+  }
+
+  /** The customer's receipt notice, and the desk's owner told when the reserve the trade drew on runs low. */
+  private async afterTrade(customer: CustomerWithStore, context: CryptoContext, desk: { id: string; name: string; fiatOwner: string }, asset: CryptoAsset, trade: ExchangeTrade, reserveAfter: bigint) {
+    const bought = trade.side === 'buy';
+    await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.exchange.completed', {
+      subject: trade.id,
+      title: `${bought ? 'You bought' : 'You sold'} ${fromUnits(trade.amount, asset.decimals)} ${asset.code}`,
+      body: `${exchangeTradeNumber(trade.number)}: ${formatMoney(trade.fiatMinor, trade.currency)} ${bought ? 'paid' : 'added to your P2P money'}.`,
+      link: '/account/crypto/exchange',
+      mode: trade.mode,
+    });
+    const day = new Date().toISOString().slice(0, 10);
+    if (desk.id === bitocardDesk) {
+      const alert = bought
+        ? asset.exchangeReserveAlert === null ? null : toUnits(asset.exchangeReserveAlert, asset.decimals)
+        : (await this.prisma.country.findUnique({ where: { code: context.country }, select: { exchangeReserveAlertMinor: true } }))?.exchangeReserveAlertMinor ?? null;
+      if (alert === null || reserveAfter >= alert) return;
+      const left = bought ? `${fromUnits(reserveAfter, asset.decimals)} ${asset.code}` : formatMoney(reserveAfter, trade.currency);
+      await this.inbox.admins('admin.exchange.reserve_low', {
+        subject: `${trade.mode}:${bought ? asset.code : `${context.country}:${trade.currency}`}:${day}`,
+        title: `BitoCard's ${bought ? asset.code : trade.currency} exchange reserve is low`,
+        body: `${left} left after ${exchangeTradeNumber(trade.number)}. Fund it from Crypto > Exchange > Reserves.`,
+        link: '/crypto/exchange',
+        mode: trade.mode,
+      });
+      return;
+    }
+    // A reseller desk: told once a day per coin or currency when the reserve can no longer cover its smallest trade.
+    const markup = await this.prisma.exchangeMarkup.findUnique({ where: { desk_mode_asset_currency: { desk: desk.id, mode: trade.mode, asset: asset.code, currency: trade.currency } } });
+    const covers = bought ? (reserveAfter * trade.priceMinor) / 10n ** BigInt(asset.decimals) : reserveAfter;
+    if (covers >= (markup?.minFiatMinor ?? 1n)) return;
+    await this.inbox.reseller(desk.id, 'exchange.reserve_low', {
+      subject: `${trade.mode}:${bought ? asset.code : trade.currency}:${day}`,
+      title: `Your ${bought ? asset.code : trade.currency} exchange reserve is running out`,
+      body: `Customers can no longer ${bought ? 'buy' : 'sell'} ${asset.code} at your desk. Fund the reserve in Exchange > Desk.`,
+      link: '/exchange/desk',
+      mode: trade.mode,
+    });
   }
 
   async trades(customer: CustomerWithStore, page: { limit?: number; starting_after?: string }) {
@@ -400,18 +459,34 @@ export class ExchangeService {
     return { object: 'exchange_reserves' as const, mode, desk: { id: resellerId, name: reseller.name }, coins, wallets: money };
   }
 
+  /** A reseller's own desk may be changed only while the `reseller_desks` switch is on, and live only once verified. */
+  private async requireOwnDesk(resellerId: string, mode: LedgerMode) {
+    if (!(await this.settings.isOn('reseller_desks', resellerId))) throw conflict('exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
+    if (mode === 'live') {
+      const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { status: true } });
+      if (reseller.status !== 'active') throw conflict('exchange_unavailable', 'Your business must be verified before running a live exchange desk.');
+    }
+  }
+
   async resellerDesk(resellerId: string) {
-    const [enabled, choice] = await Promise.all([this.settings.isOn('reseller_desks', resellerId), this.prisma.exchangeDesk.findUnique({ where: { resellerId } })]);
-    return { object: 'exchange_desk' as const, enabled, fallback_to_bitocard: choice?.fallbackToBitocard ?? true };
+    const [enabled, choice, reseller] = await Promise.all([
+      this.settings.isOn('reseller_desks', resellerId),
+      this.prisma.exchangeDesk.findUnique({ where: { resellerId } }),
+      this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { country: true } }),
+    ]);
+    const markupCapBps = reseller.country ? await this.markupCap(reseller.country) : 0;
+    return { object: 'exchange_desk' as const, enabled, fallback_to_bitocard: choice?.fallbackToBitocard ?? true, markup_cap_bps: markupCapBps };
   }
 
   async setResellerDesk(resellerId: string, fallbackToBitocard: boolean) {
+    if (!(await this.settings.isOn('reseller_desks', resellerId))) throw conflict('exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
     await this.prisma.exchangeDesk.upsert({ where: { resellerId }, create: { resellerId, fallbackToBitocard }, update: { fallbackToBitocard } });
     return this.resellerDesk(resellerId);
   }
 
   /** Put topped-up reseller money behind customer exchanges, or return it to the reseller's spendable wallet. */
   async transferResellerFiat(resellerId: string, mode: LedgerMode, input: { currency: string; amount: number; direction: 'fund' | 'withdraw' }) {
+    await this.requireOwnDesk(resellerId, mode);
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { country: true, house: true } });
     if (reseller.house || !reseller.country) throw invalid('exchange_unavailable', 'This reseller has no exchange desk.');
     const country = await this.prisma.country.findUniqueOrThrow({ where: { code: reseller.country }, select: { currency: true } });
@@ -483,11 +558,12 @@ export class ExchangeService {
   }
 
   async setResellerMarkup(resellerId: string, actorId: string | null, input: { mode: LedgerMode; asset: string; currency: string; buy_markup_bps: number; sell_markup_bps: number; min_fiat: number; max_fiat: number | null; enabled: boolean }) {
+    await this.requireOwnDesk(resellerId, input.mode);
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { country: true } });
     if (!reseller.country) throw invalid('country_required', 'Set your business country first.');
-    const market = await this.prisma.country.findUniqueOrThrow({ where: { code: reseller.country }, select: { currency: true, markupCapPercent: true } });
+    const market = await this.prisma.country.findUniqueOrThrow({ where: { code: reseller.country }, select: { currency: true, exchangeMarkupCapBps: true } });
     if (![market.currency, 'USD'].includes(input.currency.toUpperCase())) throw invalid('currency_unsupported', 'Only your country and US dollar wallets can be used.', 'currency');
-    const cap = Math.min(maxMarkupBps, market.markupCapPercent * 100);
+    const cap = Math.min(maxMarkupBps, market.exchangeMarkupCapBps);
     if (input.buy_markup_bps > cap || input.sell_markup_bps > cap) throw invalid('markup_above_cap', `Your market allows exchange markups of at most ${cap / 100}%.`, 'buy_markup_bps');
     return this.saveMarkup(resellerId, actorId, input);
   }
@@ -512,8 +588,77 @@ export class ExchangeService {
     return (await this.markupsFor(input.mode, deskId, [currency])).data.find(row => row.asset === asset.code && row.currency === currency);
   }
 
-  async adminTrades(filter: { mode?: LedgerMode; asset?: string; customer_id?: string; limit?: number; starting_after?: string }) {
-    return this.list({ ...(filter.mode ? { mode: filter.mode } : {}), ...(filter.asset ? { asset: filter.asset.toUpperCase() } : {}), ...(filter.customer_id ? { customerId: filter.customer_id } : {}) }, filter, true);
+  async adminTrades(filter: { mode?: LedgerMode; asset?: string; customer_id?: string; desk?: string; limit?: number; starting_after?: string }) {
+    return this.list(
+      { ...(filter.mode ? { mode: filter.mode } : {}), ...(filter.asset ? { asset: filter.asset.toUpperCase() } : {}), ...(filter.customer_id ? { customerId: filter.customer_id } : {}), ...(filter.desk ? { desk: filter.desk } : {}) },
+      filter,
+      true,
+    );
+  }
+
+  /** Customers' trades at a reseller's own desk, for that reseller (their customers, their markup earned). */
+  async deskTrades(resellerId: string, mode: LedgerMode, page: { limit?: number; starting_after?: string }) {
+    const limit = page.limit ?? 25;
+    const rows = await this.prisma.exchangeTrade.findMany({
+      where: { desk: resellerId, mode },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(page.starting_after ? { cursor: { id: page.starting_after }, skip: 1 } : {}),
+      include: { customer: { select: { id: true, name: true, email: true } } },
+    });
+    const assets = new Map((await this.wallets.assets(true)).map(asset => [asset.code, asset]));
+    return {
+      object: 'list' as const,
+      data: rows.slice(0, limit).map(row => ({
+        object: 'desk_trade' as const,
+        id: row.id,
+        number: exchangeTradeNumber(row.number),
+        mode: row.mode,
+        side: row.side as ExchangeSide,
+        asset: row.asset,
+        currency: row.currency,
+        amount: fromUnits(row.amount, assets.get(row.asset)!.decimals),
+        fiat: minor(row.fiatMinor),
+        price: minor(row.priceMinor),
+        markup: minor(row.markupMinor),
+        customer: { id: row.customer.id, name: row.customer.name, email: row.customer.email },
+        created_at: row.createdAt.toISOString(),
+      })),
+      has_more: rows.length > limit,
+    };
+  }
+
+  /** Every reseller running a desk: whether it may, its fallback choice, the pairs it offers and its reserves. */
+  async adminDesks(mode: LedgerMode) {
+    const [desks, offering] = await Promise.all([
+      this.prisma.exchangeDesk.findMany({ select: { resellerId: true, fallbackToBitocard: true } }),
+      this.prisma.exchangeMarkup.findMany({ where: { mode, desk: { not: bitocardDesk } }, select: { desk: true, asset: true, currency: true, enabled: true, buyMarkupBps: true, sellMarkupBps: true } }),
+    ]);
+    const ids = [...new Set([...desks.map(row => row.resellerId), ...offering.map(row => row.desk)])];
+    const resellers = await this.prisma.reseller.findMany({ where: { id: { in: ids }, house: false }, select: { id: true, name: true, country: true, status: true } });
+    const balances = await this.prisma.ledgerAccount.findMany({
+      where: { mode, resellerId: { in: ids }, kind: { in: ['reserve_fiat', 'reserve_crypto'] } },
+      select: { resellerId: true, kind: true, currency: true, balanceMinor: true },
+    });
+    const assets = new Map((await this.wallets.assets(true)).map(asset => [asset.code, asset]));
+    const data = [];
+    for (const reseller of resellers) {
+      const own = balances.filter(row => row.resellerId === reseller.id && row.balanceMinor !== 0n);
+      data.push({
+        object: 'exchange_desk_summary' as const,
+        reseller: { id: reseller.id, name: reseller.name, country: reseller.country, status: reseller.status },
+        allowed: await this.settings.isOn('reseller_desks', reseller.id),
+        fallback_to_bitocard: desks.find(row => row.resellerId === reseller.id)?.fallbackToBitocard ?? true,
+        pairs: offering
+          .filter(row => row.desk === reseller.id)
+          .map(row => ({ asset: row.asset, currency: row.currency, enabled: row.enabled, buy_markup_bps: row.buyMarkupBps, sell_markup_bps: row.sellMarkupBps })),
+        reserves: {
+          fiat: own.filter(row => row.kind === 'reserve_fiat').map(row => ({ currency: row.currency, balance: minor(row.balanceMinor) })),
+          coins: own.filter(row => row.kind === 'reserve_crypto').map(row => ({ asset: row.currency, balance: fromUnits(row.balanceMinor, assets.get(row.currency)?.decimals ?? 8) })),
+        },
+      });
+    }
+    return { object: 'list' as const, mode, data };
   }
 
   private async list(where: Prisma.ExchangeTradeWhereInput, page: { limit?: number; starting_after?: string }, admin = false) {
@@ -577,5 +722,19 @@ export class ExchangeService {
       from_wallet: minor(trade.fromWallet),
       created_at: trade.createdAt.toISOString(),
     };
+  }
+}
+
+/**
+ * The asset's daily exchange limit per taker (`crypto_assets.exchange_daily_limit`, coin units; null: none), checked
+ * inside the trade's transaction with the taker's coin account locked, so parallel trades cannot pass it.
+ */
+export async function exchangeDailyLimit(asset: CryptoAsset, amount: bigint, tradedSince: (since: Date) => Promise<bigint>) {
+  if (asset.exchangeDailyLimit === null) return;
+  const limit = toUnits(asset.exchangeDailyLimit, asset.decimals);
+  const used = await tradedSince(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  if (used + amount > limit) {
+    const left = limit > used ? limit - used : 0n;
+    throw new ApiError(HttpStatus.UNPROCESSABLE_ENTITY, 'invalid_request_error', 'exchange_limit', `You can exchange ${fromUnits(left, asset.decimals)} more ${asset.code} in the next 24 hours.`, 'amount');
   }
 }

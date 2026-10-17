@@ -13,7 +13,7 @@ import { fromUnits, toUnits } from '../amounts.js';
 import { CryptoWalletsService } from '../crypto-wallets.service.js';
 import { CryptoPricesService } from '../prices.js';
 import { available, deskPrice, type ExchangeSide, markupEarned, quoteLifetimeMs, tradeTerms } from './pricing.js';
-import { bitocardDesk, cryptoReserveRef, fiatReserveRef } from './exchange.service.js';
+import { bitocardDesk, cryptoReserveRef, fiatReserveRef, exchangeDailyLimit } from './exchange.service.js';
 
 const error = (status: HttpStatus, code: string, message: string) => new ApiError(status,
   status === HttpStatus.BAD_REQUEST || status === HttpStatus.PAYMENT_REQUIRED ? 'invalid_request_error'
@@ -84,7 +84,8 @@ export class ResellerDeskService {
           your_coins: fromUnits(myCoins, asset.decimals), your_wallet: minor(myFunding + myEarnings) };
       } catch (caught) {
         if (!(caught instanceof ApiError)) throw caught;
-        return { asset: asset.code, name: asset.name, decimals: asset.decimals, closed: caught.code };
+        const myCoins = await this.balance(mode, coinRef(resellerId, asset.code));
+        return { asset: asset.code, name: asset.name, decimals: asset.decimals, closed: caught.code, your_coins: fromUnits(myCoins, asset.decimals) };
       }
     }));
     return { object: 'reseller_exchange' as const, mode, currency, desk: { id: bitocardDesk, name: 'BitoCard' }, quote_seconds: quoteLifetimeMs / 1000, assets: rows };
@@ -129,6 +130,9 @@ export class ResellerDeskService {
       if (!claimed.count) throw error(HttpStatus.CONFLICT, 'quote_expired', 'Get a new quote.');
       const balances = await this.ledger.lockBalances(tx, Object.values(ids));
       const has = (accountId: string) => balances.get(accountId) ?? 0n;
+      await exchangeDailyLimit(asset, quote.amount, async since =>
+        (await tx.resellerDeskTrade.aggregate({ _sum: { amount: true }, where: { resellerId, mode, asset: asset.code, createdAt: { gte: since } } }))._sum.amount ?? 0n,
+      );
       const postings: PreparedEntry['postings'] = [];
       if (quote.side === 'buy') {
         if (has(ids.houseCoins) < quote.amount) throw error(HttpStatus.PAYMENT_REQUIRED, 'reserve_insufficient', 'BitoCard’s coin reserve changed.');
@@ -166,9 +170,29 @@ export class ResellerDeskService {
     return { object: 'list' as const, data: rows.slice(0, limit).map(row => this.presentTrade(row, assets.get(row.asset)!)), has_more: rows.length > limit };
   }
 
+  /** Every reseller's trades with BitoCard's desk, for admins (newest first), with BitoCard's markup earned. */
+  async adminTrades(filter: { mode?: LedgerMode; asset?: string; reseller_id?: string; limit?: number; starting_after?: string }) {
+    const limit = filter.limit ?? 25;
+    const rows = await this.prisma.resellerDeskTrade.findMany({
+      where: { ...(filter.mode ? { mode: filter.mode } : {}), ...(filter.asset ? { asset: filter.asset.toUpperCase() } : {}), ...(filter.reseller_id ? { resellerId: filter.reseller_id } : {}) },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
+    });
+    const names = new Map((await this.prisma.reseller.findMany({ where: { id: { in: rows.map(row => row.resellerId) } }, select: { id: true, name: true } })).map(row => [row.id, row.name]));
+    const assets = new Map((await this.wallets.assets(true)).map(asset => [asset.code, asset]));
+    return {
+      object: 'list' as const,
+      data: rows.slice(0, limit).map(row => ({ ...this.presentTrade(row, assets.get(row.asset)!), reseller: { id: row.resellerId, name: names.get(row.resellerId) ?? null } })),
+      has_more: rows.length > limit,
+    };
+  }
+
   /** Move the reseller's own coins into or out of its customer-facing desk, without changing total custody. */
   async transferCoins(resellerId: string, mode: LedgerMode, input: { asset: string; amount: string; direction: 'fund' | 'withdraw' }) {
     await this.reseller(resellerId, mode);
+    // Coins behind the reseller's own desk: only while running a desk is switched on for them.
+    if (!(await this.settings.isOn('reseller_desks', resellerId))) throw error(HttpStatus.CONFLICT, 'exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
     const asset = await this.wallets.asset(input.asset);
     const amount = toUnits(input.amount, asset.decimals);
     if (amount <= 0n) throw error(HttpStatus.BAD_REQUEST, 'amount_too_small', 'Enter an amount above zero.');

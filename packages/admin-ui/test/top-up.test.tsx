@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ManualTopUp } from '@bitocard/api-client/admin';
-import { ManualTopUpsList, resendWait, topUpProblems, WalletTopUpDialog } from '../src';
+import { confirmCodeProblem, defaultConfirmMethod, ManualTopUpsList, resendWait, topUpProblems, WalletTopUpDialog } from '../src';
 
 afterEach(cleanup);
 
@@ -96,7 +96,7 @@ describe('manual top-up form', () => {
     const boxes = screen.getAllByRole('textbox') as HTMLInputElement[];
     for (const [index, digit] of [...'48213'].entries()) fireEvent.change(boxes[index], { target: { value: digit } });
     fireEvent.change(boxes[5], { target: { value: '7' } });
-    await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '482137'));
+    await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '482137', 'email'));
     await waitFor(() => expect(props.onDone).toHaveBeenCalled());
     expect(props.onClose).toHaveBeenCalled();
   });
@@ -124,6 +124,59 @@ describe('manual top-up form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel top-up' }));
     await waitFor(() => expect(props.onCancel).toHaveBeenCalledWith('mt_1'));
     expect(props.onClose).toHaveBeenCalled();
+  });
+});
+
+describe('confirming with the authenticator app', () => {
+  test('the authenticator is the default only when offered', () => {
+    expect(defaultConfirmMethod(['authenticator', 'email'])).toBe('authenticator');
+    expect(defaultConfirmMethod(['email'])).toBe('email');
+    expect(defaultConfirmMethod(undefined)).toBe('email');
+    expect(confirmCodeProblem('authenticator')).toMatch(/authenticator app/);
+    expect(confirmCodeProblem('email')).toMatch(/email/);
+  });
+
+  test('offered: chosen by default, no resend; the emailed code can still be picked and resent', async () => {
+    const props = setup({ chooseMode: false, onRequest: vi.fn(async () => ({ ...topUp(), confirm_with: ['authenticator', 'email'] as Array<'authenticator' | 'email'> })) });
+    fireEvent.change(screen.getByLabelText('Where the money comes from'), { target: { value: 'goodwill' } });
+    fireEvent.change(screen.getByLabelText('Amount (NGN)'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Sorry for the delay' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+
+    const app = (await screen.findByLabelText('Authenticator app')) as HTMLInputElement;
+    expect(app.checked).toBe(true);
+    expect(screen.getByText('Code from your authenticator app')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Resend/ })).toBeNull();
+    fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '246810' } });
+    await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '246810', 'authenticator'));
+  });
+
+  test('switching to the emailed code clears what was typed and shows resend', async () => {
+    const props = setup({ chooseMode: false, onConfirm: vi.fn(async () => topUp({ status: 'completed' })), onRequest: vi.fn(async () => ({ ...topUp({ code_sent_at: '2026-01-01T00:00:00Z' }), confirm_with: ['authenticator', 'email'] as Array<'authenticator' | 'email'> })) });
+    fireEvent.change(screen.getByLabelText('Where the money comes from'), { target: { value: 'goodwill' } });
+    fireEvent.change(screen.getByLabelText('Amount (NGN)'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Sorry for the delay' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+
+    fireEvent.change((await screen.findAllByRole('textbox'))[0], { target: { value: '1' } });
+    fireEvent.click(screen.getByLabelText('Emailed code'));
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: 'Resend code' }));
+    await waitFor(() => expect(props.onResend).toHaveBeenCalledWith('mt_1'));
+    // The resend's answer carries no confirm_with: the choice stays.
+    expect(screen.getByLabelText('Authenticator app')).toBeTruthy();
+    fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '135790' } });
+    await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '135790', 'email'));
+  });
+
+  test('not offered: only the emailed code, with no choice shown', async () => {
+    setup({ chooseMode: false, onRequest: vi.fn(async () => ({ ...topUp(), confirm_with: ['email'] as Array<'authenticator' | 'email'> })) });
+    fireEvent.change(screen.getByLabelText('Where the money comes from'), { target: { value: 'goodwill' } });
+    fireEvent.change(screen.getByLabelText('Amount (NGN)'), { target: { value: '100' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Sorry for the delay' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+    expect(await screen.findByText('Code from the email')).toBeTruthy();
+    expect(screen.queryByLabelText('Authenticator app')).toBeNull();
   });
 });
 

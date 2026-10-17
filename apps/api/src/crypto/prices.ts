@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IntegrationsService } from '../integrations/integrations.service.js';
-import { coinIds, fetchPrices, freshMs, liveMs, marketMaxAgeMs, priceFields, staleMs, type UsdPrice } from './price-feed.js';
+import { InboxService } from '../notifications/inbox.service.js';
+import { coinIds, defaultDivergenceBps, divergenceBps, fetchPrices, freshMs, liveMs, marketMaxAgeMs, priceFields, secondaryPrice, staleMs, type UsdPrice } from './price-feed.js';
 
 export { unitsForCents } from './price-feed.js';
 
@@ -13,8 +14,13 @@ export { unitsForCents } from './price-feed.js';
 export class CryptoPricesService {
   private readonly logger = new Logger('CryptoPrices');
   private readonly cache = new Map<string, UsdPrice>();
+  /** Coinbase's prices, asked at most once a minute per coin. */
+  private readonly second = new Map<string, { e8: bigint | null; at: number }>();
 
-  constructor(private readonly integrations: IntegrationsService) {}
+  constructor(
+    private readonly integrations: IntegrationsService,
+    private readonly inbox: InboxService,
+  ) {}
 
   /** A coin's US dollar price, at most 30 minutes old, or null when none can be had (the caller pays another way). */
   async usd(asset: string): Promise<UsdPrice | null> {
@@ -42,7 +48,37 @@ export class CryptoPricesService {
       const price = this.cache.get(asset);
       if (price && isLive(price)) prices.set(asset, price);
     }
+    await this.crossCheck(prices);
     return prices;
+  }
+
+  /**
+   * With the Coinbase check on, a coin whose CoinGecko price is further than the set divergence from Coinbase's is
+   * left out (its pair closes) and operations are told, once an hour per coin. A coin Coinbase does not price is
+   * decided by CoinGecko alone.
+   */
+  private async crossCheck(prices: Map<string, UsdPrice>) {
+    const values = this.integrations.values(priceFields.map(field => field.key));
+    if (!['true', 'on', '1'].includes(String(values.CRYPTO_PRICE_SECONDARY ?? '').toLowerCase())) return;
+    const limit = Number(values.CRYPTO_PRICE_DIVERGENCE_BPS) > 0 ? Number(values.CRYPTO_PRICE_DIVERGENCE_BPS) : defaultDivergenceBps;
+    for (const [asset, price] of [...prices]) {
+      let second = this.second.get(asset);
+      if (!second || Date.now() - second.at >= liveMs) {
+        second = { e8: await secondaryPrice(values, asset), at: Date.now() };
+        this.second.set(asset, second);
+      }
+      if (second.e8 === null) continue;
+      const gap = divergenceBps(price.e8, second.e8);
+      if (gap <= limit) continue;
+      prices.delete(asset);
+      this.logger.warn({ asset, coingecko: price.text, gap }, 'Exchange price sources disagree');
+      await this.inbox.admins('admin.exchange.price_divergence', {
+        subject: `${asset}:${new Date().toISOString().slice(0, 13)}`,
+        title: `${asset} exchange paused: prices disagree`,
+        body: `CoinGecko and Coinbase differ by ${(gap / 100).toFixed(2)}% (more than ${(limit / 100).toFixed(2)}%). ${asset} trading resumes once they agree.`,
+        link: '/crypto/exchange',
+      });
+    }
   }
 
   private async fetch(assets: string[]) {
@@ -56,6 +92,7 @@ export class CryptoPricesService {
   /** Forgets cached prices (tests). */
   forget() {
     this.cache.clear();
+    this.second.clear();
   }
 }
 

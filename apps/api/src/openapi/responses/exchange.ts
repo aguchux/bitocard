@@ -20,7 +20,7 @@ const overviewAssetOpen = shape({ asset: str('Coin code.'), name: str('Coin name
   available_to_sell_for: int('BitoCard’s available fiat reserve in minor units.'), your_coins: coin,
   your_wallet: int('Your available fiat wallet balance in minor units.'),
 });
-const overviewAssetClosed = shape({ asset: str('Coin code.'), name: str('Coin name.'), decimals: int('Asset decimal places.'), closed: str('Reason the pair is unavailable.') });
+const overviewAssetClosed = shape({ asset: str('Coin code.'), name: str('Coin name.'), decimals: int('Asset decimal places.'), closed: str('Reason the pair is unavailable.'), your_coins: coin });
 const quote = objectSchema('ResellerExchangeQuote', {
   object: constant('reseller_exchange_quote'), id: uuid('Quote ID.'), mode, side, asset: str('Coin code.'), currency,
   amount: coin, fiat: int('Fiat in minor units.'), price: int('Locked fiat price per whole coin, in minor units.'),
@@ -32,7 +32,17 @@ const trade = objectSchema('ResellerExchangeTrade', {
   price: int('Locked fiat price per whole coin, in minor units.'), markup: int('BitoCard’s markup earned, in fiat minor units.'), created_at: time('Trade creation.'),
 });
 
-const deskExample = { object: 'exchange_desk', enabled: true, fallback_to_bitocard: true };
+const deskTrade = objectSchema('DeskTrade', {
+  object: constant('desk_trade'), id: uuid('Trade ID.'), number: str('Receipt number shown to the customer.'), mode, side,
+  asset: str('Coin code.'), currency, amount: coin, fiat: int('Fiat in minor units.'), price: int('Fiat price per whole coin, in minor units.'),
+  markup: int('Your markup earned, in fiat minor units.'), customer: shape({ id: uuid('Customer ID.'), name: str('Customer name.'), email: str('Customer email.') }),
+  created_at: time('Trade time.'),
+});
+const deskTradeExample = { object: 'desk_trade', id: '2c9a4c1e-4b1f-4f1c-9a43-1b2d1c0f7a11', number: 'EX-000124', mode: 'test', side: 'buy', asset: 'BTC', currency: 'NGN',
+  amount: '0.01000000', fiat: 91350000, price: 9135000000, markup: 900000, customer: { id: '0b6f3a52-6a0b-4b7e-9b52-3b6f6c1d2e33', name: 'Ada Trader', email: 'ada@example.com' },
+  created_at: '2026-10-17T11:31:00.000Z' };
+
+const deskExample = { object: 'exchange_desk', enabled: true, fallback_to_bitocard: true, markup_cap_bps: 500 };
 const reserveExample = { object: 'exchange_reserves', mode: 'test', desk: { id: '9ea9e75d-c29a-4b0b-85d4-0679a952a272', name: 'Ada Digital' },
   coins: [{ asset: 'BTC', name: 'Bitcoin', enabled: true, balance: '0.01000000' }], wallets: [{ currency: 'NGN', balance: 250000 }, { currency: 'USD', balance: 0 }] };
 const markupExample = { object: 'exchange_markup', asset: 'BTC', currency: 'NGN', enabled: true, buy_markup_bps: 150, sell_markup_bps: 150,
@@ -47,13 +57,13 @@ const tradeExample = { object: 'reseller_exchange_trade', id: 'eaed234d-f741-4c8
 
 export const exchangeDocs: DocsArea = {
   schemas: {
-    ExchangeDesk: objectSchema('ExchangeDesk', { object: constant('exchange_desk'), enabled: bool('Whether the reseller desk is enabled by BitoCard.'), fallback_to_bitocard: bool('Whether customers may use BitoCard when the reseller does not offer the pair.') }),
+    ExchangeDesk: objectSchema('ExchangeDesk', { object: constant('exchange_desk'), enabled: bool('Whether the reseller desk is enabled by BitoCard.'), fallback_to_bitocard: bool('Whether customers may use BitoCard when the reseller does not offer the pair.'), markup_cap_bps: int('The most markup your market allows on each side, in basis points.') }),
     ExchangeReserves: objectSchema('ExchangeReserves', { object: constant('exchange_reserves'), mode, desk: shape({ id: str('Reseller ID.'), name: str('Store name.') }), coins: array(reserveCoin), wallets: array(reserveWallet) }),
     ExchangeMarkup: markup,
     ResellerExchangeOverview: objectSchema('ResellerExchangeOverview', { object: constant('reseller_exchange'), mode, currency,
       desk: shape({ id: str('BitoCard desk ID.'), name: str('BitoCard desk name.') }), quote_seconds: int('Seconds a quote remains valid.'),
       assets: array({ anyOf: [overviewAssetOpen, overviewAssetClosed] }) }),
-    ResellerExchangeQuote: quote, ResellerExchangeTrade: trade,
+    ResellerExchangeQuote: quote, ResellerExchangeTrade: trade, DeskTrade: deskTrade,
     ResellerCoinBalance: objectSchema('ResellerCoinBalance', { object: constant('reseller_coin_balance'), mode, asset: str('Coin code.'), wallet: coin, reserve: coin }),
   },
   responses: {
@@ -64,6 +74,8 @@ export const exchangeDocs: DocsArea = {
     'POST /v1/exchange/reserves/transfers': { status: 201, description: 'Updated fiat reserves.', schema: 'ExchangeReserves', example: reserveExample },
     'POST /v1/exchange/reserves/coins/transfers': { status: 201, description: 'Updated coin wallet and reserve.', schema: 'ResellerCoinBalance',
       example: { object: 'reseller_coin_balance', mode: 'test', asset: 'BTC', wallet: '0.00400000', reserve: '0.00600000' } },
+    'GET /v1/exchange/desk/trades': { status: 200, description: 'Your customers’ trades at your desk.', schema: list(ref('DeskTrade')),
+      example: { object: 'list', data: [deskTradeExample], has_more: false } },
     'GET /v1/exchange/markups': { status: 200, description: 'Your customer exchange prices.', schema: list(ref('ExchangeMarkup'), { mode }, false), example: { object: 'list', mode: 'test', data: [markupExample] } },
     'PUT /v1/exchange/markups': { status: 200, description: 'Updated customer price.', schema: 'ExchangeMarkup', example: markupExample },
     'POST /v1/exchange/quotes': { status: 201, description: 'Price held for 30 seconds.', schema: 'ResellerExchangeQuote', example: quoteExample },

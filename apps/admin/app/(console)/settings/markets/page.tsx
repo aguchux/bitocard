@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, categoryName, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
+import { ExchangeLimits } from "./exchange-limits";
 import { IdentityProvider } from "./identity-provider";
 import { PaymentMethods } from "./payment-methods";
 import { SpinLimit } from "./spin-limit";
@@ -143,6 +144,16 @@ function Markets() {
           <IdentityProvider code={country.code} country={country.name} provider={country.identity_provider} editable={editable} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Spin and win</h3>
           <SpinLimit code={country.code} country={country.name} limit={country.spin_daily_limit} editable={editable} />
+          <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Exchange</h3>
+          <ExchangeLimits
+            key={`${country.code}:${country.exchange_markup_cap_bps ?? ""}:${country.exchange_reserve_alert_minor ?? ""}`}
+            code={country.code}
+            country={country.name}
+            currency={country.currency}
+            capBps={country.exchange_markup_cap_bps}
+            alertMinor={country.exchange_reserve_alert_minor}
+            editable={editable}
+          />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Tax</h3>
           <TaxRateCard key={`${country.code}:${rate?.updated_at ?? ""}`} country={country.name} code={country.code} rate={rate ?? null} editable={can(admin, "finance")} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Payment methods</h3>

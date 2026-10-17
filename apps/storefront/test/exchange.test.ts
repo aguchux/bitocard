@@ -1,8 +1,8 @@
 // The exchange screen's maths mirrors the API's: BigInt only, rounded in the desk's favour, capped at the reserve, the
 // customer's balance and the per-trade maximum, and never silently trimming what was typed.
 import { describe, expect, test } from "vitest";
-import type { StoreExchangeSide } from "@bitocard/api-client/storefront";
-import { changeText, fiatText, maximum, parseCoin, parseFiat, problem, terms, units, usdText } from "@/lib/exchange";
+import { formatFace, type StoreExchange, type StoreExchangeSide } from "@bitocard/api-client/storefront";
+import { availabilityText, changeText, exchangeHref, fiatParam, fiatText, initialSource, maximum, parseCoin, parseFiat, problem, reservePrices, terms, units, usdText, walletExchangeLinks } from "@/lib/exchange";
 import { cryptoSections, subMenuFor } from "@/components/app/sub-menus";
 
 const btcBuy: StoreExchangeSide = { price: 9_090_000_000, markup_bps: 100, min_fiat: 100, max_fiat: null, available_amount: "0.50000000", available_fiat: 4_545_000_000 };
@@ -67,5 +67,64 @@ describe("words", () => {
   test("Exchange sits in the Crypto rail right after Wallets", () => {
     expect(cryptoSections.map(item => item.label).slice(0, 3)).toEqual(["Wallets", "Exchange", "Market"]);
     expect(subMenuFor("/account/crypto/exchange", "asset=BTC&side=sell")).toMatchObject({ menu: { key: "crypto" }, active: "/account/crypto/exchange" });
+  });
+});
+
+describe("links into the exchange", () => {
+  const exchange: StoreExchange = {
+    object: "exchange",
+    mode: "test",
+    currency: "NGN",
+    desk: { id: "d", name: "BitoCard" },
+    enabled: true,
+    reason: null,
+    message: null,
+    quote_seconds: 30,
+    balances: { proceeds: 0, wallet: 0 },
+    assets: [
+      { desk: { id: "d", name: "BitoCard" }, asset: "BTC", name: "Bitcoin", decimals: 8, holding: "0.00000000", market: null, closed: null, buy: btcBuy, sell: btcSell },
+      { desk: { id: "d", name: "BitoCard" }, asset: "ETH", name: "Ether", decimals: 8, holding: "0.00000000", market: null, closed: "price_unavailable", buy: null, sell: null },
+    ],
+  };
+
+  test("the exchange screen for a coin and side, with an amount only when there is one", () => {
+    expect(exchangeHref({ asset: "BTC", side: "buy" })).toBe("/account/crypto/exchange?asset=BTC&side=buy");
+    expect(exchangeHref({ asset: "BTC", side: "sell", fiat: 5_000_000 })).toBe("/account/crypto/exchange?asset=BTC&side=sell&fiat=5000000");
+    expect(exchangeHref({ asset: "BTC", side: "buy", fiat: 0n })).toBe("/account/crypto/exchange?asset=BTC&side=buy");
+  });
+
+  test("?fiat= is whole minor units or nothing", () => {
+    expect(fiatParam("5000000")).toBe(5_000_000n);
+    expect(fiatParam("0")).toBeNull();
+    expect(fiatParam("12.5")).toBeNull();
+    expect(fiatParam("-1")).toBeNull();
+    expect(fiatParam("1".repeat(16))).toBeNull();
+    expect(fiatParam(undefined)).toBeNull();
+  });
+
+  test("wallet rows: Buy where the side is open, Sell only while holding some", () => {
+    expect(walletExchangeLinks(exchange, "BTC", "0.00000000")).toEqual({ buy: "/account/crypto/exchange?asset=BTC&side=buy", sell: null });
+    expect(walletExchangeLinks(exchange, "BTC", "0.10000000")).toEqual({ buy: "/account/crypto/exchange?asset=BTC&side=buy", sell: "/account/crypto/exchange?asset=BTC&side=sell" });
+    expect(walletExchangeLinks(exchange, "ETH", "1.00000000")).toEqual({ buy: null, sell: null });
+    expect(walletExchangeLinks(exchange, "DOGE", "1")).toEqual({ buy: null, sell: null });
+    expect(walletExchangeLinks({ ...exchange, enabled: false }, "BTC", "1")).toEqual({ buy: null, sell: null });
+    expect(walletExchangeLinks(null, "BTC", "1")).toEqual({ buy: null, sell: null });
+  });
+
+  test("quick buy or sell starts from the reserve where it has a price", () => {
+    const prices = reservePrices(exchange);
+    expect(prices).toEqual({ BTC: { buy: btcBuy.price, sell: btcSell.price }, ETH: { buy: null, sell: null } });
+    expect(initialSource(prices, "BTC", "buy")).toBe("reserve");
+    expect(initialSource(prices, "ETH", "sell")).toBe("p2p");
+    expect(reservePrices({ ...exchange, enabled: false })).toEqual({});
+    expect(initialSource({}, "BTC", "buy")).toBe("p2p");
+  });
+
+  test("the review says what the reserve has, and when the quote is all of it", () => {
+    const quote = { side: "buy" as const, asset: "BTC", currency: "NGN", available: { amount: "0.42000000", fiat: 3_800_000_000 }, capped: false };
+    expect(availabilityText(quote, "BitoCard")).toEqual({ line: "Up to 0.42 BTC available from BitoCard.", capped: null });
+    const selling = availabilityText({ ...quote, side: "sell", capped: true }, "Ada's Store");
+    expect(selling.line).toBe(`Up to ${formatFace(3_800_000_000, "NGN")} available from Ada's Store.`);
+    expect(selling.capped).toBe("This quote is the most Ada's Store has available right now.");
   });
 });

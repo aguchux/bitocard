@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, ChevronLeft, Clock, Coins, Landmark, Lock, Snowflake, Wallet } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoTransaction, type StoreCryptoWallets, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
+import { formatCrypto, formatFace, type StoreCryptoTransaction, type StoreCryptoWallets, type StoreExchange, type StoreList, type StoreWalletTopUp, type StoreWalletTransaction } from "@bitocard/api-client/storefront";
 import { canWithdraw, CoinBadge, hasP2pMoney, heldAssets } from "@/components/app/crypto";
 import { ActivityHeading, CryptoActivityList, MoneyActivityList } from "@/components/app/wallet-activity";
 import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/wallet-forms";
 import { activityHref, cryptoMoves, recentItems } from "@/lib/activity";
+import { walletExchangeLinks } from "@/lib/exchange";
 import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
 import { simulateTopUp, walletFor } from "@/lib/wallet";
 
@@ -73,7 +74,7 @@ const coinsSummary = (wallets: StoreCryptoWallets) => {
  * the last 24 hours of coin activity (a few, View all for the rest). With crypto closed to them, only what they still
  * hold, which they can still withdraw or cash out.
  */
-function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; activity: StoreCryptoTransaction[] | null }) {
+function CryptoWallets({ wallets, activity, exchange }: { wallets: StoreCryptoWallets; activity: StoreCryptoTransaction[] | null; exchange: StoreExchange | null }) {
   const usable = wallets.enabled && !wallets.frozen && wallets.verified;
   const withdraw = canWithdraw(wallets);
   const coins = wallets.enabled ? wallets.assets : heldAssets(wallets);
@@ -108,8 +109,12 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
         </div>
         {!wallets.enabled ? <p className="mt-2 text-sm text-white/70">Crypto is closed in your country. You can still withdraw what you hold and cash out your P2P money.</p> : null}
         <ul className="mt-3 divide-y divide-white/10">
-          {coins.map(asset => (
-            <li key={asset.asset} className="flex items-center gap-3 py-3">
+          {coins.map(asset => {
+            // Buy and Sell straight from BitoCard's reserve, where the instant exchange is offered to them.
+            const links = usable ? walletExchangeLinks(exchange, asset.asset, asset.available) : { buy: null, sell: null };
+            return (
+            <li key={asset.asset} className="py-3">
+              <div className="flex items-center gap-3">
               <CoinBadge asset={asset.asset} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{asset.name}</span>
@@ -136,8 +141,24 @@ function CryptoWallets({ wallets, activity }: { wallets: StoreCryptoWallets; act
                 <span className="block font-bold">{formatCrypto(asset.total, asset.asset)}</span>
                 {asset.total !== asset.available ? <span className="block text-xs text-white/60">{formatCrypto(asset.available)} available</span> : null}
               </span>
+              </div>
+              {links.buy || links.sell ? (
+                <span className="mt-2 flex gap-2 pl-13">
+                  {links.buy ? (
+                    <Link href={links.buy} aria-label={`Buy ${asset.asset}`} className="inline-flex min-h-11 items-center rounded-xl bg-white/10 px-4 text-sm font-semibold hover:bg-white/20">
+                      Buy
+                    </Link>
+                  ) : null}
+                  {links.sell ? (
+                    <Link href={links.sell} aria-label={`Sell ${asset.asset}`} className="inline-flex min-h-11 items-center rounded-xl bg-white/10 px-4 text-sm font-semibold hover:bg-white/20">
+                      Sell
+                    </Link>
+                  ) : null}
+                </span>
+              ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
         {wallets.enabled || hasP2pMoney(wallets) ? (
           <div className="mt-3 border-t border-white/10 pt-3 text-sm">
@@ -168,13 +189,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
   // The country wallet unless `?wallet=USD` chose the US dollar one, or `?wallet=crypto` the coins.
   const showCrypto = params.wallet === "crypto";
   const asked = /^[A-Za-z]{3}$/.test(params.wallet ?? "") ? params.wallet!.toUpperCase() : undefined;
-  const [customer, chosen, activity, overview, cryptoActivity] = await Promise.all([
+  const [customer, chosen, activity, overview, cryptoActivity, exchange] = await Promise.all([
     currentCustomer(),
     walletFor(asked),
     showCrypto ? null : customerApi<StoreList<StoreWalletTransaction>>("GET", "/v1/store/wallet/transactions?limit=20"),
     customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"),
     // Enough to find the last 24 hours' few once lock moves are left out.
     showCrypto ? customerApi<StoreList<StoreCryptoTransaction>>("GET", "/v1/store/crypto/transactions?limit=30") : null,
+    // Whether the coins' rows get Buy and Sell from BitoCard's reserve.
+    showCrypto ? customerApi<StoreExchange>("GET", "/v1/store/exchange") : null,
   ]);
   const wallet = chosen ?? (asked ? await walletFor() : null);
   // The Crypto tab is there where the store offers crypto, or while the customer still holds coins or P2P money.
@@ -242,7 +265,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             </nav>
           ) : null}
           {cryptoTab ? (
-            <CryptoWallets wallets={crypto} activity={cryptoActivity?.ok ? cryptoActivity.data.data : null} />
+            <CryptoWallets wallets={crypto} activity={cryptoActivity?.ok ? cryptoActivity.data.data : null} exchange={exchange?.ok ? exchange.data : null} />
           ) : (
           <>
           <section aria-label="Balance" className="rounded-3xl bg-navy-900 p-6 text-white">

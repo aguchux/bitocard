@@ -9,6 +9,16 @@ import type { IntegrationLink } from '../integrations/links.js';
 export const priceFields: IntegrationField[] = [
   { key: 'COINGECKO_API_KEY', label: 'API key', secret: true, kind: 'text', required: false, help: 'CoinGecko > Developer dashboard > API keys. A free Demo key works; without one the public rate limit applies.' },
   { key: 'COINGECKO_API_URL', label: 'API address', secret: false, kind: 'url', required: false, help: 'Leave empty for https://api.coingecko.com. A Pro key needs https://pro-api.coingecko.com.' },
+  {
+    key: 'CRYPTO_PRICE_SECONDARY',
+    label: 'Check against Coinbase',
+    secret: false,
+    kind: 'flag',
+    required: false,
+    help: 'On: every exchange price is also read from Coinbase’s public spot prices; a coin whose two prices differ by more than the divergence below is paused and operations are told.',
+  },
+  { key: 'CRYPTO_PRICE_DIVERGENCE_BPS', label: 'Largest divergence (basis points)', secret: false, kind: 'number', required: false, help: 'Default 100 (1%).' },
+  { key: 'COINBASE_PRICE_URL', label: 'Coinbase address', secret: false, kind: 'url', required: false, help: 'Leave empty for https://api.coinbase.com.' },
 ];
 
 export const priceLinks: IntegrationLink[] = [
@@ -101,4 +111,31 @@ export async function checkPrices(values: Record<string, string | undefined>) {
   } catch (error) {
     return { environment: 'live' as const, ok: false, message: `CoinGecko ${error instanceof Error ? error.message : 'failed'}.`, chains: [] };
   }
+}
+
+/** The default largest difference between CoinGecko's and Coinbase's prices before a coin's exchange pair pauses. */
+export const defaultDivergenceBps = 100;
+
+/**
+ * Coinbase's public spot price of a coin in US dollars (`/v2/prices/<COIN>-USD/spot`, no key), the second opinion on
+ * CoinGecko for the exchange. Null when Coinbase does not price the coin or cannot be reached: then CoinGecko alone
+ * decides, as without the check.
+ */
+export async function secondaryPrice(values: Record<string, string | undefined>, asset: string): Promise<bigint | null> {
+  const base = (values.COINBASE_PRICE_URL || 'https://api.coinbase.com').replace(/\/+$/, '');
+  try {
+    const res = await fetch(`${base}/v2/prices/${encodeURIComponent(asset)}-USD/spot`, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(10_000), redirect: 'error' });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: { amount?: string } };
+    const amount = Number(body?.data?.amount);
+    return priceE8(amount);
+  } catch {
+    return null;
+  }
+}
+
+/** How far apart two prices are, in basis points of the second. */
+export function divergenceBps(a: bigint, b: bigint) {
+  const gap = a > b ? a - b : b - a;
+  return Number((gap * 10_000n) / b);
 }

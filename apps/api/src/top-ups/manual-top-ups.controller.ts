@@ -34,8 +34,12 @@ class TopUpDto {
 }
 
 class ConfirmDto {
-  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code from the email' })
+  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code from your authenticator app or the email' })
   code: string;
+
+  /** authenticator (the admin's app, when set up) or email (the code we emailed; the default). */
+  @IsOptional() @IsIn(['authenticator', 'email'])
+  method?: 'authenticator' | 'email';
 }
 
 class FilterDto extends PageDto {
@@ -85,7 +89,7 @@ export class AdminManualTopUpsController {
   @Post('top-ups/:id/confirm')
   @HttpCode(HttpStatus.OK)
   confirm(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ConfirmDto) {
-    return this.topUps.confirm(adminId(caller)!, id, body.code);
+    return this.topUps.confirm(adminId(caller)!, id, body.code, body.method);
   }
 
   @Post('top-ups/:id/resend-code')

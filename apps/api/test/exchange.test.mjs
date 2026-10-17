@@ -283,14 +283,28 @@ describe('reseller exchange', () => {
       assert.equal((await browser.post('/v1/exchange/trades', { quote_id: quoted.json.id }, headers)).json.error.code, 'quote_expired');
       const reserveBefore = (await browser.get('/v1/exchange/reserves', headers)).json.coins.find(row => row.asset === 'BTC').balance;
       assert.equal(Number(reserveBefore), 0);
+      // Coins behind the reseller's own desk need the desk switch.
+      assert.equal((await browser.post('/v1/exchange/reserves/coins/transfers', { asset: 'BTC', amount: '0.006', direction: 'fund' }, headers)).json.error.code, 'exchange_not_enabled');
+      assert.equal((await admin.put('/v1/admin/switches/reseller_desks', { enabled: true })).status, 200);
       const funded = await browser.post('/v1/exchange/reserves/coins/transfers', { asset: 'BTC', amount: '0.006', direction: 'fund' }, headers);
       assert.equal(funded.status, 201, JSON.stringify(funded.json));
       assert.deepEqual([funded.json.wallet, funded.json.reserve], ['0.00400000', '0.00600000']);
       assert.equal((await browser.post('/v1/exchange/reserves/coins/transfers', { asset: 'BTC', amount: '0.005', direction: 'withdraw' }, headers)).status, 201);
       assert.equal((await browser.post('/v1/exchange/reserves/coins/transfers', { asset: 'BTC', amount: '0.002', direction: 'withdraw' }, headers)).json.error.code, 'insufficient_funds');
+      // A closed pair still shows what the reseller holds of the coin.
+      prices.forget();
+      feed.age = 6 * 60_000;
+      try {
+        const closed = (await browser.get('/v1/exchange?currency=NGN', headers)).json.assets.find(row => row.asset === 'BTC');
+        assert.deepEqual([closed.closed, closed.your_coins], ['price_unavailable', '0.00900000']);
+      } finally {
+        feed.age = 0;
+        prices.forget();
+      }
       await ledgerOk();
     } finally {
       assert.equal((await admin.put('/v1/admin/switches/reseller_exchange', { enabled: null })).status, 200);
+      assert.equal((await admin.put('/v1/admin/switches/reseller_desks', { enabled: null })).status, 200);
     }
   });
 

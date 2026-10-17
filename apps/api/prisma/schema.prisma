@@ -563,6 +563,10 @@ model Country {
   identityProvider   String            @default("didit") @map("identity_provider")
   /// Spin and win: spins each customer may take per day (UTC) in this market, 1 to 10.
   spinDailyLimit     Int      @default(2) @map("spin_daily_limit")
+  /// The most a reseller's own exchange desk may mark up (basis points, 0 to 2,000) in this market.
+  exchangeMarkupCapBps Int    @default(500) @map("exchange_markup_cap_bps")
+  /// Admins are told when BitoCard's fiat exchange reserve in this market falls below this (minor units); null: never.
+  exchangeReserveAlertMinor BigInt? @map("exchange_reserve_alert_minor")
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
   categories         CountryCategory[]
@@ -2514,6 +2518,10 @@ model CryptoAsset {
   withdrawalDailyLimit String @default("0") @map("withdrawal_daily_limit")
   /// Withdrawals from this amount (asset units, decimal string) wait for an admin's approval.
   withdrawalReviewFrom String @default("0") @map("withdrawal_review_from")
+  /// The most one taker may exchange of this coin in 24 hours (coin units, as text); null: no daily limit.
+  exchangeDailyLimit String? @map("exchange_daily_limit")
+  /// Admins are told when BitoCard's coin reserve falls below this (coin units, as text); null: never.
+  exchangeReserveAlert String? @map("exchange_reserve_alert")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("crypto_assets")
@@ -2778,6 +2786,8 @@ model ManualTopUp {
   codeExpiresAt     DateTime?  @map("code_expires_at")
   codeAttempts      Int        @default(0) @map("code_attempts")
   codeSentAt        DateTime?  @map("code_sent_at")
+  /// Codes sent for this request (capped, so resends cannot give unlimited guesses).
+  codeSends         Int        @default(1) @map("code_sends")
   entryId           String?    @map("entry_id") @db.Uuid
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
@@ -2951,6 +2961,8 @@ model ReserveMovement {
   codeExpiresAt     DateTime?  @map("code_expires_at")
   codeAttempts      Int        @default(0) @map("code_attempts")
   codeSentAt        DateTime?  @map("code_sent_at")
+  /// Codes sent for this request (capped, so resends cannot give unlimited guesses).
+  codeSends         Int        @default(1) @map("code_sends")
   entryId           String?    @map("entry_id") @db.Uuid
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")

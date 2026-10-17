@@ -1,5 +1,5 @@
 import { bitocardApi } from '../base';
-import type { List } from './types';
+import type { ConfirmMethod, List } from './types';
 
 export type ManualTopUpSource = 'received' | 'goodwill';
 export type ManualTopUpStatus = 'awaiting_code' | 'expired' | 'completed' | 'cancelled';
@@ -25,6 +25,8 @@ export type ManualTopUp = {
   code_sent_at: string | null;
   created_at: string;
   completed_at: string | null;
+  /** On the request's answer only: how the admin can confirm it (the authenticator app when set up; the emailed code always). */
+  confirm_with?: ConfirmMethod[];
 };
 
 export type ManualTopUpInput = {
@@ -64,8 +66,9 @@ export const adminTopUpsApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/customers/${id}/top-ups`, method: 'POST', body }),
       invalidatesTags: ['TopUp', 'Activity'],
     }),
-    confirmTopUp: build.mutation<ManualTopUp, { id: string; code: string }>({
-      query: ({ id, code }) => ({ url: `/v1/admin/top-ups/${id}/confirm`, method: 'POST', body: { code } }),
+    /** `method`: the admin's authenticator app or the emailed code (the API's default). */
+    confirmTopUp: build.mutation<ManualTopUp, { id: string; code: string; method?: ConfirmMethod }>({
+      query: ({ id, code, method }) => ({ url: `/v1/admin/top-ups/${id}/confirm`, method: 'POST', body: { code, ...(method ? { method } : {}) } }),
       invalidatesTags: result => [...credited(result)],
     }),
     resendTopUpCode: build.mutation<ManualTopUp, string>({

@@ -34,8 +34,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   );
 });
 
-export function Card({ className, children, as: Tag = 'section' }: { className?: string; children: ReactNode; as?: 'section' | 'div' | 'article' }) {
-  return <Tag className={cn('min-w-0 rounded-2xl border border-line bg-white shadow-card', className)}>{children}</Tag>;
+/** `id` lets a link jump to the card (`#id`). */
+export function Card({ className, children, as: Tag = 'section', id }: { className?: string; children: ReactNode; as?: 'section' | 'div' | 'article'; id?: string }) {
+  return (
+    <Tag id={id} className={cn('min-w-0 rounded-2xl border border-line bg-white shadow-card', className)}>
+      {children}
+    </Tag>
+  );
 }
 
 export function CardHeader({ title, description, actions, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; className?: string }) {

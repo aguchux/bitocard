@@ -5,11 +5,11 @@ import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreExchange, 
 import { card, CoinBadge, CoinPicker, CryptoGate, CryptoNav, date } from "@/components/app/crypto";
 import { ExchangeSheet } from "@/components/app/exchange/exchange-sheet";
 import { customerApi } from "@/lib/customer";
-import { changeText, usdText } from "@/lib/exchange";
+import { changeText, fiatParam, usdText } from "@/lib/exchange";
 
 export const metadata: Metadata = { title: "Exchange" };
 
-type Search = { asset?: string; side?: string };
+type Search = { asset?: string; side?: string; fiat?: string };
 
 /** Gates the crypto pages share (identity check, frozen account, crypto closed) say why first. */
 const cryptoBlocks = new Set(["crypto_not_enabled", "customer_verification_required", "crypto_account_frozen", "email_not_verified"]);
@@ -34,7 +34,10 @@ export default async function ExchangePage({ searchParams }: { searchParams: Pro
   const asset = codes.includes(asked) ? asked : (open[0]?.asset ?? codes[0] ?? "USDT");
   const pair = exchange?.assets.find(item => item.asset === asset) ?? null;
   const sideTerms = pair ? (side === "buy" ? pair.buy : pair.sell) : null;
+  // Switching side or coin starts afresh: the amount sent here (`?fiat=`, from Quick buy or sell) is for this pair only.
   const href = (next: { asset?: string; side?: string }) => `/account/crypto/exchange?${new URLSearchParams({ asset, side, ...next }).toString()}`;
+  const fiat = fiatParam(params.fiat);
+  const initialFiat = fiat === null ? null : Number(fiat);
   const desk = pair?.desk.name ?? exchange?.desk.name ?? "BitoCard";
 
   return (
@@ -77,7 +80,7 @@ export default async function ExchangePage({ searchParams }: { searchParams: Pro
           <CoinPicker assets={codes} wallets={wallets.ok ? wallets.data : null} current={asset} href={code => href({ asset: code })} label={side === "buy" ? "Coin to buy" : "Coin to sell"} />
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,36rem)_minmax(0,1fr)] lg:items-start">
-            <ExchangeSheet key={`${asset}-${side}`} pair={pair} side={side} currency={exchange.currency} desk={desk} balances={exchange.balances} quoteSeconds={exchange.quote_seconds} />
+            <ExchangeSheet key={`${asset}-${side}-${initialFiat ?? ""}`} initialFiat={initialFiat} pair={pair} side={side} currency={exchange.currency} desk={desk} balances={exchange.balances} quoteSeconds={exchange.quote_seconds} />
 
             <aside aria-label={`${desk} and the market`} className="space-y-3 text-sm lg:sticky lg:top-24">
               <section className={card}>
@@ -131,34 +134,34 @@ export default async function ExchangePage({ searchParams }: { searchParams: Pro
               </Link>
             </aside>
           </div>
-
-          {trades.ok && trades.data.data.length ? (
-            <section aria-labelledby="exchange-trades" className={card}>
-              <h2 id="exchange-trades" className="mb-1 text-lg font-bold">
-                Your exchange trades
-              </h2>
-              <ul className="divide-y divide-slate-100">
-                {trades.data.data.map(trade => (
-                  <li key={trade.id} className="flex items-center gap-3 py-3">
-                    <CoinBadge asset={trade.asset} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">
-                        {trade.side === "buy" ? "Bought" : "Sold"} {formatCrypto(trade.amount, trade.asset)}
-                      </span>
-                      <span className="block truncate text-sm text-slate-500">
-                        {trade.number} · with {trade.desk.name} · {date(trade.created_at)}
-                      </span>
-                    </span>
-                    <span className={`shrink-0 font-semibold tabular-nums ${trade.side === "buy" ? "text-navy-900" : "text-emerald-700"}`}>
-                      {trade.side === "buy" ? "−" : "+"}
-                      {formatFace(trade.fiat, trade.currency)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
         </>
+      ) : null}
+      {/* Shown whatever the exchange says now: a trade notification links here, and past trades stay visible. */}
+      {trades.ok && trades.data.data.length ? (
+        <section aria-labelledby="exchange-trades" className={card}>
+          <h2 id="exchange-trades" className="mb-1 text-lg font-bold">
+            Your exchange trades
+          </h2>
+          <ul className="divide-y divide-slate-100">
+            {trades.data.data.map(trade => (
+              <li key={trade.id} className="flex items-center gap-3 py-3">
+                <CoinBadge asset={trade.asset} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">
+                    {trade.side === "buy" ? "Bought" : "Sold"} {formatCrypto(trade.amount, trade.asset)}
+                  </span>
+                  <span className="block truncate text-sm text-slate-500">
+                    {trade.number} · with {trade.desk.name} · {date(trade.created_at)}
+                  </span>
+                </span>
+                <span className={`shrink-0 font-semibold tabular-nums ${trade.side === "buy" ? "text-navy-900" : "text-emerald-700"}`}>
+                  {trade.side === "buy" ? "−" : "+"}
+                  {formatFace(trade.fiat, trade.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
     </div>
   );

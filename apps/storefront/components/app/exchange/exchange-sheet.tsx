@@ -7,7 +7,7 @@ import { ArrowDownUp, CircleAlert, CircleCheck, Clock3, X } from "lucide-react";
 import { formatCrypto, formatFace, type StoreExchangeAsset, type StoreExchangeQuote, type StoreExchangeTrade } from "@bitocard/api-client/storefront";
 import { CoinBadge } from "@/components/app/crypto";
 import { quoteExchange, tradeExchange } from "@/lib/exchange-actions";
-import { changeText, fiatText, maximum, parseCoin, parseFiat, percent, problem, type Side, terms, type Unit, units, usdText } from "@/lib/exchange";
+import { availabilityText, changeText, fiatText, maximum, parseCoin, parseFiat, percent, problem, type Side, terms, type Unit, units, usdText } from "@/lib/exchange";
 
 type Props = {
   pair: StoreExchangeAsset;
@@ -16,6 +16,8 @@ type Props = {
   desk: string;
   balances: { proceeds: number; wallet: number };
   quoteSeconds: number;
+  /** Money to start from (minor units), when another screen sent the customer here with an amount. */
+  initialFiat?: number | null;
 };
 
 /**
@@ -23,11 +25,11 @@ type Props = {
  * with the limit BitoCard's reserve sets shown right under what is typed, where the money comes from or goes, and the
  * desk's price beside the market price. Review asks the API for a quote held for 30 seconds.
  */
-export function ExchangeSheet({ pair, side, currency, desk, balances, quoteSeconds }: Props) {
+export function ExchangeSheet({ pair, side, currency, desk, balances, quoteSeconds, initialFiat = null }: Props) {
   const id = useId();
   const sideTerms = side === "buy" ? pair.buy : pair.sell;
-  const [unit, setUnit] = useState<Unit>(side === "buy" ? "fiat" : "coin");
-  const [text, setText] = useState("");
+  const [unit, setUnit] = useState<Unit>(initialFiat || side === "buy" ? "fiat" : "coin");
+  const [text, setText] = useState(initialFiat ? fiatText(BigInt(initialFiat)) : "");
   const [reviewing, setReviewing] = useState(false);
   const [quote, setQuote] = useState<StoreExchangeQuote | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -164,13 +166,13 @@ export function ExchangeSheet({ pair, side, currency, desk, balances, quoteSecon
       <dl className="mt-5 divide-y divide-slate-100 text-sm">
         <div className="flex items-baseline justify-between gap-4 pb-3">
           <dt className="text-slate-600">{outLabel}</dt>
-          <dd className="text-right font-display text-xl font-extrabold text-navy-900 tabular-nums" aria-live="polite">
+          <dd className="min-w-0 text-right font-display text-xl font-extrabold break-all text-navy-900 tabular-nums" aria-live="polite">
             {outValue}
           </dd>
         </div>
         <div className="flex items-start justify-between gap-4 py-3">
           <dt className="text-slate-600">{side === "buy" ? "Paid from" : "Money goes to"}</dt>
-          <dd className="text-right text-navy-900">
+          <dd className="min-w-0 text-right text-navy-900">
             {side === "buy" ? (
               <>
                 P2P money first, then your {currency} wallet
@@ -190,7 +192,7 @@ export function ExchangeSheet({ pair, side, currency, desk, balances, quoteSecon
           <dt className="text-slate-600">
             {desk} {side === "buy" ? "sells at" : "buys at"}
           </dt>
-          <dd className="text-right font-semibold text-navy-900 tabular-nums">
+          <dd className="min-w-0 text-right font-semibold break-words text-navy-900 tabular-nums">
             {formatFace(sideTerms.price, currency)} / {coin}
           </dd>
         </div>
@@ -273,6 +275,7 @@ function ReviewDialog({ quote, desk, seconds, onRequote, onClose, onTraded }: { 
   const coins = formatCrypto(quote.amount, quote.asset);
   const money = formatFace(quote.fiat, quote.currency);
   const expired = left <= 0;
+  const availability = availabilityText(quote, desk);
 
   const close = () => {
     ref.current?.close();
@@ -334,18 +337,18 @@ function ReviewDialog({ quote, desk, seconds, onRequote, onClose, onTraded }: { 
           <dl className="min-w-0 flex-1 text-sm">
             <div className="flex justify-between gap-3">
               <dt className="text-slate-500">{buying ? "You pay" : "You sell"}</dt>
-              <dd className="font-display text-lg font-extrabold tabular-nums">{buying ? money : coins}</dd>
+              <dd className="min-w-0 text-right font-display text-lg font-extrabold break-all tabular-nums">{buying ? money : coins}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-slate-500">You receive</dt>
-              <dd className="font-display text-lg font-extrabold tabular-nums">{buying ? coins : money}</dd>
+              <dd className="min-w-0 text-right font-display text-lg font-extrabold break-all tabular-nums">{buying ? coins : money}</dd>
             </div>
           </dl>
         </div>
         <dl className="divide-y divide-slate-100 rounded-2xl bg-slate-50 px-4 text-sm">
           <div className="flex justify-between gap-3 py-2.5">
             <dt className="text-slate-500">{desk}&apos;s price</dt>
-            <dd className="font-semibold tabular-nums">
+            <dd className="min-w-0 text-right font-semibold break-words tabular-nums">
               {formatFace(quote.price, quote.currency)} / {quote.asset}
             </dd>
           </div>
@@ -366,6 +369,17 @@ function ReviewDialog({ quote, desk, seconds, onRequote, onClose, onTraded }: { 
             </div>
           ) : null}
         </dl>
+
+        {!done ? (
+          <div className="text-sm">
+            <p className="text-slate-600">{availability.line}</p>
+            {availability.capped ? (
+              <p className="mt-2 flex gap-2 rounded-2xl bg-amber-50 px-3 py-2.5 text-amber-900 ring-1 ring-amber-200/70">
+                <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> {availability.capped}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? (
           <p className="flex gap-2 rounded-2xl bg-red-50 px-3 py-2.5 text-sm text-red-800 ring-1 ring-red-200" role="alert">

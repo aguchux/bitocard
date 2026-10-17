@@ -578,6 +578,10 @@ export type StoreExchangeQuote = {
   fx_rate: string;
   expires_at: string;
   created_at: string;
+  /** The most the desk's reserve allows on this side right now, in coins and money (fiat minor units). */
+  available: { amount: string; fiat: number };
+  /** True when the quote is exactly that most: the trade takes everything the reserve has available. */
+  capped: boolean;
 };
 
 export type StoreExchangeTrade = {

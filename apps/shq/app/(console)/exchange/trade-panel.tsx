@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, Select } from "@bitocard/admin-ui";
 import { type ResellerExchangeQuote, useQuoteResellerExchangeMutation, useResellerExchangeOverviewQuery, useResellerExchangeTradesQuery, useTradeResellerExchangeMutation } from "@bitocard/api-client/reseller";
 
 const coinInput = /^\d{1,12}(?:\.\d{1,8})?$/;
 
-export function TradePanel({ currencies }: { currencies: string[] }) {
+/** BitoCard's prices for the reseller's wallets; only owners, admins and finance may quote and trade (the API's roles). */
+export function TradePanel({ currencies, canTrade }: { currencies: string[]; canTrade: boolean }) {
   const id = useId();
   const [currency, setCurrency] = useState(currencies[0] ?? "USD");
   const [asset, setAsset] = useState("BTC");
@@ -50,14 +52,15 @@ export function TradePanel({ currencies }: { currencies: string[] }) {
           <div>Your coin wallet: <strong>{open.your_coins} {asset}</strong></div>
           <div>Your fiat wallet: <strong>{formatMoney(open.your_wallet, currency)}</strong></div>
         </div> : <div className="mt-4"><Notice tone="amber">{pair && "closed" in pair ? `This pair is unavailable (${pair.closed}).` : "Choose an available coin."}</Notice></div>}
-        <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={event => {
+        {!canTrade ? <div className="mt-5"><Notice tone="blue">Only your business&apos;s owner, admins and finance team can trade with BitoCard.</Notice></div> : null}
+        {canTrade ? <form className="mt-5 flex flex-wrap items-end gap-3" onSubmit={event => {
           event.preventDefault(); reset();
           if (!open || !coinInput.test(amount)) return;
           void makeQuote({ asset, currency, side, amount }).unwrap().then(result => { setExpired(false); setQuote(result); }).catch(() => undefined);
         }}>
           <Field label={`Amount (${asset})`} htmlFor={`${id}-amount`}><Input id={`${id}-amount`} inputMode="decimal" value={amount} onChange={event => { setAmount(event.target.value); reset(); }} placeholder="0.00" /></Field>
           <Button type="submit" disabled={!open || !coinInput.test(amount)} loading={quoting.isLoading}>Review trade</Button>
-        </form>
+        </form> : null}
         {quoting.error ? <div className="mt-3"><Notice tone="red">{errorMessage(quoting.error)}</Notice></div> : null}
         {quote ? <div className="mt-5 rounded-xl border border-line p-4" role="region" aria-label="Trade quote">
           <p className="font-semibold">{side === "buy" ? `Buy ${quote.amount} ${asset}` : `Sell ${quote.amount} ${asset}`} with BitoCard</p>
@@ -72,10 +75,11 @@ export function TradePanel({ currencies }: { currencies: string[] }) {
         {done ? <p className="mt-4 text-sm font-semibold text-mint-700" role="status">{done}</p> : null}
       </> : null}
     </Card>
-    <Card><CardHeader title="Trades with BitoCard" description="Your completed wallet and coin exchanges." />
+    <Card><CardHeader title="Recent trades with BitoCard" description="Your latest wallet and coin exchanges." actions={<Link href="/exchange/trades" className="text-sm font-semibold text-brand-600 hover:underline">All trades</Link>} />
       {history.error ? <div className="px-5 pb-5"><Notice tone="red">{errorMessage(history.error)}</Notice></div> : null}
-      <ul className="divide-y divide-line px-5 pb-4 sm:px-6">{history.data?.data.map(row => <li key={row.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
-        <span><strong>{row.number}</strong> · {row.side === "buy" ? "Bought" : "Sold"} {row.amount} {row.asset}</span><span>{formatMoney(row.fiat, row.currency)}</span>
+      {history.data && !history.data.data.length ? <p className="px-5 pb-5 text-sm text-muted sm:px-6">No trades yet.</p> : null}
+      <ul className="divide-y divide-line px-5 pb-4 sm:px-6">{history.data?.data.slice(0, 5).map(row => <li key={row.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+        <span className="min-w-0"><strong>{row.number}</strong> · {row.side === "buy" ? "Bought" : "Sold"} {row.amount} {row.asset}</span><span>{formatMoney(row.fiat, row.currency)}</span>
       </li>)}</ul>
     </Card>
   </div>;

@@ -18,7 +18,7 @@ export function ResellerSwitchesCard({ resellerId, features }: { resellerId: str
   const own = (key: string) => switches.data?.data.find(row => row.key === key && row.reseller_id === resellerId)?.enabled;
 
   return (
-    <Card>
+    <Card id="feature-switches" className="scroll-mt-24">
       <CardHeader title="Feature switches" description="For this reseller only: overrides their country and the global setting." />
       {state.error ? (
         <div className="px-5 pt-3 sm:px-6">

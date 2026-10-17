@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, type PipeTransform, Post, Put } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
@@ -36,6 +36,10 @@ class UpdateCountryDto {
   @IsOptional() @IsInt() @Min(0) @Max(90) payout_hold_days?: number;
   /** Spin and win: spins per customer per day in this market. */
   @IsOptional() @IsInt() @Min(1) @Max(10) spin_daily_limit?: number;
+  /** Exchange: the most a reseller's own desk may mark up here, in basis points (at most 20%). */
+  @IsOptional() @IsInt() @Min(0) @Max(2000) exchange_markup_cap_bps?: number;
+  /** Exchange: admins are told when BitoCard's fiat reserve here falls below this (minor units); null: never. */
+  @ValidateIf((_object, value) => value !== null) @IsOptional() @IsInt() @Min(0) exchange_reserve_alert_minor?: number | null;
   @IsOptional() @IsInt() @Min(0) min_withdrawal_minor?: number;
 }
 

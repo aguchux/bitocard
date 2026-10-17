@@ -2,13 +2,13 @@
 
 import { useEffect, useId, useState } from 'react';
 import { MailCheck } from 'lucide-react';
-import type { ManualTopUp, ManualTopUpInput, ManualTopUpSource } from '@bitocard/api-client/admin';
+import type { ConfirmMethod, ManualTopUp, ManualTopUpInput, ManualTopUpSource } from '@bitocard/api-client/admin';
 import { errorMessage, formatDateTime, formatMoney } from '../format';
 import { Dialog } from './data';
 import { amountToMinor } from './pricing';
 import { Button, Field, Input, KeyValue, Select, Textarea } from './primitives';
 import { Badge, Notice, type Tone } from './status';
-import { CodeInput } from './code-input';
+import { ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod } from './confirm-code';
 
 const resendAfterSeconds = 60;
 
@@ -42,8 +42,9 @@ export function resendWait(sentAt: string | null, now = Date.now()) {
 
 /**
  * Manual top-up in two steps. First the wallet, amount, where the money comes from and why; "Email me a code" asks
- * the API, which emails a 6-digit code to the signed-in admin. Then the code: only it adds the money. The code can be
- * sent again after a minute, and the top-up cancelled while it waits.
+ * the API, which emails a 6-digit code to the signed-in admin. Then the code: the authenticator app's when the admin has
+ * one (the default then), or the emailed one; only it adds the money. The emailed code can be sent again after a
+ * minute, and the top-up cancelled while it waits.
  */
 export function WalletTopUpDialog({
   open,
@@ -68,7 +69,7 @@ export function WalletTopUpDialog({
   chooseMode: boolean;
   modeNote?: string;
   onRequest: (input: ManualTopUpInput) => Promise<ManualTopUp>;
-  onConfirm: (id: string, code: string) => Promise<ManualTopUp>;
+  onConfirm: (id: string, code: string, method: ConfirmMethod) => Promise<ManualTopUp>;
   onResend: (id: string) => Promise<ManualTopUp>;
   onCancel: (id: string) => Promise<unknown>;
   onDone?: (topUp: ManualTopUp) => void;
@@ -83,6 +84,8 @@ export function WalletTopUpDialog({
   const [touched, setTouched] = useState(false);
   const [pending, setPending] = useState<ManualTopUp | null>(null);
   const [code, setCode] = useState('');
+  const [methods, setMethods] = useState<ConfirmMethod[] | undefined>(undefined);
+  const [method, setMethod] = useState<ConfirmMethod>('email');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -109,6 +112,8 @@ export function WalletTopUpDialog({
     setTouched(false);
     setPending(null);
     setCode('');
+    setMethods(undefined);
+    setMethod('email');
     setError(null);
   };
   const close = () => {
@@ -141,15 +146,17 @@ export function WalletTopUpDialog({
         reason: reason.trim(),
       });
       setPending(created);
+      setMethods(created.confirm_with);
+      setMethod(defaultConfirmMethod(created.confirm_with));
       setNow(Date.now());
     });
   };
 
   const confirm = (value = code) => {
     if (!pending) return;
-    if (!/^\d{6}$/.test(value)) return setError('Enter the 6-digit code from the email.');
+    if (!/^\d{6}$/.test(value)) return setError(confirmCodeProblem(method));
     void run(async () => {
-      const done = await onConfirm(pending.id, value);
+      const done = await onConfirm(pending.id, value, method);
       onDone?.(done);
       close();
     });
@@ -189,7 +196,7 @@ export function WalletTopUpDialog({
       open={open}
       onClose={close}
       title={pending ? `Confirm ${pending.number}` : 'Top up wallet'}
-      description={pending ? `Enter the code we emailed you to add the money to ${targetName}'s wallet.` : `Add money to ${targetName}'s wallet. Nothing moves until you enter the code we email you.`}
+      description={pending ? `Enter your code to add the money to ${targetName}'s wallet.` : `Add money to ${targetName}'s wallet. Nothing moves until you enter the code we email you.`}
       footer={footer}
     >
       <div className="space-y-4">
@@ -204,27 +211,23 @@ export function WalletTopUpDialog({
                 { label: 'Code expires', value: pending.code_expires_at ? formatDateTime(pending.code_expires_at) : '—' },
               ]}
             />
-            <div className="space-y-2 rounded-lg bg-canvas p-4">
-              <p className="text-sm font-semibold text-ink">Code from the email</p>
-              <CodeInput label="Code from the email" value={code} onChange={setCode} onComplete={confirm} autoFocus disabled={busy} />
-              <div className="flex items-center justify-between gap-2 pt-1 text-sm text-muted">
-                <span>Sent to your admin email.</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy || wait > 0}
-                  onClick={() =>
-                    void run(async () => {
-                      setPending(await onResend(pending.id));
-                      setCode('');
-                      setNow(Date.now());
-                    })
-                  }
-                >
-                  {wait > 0 ? `Resend in ${wait}s` : 'Resend code'}
-                </Button>
-              </div>
-            </div>
+            <ConfirmCodePanel
+              methods={methods}
+              method={method}
+              onMethodChange={setMethod}
+              code={code}
+              onCodeChange={setCode}
+              onComplete={confirm}
+              busy={busy}
+              wait={wait}
+              onResend={() =>
+                void run(async () => {
+                  setPending(await onResend(pending.id));
+                  setCode('');
+                  setNow(Date.now());
+                })
+              }
+            />
           </>
         ) : (
           <>

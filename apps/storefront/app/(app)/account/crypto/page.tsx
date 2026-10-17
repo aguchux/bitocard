@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Lock, Snowflake } from "lucide-react";
-import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pProfile, type StoreP2pTrade } from "@bitocard/api-client/storefront";
+import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreExchange, type StoreList, type StoreP2pProfile, type StoreP2pTrade } from "@bitocard/api-client/storefront";
 import { canWithdraw, card, CoinBadge, CryptoGate, CryptoNav, hasP2pMoney, heldAssets, TradeRow, tradableAssets } from "@/components/app/crypto";
 import { NicknameForm, QuickTrade, TestCryptoForm } from "@/components/app/crypto-forms";
 import { customerApi } from "@/lib/customer";
+import { reservePrices, walletExchangeLinks } from "@/lib/exchange";
 
 export const metadata: Metadata = { title: "Crypto" };
 
@@ -14,11 +15,15 @@ export const metadata: Metadata = { title: "Crypto" };
  * closed to them, what they still hold stays here to withdraw and cash out.
  */
 export default async function CryptoPage() {
-  const [overview, profile, trades] = await Promise.all([
+  const [overview, profile, trades, exchangeOverview] = await Promise.all([
     customerApi<StoreCryptoWallets>("GET", "/v1/store/crypto"),
     customerApi<StoreP2pProfile>("GET", "/v1/store/p2p/profile"),
     customerApi<StoreList<StoreP2pTrade>>("GET", "/v1/store/p2p/trades?limit=5"),
+    customerApi<StoreExchange>("GET", "/v1/store/exchange"),
   ]);
+  const exchange = exchangeOverview.ok ? exchangeOverview.data : null;
+  const reserve = reservePrices(exchange);
+  const desk = exchange?.desk.name ?? "BitoCard";
   const wallets = overview.ok ? overview.data : null;
   // Coins that can be traded or deposited: crypto open to them and the coin not switched off.
   const assets = tradableAssets(wallets);
@@ -42,12 +47,8 @@ export default async function CryptoPage() {
             Quick buy or sell
           </h2>
           <div className="rounded-2xl bg-white p-4 text-navy-900">
-            <QuickTrade assets={assets} currency={wallets.currency} />
+            <QuickTrade assets={assets} currency={wallets.currency} reserve={reserve} desk={desk} />
           </div>
-          <Link href="/account/crypto/exchange" className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 text-sm font-semibold hover:bg-white/15">
-            <span>Or trade instantly with BitoCard at the live market price</span>
-            <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
-          </Link>
         </section>
       ) : null}
 
@@ -72,8 +73,11 @@ export default async function CryptoPage() {
           </div>
           {!coins.length ? <p className="py-3 text-sm text-slate-600">You hold no coins.</p> : null}
           <ul className="divide-y divide-slate-100">
-            {coins.map(asset => (
-              <li key={asset.asset} className="flex items-center gap-3 py-3">
+            {coins.map(asset => {
+              const links = wallets.enabled && !wallets.frozen && wallets.verified ? walletExchangeLinks(exchange, asset.asset, asset.available) : { buy: null, sell: null };
+              return (
+              <li key={asset.asset} className="py-3">
+                <div className="flex items-center gap-3">
                 <CoinBadge asset={asset.asset} />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold">{asset.name}</span>
@@ -100,8 +104,24 @@ export default async function CryptoPage() {
                   <span className="block font-bold">{formatCrypto(asset.available, asset.asset)}</span>
                   <span className="block text-xs text-slate-500">available</span>
                 </span>
+                </div>
+                {links.buy || links.sell ? (
+                  <span className="mt-2 flex gap-2 pl-13">
+                    {links.buy ? (
+                      <Link href={links.buy} aria-label={`Buy ${asset.asset} from ${desk}`} className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400">
+                        Buy
+                      </Link>
+                    ) : null}
+                    {links.sell ? (
+                      <Link href={links.sell} aria-label={`Sell ${asset.asset} to ${desk}`} className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400">
+                        Sell
+                      </Link>
+                    ) : null}
+                  </span>
+                ) : null}
               </li>
-            ))}
+              );
+            })}
           </ul>
           <dl className="mt-3 grid gap-2 rounded-2xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
             <div className="flex min-w-0 items-baseline justify-between gap-3 sm:block">

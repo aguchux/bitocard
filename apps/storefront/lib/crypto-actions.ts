@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreP2pAd, StoreP2pProfile, StoreP2pQuote, StoreP2pTrade, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
 import type { FormState } from "@/lib/account-actions";
 import { customerApi } from "@/lib/customer";
+import { exchangeHref } from "@/lib/exchange";
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
@@ -45,14 +46,16 @@ export async function addTestCrypto(_state: FormState, form: FormData): Promise<
 }
 
 /**
- * Quick buy or sell: finds the best ad for the amount (fiat) and goes to the confirmation, where the customer sees
- * exactly what they get before anything moves.
+ * Quick buy or sell: from BitoCard's reserve (`source=reserve`) it opens the instant exchange with the coin, side and
+ * amount filled in, where the customer reviews a held price; from traders it finds the best ad for the amount (fiat)
+ * and goes to the confirmation, where the customer sees exactly what they get before anything moves.
  */
 export async function findBestPrice(_state: FormState, form: FormData): Promise<FormState> {
   const fiat = toMinor(text(form, "fiat"));
   if (!fiat) return { error: "Enter how much you want to trade.", field: "fiat" };
   const side = text(form, "side") === "sell" ? "sell" : "buy";
   const asset = text(form, "asset");
+  if (text(form, "source") === "reserve") redirect(exchangeHref({ asset, side, fiat }));
   const result = await customerApi<StoreP2pQuote>("GET", `/v1/store/p2p/quote?${new URLSearchParams({ asset, side, fiat: String(fiat) }).toString()}`);
   if (!result.ok) {
     signInFirst(result.status, "/account/crypto");
@@ -277,4 +280,11 @@ export async function simulateCashOut(_state: FormState, form: FormData): Promis
   if (!result.ok) return { error: result.message };
   revalidatePath("/account/crypto/cash-out");
   return {};
+}
+
+/** The best price on the P2P market for a coin and side right now (fiat minor units per whole coin), or null with no ad. */
+export async function bestP2pPrice(asset: string, side: "buy" | "sell"): Promise<number | null> {
+  if (!/^[A-Z0-9]{2,10}$/.test(asset)) return null;
+  const result = await customerApi<{ data: StoreP2pAd[] }>("GET", `/v1/store/p2p/market?${new URLSearchParams({ asset, side: side === "sell" ? "sell" : "buy", limit: "1" }).toString()}`);
+  return result.ok ? (result.data.data[0]?.price ?? null) : null;
 }

@@ -57,6 +57,7 @@ export const notificationTypes = {
   'store.checkout_refused': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Store order turned away' },
   'number.expiring': { realm: 'reseller', roles: ['admin', 'support', 'finance'], severity: 'warning', label: 'Virtual number expiring' },
   'number.renewal_failed': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Virtual number not renewed' },
+  'exchange.reserve_low': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Exchange desk reserve running low' },
   'number.expired': { realm: 'reseller', roles: ['admin', 'support', 'finance'], severity: 'critical', label: 'Virtual number paused' },
   'number.deleted': { realm: 'reseller', roles: ['admin', 'support'], severity: 'warning', label: 'Virtual number deleted' },
   'payout.paid': { realm: 'reseller', roles: ['finance'], severity: 'success', label: 'Withdrawal paid' },
@@ -107,6 +108,8 @@ export const notificationTypes = {
   'admin.crypto.custody_shortfall': { realm: 'admin', roles: ['finance', 'operations'], severity: 'critical', label: 'Crypto custody shortfall' },
   'admin.crypto.deposit_stuck': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Crypto deposit cannot be settled' },
   'admin.wallet.manual_top_up': { realm: 'admin', roles: ['finance'], severity: 'info', label: 'Wallet topped up by hand' },
+  'admin.exchange.reserve_low': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Exchange reserve running low' },
+  'admin.exchange.price_divergence': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Exchange price sources disagree' },
 
   // Storefront customers (baselined: sent once customer accounts exist) -----------------------------------------------
   'customer.order.completed': { realm: 'customer', severity: 'success', label: 'Order delivered', push: true },
@@ -119,6 +122,7 @@ export const notificationTypes = {
   'customer.gift_card_sale.accepted': { realm: 'customer', severity: 'success', label: 'Gift card sale accepted', push: true },
   'customer.gift_card_sale.declined': { realm: 'customer', severity: 'warning', label: 'Gift card sale declined', push: true },
   'customer.p2p.trade_completed': { realm: 'customer', severity: 'success', label: 'P2P trade completed', push: true },
+  'customer.exchange.completed': { realm: 'customer', severity: 'success', label: 'Exchange completed', push: true },
   'customer.crypto.deposit_credited': { realm: 'customer', severity: 'success', label: 'Crypto deposit arrived', push: true },
   'customer.crypto.frozen': { realm: 'customer', severity: 'warning', label: 'Crypto frozen', push: true, locked: true },
   'customer.crypto.withdrawal_sent': { realm: 'customer', severity: 'success', label: 'Crypto withdrawal sent', push: true },

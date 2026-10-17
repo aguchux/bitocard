@@ -278,15 +278,19 @@ export class CryptoWalletsService {
 
   // -- Admin ----------------------------------------------------------------------------------------------------
 
-  async setAsset(adminId: string | null, code: string, input: { enabled?: boolean; p2p_fee_bps?: number; withdrawal_daily_limit?: string; withdrawal_review_from?: string }) {
+  async setAsset(adminId: string | null, code: string, input: { enabled?: boolean; p2p_fee_bps?: number; withdrawal_daily_limit?: string; withdrawal_review_from?: string; exchange_daily_limit?: string | null; exchange_reserve_alert?: string | null }) {
     const before = await this.prisma.cryptoAsset.findUnique({ where: { code: code.toUpperCase() } });
     if (!before) throw notFound('asset');
     for (const key of ['withdrawal_daily_limit', 'withdrawal_review_from'] as const) if (input[key] !== undefined) toUnits(input[key]!, before.decimals, key);
+    if (input.exchange_daily_limit) toUnits(input.exchange_daily_limit, before.decimals, 'exchange_daily_limit');
+    if (input.exchange_reserve_alert) toUnits(input.exchange_reserve_alert, before.decimals, 'exchange_reserve_alert');
     const after = await this.prisma.cryptoAsset.update({
       where: { code: before.code },
       data: { ...(input.enabled !== undefined ? { enabled: input.enabled } : {}), ...(input.p2p_fee_bps !== undefined ? { p2pFeeBps: input.p2p_fee_bps } : {}),
         ...(input.withdrawal_daily_limit !== undefined ? { withdrawalDailyLimit: input.withdrawal_daily_limit } : {}),
         ...(input.withdrawal_review_from !== undefined ? { withdrawalReviewFrom: input.withdrawal_review_from } : {}),
+        ...(input.exchange_daily_limit !== undefined ? { exchangeDailyLimit: input.exchange_daily_limit || null } : {}),
+        ...(input.exchange_reserve_alert !== undefined ? { exchangeReserveAlert: input.exchange_reserve_alert || null } : {}),
       },
     });
     await this.audit.record({ actorId: adminId, action: 'crypto.asset_changed', targetType: 'crypto_asset', targetId: after.code, before: presentAsset(before), after: presentAsset(after) });
@@ -459,5 +463,9 @@ export function presentAsset(asset: CryptoAsset) {
     p2p_fee_bps: asset.p2pFeeBps,
     withdrawal_daily_limit: asset.withdrawalDailyLimit,
     withdrawal_review_from: asset.withdrawalReviewFrom,
+    /** The most one taker may exchange in 24 hours; null: no daily limit. */
+    exchange_daily_limit: asset.exchangeDailyLimit,
+    /** Admins are told when BitoCard's coin reserve falls below this; null: never. */
+    exchange_reserve_alert: asset.exchangeReserveAlert,
   };
 }

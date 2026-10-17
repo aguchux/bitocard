@@ -287,7 +287,10 @@ export const adminApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Country', 'Activity'],
     }),
     /** Country-wide settings, such as who runs its identity checks (`identity_provider`). */
-    updateCountry: build.mutation<Country, { code: string; identity_provider?: IdentityProvider; spin_daily_limit?: number }>({
+    updateCountry: build.mutation<
+      Country,
+      { code: string; identity_provider?: IdentityProvider; spin_daily_limit?: number; exchange_markup_cap_bps?: number; exchange_reserve_alert_minor?: number | null }
+    >({
       query: ({ code, ...body }) => ({ url: `/v1/admin/countries/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Country', 'Activity'],
     }),

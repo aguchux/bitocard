@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useState } from "react";
 import { MailCheck } from "lucide-react";
-import { Button, CodeInput, Dialog, errorMessage, Field, formatDateTime, Input, KeyValue, Notice, resendWait, Select, Textarea } from "@bitocard/admin-ui";
+import { Button, ConfirmCodePanel, confirmCodeProblem, defaultConfirmMethod, Dialog, errorMessage, Field, formatDateTime, Input, KeyValue, Notice, resendWait, Select, Textarea } from "@bitocard/admin-ui";
 import {
+  type ConfirmMethod,
   type ExchangeReserves,
   type Mode,
   type ReserveMovement,
@@ -15,7 +16,8 @@ import {
 
 /**
  * Funding or drawing down one of BitoCard's exchange reserves, in two steps as manual top-ups: the reserve, amount and
- * why; then the 6-digit code emailed to the admin. Money reserves are a market's; coin reserves are shared by all.
+ * why; then a 6-digit code: the admin's authenticator app (the default when they have one) or the code emailed to them.
+ * Money reserves are a market's; coin reserves are shared by all.
  */
 export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onDone }: { open: boolean; onClose: () => void; kind: "fund" | "withdraw"; mode: Mode; reserves: ExchangeReserves; onDone: (movement: ReserveMovement) => void }) {
   const id = useId();
@@ -27,6 +29,8 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState<ReserveMovement | null>(null);
   const [code, setCode] = useState("");
+  const [methods, setMethods] = useState<ConfirmMethod[] | undefined>(undefined);
+  const [method, setMethod] = useState<ConfirmMethod>("email");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -50,6 +54,8 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
   const close = () => {
     setPending(null);
     setCode("");
+    setMethods(undefined);
+    setMethod("email");
     setAmount("");
     setReference("");
     setReason("");
@@ -68,13 +74,23 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
     }
   };
 
+  const confirmMovement = (value = code) => {
+    if (!pending) return;
+    if (!/^\d{6}$/.test(value)) return setError(confirmCodeProblem(method));
+    void run(async () => {
+      const done = await confirm({ id: pending.id, code: value, method }).unwrap();
+      onDone(done);
+      close();
+    });
+  };
+
   const verb = kind === "fund" ? "Fund" : "Draw down";
   return (
     <Dialog
       open={open}
       onClose={close}
       title={pending ? `Confirm ${pending.number}` : `${verb} a reserve`}
-      description={pending ? "Enter the code we emailed you. Nothing moves until you do." : kind === "fund" ? "Put money or coins BitoCard already holds behind the exchange." : "Take money or coins out of the exchange, back to BitoCard's own balance."}
+      description={pending ? "Enter your code. Nothing moves until you do." : kind === "fund" ? "Put money or coins BitoCard already holds behind the exchange." : "Take money or coins out of the exchange, back to BitoCard's own balance."}
       footer={
         pending ? (
           <>
@@ -90,17 +106,7 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
             >
               Cancel movement
             </Button>
-            <Button
-              loading={busy}
-              disabled={code.length !== 6}
-              onClick={() =>
-                void run(async () => {
-                  const done = await confirm({ id: pending.id, code }).unwrap();
-                  onDone(done);
-                  close();
-                })
-              }
-            >
+            <Button loading={busy} disabled={code.length !== 6} onClick={() => confirmMovement()}>
               {verb} {pending.amount} {pending.currency}
             </Button>
           </>
@@ -114,19 +120,21 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
               disabled={!valid}
               icon={<MailCheck className="size-4" aria-hidden />}
               onClick={() =>
-                void run(async () =>
-                  setPending(
-                    await request({
-                      mode,
-                      kind,
-                      reserve,
-                      ...(reserve === "crypto" ? { asset } : { country: market?.country, currency: market?.currency }),
-                      amount: amount.trim(),
-                      ...(reference.trim() ? { external_reference: reference.trim() } : {}),
-                      reason: reason.trim(),
-                    }).unwrap(),
-                  ),
-                )
+                void run(async () => {
+                  const created = await request({
+                    mode,
+                    kind,
+                    reserve,
+                    ...(reserve === "crypto" ? { asset } : { country: market?.country, currency: market?.currency }),
+                    amount: amount.trim(),
+                    ...(reference.trim() ? { external_reference: reference.trim() } : {}),
+                    reason: reason.trim(),
+                  }).unwrap();
+                  setPending(created);
+                  setMethods(created.confirm_with);
+                  setMethod(defaultConfirmMethod(created.confirm_with));
+                  setNow(Date.now());
+                })
               }
             >
               Email me a code
@@ -146,26 +154,23 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
                 { label: "Code expires", value: formatDateTime(pending.code_expires_at) },
               ]}
             />
-            <div className="space-y-2 rounded-lg bg-canvas p-4">
-              <p className="text-sm font-semibold text-ink">Code from the email</p>
-              <CodeInput label="Code from the email" value={code} onChange={setCode} autoFocus disabled={busy} />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy || wait > 0}
-                  onClick={() =>
-                    void run(async () => {
-                      setPending(await resend(pending.id).unwrap());
-                      setCode("");
-                      setNow(Date.now());
-                    })
-                  }
-                >
-                  {wait > 0 ? `Resend in ${wait}s` : "Resend code"}
-                </Button>
-              </div>
-            </div>
+            <ConfirmCodePanel
+              methods={methods}
+              method={method}
+              onMethodChange={setMethod}
+              code={code}
+              onCodeChange={setCode}
+              onComplete={confirmMovement}
+              busy={busy}
+              wait={wait}
+              onResend={() =>
+                void run(async () => {
+                  setPending(await resend(pending.id).unwrap());
+                  setCode("");
+                  setNow(Date.now());
+                })
+              }
+            />
           </>
         ) : (
           <>

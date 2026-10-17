@@ -19,7 +19,7 @@ type Target = { type: "reseller"; id: string } | { type: "customer"; id: string 
 
 /**
  * Finance's manual top-up of a reseller's or customer's wallet: the button opens the two-step dialog (details, then
- * the code emailed to the admin), and the latest top-ups are listed below it. Other roles see the list only.
+ * the admin's authenticator code or the code emailed to them), and the latest top-ups are listed below it. Other roles see the list only.
  */
 export function WalletTopUp({
   target,
@@ -73,7 +73,7 @@ export function WalletTopUp({
           chooseMode={target.type === "reseller"}
           modeNote={modeNote}
           onRequest={request}
-          onConfirm={(id, code) => confirm({ id, code }).unwrap()}
+          onConfirm={(id, code, method) => confirm({ id, code, method }).unwrap()}
           onResend={id => resend(id).unwrap()}
           onCancel={id => cancel(id).unwrap()}
           onDone={setDone}

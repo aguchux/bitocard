@@ -34,6 +34,8 @@ export function presentCountryAdmin(country: CountryWithCategories) {
   return {
     ...presentCountry(country),
     spin_daily_limit: country.spinDailyLimit,
+    exchange_markup_cap_bps: country.exchangeMarkupCapBps,
+    exchange_reserve_alert_minor: country.exchangeReserveAlertMinor === null ? null : Number(country.exchangeReserveAlertMinor),
     categories: country.categories
       .sort((a, b) => productCategories.indexOf(a.category) - productCategories.indexOf(b.category))
       .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification, taxable: c.taxable })),
@@ -49,6 +51,8 @@ export type CountryUpdate = Partial<{
   payout_hold_days: number;
   min_withdrawal_minor: number;
   spin_daily_limit: number;
+  exchange_markup_cap_bps: number;
+  exchange_reserve_alert_minor: number | null;
 }>;
 
 /** Markets: which countries are open, their currency, money rules and the product categories sold there. */
@@ -120,6 +124,8 @@ export class CountriesService {
         markupCapPercent: input.markup_cap_percent,
         payoutHoldDays: input.payout_hold_days,
         spinDailyLimit: input.spin_daily_limit,
+        exchangeMarkupCapBps: input.exchange_markup_cap_bps,
+        exchangeReserveAlertMinor: input.exchange_reserve_alert_minor === undefined ? undefined : input.exchange_reserve_alert_minor === null ? null : BigInt(input.exchange_reserve_alert_minor),
         minWithdrawalMinor: input.min_withdrawal_minor === undefined ? undefined : BigInt(input.min_withdrawal_minor),
       },
       include: { categories: true },

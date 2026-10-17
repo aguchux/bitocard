@@ -379,10 +379,17 @@ export type Country = {
   identity_provider?: IdentityProvider;
   /** Spin and win: spins per customer per day here (1 to 10). Missing on older API versions. */
   spin_daily_limit?: number;
+  /** The most a reseller's exchange desk may mark up here, in basis points (0 to 2000). Missing on older API versions. */
+  exchange_markup_cap_bps?: number;
+  /** Admins are told when BitoCard's money exchange reserve here falls below this (minor units); null: never. */
+  exchange_reserve_alert_minor?: number | null;
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;
 };
 
 export type IdentityProvider = 'bitocard' | 'didit';
+
+/** How an admin confirms a money action: their authenticator app (when set up), or the code emailed to them (always). */
+export type ConfirmMethod = 'authenticator' | 'email';
 
 /** Where a setting's value comes from: set in the admin app, the API's environment, the built-in default, or nowhere. */
 export type IntegrationSource = 'admin' | 'environment' | 'default' | 'unset';

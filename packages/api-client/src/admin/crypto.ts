@@ -3,7 +3,19 @@ import type { List, Mode } from './types';
 
 /** A crypto asset customers can hold and trade. `p2p_fee_bps`: BitoCard's fee, taken in the asset from the buyer. */
 /** `withdrawal_daily_limit`: the most one customer withdraws on chain in 24 hours; from `withdrawal_review_from` an admin approves. */
-export type CryptoAsset = { object: 'crypto_asset'; code: string; name: string; decimals: number; enabled: boolean; p2p_fee_bps: number; withdrawal_daily_limit: string; withdrawal_review_from: string };
+/** `exchange_daily_limit`: the most one taker exchanges in 24 hours (null: no limit); `exchange_reserve_alert`: admins are told when BitoCard's coin reserve falls below it (null: never). Both missing on older API versions. */
+export type CryptoAsset = {
+  object: 'crypto_asset';
+  code: string;
+  name: string;
+  decimals: number;
+  enabled: boolean;
+  p2p_fee_bps: number;
+  withdrawal_daily_limit: string;
+  withdrawal_review_from: string;
+  exchange_daily_limit?: string | null;
+  exchange_reserve_alert?: string | null;
+};
 
 /** Crypto amounts are decimal strings with every place ("12.500000"). */
 export type CryptoBalance = { object: 'crypto_balance'; asset: string; name: string; decimals: number; available: string; locked: string; frozen: string; withdrawing: string; total: string };
@@ -235,7 +247,10 @@ export type P2pFilter = { mode?: Mode; status?: string; asset?: string; customer
 const cryptoApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     cryptoAssets: build.query<List<CryptoAsset>, void>({ query: () => '/v1/admin/crypto/assets', providesTags: ['Crypto'] }),
-    updateCryptoAsset: build.mutation<CryptoAsset, { code: string; enabled?: boolean; p2p_fee_bps?: number; withdrawal_daily_limit?: string; withdrawal_review_from?: string }>({
+    updateCryptoAsset: build.mutation<
+      CryptoAsset,
+      { code: string; enabled?: boolean; p2p_fee_bps?: number; withdrawal_daily_limit?: string; withdrawal_review_from?: string; exchange_daily_limit?: string | null; exchange_reserve_alert?: string | null }
+    >({
       query: ({ code, ...body }) => ({ url: `/v1/admin/crypto/assets/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Crypto'],
     }),

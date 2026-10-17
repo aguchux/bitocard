@@ -8,6 +8,9 @@ import {
   Code2,
   CreditCard,
   ArrowLeftRight,
+  Bitcoin,
+  History,
+  Scale,
   FileClock,
   House,
   KeyRound,
@@ -30,7 +33,7 @@ import {
   Webhook,
 } from "lucide-react";
 
-export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "store" | "integrations" | "developers" | "team" | "settings";
+export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "exchange" | "store" | "integrations" | "developers" | "team" | "settings";
 export type ShqNavItem = { key: ShqSection; label: string; href: string; icon: LucideIcon };
 export type ShqSubNavItem = { label: string; href: string; icon?: LucideIcon };
 
@@ -40,6 +43,7 @@ export const sections: ShqNavItem[] = [
   { key: "orders", label: "Orders", href: "/orders", icon: ReceiptText },
   { key: "catalogue", label: "Catalogue", href: "/catalogue", icon: Package },
   { key: "wallet", label: "Wallet", href: "/wallet", icon: Wallet },
+  { key: "exchange", label: "Exchange", href: "/exchange", icon: ArrowLeftRight },
   { key: "store", label: "Store", href: "/store", icon: Store },
   { key: "integrations", label: "Integrations", href: "/integrations", icon: Plug },
   { key: "developers", label: "Developers", href: "/developers", icon: Code2 },
@@ -76,12 +80,20 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     title: "Wallet",
     items: [
       { label: "Balance", href: "/wallet", icon: Wallet },
-      { label: "Exchange", href: "/wallet/exchange", icon: ArrowLeftRight },
       { label: "Top-ups", href: "/wallet/top-ups", icon: CreditCard },
       { label: "Bank transfer accounts", href: "/wallet/reserved-accounts", icon: Landmark },
       { label: "Withdrawals", href: "/wallet/payouts", icon: Banknote },
       { label: "Payout bank accounts", href: "/wallet/bank-accounts", icon: Building },
       { label: "BitoCard fees", href: "/wallet/fees", icon: Percent },
+    ],
+  },
+  exchange: {
+    title: "Exchange",
+    items: [
+      { label: "Trade with BitoCard", href: "/exchange", icon: ArrowLeftRight },
+      { label: "Coins", href: "/exchange/coins", icon: Bitcoin },
+      { label: "Your desk", href: "/exchange/desk", icon: Scale },
+      { label: "Trades", href: "/exchange/trades", icon: History },
     ],
   },
   store: {

@@ -457,7 +457,8 @@ export const integrationGroups: IntegrationGroup[] = [
   {
     id: 'crypto_prices',
     name: 'CoinGecko prices',
-    description: 'US dollar prices of BNB, BTC and ETH, used only to size BitoCard’s own crypto rewards (Spin and win pays BNB worth its dollar value). Without a price, a reward pays in a dollar stablecoin instead.',
+    description:
+      'US dollar market prices of every coin: the base of every instant-exchange price (BitoCard and resellers add only their markup) and the size of Spin and win’s BNB rewards. Optionally checked against Coinbase, pausing a coin whose prices disagree.',
     section: 'blockchain' as const,
     adapterReady: true,
     fields: priceFields,
