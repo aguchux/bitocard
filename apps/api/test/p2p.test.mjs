@@ -57,8 +57,8 @@ async function customer() {
 }
 
 /** A sandbox top-up of the customer's NGN wallet, paid. */
-async function fund(shopper, amount) {
-  const started = await shopper.post('/v1/store/wallet/top-ups', { amount, return_url: returnUrl });
+async function fund(shopper, amount, currency) {
+  const started = await shopper.post('/v1/store/wallet/top-ups', { amount, return_url: returnUrl, ...(currency ? { currency } : {}) });
   assert.equal(started.status, 201, JSON.stringify(started.json));
   assert.equal((await shopper.post(`/v1/store/wallet/top-ups/${started.json.id}/simulate`, { outcome: 'succeeded' })).status, 200);
 }
@@ -103,6 +103,39 @@ describe('switched off', () => {
 describe('instant P2P trades', () => {
   before(() => switches(true));
   after(() => switches(null));
+
+  test('USD ads use USD wallets for locking, matching, settlement and release', async () => {
+    const buyer = await customer();
+    const seller = await customer();
+    await fund(buyer, 100_00, 'USD');
+    await deposit(seller, 'USDT', '20');
+    const ad = await buyer.post('/v1/store/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'USD', price: 100, amount: '10', min_fiat: 100, max_fiat: 1000 });
+    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    assert.equal(ad.json.currency, 'USD');
+    assert.equal((await seller.get('/v1/store/p2p/market?asset=USDT&side=sell&currency=USD')).json.data.some(item => item.id === ad.json.id), true);
+    assert.equal((await seller.get('/v1/store/p2p/market?asset=USDT&side=sell&currency=NGN')).json.data.some(item => item.id === ad.json.id), false);
+    assert.equal((await seller.get(`/v1/store/p2p/market?asset=USDT&side=sell&currency=USD&q=${ad.json.trader.nickname.slice(0, 6).toLowerCase()}`)).json.data.some(item => item.id === ad.json.id), true);
+    assert.equal((await seller.get('/v1/store/p2p/market?asset=USDT&side=sell&currency=USD&q=no-such-trader')).json.data.length, 0);
+    assert.equal((await buyer.post('/v1/store/p2p/ads', { side: 'buy', asset: 'USDT', currency: 'GBP', price: 100, amount: '1', min_fiat: 100, max_fiat: 100 })).json.error.code, 'currency_unsupported');
+    const trade = await seller.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 100, amount: '4' });
+    assert.equal(trade.status, 201, JSON.stringify(trade.json));
+    assert.deepEqual([trade.json.currency, trade.json.fiat], ['USD', 400]);
+    const sellerWallet = await seller.get('/v1/store/wallet?currency=USD');
+    assert.equal(sellerWallet.json.currency, 'USD');
+    assert.equal(sellerWallet.json.balance, 400);
+    assert.equal((await buyer.post(`/v1/store/p2p/ads/${ad.json.id}/cancel`)).status, 200);
+    const accounts = await prisma.ledgerAccount.findMany({ where: { customerId: buyer.id, mode: 'test', kind: { in: ['customer_wallet', 'p2p_fiat_locked'] } } });
+    assert.equal(accounts.find(row => row.currency === 'USD' && row.kind === 'p2p_fiat_locked')?.balanceMinor, 0n);
+    assert.equal(accounts.find(row => row.currency === 'USD' && row.kind === 'customer_wallet')?.balanceMinor, 96_00n);
+    const sell = await sellAd(seller, { currency: 'USD', price: 100, amount: '5', min_fiat: 100, max_fiat: 500 });
+    assert.equal(sell.status, 201, JSON.stringify(sell.json));
+    const bought = await buyer.post('/v1/store/p2p/trades', { ad_id: sell.json.id, price: 100, amount: '2' });
+    assert.equal(bought.status, 201, JSON.stringify(bought.json));
+    assert.deepEqual([bought.json.currency, bought.json.side, bought.json.fiat], ['USD', 'buy', 200]);
+    const afterBuy = await prisma.ledgerAccount.findFirst({ where: { customerId: buyer.id, mode: 'test', kind: 'customer_wallet', currency: 'USD' } });
+    assert.equal(afterBuy?.balanceMinor, 94_00n);
+    await ledgerOk();
+  });
 
   test('a sell ad locks its crypto; a buyer pays from their wallet and gets it at once, less the fee', async () => {
     const seller = await customer();

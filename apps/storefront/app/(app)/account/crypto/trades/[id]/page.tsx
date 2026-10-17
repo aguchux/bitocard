@@ -35,7 +35,7 @@ export default async function TradePage({ params, searchParams }: { params: Prom
       </Link>
       {done ? (
         <p className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 font-semibold text-emerald-800" role="status">
-          <CheckCircle2 className="size-5" aria-hidden="true" /> Done. {bought ? `${formatCrypto(trade.received, trade.asset)} is in your crypto wallet.` : `${formatFace(trade.fiat, trade.currency)} is in your P2P money.`}
+          <CheckCircle2 className="size-5" aria-hidden="true" /> Done. {bought ? `${formatCrypto(trade.received, trade.asset)} is in your crypto wallet.` : `${formatFace(trade.fiat, trade.currency)} is in your fiat balance.`}
         </p>
       ) : null}
       <section className={card} aria-label="Trade receipt">

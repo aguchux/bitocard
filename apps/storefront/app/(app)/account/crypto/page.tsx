@@ -128,7 +128,14 @@ export default async function CryptoPage() {
               <dd className="font-bold break-words">{formatFace(wallets.cash.locked, wallets.cash.currency)}</dd>
             </div>
           </dl>
-          <p className="mt-2 text-xs text-slate-500">Buying spends your P2P money first, then your wallet. Cash out pays your P2P money into your own bank account.</p>
+          {wallets.usd_cash && (wallets.usd_cash.proceeds > 0 || wallets.usd_cash.locked > 0 || wallets.usd_cash.wallet > 0) ? (
+            <dl className="mt-2 grid gap-2 rounded-2xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
+              <div><dt className="text-xs text-slate-500">USD P2P money</dt><dd className="font-bold">{formatFace(wallets.usd_cash.proceeds, "USD")}</dd></div>
+              <div><dt className="text-xs text-slate-500">USD wallet</dt><dd className="font-bold"><Link href="/account/wallet?wallet=USD" className="hover:underline">{formatFace(wallets.usd_cash.wallet, "USD")}</Link></dd></div>
+              <div><dt className="text-xs text-slate-500">USD in buy ads</dt><dd className="font-bold">{formatFace(wallets.usd_cash.locked, "USD")}</dd></div>
+            </dl>
+          ) : null}
+          <p className="mt-2 text-xs text-slate-500">Buying spends P2P money in the ad&apos;s currency first, then that currency&apos;s wallet. Bank cash out is available for local-currency P2P money.</p>
         </section>
       ) : null}
 

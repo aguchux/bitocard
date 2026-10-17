@@ -61,7 +61,7 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
           </dl>
           <p className="mt-3 flex items-start gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" />
-            {buying ? "Paid from your P2P money first, then your wallet. " : "The money goes to your P2P balance at once. "}
+            {buying ? "Paid from your balance in this currency. " : "The money goes to your fiat balance at once. "}
             Settled instantly by BitoCard: the coins and the money move together in one step, or not at all.
           </p>
           <div className="mt-4">

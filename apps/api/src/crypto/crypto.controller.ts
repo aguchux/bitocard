@@ -53,6 +53,12 @@ class MarketQueryDto {
   @IsIn(['buy', 'sell'])
   side: AdSide;
 
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  currency?: string;
+
+  @IsOptional() @IsString() @MaxLength(80)
+  q?: string;
+
   /** Only ads taking this amount (fiat minor units). */
   @IsOptional() @Type(() => Number) @IsInt() @Min(1)
   fiat?: number;
@@ -68,6 +74,9 @@ class QuoteQueryDto {
   @IsIn(['buy', 'sell'])
   side: AdSide;
 
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  currency?: string;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1)
   fiat?: number;
 
@@ -81,6 +90,10 @@ class CreateAdDto {
 
   @Transform(upper) @assetCode()
   asset: string;
+
+  /** The customer's local currency, or US dollars. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  currency?: string;
 
   /** Fiat minor units per whole unit of the asset (NGN 1,650.00 per USDT is 165000). */
   @IsInt() @Min(1) @Max(1_000_000_000_000_00)

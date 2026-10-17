@@ -83,13 +83,13 @@ export class ExchangeService {
   }
 
   /** Each coin's market price, markup and reserves in one currency, and why it is closed when it is. */
-  private async desk(context: CryptoContext, asset?: string) {
+  private async desk(context: CryptoContext, asset?: string, currency = context.currency) {
     const house = this.stores.isHouse(context.customer.store);
     if (house) return { id: bitocardDesk, name: 'BitoCard', fiatOwner: context.seller.id, coinOwner: houseRootId, enabled: true };
     const resellerId = context.seller.id;
     const [allowed, ownMarkup, choice] = await Promise.all([
       this.settings.isOn('reseller_desks', resellerId),
-      asset ? this.prisma.exchangeMarkup.findUnique({ where: { desk_mode_asset_currency: { desk: resellerId, mode: context.mode, asset, currency: context.currency } }, select: { enabled: true } }) : null,
+      asset ? this.prisma.exchangeMarkup.findUnique({ where: { desk_mode_asset_currency: { desk: resellerId, mode: context.mode, asset, currency } }, select: { enabled: true } }) : null,
       this.prisma.exchangeDesk.findUnique({ where: { resellerId } }),
     ]);
     if (allowed && (!asset || ownMarkup?.enabled)) return { id: resellerId, name: context.customer.store.name, fiatOwner: resellerId, coinOwner: resellerId, enabled: true };
@@ -167,8 +167,10 @@ export class ExchangeService {
   // -- Customers -----------------------------------------------------------------------------------------------------
 
   /** What the customer can trade now: each coin's market price, BitoCard's prices and reserves, and their balances. */
-  async overview(customer: CustomerWithStore, asked?: string) {
+  async overview(customer: CustomerWithStore, asked?: string, requestedCurrency?: string) {
     const context = await this.wallets.context(customer);
+    const currency = (requestedCurrency ?? context.currency).toUpperCase();
+    if (currency !== context.currency && currency !== 'USD') throw invalid('currency_unsupported', 'Use your local wallet or your US dollar wallet.', 'currency');
     let reason: { code: string; message: string } | null = null;
     try {
       await this.requireTrader(customer);
@@ -177,10 +179,10 @@ export class ExchangeService {
       reason = { code: error.code, message: error.message };
     }
     const assets = (await this.wallets.assets()).filter(asset => !asked || asset.code === asked.toUpperCase());
-    const desks = await Promise.all(assets.map(asset => this.desk(context, asset.code)));
+    const desks = await Promise.all(assets.map(asset => this.desk(context, asset.code, currency)));
     const pairs = reason ? [] : await Promise.all(assets.map(async (asset, index) => {
       const desk = desks[index]!;
-      const [pair] = await this.pairs(context.mode, context.currency, desk.enabled ? desk.fiatOwner : null, desk.id, desk.coinOwner, [asset]);
+      const [pair] = await this.pairs(context.mode, currency, desk.enabled ? desk.fiatOwner : null, desk.id, desk.coinOwner, [asset]);
       return { ...pair, closed: desk.enabled ? pair.closed : 'not_offered' as ClosedReason };
     }));
     const desk = desks[0] ?? await this.desk(context);
@@ -192,13 +194,13 @@ export class ExchangeService {
     return {
       object: 'exchange' as const,
       mode: context.mode,
-      currency: context.currency,
+      currency,
       desk: { id: desk.id, name: desk.name },
       enabled: !reason,
       reason: reason?.code ?? null,
       message: reason?.message ?? null,
       quote_seconds: quoteLifetimeMs / 1000,
-      balances: { proceeds: minor(held('customer_withdrawable', context.currency)), wallet: minor(held('customer_wallet', context.currency)) },
+      balances: { proceeds: minor(held('customer_withdrawable', currency)), wallet: minor(held('customer_wallet', currency)) },
       assets: pairs.map((pair, index) => ({ ...this.presentPair(pair), desk: { id: desks[index]!.id, name: desks[index]!.name }, holding: fromUnits(held('crypto_wallet', pair.asset.code), pair.asset.decimals) })),
     };
   }

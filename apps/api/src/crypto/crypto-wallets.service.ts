@@ -210,6 +210,7 @@ export class CryptoWalletsService {
         /** P2P money on its way to the customer's bank, until the transfer is paid or returned. */
         paying_out: minor(balance('customer_payouts_pending', context.currency)),
       },
+      ...(context.currency !== 'USD' ? { usd_cash: { currency: 'USD', proceeds: minor(balance('customer_withdrawable', 'USD')), wallet: minor(balance('customer_wallet', 'USD')), locked: minor(balance('p2p_fiat_locked', 'USD')), paying_out: minor(balance('customer_payouts_pending', 'USD')) } } : {}),
     };
   }
 

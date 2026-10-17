@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   const { store, missing } = await currentStore();
-  const shell = "store min-h-svh overflow-x-clip bg-page text-navy-900";
+  const shell = "store flex min-h-svh flex-col overflow-x-clip bg-page text-navy-900";
   if (missing) {
     return (
       <div className={shell}>
@@ -51,7 +51,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
         </p>
       ) : null}
       <StoreHeader groups={groups} countries={countries} market={market} marketLocked={Boolean(customer?.country && !store)} signedIn={Boolean(customer)} store={store} />
-      <main id="main" className="mx-auto w-full max-w-[1400px] px-4 pt-6 sm:px-6 lg:px-8">
+      <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 sm:px-6 lg:px-8">
         {children}
       </main>
       <StoreFooter groups={groups} store={store} />

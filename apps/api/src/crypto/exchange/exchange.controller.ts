@@ -22,6 +22,9 @@ const decimalAmount = () => Matches(/^\d{1,20}(\.\d{1,18})?$/, { message: 'amoun
 class OverviewDto {
   @IsOptional() @Transform(upper) @assetCode()
   asset?: string;
+
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  currency?: string;
 }
 
 class QuoteDto {
@@ -292,7 +295,7 @@ export class CustomerExchangeController {
 
   @Get()
   overview(@CurrentCustomer() caller: CustomerCaller, @Query() query: OverviewDto) {
-    return this.exchange.overview(caller.customer, query.asset);
+    return this.exchange.overview(caller.customer, query.asset, query.currency);
   }
 
   @Post('quotes')

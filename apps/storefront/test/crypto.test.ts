@@ -126,6 +126,13 @@ describe("ads", () => {
     expect(await postAd({}, form({ side: "buy", asset: "USDT", price: "1650", amount: "-1", min_fiat: "1", max_fiat: "2" }))).toEqual({ error: "Enter how much to trade.", field: "amount" });
   });
 
+  test("posting a USD buy ad sends the selected wallet currency", async () => {
+    const fetch = vi.fn(async () => reply({ object: "p2p_ad", id: ad }, 201));
+    vi.stubGlobal("fetch", fetch);
+    await expect(postAd({}, form({ side: "buy", asset: "ETH", currency: "USD", price: "2,000", amount: "1.5", min_fiat: "50", max_fiat: "3000" }))).rejects.toThrow("redirect:/account/crypto/ads?posted=1");
+    expect(bodyOf(calls(fetch)[0])).toMatchObject({ side: "buy", asset: "ETH", currency: "USD", price: 200000, amount: "1.5" });
+  });
+
   test("pause, resume, close and a new price", async () => {
     const fetch = vi.fn(async () => reply({ object: "p2p_ad", id: ad }));
     vi.stubGlobal("fetch", fetch);

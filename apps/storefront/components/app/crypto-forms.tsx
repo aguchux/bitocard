@@ -191,20 +191,20 @@ export function ConfirmTradeForm({ adId, price, feeBps, fiat, label, nonce }: { 
 }
 
 /** Posting an ad: sell (your crypto is locked for the market) or buy (the money it needs is locked). */
-export function PostAdForm({ assets, currency }: { assets: string[]; currency: string }) {
+export function PostAdForm({ asset, currency, side, suggestedPrice, suggestedAmount, suggestedMax }: { asset: string; currency: string; side: "buy" | "sell"; suggestedPrice?: string; suggestedAmount?: string; suggestedMax?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(postAd, {});
-  const [side, setSide] = useState<"buy" | "sell">("sell");
   return (
     <form action={action} className="space-y-4" aria-label="Post an ad">
-      <SideSwitch value={side} onChange={setSide} labels={{ buy: "I want to buy", sell: "I want to sell" }} />
+      <input type="hidden" name="side" value={side} />
+      <input type="hidden" name="asset" value={asset} />
+      <input type="hidden" name="currency" value={currency} />
       <FormMessage state={state} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AssetSelect assets={assets} />
-        <TextField label={`Your price per coin (${currency})`} name="price" inputMode="decimal" placeholder="1,650" required state={state} />
-        <TextField label="How much (coins)" name="amount" inputMode="decimal" placeholder="100" required state={state} hint={side === "sell" ? "Locked from your wallet while the ad is open." : "The money for it is locked from your balance while the ad is open."} />
+        <TextField label={`Your price per ${asset} (${currency})`} name="price" inputMode="decimal" defaultValue={suggestedPrice} placeholder="Enter a price" required state={state} hint={suggestedPrice ? "Filled from the current market price and desk markup. You can edit it." : "Enter the price you want to offer."} />
+        <TextField label={`How much (${asset})`} name="amount" inputMode="decimal" defaultValue={suggestedAmount} placeholder="Amount" required state={state} hint={side === "sell" ? "Locked from your coin wallet while the ad is open." : `Calculated from your ${currency} balance at the suggested price; the final amount is locked when you post.`} />
         <div className="grid grid-cols-2 gap-3">
-          <TextField label={`Min per trade`} name="min_fiat" inputMode="decimal" placeholder="1,000" required state={state} />
-          <TextField label={`Max per trade`} name="max_fiat" inputMode="decimal" placeholder="500,000" required state={state} />
+          <TextField label="Min per trade" name="min_fiat" inputMode="decimal" placeholder="Minimum" required state={state} />
+          <TextField label="Max per trade" name="max_fiat" inputMode="decimal" defaultValue={suggestedMax} placeholder="Maximum" required state={state} />
         </div>
       </div>
       <TextField label="Terms (optional)" name="terms" maxLength={500} placeholder="Anything buyers should know" state={state} />

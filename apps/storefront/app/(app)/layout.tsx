@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [{ store, missing }, customer] = await Promise.all([currentStore(), currentCustomer()]);
-  const shell = "min-h-svh overflow-x-clip bg-white text-navy-900";
+  const shell = "flex min-h-svh flex-col overflow-x-clip bg-white text-navy-900";
   if (missing) {
     return (
       <div className={shell}>
@@ -82,14 +82,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         }
       />
       <AppNav desktopNav={desktopNav} />
-      <div className="lg:flex">
+      <div className="flex flex-1">
         {rail ? <AppRail /> : null}
         {/* Desktop: a tab's own places (Catalog, Orders, Wallet, Crypto, Account screens) as a second rail; pills elsewhere. */}
         <Suspense fallback={null}>
           <SubRail context={subMenus} />
         </Suspense>
-        <div className={`min-w-0 flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
-          <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
+        <div className={`flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] ${rail ? "lg:pb-0" : ""}`}>
+          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-8 sm:px-6 sm:pt-8 lg:px-8">
             {children}
           </main>
           <footer className="px-4 pb-6 text-center text-xs text-slate-500">

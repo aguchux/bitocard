@@ -97,6 +97,7 @@ export async function postAd(_state: FormState, form: FormData): Promise<FormSta
   const result = await customerApi<StoreP2pAd>("POST", "/v1/store/p2p/ads", {
     side: text(form, "side") === "buy" ? "buy" : "sell",
     asset: text(form, "asset"),
+    ...(text(form, "currency") ? { currency: text(form, "currency") } : {}),
     price,
     amount,
     min_fiat: min,

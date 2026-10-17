@@ -164,10 +164,11 @@ export class P2pService {
    * The order book a customer sees: to buy, the sell ads cheapest first; to sell, the buy ads paying most first.
    * Never their own ads, paused ones or ads of frozen accounts. With `fiat`, only ads that take that amount.
    */
-  async market(customer: CustomerWithStore, query: { asset: string; side: AdSide; fiat?: number; limit?: number }) {
+  async market(customer: CustomerWithStore, query: { asset: string; side: AdSide; currency?: string; q?: string; fiat?: number; limit?: number }) {
     const context = await this.requireTrader(customer);
+    const currency = this.tradeCurrency(context.currency, query.currency);
     const asset = await this.wallets.asset(query.asset);
-    const ads = await this.book(context, asset, query.side, customer.id, 200);
+    const ads = await this.book(context, asset, query.side, customer.id, 200, currency, query.q?.trim());
     const fiat = query.fiat !== undefined ? BigInt(query.fiat) : null;
     const usable = ads.filter(ad => {
       const capacity = this.capacity(ad, asset);
@@ -176,7 +177,13 @@ export class P2pService {
     });
     const shown = usable.slice(0, query.limit ?? 50);
     const { owner, stats } = await this.owners(shown, context.mode);
-    return { object: 'list' as const, asset: asset.code, currency: context.currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id)) };
+    return { object: 'list' as const, asset: asset.code, currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId), customer.id)) };
+  }
+
+  private tradeCurrency(local: string, requested?: string) {
+    const currency = requested?.toUpperCase() ?? local;
+    if (currency !== local && currency !== 'USD') throw invalid('currency_unsupported', 'Use your local wallet or your US dollar wallet.', 'currency');
+    return currency;
   }
 
   /**
@@ -203,12 +210,12 @@ export class P2pService {
     return known.get(customerId)!;
   }
 
-  private async book(context: CryptoContext, asset: CryptoAsset, side: AdSide, viewerId: string, take: number) {
+  private async book(context: CryptoContext, asset: CryptoAsset, side: AdSide, viewerId: string, take: number, currency: string, trader?: string) {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
     const known = new Map<string, Promise<boolean>>();
     const ads = await this.prisma.p2pAd.findMany({
-      where: { mode: context.mode, country: context.country, asset: asset.code, side: adSide, status: 'active', customerId: { not: viewerId }, remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null } },
+      where: { mode: context.mode, country: context.country, currency, asset: asset.code, side: adSide, status: 'active', customerId: { not: viewerId }, remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });
@@ -217,11 +224,12 @@ export class P2pService {
   }
 
   /** The best ad for buying or selling an amount (fiat or crypto) right now, with the trade it would make. */
-  async quote(customer: CustomerWithStore, query: { asset: string; side: AdSide; fiat?: number; amount?: string }) {
+  async quote(customer: CustomerWithStore, query: { asset: string; side: AdSide; currency?: string; fiat?: number; amount?: string }) {
     const context = await this.requireTrader(customer);
+    const currency = this.tradeCurrency(context.currency, query.currency);
     const asset = await this.wallets.asset(query.asset);
     if ((query.fiat === undefined) === (query.amount === undefined)) throw invalid('parameter_missing', 'Send either fiat or amount.', 'fiat');
-    const ads = await this.book(context, asset, query.side, customer.id, 200);
+    const ads = await this.book(context, asset, query.side, customer.id, 200, currency);
     for (const ad of ads) {
       try {
         const terms = this.terms(ad, asset, { fiat: query.fiat, amount: query.amount });
@@ -310,8 +318,9 @@ export class P2pService {
    * Posts an ad. A sell ad locks all its crypto from the wallet now; a buy ad locks the fiat it needs (rounded up)
    * from the customer's P2P proceeds, then their wallet. Nothing is posted if the balance is short.
    */
-  async createAd(customer: CustomerWithStore, input: { side: AdSide; asset: string; price: number; amount: string; min_fiat: number; max_fiat: number; terms?: string }) {
+  async createAd(customer: CustomerWithStore, input: { side: AdSide; asset: string; currency?: string; price: number; amount: string; min_fiat: number; max_fiat: number; terms?: string }) {
     const context = await this.requireTrader(customer);
+    const currency = this.tradeCurrency(context.currency, input.currency);
     const asset = await this.wallets.asset(input.asset);
     const amount = toUnits(input.amount, asset.decimals);
     const price = BigInt(input.price);
@@ -325,7 +334,7 @@ export class P2pService {
       mode: context.mode,
       customerId: customer.id,
       country: context.country,
-      currency: context.currency,
+      currency,
       asset: asset.code,
       side: input.side,
       priceMinor: price,
@@ -351,13 +360,13 @@ export class P2pService {
     } else {
       const needed = fiatFor(amount, price, asset.decimals, true);
       if (needed <= 0n) throw invalid('amount_too_small', 'This amount is too small to trade.', 'amount');
-      const sources = await this.fiatSources(customer.id, context.mode, context.currency);
-      const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'p2p_fiat_locked', context.currency));
+      const sources = await this.fiatSources(customer.id, context.mode, currency);
+      const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'p2p_fiat_locked', currency));
       ad = await this.prisma.$transaction(async tx => {
         const balances = await this.ledger.lockBalances(tx, [sources.proceedsId, sources.walletId, lockedId]);
         const { fromProceeds, fromWallet } = this.split(balances, sources, needed);
         const created = await tx.p2pAd.create({ data: { ...base, fiatLockedMinor: needed, fiatFromProceeds: fromProceeds } });
-        await this.write(tx, context.mode, `p2p_ad:${id}:lock`, 'p2p_ad_lock', `${context.currency} locked for your buy ad`, { ad_id: id }, [
+        await this.write(tx, context.mode, `p2p_ad:${id}:lock`, 'p2p_ad_lock', `${currency} locked for your buy ad`, { ad_id: id }, [
           ...(fromProceeds > 0n ? [{ accountId: sources.proceedsId, kind: 'customer_withdrawable' as const, amount: fromProceeds }] : []),
           ...(fromWallet > 0n ? [{ accountId: sources.walletId, kind: 'customer_wallet' as const, amount: fromWallet }] : []),
           { accountId: lockedId, kind: 'p2p_fiat_locked', amount: -needed },
@@ -389,8 +398,8 @@ export class P2pService {
     const found = await this.prisma.p2pAd.findFirst({ where: { id, customerId: customer.id, mode: context.mode } });
     if (!found) throw notFound('ad');
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: found.asset } });
-    const sources = await this.fiatSources(customer.id, context.mode, context.currency);
-    const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'p2p_fiat_locked', context.currency));
+    const sources = await this.fiatSources(customer.id, context.mode, found.currency);
+    const lockedId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'p2p_fiat_locked', found.currency));
     const ad = await this.prisma.$transaction(async tx => {
       const ad = await this.lockAd(tx, id);
       if (!ad || !openStatuses.includes(ad.status)) throw conflict('ad_closed', 'This ad is closed.');
@@ -408,7 +417,7 @@ export class P2pService {
         if (delta > 0n) {
           const balances = await this.ledger.lockBalances(tx, [sources.proceedsId, sources.walletId, lockedId]);
           const { fromProceeds, fromWallet } = this.split(balances, sources, delta);
-          await this.write(tx, context.mode, reference, 'p2p_ad_lock', `More ${context.currency} locked for your buy ad`, { ad_id: id }, [
+          await this.write(tx, context.mode, reference, 'p2p_ad_lock', `More ${found.currency} locked for your buy ad`, { ad_id: id }, [
             ...(fromProceeds > 0n ? [{ accountId: sources.proceedsId, kind: 'customer_withdrawable' as const, amount: fromProceeds }] : []),
             ...(fromWallet > 0n ? [{ accountId: sources.walletId, kind: 'customer_wallet' as const, amount: fromWallet }] : []),
             { accountId: lockedId, kind: 'p2p_fiat_locked', amount: -delta },
@@ -417,7 +426,7 @@ export class P2pService {
           data.fiatFromProceeds = ad.fiatFromProceeds + fromProceeds;
         } else if (delta < 0n) {
           const back = this.giveBack(ad, -delta);
-          await this.write(tx, context.mode, reference, 'p2p_ad_release', `${context.currency} your buy ad no longer needs`, { ad_id: id }, this.releasePostings(sources, lockedId, back));
+          await this.write(tx, context.mode, reference, 'p2p_ad_release', `${found.currency} your buy ad no longer needs`, { ad_id: id }, this.releasePostings(sources, lockedId, back));
           data.fiatLockedMinor = needed;
           data.fiatFromProceeds = ad.fiatFromProceeds - back.toProceeds;
         }
@@ -484,6 +493,7 @@ export class P2pService {
     if ((input.fiat === undefined) === (input.amount === undefined)) throw invalid('parameter_missing', 'Send either fiat or amount.', 'fiat');
     const found = await this.prisma.p2pAd.findFirst({ where: { id: input.ad_id, mode: context.mode, country: context.country } });
     if (!found || found.status !== 'active') throw adUnavailable();
+    this.tradeCurrency(context.currency, found.currency);
     if (found.customerId === customer.id) throw conflict('own_ad', 'This is your own ad.', 'ad_id');
     if (!(await this.ownerCanTrade(found.customerId))) throw adUnavailable();
     const asset = await this.wallets.asset(found.asset);
@@ -497,12 +507,15 @@ export class P2pService {
     const ownerSells = found.side === 'sell';
     const buyerId = ownerSells ? customer.id : found.customerId;
     const sellerId = ownerSells ? found.customerId : customer.id;
-    const { mode, currency } = context;
+    const { mode } = context;
+    const currency = found.currency;
     const account = (id: string, kind: AccountKind, code: string) => this.ledger.accountId(mode, this.wallets.ref(id, kind, code));
     const sellerCrypto = await account(sellerId, ownerSells ? 'crypto_locked' : 'crypto_wallet', asset.code);
     const buyerCrypto = await account(buyerId, 'crypto_wallet', asset.code);
     const feesId = await this.ledger.accountId(mode, cryptoFeesRef(asset.code));
-    const sellerProceeds = await account(sellerId, 'customer_withdrawable', currency);
+    // USD sales outside a USD home market settle to the spendable USD wallet: local bank cash-out cannot pay USD proceeds.
+    const sellerCreditKind: AccountKind = currency === 'USD' && context.currency !== 'USD' ? 'customer_wallet' : 'customer_withdrawable';
+    const sellerProceeds = await account(sellerId, sellerCreditKind, currency);
     const buyerSources = await this.fiatSources(buyerId, mode, currency);
     const buyerLocked = await account(buyerId, 'p2p_fiat_locked', currency);
     const id = randomUUID();
@@ -560,7 +573,7 @@ export class P2pService {
         { accountId: buyerCrypto, kind: 'crypto_wallet', amount: -now.received },
         ...(now.fee > 0n ? [{ accountId: feesId, kind: 'crypto_fees' as const, amount: -now.fee }] : []),
         ...fiatPostings,
-        { accountId: sellerProceeds, kind: 'customer_withdrawable', amount: -now.fiat },
+        { accountId: sellerProceeds, kind: sellerCreditKind, amount: -now.fiat },
       ]);
       return trade;
     });
@@ -587,10 +600,12 @@ export class P2pService {
     const owner = await this.prisma.customer.findUnique({ where: { id: ad.customerId }, select: { storeId: true } });
     if (!owner) return;
     const sold = ad.side === 'sell';
+    const market = await this.prisma.country.findUnique({ where: { code: ad.country }, select: { currency: true } });
+    const destination = trade.currency === 'USD' && market?.currency !== 'USD' ? 'USD wallet' : 'P2P balance';
     await this.inbox.customer({ customerId: ad.customerId, storeId: owner.storeId }, 'customer.p2p.trade_completed', {
       subject: trade.id,
       title: sold ? `You sold ${fromUnits(trade.amount, asset.decimals)} ${asset.code}` : `You bought ${fromUnits(trade.amount - trade.feeAmount, asset.decimals)} ${asset.code}`,
-      body: sold ? `${trade.currency} ${(minor(trade.fiatMinor) / 100).toFixed(2)} is in your P2P balance.` : `Paid ${trade.currency} ${(minor(trade.fiatMinor) / 100).toFixed(2)} from your buy ad.`,
+      body: sold ? `${trade.currency} ${(minor(trade.fiatMinor) / 100).toFixed(2)} is in your ${destination}.` : `Paid ${trade.currency} ${(minor(trade.fiatMinor) / 100).toFixed(2)} from your buy ad.`,
       link: `/account/crypto/trades/${trade.id}`,
       mode: trade.mode,
     });

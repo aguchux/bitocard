@@ -378,6 +378,8 @@ export type StoreCryptoWallets = {
   assets: StoreCryptoBalance[];
   /** proceeds: P2P sales (withdrawable); wallet: top-ups; locked: behind buy ads; paying_out: on its way to a bank. */
   cash: { currency: string; proceeds: number; wallet: number; locked: number; paying_out: number };
+  /** USD balances when the customer's home currency is not USD. */
+  usd_cash?: { currency: 'USD'; proceeds: number; wallet: number; locked: number; paying_out: number };
 };
 
 export type StoreCryptoTransaction = {

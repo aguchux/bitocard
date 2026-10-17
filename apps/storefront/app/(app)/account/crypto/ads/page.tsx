@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreList, type StoreP2pAd } from "@bitocard/api-client/storefront";
 import { card, CoinBadge, CryptoGate, CryptoNav, tradableAssets } from "@/components/app/crypto";
-import { ActionButton, PostAdForm, RepriceForm } from "@/components/app/crypto-forms";
+import { ActionButton, RepriceForm } from "@/components/app/crypto-forms";
+import { PostAdLauncher } from "@/components/app/p2p-dialogs";
 import { changeAd } from "@/lib/crypto-actions";
 import { customerApi } from "@/lib/customer";
 
@@ -18,7 +19,7 @@ function AdButton({ id, op, children, danger = false }: { id: string; op: "pause
   );
 }
 
-/** The customer's ads: post a new one, see what each has filled, change its price, pause or close it. */
+/** The customer's own ads: see fills, change price, pause or close. */
 export default async function AdsPage({ searchParams }: { searchParams: Promise<{ posted?: string }> }) {
   const params = await searchParams;
   const [overview, open, closed] = await Promise.all([
@@ -32,7 +33,10 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <h1 className="font-display text-2xl font-extrabold text-navy-900">My ads</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-2xl font-extrabold text-navy-900">My ads</h1>
+        {!blocked && wallets && tradableAssets(wallets).length ? <PostAdLauncher assets={tradableAssets(wallets)} /> : null}
+      </div>
       <CryptoNav current="/account/crypto/ads" />
       {params.posted ? (
         <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status">
@@ -40,14 +44,6 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
         </p>
       ) : null}
       {blocked ? <CryptoGate wallets={wallets} p2p /> : null}
-      {wallets && !blocked ? (
-        <section aria-labelledby="post" className={card}>
-          <h2 id="post" className="mb-3 text-lg font-bold">
-            Post an ad
-          </h2>
-          <PostAdForm assets={tradableAssets(wallets)} currency={wallets.currency} />
-        </section>
-      ) : null}
       {ads.length ? (
         <ul className="space-y-3" aria-label="Your ads">
           {ads.map(ad => {
@@ -90,7 +86,7 @@ export default async function AdsPage({ searchParams }: { searchParams: Promise<
           })}
         </ul>
       ) : !blocked ? (
-        <p className={card}>You have no ads yet. Post one above: sell ads lock your coins until traded or closed; buy ads lock the money they need.</p>
+        <p className={card}>You have no ads yet. Sell ads lock your coins until traded or closed; buy ads lock the money they need.</p>
       ) : null}
     </div>
   );

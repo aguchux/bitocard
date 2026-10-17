@@ -153,7 +153,7 @@ export const withdrawableAssets = (wallets: StoreCryptoWallets | null) => {
 export const canWithdraw = (wallets: StoreCryptoWallets | null) => Boolean(wallets && wallets.verified && !wallets.frozen && wallets.assets.some(item => Number(item.available) > 0));
 
 /** P2P money left from selling: still to pay out, or on its way to the bank. Shown even with crypto switched off. */
-export const hasP2pMoney = (wallets: StoreCryptoWallets | null) => Boolean(wallets && (wallets.cash.proceeds > 0 || wallets.cash.paying_out > 0));
+export const hasP2pMoney = (wallets: StoreCryptoWallets | null) => Boolean(wallets && (wallets.cash.proceeds > 0 || wallets.cash.paying_out > 0 || (wallets.usd_cash?.proceeds ?? 0) > 0));
 
 /**
  * Why the customer cannot use this part of crypto yet, or null when they can. `withdraw`: sending coins out, which
@@ -168,7 +168,7 @@ export function CryptoGate({ wallets, p2p = false, withdraw = false }: { wallets
         <p className="font-semibold">Crypto is not available in your country yet</p>
         <p className="mt-1 text-sm text-slate-600">
           {heldAssets(wallets).length || hasP2pMoney(wallets)
-            ? "Trading is closed here for now. You can still withdraw the coins you hold and cash out your P2P money."
+            ? "Trading is closed here for now. You can still withdraw the coins you hold and cash out eligible local-currency P2P money."
             : "We open it country by country. We will tell you when you can hold and trade crypto here."}
         </p>
       </div>
