@@ -30,6 +30,7 @@ import { CryptoPricesService } from './prices.js';
 import { AdminSpinsController, CustomerSpinsController } from './spins.controller.js';
 import { SpinsService } from './spins.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
+import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.js';
 
 /**
  * Store customers' crypto wallets, on-chain deposits and withdrawals, the P2P market (instant trades paid from BitoCard
@@ -45,6 +46,7 @@ import { CryptoWithdrawalsService } from './withdrawals.service.js';
     CustomerSpinsController,
     CustomerExchangeController,
     ResellerExchangeController,
+    ResellerCoinsController,
     AdminCryptoController,
     AdminExchangeController,
     AdminSpinsController,
@@ -55,7 +57,7 @@ import { CryptoWithdrawalsService } from './withdrawals.service.js';
     AdminReconciliationsController,
     ChainWebhooksController,
   ],
-  providers: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, SpinsService, ExchangeService, ResellerDeskService, ReservesService],
+  providers: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService, CryptoPricesService, SpinsService, ExchangeService, ResellerDeskService, ReservesService, ResellerCoinsService],
   exports: [CryptoWalletsService, P2pService, CryptoDepositsService, CryptoWithdrawalsService, CryptoReconciliationService],
 })
 export class CryptoModule {}

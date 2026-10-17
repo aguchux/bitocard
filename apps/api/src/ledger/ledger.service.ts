@@ -40,6 +40,8 @@ const resellerKinds = new Set<AccountKind>([
   'reserve_fiat',
   'reserve_crypto',
   'reseller_crypto',
+  // Premium resellers' coins on their way out on chain.
+  'reseller_crypto_withdrawing',
 ]);
 /** A store customer's own money and crypto: their wallets, P2P proceeds and what they have locked or an admin froze, never below zero. */
 const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards']);

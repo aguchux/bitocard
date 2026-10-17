@@ -158,12 +158,12 @@ class TradeDto {
   preview?: boolean;
 }
 
-class DepositNetworksDto {
+export class DepositNetworksDto {
   @Transform(upper) @assetCode()
   asset: string;
 }
 
-class DepositAddressDto extends DepositNetworksDto {
+export class DepositAddressDto extends DepositNetworksDto {
   @Transform(upper) @IsIn([...chains])
   chain: string;
 }
@@ -214,7 +214,7 @@ export class CustomerCryptoController {
   }
 }
 
-class WithdrawalAddressDto {
+export class WithdrawalAddressDto {
   @Transform(upper) @IsIn([...chains])
   chain: string;
 
@@ -225,7 +225,7 @@ class WithdrawalAddressDto {
   label: string;
 }
 
-class WithdrawalDto {
+export class WithdrawalDto {
   @Transform(upper) @assetCode()
   asset: string;
 
@@ -243,7 +243,7 @@ class WithdrawalDto {
   preview?: boolean;
 }
 
-class CodeDto {
+export class CodeDto {
   @Matches(/^\d{6}$/, { message: 'code must be the 6 digits we emailed you' })
   code: string;
 }
@@ -665,6 +665,9 @@ class DepositListDto {
 
   @IsOptional() @IsUUID()
   customer_id?: string;
+
+  @IsOptional() @IsUUID()
+  reseller_id?: string;
 }
 
 /** Admin: chains (providers in order, their health, networks) and deposits. */
@@ -722,6 +725,9 @@ class WithdrawalListDto {
 
   @IsOptional() @IsUUID()
   customer_id?: string;
+
+  @IsOptional() @IsUUID()
+  reseller_id?: string;
 }
 
 /** Admin: on-chain withdrawals (approve or reject those waiting for review, recheck stuck ones). */

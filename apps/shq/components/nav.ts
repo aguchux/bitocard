@@ -7,7 +7,9 @@ import {
   Building,
   Code2,
   CreditCard,
+  ArrowDownToLine,
   ArrowLeftRight,
+  ArrowUpFromLine,
   Bitcoin,
   History,
   Scale,
@@ -92,6 +94,8 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     items: [
       { label: "Trade with BitoCard", href: "/exchange", icon: ArrowLeftRight },
       { label: "Coins", href: "/exchange/coins", icon: Bitcoin },
+      { label: "Deposit", href: "/exchange/deposit", icon: ArrowDownToLine },
+      { label: "Withdraw", href: "/exchange/withdraw", icon: ArrowUpFromLine },
       { label: "Your desk", href: "/exchange/desk", icon: Scale },
       { label: "Trades", href: "/exchange/trades", icon: History },
     ],

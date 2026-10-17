@@ -27,7 +27,10 @@ export default async function CryptoPage() {
   const wallets = overview.ok ? overview.data : null;
   // Coins that can be traded or deposited: crypto open to them and the coin not switched off.
   const assets = tradableAssets(wallets);
-  const blocked = !wallets || !wallets.p2p_enabled || wallets.frozen || !wallets.verified;
+  // P2P and the instant exchange are separate markets: Quick buy or sell shows while either is open to the customer.
+  const p2pOpen = Boolean(wallets?.p2p_enabled);
+  const exchangeOpen = Boolean(exchange?.enabled);
+  const blocked = !wallets || (!p2pOpen && !exchangeOpen) || wallets.frozen || !wallets.verified;
   // Shown while crypto is open, or while they still hold coins or P2P money (switching crypto off never traps them).
   const coins = wallets ? (wallets.enabled ? wallets.assets : heldAssets(wallets)) : [];
   const showHoldings = Boolean(wallets && (wallets.enabled || coins.length > 0 || hasP2pMoney(wallets)));
@@ -39,7 +42,7 @@ export default async function CryptoPage() {
         <p className="text-sm text-slate-600">Buy and sell with other people, paid instantly from your BitoCard wallet.</p>
       </div>
       <CryptoNav current="/account/crypto" />
-      {blocked ? <CryptoGate wallets={wallets} p2p /> : null}
+      {blocked ? <CryptoGate wallets={wallets} p2p={!exchangeOpen} /> : null}
 
       {wallets && !blocked ? (
         <section aria-labelledby="quick" className="rounded-3xl bg-navy-900 p-4 text-white sm:p-6">
@@ -47,7 +50,7 @@ export default async function CryptoPage() {
             Quick buy or sell
           </h2>
           <div className="rounded-2xl bg-white p-4 text-navy-900">
-            <QuickTrade assets={assets} currency={wallets.currency} reserve={reserve} desk={desk} />
+            <QuickTrade assets={assets} currency={wallets.currency} reserve={reserve} desk={desk} p2p={p2pOpen} />
           </div>
         </section>
       ) : null}

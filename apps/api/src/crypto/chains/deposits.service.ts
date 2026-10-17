@@ -4,6 +4,7 @@ import { waitUntil } from '@vercel/functions';
 import { AuditService } from '../../audit/audit.service.js';
 import { ApiError } from '../../common/errors/api-error.js';
 import type { CustomerWithStore } from '../../customers/customers.service.js';
+import { type CoinOwner, coinWalletRef, ownerOf, ownerWhere } from '../owner.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { type ChainRoute, type CryptoAddress, type CryptoDeposit, type CryptoNetwork, type LedgerMode, Prisma } from '../../generated/prisma/client.js';
 import { IntegrationsService } from '../../integrations/integrations.service.js';
@@ -155,6 +156,12 @@ export class CryptoDepositsService {
   /** The networks a customer can deposit an asset on now (switched on, with a key and a provider for the store's mode). */
   async depositNetworks(customer: CustomerWithStore, asset: string) {
     const context = await this.wallets.require(customer);
+    return this.networksOpen(context.mode, asset);
+  }
+
+  /** The networks an asset can be deposited on in a mode: switched on, with a key and a provider. */
+  async networksOpen(mode: LedgerMode, asset: string) {
+    const context = { mode };
     const found = await this.wallets.asset(asset);
     const networks = await this.prisma.cryptoNetwork.findMany({ where: { asset: found.code, depositsEnabled: true }, orderBy: { chain: 'asc' } });
     const usable = [];
@@ -175,6 +182,12 @@ export class CryptoDepositsService {
    */
   async depositAddress(customer: CustomerWithStore, input: { asset: string; chain: string }) {
     const context = await this.wallets.require(customer);
+    return this.addressFor({ customerId: customer.id }, context.mode, input);
+  }
+
+  /** An owner's deposit address (a customer's, or a Premium reseller's own): one per family and mode, for good. */
+  async addressFor(owner: CoinOwner, mode: LedgerMode, input: { asset: string; chain: string }) {
+    const context = { mode };
     const asset = await this.wallets.asset(input.asset);
     const chain = input.chain.toUpperCase() as Chain;
     const network = chains.includes(chain) ? await this.prisma.cryptoNetwork.findUnique({ where: { asset_chain: { asset: asset.code, chain } } }) : null;
@@ -186,17 +199,18 @@ export class CryptoDepositsService {
     if (!xpub || !(await this.routes(chain, context.mode)).length) throw unavailable(`${chainNames[chain]} deposits are not set up yet.`, 'chain');
 
     const watchUntil = new Date(Date.now() + watchMs);
-    let address = await this.prisma.cryptoAddress.findUnique({ where: { customerId_mode_family: { customerId: customer.id, mode: context.mode, family } } });
+    const mine = () => this.prisma.cryptoAddress.findFirst({ where: { ...ownerWhere(owner), mode: context.mode, family } });
+    let address = await mine();
     for (let attempt = 0; !address && attempt < 5; attempt += 1) {
       const last = await this.prisma.cryptoAddress.findFirst({ where: { mode: context.mode, family }, orderBy: { index: 'desc' }, select: { index: true } });
       const index = (last?.index ?? -1) + 1;
       try {
         address = await this.prisma.cryptoAddress.create({
-          data: { customerId: customer.id, mode: context.mode, family, index, address: deriveAddress(family, xpub, index), keyFingerprint: xpubFingerprint(xpub), watchUntil },
+          data: { ...ownerWhere(owner), mode: context.mode, family, index, address: deriveAddress(family, xpub, index), keyFingerprint: xpubFingerprint(xpub), watchUntil },
         });
       } catch (error) {
         if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
-        address = await this.prisma.cryptoAddress.findUnique({ where: { customerId_mode_family: { customerId: customer.id, mode: context.mode, family } } });
+        address = await mine();
       }
     }
     if (!address) throw new Error('Could not issue a deposit address');
@@ -217,8 +231,12 @@ export class CryptoDepositsService {
 
   /** The customer's deposits, newest first. */
   async customerDeposits(customer: CustomerWithStore) {
-    const mode = (await this.wallets.context(customer)).mode;
-    const rows = await this.prisma.cryptoDeposit.findMany({ where: { customerId: customer.id, mode }, orderBy: { createdAt: 'desc' }, take: 25 });
+    return this.depositsOf({ customerId: customer.id }, (await this.wallets.context(customer)).mode);
+  }
+
+  /** An owner's deposits in a mode, newest first. */
+  async depositsOf(owner: CoinOwner, mode: LedgerMode) {
+    const rows = await this.prisma.cryptoDeposit.findMany({ where: { ...ownerWhere(owner), mode }, orderBy: { createdAt: 'desc' }, take: 25 });
     return { object: 'list' as const, data: await this.present(rows) };
   }
 
@@ -483,6 +501,7 @@ export class CryptoDepositsService {
       await this.prisma.cryptoDeposit.create({
         data: {
           customerId: address.customerId,
+          resellerId: address.resellerId,
           mode,
           chain,
           asset: network.asset,
@@ -621,10 +640,12 @@ export class CryptoDepositsService {
     return this.credit(deposit, asset.decimals);
   }
 
-  /** Credits a confirmed deposit to the customer's wallet, once. */
+  /** Credits a confirmed deposit to its owner's coin wallet (a customer's, or a reseller's own), once. */
   private async credit(deposit: CryptoDeposit, decimals: number) {
+    const owner = ownerOf(deposit);
+    const walletRef = coinWalletRef(owner, deposit.asset);
     const custody = await this.ledger.accountId(deposit.mode, { kind: 'crypto_custody', currency: deposit.asset });
-    const wallet = await this.ledger.accountId(deposit.mode, this.wallets.ref(deposit.customerId, 'crypto_wallet', deposit.asset));
+    const wallet = await this.ledger.accountId(deposit.mode, walletRef);
     const done = await this.prisma.$transaction(async tx => {
       const claimed = await tx.cryptoDeposit.updateMany({ where: { id: deposit.id, status: 'pending' }, data: { status: 'credited', creditedAt: new Date() } });
       if (claimed.count !== 1) return false;
@@ -632,19 +653,30 @@ export class CryptoDepositsService {
         mode: deposit.mode,
         type: 'crypto_deposit',
         reference: `crypto_deposit:${deposit.chain}:${deposit.txHash}:${deposit.outputIndex}`,
+        resellerId: owner.resellerId ?? null,
         description: `${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]}`,
         metadata: { deposit_id: deposit.id, tx_hash: deposit.txHash },
         postings: [
           { accountId: custody, kind: 'crypto_custody', amount: deposit.amount },
-          { accountId: wallet, kind: 'crypto_wallet', amount: -deposit.amount },
+          { accountId: wallet, kind: walletRef.kind, amount: -deposit.amount },
         ],
       });
       return true;
     });
     if (!done) return false;
-    const customer = await this.prisma.customer.findUnique({ where: { id: deposit.customerId }, select: { storeId: true } });
+    if (owner.resellerId) {
+      await this.inbox.reseller(owner.resellerId, 'crypto.deposit_credited', {
+        subject: deposit.id,
+        title: `${fromUnits(deposit.amount, decimals)} ${deposit.asset} arrived`,
+        body: `Your ${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]} is in your coin wallet.`,
+        link: '/exchange/coins',
+        mode: deposit.mode,
+      });
+      return true;
+    }
+    const customer = await this.prisma.customer.findUnique({ where: { id: owner.customerId }, select: { storeId: true } });
     if (customer) {
-      await this.inbox.customer({ customerId: deposit.customerId, storeId: customer.storeId }, 'customer.crypto.deposit_credited', {
+      await this.inbox.customer({ customerId: owner.customerId!, storeId: customer.storeId }, 'customer.crypto.deposit_credited', {
         subject: deposit.id,
         title: `${fromUnits(deposit.amount, decimals)} ${deposit.asset} arrived`,
         body: `Your ${deposit.asset} deposit on ${chainNames[deposit.chain as Chain]} is in your crypto wallet.`,
@@ -851,15 +883,32 @@ export class CryptoDepositsService {
     return { object: 'chain_check' as const, results };
   }
 
-  async adminDeposits(query: { mode?: LedgerMode; status?: string; customer_id?: string }) {
+  async adminDeposits(query: { mode?: LedgerMode; status?: string; customer_id?: string; reseller_id?: string }) {
     const rows = await this.prisma.cryptoDeposit.findMany({
-      where: { ...(query.mode ? { mode: query.mode } : {}), ...(query.status ? { status: query.status } : {}), ...(query.customer_id ? { customerId: query.customer_id } : {}) },
-      include: { customer: { select: { email: true } } },
+      where: {
+        ...(query.mode ? { mode: query.mode } : {}),
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.customer_id ? { customerId: query.customer_id } : {}),
+        ...(query.reseller_id ? { resellerId: query.reseller_id } : {}),
+      },
+      include: { customer: { select: { email: true } }, reseller: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
     const presented = await this.present(rows);
-    return { object: 'list' as const, data: presented.map((item, index) => ({ ...item, address: rows[index].address, confirmed_by: rows[index].confirmedBy, customer: { id: rows[index].customerId, email: rows[index].customer.email } })) };
+    return {
+      object: 'list' as const,
+      data: presented.map((item, index) => {
+        const row = rows[index];
+        return {
+          ...item,
+          address: row.address,
+          confirmed_by: row.confirmedBy,
+          customer: row.customerId && row.customer ? { id: row.customerId, email: row.customer.email } : null,
+          reseller: row.resellerId && row.reseller ? { id: row.resellerId, name: row.reseller.name } : null,
+        };
+      }),
+    };
   }
 }
 

@@ -2043,7 +2043,8 @@
                         "chargeback_protection",
                         "priority_support",
                         "international_selling",
-                        "own_integrations"
+                        "own_integrations",
+                        "onchain_crypto"
                       ]
                     }
                   ]
@@ -10559,7 +10560,8 @@
                       "chargeback_protection",
                       "priority_support",
                       "international_selling",
-                      "own_integrations"
+                      "own_integrations",
+                      "onchain_crypto"
                     ]
                   },
                   "renews_at": "2026-11-06T09:00:00.000Z",
@@ -10675,7 +10677,8 @@
                       "chargeback_protection",
                       "priority_support",
                       "international_selling",
-                      "own_integrations"
+                      "own_integrations",
+                      "onchain_crypto"
                     ]
                   },
                   "renews_at": "2026-11-06T09:00:00.000Z",
@@ -29393,7 +29396,8 @@
                     "chargeback_protection",
                     "priority_support",
                     "international_selling",
-                    "own_integrations"
+                    "own_integrations",
+                    "onchain_crypto"
                   ]
                 },
                 "description": "What the plan adds, for example `chargeback_protection`."
@@ -32964,10 +32968,11 @@
                 "chargeback_protection",
                 "priority_support",
                 "international_selling",
-                "own_integrations"
+                "own_integrations",
+                "onchain_crypto"
               ]
             },
-            "description": "What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations`."
+            "description": "What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations`, `onchain_crypto` (depositing and withdrawing coins on chain)."
           }
         }
       },
@@ -36227,6 +36232,10 @@
               "number.expiring",
               "number.renewal_failed",
               "exchange.reserve_low",
+              "crypto.deposit_credited",
+              "crypto.withdrawal_sent",
+              "crypto.withdrawal_failed",
+              "crypto.address_added",
               "number.expired",
               "number.deleted",
               "payout.paid",
@@ -36406,6 +36415,10 @@
               "number.expiring",
               "number.renewal_failed",
               "exchange.reserve_low",
+              "crypto.deposit_credited",
+              "crypto.withdrawal_sent",
+              "crypto.withdrawal_failed",
+              "crypto.address_added",
               "number.expired",
               "number.deleted",
               "payout.paid",

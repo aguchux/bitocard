@@ -160,7 +160,6 @@ export function ReserveMovementDialog({ open, onClose, kind, mode, reserves, onD
               onMethodChange={setMethod}
               code={code}
               onCodeChange={setCode}
-              onComplete={confirmMovement}
               busy={busy}
               wait={wait}
               onResend={() =>

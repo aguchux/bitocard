@@ -3,7 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ActionDialog, Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { CoinOwnerLink } from "@/components/coin-owner";
+import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import {
   type CryptoWithdrawal,
   type CryptoWithdrawalStatus,
@@ -85,12 +86,8 @@ function Withdrawals() {
     },
     {
       key: "customer",
-      header: "Customer",
-      cell: item => (
-        <AppLink href={`/crypto/customers/${item.customer.id}`} className="text-brand-600 hover:underline">
-          {item.customer.email}
-        </AppLink>
-      ),
+      header: "Owner",
+      cell: item => <CoinOwnerLink customer={item.customer} reseller={item.reseller} />,
     },
     {
       key: "to",

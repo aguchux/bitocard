@@ -24,7 +24,9 @@ export function confirmCodeProblem(method: ConfirmMethod) {
 
 /**
  * Confirming a money action with a 6-digit code: the admin's authenticator app (offered when they have one set up,
- * and then the default) or the code we emailed them (always sent). Only the emailed code can be sent again.
+ * and then the default) or the code we emailed them (always sent). Only the emailed code can be sent again. Nothing is
+ * submitted when the sixth digit is typed: the admin presses the dialog's confirm button, so a mistyped authenticator
+ * code never counts towards the lockout by itself.
  */
 export function ConfirmCodePanel({
   methods,
@@ -32,7 +34,6 @@ export function ConfirmCodePanel({
   onMethodChange,
   code,
   onCodeChange,
-  onComplete,
   busy,
   wait,
   onResend,
@@ -43,7 +44,6 @@ export function ConfirmCodePanel({
   onMethodChange: (method: ConfirmMethod) => void;
   code: string;
   onCodeChange: (code: string) => void;
-  onComplete?: (code: string) => void;
   busy: boolean;
   /** Seconds until another email can be sent. */
   wait: number;
@@ -92,7 +92,7 @@ export function ConfirmCodePanel({
         </fieldset>
       ) : null}
       <p className="text-sm font-semibold text-ink">{labels.code}</p>
-      <CodeInput key={method} label={labels.code} value={code} onChange={onCodeChange} onComplete={onComplete} autoFocus disabled={busy} />
+      <CodeInput key={method} label={labels.code} value={code} onChange={onCodeChange} autoFocus disabled={busy} />
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-2 pt-1 text-sm text-muted">
         <span>{labels.hint}</span>
         {method === 'email' ? (

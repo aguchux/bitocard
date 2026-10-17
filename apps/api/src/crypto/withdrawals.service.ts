@@ -22,6 +22,7 @@ import { type Screening, screenerKeys, screeners } from './custody/screening.js'
 import { type CryptoSigner, RemoteSigner, SignerError, signerFields, SimulatedSigner, type SignerTransfer } from './custody/signer.js';
 import { CryptoWalletsService, cryptoFeesRef, notFound } from './crypto-wallets.service.js';
 import { checksumAddress, tronToHex } from './derive.js';
+import { type CoinOwner, coinWalletRef, ownerOf, ownerWhere, withdrawingRef } from './owner.js';
 
 const minute = 60_000;
 const hour = 60 * minute;
@@ -48,6 +49,13 @@ const codeDigest = (id: string, code: string) => sha256(`crypto_withdrawal:${id}
 const open = ['awaiting_code', 'review', 'queued', 'submitting', 'broadcast', 'completed'];
 
 const bitcoinCheck = base58check(sha256Bytes);
+
+/**
+ * Who is withdrawing: the coins' owner (a store customer, or a Premium reseller's own coin wallet), the mode, where the
+ * code and notices are emailed, the name the emails carry, how admins see them, and for a reseller the team member
+ * asking (only they can confirm what they asked for).
+ */
+export type Holder = { owner: CoinOwner; mode: LedgerMode; email: string; brand: string; who: string; userId?: string };
 
 /**
  * Each Bitcoin-style chain's address forms on its main and test networks: the SegWit prefix (none for Dogecoin, which
@@ -166,14 +174,26 @@ export class CryptoWithdrawalsService {
 
   // -- Addresses ------------------------------------------------------------------------------------------------
 
+  private customerHolder(customer: CustomerWithStore, mode: LedgerMode): Holder {
+    return { owner: { customerId: customer.id }, mode, email: customer.email, brand: customer.store.name, who: customer.email };
+  }
+
   async addresses(customer: CustomerWithStore) {
-    const { mode } = await this.wallets.context(customer);
-    const rows = await this.prisma.cryptoWithdrawalAddress.findMany({ where: { customerId: customer.id, mode }, orderBy: { createdAt: 'desc' } });
+    return this.addressesOf({ customerId: customer.id }, (await this.wallets.context(customer)).mode);
+  }
+
+  async addressesOf(owner: CoinOwner, mode: LedgerMode) {
+    const rows = await this.prisma.cryptoWithdrawalAddress.findMany({ where: { ...ownerWhere(owner), mode }, orderBy: { createdAt: 'desc' } });
     return { object: 'list' as const, data: rows.map(presentAddress) };
   }
 
   async addAddress(customer: CustomerWithStore, input: { chain: string; address: string; label: string }) {
     const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
+    return this.addAddressFor(this.customerHolder(customer, context.mode), input);
+  }
+
+  async addAddressFor(holder: Holder, input: { chain: string; address: string; label: string }) {
+    const context = { mode: holder.mode };
     const chain = input.chain.toUpperCase() as Chain;
     if (!withdrawalChains.includes(chain)) throw unavailable(`Withdrawals on ${chainNames[chain] ?? 'this network'} are not open yet.`, 'chain');
     const address = withdrawalAddress(chain, input.address, context.mode === 'test');
@@ -183,16 +203,16 @@ export class CryptoWithdrawalsService {
     const family = chainFamily[chain];
     const internal = await this.prisma.cryptoAddress.findFirst({ where: { family, address: { equals: address, mode: family === 'evm' ? 'insensitive' : 'default' } }, select: { id: true } });
     if (internal) throw invalid('address_internal', 'This is a BitoCard deposit address. Send to an address outside BitoCard.', 'address');
-    if ((await this.prisma.cryptoWithdrawalAddress.count({ where: { customerId: customer.id, mode: context.mode } })) >= maxAddresses) {
+    if ((await this.prisma.cryptoWithdrawalAddress.count({ where: { ...ownerWhere(holder.owner), mode: context.mode } })) >= maxAddresses) {
       throw invalid('too_many_addresses', `You can save up to ${maxAddresses} addresses. Remove one first.`);
     }
     const screening = await this.screen(address);
-    if (screening.status === 'flagged') await this.refuseFlagged(customer, context.mode, chain, address, screening, 'address');
+    if (screening.status === 'flagged') await this.refuseFlagged(holder, chain, address, screening, 'address');
     const usableFrom = new Date(Date.now() + addressWaitMs);
     let row: CryptoWithdrawalAddress;
     try {
       row = await this.prisma.cryptoWithdrawalAddress.create({
-        data: { customerId: customer.id, mode: context.mode, chain, address, label: input.label.trim(), usableFrom, screening: screening.status, screenedBy: screening.provider, screenedAt: screening.provider ? new Date() : null },
+        data: { ...ownerWhere(holder.owner), mode: context.mode, chain, address, label: input.label.trim(), usableFrom, screening: screening.status, screenedBy: screening.provider, screenedAt: screening.provider ? new Date() : null },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'address_exists', 'You already saved this address.', 'address');
@@ -200,26 +220,31 @@ export class CryptoWithdrawalsService {
     }
     const when = usableFrom.toUTCString().replace(':00 GMT', ' UTC');
     await this.email
-      .send(cryptoAddressAddedEmail(customer.email, { store: customer.store.name, label: row.label, network: chainNames[chain], address, usableFrom: when }))
-      .catch(error => this.logger.warn({ err: error, customerId: customer.id }, 'Could not email the address notice'));
-    await this.inbox.customer({ customerId: customer.id, storeId: customer.storeId }, 'customer.crypto.address_added', {
+      .send(cryptoAddressAddedEmail(holder.email, { store: holder.brand, label: row.label, network: chainNames[chain], address, usableFrom: when }))
+      .catch(error => this.logger.warn({ err: error, address: row.id }, 'Could not email the address notice'));
+    const notice = {
       title: 'Withdrawal address added',
       body: `"${row.label}" (${chainNames[chain]}) can be used from ${when}. If this was not you, remove it and change your password.`,
-      link: '/account/crypto/withdraw',
       mode: context.mode,
       subject: row.id,
-    });
+    };
+    if (holder.owner.resellerId) await this.inbox.reseller(holder.owner.resellerId, 'crypto.address_added', { ...notice, link: '/exchange/withdraw' });
+    else {
+      const customer = await this.prisma.customer.findUnique({ where: { id: holder.owner.customerId }, select: { storeId: true } });
+      if (customer) await this.inbox.customer({ customerId: holder.owner.customerId!, storeId: customer.storeId }, 'customer.crypto.address_added', { ...notice, link: '/account/crypto/withdraw' });
+    }
     return presentAddress(row);
   }
 
   /** Admins are told about a sanctioned address, and it is refused. */
-  private async refuseFlagged(customer: CustomerWithStore, mode: LedgerMode, chain: Chain, address: string, screening: { provider: string | null; detail?: string | null }, param: string): Promise<never> {
+  private async refuseFlagged(holder: Holder, chain: Chain, address: string, screening: { provider: string | null; detail?: string | null }, param: string): Promise<never> {
+    const id = holder.owner.resellerId ?? holder.owner.customerId;
     await this.inbox.admins('admin.crypto.address_flagged', {
       title: 'Withdrawal address on a sanctions list',
-      body: `${customer.email} tried to use ${address} (${chainNames[chain]}), which ${screening.provider} reports: ${screening.detail ?? 'sanctioned'}. It was refused.`,
-      link: `/crypto/customers/${customer.id}`,
-      mode,
-      subject: `${customer.id}:${chain}:${address}`,
+      body: `${holder.who} tried to use ${address} (${chainNames[chain]}), which ${screening.provider} reports: ${screening.detail ?? 'sanctioned'}. It was refused.`,
+      link: holder.owner.resellerId ? `/resellers/${id}` : `/crypto/customers/${id}`,
+      mode: holder.mode,
+      subject: `${id}:${chain}:${address}`,
     });
     throw invalid('address_refused', 'This address cannot be used for withdrawals.', param);
   }
@@ -228,17 +253,21 @@ export class CryptoWithdrawalsService {
    * A saved address screened over a day ago is screened again before it is used. A flagged answer is kept and refuses
    * it; when no screener answers, this withdrawal is treated as unscreened (live: reviewed) and the old answer kept.
    */
-  private async rescreened(customer: CustomerWithStore, row: CryptoWithdrawalAddress): Promise<CryptoWithdrawalAddress> {
+  private async rescreened(holder: Holder, row: CryptoWithdrawalAddress): Promise<CryptoWithdrawalAddress> {
     if (row.screening === 'flagged' || (row.screenedAt && Date.now() - row.screenedAt.getTime() < rescreenAfterMs)) return row;
     const screening = await this.screen(row.address);
     if (!screening.provider) return { ...row, screening: 'unscreened' };
     const fresh = await this.prisma.cryptoWithdrawalAddress.update({ where: { id: row.id }, data: { screening: screening.status, screenedBy: screening.provider, screenedAt: new Date() } });
-    if (fresh.screening === 'flagged') await this.refuseFlagged(customer, row.mode, row.chain as Chain, row.address, screening, 'address_id');
+    if (fresh.screening === 'flagged') await this.refuseFlagged(holder, row.chain as Chain, row.address, screening, 'address_id');
     return fresh;
   }
 
   async removeAddress(customer: CustomerWithStore, id: string) {
-    const removed = await this.prisma.cryptoWithdrawalAddress.deleteMany({ where: { id, customerId: customer.id } });
+    return this.removeAddressOf({ customerId: customer.id }, id);
+  }
+
+  async removeAddressOf(owner: CoinOwner, id: string) {
+    const removed = await this.prisma.cryptoWithdrawalAddress.deleteMany({ where: { id, ...ownerWhere(owner) } });
     if (!removed.count) throw notFound('address');
     return { object: 'crypto_withdrawal_address' as const, id, deleted: true };
   }
@@ -250,20 +279,25 @@ export class CryptoWithdrawalsService {
   }
 
   /** What has been withdrawn (or is on its way) in the last 24 hours, in ledger units. */
-  private async usedToday(tx: Prisma.TransactionClient | PrismaService, customerId: string, mode: LedgerMode, asset: string) {
-    const sum = await tx.cryptoWithdrawal.aggregate({ where: { customerId, mode, asset, status: { in: open }, createdAt: { gt: new Date(Date.now() - 24 * hour) } }, _sum: { amount: true } });
+  private async usedToday(tx: Prisma.TransactionClient | PrismaService, owner: CoinOwner, mode: LedgerMode, asset: string) {
+    const sum = await tx.cryptoWithdrawal.aggregate({ where: { ...ownerWhere(owner), mode, asset, status: { in: open }, createdAt: { gt: new Date(Date.now() - 24 * hour) } }, _sum: { amount: true } });
     return sum._sum.amount ?? 0n;
   }
 
   /** The networks an asset can be withdrawn on now, with their fee and minimum, and the customer's daily limit. */
   async networks(customer: CustomerWithStore, assetCode: string) {
     const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
+    return this.networksFor(this.customerHolder(customer, context.mode), assetCode);
+  }
+
+  async networksFor(holder: Holder, assetCode: string) {
+    const context = { mode: holder.mode };
     const asset = await this.wallets.asset(assetCode, 'asset', true);
     const signer = this.signer(context.mode);
     const networks = await this.prisma.cryptoNetwork.findMany({ where: { asset: asset.code, withdrawalsEnabled: true }, orderBy: { chain: 'asc' } });
     const usable = signer ? networks.filter(item => withdrawalChains.includes(item.chain as Chain) && (!item.contract || this.contractFor(item, context.mode))) : [];
     const limit = toUnits(asset.withdrawalDailyLimit, asset.decimals);
-    const used = await this.usedToday(this.prisma, customer.id, context.mode, asset.code);
+    const used = await this.usedToday(this.prisma, holder.owner, context.mode, asset.code);
     return {
       object: 'crypto_withdrawal_networks' as const,
       asset: asset.code,
@@ -283,13 +317,19 @@ export class CryptoWithdrawalsService {
   // -- Withdrawals ----------------------------------------------------------------------------------------------
 
   /** Why a withdrawal must wait for an admin, or null. */
-  private async reviewReason(customerId: string, mode: LedgerMode, asset: CryptoAsset, amount: bigint, address: CryptoWithdrawalAddress) {
+  private async reviewReason(owner: CoinOwner, mode: LedgerMode, asset: CryptoAsset, amount: bigint, address: CryptoWithdrawalAddress) {
     const from = toUnits(asset.withdrawalReviewFrom, asset.decimals);
     if (from > 0n && amount >= from) return 'amount';
     if (mode !== 'live') return null;
     if (address.screening !== 'clear') return 'unscreened';
     const reversible = await this.prisma.payment.count({
-      where: { customerId, mode, purpose: 'customer_top_up', status: 'succeeded', reservedAccountId: null, completedAt: { gt: new Date(Date.now() - reversibleWindowMs) } },
+      where: {
+        ...(owner.resellerId ? { resellerId: owner.resellerId, customerId: null, purpose: 'wallet_top_up' as const } : { customerId: owner.customerId, purpose: 'customer_top_up' as const }),
+        mode,
+        status: 'succeeded',
+        reservedAccountId: null,
+        completedAt: { gt: new Date(Date.now() - reversibleWindowMs) },
+      },
     });
     return reversible ? 'recent_card_top_up' : null;
   }
@@ -297,15 +337,21 @@ export class CryptoWithdrawalsService {
   /** Previews or asks for a withdrawal; asking moves the amount and fee out of the wallet and emails the code. */
   async create(customer: CustomerWithStore, input: { asset: string; chain: string; address_id: string; amount: string; preview?: boolean }) {
     const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
+    return this.createFor(this.customerHolder(customer, context.mode), input);
+  }
+
+  async createFor(holder: Holder, input: { asset: string; chain: string; address_id: string; amount: string; preview?: boolean }) {
+    const context = { mode: holder.mode };
+    const owner = holder.owner;
     const asset = await this.wallets.asset(input.asset, 'asset', true);
     const chain = input.chain.toUpperCase() as Chain;
     const network = chains.includes(chain) ? await this.prisma.cryptoNetwork.findUnique({ where: { asset_chain: { asset: asset.code, chain } } }) : null;
     if (!network?.withdrawalsEnabled || !withdrawalChains.includes(chain)) throw unavailable(`${asset.code} withdrawals on this network are not open.`, 'chain');
     if (network.contract && !this.contractFor(network, context.mode)) throw unavailable(`${asset.code} on ${chainNames[chain]} has no test network token yet.`, 'chain');
     if (!this.signer(context.mode)) throw unavailable('Crypto withdrawals are not open yet.');
-    const saved = await this.prisma.cryptoWithdrawalAddress.findFirst({ where: { id: input.address_id, customerId: customer.id, mode: context.mode } });
+    const saved = await this.prisma.cryptoWithdrawalAddress.findFirst({ where: { id: input.address_id, ...ownerWhere(owner), mode: context.mode } });
     if (!saved) throw notFound('address');
-    const address = input.preview ? saved : await this.rescreened(customer, saved);
+    const address = input.preview ? saved : await this.rescreened(holder, saved);
     if (address.chain !== chain) throw invalid('address_wrong_network', `This address is for ${chainNames[address.chain as Chain]}, not ${chainNames[chain]}.`, 'address_id');
     if (address.screening === 'flagged') throw invalid('address_refused', 'This address cannot be used for withdrawals.', 'address_id');
     if (address.usableFrom > new Date()) {
@@ -318,14 +364,14 @@ export class CryptoWithdrawalsService {
     const fee = toUnits(network.withdrawalFee, asset.decimals);
     const rawAmount = chainUnits(amount, network.decimals, asset.decimals);
     const limit = toUnits(asset.withdrawalDailyLimit, asset.decimals);
-    const reason = await this.reviewReason(customer.id, context.mode, asset, amount, address);
+    const reason = await this.reviewReason(owner, context.mode, asset, amount, address);
     const overLimit = (used: bigint) => {
       if (used + amount > limit) {
         throw invalid('withdrawal_limit', `You can withdraw up to ${fromUnits(limit, asset.decimals)} ${asset.code} in 24 hours; ${fromUnits(limit > used ? limit - used : 0n, asset.decimals)} is left.`, 'amount');
       }
     };
     if (input.preview) {
-      overLimit(await this.usedToday(this.prisma, customer.id, context.mode, asset.code));
+      overLimit(await this.usedToday(this.prisma, owner, context.mode, asset.code));
       return {
         object: 'crypto_withdrawal_preview' as const,
         mode: context.mode,
@@ -342,16 +388,19 @@ export class CryptoWithdrawalsService {
 
     const id = randomUUID();
     const code = numericCode();
-    const walletId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'crypto_wallet', asset.code));
-    const withdrawingId = await this.ledger.accountId(context.mode, this.wallets.ref(customer.id, 'crypto_withdrawing', asset.code));
+    const walletRef = coinWalletRef(owner, asset.code);
+    const holdRef = withdrawingRef(owner, asset.code);
+    const walletId = await this.ledger.accountId(context.mode, walletRef);
+    const withdrawingId = await this.ledger.accountId(context.mode, holdRef);
     const created = await this.prisma.$transaction(async tx => {
-      // Locking the wallet serialises this customer's withdrawals of the asset, so parallel requests cannot pass the limit together.
+      // Locking the wallet serialises this owner's withdrawals of the asset, so parallel requests cannot pass the limit together.
       await this.ledger.lockBalances(tx, [walletId, withdrawingId]);
-      overLimit(await this.usedToday(tx, customer.id, context.mode, asset.code));
+      overLimit(await this.usedToday(tx, owner, context.mode, asset.code));
       const row = await tx.cryptoWithdrawal.create({
         data: {
           id,
-          customerId: customer.id,
+          ...ownerWhere(owner),
+          requestedBy: holder.userId ?? null,
           mode: context.mode,
           asset: asset.code,
           chain,
@@ -371,33 +420,46 @@ export class CryptoWithdrawalsService {
         mode: context.mode,
         type: 'crypto_withdrawal',
         reference: `crypto_withdrawal:${id}`,
+        resellerId: owner.resellerId ?? null,
         description: `${asset.code} withdrawal on ${chainNames[chain]}`,
         metadata: { withdrawal_id: id },
         postings: [
-          { accountId: walletId, kind: 'crypto_wallet', amount: amount + fee },
-          { accountId: withdrawingId, kind: 'crypto_withdrawing', amount: -(amount + fee) },
+          { accountId: walletId, kind: walletRef.kind, amount: amount + fee },
+          { accountId: withdrawingId, kind: holdRef.kind, amount: -(amount + fee) },
         ],
       });
       return row;
     });
-    await this.sendCode(customer, created, asset, code);
+    await this.sendCode(holder, created, asset, code);
     return this.present(created, asset);
   }
 
-  private async sendCode(customer: CustomerWithStore, row: CryptoWithdrawal, asset: Pick<CryptoAsset, 'decimals'>, code: string) {
+  private async sendCode(holder: Holder, row: CryptoWithdrawal, asset: Pick<CryptoAsset, 'decimals'>, code: string) {
     await this.email
-      .send(cryptoWithdrawalCodeEmail(customer.email, { store: customer.store.name, code, amount: fromUnits(row.amount, asset.decimals), asset: row.asset, network: chainNames[row.chain as Chain], address: row.address }))
+      .send(cryptoWithdrawalCodeEmail(holder.email, { store: holder.brand, code, amount: fromUnits(row.amount, asset.decimals), asset: row.asset, network: chainNames[row.chain as Chain], address: row.address }))
       .catch(error => this.logger.warn({ err: error, withdrawal: row.id }, 'Could not email the withdrawal code'));
   }
 
-  private async own(customer: CustomerWithStore, id: string) {
-    const row = await this.prisma.cryptoWithdrawal.findFirst({ where: { id, customerId: customer.id } });
+  private async own(owner: CoinOwner, id: string) {
+    const row = await this.prisma.cryptoWithdrawal.findFirst({ where: { id, ...ownerWhere(owner) } });
     if (!row) throw notFound('withdrawal');
     return row;
   }
 
+  /** A reseller's withdrawal is confirmed (and its code resent) only by the team member who asked: the code went to them. */
+  private ownAsked(holder: Holder, row: CryptoWithdrawal) {
+    if (holder.owner.resellerId && row.requestedBy !== holder.userId) {
+      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_requester', 'Only the person who asked for this withdrawal can confirm it.');
+    }
+  }
+
   async resendCode(customer: CustomerWithStore, id: string) {
-    const row = await this.own(customer, id);
+    return this.resendFor(this.customerHolder(customer, (await this.wallets.context(customer)).mode), id);
+  }
+
+  async resendFor(holder: Holder, id: string) {
+    const row = await this.own(holder.owner, id);
+    this.ownAsked(holder, row);
     if (row.status !== 'awaiting_code') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     if (row.codeSentAt && Date.now() - row.codeSentAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
@@ -409,14 +471,20 @@ export class CryptoWithdrawalsService {
     });
     if (!updated.count) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     const asset = await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: row.asset } });
-    await this.sendCode(customer, row, asset, code);
+    await this.sendCode(holder, row, asset, code);
     return this.present(await this.prisma.cryptoWithdrawal.findUniqueOrThrow({ where: { id: row.id } }), asset);
   }
 
   /** The emailed code confirms the withdrawal: it then waits for an admin or goes to the signer. */
   async confirm(customer: CustomerWithStore, id: string, code: string) {
     const context = await this.wallets.requireHolder(customer, 'withdrawing crypto');
-    const row = await this.own(customer, id);
+    return this.confirmFor(this.customerHolder(customer, context.mode), id, code);
+  }
+
+  async confirmFor(holder: Holder, id: string, code: string) {
+    const context = { mode: holder.mode };
+    const row = await this.own(holder.owner, id);
+    this.ownAsked(holder, row);
     if (row.status !== 'awaiting_code' || !row.codeHash) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_awaiting_code', 'This withdrawal is not waiting for a code.');
     if (!row.codeExpiresAt || row.codeExpiresAt <= new Date()) throw invalid('code_expired', 'That code has expired. Ask for a new one.', 'code');
     // Claim an attempt before comparing, in one statement, so parallel guesses never get past the limit.
@@ -430,7 +498,7 @@ export class CryptoWithdrawalsService {
     if (next === 'review') {
       await this.inbox.admins('admin.crypto.withdrawal_review', {
         title: `Approve a ${row.asset} withdrawal`,
-        body: `CW-${String(row.number).padStart(6, '0')}: ${fromUnits(row.amount, asset.decimals)} ${row.asset} on ${chainNames[row.chain as Chain]} for ${customer.email} (${reviewReasons[row.reviewReason!] ?? row.reviewReason}).`,
+        body: `CW-${String(row.number).padStart(6, '0')}: ${fromUnits(row.amount, asset.decimals)} ${row.asset} on ${chainNames[row.chain as Chain]} for ${holder.who} (${reviewReasons[row.reviewReason!] ?? row.reviewReason}).`,
         link: '/crypto/withdrawals',
         mode: context.mode,
         subject: row.id,
@@ -443,21 +511,32 @@ export class CryptoWithdrawalsService {
 
   /** The customer cancels before it is sent (waiting for the code or an admin): the money goes back to the wallet. */
   async cancel(customer: CustomerWithStore, id: string) {
-    const row = await this.own(customer, id);
+    return this.cancelFor({ customerId: customer.id }, id);
+  }
+
+  async cancelFor(owner: CoinOwner, id: string) {
+    const row = await this.own(owner, id);
     const done = await this.release(row, ['awaiting_code', 'review'], 'cancelled', null);
     if (!done) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'withdrawal_not_cancellable', 'This withdrawal is already on its way and cannot be cancelled.');
     return this.present(done, await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: row.asset } }));
   }
 
   async list(customer: CustomerWithStore) {
-    const { mode } = await this.wallets.context(customer);
-    const rows = await this.prisma.cryptoWithdrawal.findMany({ where: { customerId: customer.id, mode }, orderBy: { createdAt: 'desc' }, take: 25 });
+    return this.listOf({ customerId: customer.id }, (await this.wallets.context(customer)).mode);
+  }
+
+  async listOf(owner: CoinOwner, mode: LedgerMode) {
+    const rows = await this.prisma.cryptoWithdrawal.findMany({ where: { ...ownerWhere(owner), mode }, orderBy: { createdAt: 'desc' }, take: 25 });
     const assets = await this.assetMap();
     return { object: 'list' as const, data: rows.map(row => this.present(row, assets.get(row.asset)!)) };
   }
 
   async get(customer: CustomerWithStore, id: string) {
-    const row = await this.own(customer, id);
+    return this.getOf({ customerId: customer.id }, id);
+  }
+
+  async getOf(owner: CoinOwner, id: string) {
+    const row = await this.own(owner, id);
     return this.present(row, await this.prisma.cryptoAsset.findUniqueOrThrow({ where: { code: row.asset } }));
   }
 
@@ -472,8 +551,11 @@ export class CryptoWithdrawalsService {
    * in one of those statuses (another request got there first).
    */
   private async release(row: CryptoWithdrawal, from: string[], status: 'cancelled' | 'rejected' | 'failed', error: string | null, review?: { adminId: string | null; note: string }) {
-    const withdrawingId = await this.ledger.accountId(row.mode, this.wallets.ref(row.customerId, 'crypto_withdrawing', row.asset));
-    const walletId = await this.ledger.accountId(row.mode, this.wallets.ref(row.customerId, 'crypto_wallet', row.asset));
+    const owner = ownerOf(row);
+    const holdRef = withdrawingRef(owner, row.asset);
+    const walletRef = coinWalletRef(owner, row.asset);
+    const withdrawingId = await this.ledger.accountId(row.mode, holdRef);
+    const walletId = await this.ledger.accountId(row.mode, walletRef);
     const done = await this.prisma.$transaction(async tx => {
       const claimed = await tx.cryptoWithdrawal.updateMany({
         where: { id: row.id, status: { in: from } },
@@ -484,22 +566,25 @@ export class CryptoWithdrawalsService {
         mode: row.mode,
         type: 'crypto_withdrawal_release',
         reference: `crypto_withdrawal:${row.id}:released`,
+        resellerId: owner.resellerId ?? null,
         description: `${row.asset} withdrawal ${status}: returned to the wallet`,
         metadata: { withdrawal_id: row.id },
         postings: [
-          { accountId: withdrawingId, kind: 'crypto_withdrawing', amount: row.amount + row.fee },
-          { accountId: walletId, kind: 'crypto_wallet', amount: -(row.amount + row.fee) },
+          { accountId: withdrawingId, kind: holdRef.kind, amount: row.amount + row.fee },
+          { accountId: walletId, kind: walletRef.kind, amount: -(row.amount + row.fee) },
         ],
       });
       return tx.cryptoWithdrawal.findUniqueOrThrow({ where: { id: row.id } });
     });
-    if (done && status !== 'cancelled') await this.tellCustomer(done, 'customer.crypto.withdrawal_failed');
+    if (done && status !== 'cancelled') await this.tellOwner(done, 'failed');
     return done;
   }
 
   /** Settles a confirmed transfer once: the amount out of custody, the fee to BitoCard's crypto fees. */
   private async complete(row: CryptoWithdrawal, confirmations: number) {
-    const withdrawingId = await this.ledger.accountId(row.mode, this.wallets.ref(row.customerId, 'crypto_withdrawing', row.asset));
+    const owner = ownerOf(row);
+    const holdRef = withdrawingRef(owner, row.asset);
+    const withdrawingId = await this.ledger.accountId(row.mode, holdRef);
     const custodyId = await this.ledger.accountId(row.mode, { kind: 'crypto_custody', currency: row.asset });
     const feesId = row.fee > 0n ? await this.ledger.accountId(row.mode, cryptoFeesRef(row.asset)) : null;
     const done = await this.prisma.$transaction(async tx => {
@@ -509,34 +594,43 @@ export class CryptoWithdrawalsService {
         mode: row.mode,
         type: 'crypto_withdrawal_sent',
         reference: `crypto_withdrawal:${row.id}:sent`,
+        resellerId: owner.resellerId ?? null,
         description: `${row.asset} withdrawal on ${chainNames[row.chain as Chain]} confirmed`,
         metadata: { withdrawal_id: row.id, tx_hash: row.txHash },
         postings: [
-          { accountId: withdrawingId, kind: 'crypto_withdrawing', amount: row.amount + row.fee },
+          { accountId: withdrawingId, kind: holdRef.kind, amount: row.amount + row.fee },
           { accountId: custodyId, kind: 'crypto_custody', amount: -row.amount },
           ...(feesId ? [{ accountId: feesId, kind: 'crypto_fees' as const, amount: -row.fee }] : []),
         ],
       });
       return tx.cryptoWithdrawal.findUniqueOrThrow({ where: { id: row.id } });
     });
-    if (done) await this.tellCustomer(done, 'customer.crypto.withdrawal_sent');
+    if (done) await this.tellOwner(done, 'sent');
     return done;
   }
 
-  private async tellCustomer(row: CryptoWithdrawal, type: 'customer.crypto.withdrawal_sent' | 'customer.crypto.withdrawal_failed') {
-    const customer = await this.prisma.customer.findUnique({ where: { id: row.customerId }, select: { storeId: true } });
+  private async tellOwner(row: CryptoWithdrawal, outcome: 'sent' | 'failed') {
     const asset = await this.prisma.cryptoAsset.findUnique({ where: { code: row.asset } });
-    if (!customer || !asset) return;
+    if (!asset) return;
     const amount = `${fromUnits(row.amount, asset.decimals)} ${row.asset}`;
-    await this.inbox.customer({ customerId: row.customerId, storeId: customer.storeId }, type, {
+    const content = {
       subject: row.id,
-      title: type === 'customer.crypto.withdrawal_sent' ? `${amount} sent` : `${amount} not sent`,
+      title: outcome === 'sent' ? `${amount} sent` : `${amount} not sent`,
       body:
-        type === 'customer.crypto.withdrawal_sent'
+        outcome === 'sent'
           ? `Your withdrawal on ${chainNames[row.chain as Chain]} is confirmed on chain.`
-          : `Your withdrawal was ${row.status === 'rejected' ? 'not approved' : 'not sent'}. The ${row.asset} is back in your wallet.`,
-      link: '/account/crypto/withdraw',
+          : `Your withdrawal was ${row.status === 'rejected' ? 'not approved' : 'not sent'}. The ${row.asset} is back in your ${row.resellerId ? 'coin ' : ''}wallet.`,
       mode: row.mode,
+    };
+    if (row.resellerId) {
+      await this.inbox.reseller(row.resellerId, outcome === 'sent' ? 'crypto.withdrawal_sent' : 'crypto.withdrawal_failed', { ...content, link: '/exchange/withdraw' });
+      return;
+    }
+    const customer = row.customerId ? await this.prisma.customer.findUnique({ where: { id: row.customerId }, select: { storeId: true } }) : null;
+    if (!customer) return;
+    await this.inbox.customer({ customerId: row.customerId!, storeId: customer.storeId }, outcome === 'sent' ? 'customer.crypto.withdrawal_sent' : 'customer.crypto.withdrawal_failed', {
+      ...content,
+      link: '/account/crypto/withdraw',
     });
   }
 
@@ -561,8 +655,11 @@ export class CryptoWithdrawalsService {
     const signer = this.signer(row.mode);
     if (!signer) return this.unclear(row, 'No signer is set up for this mode.');
     const network = await this.prisma.cryptoNetwork.findUniqueOrThrow({ where: { asset_chain: { asset: row.asset, chain: row.chain } } });
-    const owner = await this.prisma.customer.findUniqueOrThrow({ where: { id: row.customerId }, select: { cryptoFrozenAt: true } });
-    if (owner.cryptoFrozenAt) {
+    // A frozen customer account, or a suspended reseller, sends nothing more.
+    const frozen = row.resellerId
+      ? (await this.prisma.reseller.findUniqueOrThrow({ where: { id: row.resellerId }, select: { status: true } })).status === 'suspended'
+      : Boolean((await this.prisma.customer.findUniqueOrThrow({ where: { id: row.customerId! }, select: { cryptoFrozenAt: true } })).cryptoFrozenAt);
+    if (frozen) {
       // A frozen account sends nothing more. Only one the signer never received can be returned; one it did is followed up.
       const known = row.attempts > 1 ? await signer.status(row.signerReference).catch(() => undefined) : null;
       if (known === null) return void (await this.release(row, ['submitting'], 'failed', 'The crypto account was frozen before it was sent.'));
@@ -737,10 +834,16 @@ export class CryptoWithdrawalsService {
 
   // -- Admin ----------------------------------------------------------------------------------------------------
 
-  async adminList(query: { mode?: LedgerMode; status?: string; customer_id?: string; id?: string }) {
+  async adminList(query: { mode?: LedgerMode; status?: string; customer_id?: string; reseller_id?: string; id?: string }) {
     const rows = await this.prisma.cryptoWithdrawal.findMany({
-      where: { ...(query.id ? { id: query.id } : {}), ...(query.mode ? { mode: query.mode } : {}), ...(query.status ? { status: query.status } : {}), ...(query.customer_id ? { customerId: query.customer_id } : {}) },
-      include: { customer: { select: { email: true } }, savedAddress: { select: { screening: true, screenedBy: true, label: true } } },
+      where: {
+        ...(query.id ? { id: query.id } : {}),
+        ...(query.mode ? { mode: query.mode } : {}),
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.customer_id ? { customerId: query.customer_id } : {}),
+        ...(query.reseller_id ? { resellerId: query.reseller_id } : {}),
+      },
+      include: { customer: { select: { email: true } }, reseller: { select: { name: true } }, savedAddress: { select: { screening: true, screenedBy: true, label: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -749,7 +852,8 @@ export class CryptoWithdrawalsService {
       object: 'list' as const,
       data: rows.map(row => ({
         ...this.present(row, assets.get(row.asset)!),
-        customer: { id: row.customerId, email: row.customer.email },
+        customer: row.customerId && row.customer ? { id: row.customerId, email: row.customer.email } : null,
+        reseller: row.resellerId && row.reseller ? { id: row.resellerId, name: row.reseller.name } : null,
         screening: row.savedAddress?.screening ?? null,
         screened_by: row.savedAddress?.screenedBy ?? null,
         signer_reference: row.signerReference,
@@ -773,7 +877,7 @@ export class CryptoWithdrawalsService {
     return (await this.adminList({ id })).data[0];
   }
 
-  /** Operations or finance turn down a withdrawal waiting for review: the money goes back to the customer's wallet. */
+  /** Operations or finance turn down a withdrawal waiting for review: the coins go back to their owner's wallet. */
   async reject(adminId: string | null, id: string, note: string) {
     const row = await this.prisma.cryptoWithdrawal.findUnique({ where: { id } });
     if (!row) throw notFound('withdrawal');

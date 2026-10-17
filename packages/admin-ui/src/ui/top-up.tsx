@@ -217,7 +217,6 @@ export function WalletTopUpDialog({
               onMethodChange={setMethod}
               code={code}
               onCodeChange={setCode}
-              onComplete={confirm}
               busy={busy}
               wait={wait}
               onResend={() =>

@@ -12,6 +12,7 @@ const featureText: Record<string, string> = {
   chargeback_protection: "Chargebacks handled by BitoCard, not taken from your wallet",
   priority_support: "Priority support, including chat",
   international_selling: "Sell to customers outside your country",
+  onchain_crypto: "Deposit and withdraw your own coins on chain",
 };
 const standardBasics = ["Your own store and the reseller API", "Sell to customers in your country", "Chargebacks are taken from your wallet"];
 

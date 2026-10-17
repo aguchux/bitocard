@@ -129,6 +129,7 @@ export function QuickTrade({
   defaultSide = "buy",
   reserve = {},
   desk = "BitoCard",
+  p2p = true,
 }: {
   assets: string[];
   currency: string;
@@ -137,6 +138,8 @@ export function QuickTrade({
   /** The reserve's prices per coin and side (`reservePrices`); empty where the instant exchange is not offered. */
   reserve?: ReservePrices;
   desk?: string;
+  /** Whether P2P trading is open to the customer (a separate market from the instant exchange). */
+  p2p?: boolean;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(findBestPrice, {});
   const [side, setSide] = useState<"buy" | "sell">(defaultSide);
@@ -144,28 +147,30 @@ export function QuickTrade({
   const reservePrice = reserve[asset]?.[side] ?? null;
   const [chosen, setChosen] = useState<Source | null>(null);
   // The reserve while it has a price for this coin and side (unless the customer chose traders), else traders.
-  const source: Source = reservePrice === null ? "p2p" : (chosen ?? initialSource(reserve, asset, side));
+  const source: Source = !p2p ? "reserve" : reservePrice === null ? "p2p" : (chosen ?? initialSource(reserve, asset, side));
+  // Nothing to trade on: P2P closed to them and the reserve has no price for this coin and side.
+  const unavailable = source === "reserve" && reservePrice === null;
   // The best P2P price per coin and side, asked once each (undefined while asking, null with no ad).
-  const [p2p, setP2p] = useState<Record<string, number | null>>({});
+  const [prices, setPrices] = useState<Record<string, number | null>>({});
   const key = `${asset}:${side}`;
   // Where the store offers no instant exchange, traders are the only source and the choice is not shown.
   const offered = Object.keys(reserve).length > 0;
   useEffect(() => {
-    if (!offered || !asset || key in p2p) return;
+    if (!offered || !p2p || !asset || key in prices) return;
     let current = true;
     void bestP2pPrice(asset, side).then(
-      price => current && setP2p(prices => ({ ...prices, [key]: price })),
-      () => current && setP2p(prices => ({ ...prices, [key]: null })),
+      price => current && setPrices(known => ({ ...known, [key]: price })),
+      () => current && setPrices(known => ({ ...known, [key]: null })),
     );
     return () => {
       current = false;
     };
-  }, [offered, asset, side, key, p2p]);
-  const p2pPrice = p2p[key];
+  }, [offered, p2p, asset, side, key, prices]);
+  const p2pPrice = p2p ? prices[key] : null;
   const priceText = (price: number | null | undefined, none: string) => (price === undefined ? "Checking the price…" : price === null ? none : `${formatFace(price, currency)} per ${asset}`);
   const options: { value: Source; title: string; note: string; price: string; disabled: boolean }[] = [
     { value: "reserve", title: `From ${desk}'s reserve`, note: "Instant, at the live market price", price: priceText(reservePrice, "Not available for this coin right now"), disabled: reservePrice === null },
-    { value: "p2p", title: "From traders (P2P)", note: side === "buy" ? "The cheapest ad for your amount" : "The best-paying ad for your amount", price: priceText(p2pPrice, "No ads right now"), disabled: false },
+    { value: "p2p", title: "From traders (P2P)", note: side === "buy" ? "The cheapest ad for your amount" : "The best-paying ad for your amount", price: p2p ? priceText(p2pPrice, "No ads right now") : "P2P trading is not open to you", disabled: !p2p },
   ];
 
   return (
@@ -198,7 +203,8 @@ export function QuickTrade({
       </fieldset>
       ) : null}
       <TextField label={side === "buy" ? `You pay (${currency})` : `You receive (${currency})`} name="fiat" inputMode="decimal" placeholder="50,000" required state={state} />
-      <Submit pending={pending} className="w-full">
+      {unavailable ? <p className="text-sm text-slate-600">{desk} has no price for {asset} right now. Try again shortly.</p> : null}
+      <Submit pending={pending || unavailable} className="w-full">
         <Zap className="size-4" aria-hidden="true" /> {source === "reserve" ? (side === "buy" ? `Buy from ${desk}` : `Sell to ${desk}`) : side === "buy" ? "Find the best price to buy" : "Find the best price to sell"}
       </Submit>
       <p className="text-xs text-slate-500">

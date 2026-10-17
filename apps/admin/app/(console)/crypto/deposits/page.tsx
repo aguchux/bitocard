@@ -3,7 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, Notice, PageHeader, type Column, type Tone } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { CoinOwnerLink } from "@/components/coin-owner";
+import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type CryptoDeposit, type Mode, useCryptoDepositsQuery, useRecheckCryptoDepositMutation } from "@bitocard/api-client/admin";
 
 const tones: Record<CryptoDeposit["status"], Tone> = { pending: "amber", credited: "green", ignored: "grey", failed: "red" };
@@ -25,12 +26,8 @@ const baseColumns: Array<Column<CryptoDeposit>> = [
   },
   {
     key: "customer",
-    header: "Customer",
-    cell: deposit => (
-      <AppLink href={`/crypto/customers/${deposit.customer.id}`} className="text-brand-600 hover:underline">
-        {deposit.customer.email}
-      </AppLink>
-    ),
+    header: "Owner",
+    cell: deposit => <CoinOwnerLink customer={deposit.customer} reseller={deposit.reseller} />,
   },
   { key: "tx", header: "Transaction", hideOnMobile: true, cell: deposit => <span className="block max-w-56 truncate font-mono text-xs" title={deposit.tx_hash}>{deposit.tx_hash}</span> },
   { key: "confirmations", header: "Confirmations", hideOnMobile: true, cell: deposit => `${deposit.confirmations}${deposit.confirmations_needed ? ` / ${deposit.confirmations_needed}` : ""}` },

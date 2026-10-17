@@ -28,7 +28,7 @@ const transactionTypes = [
 
 const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 const feeKinds = ['supplier_order', 'gateway_payment'] as const;
-const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations'] as const;
+const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations', 'onchain_crypto'] as const;
 
 const currency = str('ISO 4217 currency of the amounts: the wallet\'s, your country\'s currency (for example `NGN`, `GHS` or `KES`) or `USD`.');
 const nano = (description: string) => str(`${description} In billionths of a minor unit, as a string of digits so no precision is lost.`, { pattern: '^\\d+$' });
@@ -356,7 +356,7 @@ const Plan = objectSchema(
       },
       'The price.',
     ),
-    features: array(oneOf('A plan feature.', planFeatures), 'What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations`.'),
+    features: array(oneOf('A plan feature.', planFeatures), 'What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations`, `onchain_crypto` (depositing and withdrawing coins on chain).'),
   },
   'A reseller plan.',
 );
@@ -520,7 +520,7 @@ const premiumPlan = {
   code: 'premium',
   name: 'Premium',
   price: { amount: 2_500, currency: 'USD', interval: 'month' },
-  features: ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations'],
+  features: ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations', 'onchain_crypto'],
 };
 
 const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '2026-11-06T09:00:00.000Z', cancel_at_period_end: false, past_due_since: null };

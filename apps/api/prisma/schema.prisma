@@ -469,6 +469,10 @@ model Reseller {
   house                 Boolean                @default(false)
   checkouts             Checkout[]
   manualTopUps          ManualTopUp[]
+  cryptoAddresses       CryptoAddress[]
+  cryptoDeposits        CryptoDeposit[]
+  cryptoWithdrawals     CryptoWithdrawal[]
+  cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
 
   @@map("resellers")
 }
@@ -803,6 +807,8 @@ enum AccountKind {
   reserve_crypto
   /// A reseller's own coins bought from BitoCard, before they fund their customer-facing desk.
   reseller_crypto
+  /// A reseller's coins on their way out on chain (asked, confirmed, being sent), never negative.
+  reseller_crypto_withdrawing
 }
 
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
@@ -2667,7 +2673,9 @@ model CryptoNetwork {
 /// An address a customer saved to withdraw crypto to: usable 24 hours after it is added, screened against sanctions lists.
 model CryptoWithdrawalAddress {
   id          String     @id @default(uuid()) @db.Uuid
-  customerId  String     @map("customer_id") @db.Uuid
+  /// A store customer's or a reseller's saved address (exactly one).
+  customerId  String?    @map("customer_id") @db.Uuid
+  resellerId  String?    @map("reseller_id") @db.Uuid
   mode        LedgerMode
   chain       String
   address     String
@@ -2679,10 +2687,12 @@ model CryptoWithdrawalAddress {
   screenedBy  String?    @map("screened_by")
   screenedAt  DateTime?  @map("screened_at")
   createdAt   DateTime   @default(now()) @map("created_at")
-  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  reseller    Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   withdrawals CryptoWithdrawal[]
 
   @@unique([customerId, mode, chain, address])
+  @@unique([resellerId, mode, chain, address])
   @@map("crypto_withdrawal_addresses")
 }
 
@@ -2976,7 +2986,11 @@ model CryptoWithdrawal {
   id               String     @id @default(uuid()) @db.Uuid
   /// Shown as CW-000123.
   number           Int        @unique @default(autoincrement())
-  customerId       String     @map("customer_id") @db.Uuid
+  /// Whose coins: a store customer or a reseller (exactly one).
+  customerId       String?    @map("customer_id") @db.Uuid
+  resellerId       String?    @map("reseller_id") @db.Uuid
+  /// For a reseller's withdrawal, the team member who asked: only they can confirm it with the emailed code.
+  requestedBy      String?    @map("requested_by") @db.Uuid
   mode             LedgerMode
   asset            String     @db.VarChar(10)
   chain            String
@@ -3010,10 +3024,12 @@ model CryptoWithdrawal {
   createdAt        DateTime   @default(now()) @map("created_at")
   updatedAt        DateTime   @updatedAt @map("updated_at")
   completedAt      DateTime?  @map("completed_at")
-  customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer         Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reseller         Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
   savedAddress     CryptoWithdrawalAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   @@index([status, nextCheckAt])
+  @@index([resellerId, createdAt])
   @@index([customerId, createdAt])
   @@map("crypto_withdrawals")
 }
@@ -3021,7 +3037,9 @@ model CryptoWithdrawal {
 /// A customer's own deposit address in a family (bitcoin, evm, tron), derived from BitoCard's xpub at `index`.
 model CryptoAddress {
   id             String     @id @default(uuid()) @db.Uuid
-  customerId     String     @map("customer_id") @db.Uuid
+  /// Exactly one owner: a store customer or a reseller (Premium resellers' own coin wallets; a database check).
+  customerId     String?    @map("customer_id") @db.Uuid
+  resellerId     String?    @map("reseller_id") @db.Uuid
   mode           LedgerMode
   family         String
   index          Int
@@ -3033,9 +3051,11 @@ model CryptoAddress {
   /// Last read outside its watch window (TRON and Bitcoin list each address's history, so unwatched ones are swept in turn).
   sweptAt        DateTime?  @map("swept_at")
   createdAt      DateTime   @default(now()) @map("created_at")
-  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer       Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  reseller       Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
 
   @@unique([customerId, mode, family])
+  @@unique([resellerId, mode, family])
   @@unique([mode, family, index])
   @@unique([mode, family, address])
   @@index([mode, family, watchUntil])
@@ -3047,7 +3067,9 @@ model CryptoAddress {
 /// provider agrees), then credited once (`crypto_deposit:<chain>:<tx>:<index>`).
 model CryptoDeposit {
   id            String     @id @default(uuid()) @db.Uuid
-  customerId    String     @map("customer_id") @db.Uuid
+  /// The address's owner: a store customer or a reseller (exactly one).
+  customerId    String?    @map("customer_id") @db.Uuid
+  resellerId    String?    @map("reseller_id") @db.Uuid
   mode          LedgerMode
   chain         String
   asset         String     @db.VarChar(10)
@@ -3072,9 +3094,11 @@ model CryptoDeposit {
   /// When the signer was told about the deposit's address (so it sweeps it and counts it in its balances).
   signerTrackedAt DateTime? @map("signer_tracked_at")
   createdAt     DateTime   @default(now()) @map("created_at")
-  customer      Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer      Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reseller      Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
 
   @@unique([chain, txHash, outputIndex])
+  @@index([resellerId, createdAt])
   @@index([status, chain])
   @@index([status, mode, checkedAt])
   @@index([customerId, createdAt])

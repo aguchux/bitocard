@@ -156,7 +156,9 @@ export type CryptoDeposit = {
   confirmations_needed: number | null;
   address: string;
   confirmed_by: string[];
-  customer: { id: string; email: string };
+  /** Whose coins: a store customer's, or a Premium reseller's own coin wallet (exactly one is set). */
+  customer: { id: string; email: string } | null;
+  reseller: { id: string; name: string } | null;
   created_at: string;
   credited_at: string | null;
 };
@@ -183,7 +185,9 @@ export type CryptoWithdrawal = {
   confirmations: number;
   created_at: string;
   completed_at: string | null;
-  customer: { id: string; email: string };
+  /** Whose coins: a store customer's, or a Premium reseller's own coin wallet (exactly one is set). */
+  customer: { id: string; email: string } | null;
+  reseller: { id: string; name: string } | null;
   screening: 'clear' | 'flagged' | 'unscreened' | null;
   screened_by: string | null;
   signer_reference: string;

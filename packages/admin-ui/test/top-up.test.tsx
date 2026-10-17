@@ -96,6 +96,8 @@ describe('manual top-up form', () => {
     const boxes = screen.getAllByRole('textbox') as HTMLInputElement[];
     for (const [index, digit] of [...'48213'].entries()) fireEvent.change(boxes[index], { target: { value: digit } });
     fireEvent.change(boxes[5], { target: { value: '7' } });
+    expect(props.onConfirm).not.toHaveBeenCalledWith('mt_1', '482137', 'email');
+    fireEvent.click(screen.getByRole('button', { name: /^Add / }));
     await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '482137', 'email'));
     await waitFor(() => expect(props.onDone).toHaveBeenCalled());
     expect(props.onClose).toHaveBeenCalled();
@@ -118,6 +120,7 @@ describe('manual top-up form', () => {
 
     const boxes = await screen.findAllByRole('textbox');
     fireEvent.paste(boxes[0], { clipboardData: { getData: () => '111111' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Add / }));
     expect(await screen.findByText('That code is not valid. Check it or ask for a new one.')).toBeTruthy();
     expect(props.onClose).not.toHaveBeenCalled();
 
@@ -148,6 +151,8 @@ describe('confirming with the authenticator app', () => {
     expect(screen.getByText('Code from your authenticator app')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Resend/ })).toBeNull();
     fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '246810' } });
+    expect(props.onConfirm).not.toHaveBeenCalledWith('mt_1', '246810', 'authenticator');
+    fireEvent.click(screen.getByRole('button', { name: /^Add / }));
     await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '246810', 'authenticator'));
   });
 
@@ -166,6 +171,8 @@ describe('confirming with the authenticator app', () => {
     // The resend's answer carries no confirm_with: the choice stays.
     expect(screen.getByLabelText('Authenticator app')).toBeTruthy();
     fireEvent.paste(screen.getAllByRole('textbox')[0], { clipboardData: { getData: () => '135790' } });
+    expect(props.onConfirm).not.toHaveBeenCalledWith('mt_1', '135790', 'email');
+    fireEvent.click(screen.getByRole('button', { name: /^Add / }));
     await waitFor(() => expect(props.onConfirm).toHaveBeenCalledWith('mt_1', '135790', 'email'));
   });
 
