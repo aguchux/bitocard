@@ -1,9 +1,12 @@
 @import "tailwindcss";
+@import "@bitocard/ui/styles/tokens.css";
 @import "@bitocard/ui/styles/interactive.css";
 
+/* The brand palette and Inter (`font-sans`) come from the shared tokens; the docs add their code font and the code
+   panels' background (shiki's github-dark, so highlighted code and its panel match). */
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-code: #0d1117;
 }
 
 html {
@@ -19,7 +22,7 @@ html {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.65;
-  background: #0d1117 !important;
+  background: var(--color-code) !important;
 }
 .code-panel pre {
   max-height: 32rem;
@@ -35,15 +38,15 @@ html {
 .schema-description code,
 .prose-docs :not(pre) > code {
   border-radius: 0.3rem;
-  background: rgb(7 15 76 / 0.06);
+  background: color-mix(in srgb, var(--color-navy-900) 6%, transparent);
   padding: 0.1rem 0.35rem;
   font-family: var(--font-mono);
   font-size: 0.85em;
-  color: #070f4c;
+  color: var(--color-navy-900);
 }
 .schema-description a,
 .prose-docs a {
-  color: #e0116d;
+  color: var(--color-brand-600);
   font-weight: 600;
   text-underline-offset: 3px;
 }
@@ -55,7 +58,7 @@ html {
 /* Guides. */
 .prose-docs {
   max-width: 48rem;
-  color: #334155;
+  color: var(--color-slate-700);
   line-height: 1.75;
 }
 .prose-docs > * + * {
@@ -66,20 +69,20 @@ html {
   line-height: 1.15;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #070f4c;
+  color: var(--color-navy-900);
 }
 .prose-docs h2 {
   margin-top: 2.75rem;
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #070f4c;
+  color: var(--color-navy-900);
 }
 .prose-docs h3 {
   margin-top: 2rem;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #070f4c;
+  color: var(--color-navy-900);
 }
 .prose-docs .heading-anchor {
   color: inherit;
@@ -99,7 +102,7 @@ html {
   margin-top: 0.35rem;
 }
 .prose-docs strong {
-  color: #0f172a;
+  color: var(--color-slate-900);
 }
 .prose-docs table {
   display: block;
@@ -110,20 +113,20 @@ html {
 }
 .prose-docs th,
 .prose-docs td {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-slate-200);
   padding: 0.55rem 0.75rem;
   text-align: left;
   vertical-align: top;
 }
 .prose-docs th {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-slate-50);
+  color: var(--color-slate-900);
   font-weight: 600;
   white-space: nowrap;
 }
 .prose-docs blockquote {
-  border-left: 3px solid #ff2382;
-  background: #fdf2f8;
+  border-left: 3px solid var(--color-brand-500);
+  background: var(--color-brand-50);
   padding: 0.75rem 1rem;
   border-radius: 0 0.5rem 0.5rem 0;
 }

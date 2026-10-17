@@ -64,7 +64,7 @@ export function SchemaFields({ schema, depth = 0 }: { schema: Schema | undefined
         <p className="text-sm text-slate-600">One of:</p>
         {objects.map((variant, index) => (
           <details key={index} className="rounded-lg border border-slate-200 bg-white" open={depth === 0 && index === 0}>
-            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-[#070f4c]">{resolve(variant)?.title ?? typeLabel(variant)}</summary>
+            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-navy-900">{resolve(variant)?.title ?? typeLabel(variant)}</summary>
             <div className="border-t border-slate-100 px-3 py-2">
               <SchemaFields schema={variant} depth={depth + 1} />
             </div>
@@ -98,9 +98,9 @@ export function SchemaFields({ schema, depth = 0 }: { schema: Schema | undefined
         return (
           <li key={name} className="py-3">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <code className="font-mono text-[13px] font-semibold text-[#070f4c]">{name}</code>
+              <code className="font-mono text-[13px] font-semibold text-navy-900">{name}</code>
               <span className="font-mono text-xs text-slate-500">{typeLabel(property)}</span>
-              {required ? <span className="text-xs font-semibold text-[#e0116d]">required</span> : null}
+              {required ? <span className="text-xs font-semibold text-brand-600">required</span> : null}
             </div>
             {field.description ? <div className="schema-description mt-1 text-sm text-slate-600" dangerouslySetInnerHTML={{ __html: inline(field.description) }} /> : null}
             {values?.length ? (

@@ -12,7 +12,13 @@
   --color-navy-900: #070f4c;
   --color-navy-800: #111a5e;
   --color-navy-700: #1d2873;
+  /* Navy tones for the public sites' plain-CSS pages (/resellers, legals): body copy, quiet text, borders, soft panels. */
+  --color-navy-600: #414f77;
+  --color-navy-500: #647295;
+  --color-navy-400: #8090b7;
+  --color-navy-200: #e3e7f2;
   --color-navy-100: #e7e9f6;
+  --color-navy-50: #f3f6fd;
 
   /* Pink: calls to action, active states, links. 500 is the brand pink; 600 hover and link text; 700 focus. */
   --color-brand-50: #fff0f7;
@@ -26,6 +32,9 @@
 
   /* Accents used alongside the brand pair. */
   --color-azure-500: #2477ff;
+  --color-mint-50: #e7f9f5;
+  --color-mint-500: #00a575;
+  --color-mint-700: #00875f;
   --color-gold-400: #ffd23f;
   --color-plum-800: #3a1680;
   --color-plum-900: #2a1466;

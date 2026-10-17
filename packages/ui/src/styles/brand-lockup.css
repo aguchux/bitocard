@@ -7,10 +7,10 @@
 .wordmark.brand-lockup { font-size: var(--wordmark, 28px); display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; column-gap: .3em; row-gap: .08em; line-height: 1; text-decoration: none; }
 .wordmark.brand-lockup .brand-icon { grid-row: 1 / span 2; height: 1.6em; }
 .wordmark.brand-lockup .brand-name { grid-column: 2; align-self: end; }
-.wordmark.brand-lockup .tagline { grid-column: 2; align-self: start; color: #414f77; font-size: max(13px, .36em); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
+.wordmark.brand-lockup .tagline { grid-column: 2; align-self: start; color: var(--color-navy-600, #414f77); font-size: max(13px, .36em); font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
 /* The logo outside the lockup: the "b" mark on the left, a little taller than the name beside it. */
 .brand-icon { display: block; flex: none; height: 1.15em; }
 .brand-icon img { display: block; width: auto; height: 100%; }
 .brand-name { white-space: nowrap; }
-.brand-name .brand-accent { color: var(--pink, #ff2382); }
+.brand-name .brand-accent { color: var(--color-brand-500, #ff2382); }
 

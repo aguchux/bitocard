@@ -22,7 +22,7 @@ function Groups({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () =>
                     href={link.href}
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
-                    className={`block rounded-md px-2.5 py-1.5 ${active ? "bg-pink-50 font-semibold text-[#e0116d]" : "text-slate-600 hover:bg-slate-50 hover:text-[#070f4c]"}`}
+                    className={`block rounded-md px-2.5 py-1.5 ${active ? "bg-pink-50 font-semibold text-brand-600" : "text-slate-600 hover:bg-slate-50 hover:text-navy-900"}`}
                   >
                     {link.title}
                   </Link>
@@ -83,14 +83,14 @@ export function MobileNav({ groups }: { groups: NavGroup[] }) {
   }
   return (
     <div className="lg:hidden">
-      <button type="button" aria-label="Open navigation" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-10 place-items-center rounded-lg text-[#070f4c] hover:bg-slate-100">
+      <button type="button" aria-label="Open navigation" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-10 place-items-center rounded-lg text-navy-900 hover:bg-slate-100">
         <Menu className="size-5" aria-hidden />
       </button>
       {open ? (
         <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Navigation">
           <div className="flex h-dvh w-[min(20rem,86vw)] flex-col bg-white shadow-2xl">
             <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 px-4">
-              <span className="font-semibold text-[#070f4c]">Documentation</span>
+              <span className="font-semibold text-navy-900">Documentation</span>
               <button type="button" aria-label="Close navigation" onClick={() => setOpen(false)} className="grid size-10 place-items-center rounded-lg hover:bg-slate-100">
                 <X className="size-5" aria-hidden />
               </button>
@@ -99,7 +99,7 @@ export function MobileNav({ groups }: { groups: NavGroup[] }) {
               <Groups groups={groups} onNavigate={() => setOpen(false)} />
             </div>
           </div>
-          <button type="button" tabIndex={-1} aria-hidden className="flex-1 bg-[#070f4c]/40" onClick={() => setOpen(false)} />
+          <button type="button" tabIndex={-1} aria-hidden className="flex-1 bg-navy-900/40" onClick={() => setOpen(false)} />
         </div>
       ) : null}
     </div>

@@ -27,16 +27,16 @@ export default async function TagPage({ params }: { params: Promise<{ tag: strin
   return (
     <div>
       <header className="max-w-4xl space-y-4 pb-6">
-        <p className="text-sm font-semibold text-[#e0116d]">
+        <p className="text-sm font-semibold text-brand-600">
           <Link href="/reference">API reference</Link>
           {section ? ` · ${section.title}` : ""}
         </p>
-        <h1 className="text-4xl font-extrabold tracking-tight text-[#070f4c]">{tag}</h1>
+        <h1 className="text-4xl font-extrabold tracking-tight text-navy-900">{tag}</h1>
         {tagIntros[tag] ? <p className="schema-description text-lg text-slate-600" dangerouslySetInnerHTML={{ __html: inline(tagIntros[tag]) }} /> : null}
         <ul className="flex flex-col gap-1.5 rounded-2xl border border-slate-200 p-4">
           {operations.map(operation => (
             <li key={operation.id}>
-              <a href={`#${operation.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm hover:text-[#e0116d]">
+              <a href={`#${operation.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm hover:text-brand-600">
                 <MethodBadge method={operation.method} small />
                 <span className="font-mono text-[13px] text-slate-700">{operation.path}</span>
                 <span className="text-slate-500">{operation.summary}</span>

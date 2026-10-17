@@ -31,10 +31,10 @@ export default async function EventPage({ params }: { params: Promise<{ type: st
     <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
       <div className="min-w-0 space-y-8">
         <header className="space-y-3">
-          <p className="text-sm font-semibold text-[#e0116d]">
+          <p className="text-sm font-semibold text-brand-600">
             <Link href="/reference/webhook-events">Webhook events</Link>
           </p>
-          <h1 className="font-mono text-3xl font-bold tracking-tight text-[#070f4c]">{event.type}</h1>
+          <h1 className="font-mono text-3xl font-bold tracking-tight text-navy-900">{event.type}</h1>
           <p className="text-lg text-slate-600">{event.summary}</p>
         </header>
         <div className="prose-docs" dangerouslySetInnerHTML={{ __html: description.html }} />
@@ -55,7 +55,7 @@ export default async function EventPage({ params }: { params: Promise<{ type: st
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 px-4">
             {event.headers.map(header => (
               <li key={header.name} className="py-3">
-                <code className="font-mono text-[13px] font-semibold text-[#070f4c]">{header.name}</code>
+                <code className="font-mono text-[13px] font-semibold text-navy-900">{header.name}</code>
                 {header.description ? <div className="schema-description mt-1 text-sm text-slate-600" dangerouslySetInnerHTML={{ __html: inline(header.description) }} /> : null}
               </li>
             ))}
@@ -68,7 +68,7 @@ export default async function EventPage({ params }: { params: Promise<{ type: st
             {others.map((item, index) => (
               <span key={item.type}>
                 {index ? ", " : ""}
-                <Link href={`/reference/webhook-events/${eventSlug(item.type)}`} className="font-mono font-semibold text-[#e0116d]">
+                <Link href={`/reference/webhook-events/${eventSlug(item.type)}`} className="font-mono font-semibold text-brand-600">
                   {item.type}
                 </Link>
               </span>

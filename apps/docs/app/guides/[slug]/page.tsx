@@ -27,7 +27,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
   return (
     <div className="flex gap-12">
       <article className="min-w-0 flex-1">
-        <p className="mb-3 text-sm font-semibold text-[#e0116d]">{guide.group}</p>
+        <p className="mb-3 text-sm font-semibold text-brand-600">{guide.group}</p>
         <div className="prose-docs" dangerouslySetInnerHTML={{ __html: guide.html }} />
         <nav aria-label="Guides" className="mt-16 grid max-w-3xl gap-3 border-t border-slate-200 pt-6 sm:grid-cols-2">
           {previous ? (
@@ -35,7 +35,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
               <ArrowLeft className="size-4 text-slate-400" aria-hidden />
               <span>
                 <span className="block text-xs text-slate-500">Previous</span>
-                <span className="font-semibold text-[#070f4c]">{previous.title}</span>
+                <span className="font-semibold text-navy-900">{previous.title}</span>
               </span>
             </Link>
           ) : (
@@ -45,7 +45,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
             <Link href={`/guides/${next.slug}`} className="flex items-center justify-end gap-2 rounded-xl border border-slate-200 p-4 text-right hover:border-slate-300">
               <span>
                 <span className="block text-xs text-slate-500">Next</span>
-                <span className="font-semibold text-[#070f4c]">{next.title}</span>
+                <span className="font-semibold text-navy-900">{next.title}</span>
               </span>
               <ArrowRight className="size-4 text-slate-400" aria-hidden />
             </Link>
@@ -53,7 +53,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
             <Link href="/reference" className="flex items-center justify-end gap-2 rounded-xl border border-slate-200 p-4 text-right hover:border-slate-300">
               <span>
                 <span className="block text-xs text-slate-500">Next</span>
-                <span className="font-semibold text-[#070f4c]">API reference</span>
+                <span className="font-semibold text-navy-900">API reference</span>
               </span>
               <ArrowRight className="size-4 text-slate-400" aria-hidden />
             </Link>
@@ -66,7 +66,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
           <ul className="space-y-1.5 text-sm">
             {contents.map(heading => (
               <li key={heading.id}>
-                <a href={`#${heading.id}`} className="text-slate-600 hover:text-[#e0116d]">
+                <a href={`#${heading.id}`} className="text-slate-600 hover:text-brand-600">
                   {heading.text}
                 </a>
               </li>

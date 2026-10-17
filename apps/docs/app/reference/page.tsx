@@ -14,23 +14,23 @@ export default function ReferenceIndex() {
   return (
     <div className="max-w-5xl space-y-12">
       <header className="space-y-4">
-        <h1 className="text-4xl font-extrabold tracking-tight text-[#070f4c]">API reference</h1>
+        <h1 className="text-4xl font-extrabold tracking-tight text-navy-900">API reference</h1>
         <div className="prose-docs" dangerouslySetInnerHTML={{ __html: inline(document.info.description) }} />
         <dl className="grid gap-4 rounded-2xl border border-slate-200 p-5 text-sm sm:grid-cols-3">
           <div>
-            <dt className="font-semibold text-[#070f4c]">Base URL</dt>
+            <dt className="font-semibold text-navy-900">Base URL</dt>
             <dd className="mt-1 font-mono text-slate-600">{apiBase}</dd>
           </div>
           <div>
-            <dt className="font-semibold text-[#070f4c]">Authentication</dt>
+            <dt className="font-semibold text-navy-900">Authentication</dt>
             <dd className="mt-1 text-slate-600">
-              <code className="font-mono">Authorization: Bearer bc_test_…</code> (<Link href="/guides/authentication" className="font-semibold text-[#e0116d]">guide</Link>)
+              <code className="font-mono">Authorization: Bearer bc_test_…</code> (<Link href="/guides/authentication" className="font-semibold text-brand-600">guide</Link>)
             </dd>
           </div>
           <div>
-            <dt className="font-semibold text-[#070f4c]">Machine-readable</dt>
+            <dt className="font-semibold text-navy-900">Machine-readable</dt>
             <dd className="mt-1 text-slate-600">
-              <a href={`${apiBase}/v1/openapi.json`} className="font-semibold text-[#e0116d]">
+              <a href={`${apiBase}/v1/openapi.json`} className="font-semibold text-brand-600">
                 OpenAPI 3.1 document
               </a>
             </dd>
@@ -43,21 +43,21 @@ export default function ReferenceIndex() {
         if (!present.length) return null;
         return (
           <section key={section.title} aria-labelledby={tagSlug(section.title)} className="space-y-4">
-            <h2 id={tagSlug(section.title)} className="text-2xl font-bold tracking-tight text-[#070f4c]">
+            <h2 id={tagSlug(section.title)} className="text-2xl font-bold tracking-tight text-navy-900">
               {section.title}
             </h2>
             {section.kind === "dashboard" ? <p className="text-sm text-slate-600">These are what SHQ, the reseller dashboard, calls with its signed-in session. API keys cannot use them; they are documented so you know what the dashboard does.</p> : null}
             <div className="grid gap-4 lg:grid-cols-2">
               {present.map(tag => (
                 <div key={tag} className="rounded-2xl border border-slate-200 p-5">
-                  <Link href={`/reference/${tagSlug(tag)}`} className="text-lg font-semibold text-[#070f4c] hover:text-[#e0116d]">
+                  <Link href={`/reference/${tagSlug(tag)}`} className="text-lg font-semibold text-navy-900 hover:text-brand-600">
                     {tag}
                   </Link>
                   {tagIntros[tag] ? <p className="schema-description mt-1 text-sm text-slate-600" dangerouslySetInnerHTML={{ __html: inline(tagIntros[tag]) }} /> : null}
                   <ul className="mt-3 space-y-1.5">
                     {operationsFor(tag).map(operation => (
                       <li key={operation.id}>
-                        <Link href={operationHref(operation)} className="flex items-center gap-2 text-sm hover:text-[#e0116d]">
+                        <Link href={operationHref(operation)} className="flex items-center gap-2 text-sm hover:text-brand-600">
                           <MethodBadge method={operation.method} small />
                           <span className="min-w-0 truncate font-mono text-[13px] text-slate-700">{operation.path}</span>
                         </Link>
@@ -72,14 +72,14 @@ export default function ReferenceIndex() {
       })}
 
       <section aria-labelledby="events" className="space-y-4">
-        <h2 id="events" className="text-2xl font-bold tracking-tight text-[#070f4c]">
+        <h2 id="events" className="text-2xl font-bold tracking-tight text-navy-900">
           Webhook events
         </h2>
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {webhookEvents.map(event => (
             <li key={event.type}>
               <Link href={`/reference/webhook-events/${eventSlug(event.type)}`} className="block rounded-xl border border-slate-200 p-3 hover:border-slate-300">
-                <code className="font-mono text-sm font-semibold text-[#070f4c]">{event.type}</code>
+                <code className="font-mono text-sm font-semibold text-navy-900">{event.type}</code>
                 <span className="mt-0.5 block text-xs text-slate-600">{event.summary}</span>
               </Link>
             </li>

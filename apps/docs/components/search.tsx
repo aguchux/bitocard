@@ -70,7 +70,7 @@ export function Search({ index }: { index: SearchEntry[] }) {
         <kbd className="hidden rounded border border-slate-200 bg-white px-1.5 font-sans text-[11px] text-slate-400 sm:inline">Ctrl K</kbd>
       </button>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#070f4c]/40 p-4 pt-[10vh]" role="dialog" aria-modal="true" aria-label="Search" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-navy-900/40 p-4 pt-[10vh]" role="dialog" aria-modal="true" aria-label="Search" onClick={() => setOpen(false)}>
           <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={event => event.stopPropagation()}>
             <label className="flex items-center gap-3 border-b border-slate-200 px-4">
               <SearchIcon className="size-5 text-slate-400" aria-hidden />
@@ -112,7 +112,7 @@ export function Search({ index }: { index: SearchEntry[] }) {
                   >
                     <span className="mt-0.5 w-16 shrink-0 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{entry.method ?? entry.kind}</span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-[#070f4c]">{entry.title}</span>
+                      <span className="block truncate text-sm font-semibold text-navy-900">{entry.title}</span>
                       <span className="block truncate text-xs text-slate-500">{entry.detail}</span>
                     </span>
                   </button>

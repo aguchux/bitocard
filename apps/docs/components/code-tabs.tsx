@@ -55,7 +55,7 @@ export function CodeTabs({ tabs, title }: { tabs: CodeTab[]; title?: string }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-code shadow-sm">
       <div className="flex items-center gap-1 border-b border-white/10 px-2">
         {title ? <span className="mr-2 hidden pl-2 text-xs font-semibold text-slate-400 sm:inline">{title}</span> : null}
         {tabs.length === 1 ? (
@@ -69,7 +69,7 @@ export function CodeTabs({ tabs, title }: { tabs: CodeTab[]; title?: string }) {
               role="tab"
               aria-selected={tab.id === active.id}
               onClick={() => choose(tab.id)}
-              className={`min-h-10 shrink-0 border-b-2 px-3 text-xs font-semibold ${tab.id === active.id ? "border-[#ff2382] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}
+              className={`min-h-10 shrink-0 border-b-2 px-3 text-xs font-semibold ${tab.id === active.id ? "border-brand-500 text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}
             >
               {tab.label}
             </button>

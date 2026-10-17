@@ -43,9 +43,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
             <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
               <MobileNav groups={groups} />
-              <Link href="/" className="wordmark inline-flex shrink-0 items-center gap-2 text-[21px] font-extrabold sm:text-[24px] tracking-tight text-[#070f4c] no-underline" aria-label="BitoCard API documentation home">
+              <Link href="/" className="wordmark inline-flex shrink-0 items-center gap-2 text-[21px] font-extrabold sm:text-[24px] tracking-tight text-navy-900 no-underline" aria-label="BitoCard API documentation home">
                 <Brand />
-                <span className="hidden rounded-md bg-[#070f4c] px-1.5 py-0.5 text-xs font-bold tracking-wide text-white sm:inline">DOCS</span>
+                <span className="hidden rounded-md bg-navy-900 px-1.5 py-0.5 text-xs font-bold tracking-wide text-white sm:inline">DOCS</span>
               </Link>
               <div className="flex min-w-0 flex-1 justify-end md:justify-center">
                 <Search index={index} />
@@ -62,11 +62,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           </div>
           <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-500">
             {brand.credit} ·{" "}
-            <a href="https://shq.bitocard.com" className="hover:text-[#070f4c]">
+            <a href="https://shq.bitocard.com" className="hover:text-navy-900">
               SHQ
             </a>{" "}
             ·{" "}
-            <a href="https://legals.bitocard.com/documents/terms" className="hover:text-[#070f4c]">
+            <a href="https://legals.bitocard.com/documents/terms" className="hover:text-navy-900">
               Terms
             </a>
           </footer>

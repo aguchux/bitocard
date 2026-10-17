@@ -26,7 +26,7 @@ export function AuthBadge({ operation }: { operation: Operation }) {
   if (operation.auth === "public") return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">Public: no sign-in</span>;
   if (operation.auth === "session") return <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-800">Dashboard only (SHQ session)</span>;
   return (
-    <span className="rounded-full bg-[#070f4c]/5 px-2.5 py-1 text-xs font-semibold text-[#070f4c]">
+    <span className="rounded-full bg-navy-900/5 px-2.5 py-1 text-xs font-semibold text-navy-900">
       API key{operation.scopes.length ? ` · ${operation.scopes.join(", ")}` : ""}
     </span>
   );
@@ -75,7 +75,7 @@ export async function OperationView({ operation }: { operation: Operation }) {
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)]">
         <div className="min-w-0 space-y-6">
           <header className="space-y-3">
-            <h2 id={`${operation.id}-title`} className="text-2xl font-bold tracking-tight text-[#070f4c]">
+            <h2 id={`${operation.id}-title`} className="text-2xl font-bold tracking-tight text-navy-900">
               <a href={`#${operation.id}`} className="hover:underline">
                 {operation.summary}
               </a>
@@ -101,10 +101,10 @@ export async function OperationView({ operation }: { operation: Operation }) {
                 {parameters.map(parameter => (
                   <li key={`${parameter.in}:${parameter.name}`} className="py-3">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                      <code className="font-mono text-[13px] font-semibold text-[#070f4c]">{parameter.name}</code>
+                      <code className="font-mono text-[13px] font-semibold text-navy-900">{parameter.name}</code>
                       <span className="font-mono text-xs text-slate-500">{typeLabel(parameter.schema)}</span>
                       <span className="text-xs text-slate-500">{parameter.in}</span>
-                      {parameter.required || parameter.in === "path" ? <span className="text-xs font-semibold text-[#e0116d]">required</span> : null}
+                      {parameter.required || parameter.in === "path" ? <span className="text-xs font-semibold text-brand-600">required</span> : null}
                     </div>
                     {parameter.description ? <div className="schema-description mt-1 text-sm text-slate-600" dangerouslySetInnerHTML={{ __html: inline(parameter.description) }} /> : null}
                     {constraints(resolve(parameter.schema) ?? {}).length ? <p className="mt-1 text-xs text-slate-500">{constraints(resolve(parameter.schema) ?? {}).join(" · ")}</p> : null}

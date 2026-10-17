@@ -13,7 +13,7 @@ export function AccountControls() {
       <button
         type="button"
         onClick={() => window.location.assign(shqSignInUrl())}
-        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#070f4c] px-3 text-sm font-semibold whitespace-nowrap text-white hover:bg-[#121a6b]"
+        className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-navy-900 px-3 text-sm font-semibold whitespace-nowrap text-white hover:bg-navy-800"
         title="Sign in with your SHQ account to try the API"
       >
         <LogIn className="size-4" aria-hidden />
@@ -31,7 +31,7 @@ export function AccountControls() {
           <select
             value={membership.reseller.id}
             onChange={event => chooseReseller(event.target.value)}
-            className="min-h-9 max-w-44 truncate rounded-lg border border-slate-200 bg-white px-2 text-sm text-[#070f4c]"
+            className="min-h-9 max-w-44 truncate rounded-lg border border-slate-200 bg-white px-2 text-sm text-navy-900"
           >
             {session.memberships.map(item => (
               <option key={item.reseller.id} value={item.reseller.id}>
@@ -51,7 +51,7 @@ export function AccountControls() {
           role="radio"
           aria-checked={mode === "test"}
           onClick={() => setMode("test")}
-          className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 ${mode === "test" ? "bg-white text-[#070f4c] shadow-sm" : "text-slate-500 hover:text-[#070f4c]"}`}
+          className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 ${mode === "test" ? "bg-white text-navy-900 shadow-sm" : "text-slate-500 hover:text-navy-900"}`}
         >
           <FlaskConical className="size-4" aria-hidden />
           Sandbox

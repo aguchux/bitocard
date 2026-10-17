@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { appUrl, brand, siteUrl } from "@bitocard/ui/site";
+import { colors } from "@bitocard/ui/tokens";
 import { languageAlternates, ogImage, siteName } from "@/components/seo";
 import "./globals.css";
 import "@bitocard/ui/styles/workspace.css";
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
   referrer: "strict-origin-when-cross-origin",
 };
 
-export const viewport: Viewport = { themeColor: "#fcfdff", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: colors.page, colorScheme: "light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en-GB"><body>{children}</body></html>;

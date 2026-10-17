@@ -37,17 +37,17 @@ export default async function Home() {
     <div className="space-y-16">
       <section className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] xl:items-center">
         <div className="space-y-5">
-          <p className="inline-flex rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold tracking-wide text-[#e0116d] uppercase">BitoCard API · v1</p>
-          <h1 className="text-4xl leading-tight font-extrabold tracking-tight text-[#070f4c] sm:text-5xl">Sell digital products from your own systems</h1>
+          <p className="inline-flex rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold tracking-wide text-brand-600 uppercase">BitoCard API · v1</p>
+          <h1 className="text-4xl leading-tight font-extrabold tracking-tight text-navy-900 sm:text-5xl">Sell digital products from your own systems</h1>
           <p className="max-w-2xl text-lg text-slate-600">
             One REST API for the BitoCard catalogue, quotes, orders, your wallet and webhooks. Your website, app or back office sells gift cards, airtime, data, bills and more to your
             own customers; BitoCard fulfils them.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/guides/quickstart" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff2382] px-5 font-semibold text-white hover:bg-[#e8116d]">
+            <Link href="/guides/quickstart" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
               Start building <ArrowRight className="size-4" aria-hidden />
             </Link>
-            <Link href="/reference" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-5 font-semibold text-[#070f4c] hover:border-slate-300">
+            <Link href="/reference" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-5 font-semibold text-navy-900 hover:border-slate-300">
               API reference
             </Link>
           </div>
@@ -65,15 +65,15 @@ export default async function Home() {
       </section>
 
       <section aria-labelledby="start" className="space-y-4">
-        <h2 id="start" className="text-2xl font-bold tracking-tight text-[#070f4c]">
+        <h2 id="start" className="text-2xl font-bold tracking-tight text-navy-900">
           Start here
         </h2>
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map(card => (
             <li key={card.href}>
-              <Link href={card.href} className="group flex h-full flex-col gap-2 rounded-2xl border border-slate-200 p-5 transition hover:border-[#ff2382] hover:shadow-sm">
-                <card.icon className="size-6 text-[#ff2382]" aria-hidden />
-                <span className="font-semibold text-[#070f4c] group-hover:text-[#e0116d]">{card.title}</span>
+              <Link href={card.href} className="group flex h-full flex-col gap-2 rounded-2xl border border-slate-200 p-5 transition hover:border-brand-500 hover:shadow-sm">
+                <card.icon className="size-6 text-brand-500" aria-hidden />
+                <span className="font-semibold text-navy-900 group-hover:text-brand-600">{card.title}</span>
                 <span className="text-sm text-slate-600">{card.body}</span>
               </Link>
             </li>
@@ -82,7 +82,7 @@ export default async function Home() {
       </section>
 
       <section aria-labelledby="core" className="space-y-4">
-        <h2 id="core" className="text-2xl font-bold tracking-tight text-[#070f4c]">
+        <h2 id="core" className="text-2xl font-bold tracking-tight text-navy-900">
           The core API
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2">
@@ -91,7 +91,7 @@ export default async function Home() {
             .map(tag => (
               <li key={tag}>
                 <Link href={`/reference/${tagSlug(tag)}`} className="block h-full rounded-xl border border-slate-200 p-4 hover:border-slate-300 hover:bg-slate-50">
-                  <span className="font-semibold text-[#070f4c]">{tag}</span>
+                  <span className="font-semibold text-navy-900">{tag}</span>
                   <span className="mt-1 block text-sm text-slate-600">{tagIntros[tag]?.replace(/`/g, "")}</span>
                 </Link>
               </li>

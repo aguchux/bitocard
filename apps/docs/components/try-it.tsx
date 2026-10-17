@@ -125,7 +125,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[#ff2382] px-3 text-sm font-semibold text-[#e0116d] hover:bg-pink-50"
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-brand-500 px-3 text-sm font-semibold text-brand-600 hover:bg-pink-50"
       >
         <Play className="size-4" aria-hidden />
         Try it
@@ -136,7 +136,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
   return (
     <form onSubmit={submit} className={`space-y-4 rounded-2xl border p-4 ${live && operation.auth === "api_key" ? "border-red-300 bg-red-50/40" : "border-slate-200 bg-white"}`} aria-labelledby={`${id}-title`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p id={`${id}-title`} className="text-sm font-semibold text-[#070f4c]">
+        <p id={`${id}-title`} className="text-sm font-semibold text-navy-900">
           Try it
           {operation.auth === "api_key" ? (
             <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${live ? "bg-red-600 text-white" : "bg-emerald-100 text-emerald-800"}`}>{live ? "Live" : "Sandbox"}</span>
@@ -144,7 +144,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
             <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">Public: no sign-in</span>
           )}
         </p>
-        <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500 hover:text-[#070f4c]">
+        <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500 hover:text-navy-900">
           Close
         </button>
       </div>
@@ -152,7 +152,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
       {blocked === "signin" ? (
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
           <span>Sign in with your SHQ account to call your sandbox or live account from here.</span>
-          <button type="button" onClick={() => window.location.assign(shqSignInUrl())} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-[#070f4c] px-3 font-semibold text-white">
+          <button type="button" onClick={() => window.location.assign(shqSignInUrl())} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-navy-900 px-3 font-semibold text-white">
             <LogIn className="size-4" aria-hidden />
             Sign in
           </button>
@@ -167,7 +167,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
           {operation.parameters.map(item => (
             <label key={`${item.in}:${item.name}`} className="text-sm">
               <span className="mb-1 flex items-baseline gap-2">
-                <code className="font-semibold text-[#070f4c]">{item.name}</code>
+                <code className="font-semibold text-navy-900">{item.name}</code>
                 <span className="text-xs text-slate-500">
                   {item.in}
                   {item.required ? ", required" : ""}
@@ -180,7 +180,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
                 placeholder={item.description.slice(0, 60)}
                 autoComplete="off"
                 spellCheck={false}
-                className="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-mono text-[13px] focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none"
+                className="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-mono text-[13px] focus:border-brand-500 focus:ring-2 focus:ring-pink-100 focus:outline-none"
               />
             </label>
           ))}
@@ -189,13 +189,13 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
 
       {write && operation.method !== "DELETE" && operation.body !== null ? (
         <label className="block text-sm">
-          <span className="mb-1 block font-semibold text-[#070f4c]">Body (JSON)</span>
+          <span className="mb-1 block font-semibold text-navy-900">Body (JSON)</span>
           <textarea
             value={body}
             onChange={event => setBody(event.target.value)}
             rows={Math.min(16, Math.max(4, body.split("\n").length + 1))}
             spellCheck={false}
-            className="w-full rounded-lg border border-slate-200 bg-[#0d1117] p-3 font-mono text-[13px] leading-relaxed text-slate-100 focus:border-[#ff2382] focus:ring-2 focus:ring-pink-100 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-code p-3 font-mono text-[13px] leading-relaxed text-slate-100 focus:border-brand-500 focus:ring-2 focus:ring-pink-100 focus:outline-none"
           />
         </label>
       ) : null}
@@ -210,7 +210,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
         <button
           type="submit"
           disabled={Boolean(blocked) || sending}
-          className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${live && operation.auth === "api_key" ? "bg-red-600 hover:bg-red-700" : "bg-[#ff2382] hover:bg-[#e8116d]"}`}
+          className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${live && operation.auth === "api_key" ? "bg-red-600 hover:bg-red-700" : "bg-brand-500 hover:bg-brand-600"}`}
         >
           {sending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Play className="size-4" aria-hidden />}
           Send {operation.method}
@@ -251,7 +251,7 @@ export function TryIt({ operation }: { operation: TryItOperation }) {
               {result.requestId ? <span>Request-Id {result.requestId}</span> : null}
               {result.replayed ? <span>Idempotent replay</span> : null}
             </p>
-            <pre className="max-h-[28rem] overflow-auto rounded-xl bg-[#0d1117] p-3 font-mono text-[13px] leading-relaxed text-slate-100">{result.body || "(no body)"}</pre>
+            <pre className="max-h-[28rem] overflow-auto rounded-xl bg-code p-3 font-mono text-[13px] leading-relaxed text-slate-100">{result.body || "(no body)"}</pre>
           </div>
         )
       ) : null}
