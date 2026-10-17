@@ -13,11 +13,4 @@
   :focus-visible { outline: 3px solid var(--color-brand-700); outline-offset: 5px; }
   :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
 }
-/* Spin and win (components/app/spin-wheel.tsx): the win popping in, and a small burst of dots when the wheel lands.
-   Transforms and opacity only, so they run on the GPU; none of it with reduced motion. */
-@keyframes spin-pop { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.04); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes spin-burst { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(0.3); opacity: 0; } }
-.spin-pop { animation: spin-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.spin-burst { position: absolute; inset: 0; pointer-events: none; }
-.spin-burst > span { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; border-radius: 9999px; opacity: 0; animation: spin-burst 0.9s ease-out forwards; }
-@media (prefers-reduced-motion: reduce) { .spin-pop, .spin-burst > span { animation: none; } .spin-burst { display: none; } }
+/* Spin and win's styles are its own CSS module: components/app/spin/spin.module.css. */

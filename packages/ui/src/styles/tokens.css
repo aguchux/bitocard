@@ -35,7 +35,11 @@
   --color-mint-50: #e7f9f5;
   --color-mint-500: #00a575;
   --color-mint-700: #00875f;
+  /* Gold: rewards, Spin and win's metal rim, pointer and prize. 400 is the accent; 200 highlights, 700 shadows. */
+  --color-gold-200: #fff0b3;
   --color-gold-400: #ffd23f;
+  --color-gold-500: #f5b50a;
+  --color-gold-700: #a86d00;
   --color-plum-800: #3a1680;
   --color-plum-900: #2a1466;
 

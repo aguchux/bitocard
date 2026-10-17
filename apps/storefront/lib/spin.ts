@@ -1,4 +1,5 @@
-import type { StoreSpinRewards } from "@bitocard/api-client/storefront";
+import type { StoreSpinAllowance, StoreSpinRewards } from "@bitocard/api-client/storefront";
+import { colors } from "@bitocard/ui/tokens";
 
 /**
  * The wheel's geometry, shared by the wheel and its tests. Segments run clockwise from the top: segment `i` covers
@@ -38,6 +39,33 @@ export function landingAngle({ current, segment, count, turns, offset = 0 }: { c
 
 /** "$0.05" from "0.05"; the API's dollar strings keep two places. */
 export const usd = (value: string) => `$${Number(value).toFixed(2)}`;
+
+/** A wedge's colour: the wheel's top prize is gold, the rest alternate navy and pink. */
+export type SegmentTone = "navy" | "pink" | "gold";
+
+export function segmentTones(segments: Array<{ usd: string }>): SegmentTone[] {
+  const top = Math.max(...segments.map(segment => Number(segment.usd)));
+  return segments.map((segment, i) => (segments.length > 2 && Number(segment.usd) === top ? "gold" : i % 2 ? "pink" : "navy"));
+}
+
+/**
+ * Each coin's own colour and mark, for the wheel's chips and the coin tokens (the coins' brand colours, illustration
+ * only). `dark`: the mark is navy on it (BNB's yellow is too light for white).
+ */
+const coins: Record<string, { colour: string; glyph: string; dark?: boolean }> = {
+  USDT: { colour: "#26a17b", glyph: "₮" },
+  USDC: { colour: "#2775ca", glyph: "$" },
+  BNB: { colour: "#f3ba2f", glyph: "B", dark: true },
+};
+
+export const coinFor = (asset: string) => coins[asset] ?? { colour: colors.azure500, glyph: asset.slice(0, 1) };
+
+/** Today's spins as lights: one per spin a day, lit for each still to spin (all lit before the first spin). */
+export function todayLights(allowance: StoreSpinAllowance | null, dailyLimit: number) {
+  const total = Math.max(1, allowance?.daily_limit ?? dailyLimit);
+  const lit = !allowance ? total : allowance.finished ? 0 : Math.min(total, Math.max(0, allowance.today_left));
+  return { lit, total };
+}
 
 /** Why the customer cannot spin, in plain words, with where to put it right (if anywhere). */
 export const spinBlocks: Record<string, { title: string; text: string; link?: { href: string; label: string } }> = {

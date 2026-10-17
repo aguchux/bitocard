@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { StoreSpinAllowance, StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { setRequest } from "./request";
 import { spinNote } from "@/components/app/spin-dialog";
-import { landingAngle, restingAngle, segmentAt, segmentWidth, showSpin, spinBlocks, usd } from "@/lib/spin";
+import { coinFor, landingAngle, restingAngle, segmentAt, segmentTones, segmentWidth, showSpin, spinBlocks, todayLights, usd } from "@/lib/spin";
 
 const redirect = vi.fn((url: string) => {
   throw new Error(`redirect:${url}`);
@@ -141,6 +141,27 @@ describe("the wheel's geometry", () => {
   test("money", () => {
     expect(usd("0.05")).toBe("$0.05");
     expect(usd("1")).toBe("$1.00");
+  });
+});
+
+describe("the wheel's look", () => {
+  test("the top prize is gold, the other wedges alternate navy and pink", () => {
+    const values = ["0.01", "0.02", "0.10", "0.03", "0.01", "0.04"].map(usd => ({ usd }));
+    expect(segmentTones(values)).toEqual(["navy", "pink", "gold", "pink", "navy", "pink"]);
+    expect(segmentTones([{ usd: "0.01" }, { usd: "0.01" }])).toEqual(["navy", "pink"]);
+  });
+
+  test("every coin has a colour and a mark, unknown ones a fallback", () => {
+    for (const asset of ["USDT", "USDC", "BNB"]) expect(coinFor(asset).colour).toMatch(/^#[0-9a-f]{6}$/);
+    expect(coinFor("BNB").dark).toBe(true);
+    expect(coinFor("ETH").glyph).toBe("E");
+  });
+
+  test("today's lights: all lit before the first spin, the spins left today, none once finished", () => {
+    expect(todayLights(null, 2)).toEqual({ lit: 2, total: 2 });
+    expect(todayLights({ ...allowance, today_left: 1 }, 2)).toEqual({ lit: 1, total: 2 });
+    expect(todayLights({ ...allowance, finished: true }, 2)).toEqual({ lit: 0, total: 2 });
+    expect(todayLights({ ...allowance, daily_limit: 3, today_left: 9 }, 2)).toEqual({ lit: 3, total: 3 });
   });
 });
 
