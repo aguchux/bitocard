@@ -164,16 +164,18 @@ describe("the wheel's look", () => {
     expect(todayLights({ ...allowance, daily_limit: 3, today_left: 9 }, 2)).toEqual({ lit: 3, total: 3 });
   });
 
-  test("the wins history shows six at a time, newest first, paging through the rest", () => {
-    expect(winsPerPage).toBe(6);
+  test("the wins history shows five at a time, newest first, paging through the rest", () => {
+    expect(winsPerPage).toBe(5);
     expect(winsPage(0, 0)).toEqual({ pages: 1, current: 0, start: 0, end: 0 });
-    expect(winsPage(4, 0)).toEqual({ pages: 1, current: 0, start: 0, end: 4 });
-    expect(winsPage(10, 0)).toEqual({ pages: 2, current: 0, start: 0, end: 6 });
-    expect(winsPage(10, 1)).toEqual({ pages: 2, current: 1, start: 6, end: 10 });
+    expect(winsPage(5, 0)).toEqual({ pages: 1, current: 0, start: 0, end: 5 });
+    expect(winsPage(12, 0)).toEqual({ pages: 3, current: 0, start: 0, end: 5 });
+    expect(winsPage(12, 2)).toEqual({ pages: 3, current: 2, start: 10, end: 12 });
     // Out of range (the list shrank, or a stale page): kept within the pages there are.
-    expect(winsPage(10, 5)).toMatchObject({ current: 1, start: 6 });
-    expect(winsPage(10, -1)).toMatchObject({ current: 0, start: 0 });
-    expect(winsPage(100, 16)).toEqual({ pages: 17, current: 16, start: 96, end: 100 });
+    expect(winsPage(12, 9)).toMatchObject({ current: 2, start: 10 });
+    expect(winsPage(12, -1)).toMatchObject({ current: 0, start: 0 });
+    expect(winsPage(100, 19)).toEqual({ pages: 20, current: 19, start: 95, end: 100 });
+    // Any page size still works.
+    expect(winsPage(10, 1, 6)).toEqual({ pages: 2, current: 1, start: 6, end: 10 });
   });
 });
 

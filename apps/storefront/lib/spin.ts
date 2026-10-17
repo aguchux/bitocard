@@ -68,7 +68,7 @@ export function todayLights(allowance: StoreSpinAllowance | null, dailyLimit: nu
 }
 
 /** Wins shown at a time in the dialog's history; the rest are a page away. */
-export const winsPerPage = 6;
+export const winsPerPage = 5;
 
 /**
  * Which wins a page of the history shows: `page` (0 is the newest) kept within the pages there are, and the slice
