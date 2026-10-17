@@ -9,7 +9,8 @@
     "dev": "tsc -p tsconfig.build.json && node --env-file-if-exists=.env dist/main.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.build.json && node --test \"test/*.test.mjs\""
+    "test": "tsc -p tsconfig.build.json && node --test \"test/*.test.mjs\"",
+    "test:docker": "tsc -p tsconfig.build.json && node --env-file=test/docker.env --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "@noble/curves": "^2.4.0",
@@ -18,6 +19,7 @@
     "@scure/bip32": "^2.4.0",
     "@scure/bip39": "^2.4.0",
     "@scure/btc-signer": "^2.4.1",
+    "@vercel/functions": "^3.9.10",
     "pg": "^8.23.1"
   },
   "devDependencies": {

@@ -155,10 +155,22 @@ keys are hardened only, so only the signer can make customers' Solana deposit ad
 
 ## BitoCard's signer (`apps/signer`)
 
-A plain Node service (no framework) with its own Postgres database, deployed with `apps/signer/Dockerfile` on a host
-off Vercel (for example DigitalOcean App Platform) behind HTTPS. Run **one instance per network**: a `mainnet` signer
-for live stores and a `testnet` one for sandbox stores. Settings are environment variables, listed in
-`apps/signer/.env.example`, all checked at start.
+A plain Node service (no framework) with its own Postgres database. Run **one per network**: a `mainnet` signer for
+live stores and a `testnet` one for sandbox stores. Settings are environment variables, listed in
+`apps/signer/.env.example`, all checked at start. It runs two ways, from the same code:
+
+- **On Vercel (now, decided by the owner on 17 October 2026)**, as its own project with Root Directory `apps/signer`
+  (`vercel.json`): `api/index.mjs` answers the API (every path is rewritten to it; the signature covers the original
+  path) and `api/worker.mjs` is the worker, run by Vercel Cron every minute (`CRON_SECRET`, at least 16 characters),
+  each run stopping after 50 seconds. A new transfer is signed straight after the reply (`waitUntil`). Several
+  instances may run at once, so recording a transfer with its limit check, and signing on each chain, happen one at
+  a time across instances under Postgres transaction-scoped advisory locks (they hold through Neon's pooler too). Its database is
+  its own Neon Postgres (never the API's). **Put the project in its own Vercel team**, which only the owner can open:
+  anyone who can read a project's environment variables in the API's team must never be able to read
+  `TURNKEY_API_PRIVATE_KEY` or change `SIGNER_LIMITS`.
+- **As a server (when traffic grows)** with `apps/signer/Dockerfile` (`npm start`: the HTTP interface plus the worker
+  every `SIGNER_WORKER_INTERVAL_MS`, default 15 seconds) on a host off Vercel such as DigitalOcean App Platform, behind
+  HTTPS, one instance. Moving is a deployment change: point the admin app's signer address at the new host.
 
 - **Keys (`src/vault`).** `turnkey`: the recovery phrase is imported into one Turnkey wallet and never leaves it. Turnkey
   exports no xpubs, so the signer is given the same account xpubs as the admin app (`SIGNER_XPUB_<FAMILY>`) and works
@@ -185,7 +197,7 @@ for live stores and a `testnet` one for sandbox stores. Settings are environment
   `{ "chain": "TRON", "asset": "USDT", "contract": "TR7N…", "decimals": 6, "per_transfer": "5000000000",
   "daily": "20000000000", "sweep_min": "20000000" }`. Anything without an entry is refused, so the list is also what
   the signer may send. The daily limit counts withdrawals of the last 24 hours, never sweeps.
-- **Sweeps.** Every pass (`SIGNER_WORKER_INTERVAL_MS`, default 15 seconds) looks at up to 100 tracked deposit addresses
+- **Sweeps.** Every worker pass looks at up to 100 tracked deposit addresses
   and moves one step on each: a token at or above its `sweep_min` gets the chain's coin for gas from the hot wallet
   first (EVM: the estimate with a margin; TRON: 30 TRX), then is swept once that has arrived; then the coin itself
   (everything less the fee). Nothing starts while the address has a transfer on its way. Assets without `sweep_min`
@@ -206,7 +218,8 @@ for live stores and a `testnet` one for sandbox stores. Settings are environment
    admin app.
 4. **Nodes.** One HTTPS endpoint per chain the signer sends on (they can be the same providers as the API's), and
    `SIGNER_BLOCKCYPHER_TOKEN` for Dogecoin's main network.
-5. **Limits** for every coin and token, then deploy behind HTTPS with its own Postgres.
+5. **Limits** for every coin and token, then deploy: a Vercel project (Root Directory `apps/signer`) in its own team
+   with a Neon database and the settings as encrypted environment variables, plus `CRON_SECRET`.
 6. **The admin app.** Settings > Integrations > Blockchain > Crypto signer: the address and the same secret, the
    Sandbox switch on for the `testnet` signer. Test connection shows its hot wallets: fund them, starting small.
 7. **Test networks first.** Run a `testnet` signer (`SIGNER_VAULT=local` is fine there) against Sepolia, Nile and the

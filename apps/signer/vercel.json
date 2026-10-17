@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd ../.. && npm ci",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/signer",
+  "ignoreCommand": "npx turbo-ignore",
+  "functions": {
+    "api/index.mjs": { "maxDuration": 60 },
+    "api/worker.mjs": { "maxDuration": 60 }
+  },
+  "rewrites": [{ "source": "/((?!api/worker).*)", "destination": "/api/index" }],
+  "crons": [{ "path": "/api/worker", "schedule": "* * * * *" }]
+}

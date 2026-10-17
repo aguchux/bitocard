@@ -3,8 +3,13 @@
  * kept before they are broadcast, and the customer deposit addresses the API has told it about (to sweep and to count in balances). It is the signer's memory across restarts; the
  * API's database knows nothing of it.
  */
-export interface Db {
+export interface Queryable {
   query<T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
+}
+
+export interface Db extends Queryable {
+  /** A single connection (a pool's), for work that must hold a lock across several statements. */
+  connect?(): Promise<Queryable & { release(): void }>;
 }
 
 export const schema = `
@@ -63,6 +68,18 @@ export type TransferRow = {
   created_at: Date;
 };
 
-export async function migrate(db: Db) {
-  for (const statement of schema.split(';').map(s => s.trim()).filter(Boolean)) await db.query(statement);
+/**
+ * Creates the tables if they are missing, in one transaction under an advisory lock, so instances starting at the same
+ * moment (Vercel functions) never race. Pass one connection (a pool's client), not a pool.
+ */
+export async function migrate(db: Queryable) {
+  await db.query('BEGIN');
+  try {
+    await db.query('SELECT pg_advisory_xact_lock(7243100)');
+    for (const statement of schema.split(';').map(s => s.trim()).filter(Boolean)) await db.query(statement);
+    await db.query('COMMIT');
+  } catch (error) {
+    await db.query('ROLLBACK');
+    throw error;
+  }
 }

@@ -1,7 +1,7 @@
 import { type ChainDriver, type Intent, Refusal, type Signed } from './chains/driver.js';
 import type { Limit, SignerConfig } from './config.js';
 import { addressOf, type Chain, chains, familyOf, isEvm, isUtxo, keyPath, type KeyOwner, nativeCoin, type Network } from './keys.js';
-import type { Db, TransferRow } from './store.js';
+import type { Db, Queryable, TransferRow } from './store.js';
 import type { KeyVault } from './vault/vault.js';
 
 /** An answer the HTTP layer sends as is: 4xx are definite refusals (nothing was sent). */
@@ -84,7 +84,11 @@ export class Signer {
 
   // ---- Withdrawals -------------------------------------------------------------------------------------------------
 
-  async receive(body: unknown): Promise<TransferView> {
+  /**
+   * Records a transfer and starts signing it. `afterReply` takes that work when the platform must be told to keep
+   * running after the reply (Vercel's `waitUntil`); without it the work runs on in this process.
+   */
+  async receive(body: unknown, afterReply?: (work: Promise<unknown>) => void): Promise<TransferView> {
     const input = body as Record<string, unknown>;
     const reference = input?.reference;
     if (typeof reference !== 'string' || !/^[A-Za-z0-9_.:-]{1,120}$/.test(reference)) throw new HttpError(400, 'reference is required');
@@ -103,28 +107,59 @@ export class Signer {
     const to = driver.address(String(input.to ?? ''));
     if (!to) throw new HttpError(422, `not a valid ${chain} address`);
 
-    // Recorded first, atomically: a GET for this reference never answers 404 once a POST carrying it arrived.
-    const inserted = await this.db.query<TransferRow>(
-      `INSERT INTO transfers (reference, kind, chain, network, asset, contract, to_address, amount)
-       VALUES ($1, 'withdrawal', $2, $3, $4, $5, $6, $7) ON CONFLICT (reference) DO NOTHING RETURNING *`,
-      [reference, chain, this.config.network, asset, contract, to, input.amount],
-    );
-    if (!inserted.rows.length) return (await this.get(reference))!;
+    // Recorded and checked against the limits in one step, alone per asset across every instance: two parallel
+    // requests can never both fit under the daily limit, and the record is committed before anything is signed, so
+    // a GET for this reference never answers 404 once a POST carrying it was answered.
+    const recorded = await this.exclusive(`limits:${chain}:${asset}`, async db => {
+      const inserted = await db.query<TransferRow>(
+        `INSERT INTO transfers (reference, kind, chain, network, asset, contract, to_address, amount)
+         VALUES ($1, 'withdrawal', $2, $3, $4, $5, $6, $7) ON CONFLICT (reference) DO NOTHING RETURNING *`,
+        [reference, chain, this.config.network, asset, contract, to, input.amount],
+      );
+      if (!inserted.rows.length) return null;
+      const refusal = await this.checkLimits(db, inserted.rows[0], limit);
+      if (refusal) await db.query(`UPDATE transfers SET status = 'failed', reason = $2, updated_at = now() WHERE reference = $1`, [reference, refusal]);
+      return { row: inserted.rows[0], refusal };
+    });
+    if (!recorded) return (await this.get(reference))!;
     this.log('transfer.received', { reference, chain, asset, amount: input.amount });
-
-    const refusal = await this.locks.run(`limits:${chain}:${asset}`, () => this.checkLimits(inserted.rows[0], limit));
-    if (refusal) {
-      await this.fail(reference, refusal);
+    if (recorded.refusal) {
+      this.log('transfer.failed', { reference, reason: recorded.refusal });
       return (await this.get(reference))!;
     }
-    void this.process(reference).catch(error => this.log('transfer.error', { reference, error: String(error) }));
-    return this.view(inserted.rows[0]);
+    const work = this.process(reference).catch(error => this.log('transfer.error', { reference, error: String(error) }));
+    afterReply?.(work);
+    return this.view(recorded.row);
   }
 
-  private async checkLimits(row: TransferRow, limit: Limit) {
+  /**
+   * Runs work alone, in this process and across every instance (Vercel runs several): inside a transaction holding a
+   * Postgres advisory lock on the key (transaction-scoped, so it also holds through a connection pooler). The work's
+   * queries go through the connection it is given, so what it writes is committed before the lock is let go.
+   */
+  private exclusive<T>(key: string, work: (db: Queryable) => Promise<T>): Promise<T> {
+    return this.locks.run(key, async () => {
+      if (!this.db.connect) return work(this.db);
+      const client = await this.db.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+        const result = await work(client);
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    });
+  }
+
+  private async checkLimits(db: Queryable, row: TransferRow, limit: Limit) {
     const amount = BigInt(row.amount);
     if (amount > limit.perTransfer) return `above this signer's limit of ${limit.perTransfer} per transfer`;
-    const sent = await this.db.query<{ total: string | null }>(
+    const sent = await db.query<{ total: string | null }>(
       `SELECT SUM(amount)::text AS total FROM transfers
        WHERE kind = 'withdrawal' AND chain = $1 AND asset = $2 AND status <> 'failed' AND reference <> $3 AND created_at > now() - interval '24 hours'`,
       [row.chain, row.asset, row.reference],
@@ -206,20 +241,21 @@ export class Signer {
 
   private async signRow(row: TransferRow, driver: ChainDriver) {
     const chain = row.chain as Chain;
-    await this.locks.run(`sign:${chain}`, async () => {
+    // One signature at a time per chain, across instances: EVM nonces and UTXOs are never handed out twice.
+    await this.exclusive(`sign:${chain}:${row.network}`, async db => {
       const signed = await driver.sign(this.intent(row), {
         // The next nonce after every transaction this signer has signed and not seen confirmed, or the chain's.
         nonce: async (address, chainNonce) => {
-          const rows = await this.db.query<{ nonce: string | null }>(
+          const rows = await db.query<{ nonce: string | null }>(
             `SELECT MAX((meta->>'nonce')::numeric)::text AS nonce FROM transfers WHERE chain = $1 AND network = $2 AND status IN ('signed', 'broadcast') AND meta->>'from' = $3`,
             [chain, row.network, address],
           );
           const ours = rows.rows[0]?.nonce;
           return ours !== null && ours !== undefined && BigInt(ours) + 1n > chainNonce ? BigInt(ours) + 1n : chainNonce;
         },
-        reserved: isUtxo(chain) ? await this.reservedInputs(chain) : undefined,
+        reserved: isUtxo(chain) ? await this.reservedInputs(db, chain) : undefined,
       });
-      const saved = await this.db.query(
+      const saved = await db.query(
         `UPDATE transfers SET status = 'signed', tx_hash = $2, raw = $3, meta = $4::jsonb, last_error = NULL, updated_at = now() WHERE reference = $1 AND status = 'pending' RETURNING reference`,
         [row.reference, signed.txHash, signed.raw, JSON.stringify(signed.meta)],
       );
@@ -227,8 +263,8 @@ export class Signer {
     });
   }
 
-  private async reservedInputs(chain: Chain) {
-    const rows = await this.db.query<{ meta: { inputs?: string[] } }>(`SELECT meta FROM transfers WHERE chain = $1 AND network = $2 AND status IN ('signed', 'broadcast')`, [chain, this.config.network]);
+  private async reservedInputs(db: Queryable, chain: Chain) {
+    const rows = await db.query<{ meta: { inputs?: string[] } }>(`SELECT meta FROM transfers WHERE chain = $1 AND network = $2 AND status IN ('signed', 'broadcast')`, [chain, this.config.network]);
     return new Set(rows.rows.flatMap(r => r.meta?.inputs ?? []));
   }
 
@@ -246,13 +282,19 @@ export class Signer {
   }
 
   /** One pass of the worker: every unfinished transfer that is due, then the sweeps. */
-  async runOnce() {
+  async runOnce(deadline = Number.POSITIVE_INFINITY) {
     const due = await this.db.query<{ reference: string }>(
       `SELECT reference FROM transfers WHERE status IN ('pending', 'signed', 'broadcast') AND next_attempt_at <= now() AND (lease_until IS NULL OR lease_until < now())
        ORDER BY next_attempt_at LIMIT 50`,
     );
-    for (const { reference } of due.rows) await this.process(reference);
-    await this.sweep();
+    let processed = 0;
+    for (const { reference } of due.rows) {
+      if (Date.now() > deadline) break;
+      await this.process(reference);
+      processed += 1;
+    }
+    const swept = Date.now() < deadline ? await this.sweep(deadline) : 0;
+    return { processed, swept };
   }
 
   // ---- Deposit addresses and sweeps ----------------------------------------------------------------------------
@@ -280,12 +322,15 @@ export class Signer {
    * when the address has too little, then the token once that has arrived), then the coin itself. Only assets with a
    * `sweep_min` are swept, and nothing is started while that address has a transfer still on its way.
    */
-  async sweep() {
+  async sweep(deadline = Number.POSITIVE_INFINITY) {
     const addresses = await this.db.query<{ chain: Chain; address_index: number; address: string }>(
       `SELECT chain, address_index, address FROM deposit_addresses WHERE network = $1 ORDER BY swept_at NULLS FIRST LIMIT 100`,
       [this.config.network],
     );
+    let looked = 0;
     for (const entry of addresses.rows) {
+      if (Date.now() > deadline) break;
+      looked += 1;
       const driver = this.drivers[entry.chain];
       if (!driver) continue;
       try {
@@ -295,6 +340,7 @@ export class Signer {
       }
       await this.db.query('UPDATE deposit_addresses SET swept_at = now() WHERE chain = $1 AND network = $2 AND address_index = $3', [entry.chain, this.config.network, entry.address_index]);
     }
+    return looked;
   }
 
   private async sweepAddress(chain: Chain, index: number, address: string, driver: ChainDriver) {
