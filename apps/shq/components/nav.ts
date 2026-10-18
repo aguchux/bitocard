@@ -104,7 +104,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
   store: {
     title: "Store",
     items: [
-      { label: "Your store", href: "/store", icon: Store },
+      { label: "Your stores", href: "/store", icon: Store },
       { label: "Customers", href: "/store/customers", icon: Users },
       { label: "Domains", href: "/store/domains", icon: Globe },
     ],

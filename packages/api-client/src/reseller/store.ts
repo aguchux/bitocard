@@ -1,5 +1,6 @@
 import { bitocardApi } from '../base';
 import type { StoreCustomer, StoreCustomerDetail, StoreCustomerFilter, StoreCustomerUpdate } from '../store-customers';
+import type { StoreSection, StoreSectionType, StoreTemplateKey, StoreThemeColors, StoreVariantStyle } from '../storefront';
 import type { List, ResellerStatus } from './common';
 
 export type { StoreCustomer, StoreCustomerDetail } from '../store-customers';
@@ -15,6 +16,13 @@ export type Store = {
   url: string;
   status: StoreStatus;
   branding: StoreBranding;
+  /** The store's template (what it sells), design variant and colour theme (`GET /v1/store-templates`). */
+  template: StoreTemplateKey;
+  variant: string;
+  theme: string;
+  /** Single product stores: the product key it sells. */
+  focus: string | null;
+  home: { version: number | null; published_at: string | null };
   /** Customer checkout: `test` (sandbox: simulated payments and orders) until switched `live` (needs a verified business). */
   checkout_mode: 'test' | 'live';
   /** The customer account app's menu on desktop; null follows BitoCard's default. */
@@ -26,7 +34,50 @@ export type Store = {
 };
 /** `reason` explains why an address cannot be used (format, reserved or taken). Your own store's address reads as taken. */
 export type SubdomainCheck = { object: 'subdomain_availability'; subdomain: string; available: boolean; reason: string | null };
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: 'test' | 'live'; desktop_nav?: 'rail' | 'bottom' | null; customer_verification?: boolean };
+export type StoreInput = {
+  name?: string;
+  subdomain?: string;
+  logo_url?: string | null;
+  primary_color?: string;
+  accent_color?: string;
+  checkout_mode?: 'test' | 'live';
+  desktop_nav?: 'rail' | 'bottom' | null;
+  customer_verification?: boolean;
+  template?: StoreTemplateKey;
+  variant?: string;
+  theme?: string;
+  focus?: string | null;
+};
+
+/** A store template with its design variants and their colour themes; `available` says whether it can be used now. */
+export type StoreTemplate = {
+  object: 'store_template';
+  key: StoreTemplateKey;
+  name: string;
+  tagline: string;
+  description: string;
+  categories: string[] | null;
+  single_product: boolean;
+  crypto: boolean;
+  sections: StoreSectionType[];
+  available: boolean;
+  reason: string | null;
+  variants: Array<{ key: string; name: string; description: string; style: StoreVariantStyle; themes: Array<{ key: string; name: string; colors: StoreThemeColors }> }>;
+};
+/** A store's home page in the editor (`/v1/stores/:id/home`). */
+export type StoreHomeEditor = {
+  object: 'store_home_editor';
+  store_id: string;
+  template: StoreTemplateKey;
+  variant: string;
+  sections_allowed: StoreSectionType[];
+  draft: StoreSection[];
+  published: boolean;
+  version: number | null;
+  published_at: string | null;
+  updated_at: string;
+};
+export type StoreHomeVersion = { object: 'store_home_version'; version: number; template: StoreTemplateKey; variant: string; sections: number; restorable: boolean; published_at: string };
 
 /** The business details (`PATCH /v1/reseller`). The country can only be set once. */
 export type ResellerProfile = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus };
@@ -79,6 +130,20 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
     }),
     publishStore: build.mutation<Store, string>({ query: id => ({ url: `/v1/stores/${id}/publish`, method: 'POST' }), invalidatesTags: ['Store'] }),
     storeTraffic: build.query<StoreTraffic, { id: string; days?: number }>({ query: ({ id, days = 30 }) => `/v1/stores/${id}/traffic?days=${days}`, keepUnusedDataFor: 300 }),
+    storeTemplates: build.query<List<StoreTemplate>, void>({ query: () => '/v1/store-templates', providesTags: ['Store'] }),
+    storeHome: build.query<StoreHomeEditor, string>({ query: id => `/v1/stores/${id}/home`, providesTags: (_result, _error, id) => [{ type: 'Store', id: `home:${id}` }] }),
+    saveStoreHome: build.mutation<StoreHomeEditor, { id: string; sections: StoreSection[] }>({ query: ({ id, sections }) => ({ url: `/v1/stores/${id}/home/draft`, method: 'PUT', body: { sections } }) }),
+    publishStoreHome: build.mutation<StoreHomeEditor, string>({
+      query: id => ({ url: `/v1/stores/${id}/home/publish`, method: 'POST' }),
+      invalidatesTags: (_result, _error, id) => ['Store', { type: 'Store', id: `home:${id}` }],
+    }),
+    resetStoreHome: build.mutation<StoreHomeEditor, string>({ query: id => ({ url: `/v1/stores/${id}/home/reset`, method: 'POST' }), invalidatesTags: (_result, _error, id) => [{ type: 'Store', id: `home:${id}` }] }),
+    storeHomeVersions: build.query<List<StoreHomeVersion>, string>({ query: id => `/v1/stores/${id}/home/versions`, providesTags: (_result, _error, id) => [{ type: 'Store', id: `home:${id}` }] }),
+    restoreStoreHome: build.mutation<StoreHomeEditor, { id: string; version: number }>({
+      query: ({ id, version }) => ({ url: `/v1/stores/${id}/home/restore`, method: 'POST', body: { version } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Store', id: `home:${id}` }],
+    }),
+    previewStoreHome: build.mutation<{ object: 'store_home_preview'; url: string; token: string; expires_at: string }, string>({ query: id => ({ url: `/v1/stores/${id}/home/preview`, method: 'POST' }) }),
     unpublishStore: build.mutation<Store, string>({ query: id => ({ url: `/v1/stores/${id}/unpublish`, method: 'POST' }), invalidatesTags: ['Store'] }),
     subdomainCheck: build.query<SubdomainCheck, string>({ query: subdomain => `/v1/stores/subdomains/${encodeURIComponent(subdomain)}`, keepUnusedDataFor: 10 }),
     updateBusiness: build.mutation<ResellerProfile, { name?: string; country?: string }>({
@@ -118,6 +183,14 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
 
 export const {
   useStoresQuery,
+  useStoreTemplatesQuery,
+  useStoreHomeQuery,
+  useSaveStoreHomeMutation,
+  usePublishStoreHomeMutation,
+  useResetStoreHomeMutation,
+  useStoreHomeVersionsQuery,
+  useRestoreStoreHomeMutation,
+  usePreviewStoreHomeMutation,
   useStoreTrafficQuery,
   useCreateStoreMutation,
   useUpdateStoreMutation,

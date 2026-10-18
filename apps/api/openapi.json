@@ -16639,6 +16639,7 @@
                     {
                       "object": "product",
                       "id": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                      "key": "airtime:NG:mtn:topup",
                       "category": "airtime",
                       "country": "NG",
                       "brand": "mtn",
@@ -16675,6 +16676,7 @@
                     {
                       "object": "product",
                       "id": "a7b8c9d0-e1f2-4a3b-8c4d-5e6f7a8b9c0d",
+                      "key": "airtime:NG:mtn:topup",
                       "category": "gift_cards",
                       "country": "US",
                       "brand": "amazon",
@@ -16845,6 +16847,7 @@
                 "example": {
                   "object": "product",
                   "id": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                  "key": "airtime:NG:mtn:topup",
                   "category": "airtime",
                   "country": "NG",
                   "brand": "mtn",
@@ -38488,6 +38491,7 @@
         "required": [
           "object",
           "id",
+          "key",
           "category",
           "country",
           "brand",
@@ -38514,6 +38518,10 @@
             "type": "string",
             "description": "Product ID. Quote it with `POST /v1/quotes`.",
             "format": "uuid"
+          },
+          "key": {
+            "type": "string",
+            "description": "Product key, `category:country:brand:variant`: the same product in every source, and its address on your hosted stores (`/p/<key>`)."
           },
           "category": {
             "type": "string",

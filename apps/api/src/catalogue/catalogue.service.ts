@@ -16,6 +16,8 @@ export function presentProductBase(product: Product, logoUrl: string | null) {
   return {
     object: 'product' as const,
     id: product.id,
+    /** BitoCard's product key (`category:country:brand:variant`), as in hosted stores' product addresses. */
+    key: product.key,
     category: product.category,
     country: product.country,
     brand: product.brand,

@@ -4,10 +4,11 @@ import type { CSSProperties } from "react";
 import { closestCenter, DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, Award, Copy, Eye, EyeOff, GripVertical, LayoutPanelTop, Megaphone, Rows2, ShieldCheck, ShoppingBag, Trash2, Grid2x2, type LucideIcon } from "lucide-react";
-import { Badge, cn } from "@bitocard/admin-ui";
-import { type Breakpoint, gridPlacement, lgSpans, mdSpans, sectionSummary, sectionTitle, sectionTypeLabel } from "@bitocard/admin-ui/storefront";
-import type { Section, SectionType } from "@bitocard/api-client/storefront";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Award, Copy, Eye, EyeOff, GripVertical, HelpCircle, LayoutPanelTop, ListChecks, Megaphone, Rows2, ShieldCheck, ShoppingBag, Sparkles, Trash2, Grid2x2, Users, Zap, type LucideIcon } from "lucide-react";
+import type { StoreSection as Section, StoreSectionType as SectionType } from "@bitocard/api-client/storefront";
+import { cn } from "../format";
+import { Badge } from "../ui/status";
+import { type Breakpoint, gridPlacement, lgSpans, mdSpans, sectionSummary, sectionTitle, sectionTypeLabel } from "./grid";
 
 export const sectionIcons: Record<SectionType, LucideIcon> = {
   hero: LayoutPanelTop,
@@ -16,6 +17,12 @@ export const sectionIcons: Record<SectionType, LucideIcon> = {
   brand_grid: Award,
   promo: Megaphone,
   trust_bar: ShieldCheck,
+  quick_buy: Zap,
+  crypto_quote: ArrowLeftRight,
+  p2p_market: Users,
+  product_spotlight: Sparkles,
+  features: ListChecks,
+  faq: HelpCircle,
 };
 
 export type CanvasActions = {

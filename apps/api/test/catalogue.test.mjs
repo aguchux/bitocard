@@ -42,9 +42,9 @@ const byKey = async (browser, key, headers) => {
 };
 
 describe('supplier registry and sync', () => {
-  test('all 32 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
+  test('all 33 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
     const { data } = (await admin.get('/v1/admin/suppliers')).json;
-    assert.equal(data.length, 32);
+    assert.equal(data.length, 33);
     assert.equal(data.find(s => s.code === 'zendit').enabled, false, 'Zendit starts switched off');
     assert.deepEqual(data.filter(s => s.enabled).map(s => s.code).sort(), ['reloadly', 'vtpass']);
     const reloadlyRecord = data.find(s => s.code === 'reloadly');
@@ -146,7 +146,8 @@ describe('catalogue', () => {
     assert.equal(status, 200);
     const names = json.data.map(p => p.name);
     assert.ok(names.includes('Amazon US') && names.includes('MTN Nigeria') && names.includes('DStv Padi N3,600'));
-    const text = JSON.stringify(json);
+    // Product keys are BitoCard's own and public (hosted stores' addresses, `/p/<key>`), so they are left out of the check.
+    const text = JSON.stringify({ ...json, data: json.data.map(({ key, ...rest }) => (assert.match(key, /^[a-z_]+:[A-Z]{2}:/), rest)) });
     for (const secret of ['reloadly', 'vtpass', 'sku', 'cost', 'dstv:dstv-padi', 'supplier']) assert.ok(!text.toLowerCase().includes(secret), `leaked ${secret}`);
 
     const amazon = json.data.find(p => p.name === 'Amazon US');

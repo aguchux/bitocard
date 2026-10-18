@@ -51,7 +51,8 @@ export default function HomePage() {
   const wallet = useWalletQuery(undefined, { skip: !seesWallet });
   const orders = useResellerOrdersInfiniteQuery({});
   const recent = orders.data?.pages[0]?.data.slice(0, 8);
-  const store = stores.data?.data[0];
+  // The checklist and the live banner follow the first published store, else the first.
+  const store = stores.data?.data.find(item => item.status === "published") ?? stores.data?.data[0];
   const currency = wallet.data?.currency;
 
   const steps: Step[] = [
@@ -66,8 +67,8 @@ export default function HomePage() {
       href: "/settings/verification",
       action: "Start",
     },
-    { done: Boolean(store), title: "Create your store", detail: "Choose its name and your bitocard.com address.", href: "/store", action: "Create" },
-    { done: store?.status === "published", title: "Publish your store", detail: "Customers can find it once it is published.", href: "/store", action: "Publish" },
+    { done: Boolean(store), title: "Create your store", detail: "Choose a template, its design and colours, and your bitocard.com address.", href: store ? "/store" : "/store/new", action: "Create" },
+    { done: store?.status === "published", title: "Publish your store", detail: "Customers can find it once it is published.", href: store ? `/store/${store.id}` : "/store", action: "Publish" },
     ...(seesWallet
       ? [{ done: Boolean(wallet.data && (wallet.data.available > 0 || wallet.data.reserved > 0)), title: "Fund your wallet", detail: "Your wallet pays BitoCard's wholesale cost for each order.", href: "/wallet/top-ups", action: "Top up" }]
       : []),

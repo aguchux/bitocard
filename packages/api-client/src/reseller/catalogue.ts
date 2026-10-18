@@ -18,6 +18,8 @@ export type PricedDenomination = { face_value: number; wholesale: number; price:
 export type Product = {
   object: 'product';
   id: string;
+  /** BitoCard's product key (`category:country:brand:variant`), as in hosted stores' product addresses (`/p/<key>`). */
+  key: string;
   category: CatalogueCategory;
   country: string;
   brand: string;

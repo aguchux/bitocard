@@ -8,6 +8,7 @@ import { AppLink } from "@bitocard/admin-ui/shell";
 import { type Store, type StoreDomain, type StoreDomains, type StoreTraffic, useStoreDomainsQuery, useStoresQuery, useStoreTrafficQuery } from "@bitocard/api-client/reseller";
 import { BuyDomain, ConnectDomain, DomainCard, mailNames, statusLabels, statusTone } from "@/components/domains";
 import { can, useReseller } from "@/components/reseller";
+import { storeHref, WithStore } from "@/components/store-templates";
 
 /** Domains that count towards the store's limit (not dismissed or never bought). */
 const counted = (domains: StoreDomain[]) => domains.filter(domain => !["removed", "failed"].includes(domain.status));
@@ -67,17 +68,22 @@ export function WithDomains({ children }: { children: (store: Store, domains: St
   const stores = useStoresQuery();
   return (
     <QueryView query={stores} loading={<Skeleton className="h-64 w-full" />} message={error => errorMessage(error, "Could not load your store.")}>
-      {({ data: [store] }) =>
-        store ? (
-          <StoreDomainsView key={store.id} store={store}>
-            {children}
-          </StoreDomainsView>
-        ) : (
-          <Notice tone="blue">
-            Create your store first: <AppLink href="/store" className="font-semibold text-brand-600 hover:underline">Store</AppLink>.
-          </Notice>
-        )
-      }
+      {({ data }) => (
+        <WithStore
+          stores={data}
+          empty={
+            <Notice tone="blue">
+              Create your store first: <AppLink href="/store" className="font-semibold text-brand-600 hover:underline">Store</AppLink>.
+            </Notice>
+          }
+        >
+          {store => (
+            <StoreDomainsView key={store.id} store={store}>
+              {children}
+            </StoreDomainsView>
+          )}
+        </WithStore>
+      )}
     </QueryView>
   );
 }
@@ -172,7 +178,7 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
           {attention.map((domain, index) => (
             <span key={domain.id}>
               {index ? ", " : ""}
-              <AppLink href={`/store/domains/${domain.id}`} className="font-semibold underline">{domain.name}</AppLink> ({domain.renewal_error === "insufficient_funds" ? "renewal waiting for funds" : statusLabels[domain.status].toLowerCase()})
+              <AppLink href={storeHref(`/store/domains/${domain.id}`, store)} className="font-semibold underline">{domain.name}</AppLink> ({domain.renewal_error === "insufficient_funds" ? "renewal waiting for funds" : statusLabels[domain.status].toLowerCase()})
             </span>
           ))}
           .
@@ -188,14 +194,14 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
           actions={
             manage ? (
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" icon={<Link2 className="size-4" aria-hidden />} disabled={!allowed} onClick={() => router.push("/store/domains/connect")}>Connect a domain</Button>
-                <Button size="sm" icon={<ShoppingCart className="size-4" aria-hidden />} disabled={!allowed || !domains.buying.available} onClick={() => router.push("/store/domains/buy")}>Buy a domain</Button>
+                <Button size="sm" variant="secondary" icon={<Link2 className="size-4" aria-hidden />} disabled={!allowed} onClick={() => router.push(storeHref("/store/domains/connect", store))}>Connect a domain</Button>
+                <Button size="sm" icon={<ShoppingCart className="size-4" aria-hidden />} disabled={!allowed || !domains.buying.available} onClick={() => router.push(storeHref("/store/domains/buy", store))}>Buy a domain</Button>
               </div>
             ) : null
           }
         />
         {list.length ? (
-          <DataTable columns={columns} rows={list} rowKey={domain => domain.id} onRowClick={domain => router.push(`/store/domains/${domain.id}`)} caption="Your domains" />
+          <DataTable columns={columns} rows={list} rowKey={domain => domain.id} onRowClick={domain => router.push(storeHref(`/store/domains/${domain.id}`, store))} caption="Your domains" />
         ) : (
           <EmptyState title="No domains yet" icon={<Globe className="size-6" aria-hidden />}>
             Buy a domain or connect one you own to use your own address.
@@ -208,12 +214,12 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
   );
 }
 
-function AddingClosed({ domains }: { domains: StoreDomains }) {
+function AddingClosed({ store, domains }: { store: Store; domains: StoreDomains }) {
   const { manage, full } = useAdding(domains);
   return (
     <Notice tone="blue">
       {!manage ? "The owner or an admin manages the store’s domains." : full ? `Your store has ${domains.max_domains} domains, the most it can have. Disconnect one to add another.` : null}{" "}
-      <AppLink href="/store/domains" className="font-semibold underline">Back to domains</AppLink>
+      <AppLink href={storeHref("/store/domains", store)} className="font-semibold underline">Back to domains</AppLink>
     </Notice>
   );
 }
@@ -223,7 +229,7 @@ export function BuyDomainScreen({ store, domains }: { store: Store; domains: Sto
   const router = useRouter();
   const { user, membership, mode } = useReseller();
   const { allowed } = useAdding(domains);
-  if (!allowed) return <AddingClosed domains={domains} />;
+  if (!allowed) return <AddingClosed store={store} domains={domains} />;
   const [first, ...rest] = user.name.trim().split(/\s+/);
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -233,10 +239,10 @@ export function BuyDomainScreen({ store, domains }: { store: Store; domains: Sto
         tlds={domains.buying.tlds}
         live={mode === "live"}
         contactDefaults={{ first_name: first ?? "", last_name: rest.join(" "), email: user.email, phone: user.phone ?? "", country: membership.reseller.country ?? "", company_name: membership.reseller.name }}
-        onBought={domain => router.push(`/store/domains/${domain.id}`)}
+        onBought={domain => router.push(storeHref(`/store/domains/${domain.id}`, store))}
       />
       <p className="text-sm text-muted">
-        Already own a domain? <AppLink href="/store/domains/connect" className="font-semibold text-brand-600 hover:underline">Connect it instead</AppLink>.
+        Already own a domain? <AppLink href={storeHref("/store/domains/connect", store)} className="font-semibold text-brand-600 hover:underline">Connect it instead</AppLink>.
       </p>
     </div>
   );
@@ -252,10 +258,10 @@ const connectSteps = [
 export function ConnectDomainScreen({ store, domains }: { store: Store; domains: StoreDomains }) {
   const router = useRouter();
   const { allowed } = useAdding(domains);
-  if (!allowed) return <AddingClosed domains={domains} />;
+  if (!allowed) return <AddingClosed store={store} domains={domains} />;
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <ConnectDomain store={store.id} onConnected={domain => router.push(`/store/domains/${domain.id}`)} />
+      <ConnectDomain store={store.id} onConnected={domain => router.push(storeHref(`/store/domains/${domain.id}`, store))} />
       <Card>
         <CardHeader title="How it works" />
         <ol className="grid gap-4 px-5 pb-5 pt-4 sm:grid-cols-3 sm:px-6">
@@ -270,7 +276,7 @@ export function ConnectDomainScreen({ store, domains }: { store: Store; domains:
       </Card>
       {domains.buying.available ? (
         <p className="text-sm text-muted">
-          No domain yet? <AppLink href="/store/domains/buy" className="font-semibold text-brand-600 hover:underline">Buy one here</AppLink>.
+          No domain yet? <AppLink href={storeHref("/store/domains/buy", store)} className="font-semibold text-brand-600 hover:underline">Buy one here</AppLink>.
         </p>
       ) : null}
     </div>
@@ -285,14 +291,14 @@ export function DomainScreen({ store, domains, id }: { store: Store; domains: St
   if (!domain) {
     return (
       <EmptyState title="No such domain" icon={<Globe className="size-6" aria-hidden />}>
-        It may have been disconnected. <AppLink href="/store/domains" className="font-semibold text-brand-600 hover:underline">Back to domains</AppLink>
+        It may have been disconnected. <AppLink href={storeHref("/store/domains", store)} className="font-semibold text-brand-600 hover:underline">Back to domains</AppLink>
       </EmptyState>
     );
   }
   return (
     <div className="space-y-6">
       <DomainTraffic store={store} name={domain.name} />
-      <DomainCard store={store.id} domain={domain} owner={membership.role === "owner"} canManage={can(membership, "admin")} onRemoved={() => router.push("/store/domains")} />
+      <DomainCard store={store.id} domain={domain} owner={membership.role === "owner"} canManage={can(membership, "admin")} onRemoved={() => router.push(storeHref("/store/domains", store))} />
     </div>
   );
 }

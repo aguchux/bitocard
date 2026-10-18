@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import type { Section, SectionType } from '@bitocard/api-client/storefront';
+import type { StoreSection as Section, StoreSectionType as SectionType } from '@bitocard/api-client/storefront';
 import {
   addSection,
+  bitocardSectionTypes,
   cleanForSave,
   duplicateSection,
   gridPlacement,
@@ -120,7 +121,8 @@ describe('hiding, duplicating and removing', () => {
 
 describe('new sections', () => {
   test('every type has a valid default matching the API', () => {
-    expect(sectionTypes.map(item => item.type)).toEqual(['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar']);
+    expect(sectionTypes.map(item => item.type)).toEqual(['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq']);
+    expect(bitocardSectionTypes).toEqual(['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar']);
     for (const { type } of sectionTypes) {
       const section = newSection(type, 'n');
       expect(section.type).toBe(type);
@@ -133,6 +135,10 @@ describe('new sections', () => {
     }
     expect(newSection('product_rail', 'n')).toMatchObject({ source: 'trending', span: { lg: 12, md: 6, rows: 1 }, limit: 6, filters: false, layout: 'cards', productKeys: [] });
     expect(newSection('brand_grid', 'n')).toMatchObject({ tag: '', limit: 12 });
+    expect(newSection('quick_buy', 'n')).toMatchObject({ categories: ['airtime', 'data'] });
+    expect(newSection('p2p_market', 'n')).toMatchObject({ asset: 'USDT', span: { lg: 6 } });
+    expect(sectionSummary(newSection('product_spotlight', 'n'))).toBe('The store’s product');
+    expect(sectionTitle(newSection('product_spotlight', 'n'))).toBe('Product spotlight');
     expect(newSection('promo', 'n')).toMatchObject({ theme: 'pink', illustration: 'none', bullets: [], span: { lg: 4, md: 3 } });
     expect(newSection('hero', 'n')).toMatchObject({ search: true, categoryChips: true });
     expect(newSection('category_grid', 'n')).toMatchObject({ categories: [] });

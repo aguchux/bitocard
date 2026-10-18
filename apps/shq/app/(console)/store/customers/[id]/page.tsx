@@ -13,6 +13,7 @@ import {
   useUpdateStoreCustomerMutation,
 } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
+import { WithStore } from "@/components/store-templates";
 import { can, useReseller } from "@/components/reseller";
 
 /**
@@ -75,7 +76,11 @@ export default function StoreCustomerPage() {
   return (
     <ShqShell section="store" current="/store/customers" crumbs={[{ label: "Store", href: "/store" }, { label: "Customers", href: "/store/customers" }, { label: "Customer" }]}>
       <QueryView query={stores} message={error => errorMessage(error, "Could not load your store.")} loading={<Skeleton className="h-96 w-full" />}>
-        {({ data: [store] }) => (store ? <Customer key={store.id} store={store} id={id} /> : null)}
+        {({ data }) => (
+          <WithStore stores={data} empty={null}>
+            {store => <Customer key={store.id} store={store} id={id} />}
+          </WithStore>
+        )}
       </QueryView>
     </ShqShell>
   );

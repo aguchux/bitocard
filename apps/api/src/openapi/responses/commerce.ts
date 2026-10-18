@@ -16,6 +16,7 @@ const product = objectSchema(
   {
     object: constant('product'),
     id: uuid('Product ID. Quote it with `POST /v1/quotes`.'),
+    key: str('Product key, `category:country:brand:variant`: the same product in every source, and its address on your hosted stores (`/p/<key>`).'),
     category: category(),
     country: str('ISO 3166-1 alpha-2 country where the product is used: the card region, or the network or biller country.'),
     brand: str('Brand slug, for example `mtn`, `dstv` or `amazon`.'),
@@ -56,6 +57,7 @@ const product = objectSchema(
 const productExample = {
   object: 'product',
   id: 'c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f',
+  key: 'airtime:NG:mtn:topup',
   category: 'airtime',
   country: 'NG',
   brand: 'mtn',

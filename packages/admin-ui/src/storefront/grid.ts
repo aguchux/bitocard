@@ -1,9 +1,9 @@
 /**
- * Pure helpers for the Storefront Manager's home page editor: reordering, sizing, adding and removing sections, and
- * placing them on the editor's grid. They mirror the API's layout rules (`apps/api/src/storefront/layout.ts`): desktop
+ * Pure helpers for the home page editor (bitocard.com's Storefront Manager and resellers' stores in SHQ): reordering,
+ * sizing, adding and removing sections, and placing them on the editor's grid. They mirror the API's layout rules (`apps/api/src/storefront/layout.ts`): desktop
  * has 12 columns, tablet 6, phones 1 (every section full width, in order).
  */
-import { categoryLabels, type Section, type SectionSpan, type SectionType } from '@bitocard/api-client/storefront';
+import { categoryLabels, type SectionSpan, type StoreSection as Section, type StoreSectionType as SectionType } from '@bitocard/api-client/storefront';
 
 export type Breakpoint = 'lg' | 'md' | 'sm';
 export type SpanBreakpoint = 'lg' | 'md';
@@ -15,7 +15,7 @@ export const rowOptions: ReadonlyArray<SectionSpan['rows']> = [1, 2];
 export const spanOptions = { lg: lgSpans, md: mdSpans } as const;
 export const gridColumns: Record<Breakpoint, number> = { lg: 12, md: 6, sm: 1 };
 
-/** The six section types, in the order the "Add section" menu lists them. */
+/** Every section type, in the order the "Add section" menu lists them (each page offers its own: `allowed`). */
 export const sectionTypes: ReadonlyArray<{ type: SectionType; label: string; description: string }> = [
   { type: 'hero', label: 'Hero', description: 'The headline, with the search box and category shortcuts.' },
   { type: 'product_rail', label: 'Product rail', description: 'Products: trending, top selling, new, featured, by category or brand, or hand-picked.' },
@@ -23,7 +23,16 @@ export const sectionTypes: ReadonlyArray<{ type: SectionType; label: string; des
   { type: 'brand_grid', label: 'Brand grid', description: 'Brand logos: featured brands, or brands with a tag.' },
   { type: 'promo', label: 'Promo card', description: 'A coloured card with a message, bullets, a button and an image or illustration.' },
   { type: 'trust_bar', label: 'Trust bar', description: 'Up to four short reassurances, such as secure checkout.' },
+  { type: 'quick_buy', label: 'Quick buy', description: 'Top up or pay a bill at once: network or biller, number and amount.' },
+  { type: 'crypto_quote', label: 'Crypto quote', description: 'Buy or sell a coin instantly at the live price.' },
+  { type: 'p2p_market', label: 'P2P market', description: 'A coin’s P2P market, with buy and sell buttons.' },
+  { type: 'product_spotlight', label: 'Product spotlight', description: 'One product in full, with its buy form.' },
+  { type: 'features', label: 'Features', description: 'Up to six features or steps, each with an icon.' },
+  { type: 'faq', label: 'Questions', description: 'Questions and answers that open one at a time.' },
 ];
+
+/** The sections bitocard.com's Storefront Manager offers (the others are reseller store templates'). */
+export const bitocardSectionTypes: SectionType[] = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar'];
 
 export const sectionTypeLabel = (type: SectionType) => sectionTypes.find(item => item.type === type)?.label ?? type;
 
@@ -40,7 +49,7 @@ export function uniqueId(taken: Iterable<string>, random: () => string = () => M
 }
 
 /** Moves the section at `from` to `to` (both clamped to the list). Returns the same list when nothing moves. */
-export function moveSection(sections: Section[], from: number, to: number): Section[] {
+export function moveSection<S extends Section>(sections: S[], from: number, to: number): S[] {
   if (from < 0 || from >= sections.length) return sections;
   const target = Math.max(0, Math.min(sections.length - 1, to));
   if (target === from) return sections;
@@ -50,7 +59,7 @@ export function moveSection(sections: Section[], from: number, to: number): Sect
   return next;
 }
 
-const update = (sections: Section[], id: string, change: (section: Section) => Section) => {
+const update = <S extends Section>(sections: S[], id: string, change: (section: S) => S) => {
   const index = sections.findIndex(section => section.id === id);
   if (index < 0) return sections;
   const next = sections.slice();
@@ -61,15 +70,15 @@ const update = (sections: Section[], id: string, change: (section: Section) => S
 const allowed = (breakpoint: SpanBreakpoint, value: number) => (spanOptions[breakpoint] as readonly number[]).includes(value);
 
 /** Sets a section's width at one breakpoint; widths the grid does not allow are ignored. */
-export function setSpan(sections: Section[], id: string, breakpoint: SpanBreakpoint, value: number): Section[] {
+export function setSpan<S extends Section>(sections: S[], id: string, breakpoint: SpanBreakpoint, value: number): S[] {
   if (!allowed(breakpoint, value)) return sections;
-  return update(sections, id, section => ({ ...section, span: { ...section.span, [breakpoint]: value } }) as Section);
+  return update(sections, id, section => ({ ...section, span: { ...section.span, [breakpoint]: value } }) as S);
 }
 
 /** Sets how many rows a section spans (1 or 2) on desktop and tablet. */
-export function setRows(sections: Section[], id: string, rows: number): Section[] {
+export function setRows<S extends Section>(sections: S[], id: string, rows: number): S[] {
   if (rows !== 1 && rows !== 2) return sections;
-  return update(sections, id, section => ({ ...section, span: { ...section.span, rows } }) as Section);
+  return update(sections, id, section => ({ ...section, span: { ...section.span, rows } }) as S);
 }
 
 /** The next allowed width after `current`, wrapping round to the narrowest. */
@@ -79,12 +88,12 @@ export function nextSpan(breakpoint: SpanBreakpoint, current: number): number {
   return options[(index + 1) % options.length];
 }
 
-export function toggleHidden(sections: Section[], id: string): Section[] {
+export function toggleHidden<S extends Section>(sections: S[], id: string): S[] {
   return update(sections, id, section => ({ ...section, hidden: !section.hidden }));
 }
 
 /** Copies a section just after itself, with a new id. */
-export function duplicateSection(sections: Section[], id: string, makeId: (taken: string[]) => string = taken => uniqueId(taken)): Section[] {
+export function duplicateSection<S extends Section>(sections: S[], id: string, makeId: (taken: string[]) => string = taken => uniqueId(taken)): S[] {
   const index = sections.findIndex(section => section.id === id);
   if (index < 0) return sections;
   const copy = structuredClone(sections[index]);
@@ -94,7 +103,7 @@ export function duplicateSection(sections: Section[], id: string, makeId: (taken
   return next;
 }
 
-export function removeSection(sections: Section[], id: string): Section[] {
+export function removeSection<S extends Section>(sections: S[], id: string): S[] {
   const next = sections.filter(section => section.id !== id);
   return next.length === sections.length ? sections : next;
 }
@@ -115,13 +124,25 @@ export function newSection(type: SectionType, id: string): Section {
       return { id, type, span: { lg: 4, md: 3, rows: 1 }, hidden: false, title: 'New promotion', subtitle: '', body: '', bullets: [], theme: 'pink', illustration: 'none' };
     case 'trust_bar':
       return { id, type, span: full, hidden: false, items: [{ icon: 'lock', title: 'Secure checkout', body: '' }] };
+    case 'quick_buy':
+      return { id, type, span: full, hidden: false, title: 'Top up now', subtitle: '', categories: ['airtime', 'data'] };
+    case 'crypto_quote':
+      return { id, type, span: full, hidden: false, title: 'Buy and sell crypto', subtitle: '', assets: [], side: 'buy' };
+    case 'p2p_market':
+      return { id, type, span: { lg: 6, md: 6, rows: 1 }, hidden: false, title: 'P2P market', subtitle: '', asset: 'USDT', limit: 5 };
+    case 'product_spotlight':
+      return { id, type, span: full, hidden: false, title: '', subtitle: '', productKey: '', bullets: [] };
+    case 'features':
+      return { id, type, span: full, hidden: false, title: 'Why buy here', subtitle: '', items: [{ icon: 'bolt', title: 'Fast', body: 'Delivered in minutes.' }] };
+    case 'faq':
+      return { id, type, span: full, hidden: false, title: 'Questions', items: [{ question: 'How do I receive it?', answer: 'Right after payment, on your order page.' }] };
   }
 }
 
 /** Adds a new section of a type at the end. */
-export function addSection(sections: Section[], type: SectionType, makeId: (taken: string[]) => string = taken => uniqueId(taken)): { sections: Section[]; id: string } {
+export function addSection<S extends Section>(sections: S[], type: S['type'], makeId: (taken: string[]) => string = taken => uniqueId(taken)): { sections: S[]; id: string } {
   const id = makeId(sections.map(section => section.id));
-  return { sections: [...sections, newSection(type, id)], id };
+  return { sections: [...sections, newSection(type, id) as S], id };
 }
 
 export type Placement = { id: string; index: number; columns: number; colSpan: number; rowSpan: number; hidden: boolean };
@@ -171,17 +192,29 @@ export function sectionSummary(section: Section): string {
     case 'promo':
       return [`${section.theme} theme`, section.cta ? `button: ${section.cta.label}` : 'no button'].join(' · ');
     case 'trust_bar':
+    case 'features':
+    case 'faq':
       return `${section.items.length} item${section.items.length === 1 ? '' : 's'}`;
+    case 'quick_buy':
+      return section.categories.map(category => categoryLabels[category]).join(', ');
+    case 'crypto_quote':
+      return [section.assets.length ? section.assets.join(', ') : 'Every coin', `${section.side} first`].join(' · ');
+    case 'p2p_market':
+      return `${section.asset} · up to ${section.limit} offers`;
+    case 'product_spotlight':
+      return section.productKey || 'The store’s product';
   }
 }
 
 /** The section's heading as the editor shows it. */
-export const sectionTitle = (section: Section) => (section.type === 'trust_bar' ? section.items.map(item => item.title).join(' · ') : section.title);
+export const sectionTitle = (section: Section) => (section.type === 'trust_bar' ? section.items.map(item => item.title).join(' · ') : section.title || sectionTypeLabel(section.type));
 
 /**
  * The layout as it is sent to the API: blank promo bullets (just added, not typed yet) are left out, so an
  * unfinished bullet does not stop the draft saving. Section order is unchanged, so error indexes still match.
  */
-export function cleanForSave(sections: Section[]): Section[] {
-  return sections.map(section => (section.type === 'promo' && section.bullets.some(bullet => !bullet.trim()) ? { ...section, bullets: section.bullets.filter(bullet => bullet.trim()) } : section));
+export function cleanForSave<S extends Section>(sections: S[]): S[] {
+  return sections.map(section =>
+    (section.type === 'promo' || section.type === 'product_spotlight') && section.bullets.some(bullet => !bullet.trim()) ? ({ ...section, bullets: section.bullets.filter(bullet => bullet.trim()) } as S) : section,
+  );
 }
