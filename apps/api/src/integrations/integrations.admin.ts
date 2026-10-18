@@ -1,4 +1,5 @@
 import { VercelDomains } from '../domains/vercel.js';
+import { checkStoreHosts } from '../stores/store-hosts.service.js';
 import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Module, Param, Post, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsObject, IsString, Matches } from 'class-validator';
@@ -57,6 +58,7 @@ export class IntegrationsAdminService {
     if (!group) throw notFound();
     if (group.section === 'blockchain') return this.testBlockchain(adminId, group);
     if (group.id === 'domains') return this.testDomains(adminId);
+    if (group.id === 'store_hosts') return this.testStoreHosts(adminId);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -106,6 +108,21 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'domains', before: null, after: { environment: 'live', ok } });
     return { object: 'integration_test' as const, integration: 'domains', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Store addresses: bitocard.com's Cloudflare zone and the storefront's Vercel project. */
+  private async testStoreHosts(adminId: string) {
+    await this.integrations.refresh(true);
+    let ok = false;
+    let message: string | null;
+    try {
+      ({ ok, message } = await checkStoreHosts(this.integrations.config));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message.replace(/^(cloudflare|vercel): /, '') : 'unknown error';
+      message = error instanceof ProviderError && error.definite ? `${error.provider === 'vercel' ? 'Vercel' : 'Cloudflare'} refused these settings (${detail}).` : `Could not reach ${error instanceof ProviderError && error.provider === 'vercel' ? 'Vercel' : 'Cloudflare'} (${detail}). Try again in a moment.`;
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'store_hosts', before: null, after: { environment: 'live', ok } });
+    return { object: 'integration_test' as const, integration: 'store_hosts', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** A blockchain provider (the latest block on each chain it is set up for) or the wallet keys (their first addresses). */

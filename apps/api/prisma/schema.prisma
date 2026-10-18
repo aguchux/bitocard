@@ -702,6 +702,15 @@ model Store {
   primaryColor          String         @default("#070f4c") @map("primary_color")
   accentColor           String         @default("#ff2382") @map("accent_color")
   publishedAt           DateTime?      @map("published_at")
+  /// The store's address on bitocard.com (its Cloudflare record and the storefront's Vercel domain): `pending` until set
+  /// up (the `domains` job retries), `ready`, or `failed` (`hostError` says why).
+  hostStatus            String         @default("pending") @map("host_status")
+  /// The subdomain whose address is set up now (differs from `subdomain` until a rename is applied).
+  hostName              String?        @map("host_name")
+  /// Cloudflare's ID of the store's CNAME record.
+  hostRecordId          String?        @map("host_record_id")
+  hostError             String?        @map("host_error")
+  hostSyncedAt          DateTime?      @map("host_synced_at")
   createdAt             DateTime       @default(now()) @map("created_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
   reseller              Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
@@ -712,6 +721,7 @@ model Store {
   domains               StoreDomain[]
 
   @@index([resellerId])
+  @@index([hostStatus])
   @@map("stores")
 }
 

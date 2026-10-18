@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { bankAccountCoolingOffMs } from '../payouts/payouts.service.js';
 import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.js';
 import { reservedSubdomains } from './reserved.js';
+import { StoreHostsService } from './store-hosts.service.js';
 
 export { reservedSubdomains };
 
@@ -65,6 +66,7 @@ export class StoresService {
     private readonly countries: CountriesService,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
+    private readonly hosts: StoreHostsService,
   ) {}
 
   /** Business name, and the country if it is not yet set (Google sign-ups choose it during onboarding). */
@@ -115,6 +117,8 @@ export class StoresService {
           accentColor: input.accent_color?.toLowerCase(),
         },
       });
+      // Its address on bitocard.com is set up at once (DNS and HTTPS take a few minutes), so it is ready by publishing.
+      await this.hosts.sync(store.id);
       return presentStore(store);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw taken();
@@ -164,8 +168,10 @@ export class StoresService {
           checkoutMode: input.checkout_mode,
           desktopNav: input.desktop_nav,
           customerVerification: input.customer_verification,
+          ...(subdomain ? { hostStatus: 'pending' } : {}),
         },
       });
+      if (subdomain) await this.hosts.sync(id);
       return presentStore(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw taken();

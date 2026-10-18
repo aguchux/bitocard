@@ -65,6 +65,12 @@ export const configSchema = z.object({
   DOMAIN_TLDS: z.string().default('com'),
   /** DNS over HTTPS (JSON) used to read a domain's public records before its nameservers move. */
   DOMAIN_DNS_LOOKUP_URL: z.string().url().default('https://cloudflare-dns.com/dns-query'),
+  /** Stores' addresses on bitocard.com: a Cloudflare token that edits the zone's DNS, and the zone. */
+  CLOUDFLARE_API_TOKEN: z.string().optional(),
+  CLOUDFLARE_ZONE_ID: z.string().optional(),
+  CLOUDFLARE_API_URL: z.string().url().default('https://api.cloudflare.com/client/v4'),
+  /** Where each store's CNAME points (Vercel's). */
+  STORE_HOST_TARGET: z.string().default('cname.vercel-dns.com'),
   MAILERSEND_API_KEY: z.string().optional(),
   MAILERSEND_API_URL: z.string().url().default('https://api.mailersend.com'),
 

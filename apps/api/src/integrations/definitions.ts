@@ -114,6 +114,10 @@ const integrationKeyList = [
   'DOMAIN_MARGIN_PERCENT',
   'DOMAIN_TLDS',
   'DOMAIN_DNS_LOOKUP_URL',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_ZONE_ID',
+  'CLOUDFLARE_API_URL',
+  'STORE_HOST_TARGET',
   'AFRICAS_TALKING_USERNAME',
   'AFRICAS_TALKING_API_KEY',
   'AFRICAS_TALKING_SANDBOX',
@@ -469,6 +473,18 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       field('DOMAIN_TLDS', 'Endings sold', { required: false, help: 'Comma separated, for example com. Vercel cannot register country endings such as .ng or .co.uk (resellers can still connect those).' }),
       field('VERCEL_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://api.vercel.com' }),
       field('DOMAIN_DNS_LOOKUP_URL', 'DNS lookup address', { kind: 'url', required: false, help: 'DNS over HTTPS (JSON) used to read a domain’s records before its nameservers move. Default: https://cloudflare-dns.com/dns-query' }),
+    ],
+  },
+  {
+    id: 'store_hosts',
+    name: 'Store addresses (Cloudflare)',
+    description:
+      'Each reseller store’s address, <subdomain>.bitocard.com, set up when it is created or renamed: a DNS-only CNAME in bitocard.com’s Cloudflare zone pointing to Vercel, and the address on the storefront project (with the Vercel settings in Domains), which issues its HTTPS. Stores waiting for these settings are set up by the domains job.',
+    fields: [
+      secret('CLOUDFLARE_API_TOKEN', 'API token', { help: 'Cloudflare > My Profile > API Tokens > Create Token, “Edit zone DNS” template, limited to the bitocard.com zone (Zone: DNS: Edit, and Zone: Zone: Read).' }),
+      field('CLOUDFLARE_ZONE_ID', 'Zone ID', { required: true, help: 'Cloudflare > bitocard.com > Overview, API section: the Zone ID.' }),
+      field('STORE_HOST_TARGET', 'Record target', { required: false, help: 'Where each store’s CNAME points. Default: cname.vercel-dns.com' }),
+      field('CLOUDFLARE_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://api.cloudflare.com/client/v4' }),
     ],
   },
   {

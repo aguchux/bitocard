@@ -99,6 +99,7 @@ export const notificationTypes = {
 
   // BitoCard admins --------------------------------------------------------------------------------------------------
   'admin.reseller.signed_up': { realm: 'admin', roles: ['operations', 'support'], severity: 'info', label: 'New reseller' },
+  'admin.store.address_failed': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Store address not set up' },
   'admin.domain.renewal_unclear': { realm: 'admin', roles: ['operations', 'finance'], severity: 'warning', label: 'Domain renewal unconfirmed' },
   'admin.connection.review': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Own integration to review' },
   'admin.verification.review': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Identity check to review' },

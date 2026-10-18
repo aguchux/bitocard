@@ -25,6 +25,8 @@ type ErrorReply = {
   errorCode?: string;
   error?: { message?: string } | string;
   failureReason?: { failureCode?: string; failureMessage?: string };
+  /** Cloudflare's shape. */
+  errors?: Array<{ message?: string }>;
 };
 
 /**
@@ -35,7 +37,7 @@ export function errorText(body: unknown, text: string, status: number) {
   const reply = (body && typeof body === 'object' ? body : {}) as ErrorReply;
   const failure = reply.failureReason ? [reply.failureReason.failureCode, reply.failureReason.failureMessage].filter(Boolean).join(': ') : '';
   const found =
-    reply.message ?? reply.responseMessage ?? reply.errorMessage ?? (typeof reply.error === 'string' ? reply.error : reply.error?.message) ?? (failure || reply.errorCode);
+    reply.message ?? reply.responseMessage ?? reply.errorMessage ?? (typeof reply.error === 'string' ? reply.error : reply.error?.message) ?? (failure || reply.errorCode) ?? (Array.isArray(reply.errors) ? reply.errors.map(error => error?.message).filter(Boolean).join('; ') || undefined : undefined);
   if (found) return found.slice(0, 300);
   const excerpt = text.replace(/\s+/g, ' ').trim().slice(0, 200);
   return excerpt ? `HTTP ${status}: ${excerpt}` : `HTTP ${status}`;

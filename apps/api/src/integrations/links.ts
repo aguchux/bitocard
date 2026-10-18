@@ -45,6 +45,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   reloadly: [signUp('https://www.reloadly.com/registration'), docs('https://developers.reloadly.com/')],
   vtpass: [signUp('https://www.vtpass.com/register'), { label: 'Sandbox sign up', url: 'https://sandbox.vtpass.com/register' }, docs('https://www.vtpass.com/documentation/')],
   didww: [signUp('https://www.didww.com/'), keys('https://my.didww.com/'), docs('https://doc.didww.com/api3/')],
+  store_hosts: [signUp('https://dash.cloudflare.com/sign-up'), keys('https://dash.cloudflare.com/profile/api-tokens', 'API tokens'), docs('https://developers.cloudflare.com/api/resources/dns/subresources/records/')],
   domains: [signUp('https://vercel.com/signup'), keys('https://vercel.com/account/settings/tokens', 'Access tokens'), docs('https://vercel.com/docs/domains/registrar-api')],
   pawapay: [signUp('https://www.pawapay.io/'), { label: 'Sandbox sign up', url: 'https://dashboard.sandbox.pawapay.io/' }, docs('https://docs.pawapay.io/v2/docs/payouts')],
   zendit: [signUp('https://zendit.io/'), keys('https://console.zendit.io/', 'Zendit console'), docs('https://developers.zendit.io/api/')],
