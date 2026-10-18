@@ -54,6 +54,17 @@ export const configSchema = z.object({
   EMAIL_FROM: z.string().default('BitoCard <no-reply@bitocard.com>'),
   RESEND_API_KEY: z.string().optional(),
   RESEND_API_URL: z.string().url().default('https://api.resend.com'),
+  /** Domains for reseller stores (Vercel): a token with access to the storefront project's team, the team and the project. */
+  VERCEL_API_TOKEN: z.string().optional(),
+  VERCEL_TEAM_ID: z.string().optional(),
+  VERCEL_STOREFRONT_PROJECT: z.string().optional(),
+  VERCEL_API_URL: z.string().url().default('https://api.vercel.com'),
+  /** BitoCard's margin on domains, in percent of Vercel's price (unset: domains cannot be bought, only connected). */
+  DOMAIN_MARGIN_PERCENT: z.string().optional(),
+  /** Endings resellers can buy, comma separated. */
+  DOMAIN_TLDS: z.string().default('com'),
+  /** DNS over HTTPS (JSON) used to read a domain's public records before its nameservers move. */
+  DOMAIN_DNS_LOOKUP_URL: z.string().url().default('https://cloudflare-dns.com/dns-query'),
   MAILERSEND_API_KEY: z.string().optional(),
   MAILERSEND_API_URL: z.string().url().default('https://api.mailersend.com'),
 

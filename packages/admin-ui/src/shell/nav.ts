@@ -56,6 +56,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'All resellers', href: '/resellers', icon: Building2 },
       { label: 'Identity checks', href: '/verifications', icon: ShieldCheck },
       { label: 'Own integrations', href: '/resellers/connections', icon: Plug },
+      { label: 'Domains', href: '/resellers/domains', icon: Globe2 },
     ],
   },
   verifications: {

@@ -443,6 +443,7 @@ model Reseller {
   countryRef            Country?               @relation(fields: [country], references: [code])
   plan                  Plan                   @relation(fields: [planCode], references: [code])
   stores                Store[]
+  domains               StoreDomain[]
   options               ResellerOption[]
   switches              FeatureSwitch[]
   /// Premium billing (M4): when the next monthly charge is due. Null means not billed (Standard, or a plan set by an admin).
@@ -708,6 +709,7 @@ model Store {
   devices               Device[]
   customers             Customer[]
   checkouts             Checkout[]
+  domains               StoreDomain[]
 
   @@index([resellerId])
   @@map("stores")
@@ -766,6 +768,8 @@ enum AccountKind {
   platform_revenue
   /// BitoCard's fees on resellers' own-integration transactions (revenue, kept apart from platform_revenue).
   platform_fees
+  /// What resellers pay BitoCard for domains (registrations and renewals), kept apart from platform_revenue.
+  domain_revenue
   tax_payable
   /// Counterpart of manual admin adjustments.
   adjustments
@@ -3356,4 +3360,70 @@ model SpinExchange {
   @@index([customerId, createdAt])
   @@index([mode, createdAt])
   @@map("spin_exchanges")
+}
+
+/// How a store's domain came to BitoCard: bought through it (Vercel's registrar) or connected (bought elsewhere).
+enum DomainSource {
+  purchased
+  connected
+}
+
+/// `purchasing` (bought, waiting for the registrar), `pending` (added, waiting for DNS or verification), `active` (the
+/// store is served on it), `failed` (the purchase failed: the money was returned), `expired`, `suspended` (by an admin)
+/// or `removed`.
+enum DomainStatus {
+  purchasing
+  pending
+  active
+  failed
+  expired
+  suspended
+  removed
+}
+
+/// A reseller store's own domain, served by the storefront through Vercel (the storefront project's domains).
+model StoreDomain {
+  id                 String        @id @default(uuid()) @db.Uuid
+  resellerId         String        @map("reseller_id") @db.Uuid
+  storeId            String        @map("store_id") @db.Uuid
+  /// Lower case, without www (the apex the reseller chose, or a subdomain of a domain they own).
+  name               String
+  source             DomainSource
+  status             DomainStatus  @default(pending)
+  /// Where its DNS is: `vercel` (Vercel's nameservers, editable in SHQ) or `external` (the reseller's own DNS host).
+  dnsMode            String        @default("external") @map("dns_mode")
+  /// The store's main address: links, payment returns and emails use it.
+  primary            Boolean       @default(false)
+  verified           Boolean       @default(false)
+  misconfigured      Boolean       @default(true)
+  /// Vercel's ownership challenges while not verified ([{ type, domain, value, reason }]).
+  verification       Json?
+  lastCheckedAt      DateTime?     @map("last_checked_at")
+  lastError          String?       @map("last_error")
+  // Buying and renewing (purchased domains only).
+  orderId            String?       @map("order_id")
+  /// Vercel's price for the registration being paid for, in US cents.
+  costCents          Int?          @map("cost_cents")
+  /// What the reseller pays for it (Vercel's price plus BitoCard's margin), in US cents.
+  priceCents         Int?          @map("price_cents")
+  holdId             String?       @map("hold_id") @db.Uuid
+  expiresAt          DateTime?     @map("expires_at")
+  autoRenew          Boolean       @default(true) @map("auto_renew")
+  renewalAttemptAt   DateTime?     @map("renewal_attempt_at")
+  renewalError       String?       @map("renewal_error")
+  remindedAt         Json?         @map("reminded_at")
+  // Email from the store's domain (Resend) and the mailbox provider chosen.
+  emailDomainId      String?       @map("email_domain_id")
+  emailStatus        String?       @map("email_status")
+  emailRecords       Json?         @map("email_records")
+  mailProvider       String?       @map("mail_provider")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  reseller           Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  store              Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([resellerId])
+  @@index([storeId])
+  @@index([status])
+  @@map("store_domains")
 }

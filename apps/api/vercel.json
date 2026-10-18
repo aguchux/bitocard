@@ -61,6 +61,10 @@
       "schedule": "20 * * * *"
     },
     {
+      "path": "/v1/cron/domains",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/v1/cron/esims",
       "schedule": "*/10 * * * *"
     },

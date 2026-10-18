@@ -617,6 +617,7 @@ export class OrdersService {
       const { url } = await this.access.link(order);
       await this.email.send(
         deliveryEmail(to, { store: store?.name ?? reseller.name, product: order.product.name, deliveries, instructions: order.product.redeemInstructions, sandbox: order.mode === 'test', link: url }),
+        { resellerId: order.resellerId, name: store?.name ?? reseller.name },
       );
       return true;
     } catch (error) {

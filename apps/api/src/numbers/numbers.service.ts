@@ -377,7 +377,7 @@ export class NumbersService {
       const to = await this.customerEmail(number);
       if (!to) return;
       const [store, link] = await Promise.all([this.storeName(number.resellerId), this.access.link({ id: number.orderId, resellerId: number.resellerId }).then(result => result.url)]);
-      await this.email.send(numberReminderEmail(to, { store, number: number.number, stage, expiresAt: number.expiresAt, deleteAt, link }));
+      await this.email.send(numberReminderEmail(to, { store, number: number.number, stage, expiresAt: number.expiresAt, deleteAt, link }), { resellerId: number.resellerId, name: store });
     } catch (error) {
       this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', numberId: number.id, stage }, 'Could not send a number reminder');
     }

@@ -1,3 +1,4 @@
+import { DomainsService } from '../domains/domains.service.js';
 import { timingSafeEqual } from 'node:crypto';
 import { Controller, Get, HttpStatus, Inject, Param, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
@@ -62,6 +63,7 @@ export class CronController {
     withdrawals: CryptoWithdrawalsService,
     customerPayouts: CustomerPayoutsService,
     reconciliation: CryptoReconciliationService,
+    domains: DomainsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -77,6 +79,8 @@ export class CronController {
       /** Hourly: virtual number renewals, reminders, pausing at expiry, deletion 15 days later, and old messages. */
       numbers: () => numbers.job(),
       esims: () => esims.job(),
+      /** Every 15 minutes: domain purchases, DNS checks, renewals and reminders. */
+      domains: () => domains.run(),
       /** Every 2 minutes: check orders the suppliers have not confirmed, and repair interrupted completions. */
       orders: () => orders.checkDue(),
       /** Daily: refresh supplier catalogues and costs, BitoCard's and resellers' own. */

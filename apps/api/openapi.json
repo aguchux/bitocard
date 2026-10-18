@@ -1695,6 +1695,7 @@
                     "startup_allowance": true,
                     "welcome_bonus": false,
                     "reserved_accounts": true,
+                    "custom_domains": false,
                     "own_integrations": false,
                     "customer_app_bottom_bar_desktop": false,
                     "customer_wallets": true,
@@ -2078,6 +2079,3056 @@
         "summary": "List reseller plans",
         "tags": [
           "Plans"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/stores/{store}/domains": {
+      "get": {
+        "description": "Each with its status, what to set at your DNS host while it is not connected, renewal and email settings.",
+        "operationId": "DomainsController_list",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The store’s domains, whether buying is open and the endings sold.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "buying",
+                    "max_domains"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreDomain"
+                      }
+                    },
+                    "buying": {
+                      "type": "object",
+                      "required": [
+                        "available",
+                        "tlds"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "available": {
+                          "type": "boolean",
+                          "description": "Whether domains can be bought here now (otherwise connect one you own)."
+                        },
+                        "tlds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "description": "An ending, for example `com`."
+                          }
+                        }
+                      }
+                    },
+                    "max_domains": {
+                      "type": "integer",
+                      "description": "The most domains a store can have."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "store_domain",
+                      "id": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f",
+                      "name": "adadigital.com",
+                      "url": "https://adadigital.com",
+                      "source": "purchased",
+                      "status": "active",
+                      "dns_mode": "vercel",
+                      "primary": true,
+                      "verified": true,
+                      "configured": true,
+                      "instructions": [],
+                      "nameservers": null,
+                      "expires_at": "2027-10-18T10:00:00.000Z",
+                      "auto_renew": true,
+                      "price": {
+                        "amount": 1350,
+                        "currency": "USD"
+                      },
+                      "renewal_error": null,
+                      "mail_provider": "google",
+                      "email_sending": {
+                        "status": "verified",
+                        "from": "orders@adadigital.com",
+                        "records": [
+                          {
+                            "type": "TXT",
+                            "name": "resend._domainkey",
+                            "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC",
+                            "priority": null,
+                            "status": "verified"
+                          }
+                        ]
+                      },
+                      "last_checked_at": "2026-10-18T10:15:00.000Z",
+                      "last_error": null,
+                      "created_at": "2026-10-18T10:00:00.000Z"
+                    },
+                    {
+                      "object": "store_domain",
+                      "id": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+                      "name": "shop.adadigital.ng",
+                      "url": "https://shop.adadigital.ng",
+                      "source": "connected",
+                      "status": "pending",
+                      "dns_mode": "external",
+                      "primary": false,
+                      "verified": true,
+                      "configured": false,
+                      "instructions": [
+                        {
+                          "type": "A",
+                          "name": "@",
+                          "value": "76.76.21.21"
+                        },
+                        {
+                          "type": "CNAME",
+                          "name": "www",
+                          "value": "cname.vercel-dns.com"
+                        }
+                      ],
+                      "nameservers": [
+                        "ns1.vercel-dns.com",
+                        "ns2.vercel-dns.com"
+                      ],
+                      "expires_at": null,
+                      "auto_renew": null,
+                      "price": null,
+                      "renewal_error": null,
+                      "mail_provider": null,
+                      "email_sending": null,
+                      "last_checked_at": "2026-10-18T10:15:00.000Z",
+                      "last_error": null,
+                      "created_at": "2026-10-18T10:00:00.000Z"
+                    }
+                  ],
+                  "buying": {
+                    "available": true,
+                    "tlds": [
+                      "com"
+                    ]
+                  },
+                  "max_domains": 5
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List a store’s domains",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Adds it to your store. Then set the records shown (or point the nameservers to BitoCard) at your DNS host; HTTPS is issued once it resolves.",
+        "operationId": "DomainsController_connect",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The domain, added to the store and waiting for your DNS.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDomain"
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+                  "name": "shop.adadigital.ng",
+                  "url": "https://shop.adadigital.ng",
+                  "source": "connected",
+                  "status": "pending",
+                  "dns_mode": "external",
+                  "primary": false,
+                  "verified": true,
+                  "configured": false,
+                  "instructions": [
+                    {
+                      "type": "A",
+                      "name": "@",
+                      "value": "76.76.21.21"
+                    },
+                    {
+                      "type": "CNAME",
+                      "name": "www",
+                      "value": "cname.vercel-dns.com"
+                    }
+                  ],
+                  "nameservers": [
+                    "ns1.vercel-dns.com",
+                    "ns2.vercel-dns.com"
+                  ],
+                  "expires_at": null,
+                  "auto_renew": null,
+                  "price": null,
+                  "renewal_error": null,
+                  "mail_provider": null,
+                  "email_sending": null,
+                  "last_checked_at": "2026-10-18T10:15:00.000Z",
+                  "last_error": null,
+                  "created_at": "2026-10-18T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Connect a domain you own",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/search": {
+      "get": {
+        "description": "The name in each ending BitoCard sells (only `.com` for now), with availability, the first year’s price and the renewal price in US dollars.",
+        "operationId": "DomainsController_search",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "The name to look for, with or without an ending (`yourstore` or `yourstore.com`).",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The name in each ending sold, with availability and prices.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DomainOffer"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "domain_offer",
+                      "domain": "adadigital.com",
+                      "available": true,
+                      "price": {
+                        "amount": 1350,
+                        "currency": "USD"
+                      },
+                      "renewal_price": {
+                        "amount": 1350,
+                        "currency": "USD"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Find a domain to buy",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/purchase": {
+      "post": {
+        "description": "Live only. The price (Vercel’s plus BitoCard’s disclosed margin) is held from your wallet in its currency at today’s rate and taken once the registrar confirms; a refused purchase returns it. The domain is registered in the contact’s name and connected to the store automatically.",
+        "operationId": "DomainsController_purchase",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The domain, `purchasing` until the registrar confirms (usually seconds), then connected to the store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDomain"
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f",
+                  "name": "adadigital.com",
+                  "url": "https://adadigital.com",
+                  "source": "purchased",
+                  "status": "pending",
+                  "dns_mode": "vercel",
+                  "primary": false,
+                  "verified": true,
+                  "configured": true,
+                  "instructions": [],
+                  "nameservers": null,
+                  "expires_at": "2027-10-18T10:00:00.000Z",
+                  "auto_renew": true,
+                  "price": {
+                    "amount": 1350,
+                    "currency": "USD"
+                  },
+                  "renewal_error": null,
+                  "mail_provider": null,
+                  "email_sending": null,
+                  "last_checked_at": "2026-10-18T10:15:00.000Z",
+                  "last_error": null,
+                  "created_at": "2026-10-18T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Buy a domain for the store",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/check": {
+      "post": {
+        "description": "Reads its DNS, ownership and nameservers again (also checked automatically).",
+        "operationId": "DomainsController_check",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The domain as it is now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDomain"
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f",
+                  "name": "adadigital.com",
+                  "url": "https://adadigital.com",
+                  "source": "purchased",
+                  "status": "active",
+                  "dns_mode": "vercel",
+                  "primary": true,
+                  "verified": true,
+                  "configured": true,
+                  "instructions": [],
+                  "nameservers": null,
+                  "expires_at": "2027-10-18T10:00:00.000Z",
+                  "auto_renew": true,
+                  "price": {
+                    "amount": 1350,
+                    "currency": "USD"
+                  },
+                  "renewal_error": null,
+                  "mail_provider": "google",
+                  "email_sending": {
+                    "status": "verified",
+                    "from": "orders@adadigital.com",
+                    "records": [
+                      {
+                        "type": "TXT",
+                        "name": "resend._domainkey",
+                        "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC",
+                        "priority": null,
+                        "status": "verified"
+                      }
+                    ]
+                  },
+                  "last_checked_at": "2026-10-18T10:15:00.000Z",
+                  "last_error": null,
+                  "created_at": "2026-10-18T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Check a domain now",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}": {
+      "patch": {
+        "description": "Make it the main address, or switch automatic renewal on or off.",
+        "operationId": "DomainsController_update",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated domain.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDomain"
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f",
+                  "name": "adadigital.com",
+                  "url": "https://adadigital.com",
+                  "source": "purchased",
+                  "status": "active",
+                  "dns_mode": "vercel",
+                  "primary": true,
+                  "verified": true,
+                  "configured": true,
+                  "instructions": [],
+                  "nameservers": null,
+                  "expires_at": "2027-10-18T10:00:00.000Z",
+                  "auto_renew": true,
+                  "price": {
+                    "amount": 1350,
+                    "currency": "USD"
+                  },
+                  "renewal_error": null,
+                  "mail_provider": "google",
+                  "email_sending": {
+                    "status": "verified",
+                    "from": "orders@adadigital.com",
+                    "records": [
+                      {
+                        "type": "TXT",
+                        "name": "resend._domainkey",
+                        "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC",
+                        "priority": null,
+                        "status": "verified"
+                      }
+                    ]
+                  },
+                  "last_checked_at": "2026-10-18T10:15:00.000Z",
+                  "last_error": null,
+                  "created_at": "2026-10-18T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a domain",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      },
+      "delete": {
+        "description": "Connected domains only. A domain bought here stays with the store until it expires or is transferred.",
+        "operationId": "DomainsController_remove",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The domain is disconnected from the store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "id",
+                    "deleted"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `store_domain`.",
+                      "const": "store_domain"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Domain ID.",
+                      "format": "uuid"
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always true."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+                  "deleted": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Disconnect a domain",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/renew": {
+      "post": {
+        "description": "Domains bought here: a year more, paid from your wallet.",
+        "operationId": "DomainsController_renew",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The domain, renewed for a year.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDomain"
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f",
+                  "name": "adadigital.com",
+                  "url": "https://adadigital.com",
+                  "source": "purchased",
+                  "status": "active",
+                  "dns_mode": "vercel",
+                  "primary": true,
+                  "verified": true,
+                  "configured": true,
+                  "instructions": [],
+                  "nameservers": null,
+                  "expires_at": "2028-10-18T10:00:00.000Z",
+                  "auto_renew": true,
+                  "price": {
+                    "amount": 1350,
+                    "currency": "USD"
+                  },
+                  "renewal_error": null,
+                  "mail_provider": "google",
+                  "email_sending": {
+                    "status": "verified",
+                    "from": "orders@adadigital.com",
+                    "records": [
+                      {
+                        "type": "TXT",
+                        "name": "resend._domainkey",
+                        "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC",
+                        "priority": null,
+                        "status": "verified"
+                      }
+                    ]
+                  },
+                  "last_checked_at": "2026-10-18T10:15:00.000Z",
+                  "last_error": null,
+                  "created_at": "2026-10-18T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Renew a domain now",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/transfer-code": {
+      "post": {
+        "description": "Owners only. Move a domain bought here to another registrar with it (not in its first 60 days).",
+        "operationId": "DomainsController_transferCode",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The code to give your new registrar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "domain",
+                    "code"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `domain_transfer_code`.",
+                      "const": "domain_transfer_code"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The domain."
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "The transfer (auth) code. Keep it private."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "domain_transfer_code",
+                  "domain": "adadigital.com",
+                  "code": "Xk7#pQ2m!vR9"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a domain’s transfer code",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": []
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/records": {
+      "get": {
+        "description": "Domains on BitoCard’s DNS. `protected` records keep your store and email working and cannot be changed here.",
+        "operationId": "DomainsController_records",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The domain’s DNS records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DnsRecord"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "dns_record",
+                      "id": "rec_3e1a7b9c2d4f",
+                      "name": "blog",
+                      "type": "CNAME",
+                      "value": "hosting.example.net",
+                      "ttl": 3600,
+                      "priority": null,
+                      "protected": false
+                    },
+                    {
+                      "object": "dns_record",
+                      "id": "rec_9d8c7b6a5f4e",
+                      "name": "",
+                      "type": "MX",
+                      "value": "smtp.google.com",
+                      "ttl": 3600,
+                      "priority": 1,
+                      "protected": true
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List DNS records",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "A, AAAA, CNAME, MX, TXT or CAA. The domain itself and www are your store’s and take no A, AAAA or CNAME.",
+        "operationId": "DomainsController_addRecord",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The record, added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DnsRecord"
+                },
+                "example": {
+                  "object": "dns_record",
+                  "id": "rec_3e1a7b9c2d4f",
+                  "name": "blog",
+                  "type": "CNAME",
+                  "value": "hosting.example.net",
+                  "ttl": 3600,
+                  "priority": null,
+                  "protected": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a DNS record",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/records/{record}": {
+      "delete": {
+        "operationId": "DomainsController_deleteRecord",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "record",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The record is deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "id",
+                    "deleted"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `dns_record`.",
+                      "const": "dns_record"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Record ID."
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always true."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "dns_record",
+                  "id": "rec_3e1a7b9c2d4f",
+                  "deleted": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a DNS record",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/dns-import": {
+      "get": {
+        "description": "Connected domains: the public records BitoCard found (email above all), and the nameservers to set afterwards.",
+        "operationId": "DomainsController_importPreview",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The public records found, and the nameservers to set once they are copied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "domain",
+                    "records",
+                    "nameservers"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `dns_import`.",
+                      "const": "dns_import"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The domain."
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "name",
+                          "value",
+                          "ttl",
+                          "priority"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "description": "Record type, for example `A`, `CNAME`, `MX` or `TXT`."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The name under the domain (`@` or empty for the domain itself)."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "The record’s value."
+                          },
+                          "ttl": {
+                            "type": "integer",
+                            "description": "Seconds."
+                          },
+                          "priority": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "MX priority."
+                          }
+                        }
+                      }
+                    },
+                    "nameservers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A nameserver."
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "dns_import",
+                  "domain": "shop.adadigital.ng",
+                  "records": [
+                    {
+                      "type": "MX",
+                      "name": "",
+                      "value": "mx.zoho.com",
+                      "ttl": 3600,
+                      "priority": 10
+                    },
+                    {
+                      "type": "TXT",
+                      "name": "",
+                      "value": "v=spf1 include:zohomail.com ~all",
+                      "ttl": 3600,
+                      "priority": null
+                    }
+                  ],
+                  "nameservers": [
+                    "ns1.vercel-dns.com",
+                    "ns2.vercel-dns.com"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Find records to copy before moving nameservers",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Copies the records you confirmed, so nothing breaks when you set the nameservers shown.",
+        "operationId": "DomainsController_importRecords",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRecordsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "How many records were copied, and the nameservers to set now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "domain",
+                    "created",
+                    "nameservers"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `dns_import`.",
+                      "const": "dns_import"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The domain."
+                    },
+                    "created": {
+                      "type": "integer",
+                      "description": "Records copied (ones already there are skipped)."
+                    },
+                    "nameservers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A nameserver."
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "dns_import",
+                  "domain": "shop.adadigital.ng",
+                  "created": 2,
+                  "nameservers": [
+                    "ns1.vercel-dns.com",
+                    "ns2.vercel-dns.com"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Copy records to BitoCard’s DNS",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/mail-provider": {
+      "put": {
+        "description": "Google Workspace, Microsoft 365 or Zoho Mail: on BitoCard’s DNS the records are written for you; otherwise they are listed to add at your DNS host.",
+        "operationId": "DomainsController_mailProvider",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailProviderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The records the provider needs, and whether BitoCard wrote them (BitoCard’s DNS) or you add them.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "domain",
+                    "provider",
+                    "provider_name",
+                    "written",
+                    "records"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `mail_setup`.",
+                      "const": "mail_setup"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The domain."
+                    },
+                    "provider": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "google",
+                        "microsoft",
+                        "zoho",
+                        null
+                      ],
+                      "description": "The provider now set, or null."
+                    },
+                    "provider_name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Its name."
+                    },
+                    "written": {
+                      "type": "boolean",
+                      "description": "Whether BitoCard wrote the records (domains on BitoCard’s DNS)."
+                    },
+                    "records": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "name",
+                          "value",
+                          "priority"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "description": "Record type, for example `A`, `CNAME`, `MX` or `TXT`."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "The name under the domain (`@` or empty for the domain itself)."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "The record’s value."
+                          },
+                          "priority": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "MX priority."
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "mail_setup",
+                  "domain": "adadigital.com",
+                  "provider": "google",
+                  "provider_name": "Google Workspace",
+                  "written": true,
+                  "records": [
+                    {
+                      "type": "MX",
+                      "name": "@",
+                      "value": "smtp.google.com",
+                      "priority": 1
+                    },
+                    {
+                      "type": "TXT",
+                      "name": "@",
+                      "value": "v=spf1 include:_spf.google.com ~all",
+                      "priority": null
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Point the domain’s email to a mailbox provider",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/stores/{store}/domains/{id}/email-sending": {
+      "post": {
+        "description": "Your store’s emails come from orders@<domain> once the domain is verified for sending (records written for you on BitoCard’s DNS).",
+        "operationId": "DomainsController_emailSending",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The domain, with sending set up (verified once its records are found).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreDomain"
+                },
+                "example": {
+                  "object": "store_domain",
+                  "id": "6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f",
+                  "name": "adadigital.com",
+                  "url": "https://adadigital.com",
+                  "source": "purchased",
+                  "status": "active",
+                  "dns_mode": "vercel",
+                  "primary": true,
+                  "verified": true,
+                  "configured": true,
+                  "instructions": [],
+                  "nameservers": null,
+                  "expires_at": "2027-10-18T10:00:00.000Z",
+                  "auto_renew": true,
+                  "price": {
+                    "amount": 1350,
+                    "currency": "USD"
+                  },
+                  "renewal_error": null,
+                  "mail_provider": "google",
+                  "email_sending": {
+                    "status": "verified",
+                    "from": "orders@adadigital.com",
+                    "records": [
+                      {
+                        "type": "TXT",
+                        "name": "resend._domainkey",
+                        "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC",
+                        "priority": null,
+                        "status": "verified"
+                      }
+                    ]
+                  },
+                  "last_checked_at": "2026-10-18T10:15:00.000Z",
+                  "last_error": null,
+                  "created_at": "2026-10-18T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send order emails from the domain",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/storefronts/domains/{domain}": {
+      "get": {
+        "operationId": "StorefrontDomainsController_storefront",
+        "parameters": [
+          {
+            "name": "domain",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The store served on the domain (active domains of published stores only).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "domain",
+                    "subdomain"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `storefront_domain`.",
+                      "const": "storefront_domain"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "description": "The domain."
+                    },
+                    "subdomain": {
+                      "type": "string",
+                      "description": "The store’s BitoCard subdomain."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "storefront_domain",
+                  "domain": "adadigital.com",
+                  "subdomain": "adadigital"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Look up the store a custom domain serves",
+        "tags": [
+          "Stores"
         ],
         "x-bitocard-auth": "public"
       }
@@ -3105,7 +6156,8 @@
                   "checkout_mode": "live",
                   "app": {
                     "desktop_nav": "rail"
-                  }
+                  },
+                  "domain": "adadigital.com"
                 }
               }
             }
@@ -28541,6 +31593,189 @@
           "value"
         ]
       },
+      "ContactDto": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string",
+            "description": "In international form, for example +2348031234567."
+          },
+          "address1": {
+            "type": "string"
+          },
+          "address2": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "description": "State, province or region."
+          },
+          "zip": {
+            "type": "string",
+            "description": "Postcode (use 00000 where there is none)."
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO country code.",
+            "example": "NG"
+          },
+          "company_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "email",
+          "phone",
+          "address1",
+          "city",
+          "state",
+          "zip",
+          "country"
+        ]
+      },
+      "PurchaseDomainDto": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "A domain you own, for example `adadigital.com` or `shop.adadigital.com`.",
+            "example": "adadigital.com"
+          },
+          "expected_price": {
+            "type": "number",
+            "description": "The price you were shown, in US cents. A changed price is refused (`price_changed`), never charged.",
+            "example": 1350
+          },
+          "contact": {
+            "description": "The domain’s registrant: you or your business. It is registered in this name.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContactDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "domain",
+          "expected_price",
+          "contact"
+        ]
+      },
+      "ConnectDomainDto": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "description": "A domain you own, for example `adadigital.com` or `shop.adadigital.com`.",
+            "example": "adadigital.com"
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      },
+      "UpdateDomainDto": {
+        "type": "object",
+        "properties": {
+          "primary": {
+            "type": "boolean",
+            "description": "Make it the store’s main address (links, payment returns and emails use it)."
+          },
+          "auto_renew": {
+            "type": "boolean",
+            "description": "Domains bought here: renew it automatically from your wallet before it expires."
+          }
+        }
+      },
+      "RecordDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name under the domain: empty or `@` for the domain itself, `blog` for blog.<domain>.",
+            "example": "blog"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CNAME",
+              "MX",
+              "TXT",
+              "CAA"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "example": "203.0.113.10"
+          },
+          "ttl": {
+            "type": "number",
+            "description": "Seconds, 60 to 86,400 (default 3,600)."
+          },
+          "priority": {
+            "type": "number",
+            "description": "MX records: their priority (lower is tried first)."
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "value"
+        ]
+      },
+      "ImportRecordsDto": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "description": "The records to copy to BitoCard’s DNS before you move the nameservers.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordDto"
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
+      },
+      "MailProviderDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "google",
+              "microsoft",
+              "zoho"
+            ],
+            "nullable": true,
+            "description": "Where your mailboxes are; null removes the records BitoCard wrote."
+          },
+          "verification": {
+            "type": "string",
+            "description": "The verification TXT value the provider gives you, for example `google-site-verification=…`."
+          }
+        },
+        "required": [
+          "provider"
+        ]
+      },
       "ResellerProfileDto": {
         "type": "object",
         "properties": {
@@ -32929,6 +36164,7 @@
               "startup_allowance",
               "welcome_bonus",
               "reserved_accounts",
+              "custom_domains",
               "own_integrations",
               "customer_app_bottom_bar_desktop",
               "customer_wallets",
@@ -32953,6 +36189,10 @@
               "reserved_accounts": {
                 "type": "boolean",
                 "description": "Live reserved bank accounts (top-ups by bank transfer), on top of the country offering them. In Nigeria the owner also needs a verified BVN."
+              },
+              "custom_domains": {
+                "type": "boolean",
+                "description": "Resellers buy or connect their own domains for their stores, manage DNS and email setup in SHQ (Settings > Integrations > Domains must be set up)."
               },
               "own_integrations": {
                 "type": "boolean",
@@ -37030,7 +40270,8 @@
           "country",
           "currency",
           "checkout_mode",
-          "app"
+          "app",
+          "domain"
         ],
         "additionalProperties": false,
         "properties": {
@@ -37115,6 +40356,13 @@
                 ]
               }
             }
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store’s own main domain while it works (for example `adadigital.com`), else null."
           }
         }
       },
@@ -39224,6 +42472,16 @@
             "type": "string",
             "description": "What it is about, for example `order.needs_review` or `security.password_changed`.",
             "enum": [
+              "domain.purchased",
+              "domain.purchase_failed",
+              "domain.active",
+              "domain.renewal_due",
+              "domain.renewed",
+              "domain.renewal_failed",
+              "domain.expired",
+              "domain.suspended",
+              "account.suspended",
+              "account.reinstated",
               "connection.approved",
               "connection.rejected",
               "connection.suspended",
@@ -39408,6 +42666,16 @@
             "type": "string",
             "description": "The notification type.",
             "enum": [
+              "domain.purchased",
+              "domain.purchase_failed",
+              "domain.active",
+              "domain.renewal_due",
+              "domain.renewed",
+              "domain.renewal_failed",
+              "domain.expired",
+              "domain.suspended",
+              "account.suspended",
+              "account.reinstated",
               "connection.approved",
               "connection.rejected",
               "connection.suspended",
@@ -39682,6 +42950,7 @@
               "didww",
               "zendit",
               "pawapay",
+              "africas_talking",
               "esim_access",
               "flutterwave",
               "stripe",
@@ -39830,6 +43099,7 @@
               "didww",
               "zendit",
               "pawapay",
+              "africas_talking",
               "esim_access",
               "flutterwave",
               "stripe",
@@ -41550,6 +44820,423 @@
           "needs_approval": {
             "type": "boolean",
             "description": "Whether BitoCard approves it before it is sent."
+          }
+        }
+      },
+      "StoreDomain": {
+        "type": "object",
+        "title": "StoreDomain",
+        "description": "One of your store’s domains: bought here or connected, with what to set while it is not connected yet.",
+        "required": [
+          "object",
+          "id",
+          "name",
+          "url",
+          "source",
+          "status",
+          "dns_mode",
+          "primary",
+          "verified",
+          "configured",
+          "instructions",
+          "nameservers",
+          "expires_at",
+          "auto_renew",
+          "price",
+          "renewal_error",
+          "mail_provider",
+          "email_sending",
+          "last_checked_at",
+          "last_error",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_domain`.",
+            "const": "store_domain"
+          },
+          "id": {
+            "type": "string",
+            "description": "Domain ID.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "The domain, in lower case."
+          },
+          "url": {
+            "type": "string",
+            "description": "Its address."
+          },
+          "source": {
+            "type": "string",
+            "description": "`purchased` (bought here) or `connected` (bought elsewhere).",
+            "enum": [
+              "purchased",
+              "connected"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`purchasing` (waiting for the registrar), `pending` (waiting for DNS or verification), `active` (your store is served on it), `failed` (the purchase failed; nothing was taken), `expired` or `suspended`.",
+            "enum": [
+              "purchasing",
+              "pending",
+              "active",
+              "failed",
+              "expired",
+              "suspended",
+              "removed"
+            ]
+          },
+          "dns_mode": {
+            "type": "string",
+            "description": "`vercel` (BitoCard’s DNS: edit records here) or `external` (your own DNS host).",
+            "enum": [
+              "vercel",
+              "external"
+            ]
+          },
+          "primary": {
+            "type": "boolean",
+            "description": "The store’s main address: links, payment returns and emails use it."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether ownership is verified."
+          },
+          "configured": {
+            "type": "boolean",
+            "description": "Whether its DNS points to your store and HTTPS can be issued."
+          },
+          "instructions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "type",
+                "name",
+                "value"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Record type, for example `A`, `CNAME`, `MX` or `TXT`."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The name under the domain (`@` or empty for the domain itself)."
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The record’s value."
+                }
+              }
+            },
+            "description": "What to set at your DNS host while it is not connected (empty once it works, or on BitoCard’s DNS)."
+          },
+          "nameservers": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "description": "A nameserver."
+            },
+            "description": "Point the domain to these nameservers to manage its DNS here (connected domains); null on BitoCard’s DNS."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When a domain bought here expires; null for connected ones.",
+            "format": "date-time"
+          },
+          "auto_renew": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Domains bought here: renewed automatically from your wallet 14 days before expiry. Null for connected ones."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "description": "What you paid for it, in US cents."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Always `USD`.",
+                    "const": "USD"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What you paid for its registration, in US cents; null for connected ones."
+          },
+          "renewal_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last renewal did not happen (`insufficient_funds`, `renewal_failed`, `renewal_pending` while it is being confirmed), else null."
+          },
+          "mail_provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "google",
+              "microsoft",
+              "zoho",
+              null
+            ],
+            "description": "Where its email goes (Google Workspace, Microsoft 365 or Zoho Mail), else null."
+          },
+          "email_sending": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "status",
+                  "from",
+                  "records"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "description": "Resend’s status: `not_started`, `pending`, `verified`, `failed` or `temporary_failure`. Order emails come from `from` once verified."
+                  },
+                  "from": {
+                    "type": "string",
+                    "description": "The address order emails come from."
+                  },
+                  "records": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "name",
+                        "value",
+                        "priority",
+                        "status"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "description": "Record type, for example `A`, `CNAME`, `MX` or `TXT`."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "The name under the domain (`@` or empty for the domain itself)."
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "The record’s value."
+                        },
+                        "priority": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "MX priority."
+                        },
+                        "status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Whether the record was found."
+                        }
+                      }
+                    },
+                    "description": "The records sending needs (written for you on BitoCard’s DNS)."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sending order emails from the domain, once asked for; else null."
+          },
+          "last_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When BitoCard last checked it.",
+            "format": "date-time"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What went wrong at the last check or purchase step, else null."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was added.",
+            "format": "date-time"
+          }
+        }
+      },
+      "DomainOffer": {
+        "type": "object",
+        "title": "DomainOffer",
+        "required": [
+          "object",
+          "domain",
+          "available",
+          "price",
+          "renewal_price"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `domain_offer`.",
+            "const": "domain_offer"
+          },
+          "domain": {
+            "type": "string",
+            "description": "The domain."
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether it can be bought."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "description": "The first year, in US cents."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Always `USD`.",
+                    "const": "USD"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first year’s price (Vercel’s plus BitoCard’s margin), in US cents; null when not available."
+          },
+          "renewal_price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "amount",
+                  "currency"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "description": "Each renewal, in US cents."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Always `USD`.",
+                    "const": "USD"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Each year after, in US cents; null when not available."
+          }
+        }
+      },
+      "DnsRecord": {
+        "type": "object",
+        "title": "DnsRecord",
+        "required": [
+          "object",
+          "id",
+          "name",
+          "type",
+          "value",
+          "ttl",
+          "priority",
+          "protected"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `dns_record`.",
+            "const": "dns_record"
+          },
+          "id": {
+            "type": "string",
+            "description": "Record ID."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name under the domain (empty for the domain itself)."
+          },
+          "type": {
+            "type": "string",
+            "description": "Record type."
+          },
+          "value": {
+            "type": "string",
+            "description": "The record’s value."
+          },
+          "ttl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Seconds."
+          },
+          "priority": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "MX priority."
+          },
+          "protected": {
+            "type": "boolean",
+            "description": "Kept by BitoCard for your store or email: not changed or deleted here."
           }
         }
       }

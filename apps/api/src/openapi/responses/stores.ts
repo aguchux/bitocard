@@ -72,6 +72,7 @@ const storefront = objectSchema(
     currency: nullableStr('ISO 4217 currency the store sells in.'),
     checkout_mode: oneOf('`live`, or `test` while the store’s checkout is the sandbox (show shoppers that orders are not real).', ['test', 'live']),
     app: shape({ desktop_nav: oneOf('The customer account app’s menu on desktop: the store’s choice, else BitoCard’s default.', ['rail', 'bottom']) }, 'How the customer account app looks.'),
+    domain: nullableStr('The store’s own main domain while it works (for example `adadigital.com`), else null.'),
   },
   'What a published store needs to render: its name, branding, country, currency and checkout mode.',
 );
@@ -472,7 +473,7 @@ export const storesDocs: DocsArea = {
       status: 200,
       description: 'The published store. Drafts, suspended stores and unknown addresses are not found.',
       schema: 'Storefront',
-      example: { object: 'storefront', name: storeExample.name, subdomain: storeExample.subdomain, branding: storeExample.branding, country: 'NG', currency: 'NGN', checkout_mode: 'live', app: { desktop_nav: 'rail' } },
+      example: { object: 'storefront', name: storeExample.name, subdomain: storeExample.subdomain, branding: storeExample.branding, country: 'NG', currency: 'NGN', checkout_mode: 'live', app: { desktop_nav: 'rail' }, domain: 'adadigital.com' },
     },
     'GET /v1/store/home': { status: 200, description: 'The home page. Until a layout is published, the default layout (`published: false`).', schema: 'StoreHome', example: homeExample },
     'GET /v1/store/products': {

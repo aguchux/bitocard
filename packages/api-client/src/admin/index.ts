@@ -441,3 +441,4 @@ export * from './crypto';
 export * from './kyc';
 export * from './top-ups';
 export * from './exchange';
+export * from './domains';

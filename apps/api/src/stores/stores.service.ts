@@ -210,6 +210,7 @@ export class StoresService {
       currency: store.reseller.countryRef?.currency ?? null,
       checkout_mode: store.checkoutMode,
       app: { desktop_nav: await desktopNavFor(this.settings, store) },
+      domain: (await this.prisma.storeDomain.findFirst({ where: { storeId: store.id, status: 'active', primary: true }, select: { name: true } }))?.name ?? null,
     };
   }
 

@@ -4,7 +4,7 @@ import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { appUrl } from "@bitocard/ui/site";
 import { apiUrl } from "./api";
-import { storeSubdomain } from "./store";
+import { customDomain, storeSubdomain } from "./store";
 
 /**
  * Store customers. The API gives a session token at sign-in; this server keeps it in its own first-party cookie and
@@ -98,6 +98,9 @@ export async function dropSession() {
  */
 export async function siteOrigin() {
   const base = new URL(appUrl("storefront"));
+  // On a reseller's own domain (confirmed by the API, never taken from the header alone) the shopper stays on it.
+  const domain = await customDomain();
+  if (domain) return `https://${domain}`;
   const store = await storeSubdomain();
   return store ? `${base.protocol}//${store}.${base.host}` : base.origin;
 }

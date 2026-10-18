@@ -31,6 +31,7 @@ import {
   type LucideIcon,
   UserCog,
   Users,
+  Globe,
   Wallet,
   Webhook,
 } from "lucide-react";
@@ -105,6 +106,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     items: [
       { label: "Your store", href: "/store", icon: Store },
       { label: "Customers", href: "/store/customers", icon: Users },
+      { label: "Domains", href: "/store/domains", icon: Globe },
     ],
   },
   integrations: { title: "Integrations", items: [{ label: "Your integrations", href: "/integrations", icon: Plug }] },

@@ -9,6 +9,7 @@ export * from './coins';
 export * from './payouts';
 export * from './developers';
 export * from './store';
+export * from './domains';
 export * from './team';
 export * from './identity';
 export * from './integrations';

@@ -10,7 +10,8 @@ import { OrdersModule } from '../orders/orders.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { PayoutsModule } from '../payouts/payouts.module.js';
 import { ResellerIntegrationsModule } from '../reseller-integrations/reseller-integrations.module.js';
+import { DomainsModule } from '../domains/domains.module.js';
 import { CronController } from './cron.controller.js';
 
-@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule], controllers: [CronController] })
+@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule], controllers: [CronController] })
 export class CronModule {}

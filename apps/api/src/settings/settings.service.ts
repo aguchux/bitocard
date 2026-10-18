@@ -19,6 +19,10 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: 'Live reserved bank accounts (top-ups by bank transfer), on top of the country offering them. In Nigeria the owner also needs a verified BVN.',
   },
+  custom_domains: {
+    scopes: ['global', 'country', 'reseller'],
+    description: 'Resellers buy or connect their own domains for their stores, manage DNS and email setup in SHQ (Settings > Integrations > Domains must be set up).',
+  },
   own_integrations: {
     scopes: ['global', 'country', 'reseller'],
     description: "Resellers connect their own supplier and payment gateway accounts (on plans with own integrations, for integrations offered in their country).",

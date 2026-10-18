@@ -128,6 +128,7 @@ export const tagTypes = [
   'Payout',
   'Subscription',
   'Store',
+  'Domain',
   'ApiKey',
   'WebhookEndpoint',
   'Event',

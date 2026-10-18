@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service.js';
+import { domainSender } from '../domains/sender.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 
-export type EmailMessage = { to: string; subject: string; text: string; html: string };
+/** `from` is set only on captured messages (the outbox), to show which sender was chosen. */
+export type EmailMessage = { to: string; subject: string; text: string; html: string; from?: string };
 
 /** One email provider. Adapters translate BitoCard's message into the provider's API. */
 export interface EmailProvider {
@@ -64,7 +67,10 @@ export class EmailService {
   /** Messages captured when no provider is configured. */
   readonly outbox: EmailMessage[] = [];
 
-  constructor(integrations: IntegrationsService) {
+  constructor(
+    integrations: IntegrationsService,
+    private readonly prisma: PrismaService,
+  ) {
     this.configured = integrations.derive(config => ({
       from: config.EMAIL_FROM,
       providers: ([
@@ -82,16 +88,21 @@ export class EmailService {
     return this.configured().from;
   }
 
-  /** Returns the provider that sent it ('outbox' when none is configured). Throws only if every provider fails. */
-  async send(message: EmailMessage): Promise<string> {
+  /**
+   * Returns the provider that sent it ('outbox' when none is configured). Throws only if every provider fails. `store`
+   * sends a reseller store's email from their own domain once it is verified for sending (through Resend, where the
+   * domain is verified; the fallback provider uses BitoCard's sender).
+   */
+  async send(message: EmailMessage, store?: { resellerId: string; name: string }): Promise<string> {
+    const own = store ? await domainSender(this.prisma, store.resellerId, store.name).catch(() => null) : null;
     if (this.providers.length === 0) {
-      this.outbox.push(message);
+      this.outbox.push(own ? { ...message, from: own } : message);
       this.logger.log({ to: message.to, subject: message.subject }, 'Email captured (no provider configured)');
       return 'outbox';
     }
     for (const provider of this.providers) {
       try {
-        await provider.send(this.from, message);
+        await provider.send(own && provider.name === 'resend' ? own : this.from, message);
         return provider.name;
       } catch (error) {
         this.logger.warn({ err: error, provider: provider.name }, 'Email provider failed; trying the next one');

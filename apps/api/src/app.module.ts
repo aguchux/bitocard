@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { CheckoutModule } from './checkout/checkout.module.js';
 import { CountriesModule } from './countries/countries.module.js';
 import { PlansModule } from './plans/plans.module.js';
+import { DomainsModule } from './domains/domains.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StoresModule } from './stores/stores.module.js';
 import { ApiKeysModule } from './api-keys/api-keys.module.js';
@@ -71,6 +72,7 @@ export class AppModule {
         CountriesModule,
         SettingsModule,
         PlansModule,
+        DomainsModule,
         StoresModule,
         HealthModule,
         AuthModule,

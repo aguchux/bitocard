@@ -1,3 +1,4 @@
+import { VercelDomains } from '../domains/vercel.js';
 import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Module, Param, Post, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsObject, IsString, Matches } from 'class-validator';
@@ -55,6 +56,7 @@ export class IntegrationsAdminService {
     const group = integrationGroups.find(item => item.id === groupId);
     if (!group) throw notFound();
     if (group.section === 'blockchain') return this.testBlockchain(adminId, group);
+    if (group.id === 'domains') return this.testDomains(adminId);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -81,6 +83,29 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
     return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Domains: the storefront project read with the token and team (proves all three). */
+  private async testDomains(adminId: string) {
+    await this.integrations.refresh(true);
+    const config = this.integrations.config;
+    const vercel = new VercelDomains({ token: config.VERCEL_API_TOKEN, teamId: config.VERCEL_TEAM_ID, project: config.VERCEL_STOREFRONT_PROJECT, baseUrl: config.VERCEL_API_URL });
+    let ok = false;
+    let message: string | null;
+    if (!vercel.configured()) {
+      message = 'Set the API token and the storefront project first.';
+    } else {
+      try {
+        const name = await vercel.check();
+        ok = true;
+        message = `Connected to the ${name} project.`;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.replace(/^vercel: /, '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `Vercel refused these settings (${detail}).` : `Could not reach Vercel (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'domains', before: null, after: { environment: 'live', ok } });
+    return { object: 'integration_test' as const, integration: 'domains', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** A blockchain provider (the latest block on each chain it is set up for) or the wallet keys (their first addresses). */

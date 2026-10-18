@@ -46,6 +46,14 @@ type CustomerType = {
  */
 export const notificationTypes = {
   // Reseller accounts ------------------------------------------------------------------------------------------------
+  'domain.purchased': { realm: 'reseller', roles: ['admin'], severity: 'success', label: 'Domain bought' },
+  'domain.purchase_failed': { realm: 'reseller', roles: ['admin'], severity: 'warning', label: 'Domain purchase failed' },
+  'domain.active': { realm: 'reseller', roles: ['admin'], severity: 'success', label: 'Store live on its domain' },
+  'domain.renewal_due': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Domain renewal due' },
+  'domain.renewed': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'success', label: 'Domain renewed' },
+  'domain.renewal_failed': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'critical', label: 'Domain renewal failed' },
+  'domain.expired': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'critical', label: 'Domain expired' },
+  'domain.suspended': { realm: 'reseller', roles: ['admin'], severity: 'critical', label: 'Domain suspended' },
   'account.suspended': { realm: 'reseller', roles: ['admin', 'developer', 'finance', 'support'], severity: 'critical', label: 'Account suspended' },
   'account.reinstated': { realm: 'reseller', roles: ['admin', 'developer', 'finance', 'support'], severity: 'success', label: 'Account no longer suspended' },
   'connection.approved': { realm: 'reseller', roles: ['admin'], severity: 'success', label: 'Own integration approved' },
@@ -91,6 +99,7 @@ export const notificationTypes = {
 
   // BitoCard admins --------------------------------------------------------------------------------------------------
   'admin.reseller.signed_up': { realm: 'admin', roles: ['operations', 'support'], severity: 'info', label: 'New reseller' },
+  'admin.domain.renewal_unclear': { realm: 'admin', roles: ['operations', 'finance'], severity: 'warning', label: 'Domain renewal unconfirmed' },
   'admin.connection.review': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Own integration to review' },
   'admin.verification.review': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Identity check to review' },
   'admin.kyc.submitted': { realm: 'admin', roles: ['operations', 'support'], severity: 'info', label: 'BitoCard Verify check to review' },

@@ -507,7 +507,7 @@ export class KycService {
     if (!to) return;
     const brand = (await this.brand(c)).name;
     await this.email
-      .send(verifyOutcomeEmail(to, { brand, outcome, reason: reason ? (declineReasons[reason as DeclineReason] ?? null) : null, note, link: this.continueUrl(c) }))
+      .send(verifyOutcomeEmail(to, { brand, outcome, reason: reason ? (declineReasons[reason as DeclineReason] ?? null) : null, note, link: this.continueUrl(c) }), c.storeId ? { resellerId: c.resellerId, name: brand } : undefined)
       .catch(error => this.logger.warn({ err: error, caseId: c.id }, 'Could not email the outcome'));
   }
 

@@ -970,3 +970,138 @@ export async function fakeAfricasTalking() {
     },
   };
 }
+
+
+/**
+ * Vercel (registrar, project domains, domain config and DNS), Resend's domains API and DNS over HTTPS, on one address.
+ * `state.taken` holds names already registered elsewhere; `state.configured` connected names whose DNS points to the
+ * store; `state.owned` names on Vercel's DNS (bought, or nameservers moved).
+ */
+export async function fakeDomains() {
+  const state = {
+    taken: new Set(['taken.com']),
+    owned: {},
+    projectDomains: {},
+    configured: new Set(),
+    unverified: new Set(),
+    records: {},
+    orders: {},
+    orderStatus: 'completed',
+    buyReply: 'ok',
+    renewReply: 'ok',
+    renewals: 0,
+    sending: {},
+    sendingStatus: 'pending',
+    emails: [],
+    publicDns: {},
+    next: 1,
+  };
+  const intended = ['ns1.vercel-dns.com', 'ns2.vercel-dns.com'];
+  const notFound = { status: 404, body: { error: { code: 'not_found', message: 'Not found' } } };
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (path === '/dns-query') return { body: { Status: 0, Answer: state.publicDns[`${query.get('name')}|${query.get('type')}`] ?? [] } };
+    if (path.startsWith('/domains') || path === '/emails') {
+      if (headers.authorization !== 'Bearer resend-key') return { status: 401, body: { message: 'Invalid API key' } };
+      if (method === 'POST' && path === '/emails') {
+        state.emails.push(body);
+        return { body: { id: `em_${state.next++}` } };
+      }
+      if (method === 'POST' && path === '/domains') {
+        const id = `rd_${state.next++}`;
+        state.sending[id] = {
+          id,
+          name: body.name,
+          records: [
+            { record: 'DKIM', name: 'resend._domainkey', type: 'TXT', value: 'p=MIGfMA0GCSqGSIb3DQEB', ttl: 'Auto', status: 'not_started' },
+            { record: 'SPF', name: 'send', type: 'MX', value: 'feedback-smtp.us-east-1.amazonses.com', priority: 10, ttl: 'Auto', status: 'not_started' },
+            { record: 'SPF', name: 'send', type: 'TXT', value: 'v=spf1 include:amazonses.com ~all', ttl: 'Auto', status: 'not_started' },
+          ],
+        };
+        return { status: 201, body: { ...state.sending[id], status: 'not_started' } };
+      }
+      const one = /^\/domains\/([\w-]+)(\/verify)?$/.exec(path);
+      if (one && state.sending[one[1]]) return one[2] ? { body: { object: 'domain', id: one[1] } } : { body: { ...state.sending[one[1]], status: state.sendingStatus } };
+      return { status: 404, body: { message: 'Not found' } };
+    }
+    if (headers.authorization !== 'Bearer vercel-token') return { status: 403, body: { error: { code: 'forbidden', message: 'Not authorized' } } };
+    if (query.get('teamId') !== 'team_bitocard') return { status: 403, body: { error: { code: 'forbidden', message: 'Wrong team' } } };
+    if (method === 'GET' && path === '/v9/projects/bitocard-storefront') return { body: { id: 'prj_store', name: 'bitocard-storefront' } };
+    let match;
+    if ((match = /^\/v1\/registrar\/domains\/([^/]+)\/availability$/.exec(path))) return { body: { available: !state.taken.has(match[1]) && !state.owned[match[1]] } };
+    if ((match = /^\/v1\/registrar\/domains\/([^/]+)\/price$/.exec(path))) return { body: { years: 1, purchasePrice: 11.25, renewalPrice: 12.5, transferPrice: 11.25 } };
+    if (method === 'POST' && (match = /^\/v1\/registrar\/domains\/([^/]+)\/buy$/.exec(path))) {
+      if (state.buyReply === 'refuse') return { status: 400, body: { error: { code: 'domain_not_available', message: 'Domain is not available' } } };
+      if (Math.abs(body.expectedPrice - 11.25) > 0.001 || body.autoRenew !== false) return { status: 400, body: { error: { code: 'price_mismatch', message: 'Expected price does not match' } } };
+      const orderId = `ord_${state.next++}`;
+      state.orders[orderId] = { domain: match[1], contact: body.contactInformation };
+      state.owned[match[1]] = { expiresAt: Date.now() + 365 * 24 * 3600_000 };
+      return { body: { orderId } };
+    }
+    if ((match = /^\/v1\/registrar\/orders\/([^/]+)$/.exec(path))) {
+      const order = state.orders[match[1]];
+      return order ? { body: { orderId: match[1], status: state.orderStatus, domains: [{ domainName: order.domain, status: state.orderStatus }] } } : notFound;
+    }
+    if (method === 'POST' && (match = /^\/v1\/registrar\/domains\/([^/]+)\/renew$/.exec(path))) {
+      if (state.renewReply === 'refuse') return { status: 400, body: { error: { code: 'renewal_failed', message: 'Cannot renew' } } };
+      if (state.renewReply === 'timeout') return { status: 504, body: { error: { code: 'timeout', message: 'Gateway timeout' } } };
+      state.renewals += 1;
+      state.owned[match[1]].expiresAt += 365 * 24 * 3600_000;
+      return { body: { orderId: `ord_${state.next++}` } };
+    }
+    if (/^\/v1\/registrar\/domains\/([^/]+)\/auth-code$/.test(path)) return { body: { authCode: 'AUTH-7Kp2' } };
+    if (method === 'POST' && path === '/v10/projects/bitocard-storefront/domains') {
+      state.projectDomains[body.name] = { name: body.name, verified: !state.unverified.has(body.name) };
+      return { body: { ...state.projectDomains[body.name], verification: [] } };
+    }
+    if ((match = /^\/v9\/projects\/bitocard-storefront\/domains\/([^/]+?)(\/verify)?$/.exec(path))) {
+      const name = decodeURIComponent(match[1]);
+      if (method === 'DELETE') {
+        delete state.projectDomains[name];
+        return { body: {} };
+      }
+      const found = state.projectDomains[name];
+      if (!found) return notFound;
+      found.verified = !state.unverified.has(name);
+      return { body: { ...found, verification: found.verified ? [] : [{ type: 'TXT', domain: `_vercel.${name}`, value: 'vc-domain-verify=abc', reason: 'pending_domain_verification' }] } };
+    }
+    if ((match = /^\/v6\/domains\/([^/]+)\/config$/.exec(path))) {
+      const name = decodeURIComponent(match[1]);
+      return { body: { misconfigured: !(state.configured.has(name) || state.owned[name]), configuredBy: state.configured.has(name) ? 'A' : null, acceptedChallenges: [], recommendedIPv4: [{ rank: 1, value: ['76.76.21.21'] }], recommendedCNAME: [{ rank: 1, value: 'cname.vercel-dns.com.' }] } };
+    }
+    if ((match = /^\/v5\/domains\/([^/]+)$/.exec(path))) {
+      const name = decodeURIComponent(match[1]);
+      const owned = state.owned[name];
+      if (!owned && !state.projectDomains[name]) return notFound;
+      return { body: { domain: { name, serviceType: owned ? 'zeit.world' : 'external', nameservers: owned ? intended : ['ns1.registrar.example'], intendedNameservers: intended, expiresAt: owned?.expiresAt ?? null } } };
+    }
+    if ((match = /^\/v4\/domains\/([^/]+)\/records$/.exec(path))) return { body: { records: state.records[decodeURIComponent(match[1])] ?? [] } };
+    if (method === 'POST' && (match = /^\/v2\/domains\/([^/]+)\/records$/.exec(path))) {
+      const name = decodeURIComponent(match[1]);
+      const id = `rec_${state.next++}`;
+      (state.records[name] ??= []).push({ id, name: body.name, type: body.type, value: body.value, ttl: body.ttl, ...(body.mxPriority !== undefined ? { mxPriority: body.mxPriority } : {}), ...(body.comment ? { comment: body.comment } : {}) });
+      return { body: { uid: id } };
+    }
+    if (method === 'DELETE' && (match = /^\/v2\/domains\/([^/]+)\/records\/([^/]+)$/.exec(path))) {
+      const name = decodeURIComponent(match[1]);
+      state.records[name] = (state.records[name] ?? []).filter(record => record.id !== match[2]);
+      return { body: {} };
+    }
+    return { status: 404, body: { error: { code: 'not_found', message: `Fake Vercel has no ${method} ${path}` } } };
+  });
+  return {
+    ...service,
+    state,
+    env: {
+      VERCEL_API_TOKEN: 'vercel-token',
+      VERCEL_TEAM_ID: 'team_bitocard',
+      VERCEL_STOREFRONT_PROJECT: 'bitocard-storefront',
+      VERCEL_API_URL: service.url,
+      DOMAIN_MARGIN_PERCENT: '20',
+      DOMAIN_DNS_LOOKUP_URL: `${service.url}/dns-query`,
+      RESEND_API_KEY: 'resend-key',
+      RESEND_API_URL: service.url,
+    },
+  };
+}

@@ -1,8 +1,8 @@
 import { createHmac } from "node:crypto";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setRequest } from "./request";
 import { safeNext, shopperHeader, siteOrigin } from "@/lib/customer";
-import { storeSubdomain } from "@/lib/store";
+import { customDomain, storeSubdomain } from "@/lib/store";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -16,7 +16,35 @@ describe("safeNext", () => {
   });
 });
 
+/** The API's answer for reseller domains: only adadigital.com is a store's (active, published). */
+const domainLookups: string[] = [];
+beforeEach(() => {
+  domainLookups.length = 0;
+  vi.stubGlobal("fetch", async (url: string) => {
+    const match = /\/v1\/storefronts\/domains\/([^?]+)/.exec(url);
+    if (match) domainLookups.push(decodeURIComponent(match[1]));
+    if (match && decodeURIComponent(match[1]) === "adadigital.com") return new Response(JSON.stringify({ object: "storefront_domain", domain: "adadigital.com", subdomain: "acme" }), { status: 200 });
+    return new Response(JSON.stringify({ error: { code: "resource_missing" } }), { status: 404 });
+  });
+});
+afterEach(() => vi.unstubAllGlobals());
+
 describe("storeSubdomain", () => {
+  test("a reseller's own domain serves their store once the API confirms it; BitoCard's hosts are never looked up", async () => {
+    setRequest({ host: "adadigital.com" });
+    expect(await storeSubdomain()).toBe("acme");
+    expect(await customDomain()).toBe("adadigital.com");
+    expect(await siteOrigin()).toBe("https://adadigital.com");
+    setRequest({ host: "unknown-shop.com" });
+    expect(await storeSubdomain()).toBeNull();
+    domainLookups.length = 0;
+    for (const host of ["bitocard.com", "acme.bitocard.com", "acme.localhost:3000", "bitocard-git-main.vercel.app", "not a host"]) {
+      setRequest({ host });
+      await storeSubdomain();
+    }
+    expect(domainLookups).toEqual([]);
+  });
+
   test("names a reseller's store from its host; bitocard.com and www are BitoCard's own", async () => {
     setRequest({ host: "acme.bitocard.com" });
     expect(await storeSubdomain()).toBe("acme");

@@ -107,6 +107,13 @@ const integrationKeyList = [
   'PAWAPAY_SANDBOX',
   'PAWAPAY_PAYOUT_FEE_PERCENT',
   'PAWAPAY_CALLBACK_TOKEN',
+  'VERCEL_API_TOKEN',
+  'VERCEL_TEAM_ID',
+  'VERCEL_STOREFRONT_PROJECT',
+  'VERCEL_API_URL',
+  'DOMAIN_MARGIN_PERCENT',
+  'DOMAIN_TLDS',
+  'DOMAIN_DNS_LOOKUP_URL',
   'AFRICAS_TALKING_USERNAME',
   'AFRICAS_TALKING_API_KEY',
   'AFRICAS_TALKING_SANDBOX',
@@ -444,6 +451,24 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
         required: false,
         help: 'Choose a long random value (at least 16 characters). In the eSIM Access console (Developer > Webhook), set https://api.bitocard.com/v1/webhooks/esim-access?token= followed by this value: eSIMs are then delivered as soon as they are ready. Without it, orders are still checked on schedule.',
       }),
+    ],
+  },
+  {
+    id: 'domains',
+    name: 'Domains (Vercel)',
+    description:
+      'Resellers buy .com domains for their stores (Vercel’s registrar, paid from their wallet at Vercel’s price plus the margin below) or connect domains they own; the storefront serves each store on its domain with HTTPS, and domains on Vercel’s DNS are edited in SHQ. Also switch on Custom domains in Feature switches.',
+    fields: [
+      secret('VERCEL_API_TOKEN', 'API token', { help: 'Vercel > Account settings > Tokens: a token scoped to the team that owns the storefront project. It buys and renews domains on the team’s card.' }),
+      field('VERCEL_TEAM_ID', 'Team ID', { required: false, help: 'Vercel > Team settings > General: the Team ID (team_…). Leave empty for a personal account.' }),
+      field('VERCEL_STOREFRONT_PROJECT', 'Storefront project', { required: true, help: 'The storefront’s Vercel project ID (prj_…) or name: reseller domains are added to it.' }),
+      field('DOMAIN_MARGIN_PERCENT', 'Margin (%)', {
+        required: true,
+        help: 'BitoCard’s margin on domain registrations and renewals, in percent of Vercel’s price, for example 20 (0 for none). Shown to resellers in the price. Until it is set, domains can only be connected, not bought.',
+      }),
+      field('DOMAIN_TLDS', 'Endings sold', { required: false, help: 'Comma separated, for example com. Vercel cannot register country endings such as .ng or .co.uk (resellers can still connect those).' }),
+      field('VERCEL_API_URL', 'API address', { kind: 'url', required: false, help: 'Default: https://api.vercel.com' }),
+      field('DOMAIN_DNS_LOOKUP_URL', 'DNS lookup address', { kind: 'url', required: false, help: 'DNS over HTTPS (JSON) used to read a domain’s records before its nameservers move. Default: https://cloudflare-dns.com/dns-query' }),
     ],
   },
   {

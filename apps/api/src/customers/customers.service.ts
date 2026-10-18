@@ -205,7 +205,7 @@ export class CustomersService {
       this.prisma.customerCode.create({ data: { customerId: customer.id, purpose, codeHash: digest(customer.id, purpose, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
     ]);
     try {
-      await this.email.send(customerCodeEmail(customer.email, { store: store.name, code, purpose }));
+      await this.email.send(customerCodeEmail(customer.email, { store: store.name, code, purpose }), { resellerId: store.resellerId, name: store.name });
     } catch (error) {
       // Not sent: cancel it so another can be asked for at once.
       await this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } });

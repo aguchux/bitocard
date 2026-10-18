@@ -211,7 +211,7 @@ export class OrderAccessService {
       return tx.orderAccessCode.create({ data: { orderId: access.orderId, codeHash: this.codeDigest(access.orderId, code), expiresAt: new Date(now + codeLifetimeMs) } });
     });
     try {
-      await this.email.send(orderAccessCodeEmail(email, { store: this.presentStore(access.order).name, product: access.order.product.name, code }));
+      await this.email.send(orderAccessCodeEmail(email, { store: this.presentStore(access.order).name, product: access.order.product.name, code }), { resellerId: access.order.resellerId, name: this.presentStore(access.order).name });
     } catch (error) {
       // Not sent: cancel it so another can be asked for at once.
       await this.prisma.orderAccessCode.updateMany({ where: { id: created.id, consumedAt: null }, data: { consumedAt: new Date() } });
@@ -262,7 +262,7 @@ export class OrderAccessService {
       const to = access.order.customerId
         ? (await this.prisma.customer.findUnique({ where: { id: access.order.customerId }, select: { email: true } }))?.email
         : this.orderEmail(access.order);
-      if (to) await this.email.send(orderRevealedEmail(to, { store: this.presentStore(access.order).name, product: access.order.product.name, at: now }));
+      if (to) await this.email.send(orderRevealedEmail(to, { store: this.presentStore(access.order).name, product: access.order.product.name, at: now }), { resellerId: access.order.resellerId, name: this.presentStore(access.order).name });
     } catch (error) {
       this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', orderId: access.orderId }, 'Could not send the reveal alert');
     }

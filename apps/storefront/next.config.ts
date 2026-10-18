@@ -12,6 +12,17 @@ export default createNextConfig({
       { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/documents/:doc`, permanent: true },
       // Resellers' stores (<subdomain>.bitocard.com) are their own brand: BitoCard's reseller page lives on bitocard.com only.
       { source: "/resellers", has: [{ type: "host", value: "(?!www\\.)[a-z0-9-]+\\.bitocard\\.com" }], destination: "https://bitocard.com/resellers", permanent: false },
+      // Resellers' own domains too: any host that is not BitoCard's (bitocard.com, local development, Vercel previews).
+      {
+        source: "/resellers",
+        missing: [
+          { type: "host", value: "(?:[a-z0-9-]+\\.)?bitocard\\.com" },
+          { type: "host", value: "(?:[a-z0-9-]+\\.)?localhost(?::\\d+)?" },
+          { type: "host", value: ".*\\.vercel\\.app" },
+        ],
+        destination: "https://bitocard.com/resellers",
+        permanent: false,
+      },
     ];
   },
 });
