@@ -66,7 +66,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   vonage: [signUp('https://dashboard.nexmo.com/sign-up'), keys('https://dashboard.nexmo.com/settings', 'API key and secret'), docs('https://developer.vonage.com/')],
   twilio: [signUp('https://www.twilio.com/try-twilio'), keys('https://console.twilio.com/', 'Account SID and auth token'), docs('https://www.twilio.com/docs')],
   plivo: [signUp('https://console.plivo.com/accounts/register/'), keys('https://console.plivo.com/dashboard/', 'Auth ID and token'), docs('https://www.plivo.com/docs/')],
-  africas_talking: [signUp('https://account.africastalking.com/auth/register'), keys('https://account.africastalking.com/'), docs('https://developers.africastalking.com/')],
+  africas_talking: [signUp('https://account.africastalking.com/auth/register'), keys('https://account.africastalking.com/apps', 'Apps and API keys'), docs('https://developers.africastalking.com/docs/airtime/sending'), { label: 'Mobile data docs', url: 'https://developers.africastalking.com/docs/data/overview' }],
   maplerad: [site('https://maplerad.com/'), docs('https://maplerad.dev/')],
   onafriq: [site('https://onafriq.com/')],
   cellulant: [site('https://www.cellulant.io/'), { label: 'Developer portal', url: 'https://dev-portal.tingg.africa/' }],

@@ -193,6 +193,22 @@ export const configSchema = z.object({
   PAWAPAY_PAYOUT_FEE_PERCENT: z.string().optional(),
   /** In the callback address set in the pawaPay dashboard: /v1/webhooks/pawapay?token=<this>. */
   PAWAPAY_CALLBACK_TOKEN: z.string().optional(),
+  /** Africa's Talking airtime and data bundles (supplier): its app's username and API key ("sandbox" for its test app). */
+  AFRICAS_TALKING_USERNAME: z.string().optional(),
+  AFRICAS_TALKING_API_KEY: z.string().optional(),
+  AFRICAS_TALKING_SANDBOX: flag.prefault('off'),
+  /** Leave at the defaults to follow AFRICAS_TALKING_SANDBOX; any other value overrides them. */
+  AFRICAS_TALKING_API_URL: z.string().url().default('https://api.africastalking.com'),
+  AFRICAS_TALKING_DATA_URL: z.string().url().default('https://bundles.africastalking.com'),
+  /** The airtime discount agreed with Africa's Talking, in percent: BitoCard's cost is the amount less this. */
+  AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT: z.string().optional(),
+  /** Airtime countries (`KE KES 10-10000 safaricom,airtel,telkom; ...`); empty: the published defaults. */
+  AFRICAS_TALKING_AIRTIME_COUNTRIES: z.string().optional(),
+  /** The Mobile Data product made in its dashboard, and the plans sold (`KE safaricom 1GB Month 299 250; ...`). */
+  AFRICAS_TALKING_DATA_PRODUCT: z.string().optional(),
+  AFRICAS_TALKING_DATA_PLANS: z.string().optional(),
+  /** In the status callback addresses set in its dashboard: /v1/webhooks/africas-talking?token=<this>. */
+  AFRICAS_TALKING_CALLBACK_TOKEN: z.string().optional(),
   /** eSIM Access (eSIM data packages): the access code and secret key from its console (Developer). No sandbox exists. */
   ESIM_ACCESS_ACCESS_CODE: z.string().optional(),
   ESIM_ACCESS_SECRET_KEY: z.string().optional(),

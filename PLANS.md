@@ -106,7 +106,7 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 24 | Vonage | Virtual numbers, SMS | Global | Later |
 | 25 | Twilio | Virtual numbers, SMS | Global | Later |
 | 26 | Plivo | Virtual numbers, SMS | Global | Later |
-| 27 | Africa's Talking | SMS, short codes, virtual voice | Africa | Later |
+| 27 | Africa's Talking | Airtime and data bundles (adapter built, October 2026); SMS, short codes, virtual voice | Africa | Pilot (airtime and data) |
 | 28 | Flutterwave (cards) | Virtual payment cards | Nigeria pilot | Later (phase 4) |
 | 29 | Maplerad | Virtual payment cards | Nigeria | Later (alternative) |
 | 30 | Onafriq | Virtual payment cards | Pan-African | Later (expansion) |

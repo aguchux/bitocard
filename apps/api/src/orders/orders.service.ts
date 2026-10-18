@@ -401,12 +401,16 @@ export class OrdersService {
     return this.load(id);
   }
 
-  /** Still pending after an unscheduled check: keep the supplier's transaction ID, change nothing else. */
+  /**
+   * Still pending after an unscheduled check: keep the supplier's transaction ID (and what it said it charged), change
+   * nothing else.
+   */
   private async noteTransaction(order: Order, result: FulfilmentResult) {
-    if (result.supplierTransactionId && !order.supplierTransactionId) {
+    const reported = reconcile(order, result.reportedCost);
+    if ((result.supplierTransactionId && !order.supplierTransactionId) || reported) {
       await this.prisma.order.updateMany({
         where: { id: order.id, status: 'processing', supplierReference: order.supplierReference },
-        data: { supplierTransactionId: result.supplierTransactionId },
+        data: { supplierTransactionId: result.supplierTransactionId ?? order.supplierTransactionId, ...(reported ? { supplierReportedCostMinor: reported.reported } : {}) },
       });
     }
   }
@@ -414,6 +418,8 @@ export class OrdersService {
   private async wait(order: Order, result: FulfilmentResult) {
     const checks = order.checks + 1;
     const review = checks >= checkScheduleMs.length;
+    // Some suppliers say what they charged when accepting (Africa's Talking's airtime discount), not when confirming.
+    const reported = reconcile(order, result.reportedCost);
     // Only while the order is still with the supplier this answer came from: never overwrite a fallback's attempt.
     const waited = await this.prisma.order.updateMany({
       where: { id: order.id, status: 'processing', supplierReference: order.supplierReference },
@@ -421,6 +427,7 @@ export class OrdersService {
         checks,
         needsReview: review,
         supplierTransactionId: result.supplierTransactionId ?? order.supplierTransactionId,
+        ...(reported ? { supplierReportedCostMinor: reported.reported } : {}),
         nextCheckAt: new Date(Date.now() + (review ? reviewCheckMs : checkScheduleMs[checks - 1])),
       },
     });
@@ -451,7 +458,9 @@ export class OrdersService {
   /** Records the delivery and takes the held money: wholesale as revenue, tax as tax payable, and the supplier cost. */
   private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[]; esims?: SuppliedEsim[]; reportedCost?: FulfilmentResult['reportedCost'] }) {
     const deliveries = result.deliveries ?? [];
-    const reconciled = reconcile(order, result.reportedCost);
+    // What the supplier said it charged now, else what it said when it accepted the order.
+    const earlier = order.supplierReportedCostMinor !== null && order.supplierCurrency ? { amountMinor: order.supplierReportedCostMinor, currency: order.supplierCurrency } : undefined;
+    const reconciled = reconcile(order, result.reportedCost ?? earlier);
     const encryption = deliveries.some(d => d.code || d.pin) ? this.encryption() : null;
     const numbers = await this.numbersOf(order, result.numbers, deliveries);
     const esims = await this.esimsOf(order, result.esims, deliveries);

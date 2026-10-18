@@ -22,6 +22,10 @@ const addresses: Record<string, Address[]> = {
   didww: [{ key: 'DIDWW_API_URL', live: 'https://api.didww.com/v3', sandbox: 'https://sandbox-api.didww.com/v3' }],
   zendit: [{ key: 'ZENDIT_API_URL', live: 'https://api.zendit.io/v1', sandbox: 'https://test-api.zendit.io/v1' }],
   pawapay: [{ key: 'PAWAPAY_API_URL', live: 'https://api.pawapay.io', sandbox: 'https://api.sandbox.pawapay.io' }],
+  africas_talking: [
+    { key: 'AFRICAS_TALKING_API_URL', live: 'https://api.africastalking.com', sandbox: 'https://api.sandbox.africastalking.com' },
+    { key: 'AFRICAS_TALKING_DATA_URL', live: 'https://bundles.africastalking.com', sandbox: 'https://bundles.sandbox.africastalking.com' },
+  ],
   monnify: [{ key: 'MONNIFY_API_URL', live: 'https://api.monnify.com', sandbox: 'https://sandbox.monnify.com' }],
   // Flutterwave test keys use the live address.
   flutterwave: [{ key: 'FLUTTERWAVE_API_URL', live: 'https://api.flutterwave.com/v3', sandbox: 'https://api.flutterwave.com/v3' }],
@@ -36,6 +40,7 @@ export const sandboxSwitches = {
   didww: 'DIDWW_SANDBOX',
   zendit: 'ZENDIT_SANDBOX',
   pawapay: 'PAWAPAY_SANDBOX',
+  africas_talking: 'AFRICAS_TALKING_SANDBOX',
   monnify: 'MONNIFY_SANDBOX',
   flutterwave: 'FLUTTERWAVE_SANDBOX',
   stripe: 'STRIPE_SANDBOX',

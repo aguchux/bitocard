@@ -4,6 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { inSandbox, urlsFor } from '../integrations/endpoints.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { StubAdapter, type SupplierAdapter } from './adapter.js';
+import { AfricasTalkingAdapter } from './africas-talking.adapter.js';
 import { DidwwAdapter } from './didww.adapter.js';
 import { EsimAccessAdapter } from './esim-access.adapter.js';
 import { ReloadlyAdapter } from './reloadly.adapter.js';
@@ -51,6 +52,16 @@ export class SupplierAdapters {
         }),
         new ZenditAdapter({ apiKey: live('zendit') ? config.ZENDIT_API_KEY : undefined, baseUrl: config.ZENDIT_API_URL }),
         new PawapayAdapter({ apiToken: live('pawapay') ? config.PAWAPAY_API_TOKEN : undefined, baseUrl: config.PAWAPAY_API_URL, feePercent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
+        new AfricasTalkingAdapter({
+          username: live('africas_talking') ? config.AFRICAS_TALKING_USERNAME : undefined,
+          apiKey: live('africas_talking') ? config.AFRICAS_TALKING_API_KEY : undefined,
+          apiUrl: config.AFRICAS_TALKING_API_URL,
+          dataUrl: config.AFRICAS_TALKING_DATA_URL,
+          airtimeDiscountPercent: config.AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT,
+          airtimeCountries: config.AFRICAS_TALKING_AIRTIME_COUNTRIES,
+          dataProduct: config.AFRICAS_TALKING_DATA_PRODUCT,
+          dataPlans: config.AFRICAS_TALKING_DATA_PLANS,
+        }),
         new EsimAccessAdapter({ accessCode: config.ESIM_ACCESS_ACCESS_CODE, secretKey: config.ESIM_ACCESS_SECRET_KEY, baseUrl: config.ESIM_ACCESS_API_URL }),
         this.stock,
       ];
@@ -72,6 +83,18 @@ export class SupplierAdapters {
     if (code === 'zendit') return new ZenditAdapter({ apiKey: credentials.api_key, baseUrl: config.ZENDIT_API_URL });
     if (code === 'esim_access') return new EsimAccessAdapter({ accessCode: credentials.access_code, secretKey: credentials.secret_key, baseUrl: config.ESIM_ACCESS_API_URL });
     if (code === 'pawapay') return new PawapayAdapter({ apiToken: credentials.api_token, baseUrl: config.PAWAPAY_API_URL, feePercent: credentials.payout_fee_percent });
+    if (code === 'africas_talking') {
+      return new AfricasTalkingAdapter({
+        username: credentials.username,
+        apiKey: credentials.api_key,
+        apiUrl: config.AFRICAS_TALKING_API_URL,
+        dataUrl: config.AFRICAS_TALKING_DATA_URL,
+        airtimeDiscountPercent: credentials.airtime_discount_percent,
+        airtimeCountries: credentials.airtime_countries,
+        dataProduct: credentials.data_product,
+        dataPlans: credentials.data_plans,
+      });
+    }
     return null;
   }
 

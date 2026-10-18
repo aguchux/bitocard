@@ -1,6 +1,7 @@
 import type { AppConfig } from '../config/config.js';
 import { isTestKey, type Environment } from '../integrations/endpoints.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
+import { africasTalkingCheck } from '../suppliers/africas-talking.adapter.js';
 import { EsimAccessAdapter } from '../suppliers/esim-access.adapter.js';
 
 export type ConnectableKind = 'supplier' | 'payment_gateway';
@@ -16,7 +17,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -124,6 +125,31 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       await providerRequest('pawapay', `${urls.PAWAPAY_API_URL}/v2/active-conf?operationType=PAYOUT`, { headers: { authorization: `Bearer ${(values.api_token ?? '').trim().replace(/^bearer\s+/i, '')}` } });
     },
     fromSettings: config => ({ api_token: config.PAWAPAY_API_TOKEN, payout_fee_percent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
+  },
+  {
+    id: 'africas_talking',
+    kind: 'supplier',
+    name: 'Africa’s Talking',
+    description: 'Airtime and data bundles paid from your own Africa’s Talking wallet.',
+    fields: [
+      field('username', 'Username', { help: 'Your app’s username in the Africa’s Talking dashboard.' }),
+      secret('api_key', 'API key', { help: 'The app’s Settings > API Key.' }),
+      field('airtime_discount_percent', 'Airtime discount (%)', { help: 'The airtime discount on your account, for example 3: your cost is the amount less it.' }),
+      field('airtime_countries', 'Airtime countries', { required: false, help: 'Empty: Africa’s Talking’s published countries. Otherwise, for example, KE KES 10-10000 safaricom,airtel,telkom; one per line or separated by semicolons.' }),
+      field('data_product', 'Mobile Data product', { required: false, help: 'The product name made in your dashboard (Mobile Data > Products).' }),
+      field('data_plans', 'Data plans', { required: false, help: 'For example KE safaricom 1GB Month 299 250 (country, network, size, validity, price, your cost); one per line or separated by semicolons.' }),
+    ],
+    check: async (values, urls) => {
+      await africasTalkingCheck(urls.AFRICAS_TALKING_API_URL, values.username, values.api_key);
+    },
+    fromSettings: config => ({
+      username: config.AFRICAS_TALKING_USERNAME,
+      api_key: config.AFRICAS_TALKING_API_KEY,
+      airtime_discount_percent: config.AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT,
+      airtime_countries: config.AFRICAS_TALKING_AIRTIME_COUNTRIES,
+      data_product: config.AFRICAS_TALKING_DATA_PRODUCT,
+      data_plans: config.AFRICAS_TALKING_DATA_PLANS,
+    }),
   },
   {
     id: 'esim_access',

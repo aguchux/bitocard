@@ -107,6 +107,16 @@ const integrationKeyList = [
   'PAWAPAY_SANDBOX',
   'PAWAPAY_PAYOUT_FEE_PERCENT',
   'PAWAPAY_CALLBACK_TOKEN',
+  'AFRICAS_TALKING_USERNAME',
+  'AFRICAS_TALKING_API_KEY',
+  'AFRICAS_TALKING_SANDBOX',
+  'AFRICAS_TALKING_API_URL',
+  'AFRICAS_TALKING_DATA_URL',
+  'AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT',
+  'AFRICAS_TALKING_AIRTIME_COUNTRIES',
+  'AFRICAS_TALKING_DATA_PRODUCT',
+  'AFRICAS_TALKING_DATA_PLANS',
+  'AFRICAS_TALKING_CALLBACK_TOKEN',
   'ESIM_ACCESS_ACCESS_CODE',
   'ESIM_ACCESS_SECRET_KEY',
   'ESIM_ACCESS_API_URL',
@@ -390,6 +400,37 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     ],
   },
   {
+    id: 'africas_talking',
+    name: 'Africa’s Talking',
+    description:
+      'Mobile airtime (any amount, every network in its countries) and data bundles (the plans set below), paid from BitoCard’s Africa’s Talking wallet. Without the username and API key it serves only the sandbox, never live orders.',
+    webhookPath: '/v1/webhooks/africas-talking?token=<callback token>',
+    fields: [
+      field('AFRICAS_TALKING_USERNAME', 'Username', { required: true, help: 'Your app’s username (Africa’s Talking dashboard > your team > the app). Its sandbox app’s username is always sandbox.' }),
+      secret('AFRICAS_TALKING_API_KEY', 'API key', { help: 'The app’s Settings > API Key. Sandbox and live apps have different keys.' }),
+      field('AFRICAS_TALKING_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Africa’s Talking’s sandbox (api.sandbox.africastalking.com, username sandbox), for Test connection only; it is not synced or used for live orders. Off: live.' }),
+      field('AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT', 'Airtime discount (%)', {
+        required: true,
+        help: 'The airtime discount on your Africa’s Talking account, for example 3 (use the lowest across your countries and networks). BitoCard’s cost is the amount less this; the discount each send reports is kept for reconciliation. Syncing airtime refuses until it is set.',
+      }),
+      field('AFRICAS_TALKING_AIRTIME_COUNTRIES', 'Airtime countries', {
+        required: false,
+        help: 'Leave empty for Africa’s Talking’s published countries (KE, UG, TZ, RW, NG, GH, MW, ZM). Otherwise one per line or separated by semicolons: country, currency, smallest-largest amount, networks, for example KE KES 10-10000 safaricom,airtel,telkom.',
+      }),
+      field('AFRICAS_TALKING_DATA_PRODUCT', 'Mobile Data product', { required: false, help: 'The product name created in the dashboard (Mobile Data > Products). Data bundles are synced only once it is set.' }),
+      field('AFRICAS_TALKING_DATA_PLANS', 'Data plans', {
+        required: false,
+        help: 'Africa’s Talking publishes no plan list. One per line or separated by semicolons: country, network, size, validity (Day, Week, BiWeek, Month or Quarterly), the price customers know it by, BitoCard’s cost, for example KE safaricom 1GB Month 299 250.',
+      }),
+      field('AFRICAS_TALKING_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
+      field('AFRICAS_TALKING_DATA_URL', 'Mobile Data address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
+      secret('AFRICAS_TALKING_CALLBACK_TOKEN', 'Callback token', {
+        required: false,
+        help: 'Choose a long random value. In the dashboard set the airtime status callback (Airtime > Callback URLs) and the Mobile Data status callback to https://api.bitocard.com/v1/webhooks/africas-talking?token= followed by this value. Without it, callbacks are refused and orders are still checked on schedule.',
+      }),
+    ],
+  },
+  {
     id: 'esim_access',
     name: 'eSIM Access',
     description:
@@ -419,7 +460,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access', 'africas_talking']);
 
 export const integrationGroups: IntegrationGroup[] = [
   ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),

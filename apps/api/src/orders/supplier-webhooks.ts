@@ -20,6 +20,7 @@ import { didwwNotice, didwwSignatureValid } from '../suppliers/didww.webhooks.js
 import { reloadlyNotice, reloadlySignatureValid } from '../suppliers/reloadly.webhooks.js';
 import { esimAccessNotice, type EsimNotice, esimAccessWebhookValid } from '../suppliers/esim-access.adapter.js';
 import { pawapayCallbackValid, pawapayNotice } from '../suppliers/pawapay.adapter.js';
+import { africasTalkingCallbackValid, africasTalkingNotice } from '../suppliers/africas-talking.adapter.js';
 import { zenditNotice, zenditWebhookHeader, zenditWebhookValid } from '../suppliers/zendit.adapter.js';
 import { OrdersService } from './orders.service.js';
 
@@ -89,6 +90,15 @@ export class SupplierWebhooksService {
       // Stored all the same.
     }
     return this.store('pawapay', rawBody, pawapayNotice(payload));
+  }
+
+  /**
+   * Africa's Talking airtime and Mobile Data status callbacks (JSON or a form): authenticated by the token in the callback
+   * address; the body only names the transaction (airtime) or our reference (data) to re-check.
+   */
+  async receiveAfricasTalking(rawBody: Buffer | undefined, token: string | undefined) {
+    if (!rawBody || !africasTalkingCallbackValid(this.integrations.config.AFRICAS_TALKING_CALLBACK_TOKEN, token)) throw untrusted();
+    return this.store('africas_talking', rawBody, africasTalkingNotice(rawBody));
   }
 
   /**
@@ -391,6 +401,12 @@ export class SupplierWebhooksController {
   @HttpCode(HttpStatus.OK)
   pawapay(@Req() req: Request & { rawBody?: Buffer }, @Query('token') token?: string) {
     return this.webhooks.receivePawapay(req.rawBody, token);
+  }
+
+  @Post('africas-talking')
+  @HttpCode(HttpStatus.OK)
+  africasTalking(@Req() req: Request & { rawBody?: Buffer }, @Query('token') token?: string) {
+    return this.webhooks.receiveAfricasTalking(req.rawBody, token);
   }
 
   @Post('esim-access')

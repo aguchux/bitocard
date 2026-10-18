@@ -899,3 +899,74 @@ export async function fakeEsimAccess() {
   });
   return { ...service, state, env: { ESIM_ACCESS_ACCESS_CODE: accessCode, ESIM_ACCESS_SECRET_KEY: secretKey, ESIM_ACCESS_API_URL: service.url, ESIM_ACCESS_WEBHOOK_TOKEN: 'esim-webhook-token-0123456789' } };
 }
+
+/**
+ * Africa's Talking: airtime (a form post, `Sent` until the network confirms), Mobile Data (JSON, `Queued`), the
+ * transaction lookup and the balance check, on one address for both hosts. `state.airtime`/`state.data` set the reply.
+ */
+export async function fakeAfricasTalking() {
+  const state = { airtime: 'Sent', data: 'Queued', transactions: {}, sends: [], next: 1 };
+  const service = await fakeService(({ method, url, headers, body, raw }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (headers.apikey !== 'at-key') return { status: 401, body: 'The supplied authentication is invalid', headers: { 'content-type': 'text/plain' } };
+    if (method === 'GET' && path === '/version1/user') {
+      return query.get('username') === 'bitocard' ? { body: { UserData: { balance: 'KES 12500.0000' } } } : { status: 401, body: { errorMessage: 'Invalid username' } };
+    }
+    if (method === 'POST' && path === '/version1/airtime/send') {
+      const form = new URLSearchParams(raw.toString('utf8'));
+      const [recipient] = JSON.parse(form.get('recipients'));
+      state.sends.push({ kind: 'airtime', form: Object.fromEntries(form), recipient, idempotencyKey: headers['idempotency-key'] });
+      const requestId = `ATQid_${state.next++}`;
+      const [currency, amount] = recipient.amount.split(' ');
+      const discount = (Number(amount) * 0.05).toFixed(4);
+      if (state.airtime !== 'Failed') state.transactions[requestId] = state.airtime === 'Success' ? 'Success' : 'Pending';
+      return {
+        status: 201,
+        body: {
+          errorMessage: 'None',
+          numSent: state.airtime === 'Failed' ? 0 : 1,
+          totalAmount: `${currency} ${Number(amount).toFixed(4)}`,
+          totalDiscount: `${currency} ${discount}`,
+          responses: [
+            {
+              phoneNumber: recipient.phoneNumber,
+              errorMessage: state.airtime === 'Failed' ? 'Invalid phone number' : 'None',
+              amount: `${currency} ${Number(amount).toFixed(4)}`,
+              discount: `${currency} ${discount}`,
+              status: state.airtime,
+              requestId: state.airtime === 'Failed' ? 'None' : requestId,
+            },
+          ],
+        },
+      };
+    }
+    if (method === 'POST' && path === '/mobile/data/request') {
+      state.sends.push({ kind: 'data', body, idempotencyKey: headers['idempotency-key'] });
+      const transactionId = `ATPid_${state.next++}`;
+      const accepted = state.data === 'Queued';
+      if (accepted) state.transactions[transactionId] = 'Queued';
+      return { status: 201, body: { entries: [{ phoneNumber: body.recipients[0].phoneNumber, provider: 'Safaricom', status: state.data, transactionId: accepted ? transactionId : 'None', value: 'KES 250.0000' }] } };
+    }
+    if (method === 'GET' && path === '/query/transaction/find') {
+      const status = state.transactions[query.get('transactionId')];
+      if (!status) return { body: { status: 'Failure', errorMessage: 'Transaction not found' } };
+      return { body: { status: 'Success', data: { transactionId: query.get('transactionId'), status, description: status === 'Failed' ? 'Network refused' : 'Done', providerRefId: status === 'Success' ? 'SFC123456' : 'None' } } };
+    }
+    return { status: 404, body: { errorMessage: `Fake Africa's Talking has no ${path}` } };
+  });
+  return {
+    ...service,
+    state,
+    env: {
+      AFRICAS_TALKING_USERNAME: 'bitocard',
+      AFRICAS_TALKING_API_KEY: 'at-key',
+      AFRICAS_TALKING_API_URL: service.url,
+      AFRICAS_TALKING_DATA_URL: service.url,
+      AFRICAS_TALKING_AIRTIME_DISCOUNT_PERCENT: '4',
+      AFRICAS_TALKING_DATA_PRODUCT: 'BitoCard Data',
+      AFRICAS_TALKING_DATA_PLANS: 'KE safaricom 1GB Month 299 250; KE airtel 500MB Week 99 80; KE nonsense',
+      AFRICAS_TALKING_CALLBACK_TOKEN: 'at-callback',
+    },
+  };
+}

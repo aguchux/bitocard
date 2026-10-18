@@ -43,7 +43,6 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   { code: 'vonage', name: 'Vonage', description: 'Virtual numbers for messaging and calls.', fields: [key('API key'), secret('API_SECRET', 'API secret'), optionalSecret('SIGNATURE_SECRET', 'Signature secret', 'Verifies Vonage webhook signatures.')] },
   { code: 'twilio', name: 'Twilio', description: 'SMS-enabled numbers and messaging.', fields: [id('ACCOUNT_SID', 'Account SID'), secret('AUTH_TOKEN', 'Auth token', 'Also verifies Twilio webhook signatures.')] },
   { code: 'plivo', name: 'Plivo', description: 'Voice and SMS business numbers.', fields: [id('AUTH_ID', 'Auth ID'), secret('AUTH_TOKEN', 'Auth token')] },
-  { code: 'africas_talking', name: "Africa's Talking", description: 'African SMS, short codes and virtual voice.', fields: [id('USERNAME', 'Username', 'Use "sandbox" for the sandbox.'), key('API key')] },
   // Virtual cards.
   { code: 'maplerad', name: 'Maplerad', description: 'Virtual cards (Nigeria).', fields: [secret('SECRET_KEY', 'Secret key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('Sandbox: https://sandbox.api.maplerad.com/v1')] },
   { code: 'onafriq', name: 'Onafriq', description: 'Virtual cards, pan-African expansion.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), address('Onafriq API base address (sandbox or live)')] },
