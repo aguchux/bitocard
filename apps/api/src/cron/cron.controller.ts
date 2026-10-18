@@ -1,5 +1,6 @@
 import { DomainsService } from '../domains/domains.service.js';
 import { StoreHostsService } from '../stores/store-hosts.service.js';
+import { StoreVisitsService } from '../stores/store-visits.service.js';
 import { timingSafeEqual } from 'node:crypto';
 import { Controller, Get, HttpStatus, Inject, Param, Req } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
@@ -66,6 +67,7 @@ export class CronController {
     reconciliation: CryptoReconciliationService,
     domains: DomainsService,
     storeHosts: StoreHostsService,
+    storeVisits: StoreVisitsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -81,8 +83,11 @@ export class CronController {
       /** Hourly: virtual number renewals, reminders, pausing at expiry, deletion 15 days later, and old messages. */
       numbers: () => numbers.job(),
       esims: () => esims.job(),
-      /** Every 15 minutes: stores' bitocard.com addresses, then domain purchases, DNS checks, renewals and reminders. */
-      domains: async () => ({ store_addresses: await storeHosts.job(), ...(await domains.run()) }),
+      /**
+       * Every 15 minutes: stores' bitocard.com addresses, past days' visitor hashes and salts, then domain purchases, DNS
+       * checks, renewals and reminders.
+       */
+      domains: async () => ({ store_addresses: await storeHosts.job(), store_visits: await storeVisits.cleanup(), ...(await domains.run()) }),
       /** Every 2 minutes: check orders the suppliers have not confirmed, and repair interrupted completions. */
       orders: () => orders.checkDue(),
       /** Daily: refresh supplier catalogues and costs, BitoCard's and resellers' own. */

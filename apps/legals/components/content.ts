@@ -19,7 +19,7 @@ export const regions = [
 
 export const commitments: { icon: IconName; title: string; body: string }[] = [
   { icon: "ban", title: "We don’t sell your data", body: "We do not sell personal information or use it for targeted advertising." },
-  { icon: "cookie", title: "No tracking cookies", body: "We set only the cookies our sites need, such as the country you choose, and run no analytics or advertising trackers." },
+  { icon: "cookie", title: "No tracking cookies", body: "We set only the cookies our sites need, such as the country you choose, and run no tracking analytics or advertising trackers." },
   { icon: "scale", title: "Your rights, wherever you are", body: "Access, correction, deletion and more, under the law where you live." },
   { icon: "clock", title: "Updated before we launch", body: "We will publish service terms and update these notices before accounts or payments go live." },
 ];

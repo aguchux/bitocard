@@ -1,14 +1,31 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { pathHeader } from "./lib/path-header";
+import { visitRequest } from "./lib/visits";
 
 /**
- * Account pages only: passes the requested path to the layout (layouts are not given it), so signing in from an order
- * link returns to that order. Always set here, so a caller cannot choose it; the layout still checks it is a local path.
+ * Every page (never files, `_next` or prefetches):
+ * - counts the view of a reseller's store after the response (`lib/visits.ts`), never delaying or breaking the page;
+ * - on account pages, passes the requested path to the layout (layouts are not given it), so signing in from an order
+ *   link returns to that order. Always set here, so a caller cannot choose it; the layout still checks it is a local path.
  */
-export function proxy(request: NextRequest) {
+export function proxy(request: NextRequest, event?: NextFetchEvent) {
+  const visit = visitRequest(request);
+  if (visit && event) event.waitUntil(fetch(visit.url, visit.init).then(() => undefined, () => undefined));
+  const { pathname, search } = request.nextUrl;
+  if (pathname !== "/account" && !pathname.startsWith("/account/")) return NextResponse.next();
   const headers = new Headers(request.headers);
-  headers.set(pathHeader, `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  headers.set(pathHeader, `${pathname}${search}`);
   return NextResponse.next({ request: { headers } });
 }
 
-export const config = { matcher: ["/account", "/account/:path*"] };
+export const config = {
+  matcher: [
+    {
+      source: "/((?!_next/|api/|.*\\.[a-zA-Z]+$).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
+  ],
+};

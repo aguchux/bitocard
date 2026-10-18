@@ -5969,6 +5969,187 @@
         "x-bitocard-auth": "api_key"
       }
     },
+    "/v1/stores/{id}/traffic": {
+      "get": {
+        "description": "Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies.",
+        "operationId": "StoresController_traffic",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "description": "How many days back, today included (1 to 90; default 30).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The store’s traffic over the period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreTraffic"
+                },
+                "example": {
+                  "object": "store_traffic",
+                  "days": 3,
+                  "from": "2026-10-16",
+                  "to": "2026-10-18",
+                  "views": 412,
+                  "visitors": 131,
+                  "hosts": [
+                    {
+                      "host": "adadigital.com",
+                      "views": 301,
+                      "visitors": 97
+                    },
+                    {
+                      "host": "adadigital.bitocard.com",
+                      "views": 111,
+                      "visitors": 34
+                    }
+                  ],
+                  "daily": [
+                    {
+                      "date": "2026-10-16",
+                      "views": 120,
+                      "visitors": 41
+                    },
+                    {
+                      "date": "2026-10-17",
+                      "views": 158,
+                      "visitors": 49
+                    },
+                    {
+                      "date": "2026-10-18",
+                      "views": 134,
+                      "visitors": 41
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Store traffic",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/stores/{id}/unpublish": {
       "post": {
         "operationId": "StoresController_unpublish",
@@ -42095,6 +42276,106 @@
               "$ref": "#/components/schemas/StoreCountry"
             },
             "description": "Matching countries (up to 5)."
+          }
+        }
+      },
+      "StoreTraffic": {
+        "type": "object",
+        "title": "Store traffic",
+        "description": "Visits to your store, counted on BitoCard’s storefront without cookies or anything kept about your visitors.",
+        "required": [
+          "object",
+          "days",
+          "from",
+          "to",
+          "views",
+          "visitors",
+          "hosts",
+          "daily"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_traffic`.",
+            "const": "store_traffic"
+          },
+          "days": {
+            "type": "integer",
+            "description": "How many days are counted, today included."
+          },
+          "from": {
+            "type": "string",
+            "description": "The first day counted (UTC).",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "The last day counted: today (UTC).",
+            "format": "date"
+          },
+          "views": {
+            "type": "integer",
+            "description": "Pages viewed (never prefetches, files, or known crawlers and link previews)."
+          },
+          "visitors": {
+            "type": "integer",
+            "description": "Visitors, each counted once a day (told apart only within the day, without cookies), added up over the days."
+          },
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "host",
+                "views",
+                "visitors"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "description": "The address: the store’s bitocard.com address or one of its own domains."
+                },
+                "views": {
+                  "type": "integer",
+                  "description": "Pages viewed (never prefetches, files, or known crawlers and link previews)."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Visitors, each counted once a day (told apart only within the day, without cookies), added up over the days."
+                }
+              }
+            },
+            "description": "Each address the store was visited on, most viewed first."
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "date",
+                "views",
+                "visitors"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "description": "The day (UTC).",
+                  "format": "date"
+                },
+                "views": {
+                  "type": "integer",
+                  "description": "Pages viewed (never prefetches, files, or known crawlers and link previews)."
+                },
+                "visitors": {
+                  "type": "integer",
+                  "description": "Visitors, each counted once a day (told apart only within the day, without cookies), added up over the days."
+                }
+              }
+            },
+            "description": "Every day in the period, oldest first, with zeros on days without visits."
           }
         }
       },

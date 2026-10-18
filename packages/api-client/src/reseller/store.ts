@@ -54,6 +54,17 @@ export type Country = {
   categories: Array<{ category: string; customer_verification: boolean }>;
 };
 
+/** Visits to the store, counted without cookies (`GET /v1/stores/:id/traffic`). */
+export type TrafficCounts = { views: number; visitors: number };
+export type StoreTraffic = TrafficCounts & {
+  object: 'store_traffic';
+  days: number;
+  from: string;
+  to: string;
+  hosts: Array<TrafficCounts & { host: string }>;
+  daily: Array<TrafficCounts & { date: string }>;
+};
+
 /** The reseller's hosted store, business details, settings options and the public list of markets. */
 export const resellerStoreApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
@@ -67,6 +78,7 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
       invalidatesTags: ['Store'],
     }),
     publishStore: build.mutation<Store, string>({ query: id => ({ url: `/v1/stores/${id}/publish`, method: 'POST' }), invalidatesTags: ['Store'] }),
+    storeTraffic: build.query<StoreTraffic, { id: string; days?: number }>({ query: ({ id, days = 30 }) => `/v1/stores/${id}/traffic?days=${days}`, keepUnusedDataFor: 300 }),
     unpublishStore: build.mutation<Store, string>({ query: id => ({ url: `/v1/stores/${id}/unpublish`, method: 'POST' }), invalidatesTags: ['Store'] }),
     subdomainCheck: build.query<SubdomainCheck, string>({ query: subdomain => `/v1/stores/subdomains/${encodeURIComponent(subdomain)}`, keepUnusedDataFor: 10 }),
     updateBusiness: build.mutation<ResellerProfile, { name?: string; country?: string }>({
@@ -106,6 +118,7 @@ export const resellerStoreApi = bitocardApi.injectEndpoints({
 
 export const {
   useStoresQuery,
+  useStoreTrafficQuery,
   useCreateStoreMutation,
   useUpdateStoreMutation,
   usePublishStoreMutation,

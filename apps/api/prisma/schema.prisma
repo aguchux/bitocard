@@ -719,6 +719,7 @@ model Store {
   customers             Customer[]
   checkouts             Checkout[]
   domains               StoreDomain[]
+  visitDays             StoreVisitDay[]
 
   @@index([resellerId])
   @@index([hostStatus])
@@ -3436,4 +3437,40 @@ model StoreDomain {
   @@index([storeId])
   @@index([status])
   @@map("store_domains")
+}
+
+/// Visits to a reseller store per UTC day and address (its bitocard.com subdomain or a custom domain), counted on the
+/// storefront's server without cookies: page views, and visitors told apart only within the day (see `StoreVisitor`).
+model StoreVisitDay {
+  storeId  String   @map("store_id") @db.Uuid
+  host     String
+  day      DateTime @db.Date
+  views    Int      @default(0)
+  visitors Int      @default(0)
+  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@id([storeId, host, day])
+  @@index([day])
+  @@map("store_visit_days")
+}
+
+/// Today's visitors of a store: an HMAC of the address, browser and host keyed with that day's random salt, only to count
+/// each visitor once a day. Deleted with the salt once the day is over, so visits can never be linked across days.
+model StoreVisitor {
+  storeId String   @map("store_id") @db.Uuid
+  day     DateTime @db.Date
+  hash    String
+
+  @@id([storeId, day, hash])
+  @@index([day])
+  @@map("store_visitors")
+}
+
+/// One random salt per UTC day for `StoreVisitor` hashes, deleted once the day is over.
+model StoreVisitSalt {
+  day       DateTime @id @db.Date
+  salt      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("store_visit_salts")
 }

@@ -18,9 +18,9 @@ export type LegalEntity = {
 export const legalContact = "legal@bitocard.com";
 
 /** Shown as "Last updated" on every legal page. Update when any legal page changes. */
-export const legalUpdated = "17 October 2026";
+export const legalUpdated = "18 October 2026";
 /** The same date in ISO 8601, for sitemaps and structured data. Keep in step with legalUpdated. */
-export const legalUpdatedIso = "2026-10-17";
+export const legalUpdatedIso = "2026-10-18";
 
 export const legalEntities: readonly LegalEntity[] = [
   {

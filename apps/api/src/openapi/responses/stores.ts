@@ -54,6 +54,24 @@ const storeExample = {
   created_at: '2026-10-01T10:05:12.000Z',
 };
 
+const trafficCounts = {
+  views: int('Pages viewed (never prefetches, files, or known crawlers and link previews).'),
+  visitors: int('Visitors, each counted once a day (told apart only within the day, without cookies), added up over the days.'),
+};
+const storeTraffic = objectSchema(
+  'Store traffic',
+  {
+    object: constant('store_traffic'),
+    days: int('How many days are counted, today included.'),
+    from: str('The first day counted (UTC).', { format: 'date' }),
+    to: str('The last day counted: today (UTC).', { format: 'date' }),
+    ...trafficCounts,
+    hosts: array(shape({ host: str('The address: the store’s bitocard.com address or one of its own domains.'), ...trafficCounts }), 'Each address the store was visited on, most viewed first.'),
+    daily: array(shape({ date: str('The day (UTC).', { format: 'date' }), ...trafficCounts }), 'Every day in the period, oldest first, with zeros on days without visits.'),
+  },
+  'Visits to your store, counted on BitoCard’s storefront without cookies or anything kept about your visitors.',
+);
+
 const subdomainAvailability = objectSchema('Subdomain availability', {
   object: constant('subdomain_availability'),
   subdomain: str('The name checked, in lower case.'),
@@ -456,6 +474,7 @@ export const storesDocs: DocsArea = {
     StoreMenuGroup: navigationGroup,
     StoreHome: storeHome,
     StoreSearch: storeSearch,
+    StoreTraffic: storeTraffic,
   },
   responses: {
     'GET /v1/stores/subdomains/{subdomain}': {
@@ -467,6 +486,28 @@ export const storesDocs: DocsArea = {
     'POST /v1/stores': { status: 201, description: 'The new store, as a draft.', schema: 'Store', example: { ...storeExample, status: 'draft', checkout_mode: 'test', published_at: null, branding: { ...storeExample.branding, logo_url: null } } },
     'GET /v1/stores': { status: 200, description: 'Your stores (one for now), oldest first.', schema: list(ref('Store'), {}, false), example: { object: 'list', data: [storeExample] } },
     'PATCH /v1/stores/{id}': { status: 200, description: 'The updated store.', schema: 'Store', example: storeExample },
+    'GET /v1/stores/{id}/traffic': {
+      status: 200,
+      description: 'The store’s traffic over the period.',
+      schema: 'StoreTraffic',
+      example: {
+        object: 'store_traffic',
+        days: 3,
+        from: '2026-10-16',
+        to: '2026-10-18',
+        views: 412,
+        visitors: 131,
+        hosts: [
+          { host: 'adadigital.com', views: 301, visitors: 97 },
+          { host: 'adadigital.bitocard.com', views: 111, visitors: 34 },
+        ],
+        daily: [
+          { date: '2026-10-16', views: 120, visitors: 41 },
+          { date: '2026-10-17', views: 158, visitors: 49 },
+          { date: '2026-10-18', views: 134, visitors: 41 },
+        ],
+      },
+    },
     'POST /v1/stores/{id}/publish': { status: 200, description: 'The store, now published.', schema: 'Store', example: storeExample },
     'POST /v1/stores/{id}/unpublish': { status: 200, description: 'The store, back to a draft (a suspended store is returned unchanged).', schema: 'Store', example: { ...storeExample, status: 'draft' } },
     'GET /v1/storefronts/{subdomain}': {

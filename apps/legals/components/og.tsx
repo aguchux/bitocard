@@ -36,7 +36,7 @@ export const ogPages = {
     alt: "BitoCard cookie notice – only the cookies we need, consent first",
     crumbs: [host, "Documents", "Cookie notice"], eyebrow: updated, title: "Cookie notice",
     subtitle: "Only the cookies our sites need, never for tracking, and your consent first for anything optional.",
-    chips: ["No tracking", "No analytics", "Consent first"],
+    chips: ["No tracking", "No ad trackers", "Consent first"],
   },
   "/documents/notice": {
     alt: "BitoCard legal notice – the companies behind BitoCard",

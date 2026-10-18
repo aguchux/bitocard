@@ -1,10 +1,15 @@
-import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Inject, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiQuery, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional, IsString, IsUrl, Length, Matches, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, Roles, Scopes, SessionOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { clientHeader, signedClientIp } from '../common/rate-limit/client-ip.js';
+import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { maxTrafficDays, StoreVisitsService } from './store-visits.service.js';
 import { StoresService } from './stores.service.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
@@ -97,7 +102,10 @@ export class ResellerController {
 @Scopes('stores:manage')
 @Controller('stores')
 export class StoresController {
-  constructor(private readonly stores: StoresService) {}
+  constructor(
+    private readonly stores: StoresService,
+    private readonly visits: StoreVisitsService,
+  ) {}
 
   @ApiOperation({ summary: 'Check whether a store address is free' })
   @Get('subdomains/:subdomain')
@@ -128,6 +136,17 @@ export class StoresController {
   @HttpCode(HttpStatus.OK)
   publish(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
     return this.stores.publish(resellerOf(caller), id);
+  }
+
+  @ApiOperation({
+    summary: 'Store traffic',
+    description: 'Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies.',
+  })
+  @ApiQuery({ name: 'days', required: false, description: `How many days back, today included (1 to ${maxTrafficDays}; default 30).` })
+  @Get(':id/traffic')
+  async traffic(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Query('days') days?: string) {
+    const store = await this.stores.get(resellerOf(caller), id);
+    return this.visits.traffic(store.id, Number(days ?? 30));
   }
 
   @ApiOperation({ summary: 'Unpublish a store' })
@@ -163,5 +182,36 @@ export class AdminStoresController {
   @Patch(':id')
   setStatus(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: AdminStoreStatusDto) {
     return this.stores.adminSetStatus(adminId(caller), id, body.status);
+  }
+}
+
+class VisitDto {
+  @IsString() @Length(3, 260)
+  host!: string;
+
+  @IsOptional() @IsString() @Length(0, 512)
+  user_agent?: string;
+}
+
+/**
+ * The storefront's server counts a page view of a reseller store (`proxy.ts`). Only with its signed shopper address
+ * (`BitoCard-Client`, keyed with STORE_SERVER_SECRET): anything else is accepted and ignored, so it cannot be used to
+ * inflate a store's numbers.
+ */
+@ApiExcludeController()
+@Public()
+@SkipIdempotency()
+@Controller('store/visits')
+export class StoreVisitsController {
+  constructor(
+    private readonly visits: StoreVisitsService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
+
+  @Post()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async record(@Req() req: Request, @Body() body: VisitDto) {
+    const ip = signedClientIp(req.get(clientHeader), this.config.STORE_SERVER_SECRET);
+    if (ip) await this.visits.record({ host: body.host, ip, userAgent: body.user_agent ?? '' });
   }
 }
