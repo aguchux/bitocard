@@ -11,7 +11,7 @@ export default function PrivacyNotice() {
     <LegalPage
       seo={seo}
       intro={<>
-        <p>This notice explains how BitoCard handles personal information when you visit our websites, create a customer account on our store at bitocard.com, buy from it, use crypto wallets and P2P trading where we offer them, or contact us.</p>
+        <p>This notice explains how BitoCard handles personal information when you visit our websites, create a customer account on our store at bitocard.com, buy from it, use crypto wallets and P2P trading where we offer them, sell with BitoCard as a reseller, or contact us.</p>
         <p>We will update this notice before we launch any other service that collects more.</p>
       </>}
     >
@@ -59,6 +59,17 @@ export default function PrivacyNotice() {
         <p>Elsewhere, Didit checks an identity document and compares it with a selfie, which involves biometric data, and we ask for your explicit consent first; from Didit we keep only the outcome, your verified name and the document&apos;s country, never images or document numbers. In Nigeria, opening a bank account number for your wallet may need your BVN, which we pass to Flutterwave after you approve it and do not keep (a reseller owner&apos;s is kept encrypted only until their accounts are opened).</p>
         <h3>When you visit a store run by a reseller</h3>
         <p>When you open a page of a reseller&apos;s store hosted by BitoCard (on its bitocard.com address or its own domain), our server counts the page view for that store, so the reseller can see how many people visit it. We count without cookies and keep nothing about you: only, per store, address and day, how many pages were viewed and how many visitors there were. To count each visitor once a day, we keep a one-way code made from your IP address, your browser&apos;s description and the store&apos;s address, mixed with a random value that changes every day. At the end of the day the code and that day&apos;s random value are deleted, so visits can never be linked to you or to each other across days. Crawlers, link previews and pages loaded in advance are not counted. BitoCard&apos;s own store is not counted this way.</p>
+        <h3>When you sell with BitoCard as a reseller</h3>
+        <p>If you open a reseller account on Seller Head Quarters (shq.bitocard.com), or join a reseller&apos;s team, we keep:</p>
+        <ul>
+          <li>your name, email addresses, mobile numbers (each confirmed with a code) and your password, stored only as a one-way hash; your team role; when you signed in, the devices you signed in on and those you turned notifications on for;</li>
+          <li>your business: its name, country, plan and, after its business check, its type, registered name, number and address (see &ldquo;When an identity check is needed&rdquo;);</li>
+          <li>your wallet, top-ups, orders, fees, payouts and the bank accounts you add for payouts (the account number kept encrypted); we check the account name with the bank through Flutterwave before paying out;</li>
+          <li>your stores: their names, addresses, designs, pages and the logos and images you upload, with who uploaded each file and when. Uploaded files are stored with DigitalOcean in the United States and are public once you publish them on a store, so do not upload pictures of people or anyone&apos;s personal details;</li>
+          <li>your domains, where we switch them on: if you buy a domain through BitoCard, the registrant contact details you give (name, organisation, email, phone and postal address), which we pass to our registrar, Vercel Inc., to register it in your name; registries may publish some of them in their public directories under their own rules. If you set your domain up to send your store&apos;s emails, those emails are sent through Resend from your domain;</li>
+          <li>if you connect your own supplier or payment gateway accounts, their credentials, kept encrypted and used only for your own orders and payments, and the orders and payments made through them, which we process on your behalf;</li>
+          <li>your API keys (only a hash and their last characters) and your webhook endpoints and their delivery logs.</li>
+        </ul>
         <h3>When you contact us</h3>
         <p>If you email us, we receive your email address, your name if you include it, and the content of your message.</p>
         <h3>What we do not collect</h3>
@@ -79,6 +90,7 @@ export default function PrivacyNotice() {
               <tr><th scope="row">Check your identity where the law or fraud controls require it, and prevent fraud</th><td>Account and order information, identity check results; biometric data during a document check</td><td>Legal obligation, or our legitimate interests in preventing fraud; explicit consent for biometric data</td></tr>
               <tr><th scope="row">Provide crypto wallets and the P2P market: hold your crypto, credit deposits, send withdrawals, run your ads and trades, and pay out your P2P money</th><td>Account and identity check information; crypto, deposit, withdrawal, trade and ad records; addresses and on-chain data; bank account and payout details</td><td>Performance of our contract with you</td></tr>
               <tr><th scope="row">Screen withdrawal addresses against sanctions lists, review withdrawals, freeze or take crypto, and report to authorities, to prevent fraud, money laundering and sanctions breaches</th><td>Account and identity check information; crypto, deposit, withdrawal, trade and payout records; addresses and on-chain data</td><td>Legal obligation, or our legitimate interests in preventing fraud and financial crime</td></tr>
+              <tr><th scope="row">Provide reseller accounts, stores, domains and payouts, and check resellers and their businesses</th><td>Reseller account, business, wallet, payout, store, domain and integration information; identity and business check results</td><td>Performance of our contract with the reseller; legal obligation, or our legitimate interests in preventing fraud, for the checks</td></tr>
               <tr><th scope="row">Show resellers how many people visit their stores</th><td>Technical information, reduced to daily counts the same day</td><td>Our legitimate interests, and the reseller&apos;s, in knowing how their store is used, in a way that keeps nothing about you</td></tr>
               <tr><th scope="row">Check that our wallets hold what we hold for customers</th><td>Crypto balances and on-chain data</td><td>Legal obligation, or our legitimate interests in keeping customers&apos; crypto safe</td></tr>
               <tr><th scope="row">Keep accounting and tax records</th><td>Order and payment information</td><td>Legal obligation</td></tr>
@@ -93,6 +105,7 @@ export default function PrivacyNotice() {
       <Section id="share" title="5. Who we share it with">
         <ul>
           <li><strong>Service providers</strong> who act on our instructions. Vercel Inc. hosts our websites and delivers them through its global network, and our database host stores our records in the United States. Resend and MailerSend send our emails, including your codes and receipts. Our email provider handles messages you send us.</li>
+          <li><strong>Our domain registrar</strong>, Vercel Inc., which receives the registrant contact details of domains resellers buy through BitoCard, and the registries of those domain endings. <strong>DigitalOcean</strong> stores the logos and images uploaded to stores and our sites, in the United States.</li>
           <li><strong>Payment providers</strong> that take your payment and send refunds: Stripe (cards), Flutterwave (cards, bank transfer and mobile money), Monnify (Nigerian bank transfer and cards) and pawaPay (mobile money), depending on your country and the method you choose. Flutterwave also sends payouts of P2P money to your bank account. Each also processes your payment under its own privacy notice.</li>
           <li><strong>Blockchain data providers</strong> that read the blockchains for us, to find and confirm deposits and withdrawals: Alchemy, QuickNode, Infura, Ankr, NodeReal, GetBlock, Chainstack, Moralis, Helius, TronGrid, Tatum, BlockCypher, mempool.space, Blockstream and litecoinspace.org, depending on the network. They receive your deposit and withdrawal addresses and transaction hashes, not your name.</li>
           <li><strong>Sanctions screening providers</strong>: Chainalysis and TRM Labs receive the crypto withdrawal addresses you save, to check them against sanctions lists.</li>
@@ -119,6 +132,7 @@ export default function PrivacyNotice() {
         <ul>
           <li>Server and security logs are kept by our hosting provider for a short period, usually no longer than 30 days.</li>
           <li>The daily code used to count a store&apos;s visitors is deleted at the end of the day. The daily counts, which contain no personal information, are kept for about 13 months.</li>
+          <li>Uploaded images are kept while they are used on a store or our sites; uploads never completed are deleted within a day. A domain&apos;s registrant details are kept while it is registered through us, and as long as our records of its purchase.</li>
           <li>Your account is kept while it is open. Ask us to close it at any time; we then delete your account details within 30 days, except what we must keep for the records below.</li>
           <li>Orders, payments and refunds are kept for as long as accounting and tax laws require, usually six years after the order.</li>
           <li>Disputes and their messages are kept with the order they are about, for as long as we keep the order (usually six years after it), so we can deal with any claim about it.</li>

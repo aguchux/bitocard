@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Layers } from "lucide-react";
 import { ActionDialog, Button, Card, CardHeader, Dialog, EmptyState, errorMessage, Notice, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
+import { appUrl } from "@bitocard/ui/site";
 import { type EditorSources, HomeEditor } from "@bitocard/admin-ui/storefront";
 import {
   type Store,
@@ -120,7 +121,7 @@ function Designer({ store, home, templates }: { store: Store; home: StoreHomeEdi
       previewable
       sources={sources}
       copy={{
-        publish: "Shoppers see this home page within a minute. Earlier versions stay in Versions.",
+        publish: "Shoppers see this home page within a minute. Earlier versions stay in Versions. Everything on it must be yours to use and honest (reseller terms, section 8).",
         reset: { label: "Start from the design", description: "Your draft is replaced by the design’s starting home page. What shoppers see does not change until you publish." },
         empty: "The home page has no sections. Add one, or start from the design.",
         notLive: "Shoppers see the design’s starting home page. Publish to show yours.",
@@ -134,6 +135,10 @@ function Designer({ store, home, templates }: { store: Store; home: StoreHomeEdi
       }}
     >
       <DesignChoice store={store} templates={templates} />
+      <p className="text-xs text-muted">
+        You are responsible for the words, logos and images you publish: they must be yours to use, honest and free of anyone&apos;s personal details. See{" "}
+        <a href={appUrl("legals", "/documents/reseller-terms#content")} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">what you publish on your stores</a>.
+      </p>
     </HomeEditor>
   );
 }

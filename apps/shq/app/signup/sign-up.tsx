@@ -361,7 +361,7 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
             <p className="text-xs text-muted">
               By creating an account you agree to the{" "}
               <a href={termsUrl} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">
-                Terms of use
+                Reseller terms
               </a>{" "}
               and confirm you have read the{" "}
               <a href={privacyUrl} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">

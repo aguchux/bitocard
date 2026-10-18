@@ -1,0 +1,42 @@
+// Every legal document listed in legal.ts (and so in every site's footer) is a page of the legals app, with its card on
+// the documents hub and its banner image: a document added to the list but not built, or built but not listed, fails.
+import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { describe, test } from 'node:test';
+
+const legal = readFileSync(new URL('../src/legal.ts', import.meta.url), 'utf8');
+const legals = new URL('../../../apps/legals/', import.meta.url);
+const content = readFileSync(new URL('components/content.ts', legals), 'utf8');
+const og = readFileSync(new URL('components/og.tsx', legals), 'utf8');
+
+const listed = [...legal.matchAll(/\{ href: "(\/documents\/[a-z-]+)", label: "([^"]+)"/g)].map(([, href, label]) => ({ href, label }));
+
+describe('legal documents', () => {
+  test('the list names the documents', () => {
+    assert.ok(listed.length >= 5);
+    assert.ok(listed.some(doc => doc.href === '/documents/reseller-terms'));
+  });
+
+  for (const { href, label } of listed) {
+    test(`${label} has its page, card and banner image`, () => {
+      const page = new URL(`app/(site)${href}/page.tsx`, legals);
+      assert.ok(existsSync(page), `${href} has a page`);
+      const source = readFileSync(page, 'utf8');
+      assert.match(source, new RegExp(`path: "${href}"`), `${href} passes its own path to pageMetadata`);
+      assert.match(source, /pageMetadata\(seo\)/);
+      assert.ok(content.includes(`"${href}":`), `${href} has a card on the documents hub`);
+      assert.ok(og.includes(`"${href}":`), `${href} has a banner image`);
+    });
+  }
+
+  test('every document page is listed', () => {
+    const pages = readdirSync(new URL('app/(site)/documents/', legals), { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => `/documents/${entry.name}`);
+    assert.deepEqual(pages.sort(), listed.map(doc => doc.href).sort());
+  });
+
+  test('the reseller terms are marked as a draft and cover stores, content and domains', () => {
+    const terms = readFileSync(new URL('app/(site)/documents/reseller-terms/page.tsx', legals), 'utf8');
+    assert.match(terms, /This is a draft/);
+    for (const id of ['stores', 'content', 'domains', 'customers', 'disputes', 'wallet']) assert.match(terms, new RegExp(`<Section id="${id}"`), `section ${id}`);
+  });
+});

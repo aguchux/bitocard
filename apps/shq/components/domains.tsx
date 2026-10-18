@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Copy, Globe, Mail, RefreshCw, Search, ServerCog, Trash2 } from "lucide-react";
+import { appUrl } from "@bitocard/ui/site";
 import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, errorMessage, Field, formatDate, Input, Notice, Select, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import {
   type DnsImport,
@@ -167,7 +168,9 @@ function BuyDialog({ store, offer, defaults, onClose, onBought }: { store: strin
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-muted">The domain is registered in this name: you or your business. The registrar emails this address once to confirm it; confirm it within 15 days or the domain is paused.</p>
+        <p className="text-sm text-muted">The domain is registered in this name: you or your business. The registrar emails this address once to confirm it; confirm it within 15 days or the domain is paused. Domains bought here are yours, under the{" "}
+          <a href={appUrl("legals", "/documents/reseller-terms#domains")} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">reseller terms</a>.
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
           {field("first_name", "First name", { autoComplete: "given-name" })}
           {field("last_name", "Last name", { autoComplete: "family-name" })}

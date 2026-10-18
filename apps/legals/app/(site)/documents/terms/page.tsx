@@ -28,7 +28,7 @@ export default function TermsOfUse() {
           <li>Setup times, including our five-minute store setup goal, are goals, not promises. Verification, funding and readiness to take orders may take longer.</li>
         </ul>
         <p>Crypto wallets and peer-to-peer (P2P) trading are not offered in any country yet. Section 4 explains how they will work where we switch them on.</p>
-        <p>When a service launches, it will be governed by separate terms, such as reseller and customer agreements, which you will need to accept before using it.</p>
+        <p>When a service launches, it will be governed by separate terms, such as our <Link href="/documents/reseller-terms">reseller terms</Link> and customer terms of sale, which you will need to accept before using it.</p>
       </Section>
 
       <Section id="problems" title="3. Problems with an order">

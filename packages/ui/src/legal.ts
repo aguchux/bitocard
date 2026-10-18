@@ -62,6 +62,7 @@ export const defaultEntity = legalEntities[0];
 export const legalDocuments = [
   { href: "/documents/privacy", label: "Privacy notice", short: "Privacy" },
   { href: "/documents/terms", label: "Terms of use", short: "Terms" },
+  { href: "/documents/reseller-terms", label: "Reseller terms", short: "Reseller terms" },
   { href: "/documents/cookies", label: "Cookie notice", short: "Cookies" },
   { href: "/documents/notice", label: "Legal notice", short: "Legal notice" },
 ] as const;

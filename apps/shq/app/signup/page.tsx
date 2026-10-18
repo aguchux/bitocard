@@ -10,7 +10,7 @@ export default function SignUpPage() {
   return (
     <AuthLayout>
       <Suspense>
-        <SignUp termsUrl={appUrl("legals", "/documents/terms")} privacyUrl={appUrl("legals", "/documents/privacy")} />
+        <SignUp termsUrl={appUrl("legals", "/documents/reseller-terms")} privacyUrl={appUrl("legals", "/documents/privacy")} />
       </Suspense>
     </AuthLayout>
   );

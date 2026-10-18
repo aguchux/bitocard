@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Search } from "lucide-react";
 import { Button, Card, CardHeader, cn, errorMessage, Field, Input, Notice, PageHeader, QueryView, Skeleton, useDebouncedValue } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
+import { appUrl } from "@bitocard/ui/site";
 import { type StoreTemplate, useCatalogueProductsInfiniteQuery, useCreateStoreMutation, useStoreTemplatesQuery } from "@bitocard/api-client/reseller";
 import type { StoreTemplateKey } from "@bitocard/api-client/storefront";
 import { ShqShell } from "@/components/shq-shell";
@@ -134,6 +135,10 @@ function Wizard({ templates }: { templates: StoreTemplate[] }) {
             </Field>
             <SubdomainField id="store-subdomain" value={subdomain} onChange={setSubdomain} hint="Lower-case letters, numbers and single hyphens. You can change it while the store is a draft." />
             {template.single_product ? <FocusPicker value={focus} onChange={setFocus} /> : null}
+            <p className="text-xs text-muted">
+              What you publish on your store (its name, words, logos and images) must be yours to use and honest, as the{" "}
+              <a href={appUrl("legals", "/documents/reseller-terms#content")} target="_blank" rel="noopener" className="font-semibold text-brand-600 hover:underline">reseller terms</a> set out.
+            </p>
           </form>
         </Card>
       ) : null}

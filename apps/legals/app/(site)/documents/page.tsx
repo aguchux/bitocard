@@ -4,7 +4,7 @@ import { appUrl } from "@bitocard/ui/site";
 import { ContactBand, DocumentCards, PageBanner, RegionLinks, Section } from "@/components/blocks";
 import { breadcrumbSchema, pageMetadata, webPageFields } from "@/components/seo";
 
-const seo = { title: "Documents", description: "Every BitoCard legal document in one place: privacy notice, terms of use, cookie notice and legal notice, with your privacy rights by region.", path: "/documents" };
+const seo = { title: "Documents", description: "Every BitoCard legal document in one place: privacy notice, terms of use, reseller terms, cookie notice and legal notice, with your privacy rights by region.", path: "/documents" };
 
 export const metadata = pageMetadata(seo);
 
@@ -41,7 +41,7 @@ export default function DocumentsPage() {
 
       <Section id="coming-next" title="Coming next">
         <div className="next-note">
-          <p>Before BitoCard launches accounts, payments or transactions, we will publish the terms that govern them here, such as reseller and customer agreements, and update the notices above. Nothing here yet offers or governs a live service.</p>
+          <p>Our reseller terms are published as a draft for resellers to read before they sign up. Before BitoCard takes payments in a country, we will publish the customer terms of sale here and update the notices above. Nothing here yet offers or governs a live service.</p>
         </div>
       </Section>
 

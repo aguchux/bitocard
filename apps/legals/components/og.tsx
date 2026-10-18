@@ -17,8 +17,8 @@ export const ogPages = {
   "/documents": {
     alt: "BitoCard legal documents – every document in one place",
     crumbs: [host, "Documents"], eyebrow: updated, title: "Every document.", accent: "One place.",
-    subtitle: "Privacy notice, terms of use, cookie notice and legal notice, kept up to date for every region.",
-    chips: ["Privacy", "Terms", "Cookies", "Legal notice"],
+    subtitle: "Privacy notice, terms of use, reseller terms, cookie notice and legal notice, kept up to date for every region.",
+    chips: ["Privacy", "Terms", "Reseller terms", "Cookies", "Legal notice"],
   },
   "/documents/privacy": {
     alt: "BitoCard privacy notice – your privacy rights in every region",
@@ -31,6 +31,12 @@ export const ogPages = {
     crumbs: [host, "Documents", "Terms of use"], eyebrow: updated, title: "Terms of use",
     subtitle: "The rules for using BitoCard websites, and the law that applies where you are.",
     chips: ["Acceptable use", "Intellectual property", "Governing law"],
+  },
+  "/documents/reseller-terms": {
+    alt: "BitoCard reseller terms",
+    crumbs: [host, "Documents", "Reseller terms"], eyebrow: updated, title: "Reseller terms",
+    subtitle: "Selling with BitoCard: your account, wallet, prices, stores, domains and customers.",
+    chips: ["Stores", "Wallet & payouts", "Domains", "Your customers"],
   },
   "/documents/cookies": {
     alt: "BitoCard cookie notice – only the cookies we need, consent first",
