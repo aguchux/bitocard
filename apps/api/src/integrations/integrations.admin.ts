@@ -27,6 +27,8 @@ type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
 
 const maxValueLength = 4000;
+/** Platform integrations with their own Test connection check (not a connectable adapter or a blockchain provider). */
+const ownTests = new Set(['domains', 'store_hosts']);
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such integration.');
 const invalidValue = (key: string, message: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'invalid_value', message, `values.${key}`);
 
@@ -226,7 +228,7 @@ export class IntegrationsAdminService {
       /** The Sandbox switch: true while BitoCard's account uses the provider's sandbox (never live); null without one. */
       sandbox: sandboxField ? sandboxField.value === true : null,
       /** Whether Test connection can check these credentials (a built adapter with a check). */
-      testable: group.section === 'blockchain' || Boolean(connectable(group.id)),
+      testable: group.section === 'blockchain' || ownTests.has(group.id) || Boolean(connectable(group.id)),
       /** Resellers' own accounts: `available` once BitoCard's adapter can take them, `enabled` when an admin allows it. */
       reseller_access: { available: Boolean(connectable(group.id)), enabled: access.has(group.id) },
       updated_at: updates.sort().at(-1) ?? null,

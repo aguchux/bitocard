@@ -134,6 +134,8 @@ describe('store addresses', () => {
   });
 
   test('Test connection reads the zone and the storefront project, and refuses another zone', async () => {
+    const cards = (await admin.get('/v1/admin/integrations')).json.data;
+    assert.deepEqual(['store_hosts', 'domains'].map(id => cards.find(card => card.id === id).testable), [true, true], 'the cards show Test connection');
     const tested = await admin.post('/v1/admin/integrations/store_hosts/test');
     assert.equal(tested.status, 200, JSON.stringify(tested.json));
     assert.deepEqual([tested.json.ok, tested.json.message], [true, 'Connected to the bitocard.com zone and the bitocard-storefront project.']);
