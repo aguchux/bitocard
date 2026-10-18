@@ -1,6 +1,6 @@
 # BitoCard VPN implementation plan
 
-**Status:** stages 1–5 implemented through 18 October 2026. VPN sales remain disabled.
+**Status:** stages 2–11 implemented on 18 October 2026 (engineering complete). Stage 1's launch blockers and stage 12's pilot remain, so VPN sales stay disabled: the supplier, its markets and any listing are off.
 
 This is the implementation source for VPN access in BitoCard. The earlier `BITOCARD_VPNRESELLERS_CLAUDE_PLAN.md` is background material only. Where they differ, this plan, `PLANS.md`, `DESIGN.md`, and `AGENTS.md` win.
 
@@ -79,54 +79,48 @@ Launch blockers requiring written answers or an executed agreement:
 - [x] Store the password only in encrypted delivery storage. Never log it or include it in webhooks, lists, notifications, or lifecycle rows.
 - [x] Generate the password before the create attempt and persist the encrypted value before the network call so a retry uses the same credentials.
 
-### 6. Order provisioning
+### 6. Order provisioning — complete
 
-- Create the fixed 30-day supplier offer and BitoCard product through the existing catalogue sync/linkage.
-- Provision only from the authoritative paid order transition.
-- Use the existing order attempt, polling, wallet settlement, reversal, and exception queue.
-- A clear supplier refusal fails through the existing reversal policy. A timeout stays pending and is reconciled before any retry.
-- Set the expiry explicitly after account creation and verify it from a subsequent read before completing the order.
+- [x] Create the fixed 30-day supplier offer and BitoCard product through the existing catalogue sync/linkage (`software:WW:bitocard:vpn-access-30d`, SKU `vpn-30-day`, face value and cost the integration's expected monthly cost).
+- [x] Provision only from the authoritative paid order transition (`OrdersService.attempt`; the sandbox never calls the supplier).
+- [x] Use the existing order attempt, polling, wallet settlement, reversal, and exception queue.
+- [x] A clear supplier refusal fails through the existing reversal policy. A timeout stays pending and is reconciled before any retry: `check_username` first, then the project's accounts; the status check never creates.
+- [x] Set the expiry explicitly after account creation and verify it from a subsequent read before completing the order. Access ends at the start of the UTC day after 30 full days (`vpnExpiry`), so the customer always gets at least 30 days. An account without an expiry would renew automatically and bill every day, so it never completes.
+- [x] Accounts are created inside BitoCard's project under a BitoCard customer record named after the account (`vpn+<username>@bitocard.com`): no end-user data is sent. **Confirm with the supplier** that such customer records are acceptable.
 
-### 7. Lifecycle and reconciliation
+### 7. Lifecycle and reconciliation — complete
 
-- Disable accounts at the promised expiry and verify supplier status.
-- Reconcile active accounts, expiry, actual daily cost, and central supplier balance.
-- Alert on expiry drift, unexpected active accounts, low balance, and projected runway below the approved threshold.
-- Offer audited password reset. Customer deletion is not an MVP action; permanent deletion is restricted to retention-aware admin maintenance.
+- [x] `VpnService` (`apps/api/src/vpn/vpn.service.ts`) syncs what each subscription should be (active within its term while its order is completed; `expired`, `revoked` after a refund, `suspended` by an admin, `failed`) with the supplier, and reads it back before believing it. The `vpn` job runs every 15 minutes.
+- [x] Disable at the promised expiry and after refunds, verified; unconfirmed disables retry (5, 15, 60, 180, 360 minutes) and then tell operations (`admin.vpn.attention`).
+- [x] Expiry drift (including a missing expiry) is set back to ours and reported; an account the supplier disabled during its term goes to `needs_review`, never re-enabled blindly.
+- [x] Daily reconciliation (`vpn-reconcile` job, `vpn_reconciliations`): the project's Active accounts against ours (strays and missing ones, ours checked again at once), the credit (`GET /profile`), the credit used since the previous run, and the runway. `admin.vpn.credit_low` below `LOW_BALANCE_USD` (default 25) or under 7 days of runway.
+- [x] Audited password reset for resellers, customers and admins: the new password is stored encrypted as pending before the supplier is asked and sent again until confirmed, so an unclear reply never strands the customer. Customer deletion is not an MVP action.
 
-### 8. Public API and documentation
+### 8. Public API and documentation — complete
 
-- Add VPN subscription state to the order presenter and OpenAPI response.
-- Add authenticated access and password-reset endpoints with reseller scopes.
-- Webhooks report readiness/status only; clients fetch secrets from the authenticated order access endpoint.
-- Update API guides and generated examples in the same change.
+- [x] Following the eSIM pattern, VPN state is its own resource rather than a field on `Order`: `GET /v1/vpn-subscriptions(?order_id, status)`, `GET /v1/vpn-subscriptions/{id}` (`orders:read`), `POST /v1/vpn-subscriptions/{id}/password-reset` (`orders:write`, owners, admins and support), documented with full examples and checked against real responses.
+- [x] `vpn_subscription.updated` reports status only (active, expired, revoked, suspended, needs review); credentials only on `GET /v1/orders/{id}`.
+- [x] Guides: Orders > VPN access, the changelog, the reference tag `VPN`.
 
-### 9. Admin experience
+### 9. Admin experience — complete
 
-- Supplier credentials and connection test under Settings > Integrations.
-- Product, offer, term, and market controls under Catalogue.
-- Subscription health table with status, expiry, last sync, next sync, order, and safe supplier reference.
-- Actions: sync, disable, enable, and password reset with existing audit conventions.
+- [x] Credentials and the low-credit threshold under Settings > Integrations > Suppliers > VPNresellers.
+- [x] Orders > VPN access (`apps/admin/app/(console)/orders/vpn`): health (active, needing attention, credit and runway, billed against expected), every subscription with its supplier state, last and next check and errors, and the reconciliations. Actions: check now, suspend, enable (step-up), password reset, run the reconciliation; all audited.
 
-### 10. Storefront and order access
+### 10. Storefront and order access — complete
 
-- Add the catalogue card and product detail using existing software components.
-- Add VPN order access using the same authentication and Reveal system as licences and eSIMs.
-- Status mapping: pending amber, processing blue, ready/active green, needs support amber, expired grey, failed red, refunded pink.
-- Support phone widths, 44px controls, keyboard access, screen-reader labels, and no horizontal scrolling.
+- [x] The product uses the existing software card and product page.
+- [x] Order access (`/a/<token>` and `/account/orders/<id>`): the username and password hidden until Reveal (the username too), with copy; `VpnAccess` shows the status, when access ends, "Does not renew automatically", devices and a password reset that shows the new sign-in once.
 
-### 11. SHQ
+### 11. SHQ — complete
 
-- Present VPN in existing catalogue eligibility, price, order, customer, and report views.
-- Keep supplier identity and cost hidden.
-- Show term, customer price, BitoCard wholesale price, reseller profit, fulfilment state, and expiry using existing presenters.
+- [x] The order page shows the VPN delivery as Username and Password, and a VPN access card with its status, expiry and password reset. Catalogue, pricing and reports use the existing views.
 
 ### 12. Verification and controlled launch
 
-- Unit: status mapping, dates, credentials, request bodies, 4xx refusal versus timeout ambiguity.
-- Integration: paid provisioning, duplicate worker, lost create response, status polling, expiry, reset, reversal, and insufficient supplier balance.
-- End to end: API, parent store, reseller store, SHQ, admin, order access, notifications, and webhooks.
-- Pilot with internal accounts and a small supplier balance. Reconcile every account and daily charge before enabling one approved market.
+- [x] Unit and integration tests: `test/vpnresellers.test.mjs` (lookup, create once, unclear create, refusal, expiry that does not stick, expiry dates, credit and accounts), `test/vpn-lifecycle.test.mjs` (provisioning, reset including an unclear one, expiry, refund, drift, review, suspend and enable, reconciliation, schemas, the supplier never named), `test/vpn-credentials.test.mjs`, storefront `test/vpn-actions.test.ts`.
+- [ ] Pilot with internal accounts and a small supplier balance. Reconcile every account and daily charge before enabling one approved market.
+- [ ] Check against the live API: `check_username`, `/projects/{id}/accounts` paging and `status` filter, the `customer` record on create, and that `expire_at` ends access at midnight UTC.
 
 ## Non-negotiable invariants
 
@@ -141,4 +135,4 @@ Launch blockers requiring written answers or an executed agreement:
 
 ## Handoff state
 
-Stages 1–5 establish decisions, registration, the supplier client, lifecycle persistence, and pre-call encrypted credentials. They intentionally leave VPN unavailable for purchase. The next implementation agent should begin at stage 6 and must not enable the supplier, its markets, a VPN offer, or a listing before stages 6–7 and the launch blockers are complete.
+Engineering is complete through stage 11 (18 October 2026). What is left is not code: the stage 1 launch blockers (written resale and market approval, privacy, acceptable use and refund terms, verified claims, the supplier's answers on lifecycle and limits) and the stage 12 pilot. Until then, keep the supplier, its markets and any listing switched off. Enabling sales means: save the credentials, switch on one approved market, sync, review the price, list it, then switch the supplier on.

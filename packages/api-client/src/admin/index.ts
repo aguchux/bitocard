@@ -440,5 +440,6 @@ export * from './payment-methods';
 export * from './crypto';
 export * from './kyc';
 export * from './top-ups';
+export * from './vpn';
 export * from './exchange';
 export * from './domains';

@@ -1578,7 +1578,8 @@ model VpnSubscription {
   supplierCode      String        @map("supplier_code")
   /// Null while credentials are prepared but the supplier has not confirmed account creation.
   supplierAccountId String?       @map("supplier_account_id")
-  /// provisioning, active, disabled, expired, failed or needs_review.
+  /// provisioning, active, expired (disabled at the end of its term), revoked (disabled after a refund), suspended
+  /// (disabled by an admin), failed (never provisioned) or needs_review (the supplier disagrees and an admin must look).
   status            String        @default("provisioning")
   supplierStatus    String?       @map("supplier_status")
   startsAt          DateTime?     @map("starts_at")
@@ -1587,6 +1588,14 @@ model VpnSubscription {
   lastSyncedAt      DateTime?     @map("last_synced_at")
   nextSyncAt        DateTime?     @map("next_sync_at")
   credentialVersion Int           @default(1) @map("credential_version")
+  /// A new password sent to the supplier but not yet confirmed (encrypted): the same one is sent again until it is.
+  pendingPasswordEncrypted String? @map("pending_password_encrypted")
+  passwordChangedAt DateTime?     @map("password_changed_at")
+  /// Consecutive failed supplier checks, and the last one's reason (internal).
+  syncFailures      Int           @default(0) @map("sync_failures")
+  lastError         String?       @map("last_error")
+  /// When admins were last told about this account (needs review, drift), so they are told once per problem.
+  alertedAt         DateTime?     @map("alerted_at")
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
   order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1596,6 +1605,30 @@ model VpnSubscription {
   @@index([status, nextSyncAt])
   @@index([resellerId, mode, createdAt])
   @@map("vpn_subscriptions")
+}
+
+/// A daily check of BitoCard's VPN supplier account: its credit, the accounts it bills (Active) against those BitoCard
+/// expects to be active, and the credit used since the last check (internal; admins only).
+model VpnReconciliation {
+  id             String   @id @default(uuid()) @db.Uuid
+  supplierCode   String   @map("supplier_code")
+  /// The supplier's credit in US cents, and how much less it is than at the previous check (null after a top-up).
+  balanceCents   Int?     @map("balance_cents")
+  spentCents     Int?     @map("spent_cents")
+  /// Accounts the supplier bills, accounts BitoCard expects active, and the days the credit lasts at that rate.
+  supplierActive Int      @map("supplier_active")
+  expectedActive Int      @map("expected_active")
+  runwayDays     Float?   @map("runway_days")
+  /// Active at the supplier but not active here (usernames and IDs only), and active here but not at the supplier.
+  unexpected     Json     @default("[]")
+  missing        Json     @default("[]")
+  /// Every page of accounts was read (false: the list was too long or a page failed, so nothing was concluded).
+  complete       Boolean
+  error          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([supplierCode, createdAt])
+  @@map("vpn_reconciliations")
 }
 
 /// The order's page link (`/a/<token>` on the store's address): permanent, but the reseller can replace it, which ends

@@ -136,6 +136,28 @@ export const eventObjectSchemas: Record<string, Schema> = {
     }),
     additionalProperties: false,
   },
+  VpnSubscription: {
+    ...objectSchema('VPN subscription', {
+      object: str('Always `vpn_subscription`.', { const: 'vpn_subscription' }),
+      id: str('VPN subscription ID.', { format: 'uuid' }),
+      order_id: str('The order that bought it. Its username and password are only on `GET /v1/orders/{id}`.', { format: 'uuid' }),
+      mode,
+      status: str(
+        '`provisioning`: being set up; `active`: working until `expires_at`; `expired`: its term ended and access stopped; `revoked`: stopped after its order was refunded; `suspended`: stopped by BitoCard; `failed`: never set up (its order failed); `needs_review`: BitoCard is checking it.',
+        { enum: ['provisioning', 'active', 'expired', 'revoked', 'suspended', 'failed', 'needs_review'] },
+      ),
+      term_days: int('Days of access bought.'),
+      devices: int('Devices that can use it at once.'),
+      renews_automatically: { type: 'boolean', description: 'Always `false`: access ends at `expires_at`. Buy a new order for more time.', const: false },
+      starts_at: nullableTime('When access started.'),
+      expires_at: nullableTime('When access ends (midnight UTC, at least 30 full days after it started).'),
+      ended_at: nullableTime('When access was stopped (expired, revoked or suspended); null while active.'),
+      password_changed_at: nullableTime('When its password was last reset.'),
+      created_at: time('When it was created.'),
+      updated_at: time('When it last changed. Use it to ignore an older event that arrives after a newer one.'),
+    }),
+    additionalProperties: false,
+  },
   NumberMessage: {
     ...objectSchema('Number message', {
       object: str('Always `number_message`.', { const: 'number_message' }),
@@ -362,6 +384,24 @@ export const exampleEsim = (status = 'active', extra: Record<string, unknown> = 
   ...extra,
 });
 
+export const exampleVpnSubscription = (status = 'active', extra: Record<string, unknown> = {}) => ({
+  object: 'vpn_subscription',
+  id: '7a8b9c0d-1e2f-4a3b-9c4d-5e6f7a8b9c0d',
+  order_id: '3d8b0f25-6c4e-4a7b-9f2d-1e0c8b6a4f32',
+  mode: 'live',
+  status,
+  term_days: 30,
+  devices: 10,
+  renews_automatically: false,
+  starts_at: '2026-10-18T09:15:04.000Z',
+  expires_at: '2026-11-18T00:00:00.000Z',
+  ended_at: status === 'expired' ? '2026-11-18T00:05:12.000Z' : null,
+  password_changed_at: null,
+  created_at: '2026-10-18T09:15:01.870Z',
+  updated_at: status === 'expired' ? '2026-11-18T00:05:12.000Z' : '2026-10-18T09:15:04.000Z',
+  ...extra,
+});
+
 type EventDoc = { schema: string; summary: string; description: string; example: object };
 
 /** When each event fires, when it does not, and what comes before and after it. */
@@ -506,6 +546,16 @@ export const eventDocs: Record<EventType, EventDoc> = {
     ].join('\n\n'),
     example: exampleEsim('active'),
   },
+  'vpn_subscription.updated': {
+    schema: 'VpnSubscription',
+    summary: 'VPN access changed',
+    description: [
+      'Fires when VPN access bought by one of your orders changes `status`: it became `active` (with its order’s `order.completed`), its term ended (`expired`), it was stopped after its order was refunded (`revoked`) or by BitoCard (`suspended`), or BitoCard is checking it (`needs_review`).',
+      'Does not fire for a password reset, and never carries the username or password: fetch them with `GET /v1/orders/{id}`.',
+      'Comes after `order.completed`. Followed by more `vpn_subscription.updated` events; access never renews, so `expired` is the last.',
+    ].join('\n\n'),
+    example: exampleVpnSubscription('expired'),
+  },
   'dispute.opened': {
     schema: 'DisputeSummary',
     summary: 'A dispute was opened',
@@ -605,6 +655,7 @@ const exampleEventIds: Record<EventType, string> = {
   'number.deleted': 'c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f',
   'number.sms_received': 'd4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f8a',
   'esim.updated': '4bf2a3b4-c5d6-4e7f-8a8b-0c1d2e3f4a5b',
+  'vpn_subscription.updated': '5c03b4c5-d6e7-4f8a-9b9c-1d2e3f4a5b6c',
   'dispute.opened': 'e5f6a7b8-c9d0-4e1f-8a2b-4c5d6e7f8a9b',
   'dispute.message_received': 'f6a7b8c9-d0e1-4f2a-9b3c-5d6e7f8a9b0c',
   'dispute.escalated': '07b8c9d0-e1f2-4a3b-8c4d-6e7f8a9b0c1d',

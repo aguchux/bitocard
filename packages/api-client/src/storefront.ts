@@ -388,6 +388,20 @@ export type StoreEsimTopUpOptions = {
 
 export type StoreEsimTopUp = { object: 'esim_top_up'; id: string; name: string; status: 'pending' | 'completed' | 'failed'; amount: number; currency: string; failure_reason: string | null };
 
+/** VPN access an order bought, on its order page: never the supplier; the sign-in details are the order's delivery. */
+export type StoreVpn = {
+  object: 'vpn_subscription';
+  id: string;
+  status: 'provisioning' | 'active' | 'expired' | 'revoked' | 'suspended' | 'failed' | 'needs_review';
+  term_days: number;
+  devices: number;
+  renews_automatically: false;
+  starts_at: string | null;
+  expires_at: string | null;
+  ended_at: string | null;
+  password_changed_at: string | null;
+};
+
 // -- Crypto wallets and P2P ------------------------------------------------------------------------------------------
 
 /**

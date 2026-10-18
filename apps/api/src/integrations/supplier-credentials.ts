@@ -33,11 +33,12 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   {
     code: 'vpnresellers',
     name: 'VPNresellers',
-    description: 'Fixed-term VPN access. Registered for the pilot; customer sales stay off until provisioning and expiry reconciliation are complete.',
+    description: 'Fixed-term VPN access (30 days, never renewed automatically). Keep the supplier and its markets off until the launch blockers in the VPN plan are cleared.',
     fields: [
       secret('API_TOKEN', 'API token', 'VPNresellers dashboard > API access. Sent as a bearer token and never exposed outside the supplier adapter.'),
       id('PROJECT_ID', 'Project ID', 'The VPNresellers project used for BitoCard customer accounts.'),
       id('MONTHLY_COST_USD', 'Expected monthly cost (USD)', 'The contracted cost of one active account, used for catalogue costing only after provisioning is enabled. Confirm whenever the volume tier changes.'),
+      optional('LOW_BALANCE_USD', 'Low credit alert (USD)', 'Operations and finance are told when the supplier credit falls below this (default 25), or will last fewer than 7 days at the current number of active accounts.'),
       address('Default: https://api.vpnresellers.com/v4_1'),
     ],
   },

@@ -1,6 +1,6 @@
 import { productFeatureKeys } from '../../catalogue/features.js';
 import { ProductCategory } from '../../generated/prisma/client.js';
-import { eventObjectSchemas, exampleEsim, exampleNumberMessage, exampleVirtualNumber } from '../../webhooks/openapi.js';
+import { eventObjectSchemas, exampleEsim, exampleNumberMessage, exampleVirtualNumber, exampleVpnSubscription } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, num, objectSchema, oneOf, ref, type Schema, shape, str, stringMap, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
@@ -482,6 +482,15 @@ const esimCancellation = objectSchema(
   'The order’s eSIMs after cancelling.',
 );
 
+const vpnPasswordReset = objectSchema(
+  'VpnPasswordReset',
+  {
+    vpn_subscription: ref('VpnSubscription'),
+    credentials: objectSchema('VPN credentials', { username: str('The VPN username (unchanged).'), password: str('The new password. Show it only to your customer; `GET /v1/orders/{id}` returns it from now on.') }, 'The username and the new password.'),
+  },
+  'VPN access with its new password.',
+);
+
 const exampleTopUp = {
   object: 'esim_top_up',
   id: '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d',
@@ -498,7 +507,7 @@ const exampleTopUp = {
 };
 
 export const commerceDocs: DocsArea = {
-  schemas: { EsimTopUpOption: esimTopUpOption, EsimTopUp: esimTopUp, EsimCancellation: esimCancellation, Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
+  schemas: { EsimTopUpOption: esimTopUpOption, EsimTopUp: esimTopUp, EsimCancellation: esimCancellation, VpnPasswordReset: vpnPasswordReset, Product: product, ListingUpdate: listingUpdate, Pricing: pricing, PricePreview: pricePreview, Quote: quote, OrderAccessLink: accessLink, OrderDetail: orderDetail, Receipt: receipt, NumberRenewalPrice: renewalPrice },
   responses: {
     'GET /v1/catalogue/products': {
       status: 200,
@@ -594,6 +603,14 @@ export const commerceDocs: DocsArea = {
       description: 'The order’s eSIMs, cancelled, and the order refunded.',
       schema: 'EsimCancellation',
       example: { object: 'list', data: [exampleEsim('cancelled', { data: { total: 1_073_741_824, used: 0, remaining: 1_073_741_824, updated_at: '2026-10-11T09:00:00.000Z' }, cancellable: false })], refunded: true },
+    },
+    'GET /v1/vpn-subscriptions': { status: 200, description: 'A page of your VPN access, newest first.', schema: list(ref('VpnSubscription')), example: listExample([exampleVpnSubscription('active')], false) },
+    'GET /v1/vpn-subscriptions/{id}': { status: 200, description: 'The VPN access.', schema: 'VpnSubscription', example: exampleVpnSubscription('active') },
+    'POST /v1/vpn-subscriptions/{id}/password-reset': {
+      status: 200,
+      description: 'The new password, confirmed by the supplier. The old one no longer works.',
+      schema: 'VpnPasswordReset',
+      example: { vpn_subscription: exampleVpnSubscription('active', { password_changed_at: '2026-10-20T14:02:11.000Z', updated_at: '2026-10-20T14:02:11.000Z' }), credentials: { username: 'bc-20261018091501ab12cd', password: 'q3Zr8vYwKp1sXe0tLm9nBd4cFh7gJu2a' } },
     },
     'POST /v1/orders/{id}/simulate': {
       status: 200,

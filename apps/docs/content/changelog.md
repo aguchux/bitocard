@@ -14,6 +14,7 @@ Webhook payloads carry their own `api_version`; see [Webhooks → Versioning](/g
 
 ## October 2026
 
+- **VPN access (not on sale yet).** Orders for VPN access deliver a `vpn_account` (username in `serial`, password in `code`, on `GET /v1/orders/{id}` only). New: `GET /v1/vpn-subscriptions`, `GET /v1/vpn-subscriptions/{id}` and `POST /v1/vpn-subscriptions/{id}/password-reset`, and the `vpn_subscription.updated` event when access becomes active, expires or is stopped. Access lasts 30 days and never renews automatically.
 - **Full API reference.** Every endpoint now documents its response schema with a complete example, the scopes it needs, and the errors it can return.
 - **Try it.** Signed-in resellers can call the API from these docs against their sandbox or live account, using a short-lived token instead of an API key. See [Try it](/guides/try-it).
 - **`GET /v1/account`** can report `authenticated_as.type: "docs_token"` for calls made from the docs.

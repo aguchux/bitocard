@@ -156,7 +156,9 @@ export type FulfilmentRequest = {
   faceValue: bigint;
   faceCurrency: string;
   quantity: number;
-  recipient: { phone?: string; account_number?: string; transaction_type?: string };
+  recipient: { phone?: string; account_number?: string; transaction_type?: string; email?: string };
+  /** Prepared and encrypted before a VPN supplier is called; transient and never logged or stored in offer metadata. */
+  vpnCredentials?: { username: string; password: string; expiresAt: Date };
 };
 
 /**

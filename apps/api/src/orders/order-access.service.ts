@@ -306,8 +306,9 @@ export class OrderAccessService {
                 hidden: !open,
                 code: open && delivery.codeEncrypted && encryption ? encryption.decrypt(delivery.codeEncrypted) : null,
                 pin: open && delivery.pinEncrypted && encryption ? encryption.decrypt(delivery.pinEncrypted) : null,
-                serial: delivery.serial,
-                details: (delivery.details ?? {}) as Record<string, string>,
+                // A VPN username is half of the sign-in: hidden with its password until Reveal.
+                serial: open || delivery.kind !== 'vpn_account' ? delivery.serial : null,
+                details: Object.fromEntries(Object.entries((delivery.details ?? {}) as Record<string, string>).filter(([key]) => key !== 'credential_version')),
               };
             })
           : [],

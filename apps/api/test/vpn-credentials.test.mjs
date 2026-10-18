@@ -48,6 +48,7 @@ describe('VPN credential preparation', () => {
     const first = await service.prepare(order.id);
     assert.equal(first.username, `bc-${order.supplierReference}`);
     assert.equal(first.password.length, 32);
+    assert.equal(first.expiresAt.getTime() > Date.now() + 29 * 24 * 60 * 60 * 1000, true);
     assert.equal(state.delivery.kind, 'vpn_account');
     assert.equal(state.delivery.serial, first.username);
     assert.notEqual(state.delivery.codeEncrypted, first.password);

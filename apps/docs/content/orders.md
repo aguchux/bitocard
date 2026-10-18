@@ -52,6 +52,10 @@ Orders that stay unclear are reviewed by BitoCard's operations team.
 
 Gift card codes, PINs, licence keys and electricity tokens are encrypted at rest and returned **only** by `POST /v1/orders` and `GET /v1/orders/{id}` for your account. They never appear in order lists, webhooks or receipts. Fetch the single order when you need them, and treat them like cash.
 
+### VPN access
+
+A VPN order delivers one `vpn_account`: the username in `serial` and the password in `code`, both secret, with `details.expires_at`. Access lasts 30 days from when the order was placed (it ends at midnight UTC, at least 30 full days later) and **never renews automatically**: sell another order for more time. Follow it with `GET /v1/vpn-subscriptions?order_id=…` and the `vpn_subscription.updated` event (`active`, then `expired`; `revoked` after a refund). `POST /v1/vpn-subscriptions/{id}/password-reset` gives it a new password and returns it; the old one stops working.
+
 ## Your reference, your customer
 
 Pass `customer_reference` on the quote (your own ID for the customer). It is copied to the order, searchable with `GET /v1/orders?customer_reference=…`, and used for [customer identity checks](/reference/customers). Customers never need BitoCard accounts.

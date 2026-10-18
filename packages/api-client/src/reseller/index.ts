@@ -16,4 +16,5 @@ export * from './integrations';
 export * from './fees';
 export * from './numbers';
 export * from './esims';
+export * from './vpn';
 export * from './disputes';

@@ -1,4 +1,4 @@
-import { AlertTriangle, Gift, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Gift, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'settings';
 
@@ -38,6 +38,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Supplier notifications', href: '/orders/notifications', icon: BellRing },
       { label: 'Disputes', href: '/orders/disputes', icon: MessageSquareWarning },
       { label: 'Chargebacks', href: '/orders/chargebacks', icon: CreditCard },
+      { label: 'VPN access', href: '/orders/vpn', icon: ShieldEllipsis },
     ],
   },
   catalog: {

@@ -26,6 +26,8 @@ import { deliveryEmail, type EmailedDelivery, formatMoney } from '../notificatio
 import { emailedCategories } from '../catalogue/quotes.service.js';
 import { OrderAccessService } from './order-access.service.js';
 import { sellerFor } from './seller.js';
+import { VpnCredentialsService, type PreparedVpnCredentials } from '../vpn/vpn-credentials.service.js';
+import { presentVpn } from '../vpn/presenter.js';
 
 /** When to check an unconfirmed order again, after each check. After the last, it joins the exception queue. */
 export const checkScheduleMs = [30, 60, 120, 300, 600, 1800, 3600, 7200, 14_400, 28_800].map(seconds => seconds * 1000);
@@ -92,6 +94,7 @@ export class OrdersService {
     private readonly inbox: InboxService,
     private readonly email: EmailService,
     private readonly access: OrderAccessService,
+    private readonly vpnCredentials: VpnCredentialsService,
   ) {}
 
   /** The checkout service listens for its customers' orders (registered once at start-up). */
@@ -318,7 +321,8 @@ export class OrdersService {
       mode: order.mode,
       issued_at: (order.completedAt ?? order.updatedAt).toISOString(),
       seller: { name: seller.name, [seller.companyNumberLabel.toLowerCase().replaceAll(' ', '_')]: seller.companyNumber, registered_address: seller.registeredAddress },
-      sold_through: pickOrderStore(order.reseller.stores, order.customer?.storeId)?.name ?? order.reseller.name,
+      // The customer's store, else the first published one, else (a store not published yet) their first store.
+      sold_through: (pickOrderStore(order.reseller.stores, order.customer?.storeId) ?? order.reseller.stores[0])?.name ?? order.reseller.name,
       currency: order.currency,
       items: [{ description: order.product.name, quantity: order.quantity, unit_price: minor(unit), amount: minor(order.priceMinor) }],
       subtotal: minor(order.priceMinor - order.taxMinor),
@@ -358,9 +362,17 @@ export class OrdersService {
   }
 
   /** The sandbox never calls suppliers: it delivers realistic test items, or the outcome chosen with `simulate`. */
-  private sandboxResult(order: OrderWithProduct): FulfilmentResult {
+  private sandboxResult(order: OrderWithProduct, vpn?: PreparedVpnCredentials): FulfilmentResult {
     if (order.simulate === 'failed') return { status: 'failed', detail: 'Simulated failure' };
     if (order.simulate === 'pending') return { status: 'pending', detail: 'Simulated pending' };
+    if (vpn) {
+      return {
+        status: 'completed',
+        supplierTransactionId: `sandbox_${order.supplierReference}`,
+        deliveries: [{ kind: 'vpn_account', code: vpn.password, serial: vpn.username, details: { expires_at: vpn.expiresAt.toISOString(), duration: '30 days', devices: 'Up to 10', renewal: 'Does not renew automatically' } }],
+        vpns: [{ supplierAccountId: `sandbox_${order.supplierReference}`, status: 'active', supplierStatus: 'Active', startsAt: new Date(), expiresAt: vpn.expiresAt }],
+      };
+    }
     return { status: 'completed', supplierTransactionId: `sandbox_${order.supplierReference}`, deliveries: sandboxDeliveries(order.product.category, order.quantity) };
   }
 
@@ -371,13 +383,15 @@ export class OrdersService {
   async attempt(id: string, action: 'place' | 'check', options: { scheduled?: boolean } = {}) {
     const order = await this.prisma.order.findUniqueOrThrow({ where: { id }, include: { product: true } });
     if (order.status !== 'processing') return this.load(id);
+    const vpn = order.source === 'bitocard' && order.supplierCode === 'vpnresellers' ? await this.vpnCredentials.prepare(order.id) : null;
     let result: FulfilmentResult;
     if (order.mode === 'test') {
-      result = this.sandboxResult(order);
+      result = this.sandboxResult(order, vpn ?? undefined);
     } else {
       // The reseller's own orders go through their own account, and only theirs.
       const adapter = order.source === 'own' ? await this.own.adapterFor(order.resellerId, order.supplierCode) : this.adapters.get(order.supplierCode);
       const request = await this.request(order);
+      if (vpn) request.vpnCredentials = { username: vpn.username, password: vpn.password, expiresAt: vpn.expiresAt };
       try {
         if (!adapter) throw new ProviderError(order.supplierCode, 'your supplier account is no longer connected', action === 'place');
         if (action === 'place') {
@@ -532,7 +546,9 @@ export class OrdersService {
       for (const vpn of result.vpns ?? []) {
         const deliveryId = vpnDeliveryId ?? (await tx.orderDelivery.findFirst({ where: { orderId: order.id, kind: 'vpn_account' }, select: { id: true } }))?.id;
         if (!deliveryId) throw new Error('A VPN subscription requires its encrypted credential delivery');
-        await tx.vpnSubscription.upsert({
+        // Checked again at the end of its term (or within six hours), when it is disabled and verified.
+        const nextSyncAt = new Date(Math.min(vpn.expiresAt.getTime(), Date.now() + 6 * 60 * 60 * 1000));
+        const saved = await tx.vpnSubscription.upsert({
           where: { orderId: order.id },
           create: {
             orderId: order.id,
@@ -547,6 +563,7 @@ export class OrdersService {
             startsAt: vpn.startsAt,
             expiresAt: vpn.expiresAt,
             lastSyncedAt: new Date(),
+            nextSyncAt,
           },
           update: {
             supplierAccountId: vpn.supplierAccountId,
@@ -555,8 +572,10 @@ export class OrdersService {
             startsAt: vpn.startsAt,
             expiresAt: vpn.expiresAt,
             lastSyncedAt: new Date(),
+            nextSyncAt,
           },
         });
+        await this.events.record(tx, { resellerId: order.resellerId, mode: order.mode, type: 'vpn_subscription.updated', object: presentVpn(saved) });
       }
       await this.recordEvent(tx, 'order.completed', order.id);
       return true;

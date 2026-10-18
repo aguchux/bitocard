@@ -122,6 +122,7 @@ export const tagTypes = [
   'Wallet',
   'Exchange',
   'Esim',
+  'Vpn',
   'TopUp',
   'ReservedAccount',
   'BankAccount',

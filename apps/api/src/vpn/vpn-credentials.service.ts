@@ -4,11 +4,16 @@ import { Encryption } from '../common/encryption.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { vpnExpiry } from '../suppliers/vpnresellers.adapter.js';
+
+/** A new VPN password: 32 URL-safe characters (192 bits), within every supplier's 6 to 50 character rule. */
+export const vpnPassword = () => randomBytes(24).toString('base64url');
 
 export type PreparedVpnCredentials = {
   subscriptionId: string;
   username: string;
   password: string;
+  expiresAt: Date;
   credentialVersion: number;
 };
 
@@ -36,7 +41,9 @@ export class VpnCredentialsService {
     if (order.supplierCode !== 'vpnresellers') throw new Error('VPN credentials require the VPNresellers supplier');
 
     const username = `bc-${order.supplierReference.replace(/[^a-zA-Z0-9_-]/g, '')}`.slice(0, 50);
-    const password = randomBytes(24).toString('base64url');
+    const password = vpnPassword();
+    // The term starts when the paid order is first sent to the supplier; at least 30 full days (`vpnExpiry`).
+    const expiresAt = vpnExpiry();
     const codeEncrypted = this.encryption().encrypt(password);
     try {
       await this.prisma.$transaction(async tx => {
@@ -57,6 +64,7 @@ export class VpnCredentialsService {
             mode: order.mode,
             productId: order.productId,
             supplierCode: order.supplierCode,
+            expiresAt,
           },
         });
       });
@@ -80,6 +88,7 @@ export class VpnCredentialsService {
       subscriptionId: subscription.id,
       username: subscription.delivery.serial,
       password: this.encryption().decrypt(subscription.delivery.codeEncrypted),
+      expiresAt: subscription.expiresAt ?? (() => { throw new Error('VPN provisioning expiry is missing'); })(),
       credentialVersion: subscription.credentialVersion,
     };
   }

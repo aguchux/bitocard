@@ -122,7 +122,7 @@ export const operations: Operation[] = Object.entries(document.paths).flatMap(([
  * sections are what SHQ (the reseller dashboard) uses with its own sign-in; `public` needs no sign-in.
  */
 export const sections: Array<{ title: string; kind: "api" | "dashboard" | "public"; tags: string[] }> = [
-  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "eSIMs", "Wallet", "Exchange", "Crypto", "Payouts", "Customers", "Disputes"] },
+  { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "eSIMs", "VPN", "Wallet", "Exchange", "Crypto", "Payouts", "Customers", "Disputes"] },
   { title: "Webhooks and events", kind: "api", tags: ["Webhooks", "Events"] },
   { title: "Stores and markets", kind: "api", tags: ["Stores", "Countries", "Exchange rates", "Plans", "Settings"] },
   { title: "Dashboard (SHQ)", kind: "dashboard", tags: ["Authentication", "API keys", "Team", "Notifications", "Integrations"] },
@@ -149,6 +149,7 @@ export const tagIntros: Record<string, string> = {
   Orders: "Place an order from a quote; BitoCard holds the wholesale cost from your wallet, fulfils it and tells you the outcome. Codes and PINs are only on the single order.",
   Numbers: "Virtual numbers your orders bought: renew them from your wallet (auto-renew is on by default), read their SMS and send SMS. A number not renewed is paused at expiry and deleted 15 days later.",
   eSIMs: "eSIMs your orders delivered: their status, data use and expiry, top-ups from your wallet, and cancelling an order whose eSIMs were never installed for a refund. Activation codes are only on the order.",
+  VPN: "VPN access your orders bought (30 days, never renewed automatically): its state and expiry, and resetting its password. The username and password are only on the order.",
   Wallet: "Your pre-funded wallet: balances, ledger transactions, top-ups, reserved bank accounts and BitoCard's fees.",
   Crypto: "Your own coin wallet on chain: deposit coins to your own addresses (Premium) and withdraw them to addresses you saved, each confirmed by a code emailed to the person who asked. Dashboard sessions only.",
   Exchange: "Trade your local or US dollar wallet against BitoCard's coin reserves, then fund your own customer exchange desk. Quotes last 30 seconds and trades never exceed the available reserve.",

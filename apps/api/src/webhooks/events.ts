@@ -17,6 +17,7 @@ export const eventTypes = [
   'number.deleted',
   'number.sms_received',
   'esim.updated',
+  'vpn_subscription.updated',
   'dispute.opened',
   'dispute.message_received',
   'dispute.escalated',

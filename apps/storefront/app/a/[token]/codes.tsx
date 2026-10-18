@@ -4,10 +4,11 @@ import { useActionState, useState } from "react";
 import { Check, Copy, Eye, KeyRound } from "lucide-react";
 import type { AccessDelivery } from "@/lib/access";
 import { EsimCard } from "@/components/store/esim-card";
+import { CopyValue } from "@/components/store/vpn-access";
 import { revealCodes, type RevealState } from "./actions";
 
 const detailLabels: Record<string, string> = { duration: "Licence term", expires_at: "Expires", redemption_url: "Redeem at", units: "Units" };
-const names: Record<AccessDelivery["kind"], string> = { gift_card: "Code", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Number", esim: "eSIM", vpn_account: "VPN access" };
+const names: Record<AccessDelivery["kind"], string> = { gift_card: "Code", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Number", esim: "eSIM", vpn_account: "VPN sign-in" };
 
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -46,13 +47,22 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
         <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {shown.length > 1 ? `${names[shown[0].kind].toLowerCase()}s` : names[shown[0].kind].toLowerCase()}
       </h2>
       <p className="mt-1 text-sm text-slate-600">
-        {shown[0].kind === "esim" ? `Reveal to install ${shown.length > 1 ? "them" : "it"}. Keep ${shown.length > 1 ? "them" : "it"} private: anyone with the code can install the eSIM.` : `Keep ${shown.length > 1 ? "them" : "it"} safe: anyone with a code can use it.`}
+        {shown[0].kind === "esim"
+          ? `Reveal to install ${shown.length > 1 ? "them" : "it"}. Keep ${shown.length > 1 ? "them" : "it"} private: anyone with the code can install the eSIM.`
+          : shown[0].kind === "vpn_account"
+            ? "Your username and password for the VPN app. Keep them private: anyone with them can use your access."
+            : `Keep ${shown.length > 1 ? "them" : "it"} safe: anyone with a code can use it.`}
       </p>
       <ul className="mt-4 space-y-3">
         {shown.map((delivery, index) =>
           delivery.kind === "esim" && !delivery.hidden && delivery.code ? (
             <li key={index}>
               <EsimCard code={delivery.code} iccid={delivery.serial} details={delivery.details} title={`eSIM${shown.length > 1 ? ` ${index + 1}` : ""}`} />
+            </li>
+          ) : delivery.kind === "vpn_account" && !delivery.hidden && delivery.code ? (
+            <li key={index} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+              {delivery.serial ? <CopyValue label="Username" value={delivery.serial} /> : null}
+              <CopyValue label="Password" value={delivery.code} />
             </li>
           ) : (
           <li key={index} className="rounded-2xl border border-slate-200 p-4">
@@ -103,7 +113,7 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
         <form action={reveal} className="mt-4">
           <input type="hidden" name="token" value={token} />
           <button type="submit" disabled={pending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800 disabled:opacity-60 sm:w-auto">
-            <Eye className="size-5" aria-hidden="true" /> {pending ? "Revealing…" : shown[0].kind === "esim" ? (shown.length > 1 ? "Show eSIMs" : "Show eSIM") : shown.length > 1 ? "Reveal codes" : "Reveal code"}
+            <Eye className="size-5" aria-hidden="true" /> {pending ? "Revealing…" : shown[0].kind === "esim" ? (shown.length > 1 ? "Show eSIMs" : "Show eSIM") : shown[0].kind === "vpn_account" ? "Show sign-in details" : shown.length > 1 ? "Reveal codes" : "Reveal code"}
           </button>
         </form>
       ) : null}
@@ -114,7 +124,7 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
       ) : null}
       {instructions ? (
         <div className="mt-5 border-t border-slate-100 pt-4">
-          <p className="font-semibold">{shown[0].kind === "esim" ? "How to install" : "How to redeem"}</p>
+          <p className="font-semibold">{shown[0].kind === "esim" ? "How to install" : shown[0].kind === "vpn_account" ? "How to connect" : "How to redeem"}</p>
           <p className="mt-1 text-sm whitespace-pre-line text-slate-700">{instructions}</p>
         </div>
       ) : null}

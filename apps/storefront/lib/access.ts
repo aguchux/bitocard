@@ -91,9 +91,11 @@ type AccessAction =
   | "/esims"
   | `/esims/${string}/top-up-options`
   | `/esims/${string}/top-ups`
-  | `/esims/${string}/cancel`;
+  | `/esims/${string}/cancel`
+  | "/vpn"
+  | "/vpn/password-reset";
 /** Reads; everything else changes something and is a POST. */
-const reads = new Set<string>(["", "/number", "/esims"]);
+const reads = new Set<string>(["", "/number", "/esims", "/vpn"]);
 
 /** Calls an order-page endpoint with the customer's proof (their store session, and the pass for this page). Never cached; never throws. */
 export async function accessApi<T>(token: string, action: AccessAction = "", body?: unknown): Promise<AccessResult<T>> {

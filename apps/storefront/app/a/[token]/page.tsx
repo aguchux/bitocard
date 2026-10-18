@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarClock, CheckCircle2, Clock, LockKeyhole, Phone, Store, XCircle } from "lucide-react";
-import { categoryLabels, formatFace, type ProductCategory, type ProductFeature, type StoreEsim } from "@bitocard/api-client/storefront";
+import { categoryLabels, formatFace, type ProductCategory, type ProductFeature, type StoreEsim, type StoreVpn } from "@bitocard/api-client/storefront";
 import { brand } from "@bitocard/ui/site";
 import { RefreshWhile } from "@/components/store/order-status";
 import { FeatureIcons } from "@/components/store/features";
@@ -10,6 +10,7 @@ import { Codes } from "./codes";
 import { EmailCodeGate } from "./gate";
 import { NumberLive } from "./number";
 import { EsimManage } from "@/components/store/esim-manage";
+import { VpnAccess } from "@/components/store/vpn-access";
 
 
 // The link opens the order: never indexed, and no Referer to other sites (it would carry the link).
@@ -131,6 +132,8 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
   const liveNumber = live?.ok ? live.data.number : null;
   // eSIMs after delivery: status, data use, top-ups (paid by a store customer from their wallet) and cancelling.
   const tracked = category === "esim" && (order.status === "completed" || order.status === "refunded") ? await accessApi<{ data: StoreEsim[] }>(token, "/esims") : null;
+  // VPN access after delivery: whether it works, when it ends (never renewed), and a new password on request.
+  const vpn = order.deliveries.some(delivery => delivery.kind === "vpn_account") ? await accessApi<{ vpn_subscription: StoreVpn | null }>(token, "/vpn") : null;
 
   return (
     <Shell store={store}>
@@ -186,6 +189,7 @@ export default async function OrderAccessPage({ params }: { params: Promise<{ to
             numbers.map((delivery, index) => <NumberPanel key={index} delivery={delivery} features={order.product.features} />)
           )}
           {tracked?.ok ? <EsimManage source={{ token }} esims={tracked.data.data} store={store.name} /> : null}
+          {vpn?.ok && vpn.data.vpn_subscription ? <VpnAccess source={{ token }} vpn={vpn.data.vpn_subscription} store={store.name} /> : null}
           {order.deliveries.some(delivery => delivery.kind === "confirmation" && delivery.details.transaction_id) ? (
             <p className="text-sm text-slate-600">Transaction reference: {order.deliveries.find(delivery => delivery.details.transaction_id)?.details.transaction_id}</p>
           ) : null}

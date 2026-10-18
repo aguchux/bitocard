@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft, ExternalLink, KeyRound, MessageSquareWarning } from "lucide-react";
-import { formatFace, formatPrice, type StoreCheckout, type StoreEsim } from "@bitocard/api-client/storefront";
+import { formatFace, formatPrice, type StoreCheckout, type StoreEsim, type StoreVpn } from "@bitocard/api-client/storefront";
 import { EsimCard } from "@/components/store/esim-card";
 import { EsimManage } from "@/components/store/esim-manage";
+import { CopyValue, VpnAccess } from "@/components/store/vpn-access";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { simulateCheckout } from "@/lib/account-actions";
@@ -29,6 +30,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     order.product.category === "esim" && (order.status === "completed" || order.status === "refunded")
       ? await customerApi<{ data: StoreEsim[] }>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}/esims`)
       : null;
+  const vpnOrder = deliveries.some(delivery => delivery.kind === "vpn_account");
+  const vpn = vpnOrder ? await customerApi<{ vpn_subscription: StoreVpn | null }>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}/vpn`) : null;
 
   return (
     <div className="mx-auto grid max-w-3xl gap-6">
@@ -103,14 +106,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {deliveries.length ? (
         <section aria-labelledby="codes" className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
           <h2 id="codes" className="font-display flex items-center gap-2 text-xl font-bold">
-            <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {esims ? (deliveries.length > 1 ? "eSIMs" : "eSIM") : deliveries.length > 1 ? "codes" : "code"}
+            <KeyRound className="size-5 text-brand-500" aria-hidden="true" /> Your {vpnOrder ? "VPN sign-in" : esims ? (deliveries.length > 1 ? "eSIMs" : "eSIM") : deliveries.length > 1 ? "codes" : "code"}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">{esims ? "Install before you travel. Keep it private: anyone with the code can install the eSIM, and only once." : "Keep these safe: anyone with a code can use it."}</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {vpnOrder ? "Your username and password for the VPN app. Keep them private: anyone with them can use your access." : esims ? "Install before you travel. Keep it private: anyone with the code can install the eSIM, and only once." : "Keep these safe: anyone with a code can use it."}
+          </p>
           <ul className="mt-4 space-y-3">
             {deliveries.map((delivery, index) =>
               delivery.kind === "esim" && delivery.code ? (
                 <li key={index}>
                   <EsimCard code={delivery.code} iccid={delivery.serial} details={delivery.details} title={`eSIM${deliveries.length > 1 ? ` ${index + 1}` : ""}`} />
+                </li>
+              ) : delivery.kind === "vpn_account" && delivery.code ? (
+                <li key={index} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+                  {delivery.serial ? <CopyValue label="Username" value={delivery.serial} /> : null}
+                  <CopyValue label="Password" value={delivery.code} />
                 </li>
               ) : (
               <li key={index} className="rounded-2xl border border-slate-200 p-4">
@@ -135,6 +145,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       ) : null}
 
       {tracked?.ok ? <EsimManage source={{ checkout: order.id }} esims={tracked.data.data} store="the store" /> : null}
+      {vpn?.ok && vpn.data.vpn_subscription ? <VpnAccess source={{ checkout: order.id }} vpn={vpn.data.vpn_subscription} store="the store" /> : null}
 
       {canDispute(order.status) ? (
         <Link
