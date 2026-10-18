@@ -36,6 +36,28 @@ export function toApiError(status: number | string, data: unknown): ApiError {
 export const readTimeoutMs = 30_000;
 
 /**
+ * Admin step-up: a sensitive or money action outside the session's 5-minute window answers `step_up_required`. The
+ * admin app registers a handler that asks for the authenticator code and opens the window (true) or is cancelled
+ * (false); the request is then sent once more. Requests refused together share one prompt.
+ */
+let stepUpHandler: (() => Promise<boolean>) | null = null;
+let stepUpPending: Promise<boolean> | null = null;
+
+export function setStepUpHandler(handler: (() => Promise<boolean>) | null) {
+  stepUpHandler = handler;
+}
+
+function askForStepUp() {
+  if (!stepUpHandler) return Promise.resolve(false);
+  stepUpPending ??= stepUpHandler().finally(() => {
+    stepUpPending = null;
+  });
+  return stepUpPending;
+}
+
+const needsStepUp = (status: unknown, data: unknown) => status === 403 && (data as { error?: { code?: string } } | undefined)?.error?.code === 'step_up_required';
+
+/**
  * Sends cookies (the admin session cookie is shared on .bitocard.com), adds the Idempotency-Key every POST needs,
  * and returns ApiError on failure. A 401 outside sign-in means the session ended while the page was open: the session
  * is checked again, so the app's gate sends the person to sign in instead of leaving every panel showing an error.
@@ -48,17 +70,26 @@ export function createBaseQuery(baseUrl: () => string = apiBaseUrl): BaseQueryFn
     return raw;
   };
   return async (args, api, extra) => {
-    const request: FetchArgs = typeof args === 'string' ? { url: args } : { ...args };
-    const method = (request.method ?? 'GET').toUpperCase();
-    request.headers = {
-      accept: 'application/json',
-      ...(requestContext.reseller ? { 'bitocard-reseller': requestContext.reseller } : {}),
-      ...(requestContext.mode === 'test' ? { 'bitocard-mode': 'test' } : {}),
-      ...(request.headers as Record<string, string> | undefined),
-      ...(method === 'POST' ? { 'idempotency-key': newKey() } : {}),
+    const original: FetchArgs = typeof args === 'string' ? { url: args } : { ...args };
+    const method = (original.method ?? 'GET').toUpperCase();
+    const send = () => {
+      const request: FetchArgs = {
+        ...original,
+        headers: {
+          accept: 'application/json',
+          ...(requestContext.reseller ? { 'bitocard-reseller': requestContext.reseller } : {}),
+          ...(requestContext.mode === 'test' ? { 'bitocard-mode': 'test' } : {}),
+          ...(original.headers as Record<string, string> | undefined),
+          ...(method === 'POST' ? { 'idempotency-key': newKey() } : {}),
+        },
+      };
+      if (method === 'GET' && request.timeout === undefined) request.timeout = readTimeoutMs;
+      return client(baseUrl())(request, api, extra);
     };
-    if (method === 'GET' && request.timeout === undefined) request.timeout = readTimeoutMs;
-    const result = await client(baseUrl())(request, api, extra);
+    const request = original;
+    let result = await send();
+    // Outside the step-up window: ask for the authenticator code, then try once more (a new request, a new key).
+    if (result.error && needsStepUp(result.error.status, result.error.data) && !original.url.includes('/auth/') && (await askForStepUp())) result = await send();
     if (result.error) {
       // Runs only on a request, long after the API slice below exists.
       // eslint-disable-next-line @typescript-eslint/no-use-before-define

@@ -200,6 +200,12 @@ export class PhoneDto {
   phone: string;
 }
 
+export class PrimaryPhoneDto extends PhoneDto {
+  @ApiPropertyOptional({ description: 'Your current password; required when your account has one.' })
+  @IsOptional() @IsString() @Length(1, passwordLength.max)
+  password?: string;
+}
+
 /** A "Try it" token for the API documentation. */
 export class DocsTokenDto {
   @ApiProperty({ description: '`test` (sandbox, simulated fulfilment) or `live` (real money and real orders).', enum: ['test', 'live'], example: 'test' })

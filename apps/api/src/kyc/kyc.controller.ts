@@ -23,7 +23,8 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import type { Request, Response } from 'express';
-import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, SessionOnly } from '../auth/caller.js';
+import { PrismaService } from '../database/prisma.service.js';
+import { AdminRoles, type Caller, CurrentCaller, personOf, Public, RealmOnly, SessionOnly, requireStepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { adminId } from '../countries/countries.controller.js';
@@ -292,7 +293,10 @@ export class KycReviewsController {
 @RealmOnly('admin')
 @Controller('admin/kyc/cases')
 export class AdminKycController {
-  constructor(private readonly kyc: KycService) {}
+  constructor(
+    private readonly kyc: KycService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private reviewer(caller: Caller): Reviewer {
     return { realm: 'admin', userId: adminId(caller) || null };
@@ -326,7 +330,10 @@ export class AdminKycController {
   @AdminRoles('operations')
   @Post(':id/decline')
   @HttpCode(HttpStatus.OK)
-  decline(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DeclineDto) {
+  async decline(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DeclineDto) {
+    // Overturning an approved check needs the step-up window.
+    const current = await this.prisma.kycCase.findUnique({ where: { id }, select: { status: true } });
+    if (current?.status === 'approved') requireStepUp(caller);
     return this.kyc.decline(id, this.reviewer(caller), body);
   }
 

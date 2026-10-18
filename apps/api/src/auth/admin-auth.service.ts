@@ -2,6 +2,7 @@ import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Secret, TOTP } from 'otpauth';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
+import { stepUpWindowMs } from './caller.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sameDigest, sha256 } from '../common/crypto.js';
 import { Encryption } from '../common/encryption.js';
@@ -291,6 +292,18 @@ export class AdminAuthService {
       await this.recordFailure(user);
       throw invalidCode();
     }
+  }
+
+  /**
+   * Opens the session's 5-minute window for sensitive and money actions with the admin's authenticator code (used once;
+   * a wrong code counts towards the sign-in lockout). The window is fixed: entering a code again restarts it.
+   */
+  async stepUp(userId: string, sessionId: string, code: string) {
+    await this.confirmCode(userId, code);
+    const until = new Date(Date.now() + stepUpWindowMs);
+    await this.prisma.session.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { stepUpUntil: until } });
+    await this.audit.record({ actorId: userId, action: 'admin.step_up', targetType: 'session', targetId: sessionId, before: null, after: { until: until.toISOString() } });
+    return { object: 'admin_step_up' as const, step_up_until: until.toISOString() };
   }
 
   private present(user: User) {

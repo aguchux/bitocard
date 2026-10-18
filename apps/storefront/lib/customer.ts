@@ -19,7 +19,7 @@ const clientHeader = "bitocard-client";
 const thirtyDays = 60 * 60 * 24 * 30;
 
 /** `country` is chosen at sign-up and fixed (null for older accounts until they choose); prices and the wallet are in its `currency`. */
-export type Customer = { object: "customer"; id: string; email: string; name: string; email_verified: boolean; country: string | null; currency: string | null; created_at: string };
+export type Customer = { object: "customer"; id: string; email: string; name: string; email_verified: boolean; phone: string | null; phone_verified: boolean; phone_verification_available: boolean; country: string | null; currency: string | null; created_at: string };
 
 export type CustomerResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string | null; message: string; param: string | null };
 

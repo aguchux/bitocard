@@ -7,6 +7,7 @@ import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
 import { ExchangeLimits } from "./exchange-limits";
 import { IdentityProvider } from "./identity-provider";
+import { SmsProvider } from "./sms-provider";
 import { PaymentMethods } from "./payment-methods";
 import { SpinLimit } from "./spin-limit";
 import { TaxRateCard } from "./tax-rate";
@@ -142,6 +143,8 @@ function Markets() {
           ) : null}
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Identity checks</h3>
           <IdentityProvider code={country.code} country={country.name} provider={country.identity_provider} editable={editable} />
+          <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Phone verification</h3>
+          <SmsProvider code={country.code} provider={country.sms_provider ?? null} editable={editable} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Spin and win</h3>
           <SpinLimit code={country.code} country={country.name} limit={country.spin_daily_limit} editable={editable} />
           <h3 className="px-4 pt-2 pb-3 text-sm font-semibold sm:px-6">Exchange</h3>

@@ -5,17 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { Realm, ResellerRole } from '../generated/prisma/client.js';
-import {
-  type Caller,
-  type CallerRequest,
-  PUBLIC_ROUTE,
-  ROUTE_ADMIN_ROLES,
-  ROUTE_CRON,
-  ROUTE_REALM,
-  ROUTE_ROLES,
-  ROUTE_SCOPES,
-  ROUTE_SESSION_ONLY,
-} from './caller.js';
+import { type Caller, type CallerRequest, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, requireStepUp } from './caller.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
 import { reservedSubdomains } from '../stores/reserved.js';
 import { SessionsService, sessionPolicy } from './sessions.service.js';
@@ -97,6 +87,7 @@ export class AuthGuard implements CanActivate {
     if (realm === 'admin' && adminRoles && !caller.adminRoles.includes('super_admin') && !adminRoles.some(role => caller.adminRoles.includes(role))) {
       throw forbidden('Your admin role does not allow this.');
     }
+    if (realm === 'admin' && meta<boolean>(ROUTE_STEP_UP)) requireStepUp(caller);
 
     const roles = meta<ResellerRole[]>(ROUTE_ROLES);
     if (realm === 'reseller' && roles) {
@@ -141,6 +132,7 @@ export class AuthGuard implements CanActivate {
       resellerId,
       role,
       adminRoles: session.user.adminRoles,
+      stepUpUntil: realm === 'admin' ? session.stepUpUntil : null,
     };
   }
 

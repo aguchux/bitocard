@@ -63,6 +63,7 @@ model User {
   /// E.164, for example +2348012345678. Only resellers use phone sign-in.
   phone           String?
   phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  phones          UserPhone[]
   /// Argon2id. Null for Google-only accounts.
   passwordHash    String?    @map("password_hash")
   name            String
@@ -134,6 +135,9 @@ model Session {
   lastSeenAt DateTime  @default(now()) @map("last_seen_at")
   expiresAt  DateTime  @map("expires_at")
   revokedAt  DateTime? @map("revoked_at")
+  /// Admin sessions: sensitive and money actions are allowed until then (5 minutes after the admin entered their
+  /// authenticator code). Fixed, never extended by use, and gone with the session.
+  stepUpUntil DateTime? @map("step_up_until")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -150,6 +154,7 @@ enum OAuthIntent {
 enum CodePurpose {
   email_verification
   phone_verification
+  phone_add
   password_reset
   email_change
   admin_mfa_challenge
@@ -565,6 +570,8 @@ model Country {
   minWithdrawalMinor BigInt            @map("min_withdrawal_minor")
   /// Who checks identities here: `bitocard` (BitoCard Verify, every African country) or `didit` (elsewhere).
   identityProvider   String            @default("didit") @map("identity_provider")
+  /// Null disables profile phone verification in this market.
+  smsProvider        String?           @map("sms_provider")
   /// Spin and win: spins each customer may take per day (UTC) in this market, 1 to 10.
   spinDailyLimit     Int      @default(2) @map("spin_daily_limit")
   /// The most a reseller's own exchange desk may mark up (basis points, 0 to 2,000) in this market.
@@ -2170,6 +2177,21 @@ model UserEmail {
   @@map("user_emails")
 }
 
+/// Every confirmed reseller sign-in number, including the primary copied to users.phone for session presentation.
+model UserPhone {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  realm      Realm
+  phone      String
+  verifiedAt DateTime @map("verified_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([realm, phone])
+  @@index([userId])
+  @@map("user_phones")
+}
+
 /**
  * Logos and card art an admin uploaded for a brand registry entry (Storefront > Brand registry), keyed by the entry's
  * slug, so one upload covers every product brand slug the entry lists. Between a brand's own settings and the
@@ -2223,6 +2245,8 @@ model Customer {
   /// Argon2id.
   passwordHash     String                   @map("password_hash")
   emailVerifiedAt  DateTime?                @map("email_verified_at")
+  phone            String?
+  phoneVerifiedAt  DateTime?                @map("phone_verified_at")
   status           UserStatus               @default(active)
   failedSignIns    Int                      @default(0) @map("failed_sign_ins")
   lockedUntil      DateTime?                @map("locked_until")
@@ -2268,6 +2292,7 @@ model Customer {
   exchangeTrades     ExchangeTrade[]
 
   @@unique([storeId, email])
+  @@unique([storeId, phone])
   @@map("customers")
 }
 
@@ -2288,6 +2313,7 @@ model CustomerSession {
 
 enum CustomerCodePurpose {
   email_verification
+  phone_verification
   password_reset
 }
 
@@ -2297,6 +2323,7 @@ model CustomerCode {
   customerId String              @map("customer_id") @db.Uuid
   purpose    CustomerCodePurpose
   codeHash   String              @map("code_hash") @db.Char(64)
+  target     String?
   attempts   Int                 @default(0)
   expiresAt  DateTime            @map("expires_at")
   consumedAt DateTime?           @map("consumed_at")

@@ -83,6 +83,18 @@ export async function updateName(_state: FormState, form: FormData): Promise<For
   return { notice: "Saved." };
 }
 
+export async function addProfilePhone(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<{ object: 'notice'; phone: string }>('POST', '/v1/store/account/phone', { phone: text(form, 'phone') });
+  return result.ok ? { notice: `We sent a code to ${result.data.phone}.` } : failed(result);
+}
+
+export async function verifyProfilePhone(_state: FormState, form: FormData): Promise<FormState> {
+  const result = await customerApi<Customer>('POST', '/v1/store/account/phone/verify', { code: text(form, 'code') });
+  if (!result.ok) return failed(result);
+  revalidatePath('/account/profile/details');
+  return { notice: 'Your phone number is confirmed.' };
+}
+
 /** Sets the country of an account from before it was asked (once: it never changes after). */
 export async function setCountry(_state: FormState, form: FormData): Promise<FormState> {
   const result = await customerApi<Customer>("POST", "/v1/store/account/profile", { country: text(form, "country") });

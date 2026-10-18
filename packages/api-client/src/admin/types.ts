@@ -21,7 +21,9 @@ export type AdminRole = (typeof adminRoles)[number];
 // -- Sign-in -------------------------------------------------------------------------------------------------------
 
 export type Admin = { object: 'admin'; id: string; name: string; email: string; roles: AdminRole[] };
-export type AdminSession = { object: 'admin_session'; admin: Admin; recovery_codes?: string[] };
+/** `step_up_until`: sensitive and money actions are open on this session until then (after the authenticator code), else null. */
+export type AdminSession = { object: 'admin_session'; admin: Admin; recovery_codes?: string[]; step_up_until?: string | null };
+export type AdminStepUp = { object: 'admin_step_up'; step_up_until: string };
 export type MfaChallenge = { object: 'mfa_challenge'; challenge_token: string; mfa_setup_required: boolean; expires_in: number };
 export type MfaSetup = { object: 'mfa_setup'; secret: string; otpauth_uri: string };
 /** An emailed set-password link (admin:create or admin:reset-password), before it is used. */
@@ -377,6 +379,7 @@ export type Country = {
   min_withdrawal_minor: number;
   /** Who runs identity checks here: BitoCard Verify (Africa by default) or Didit. Missing on older API versions. */
   identity_provider?: IdentityProvider;
+  sms_provider?: 'termii' | 'africas_talking' | null;
   /** Spin and win: spins per customer per day here (1 to 10). Missing on older API versions. */
   spin_daily_limit?: number;
   /** The most a reseller's exchange desk may mark up here, in basis points (0 to 2000). Missing on older API versions. */

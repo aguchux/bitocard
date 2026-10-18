@@ -5,7 +5,7 @@ import { KeyRound, LogOut, Mail, Pencil, Plus, Smartphone, Star, Trash2 } from "
 import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
-  useAddPhoneMutation,
+  useAddAdditionalPhoneMutation,
   useChangePasswordMutation,
   useAddEmailMutation,
   useConfirmEmailMutation,
@@ -13,20 +13,31 @@ import {
   useMakePrimaryEmailMutation,
   useRemoveEmailMutation,
   useUpdateProfileMutation,
-  useVerifyPhoneMutation,
+  useConfirmAdditionalPhoneMutation,
+  usePhonesQuery,
+  useMakePrimaryPhoneMutation,
+  useRemoveAdditionalPhoneMutation,
 } from "@bitocard/api-client/reseller";
+import { PhoneInput } from "@bitocard/ui/phone-input";
 import { ShqShell } from "@/components/shq-shell";
 import { useReseller, useSignOut } from "@/components/reseller";
 
-/** Add or change the mobile number: send a code by text message, then confirm it. A confirmed number can be used to sign in. */
+/** Confirm up to five mobile numbers. Any confirmed number can be used to sign in. */
 function MobileNumber() {
-  const { user } = useReseller();
+  const { user, membership } = useReseller();
+  // Numbers come from the business country only (the API checks it again).
+  const country = membership.reseller.country;
   const [editing, setEditing] = useState(!user.phone_verified);
   const [phone, setPhone] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState("");
-  const [addPhone, addState] = useAddPhoneMutation();
-  const [verifyPhone, verifyState] = useVerifyPhoneMutation();
+  const phones = usePhonesQuery();
+  const [addPhone, addState] = useAddAdditionalPhoneMutation();
+  const [verifyPhone, verifyState] = useConfirmAdditionalPhoneMutation();
+  const [makePrimary, primaryState] = useMakePrimaryPhoneMutation();
+  const [removePhone, removeState] = useRemoveAdditionalPhoneMutation();
+  const [promoting, setPromoting] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
 
   const send = async (event: FormEvent) => {
@@ -57,17 +68,30 @@ function MobileNumber() {
   return (
     <Card>
       <CardHeader
-        title="Mobile number"
-        description="Once confirmed, you can sign in with your mobile number and password."
+        title="Phone numbers"
+        description="Add up to five confirmed numbers. Any confirmed number can be used to sign in."
         actions={user.phone ? <Badge tone={user.phone_verified ? "green" : "amber"}>{user.phone_verified ? "Confirmed" : "Not confirmed"}</Badge> : null}
       />
       <div className="space-y-4 p-5 sm:p-6">
         {done ? <Notice tone="green">Your mobile number is confirmed.</Notice> : null}
-        {user.phone ? <p className="text-base font-semibold text-ink">{user.phone}</p> : <p className="text-sm text-muted">No mobile number yet.</p>}
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {(phones.data?.data ?? []).map(item => <li key={item.phone} className="space-y-2 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-2"><Smartphone className="size-4 text-subtle" aria-hidden />{item.phone}{item.primary ? <Badge tone="blue">Primary</Badge> : null}<Badge tone={item.verified ? "green" : "amber"}>{item.verified ? "Confirmed" : "Not confirmed"}</Badge></span>
+              {!item.primary ? <span className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setPromoting(item.phone)}>Make primary</Button><Button variant="ghost" size="sm" loading={removeState.isLoading} onClick={() => void removePhone(item.phone)}>Remove</Button></span> : null}
+            </div>
+            {promoting === item.phone ? <form className="space-y-2" onSubmit={async event => { event.preventDefault(); if (await makePrimary({ phone: item.phone, password: user.has_password ? password : undefined }).unwrap().catch(() => null)) { setPromoting(null); setPassword(""); } }}>
+              {primaryState.error ? <Notice tone="red">{errorMessage(primaryState.error)}</Notice> : null}
+              {user.has_password ? <Field label="Current password" htmlFor="phone-primary-password"><Input id="phone-primary-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></Field> : null}
+              <div className="flex gap-2"><Button type="submit" loading={primaryState.isLoading}>Confirm</Button><Button type="button" variant="ghost" onClick={() => setPromoting(null)}>Cancel</Button></div>
+            </form> : null}
+          </li>)}
+        </ul>
+        {removeState.error ? <Notice tone="red">{errorMessage(removeState.error)}</Notice> : null}
 
         {!editing ? (
           <Button variant="secondary" size="sm" icon={<Smartphone className="size-4" aria-hidden />} onClick={() => setEditing(true)}>
-            Change mobile number
+            Add phone number
           </Button>
         ) : sentTo ? (
           <form
@@ -94,11 +118,21 @@ function MobileNumber() {
         ) : (
           <form onSubmit={send} className="space-y-4">
             {addState.error ? <Notice tone="red">{errorMessage(addState.error)}</Notice> : null}
-            <Field label={user.phone ? "New mobile number" : "Mobile number"} htmlFor="profile-phone" hint="International format (for example +234…) or your business country's local format.">
-              <Input id="profile-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} minLength={6} maxLength={20} required />
-            </Field>
+            {country ? (
+              <PhoneInput
+                country={country}
+                label={user.phone ? "New mobile number" : "Mobile number"}
+                onChange={value => setPhone(value ?? "")}
+                required
+                inputClassName="min-h-11 border border-line bg-white px-3 text-sm text-ink focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 aria-[invalid=true]:border-red-400"
+                errorClassName="text-red-700"
+              />
+            ) : (
+              <Notice tone="amber">Choose your business country before adding a phone number.</Notice>
+            )}
+            <p className="text-xs text-muted">A mobile number from your business country. Type it the way you dial it locally.</p>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" loading={addState.isLoading} disabled={phone.trim().length < 6}>
+              <Button type="submit" loading={addState.isLoading} disabled={!phone}>
                 Send code
               </Button>
               {user.phone_verified ? (

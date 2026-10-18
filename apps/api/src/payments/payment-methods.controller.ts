@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { ArrayMaxSize, IsArray, IsIn, IsString } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { paymentMethodPurposes, PaymentMethodsService } from './payment-methods.service.js';
 
@@ -27,6 +27,7 @@ export class AdminPaymentMethodsController {
     return this.methods.adminList(code);
   }
 
+  @StepUp()
   @Put()
   set(@CurrentCaller() caller: Caller, @Param('code') code: string, @Body() body: SetPaymentMethodsDto) {
     return this.methods.set(adminId(caller), code, body.purpose, body.enabled);

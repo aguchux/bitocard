@@ -7,6 +7,7 @@ import { cn, humanise } from '../format';
 import { AccountMenu, ConsoleShell, type Crumb } from './console-shell';
 import { menus, sections, type SectionKey } from './nav';
 import { NotificationBell } from './notifications';
+import { StepUpPrompt } from './step-up';
 import { useAdmin, useMode } from './session';
 
 export type { Crumb };
@@ -55,6 +56,7 @@ export function AdminShell({ section, current, crumbs, actions, children }: { se
   return (
     <ConsoleShell brand="Bitocard" sections={sections} menus={menus} section={section} current={current} crumbs={crumbs} actions={actions} notifications={<AdminBell />} account={<AdminAccountMenu />}>
       {children}
+      <StepUpPrompt />
     </ConsoleShell>
   );
 }

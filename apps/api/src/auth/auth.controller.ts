@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
-import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
+import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, PrimaryPhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { DocsTokensService } from './docs-tokens.service.js';
@@ -212,6 +212,45 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   verifyPhone(@CurrentCaller() caller: Caller, @Body() body: CodeDto) {
     return this.auth.verifyPhone(caller.kind === 'session' ? caller.userId : '', body.code);
+  }
+
+  @SessionOnly()
+  @ApiOperation({ summary: 'List your verified phone numbers' })
+  @Get('phones')
+  listPhones(@CurrentCaller() caller: Caller) {
+    return this.auth.listPhones(caller.kind === 'session' ? caller.userId : '');
+  }
+
+  @SessionOnly()
+  @ApiOperation({ summary: 'Add a phone number', description: 'Sends a six-digit SMS code. Up to five verified numbers per reseller user.' })
+  @Post('phones')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async addAdditionalPhone(@CurrentCaller() caller: Caller, @Body() body: PhoneDto) {
+    const country = caller.kind === 'session' && caller.resellerId ? await this.auth.resellerCountry(caller.resellerId) : null;
+    return this.auth.addAdditionalPhone(caller.kind === 'session' ? caller.userId : '', body.phone, country);
+  }
+
+  @SessionOnly()
+  @ApiOperation({ summary: 'Confirm an additional phone number' })
+  @Post('phones/verify')
+  @HttpCode(HttpStatus.OK)
+  confirmAdditionalPhone(@CurrentCaller() caller: Caller, @Body() body: CodeDto) {
+    return this.auth.confirmAdditionalPhone(caller.kind === 'session' ? caller.userId : '', body.code);
+  }
+
+  @SessionOnly()
+  @ApiOperation({ summary: 'Make a verified phone number primary', description: 'Requires the current password when the account has one.' })
+  @Post('phones/primary')
+  @HttpCode(HttpStatus.OK)
+  makePrimaryPhone(@CurrentCaller() caller: Caller, @Body() body: PrimaryPhoneDto) {
+    return this.auth.makePrimaryPhone(caller.kind === 'session' ? caller.userId : '', body.phone, body.password);
+  }
+
+  @SessionOnly()
+  @ApiOperation({ summary: 'Remove an additional phone number' })
+  @Delete('phones/:phone')
+  removeAdditionalPhone(@CurrentCaller() caller: Caller, @Param('phone') phone: string) {
+    return this.auth.removeAdditionalPhone(caller.kind === 'session' ? caller.userId : '', phone);
   }
 
   /** Email a password reset code. Always reports success, whether or not the account exists. */

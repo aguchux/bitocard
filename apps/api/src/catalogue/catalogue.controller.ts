@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes, StepUp } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -346,6 +346,7 @@ export class AdminPricingController {
     return this.pricing.adminPreview(query.country, product, query.face_value === undefined ? null : BigInt(query.face_value), query.kind ? query : null);
   }
 
+  @StepUp()
   @AdminRoles('finance')
   @Put()
   async set(@CurrentCaller() caller: Caller, @Body() body: PricingRuleDto) {
@@ -354,6 +355,7 @@ export class AdminPricingController {
     return presented;
   }
 
+  @StepUp()
   @AdminRoles('finance')
   @Delete(':id')
   async remove(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {

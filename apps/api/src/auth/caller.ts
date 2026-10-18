@@ -16,6 +16,8 @@ export type Caller =
       resellerId: string | null;
       role: ResellerRole | null;
       adminRoles: string[];
+      /** Admin sessions: sensitive actions are allowed until then (after the authenticator code), else null. */
+      stepUpUntil: Date | null;
     }
   | {
       kind: 'api_key';
@@ -41,6 +43,10 @@ export const ROUTE_SCOPES = 'auth:scopes';
 export const ROUTE_SESSION_ONLY = 'auth:session-only';
 export const ROUTE_ADMIN_ROLES = 'auth:admin-roles';
 export const ROUTE_CRON = 'auth:cron';
+export const ROUTE_STEP_UP = 'auth:step-up';
+
+/** How long an admin's authenticator code opens sensitive actions for, on that session. */
+export const stepUpWindowMs = 5 * 60_000;
 
 /**
  * The same rules, written into the OpenAPI document for the docs: `x-bitocard-auth` (`public`, `session` or, by default,
@@ -66,6 +72,19 @@ export const Roles = (...roles: ResellerRole[]) => applyDecorators(SetMetadata(R
 
 /** Admin roles allowed to call an admin route. super_admin is always allowed. */
 export const AdminRoles = (...roles: string[]) => SetMetadata(ROUTE_ADMIN_ROLES, roles);
+
+/**
+ * A sensitive or money admin action: allowed only inside the session's step-up window, opened for 5 minutes by the
+ * admin's authenticator code (`POST /v1/admin/auth/step-up`). Otherwise `step_up_required` (403), and the admin app asks
+ * for the code and tries again.
+ */
+export const StepUp = () => SetMetadata(ROUTE_STEP_UP, true);
+
+/** The same rule inside a handler, for actions sensitive only in some cases (a money decision, activating a reseller). */
+export function requireStepUp(caller: Caller) {
+  if (caller.kind === 'session' && caller.realm === 'admin' && caller.stepUpUntil && caller.stepUpUntil > new Date()) return;
+  throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'step_up_required', 'Enter the code from your authenticator app to continue.');
+}
 
 /** API key scopes required to call the route (API keys). */
 export const Scopes = (...scopes: string[]) => applyDecorators(SetMetadata(ROUTE_SCOPES, scopes), ApiExtension('x-bitocard-scopes', scopes));

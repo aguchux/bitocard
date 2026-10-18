@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpStatus, Param, Put } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { ArrayUnique, IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length, Matches, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, Roles, SessionOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, Roles, SessionOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
 import { SettingsService } from './settings.service.js';
@@ -74,6 +74,7 @@ export class SettingsController {
 export class AdminSettingsController {
   constructor(private readonly settings: SettingsService) {}
 
+  @StepUp()
   @Put('countries/:code/options/:key')
   setCountryOption(@CurrentCaller() caller: Caller, @Param('code') code: string, @Param('key') key: string, @Body() body: CountryOptionDto) {
     return this.settings.setCountryOption(adminId(caller), code, key, body.allowed, body.default);
@@ -84,6 +85,7 @@ export class AdminSettingsController {
     return this.settings.listSwitches();
   }
 
+  @StepUp()
   @Put('switches/:key')
   setSwitch(@CurrentCaller() caller: Caller, @Param('key') key: string, @Body() body: SwitchDto) {
     return this.settings.setSwitch(adminId(caller), key, { countryCode: body.country_code, resellerId: body.reseller_id }, body.enabled);

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsString, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { TaxService } from './tax.service.js';
 
@@ -33,6 +33,7 @@ export class AdminTaxController {
   }
 
   @AdminRoles('finance')
+  @StepUp()
   @Put(':country')
   set(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: TaxRateDto) {
     return this.tax.set(adminId(caller), country.toUpperCase(), body);

@@ -61,6 +61,10 @@ export const configSchema = z.object({
   TERMII_API_KEY: z.string().optional(),
   TERMII_API_URL: z.string().url().default('https://api.ng.termii.com'),
   TERMII_SENDER_ID: z.string().default('BitoCard'),
+  AFRICASTALKING_USERNAME: z.string().optional(),
+  AFRICASTALKING_API_KEY: z.string().optional(),
+  AFRICASTALKING_SENDER_ID: z.string().optional(),
+  AFRICASTALKING_API_URL: z.string().url().optional(),
 
   // Browser push notifications (Web Push, VAPID). Without both keys, push is switched off and only the in-app inbox
   // is used. Generate a key pair with `npm run push:keys -w @bitocard/api`.

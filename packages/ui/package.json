@@ -15,7 +15,9 @@
     "./styles/workspace.css": "./src/styles/workspace.css",
     "./styles/interactive.css": "./src/styles/interactive.css",
     "./styles/tokens.css": "./src/styles/tokens.css",
-    "./tokens": "./src/tokens.ts"
+    "./tokens": "./src/tokens.ts",
+    "./phone": "./src/phone.ts",
+    "./phone-input": "./src/phone-input.tsx"
   },
   "scripts": {
     "lint": "eslint .",
@@ -38,5 +40,8 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.14"
   }
 }

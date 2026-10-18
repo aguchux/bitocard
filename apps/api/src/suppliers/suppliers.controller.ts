@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patc
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import { productCategories } from '../countries/countries.service.js';
 import type { ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
@@ -146,6 +146,7 @@ export class AdminSuppliersController {
 
   /** Agreed commission (discount), routing priority and availability of one supplier offer. */
   @AdminRoles('finance', 'operations')
+  @StepUp()
   @Patch('supplier-products/:id')
   updateOffer(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateOfferDto) {
     return this.suppliers.updateOffer(adminId(caller), id, body);

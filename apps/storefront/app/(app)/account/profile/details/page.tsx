@@ -3,20 +3,20 @@ import { Lock, Mail } from "lucide-react";
 import { accountCard, AccountScreen } from "@/components/app/account-menu";
 import { CountryForm, NameForm } from "@/components/store/account-forms";
 import { Flag } from "@/components/store/flag";
+import { ProfilePhoneForm } from "@/components/store/profile-phone-form";
 import { markets } from "@/lib/countries";
 import { currentCustomer } from "@/lib/customer";
 
 export const metadata: Metadata = { title: "Profile" };
 
 /**
- * Profile: the customer's name (changeable), the email they sign in with, and their country (chosen at sign-up and
- * fixed: their wallet, payments and prices are in its currency; an older account chooses it here once).
+ * Profile: name, sign-in email, verified mobile number and the customer's fixed buying country.
  */
 export default async function DetailsPage() {
   const [customer, countries] = await Promise.all([currentCustomer().then(found => found!), markets()]);
   const country = countries.find(item => item.code === customer.country);
   return (
-    <AccountScreen title="Profile" lead="Your name, the email you sign in with and the country you buy from.">
+    <AccountScreen title="Profile" lead="Your name, email, verified phone number and the country you buy from.">
       <section aria-labelledby="details" className={accountCard}>
         <h2 id="details" className="mb-4 text-lg font-bold">
           Your details
@@ -30,6 +30,9 @@ export default async function DetailsPage() {
               <span className="min-w-0 truncate">{customer.email}</span>
             </p>
             <p className="mt-1.5 text-xs text-slate-500">You sign in with this email, and your codes are sent to it.</p>
+          </div>
+          <div className="border-t border-slate-100 pt-5">
+            <ProfilePhoneForm key={customer.phone ?? 'none'} phone={customer.phone} verified={customer.phone_verified} country={customer.country} available={customer.phone_verification_available} />
           </div>
         </div>
       </section>

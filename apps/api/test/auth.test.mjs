@@ -9,6 +9,8 @@ let base;
 before(async () => {
   server = await startApp();
   base = server.base;
+  const { PrismaService } = await import('../dist/database/prisma.service.js');
+  await server.app.get(PrismaService).country.update({ where: { code: 'NG' }, data: { smsProvider: 'termii' } });
 });
 
 after(() => server?.close());
@@ -251,6 +253,21 @@ describe('mobile number', () => {
     assert.deepEqual([verified.json.user.phone, verified.json.user.phone_verified], [phone, true]);
   });
 
+  test('a reseller can add a second verified sign-in number, promote it and remove the old one', async () => {
+    const { browser } = await signUp();
+    const first = nextPhone();
+    const second = nextPhone();
+    assert.equal((await browser.post('/v1/auth/phones', { phone: first })).status, 202);
+    assert.equal((await browser.post('/v1/auth/phones/verify', { code: await lastSmsCode(server.app, first) })).status, 200);
+    assert.equal((await browser.post('/v1/auth/phones', { phone: second })).status, 202);
+    const confirmed = await browser.post('/v1/auth/phones/verify', { code: await lastSmsCode(server.app, second) });
+    assert.deepEqual(confirmed.json.data.map(item => item.phone), [first, second]);
+    assert.equal((await client(base).post('/v1/auth/signin', { identifier: second, password })).status, 200);
+    assert.equal((await browser.post('/v1/auth/phones/primary', { phone: second, password })).status, 200);
+    assert.equal((await browser.delete(`/v1/auth/phones/${encodeURIComponent(first)}`)).status, 200);
+    assert.equal((await client(base).post('/v1/auth/signin', { identifier: first, password })).status, 401);
+  });
+
   test('a confirmed number can be used to sign in, with or without spaces', async () => {
     const { browser } = await signUp();
     const phone = nextPhone();
@@ -291,6 +308,8 @@ describe('mobile number', () => {
     const termii = await fakeService(() => ({ status: 500, body: { message: 'down' } }));
     const app = await startApp({ env: { TERMII_API_KEY: 'tm_test', TERMII_API_URL: termii.url }, database: 'pglite' });
     try {
+      const { PrismaService } = await import('../dist/database/prisma.service.js');
+      await app.app.get(PrismaService).country.update({ where: { code: 'NG' }, data: { smsProvider: 'termii' } });
       const browser = client(app.base);
       await browser.post('/v1/auth/signup', { name: 'Ada', email: uniqueEmail(), password, country: 'NG' });
       const phone = nextPhone();

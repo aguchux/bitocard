@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import { ApiBearerAuth, ApiExcludeController, ApiHeader, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsNotIn, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { AllowanceService } from './allowance.service.js';
@@ -136,6 +136,7 @@ export class AdminWalletController {
 
   /** Grants the startup allowance now (verified reseller, switch on, never granted before). Audited. */
   @AdminRoles('finance')
+  @StepUp()
   @Post('resellers/:id/startup-allowance')
   grantAllowance(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
     return this.allowance.grant(adminId(caller), id);
@@ -143,6 +144,7 @@ export class AdminWalletController {
 
   /** Takes back what remains of the startup allowance. It cannot be granted again. Audited with the reason. */
   @AdminRoles('finance')
+  @StepUp()
   @Post('resellers/:id/startup-allowance/revoke')
   revokeAllowance(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: RevokeAllowanceDto) {
     return this.allowance.revoke(adminId(caller), id, body.reason);
@@ -161,6 +163,7 @@ export class AdminWalletController {
   }
 
   @AdminRoles('finance')
+  @StepUp()
   @Post('resellers/:id/wallet/adjustments')
   adjust(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: AdjustmentDto) {
     return this.wallets.adjust(adminId(caller), { resellerId: id, ...body });

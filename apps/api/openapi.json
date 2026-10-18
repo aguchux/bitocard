@@ -1432,6 +1432,7 @@
                       "reseller_signup": true,
                       "reserved_accounts": true,
                       "identity_provider": "bitocard",
+                      "phone_verification_available": true,
                       "markup_cap_percent": 50,
                       "payout_hold_days": 15,
                       "min_withdrawal_minor": 15000,
@@ -1462,6 +1463,7 @@
                       "reseller_signup": true,
                       "reserved_accounts": false,
                       "identity_provider": "bitocard",
+                      "phone_verification_available": true,
                       "markup_cap_percent": 50,
                       "payout_hold_days": 15,
                       "min_withdrawal_minor": 130000,
@@ -1492,6 +1494,7 @@
                       "reseller_signup": true,
                       "reserved_accounts": true,
                       "identity_provider": "bitocard",
+                      "phone_verification_available": true,
                       "markup_cap_percent": 50,
                       "payout_hold_days": 15,
                       "min_withdrawal_minor": 1500000,
@@ -1574,6 +1577,7 @@
                   "reseller_signup": true,
                   "reserved_accounts": true,
                   "identity_provider": "bitocard",
+                  "phone_verification_available": true,
                   "markup_cap_percent": 50,
                   "payout_hold_days": 15,
                   "min_withdrawal_minor": 1500000,
@@ -5341,6 +5345,819 @@
           }
         },
         "summary": "Confirm your mobile number",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/phones": {
+      "get": {
+        "operationId": "AuthController_listPhones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Your confirmed sign-in numbers, the primary first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "object",
+                          "phone",
+                          "primary",
+                          "verified",
+                          "added_at"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "object": {
+                            "type": "string",
+                            "description": "Always `user_phone`.",
+                            "const": "user_phone"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "description": "The number, in E.164 form."
+                          },
+                          "primary": {
+                            "type": "boolean",
+                            "description": "Whether it is your primary number (shown on your account)."
+                          },
+                          "verified": {
+                            "type": "boolean",
+                            "description": "Whether it is confirmed; only confirmed numbers sign in."
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "description": "When it was added.",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234567",
+                      "primary": true,
+                      "verified": true,
+                      "added_at": "2026-10-01T09:00:00.000Z"
+                    },
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234568",
+                      "primary": false,
+                      "verified": true,
+                      "added_at": "2026-10-18T09:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List your verified phone numbers",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      },
+      "post": {
+        "description": "Sends a six-digit SMS code. Up to five verified numbers per reseller user.",
+        "operationId": "AuthController_addAdditionalPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "A code is on its way by SMS to the number (one from your business country).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "message",
+                    "phone"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `notice`.",
+                      "const": "notice"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "What happened, in plain English, ready to show."
+                    },
+                    "phone": {
+                      "type": "string",
+                      "description": "The number the code was sent to, in E.164 form."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "notice",
+                  "message": "A code is on its way to +2348031234568.",
+                  "phone": "+2348031234568"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a phone number",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/phones/verify": {
+      "post": {
+        "operationId": "AuthController_confirmAdditionalPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The number is confirmed and can sign in; your numbers now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "object",
+                          "phone",
+                          "primary",
+                          "verified",
+                          "added_at"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "object": {
+                            "type": "string",
+                            "description": "Always `user_phone`.",
+                            "const": "user_phone"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "description": "The number, in E.164 form."
+                          },
+                          "primary": {
+                            "type": "boolean",
+                            "description": "Whether it is your primary number (shown on your account)."
+                          },
+                          "verified": {
+                            "type": "boolean",
+                            "description": "Whether it is confirmed; only confirmed numbers sign in."
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "description": "When it was added.",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234567",
+                      "primary": true,
+                      "verified": true,
+                      "added_at": "2026-10-01T09:00:00.000Z"
+                    },
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234568",
+                      "primary": false,
+                      "verified": true,
+                      "added_at": "2026-10-18T09:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm an additional phone number",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/phones/primary": {
+      "post": {
+        "description": "Requires the current password when the account has one.",
+        "operationId": "AuthController_makePrimaryPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrimaryPhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The number is your primary one now; your numbers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "object",
+                          "phone",
+                          "primary",
+                          "verified",
+                          "added_at"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "object": {
+                            "type": "string",
+                            "description": "Always `user_phone`.",
+                            "const": "user_phone"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "description": "The number, in E.164 form."
+                          },
+                          "primary": {
+                            "type": "boolean",
+                            "description": "Whether it is your primary number (shown on your account)."
+                          },
+                          "verified": {
+                            "type": "boolean",
+                            "description": "Whether it is confirmed; only confirmed numbers sign in."
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "description": "When it was added.",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234567",
+                      "primary": true,
+                      "verified": true,
+                      "added_at": "2026-10-01T09:00:00.000Z"
+                    },
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234568",
+                      "primary": false,
+                      "verified": true,
+                      "added_at": "2026-10-18T09:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Make a verified phone number primary",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/phones/{phone}": {
+      "delete": {
+        "operationId": "AuthController_removeAdditionalPhone",
+        "parameters": [
+          {
+            "name": "phone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The number is removed; your numbers now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "object",
+                          "phone",
+                          "primary",
+                          "verified",
+                          "added_at"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "object": {
+                            "type": "string",
+                            "description": "Always `user_phone`.",
+                            "const": "user_phone"
+                          },
+                          "phone": {
+                            "type": "string",
+                            "description": "The number, in E.164 form."
+                          },
+                          "primary": {
+                            "type": "boolean",
+                            "description": "Whether it is your primary number (shown on your account)."
+                          },
+                          "verified": {
+                            "type": "boolean",
+                            "description": "Whether it is confirmed; only confirmed numbers sign in."
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "description": "When it was added.",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "user_phone",
+                      "phone": "+2348031234567",
+                      "primary": true,
+                      "verified": true,
+                      "added_at": "2026-10-01T09:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove an additional phone number",
         "tags": [
           "Authentication"
         ],
@@ -28095,6 +28912,25 @@
           "phone"
         ]
       },
+      "PrimaryPhoneDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Mobile number in international format, or local format for your business country.",
+            "minLength": 6,
+            "maxLength": 20,
+            "example": "+2348012345678"
+          },
+          "password": {
+            "type": "string",
+            "description": "Your current password; required when your account has one."
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
       "ForgotPasswordDto": {
         "type": "object",
         "properties": {
@@ -31921,6 +32757,7 @@
           "reseller_signup",
           "reserved_accounts",
           "identity_provider",
+          "phone_verification_available",
           "markup_cap_percent",
           "payout_hold_days",
           "min_withdrawal_minor",
@@ -31962,6 +32799,10 @@
               "bitocard",
               "didit"
             ]
+          },
+          "phone_verification_available": {
+            "type": "boolean",
+            "description": "Whether mobile numbers from this country can be confirmed by SMS code (and so sign in)."
           },
           "markup_cap_percent": {
             "type": "integer",
@@ -38419,7 +39260,8 @@
               "fee.refunded",
               "security.password_changed",
               "security.email_changed",
-              "security.email_added"
+              "security.email_added",
+              "security.phone_added"
             ]
           },
           "severity": {
@@ -38602,7 +39444,8 @@
               "fee.refunded",
               "security.password_changed",
               "security.email_changed",
-              "security.email_added"
+              "security.email_added",
+              "security.phone_added"
             ]
           },
           "label": {

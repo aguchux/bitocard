@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { PrismaService } from '../database/prisma.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { Prisma, type User } from '../generated/prisma/client.js';
-import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/max';
+import { parsePhoneNumberFromString, type CountryCode, getCountryCallingCode } from 'libphonenumber-js/max';
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
 import { emailAddCodeEmail, emailAddedEmail, emailChangedEmail, passwordChangedEmail, passwordResetEmail, verificationEmail } from '../notifications/templates.js';
@@ -42,11 +42,20 @@ const phoneInUse = () =>
  * E.164 form of a mobile number. Local formats (0803...) are read using the reseller's country.
  * Fixed lines are refused because they cannot receive the sign-in codes.
  */
-export function normalisePhone(raw: string, defaultCountry: string | null) {
-  const parsed = parsePhoneNumberFromString(raw, (defaultCountry ?? undefined) as CountryCode | undefined);
+/**
+ * A mobile number in E.164 form, and from the account's own country: a reseller's numbers are in its business country,
+ * a customer's in theirs (`phone_wrong_country` otherwise). Accepts the number with or without its country code.
+ */
+export function normalisePhone(raw: string, country: string | null) {
+  if (!country) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'Choose your country before adding a phone number.', 'phone');
+  const parsed = parsePhoneNumberFromString(raw, country as CountryCode);
   const type = parsed?.getType();
+  const example = `+${getCountryCallingCode(country as CountryCode)}`;
   if (!parsed?.isValid() || (type !== 'MOBILE' && type !== 'FIXED_LINE_OR_MOBILE')) {
-    throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'phone_invalid', 'Enter a valid mobile number, for example +2348012345678.', 'phone');
+    throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'phone_invalid', `Enter a valid mobile number, starting ${example}.`, 'phone');
+  }
+  if (parsed.country !== country) {
+    throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'phone_wrong_country', `Use a mobile number from your country (${example}).`, 'phone');
   }
   return parsed.number;
 }
@@ -158,7 +167,7 @@ export class AuthService {
   async signIn(identifier: string, password: string, req: Request, res: Response) {
     const phone = identifier.startsWith('+') ? (parsePhoneNumberFromString(identifier)?.number ?? identifier) : null;
     const user = await this.prisma.user.findFirst({
-      where: phone ? { realm: 'reseller', phone, phoneVerifiedAt: { not: null } } : { realm: 'reseller', email: identifier },
+      where: phone ? { realm: 'reseller', OR: [{ phone, phoneVerifiedAt: { not: null } }, { phones: { some: { phone } } }] } : { realm: 'reseller', email: identifier },
     });
     const valid = await this.passwords.verify(user?.passwordHash ?? null, password);
     if (!user || user.status !== 'active') throw invalidCredentials();
@@ -395,12 +404,13 @@ export class AuthService {
   async addPhone(userId: string, raw: string, resellerCountry: string | null) {
     const phone = normalisePhone(raw, resellerCountry);
     const taken = await this.prisma.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null }, id: { not: userId } } });
-    if (taken) throw phoneInUse();
+    if (taken || await this.prisma.userPhone.findFirst({ where: { realm: 'reseller', phone, userId: { not: userId } } })) throw phoneInUse();
     const code = await this.codes.issue(userId, 'phone_verification', phone);
     try {
-      await this.sms.send({ to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
     } catch (error) {
       await this.codes.cancel(userId, 'phone_verification');
+      if (error instanceof ApiError) throw error;
       this.logger.error({ err: error }, 'Could not send the phone confirmation code');
       throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
     }
@@ -409,13 +419,97 @@ export class AuthService {
 
   async verifyPhone(userId: string, code: string) {
     const phone = await this.codes.consume(userId, 'phone_verification', code);
+    if (await this.prisma.userPhone.findFirst({ where: { realm: 'reseller', phone, userId: { not: userId } } })) throw phoneInUse();
     try {
-      await this.prisma.user.update({ where: { id: userId }, data: { phone, phoneVerifiedAt: new Date() } });
+      await this.prisma.$transaction(async tx => {
+        const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+        const existing = await tx.userPhone.findUnique({ where: { realm_phone: { realm: 'reseller', phone } } });
+        if (existing && existing.userId !== userId) throw phoneInUse();
+        if (!existing && await tx.userPhone.count({ where: { userId } }) >= 5) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_limit', 'You can have up to five phone numbers.');
+        if (!existing) await tx.userPhone.create({ data: { userId, realm: 'reseller', phone, verifiedAt: new Date() } });
+        if (user.phone !== phone) await tx.user.update({ where: { id: userId }, data: { phone, phoneVerifiedAt: new Date() } });
+      });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw phoneInUse();
       throw error;
     }
     return this.describe(userId);
+  }
+
+  async listPhones(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { phones: { orderBy: { createdAt: 'asc' } } } });
+    return { object: 'list' as const, data: [
+      ...(user.phone ? [{ object: 'user_phone' as const, phone: user.phone, primary: true, verified: user.phoneVerifiedAt !== null, added_at: user.createdAt.toISOString() }] : []),
+      ...user.phones.filter(item => item.phone !== user.phone).map(item => ({ object: 'user_phone' as const, phone: item.phone, primary: false, verified: true, added_at: item.createdAt.toISOString() })),
+    ] };
+  }
+
+  async addAdditionalPhone(userId: string, raw: string, resellerCountry: string | null) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const phone = normalisePhone(raw, resellerCountry);
+    if (user.phone === phone || await this.prisma.userPhone.findFirst({ where: { userId, phone } })) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_already_added', 'This number is already on your account.', 'phone');
+    if (await this.prisma.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null }, id: { not: userId } } }) || await this.prisma.userPhone.findUnique({ where: { realm_phone: { realm: 'reseller', phone } } })) throw phoneInUse();
+    if (await this.prisma.userPhone.count({ where: { userId } }) >= 5) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_limit', 'You can have up to five phone numbers.');
+    const code = await this.codes.issue(userId, 'phone_add', phone);
+    try {
+      await this.sms.sendForCountry(resellerCountry, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+    } catch (error) {
+      await this.codes.cancel(userId, 'phone_add');
+      if (error instanceof ApiError) throw error;
+      this.logger.error({ err: error }, 'Could not send the phone confirmation code');
+      throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
+    }
+    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+  }
+
+  async confirmAdditionalPhone(userId: string, code: string) {
+    const phone = await this.codes.consume(userId, 'phone_add', code);
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (await this.prisma.user.findFirst({ where: { realm: 'reseller', phone, phoneVerifiedAt: { not: null }, id: { not: userId } } })) throw phoneInUse();
+    try {
+      await this.prisma.$transaction(async tx => {
+        if (await tx.userPhone.count({ where: { userId } }) >= 5) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_limit', 'You can have up to five phone numbers.');
+        await tx.userPhone.create({ data: { userId, realm: user.realm, phone, verifiedAt: new Date() } });
+        if (!user.phoneVerifiedAt) await tx.user.update({ where: { id: userId }, data: { phone, phoneVerifiedAt: new Date() } });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw phoneInUse();
+      throw error;
+    }
+    await this.inbox.person(userId, 'security.phone_added', {
+      title: 'Phone number added',
+      body: `${phone} can now sign in to your account. If this was not you, remove it and change your password.`,
+      link: '/settings/profile',
+      subject: `${userId}:${phone}`,
+    });
+    return this.listPhones(userId);
+  }
+
+  async makePrimaryPhone(userId: string, phone: string, password?: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (phone === user.phone) return this.listPhones(userId);
+    const other = await this.prisma.userPhone.findFirst({ where: { userId, phone } });
+    if (!other) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'Add and confirm that number first.', 'phone');
+    if (user.passwordHash) {
+      if (!password) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Enter your current password.', 'password');
+      await this.confirmPassword(user, password, 'password');
+    }
+    await this.prisma.user.update({ where: { id: userId }, data: { phone, phoneVerifiedAt: other.verifiedAt } });
+    await this.inbox.person(userId, 'security.phone_added', {
+      title: 'Primary phone number changed',
+      body: `${phone} is now your primary phone number. If this was not you, change your password.`,
+      link: '/settings/profile',
+      subject: `${userId}:primary:${phone}`,
+    });
+    return this.listPhones(userId);
+  }
+
+  async removeAdditionalPhone(userId: string, phone: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    if (user.phone === phone) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'primary_phone', 'Make another number primary before removing this one.', 'phone');
+    const removed = await this.prisma.userPhone.deleteMany({ where: { userId, phone } });
+    if (!removed.count) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'That number is not on your account.', 'phone');
+    return this.listPhones(userId);
   }
 
   private async sendVerification(user: User) {

@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { FeeKind, LedgerMode, ProductCategory } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
@@ -130,12 +130,14 @@ export class AdminFeesController {
   }
 
   @AdminRoles('finance')
+  @StepUp()
   @Put('fee-rules')
   setRule(@CurrentCaller() caller: Caller, @Body() body: FeeRuleDto) {
     return this.fees.setRule(adminId(caller), body);
   }
 
   @AdminRoles('finance')
+  @StepUp()
   @Delete('fee-rules/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteRule(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
@@ -161,6 +163,7 @@ export class AdminFeesController {
   }
 
   @AdminRoles('finance')
+  @StepUp()
   @Post('fees/:id/refund')
   @HttpCode(HttpStatus.OK)
   refund(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: RefundFeeDto) {

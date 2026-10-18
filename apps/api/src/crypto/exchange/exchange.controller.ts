@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, SessionOnly } from '../../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, SessionOnly, StepUp } from '../../auth/caller.js';
 import { adminId } from '../../countries/countries.controller.js';
 import { ApiError } from '../../common/errors/api-error.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../../customers/customer-session.js';
@@ -399,6 +399,7 @@ export class AdminExchangeController {
   }
 
   @AdminRoles('operations', 'finance')
+  @StepUp()
   @Put('markups')
   setMarkup(@CurrentCaller() caller: Caller, @Body() body: MarkupDto) {
     return this.exchange.setMarkup(adminId(caller), body);

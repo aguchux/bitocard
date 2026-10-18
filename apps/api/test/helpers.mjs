@@ -176,7 +176,7 @@ export async function lastEmailCode(app, to) {
 let adminCounter = 0;
 
 /** A signed-in admin (password plus authenticator) with the given roles, as a browser-like client. */
-export async function adminClient(server, roles = ['super_admin']) {
+export async function adminClient(server, roles = ['super_admin'], { stepUp = true } = {}) {
   const { AdminAuthService } = await import('../dist/auth/admin-auth.service.js');
   const email = `admin${(adminCounter += 1)}-${Date.now()}@bitocard.com`;
   const password = 'admin passphrase long';
@@ -189,6 +189,19 @@ export async function adminClient(server, roles = ['super_admin']) {
   const verified = await browser.post('/v1/admin/auth/mfa/verify', { challenge_token: challenge.challenge_token, code });
   if (verified.status !== 200) throw new Error(`Admin sign-in failed: ${JSON.stringify(verified.json)}`);
   browser.admin = { email, secret: setup.secret };
+  if (!stepUp) return browser;
+  // Like the admin app: a sensitive action outside the step-up window answers step_up_required, so the admin enters
+  // their authenticator code (opening 5 minutes) and the action is tried again once.
+  for (const method of ['post', 'patch', 'put', 'delete']) {
+    const send = browser[method];
+    browser[method] = async (...args) => {
+      const first = await send(...args);
+      if (first.status !== 403 || first.json?.error?.code !== 'step_up_required') return first;
+      const opened = await browser.post('/v1/admin/auth/step-up', { code: await adminCode(server, browser) });
+      if (opened.status !== 200) throw new Error(`Admin step-up failed: ${JSON.stringify(opened.json)}`);
+      return send(...args);
+    };
+  }
   return browser;
 }
 

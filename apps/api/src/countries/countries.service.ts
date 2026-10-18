@@ -22,6 +22,7 @@ export function presentCountry(country: CountryWithCategories) {
     reserved_accounts: country.reservedAccounts,
     /** Who checks identities here: BitoCard Verify (`bitocard`, across Africa) or Didit. */
     identity_provider: country.identityProvider as 'bitocard' | 'didit',
+    phone_verification_available: country.smsProvider !== null,
     markup_cap_percent: country.markupCapPercent,
     payout_hold_days: country.payoutHoldDays,
     min_withdrawal_minor: Number(country.minWithdrawalMinor),
@@ -34,6 +35,7 @@ export function presentCountryAdmin(country: CountryWithCategories) {
   return {
     ...presentCountry(country),
     spin_daily_limit: country.spinDailyLimit,
+    sms_provider: country.smsProvider as 'termii' | 'africas_talking' | null,
     exchange_markup_cap_bps: country.exchangeMarkupCapBps,
     exchange_reserve_alert_minor: country.exchangeReserveAlertMinor === null ? null : Number(country.exchangeReserveAlertMinor),
     categories: country.categories
@@ -47,6 +49,7 @@ export type CountryUpdate = Partial<{
   reseller_signup: boolean;
   reserved_accounts: boolean;
   identity_provider: 'bitocard' | 'didit';
+  sms_provider: 'termii' | 'africas_talking' | null;
   markup_cap_percent: number;
   payout_hold_days: number;
   min_withdrawal_minor: number;
@@ -121,6 +124,7 @@ export class CountriesService {
         resellerSignup: input.reseller_signup,
         reservedAccounts: input.reserved_accounts,
         identityProvider: input.identity_provider,
+        smsProvider: input.sms_provider,
         markupCapPercent: input.markup_cap_percent,
         payoutHoldDays: input.payout_hold_days,
         spinDailyLimit: input.spin_daily_limit,

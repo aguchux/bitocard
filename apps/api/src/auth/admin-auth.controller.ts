@@ -35,6 +35,12 @@ class MfaVerifyDto extends ChallengeDto {
   code: string;
 }
 
+class StepUpDto {
+  @ApiProperty({ description: 'The 6-digit code from the admin’s authenticator app.' })
+  @Matches(/^\d{6}$/, { message: 'code must be the 6 digits from your authenticator app' })
+  code: string;
+}
+
 class AdminEmailDto {
   @ApiProperty({ format: 'email', example: 'ops@bitocard.com' })
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
@@ -138,8 +144,18 @@ export class AdminAuthController {
   }
 
   @Get('session')
-  session(@CurrentCaller() caller: Caller) {
-    return this.adminAuth.describe(caller.kind === 'session' ? caller.userId : '');
+  async session(@CurrentCaller() caller: Caller) {
+    const described = await this.adminAuth.describe(caller.kind === 'session' ? caller.userId : '');
+    const until = caller.kind === 'session' && caller.stepUpUntil && caller.stepUpUntil > new Date() ? caller.stepUpUntil.toISOString() : null;
+    return { ...described, step_up_until: until };
+  }
+
+  /** Opens 5 minutes of sensitive and money actions on this session with the admin's authenticator code. */
+  @Post('step-up')
+  @HttpCode(HttpStatus.OK)
+  stepUp(@CurrentCaller() caller: Caller, @Body() body: StepUpDto) {
+    if (caller.kind !== 'session') throw new Error('Admin step-up needs a session');
+    return this.adminAuth.stepUp(caller.userId, caller.sessionId, body.code);
   }
 
   @Post('signout')

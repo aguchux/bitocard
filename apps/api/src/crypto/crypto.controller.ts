@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { ApiExcludeController, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
@@ -555,6 +555,7 @@ export class AdminCryptoController {
   }
 
   @AdminRoles('operations')
+  @StepUp()
   @Patch('assets/:code')
   setAsset(@CurrentCaller() caller: Caller, @Param('code') code: string, @Body() body: AssetDto) {
     return this.wallets.setAsset(adminId(caller), code, body);
@@ -590,6 +591,7 @@ export class AdminCryptoController {
   }
 
   @AdminRoles('operations')
+  @StepUp()
   @Post('freezes/:id/release')
   @HttpCode(HttpStatus.OK)
   release(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDto) {
@@ -598,6 +600,7 @@ export class AdminCryptoController {
 
   /** Finance only: frozen crypto taken to BitoCard (court orders, proven fraud). */
   @AdminRoles('finance')
+  @StepUp()
   @Post('freezes/:id/seize')
   @HttpCode(HttpStatus.OK)
   seize(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDto) {
@@ -695,6 +698,7 @@ export class AdminChainsController {
   }
 
   @AdminRoles('operations')
+  @StepUp()
   @Put('chains/:chain/routes')
   routes(@CurrentCaller() caller: Caller, @Param('chain') chain: string, @Body() body: RoutesDto) {
     return this.deposits.setRoutes(adminId(caller), chain, body);
@@ -708,6 +712,7 @@ export class AdminChainsController {
   }
 
   @AdminRoles('operations')
+  @StepUp()
   @Patch('networks/:id')
   network(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: NetworkDto) {
     return this.deposits.setNetwork(adminId(caller), id, body);
@@ -756,6 +761,7 @@ export class AdminWithdrawalsController {
 
   /** Finance only: crypto leaves BitoCard. */
   @AdminRoles('finance')
+  @StepUp()
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   approve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDto) {

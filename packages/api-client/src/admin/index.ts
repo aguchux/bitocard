@@ -7,6 +7,7 @@ import type {
   AdminProductFilter,
   AdminProductList,
   AdminSession,
+  AdminStepUp,
   AuditEntry,
   Country,
   FeatureRule,
@@ -73,6 +74,8 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: body => ({ url: '/v1/admin/auth/password-link/complete', method: 'POST', body }),
     }),
     adminSignOut: build.mutation<void, void>({ query: () => ({ url: '/v1/admin/auth/signout', method: 'POST' }), invalidatesTags: ['Session'] }),
+    /** Opens 5 minutes of sensitive and money actions on this session with the authenticator code. */
+    adminStepUp: build.mutation<AdminStepUp, { code: string }>({ query: body => ({ url: '/v1/admin/auth/step-up', method: 'POST', body }), invalidatesTags: ['Session'] }),
 
     // -- Overview and activity --------------------------------------------------------------------------------------
     overview: build.query<Overview, { days: number; mode: Mode }>({ query: args => ({ url: '/v1/admin/overview', params: args }), providesTags: ['Overview'] }),
@@ -289,7 +292,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     /** Country-wide settings, such as who runs its identity checks (`identity_provider`). */
     updateCountry: build.mutation<
       Country,
-      { code: string; identity_provider?: IdentityProvider; spin_daily_limit?: number; exchange_markup_cap_bps?: number; exchange_reserve_alert_minor?: number | null }
+      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; exchange_markup_cap_bps?: number; exchange_reserve_alert_minor?: number | null }
     >({
       query: ({ code, ...body }) => ({ url: `/v1/admin/countries/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Country', 'Activity'],
@@ -374,6 +377,7 @@ export const {
   useAdminMfaSetupMutation,
   useAdminMfaVerifyMutation,
   useAdminSignOutMutation,
+  useAdminStepUpMutation,
   useAdminSignInStartMutation,
   useAdminForgotPasswordMutation,
   useAdminPasswordLinkMutation,

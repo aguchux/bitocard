@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, requireStepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -115,6 +115,8 @@ class AdminFilterDto extends DisputeFilterDto {
   @IsOptional() @IsUUID()
   reseller_id?: string;
 }
+
+const moneyActions = new Set<string>(['refund_customer', 'credit_reseller', 'accept_chargeback']);
 
 class ExecuteDto {
   @IsIn(disputeActions)
@@ -269,6 +271,8 @@ export class AdminDisputesController {
   @Post(':id/execute')
   @HttpCode(HttpStatus.OK)
   async execute(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ExecuteDto) {
+    // Moving money (a refund, a credit, accepting a chargeback) needs the step-up window; rejecting does not.
+    if (moneyActions.has(body.action)) requireStepUp(caller);
     const author = await authorOf(this.prisma, caller, 'bitocard');
     const roles = caller.kind === 'session' ? caller.adminRoles : [];
     return this.disputes.execute({ id: adminId(caller), name: author.name, finance: roles.includes('finance') || roles.includes('super_admin') }, id, body);

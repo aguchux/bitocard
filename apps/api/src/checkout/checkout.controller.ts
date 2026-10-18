@@ -49,6 +49,11 @@ class CodeDto {
   code: string;
 }
 
+class ProfilePhoneDto {
+  @IsString() @Length(6, 25)
+  phone: string;
+}
+
 class ForgotDto {
   @Transform(lowerTrim) @IsEmail() @Length(3, 254)
   email: string;
@@ -270,6 +275,20 @@ export class CustomerAccountController {
   @HttpCode(HttpStatus.OK)
   verifyEmail(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
     return this.customers.verifyEmail(caller.customer, body.code);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('phone')
+  @HttpCode(HttpStatus.ACCEPTED)
+  addPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: ProfilePhoneDto) {
+    return this.customers.addPhone(caller.customer, body.phone);
+  }
+
+  @UseGuards(CustomerGuard)
+  @Post('phone/verify')
+  @HttpCode(HttpStatus.OK)
+  verifyPhone(@CurrentCustomer() caller: CustomerCaller, @Body() body: CodeDto) {
+    return this.customers.verifyPhone(caller.customer, body.code);
   }
 
   /** The customer's identity check for a market (BitoCard Verify across Africa, Didit elsewhere), where buying needs one. */

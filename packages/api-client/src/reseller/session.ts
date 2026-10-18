@@ -30,6 +30,7 @@ export type Notice = { object: 'notice'; message: string };
 
 /** One of a person's email addresses. Exactly one is primary: it signs in and gets notices, and cannot be removed. */
 export type UserEmail = { object: 'user_email'; email: string; primary: boolean; verified: boolean; added_at: string };
+export type UserPhone = { object: 'user_phone'; phone: string; primary: boolean; verified: boolean; added_at: string };
 /** `country` and `business_name` open a reseller account; `invitation_token` joins the inviting team instead. */
 export type SignUpInput = { name: string; email: string; password: string } & (
   | { country: string; business_name?: string; signup_token?: string }
@@ -59,6 +60,11 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     resendEmailCode: build.mutation<Notice, void>({ query: () => ({ url: '/v1/auth/email/resend', method: 'POST' }) }),
     addPhone: build.mutation<Notice, { phone: string }>({ query: body => ({ url: '/v1/auth/phone', method: 'POST', body }) }),
     verifyPhone: build.mutation<Session, { code: string }>({ query: body => ({ url: '/v1/auth/phone/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
+    phones: build.query<{ object: 'list'; data: UserPhone[] }, void>({ query: () => '/v1/auth/phones', providesTags: ['Session'] }),
+    addAdditionalPhone: build.mutation<Notice & { phone: string }, { phone: string }>({ query: body => ({ url: '/v1/auth/phones', method: 'POST', body }) }),
+    confirmAdditionalPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, { code: string }>({ query: body => ({ url: '/v1/auth/phones/verify', method: 'POST', body }), invalidatesTags: ['Session'] }),
+    makePrimaryPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, { phone: string; password?: string }>({ query: body => ({ url: '/v1/auth/phones/primary', method: 'POST', body }), invalidatesTags: ['Session'] }),
+    removeAdditionalPhone: build.mutation<{ object: 'list'; data: UserPhone[] }, string>({ query: phone => ({ url: `/v1/auth/phones/${encodeURIComponent(phone)}`, method: 'DELETE' }), invalidatesTags: ['Session'] }),
     forgotPassword: build.mutation<Notice, { email: string }>({ query: body => ({ url: '/v1/auth/password/forgot', method: 'POST', body }) }),
     resetPassword: build.mutation<unknown, { email: string; code: string; password: string }>({ query: body => ({ url: '/v1/auth/password/reset', method: 'POST', body }) }),
     updateProfile: build.mutation<Session, { name: string }>({ query: body => ({ url: '/v1/auth/profile', method: 'PATCH', body }), invalidatesTags: ['Session'] }),
@@ -93,6 +99,11 @@ export const {
   useResendEmailCodeMutation,
   useAddPhoneMutation,
   useVerifyPhoneMutation,
+  usePhonesQuery,
+  useAddAdditionalPhoneMutation,
+  useConfirmAdditionalPhoneMutation,
+  useMakePrimaryPhoneMutation,
+  useRemoveAdditionalPhoneMutation,
   useForgotPasswordMutation,
   useResetPasswordMutation,
   useAccountQuery,

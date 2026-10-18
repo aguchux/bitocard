@@ -122,11 +122,14 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | Payments and reserved accounts | Flutterwave (Nigeria, Ghana, Kenya incl. M-Pesa), Monnify (Nigeria), Stripe (UK, US, Europe), others later | MVP: Flutterwave; Monnify to qualify |
 | Identity | BitoCard Verify (own KYC/KYB, human review) across Africa; Didit elsewhere; BVN for Nigerian reserved accounts; bank validation via Flutterwave | MVP |
 | Email | Resend, MailerSend | MVP |
-| SMS (sign-in codes) | Termii | MVP |
+| SMS (phone verification) | Termii or Africa's Talking, assigned by admin per country | Disabled until the country has an assigned provider and its credentials are configured |
+
 | Domains | Vercel (registrar and connection); resell.biz (country endings) | MVP: Vercel |
 | DNS (branded nameservers) | resell.biz | MVP |
 | Exchange rates | Open Exchange Rates (reference rates), checked against Flutterwave's rates | MVP |
 | File storage (logos, icons, images) | DigitalOcean Spaces (US region, CDN), S3-compatible | MVP: built; needs the bucket, keys and its CORS rule |
+
+Profile phone numbers: each storefront customer can keep one verified mobile number; replacing it requires confirming the new number first. Reseller users can keep up to five verified mobile numbers, sign in with any of them, choose a primary number and remove secondary numbers. An admin chooses Termii, Africa's Talking or disabled for each country. New numbers join the profile and become usable for sign-in only after confirmation.
 
 **Pilot sourcing paths**
 
@@ -547,7 +550,7 @@ Store customers buy and sell popular coins and stablecoins with each other, safe
 | Background work | Vercel Queues, Workflow and Cron; transactional outbox |
 | Caching and rate limits | Redis (Upstash, via the Vercel Marketplace): catalogue and price caching, rate limits per API key, short-lived locks. Postgres stays the durable record (ledger, orders, idempotency keys) |
 | Email | Resend and MailerSend, either can send |
-| SMS (sign-in codes) | Termii |
+| SMS (phone verification) | Termii or Africa's Talking, assigned by admin per country |
 | Identity | BitoCard Verify at verify.bitocard.com (own KYC and KYB with human review: BitoCard admins, and registered KYB-verified resellers for their own customers) in every African country; Didit elsewhere; BVN only for Nigerian reserved accounts; Flutterwave account validation |
 | Payments and reserved accounts | Flutterwave, Monnify, Stripe and others |
 | Domains | Vercel (registrar API and Vercel for Platforms) |

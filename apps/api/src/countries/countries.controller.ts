@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpStatus, Param, Patch, type PipeTransform, Po
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
 import { CountriesService, presentCountry, presentCountryAdmin, productCategories } from './countries.service.js';
@@ -32,6 +32,7 @@ class UpdateCountryDto {
   @IsOptional() @IsBoolean() reseller_signup?: boolean;
   @IsOptional() @IsBoolean() reserved_accounts?: boolean;
   @IsOptional() @IsIn(['bitocard', 'didit']) identity_provider?: 'bitocard' | 'didit';
+  @ValidateIf((_object, value) => value !== null) @IsOptional() @IsIn(['termii', 'africas_talking']) sms_provider?: 'termii' | 'africas_talking' | null;
   @IsOptional() @IsInt() @Min(0) @Max(100) markup_cap_percent?: number;
   @IsOptional() @IsInt() @Min(0) @Max(90) payout_hold_days?: number;
   /** Spin and win: spins per customer per day in this market. */
@@ -97,16 +98,19 @@ export class AdminCountriesController {
     return { object: 'list' as const, data: (await this.countries.list(false)).map(presentCountryAdmin) };
   }
 
+  @StepUp()
   @Post()
   async create(@CurrentCaller() caller: Caller, @Body() body: CreateCountryDto) {
     return presentCountryAdmin(await this.countries.create(adminId(caller), body));
   }
 
+  @StepUp()
   @Patch(':code')
   async update(@CurrentCaller() caller: Caller, @Param('code') code: string, @Body() body: UpdateCountryDto) {
     return presentCountryAdmin(await this.countries.update(adminId(caller), code, body));
   }
 
+  @StepUp()
   @Put(':code/categories/:category')
   async updateCategory(
     @CurrentCaller() caller: Caller,

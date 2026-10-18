@@ -6,3 +6,4 @@ export { AppProviders } from './app-providers';
 export { NotificationBell, NotificationsInbox, unreadPollMs } from './notifications';
 export { PushSettings, pushSupported, usePushSync } from './push';
 export { docsOrigins, goNext, returnOrigins, safeNext, verifyOrigins } from './return-to';
+export { StepUpPrompt } from './step-up';

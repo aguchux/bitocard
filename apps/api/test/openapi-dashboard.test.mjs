@@ -33,6 +33,7 @@ before(async () => {
   });
   check = await responseChecker(server.app);
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
+  await prisma.country.update({ where: { code: 'NG' }, data: { smsProvider: 'termii' } });
 });
 
 after(async () => {

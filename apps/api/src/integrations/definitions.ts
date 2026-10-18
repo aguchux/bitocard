@@ -53,6 +53,10 @@ const integrationKeyList = [
   'TERMII_API_KEY',
   'TERMII_API_URL',
   'TERMII_SENDER_ID',
+  'AFRICASTALKING_USERNAME',
+  'AFRICASTALKING_API_KEY',
+  'AFRICASTALKING_SENDER_ID',
+  'AFRICASTALKING_API_URL',
   'WEB_PUSH_PUBLIC_KEY',
   'WEB_PUSH_PRIVATE_KEY',
   'WEB_PUSH_SUBJECT',
@@ -166,12 +170,23 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
   },
   {
     id: 'sms',
-    name: 'SMS (Termii)',
-    description: 'Mobile number verification and sign-in codes. Without a key, texts are only logged.',
+    name: 'SMS verification (Termii)',
+    description: 'Select Termii for a country in Markets after connecting this integration.',
     fields: [
       secret('TERMII_API_KEY', 'API key', { help: 'Termii dashboard > API (sign up at termii.com).' }),
       field('TERMII_API_URL', 'API address', { kind: 'url', help: 'Account-specific; shown in the Termii dashboard.' }),
       field('TERMII_SENDER_ID', 'Sender ID'),
+    ],
+  },
+  {
+    id: 'sms_africas_talking',
+    name: 'SMS verification (Africa’s Talking)',
+    description: 'Select Africa’s Talking for a country in Markets after connecting this integration.',
+    fields: [
+      field('AFRICASTALKING_USERNAME', 'Username', { required: true, help: 'Your app’s username in the Africa’s Talking dashboard (sandbox for its test account).' }),
+      secret('AFRICASTALKING_API_KEY', 'API key'),
+      field('AFRICASTALKING_SENDER_ID', 'Sender ID', { required: false, help: 'An approved alphanumeric sender ID or short code; leave empty for the shared one.' }),
+      field('AFRICASTALKING_API_URL', 'API address', { kind: 'url', required: false, help: 'Leave empty: the live address, or the sandbox one for the username sandbox.' }),
     ],
   },
   {

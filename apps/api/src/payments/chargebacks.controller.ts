@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { chargebackOutcomes, ChargebacksService, type ChargebackOutcome } from './chargebacks.service.js';
 
@@ -58,17 +58,20 @@ export class AdminChargebacksController {
     return this.chargebacks.list(filter);
   }
 
+  @StepUp()
   @Post()
   record(@CurrentCaller() caller: Caller, @Body() body: RecordChargebackDto) {
     return this.chargebacks.record(adminId(caller), body);
   }
 
+  @StepUp()
   @Post(':id/resolve')
   @HttpCode(HttpStatus.OK)
   resolve(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveChargebackDto) {
     return this.chargebacks.resolve(id, body.outcome, adminId(caller), body.reason);
   }
 
+  @StepUp()
   @Post(':id/clear')
   @HttpCode(HttpStatus.OK)
   clear(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonDto) {

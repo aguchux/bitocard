@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, Length, Matches } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, personOf, RealmOnly, resellerOf, Roles, SessionOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, personOf, RealmOnly, resellerOf, Roles, SessionOnly, StepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { ConnectionStatus, LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
@@ -159,12 +159,14 @@ export class AdminResellerIntegrationsController {
   }
 
   @AdminRoles('super_admin')
+  @StepUp()
   @Put('integrations/:id/reseller-availability')
   setOffer(@CurrentCaller() caller: Caller, @Param('id') id: string, @Body() body: OfferDto) {
     return this.integrations.setOffer(adminId(caller), integrationId(id), body);
   }
 
   @AdminRoles('super_admin')
+  @StepUp()
   @Put('integrations/:id/reseller-access')
   setAccess(@CurrentCaller() caller: Caller, @Param('id') id: string, @Body() body: AccessDto) {
     return this.integrations.setResellerAccess(adminId(caller), integrationId(id), body.enabled);

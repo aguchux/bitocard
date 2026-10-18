@@ -448,6 +448,25 @@ const schemas = {
 };
 
 const emailList = list(ref('UserEmail'), {}, false);
+const phoneList = shape({
+  object: constant('list'),
+  data: array(
+    shape({
+      object: constant('user_phone'),
+      phone: str('The number, in E.164 form.'),
+      primary: bool('Whether it is your primary number (shown on your account).'),
+      verified: bool('Whether it is confirmed; only confirmed numbers sign in.'),
+      added_at: time('When it was added.'),
+    }),
+  ),
+});
+const phonesExample = {
+  object: 'list',
+  data: [
+    { object: 'user_phone', phone: '+2348031234567', primary: true, verified: true, added_at: '2026-10-01T09:00:00.000Z' },
+    { object: 'user_phone', phone: '+2348031234568', primary: false, verified: true, added_at: '2026-10-18T09:00:00.000Z' },
+  ],
+};
 const notice202 = (description: string, message: string) => ({ status: 202 as const, description, schema: 'Notice', example: notice(message) });
 
 export const dashboardDocs: DocsArea = {
@@ -521,6 +540,16 @@ export const dashboardDocs: DocsArea = {
       example: { object: 'notice', message: 'A code is on its way to +2348031234567.', phone: '+2348031234567' },
     },
     'POST /v1/auth/phone/verify': { status: 200, description: 'Your mobile number is confirmed; you can sign in with it.', schema: 'Session', example: sessionExample },
+    'GET /v1/auth/phones': { status: 200, description: 'Your confirmed sign-in numbers, the primary first.', schema: phoneList, example: phonesExample },
+    'POST /v1/auth/phones': {
+      status: 202,
+      description: 'A code is on its way by SMS to the number (one from your business country).',
+      schema: shape({ object: constant('notice'), message: str('What happened, in plain English, ready to show.'), phone: str('The number the code was sent to, in E.164 form.') }),
+      example: { object: 'notice', message: 'A code is on its way to +2348031234568.', phone: '+2348031234568' },
+    },
+    'POST /v1/auth/phones/verify': { status: 200, description: 'The number is confirmed and can sign in; your numbers now.', schema: phoneList, example: phonesExample },
+    'POST /v1/auth/phones/primary': { status: 200, description: 'The number is your primary one now; your numbers.', schema: phoneList, example: phonesExample },
+    'DELETE /v1/auth/phones/{phone}': { status: 200, description: 'The number is removed; your numbers now.', schema: phoneList, example: { object: 'list', data: [phonesExample.data[0]] } },
     'POST /v1/auth/password/forgot': notice202('Always reported, whether or not the account exists.', 'If an account uses this email, a reset code is on its way.'),
     'POST /v1/auth/password/reset': { status: 200, description: 'The password is changed and every session signed out.', schema: 'Notice', example: notice('Your password has been changed. Sign in with it now.') },
     'GET /v1/auth/google/start': { status: 302, description: 'Redirects the browser to Google.' },

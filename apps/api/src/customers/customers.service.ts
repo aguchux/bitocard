@@ -1,11 +1,13 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { PasswordsService } from '../auth/passwords.service.js';
+import { normalisePhone } from '../auth/auth.service.js';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { houseStoreId } from '../checkout/house.service.js';
 import { type Country, type Customer, type CustomerCodePurpose, Prisma, type Store } from '../generated/prisma/client.js';
 import { EmailService } from '../notifications/email.service.js';
+import { SmsService } from '../notifications/sms.service.js';
 import { customerCodeEmail } from '../notifications/templates.js';
 
 const minute = 60 * 1000;
@@ -26,13 +28,16 @@ export type CustomerWithStore = Customer & { store: Store; market?: Country | nu
 const countryLocked = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_locked', 'Your country is set for good: your wallet and payments are in its currency.', 'country');
 
 /** `market` must be loaded when the customer has a country (`CustomersService.present` does it). */
-export function presentCustomer(customer: Customer & { market?: Pick<Country, 'currency'> | null }) {
+export function presentCustomer(customer: Customer & { market?: Pick<Country, 'currency' | 'smsProvider'> | null }) {
   return {
     object: 'customer' as const,
     id: customer.id,
     email: customer.email,
     name: customer.name,
     email_verified: customer.emailVerifiedAt !== null,
+    phone: customer.phone,
+    phone_verified: customer.phoneVerifiedAt !== null,
+    phone_verification_available: Boolean(customer.market?.smsProvider),
     /** Chosen at sign-up and then fixed: the wallet, checkouts and prices are in its currency. Null until chosen (older accounts). */
     country: customer.country,
     currency: customer.market?.currency ?? null,
@@ -59,6 +64,7 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordsService,
     private readonly email: EmailService,
+    private readonly sms: SmsService,
   ) {}
 
   /** The customer signed in with this token, or null (ended, expired or suspended). */
@@ -188,7 +194,7 @@ export class CustomersService {
 
   // -- Codes -----------------------------------------------------------------------------------------------------
 
-  private async sendCode(customer: Customer, store: Store, purpose: CustomerCodePurpose) {
+  private async sendCode(customer: Customer, store: Store, purpose: 'email_verification' | 'password_reset') {
     const latest = await this.prisma.customerCode.findFirst({ where: { customerId: customer.id, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
     if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
@@ -220,6 +226,46 @@ export class CustomersService {
     if (!sameDigest(record.codeHash, digest(customer.id, purpose, code))) throw codeInvalid();
     const consumed = await this.prisma.customerCode.updateMany({ where: { id: record.id, consumedAt: null }, data: { consumedAt: new Date() } });
     if (consumed.count === 0) throw codeInvalid();
+    return record.target;
+  }
+
+  /** A customer has one confirmed number. Changing it leaves the old number in place until the new one is confirmed. */
+  async addPhone(customer: Customer, raw: string) {
+    // A number from the customer's own country only (normalisePhone refuses others, and asks for the country first).
+    const phone = normalisePhone(raw, customer.country);
+    const taken = await this.prisma.customer.findFirst({ where: { storeId: customer.storeId, phone, id: { not: customer.id } } });
+    if (taken) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+    const purpose: CustomerCodePurpose = 'phone_verification';
+    const latest = await this.prisma.customerCode.findFirst({ where: { customerId: customer.id, purpose, consumedAt: null }, orderBy: { createdAt: 'desc' } });
+    if (latest && Date.now() - latest.createdAt.getTime() < resendAfterMs) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_recently_sent', 'A code was just sent. Wait a minute before asking for another.');
+    const sentToday = await this.prisma.customerCode.count({ where: { customerId: customer.id, purpose, createdAt: { gt: new Date(Date.now() - 24 * 60 * minute) } } });
+    if (sentToday >= 10) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'code_daily_limit', 'Too many codes were sent today. Try again tomorrow.');
+    const code = numericCode();
+    await this.prisma.$transaction([
+      this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } }),
+      this.prisma.customerCode.create({ data: { customerId: customer.id, purpose, target: phone, codeHash: digest(customer.id, purpose, code), expiresAt: new Date(Date.now() + codeLifetimeMs) } }),
+    ]);
+    try {
+      await this.sms.sendForCountry(customer.country, { to: phone, text: `Your BitoCard code is ${code}. It expires in 30 minutes. Never share it.` });
+    } catch (error) {
+      await this.prisma.customerCode.updateMany({ where: { customerId: customer.id, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
+      if (error instanceof ApiError) throw error;
+      this.logger.error({ err: error }, 'Could not send the customer phone confirmation code');
+      throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'sms_delivery_failed', 'We could not send the text message. Check the number and try again.');
+    }
+    return { object: 'notice' as const, message: `A code is on its way to ${phone}.`, phone };
+  }
+
+  async verifyPhone(customer: Customer, code: string) {
+    const phone = await this.consumeCode(customer, 'phone_verification', code);
+    if (!phone) throw codeInvalid();
+    try {
+      const updated = await this.prisma.customer.update({ where: { id: customer.id }, data: { phone, phoneVerifiedAt: new Date() }, include: { market: true } });
+      return presentCustomer(updated);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+      throw error;
+    }
   }
 
   async resendVerification(customer: CustomerWithStore) {

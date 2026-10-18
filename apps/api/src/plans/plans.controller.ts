@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp, requireStepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { ResellerStatus } from '../generated/prisma/client.js';
 import { PlansService, presentPlan } from './plans.service.js';
@@ -54,6 +54,7 @@ export class AdminPlansController {
   constructor(private readonly plans: PlansService) {}
 
   @AdminRoles('finance')
+  @StepUp()
   @Patch('plans/:code')
   updatePlan(@CurrentCaller() caller: Caller, @Param('code') code: string, @Body() body: UpdatePlanDto) {
     return this.plans.update(adminId(caller), code, body);
@@ -74,11 +75,13 @@ export class AdminPlansController {
   @AdminRoles('operations')
   @Patch('resellers/:id')
   updateReseller(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateResellerDto) {
+    if (body.status === 'active' || body.plan !== undefined) requireStepUp(caller);
     return this.plans.updateReseller(adminId(caller), id, body);
   }
 
   /** Lets the reseller go live without the owner's identity check. Audited with the reason. */
   @AdminRoles('operations')
+  @StepUp()
   @Post('resellers/:id/identity-waiver')
   @HttpCode(HttpStatus.OK)
   waiveIdentity(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: WaiveIdentityDto) {
@@ -87,6 +90,7 @@ export class AdminPlansController {
 
   /** Asks for the identity check again; an unverified active reseller goes back to pending. Audited with the reason. */
   @AdminRoles('operations')
+  @StepUp()
   @Post('resellers/:id/identity-waiver/remove')
   @HttpCode(HttpStatus.OK)
   restoreIdentityCheck(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: WaiverReasonDto) {
