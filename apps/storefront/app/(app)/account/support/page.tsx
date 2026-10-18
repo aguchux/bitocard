@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, MessageCircle, Plus } from "lucide-react";
 import type { StoreList, StoreTicket } from "@bitocard/api-client/storefront";
 import { currentCustomer, customerApi } from "@/lib/customer";
 import { ticketStatusLabel } from "@/lib/support";
@@ -24,9 +24,14 @@ export default async function SupportPage() {
           <h1 className="text-3xl font-extrabold tracking-tight">Help & support</h1>
           <p className="mt-1 text-slate-600">Ask the store a question and follow its answers here. For a problem with an order’s money, report it from the order.</p>
         </div>
-        <Link href="/account/support/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
-          <Plus className="size-4" aria-hidden="true" /> New question
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/account/support?chat=1" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 font-semibold text-navy-900 hover:border-slate-300">
+            <MessageCircle className="size-4" aria-hidden="true" /> Chat now
+          </Link>
+          <Link href="/account/support/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 font-semibold text-white hover:bg-brand-600">
+            <Plus className="size-4" aria-hidden="true" /> New question
+          </Link>
+        </div>
       </div>
       {!result.ok ? <p className="rounded-2xl bg-red-50 p-4 text-sm text-red-800">{result.message}</p> : null}
       {result.ok && !tickets.length ? <p className="rounded-2xl bg-white p-6 text-slate-600 ring-1 ring-slate-100">No questions yet.</p> : null}

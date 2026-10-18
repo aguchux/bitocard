@@ -396,6 +396,35 @@ export class TicketsService {
     return presentTicket((await this.load({ id }))!, 'admin');
   }
 
+  /**
+   * A ticket made from a live chat by the staff answering it (or an assistant): the requester, store and queue are the
+   * chat's, the transcript is its first message, and those answering are told as for any new ticket.
+   */
+  async fromChat(
+    chat: { resellerId: string; mode: LedgerMode; requester: string; queue: string; storeId: string | null; customerId: string | null; userId: string | null },
+    input: { subject: string; category: TicketCategory; transcript: string; source: TicketSource },
+  ) {
+    const ticket = await this.create(
+      {
+        resellerId: chat.resellerId,
+        mode: chat.mode,
+        requester: chat.requester,
+        queue: chat.queue,
+        category: input.category,
+        subject: input.subject,
+        storeId: chat.storeId,
+        customerId: chat.customerId,
+        userId: chat.userId,
+        source: input.source,
+      },
+      system,
+      input.transcript,
+    );
+    if (ticket.queue === 'bitocard') await this.tellAdmins(ticket, 'admin.support.ticket_created', `From a chat: ${ticketReference(ticket.number)}: ${ticket.subject}`);
+    else await this.tellReseller(ticket, 'support.ticket_created', 'A chat became a support ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    return ticket;
+  }
+
   // -- Shared ------------------------------------------------------------------------------------------------------
 
   /** The requester writes: whoever answers has the next turn, and a resolved ticket reopens. */

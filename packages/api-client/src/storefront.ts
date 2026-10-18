@@ -330,6 +330,19 @@ export type StoreTicket = {
   messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; visibility: 'all'; body: string; created_at: string }>;
 };
 
+/** The customer's live chat with their store (never staff names; an assistant by its name). */
+export type StoreChat = {
+  object: 'support_chat';
+  id: string;
+  /** bot: an assistant answers; waiting: for a person; with_staff: a person is answering; closed. */
+  status: 'bot' | 'waiting' | 'with_staff' | 'closed';
+  ticket_reference: string | null;
+  created_at: string;
+  closed_at: string | null;
+  messages: StoreChatMessage[];
+};
+export type StoreChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; body: string; created_at: string };
+
 export type StoreCheckout = {
   object: 'checkout';
   id: string;

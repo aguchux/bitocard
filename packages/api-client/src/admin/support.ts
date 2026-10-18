@@ -1,5 +1,5 @@
 import { bitocardApi } from '../base';
-import type { Ticket, TicketPriority, TicketQueue, TicketRequester, TicketStatus, TicketSummary } from '../reseller/support';
+import type { Chat, ChatStatus, ChatSummary, Ticket, TicketCategory, TicketPriority, TicketQueue, TicketRequester, TicketStatus, TicketSummary } from '../reseller/support';
 import type { List } from './types';
 
 export type { Ticket, TicketCategory, TicketMessage, TicketPriority, TicketQueue, TicketRequester, TicketStatus, TicketSummary } from '../reseller/support';
@@ -39,3 +39,33 @@ export const adminSupportApi = bitocardApi.injectEndpoints({
 });
 
 export const { useAdminTicketsQuery, useAdminTicketQuery, useReplyAdminTicketMutation, useReturnTicketMutation, useResolveAdminTicketMutation, useUpdateAdminTicketMutation } = adminSupportApi;
+
+export type { Chat, ChatMessage, ChatStatus, ChatSummary } from '../reseller/support';
+
+export type AdminChatSummary = ChatSummary & { reseller_id: string };
+export type AdminChat = Chat & { reseller_id: string };
+
+const chatTags = (id: string) => [{ type: 'SupportChat' as const, id }, { type: 'SupportChat' as const, id: 'LIST' }];
+
+/** BitoCard's chats: resellers' teams and bitocard.com's customers. */
+export const adminChatsApi = bitocardApi.injectEndpoints({
+  endpoints: build => ({
+    adminChats: build.query<List<AdminChatSummary>, { status?: ChatStatus } | void>({
+      query: params => ({ url: '/v1/admin/support/chats', params: { limit: 100, ...(params ?? {}) } }),
+      providesTags: [{ type: 'SupportChat', id: 'LIST' }],
+    }),
+    adminChat: build.query<AdminChat, string>({ query: id => `/v1/admin/support/chats/${id}`, providesTags: (_result, _error, id) => [{ type: 'SupportChat', id }] }),
+    replyAdminChat: build.mutation<AdminChat, { id: string; body: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/support/chats/${id}/messages`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => chatTags(id),
+    }),
+    takeAdminChat: build.mutation<AdminChat, string>({ query: id => ({ url: `/v1/admin/support/chats/${id}/take`, method: 'POST' }), invalidatesTags: (_result, _error, id) => chatTags(id) }),
+    closeAdminChat: build.mutation<AdminChat, string>({ query: id => ({ url: `/v1/admin/support/chats/${id}/close`, method: 'POST' }), invalidatesTags: (_result, _error, id) => chatTags(id) }),
+    adminChatTicket: build.mutation<AdminChat, { id: string; subject: string; category: TicketCategory }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/support/chats/${id}/ticket`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [...chatTags(id), { type: 'SupportTicket', id: 'LIST' }],
+    }),
+  }),
+});
+
+export const { useAdminChatsQuery, useAdminChatQuery, useReplyAdminChatMutation, useTakeAdminChatMutation, useCloseAdminChatMutation, useAdminChatTicketMutation } = adminChatsApi;

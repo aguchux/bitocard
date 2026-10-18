@@ -7,6 +7,7 @@ import { Brand } from "@bitocard/ui/brand";
 import { brand } from "@bitocard/ui/site";
 import { AppHeader } from "@/components/app/app-header";
 import { AppNav, AppRail } from "@/components/app/app-nav";
+import { ChatWidget } from "@/components/app/chat-widget";
 import { SubRail } from "@/components/app/sub-rail";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
@@ -99,6 +100,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </footer>
         </div>
       </div>
+      {/* Chat with the store (it reads ?chat=1, so it sits in a Suspense). */}
+      <Suspense fallback={null}>
+        <ChatWidget store={name} />
+      </Suspense>
     </div>
   );
 }

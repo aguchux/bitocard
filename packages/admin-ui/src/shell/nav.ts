@@ -1,4 +1,4 @@
-import { AlertTriangle, Gift, Inbox, LifeBuoy, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Gift, Inbox, LifeBuoy, MessagesSquare, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'support' | 'settings';
 
@@ -24,7 +24,10 @@ export type SubNavItem = { label: string; href: string; icon?: LucideIcon; count
 export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> = {
   support: {
     title: 'Support',
-    items: [{ label: 'Tickets', href: '/support', icon: Inbox }],
+    items: [
+      { label: 'Tickets', href: '/support', icon: Inbox },
+      { label: 'Chats', href: '/support/chats', icon: MessagesSquare },
+    ],
   },
   home: {
     title: 'Dashboard',

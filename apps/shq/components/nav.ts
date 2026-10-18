@@ -17,6 +17,8 @@ import {
   House,
   KeyRound,
   LifeBuoy,
+  MessagesSquare,
+  Headset,
   Inbox,
   MessageSquarePlus,
   Landmark,
@@ -117,7 +119,9 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     title: "Support",
     items: [
       { label: "Tickets", href: "/support", icon: Inbox },
+      { label: "Chats", href: "/support/chats", icon: MessagesSquare },
       { label: "New ticket", href: "/support/new", icon: MessageSquarePlus },
+      { label: "Chat with BitoCard", href: "/support/bitocard", icon: Headset },
     ],
   },
   integrations: { title: "Integrations", items: [{ label: "Your integrations", href: "/integrations", icon: Plug }] },
