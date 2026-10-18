@@ -39,14 +39,17 @@ export const disputeTopicLabels: Record<string, string> = { order: 'Order', paym
 /** Who wrote a message, as the reader sees it: "You" for their own side. */
 function authorLabel(message: DisputeThreadMessage, viewer: 'reseller' | 'admin') {
   const own = (viewer === 'reseller' && message.author === 'reseller') || (viewer === 'admin' && message.author === 'bitocard');
-  const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', system: 'BitoCard' };
+  const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', bot: 'Assistant', system: 'BitoCard' };
   const role = roles[message.author] ?? message.author;
   if (message.author === 'system') return 'Update';
   return own ? `${message.author_name ?? role} (you)` : message.author_name ? `${message.author_name} · ${role}` : role;
 }
 
-/** The messages on a dispute, oldest first; staff notes are marked as never shown to the customer. */
-export function DisputeThread({ messages, viewer }: { messages: DisputeThreadMessage[]; viewer: 'reseller' | 'admin' }) {
+/**
+ * The messages on a dispute (or support ticket), oldest first; staff notes are marked as never shown to the requester
+ * (`requester`: who that is, the customer unless said otherwise).
+ */
+export function DisputeThread({ messages, viewer, requester = 'customer' }: { messages: DisputeThreadMessage[]; viewer: 'reseller' | 'admin'; requester?: string }) {
   if (!messages.length) return <p className="text-sm text-muted">No messages yet.</p>;
   return (
     <ol className="space-y-3" aria-label="Messages">
@@ -66,7 +69,7 @@ export function DisputeThread({ messages, viewer }: { messages: DisputeThreadMes
               {message.visibility === 'staff' ? (
                 <span className="inline-flex items-center gap-1 font-medium text-amber-700">
                   <Lock className="size-3" aria-hidden />
-                  Staff only: the customer never sees this
+                  {`Staff only: the ${requester} never sees this`}
                 </span>
               ) : null}
             </div>

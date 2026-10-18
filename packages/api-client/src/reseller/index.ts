@@ -18,3 +18,4 @@ export * from './numbers';
 export * from './esims';
 export * from './vpn';
 export * from './disputes';
+export * from './support';

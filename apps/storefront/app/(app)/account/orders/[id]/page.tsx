@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, ExternalLink, KeyRound, MessageSquareWarning } from "lucide-react";
+import { ChevronLeft, ExternalLink, KeyRound, LifeBuoy, MessageSquareWarning } from "lucide-react";
 import { formatFace, formatPrice, type StoreCheckout, type StoreEsim, type StoreVpn } from "@bitocard/api-client/storefront";
 import { EsimCard } from "@/components/store/esim-card";
 import { EsimManage } from "@/components/store/esim-manage";
@@ -147,14 +147,22 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       {tracked?.ok ? <EsimManage source={{ checkout: order.id }} esims={tracked.data.data} store="the store" /> : null}
       {vpn?.ok && vpn.data.vpn_subscription ? <VpnAccess source={{ checkout: order.id }} vpn={vpn.data.vpn_subscription} store="the store" /> : null}
 
-      {canDispute(order.status) ? (
+      <div className="flex flex-wrap gap-2">
         <Link
-          href={`/account/disputes/new?order=${order.id}`}
-          className="inline-flex min-h-11 items-center gap-2 justify-self-start rounded-xl border border-slate-200 px-4 text-sm font-semibold text-navy-900 hover:border-slate-300"
+          href={`/account/support/new?order=${order.id}`}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-navy-900 hover:border-slate-300"
         >
-          <MessageSquareWarning className="size-4" aria-hidden="true" /> Report a problem with this order
+          <LifeBuoy className="size-4" aria-hidden="true" /> Ask the store about this order
         </Link>
-      ) : null}
+        {canDispute(order.status) ? (
+          <Link
+            href={`/account/disputes/new?order=${order.id}`}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-navy-900 hover:border-slate-300"
+          >
+            <MessageSquareWarning className="size-4" aria-hidden="true" /> Report a problem with this order
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -18,6 +18,8 @@ export const apiKeyScopes = [
   'customers:verify',
   'disputes:read',
   'disputes:write',
+  'support:read',
+  'support:write',
 ] as const;
 
 export const maxActiveKeys = 20;

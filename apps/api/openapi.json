@@ -8789,7 +8789,9 @@
                     "stores:manage",
                     "customers:verify",
                     "disputes:read",
-                    "disputes:write"
+                    "disputes:write",
+                    "support:read",
+                    "support:write"
                   ],
                   "reseller": {
                     "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
@@ -11388,7 +11390,9 @@
                     "stores:manage",
                     "customers:verify",
                     "disputes:read",
-                    "disputes:write"
+                    "disputes:write",
+                    "support:read",
+                    "support:write"
                   ],
                   "created_at": "2026-10-06T09:00:00.000Z",
                   "last_used_at": null,
@@ -11534,7 +11538,9 @@
                         "stores:manage",
                         "customers:verify",
                         "disputes:read",
-                        "disputes:write"
+                        "disputes:write",
+                        "support:read",
+                        "support:write"
                       ],
                       "created_at": "2026-10-06T09:00:00.000Z",
                       "last_used_at": "2026-10-06T09:12:41.000Z",
@@ -11679,7 +11685,9 @@
                     "stores:manage",
                     "customers:verify",
                     "disputes:read",
-                    "disputes:write"
+                    "disputes:write",
+                    "support:read",
+                    "support:write"
                   ],
                   "created_at": "2026-10-06T11:00:00.000Z",
                   "last_used_at": null,
@@ -11832,7 +11840,9 @@
                     "stores:manage",
                     "customers:verify",
                     "disputes:read",
-                    "disputes:write"
+                    "disputes:write",
+                    "support:read",
+                    "support:write"
                   ],
                   "created_at": "2026-10-06T09:00:00.000Z",
                   "last_used_at": "2026-10-06T09:12:41.000Z",
@@ -19896,7 +19906,10 @@
                 "dispute.escalated",
                 "dispute.returned",
                 "dispute.contested",
-                "dispute.resolved"
+                "dispute.resolved",
+                "support_ticket.created",
+                "support_ticket.updated",
+                "support_ticket.message_received"
               ]
             }
           },
@@ -27441,6 +27454,1380 @@
         "x-bitocard-auth": "api_key"
       }
     },
+    "/v1/support/tickets": {
+      "get": {
+        "description": "Your customers’ tickets and your own tickets to BitoCard, most recently active first.",
+        "operationId": "TicketsController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "`open` (waiting for whoever answers), `pending` (waiting for the requester) or `resolved`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "pending",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "queue",
+            "required": false,
+            "in": "query",
+            "description": "Who answers: `reseller` (you) or `bitocard`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reseller",
+                "bitocard"
+              ]
+            }
+          },
+          {
+            "name": "requester",
+            "required": false,
+            "in": "query",
+            "description": "`customer` (your customers’ tickets) or `reseller` (yours to BitoCard).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customer",
+                "reseller"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your tickets in this mode, most recently active first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SupportTicketSummary"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "support_ticket",
+                      "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                      "reference": "T-000042",
+                      "mode": "live",
+                      "requester": "customer",
+                      "queue": "reseller",
+                      "status": "open",
+                      "category": "order",
+                      "priority": "normal",
+                      "subject": "Where is my electricity token?",
+                      "source": "form",
+                      "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                      "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                      "customer_reference": null,
+                      "order_id": null,
+                      "checkout_id": null,
+                      "assignee_id": null,
+                      "escalated_at": null,
+                      "resolved_at": null,
+                      "last_message_at": "2026-10-19T09:12:00.000Z",
+                      "created_at": "2026-10-19T09:12:00.000Z",
+                      "updated_at": "2026-10-19T09:12:00.000Z"
+                    },
+                    {
+                      "object": "support_ticket",
+                      "id": "7b6c5d4e-3f2a-4b1c-8d9e-0f1a2b3c4d5e",
+                      "reference": "T-000043",
+                      "mode": "live",
+                      "requester": "reseller",
+                      "queue": "bitocard",
+                      "status": "open",
+                      "category": "technical",
+                      "priority": "normal",
+                      "subject": "Webhook deliveries failing since this morning",
+                      "source": "api",
+                      "store_id": null,
+                      "customer_id": null,
+                      "customer_reference": null,
+                      "order_id": null,
+                      "checkout_id": null,
+                      "assignee_id": null,
+                      "escalated_at": null,
+                      "resolved_at": null,
+                      "last_message_at": "2026-10-19T09:12:00.000Z",
+                      "created_at": "2026-10-19T09:12:00.000Z",
+                      "updated_at": "2026-10-19T09:12:00.000Z"
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List support tickets",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "post": {
+        "description": "Ask BitoCard a question (`requester: reseller`), or log a ticket for one of your customers on your own systems to answer and track (`requester: customer`, with your `customer_reference`). Customers on your hosted store open their own tickets there.",
+        "operationId": "TicketsController_open",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new ticket with its first message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "7b6c5d4e-3f2a-4b1c-8d9e-0f1a2b3c4d5e",
+                  "reference": "T-000043",
+                  "mode": "live",
+                  "requester": "reseller",
+                  "queue": "bitocard",
+                  "status": "open",
+                  "category": "technical",
+                  "priority": "normal",
+                  "subject": "Webhook deliveries failing since this morning",
+                  "source": "api",
+                  "store_id": null,
+                  "customer_id": null,
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": null,
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:12:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:12:00.000Z",
+                  "messages": [
+                    {
+                      "id": "6d5e4f3a-2b1c-4d0e-8f9a-8b7c6d5e4f3a",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "all",
+                      "body": "Our endpoint answers 200 but deliveries show as failed.",
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open a support ticket",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/support/tickets/{id}": {
+      "get": {
+        "description": "With its messages: on your customers’ tickets, staff notes included.",
+        "operationId": "TicketsController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ticket with its messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "reseller",
+                  "status": "open",
+                  "category": "order",
+                  "priority": "normal",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": null,
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:12:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:12:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a support ticket",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "patch": {
+        "description": "Set the priority or the team member a customer’s ticket is assigned to.",
+        "operationId": "TicketsController_update",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ticket with its new priority or assignee.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "reseller",
+                  "status": "open",
+                  "category": "order",
+                  "priority": "high",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+                  "escalated_at": null,
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:12:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:12:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a support ticket",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/support/tickets/{id}/messages": {
+      "post": {
+        "description": "Answer the customer (`visibility: all`: waiting for them next), add a note for your team and BitoCard (`staff`), or reply on your own ticket to BitoCard.",
+        "operationId": "TicketsController_reply",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The ticket with your message added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "reseller",
+                  "status": "pending",
+                  "category": "order",
+                  "priority": "normal",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": null,
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:40:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:40:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    },
+                    {
+                      "id": "8b7c6d5e-4f3a-4b2c-9d1e-0f9a8b7c6d5e",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "all",
+                      "body": "Sorry for the wait: your token is on the order page now.",
+                      "created_at": "2026-10-19T09:40:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a message to a support ticket",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/support/tickets/{id}/escalate": {
+      "post": {
+        "description": "Hand a customer’s ticket you cannot answer to BitoCard, with a note on what you found. BitoCard answers the customer and may send it back to you.",
+        "operationId": "TicketsController_escalate",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalateTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ticket, now with BitoCard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "bitocard",
+                  "status": "open",
+                  "category": "order",
+                  "priority": "normal",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": "2026-10-19T09:30:00.000Z",
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:30:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:30:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    },
+                    {
+                      "id": "8b7c6d5e-4f3a-4b2c-9d1e-0f9a8b7c6d5e",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "staff",
+                      "body": "The order shows delivered but the customer has no token: please check with the biller.",
+                      "created_at": "2026-10-19T09:30:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pass a support ticket to BitoCard",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/support/tickets/{id}/resolve": {
+      "post": {
+        "description": "Close a customer’s ticket you answered, or your own ticket once BitoCard has answered it, optionally with a last message. A requester’s reply reopens it.",
+        "operationId": "TicketsController_resolve",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ticket, resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "reseller",
+                  "status": "resolved",
+                  "category": "order",
+                  "priority": "normal",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": null,
+                  "resolved_at": "2026-10-19T10:00:00.000Z",
+                  "last_message_at": "2026-10-19T09:12:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T10:00:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    },
+                    {
+                      "id": "8b7c6d5e-4f3a-4b2c-9d1e-0f9a8b7c6d5e",
+                      "author": "reseller",
+                      "author_name": "Ada Obi",
+                      "visibility": "all",
+                      "body": "Sorry for the wait: your token is on the order page now.",
+                      "created_at": "2026-10-19T09:40:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve a support ticket",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/exchange": {
       "get": {
         "description": "Buy or sell a coin against your local or US dollar wallet. BitoCard reserve balances cap each offer.",
@@ -34807,7 +36194,9 @@
                 "stores:manage",
                 "customers:verify",
                 "disputes:read",
-                "disputes:write"
+                "disputes:write",
+                "support:read",
+                "support:write"
               ]
             }
           }
@@ -35170,7 +36559,10 @@
                 "dispute.escalated",
                 "dispute.returned",
                 "dispute.contested",
-                "dispute.resolved"
+                "dispute.resolved",
+                "support_ticket.created",
+                "support_ticket.updated",
+                "support_ticket.message_received"
               ]
             }
           }
@@ -35215,7 +36607,10 @@
                 "dispute.escalated",
                 "dispute.returned",
                 "dispute.contested",
-                "dispute.resolved"
+                "dispute.resolved",
+                "support_ticket.created",
+                "support_ticket.updated",
+                "support_ticket.message_received"
               ]
             }
           },
@@ -35515,6 +36910,124 @@
         "required": [
           "note"
         ]
+      },
+      "OpenTicketDto": {
+        "type": "object",
+        "properties": {
+          "requester": {
+            "type": "string",
+            "enum": [
+              "reseller",
+              "customer"
+            ],
+            "description": "`reseller`: your own question to BitoCard (BitoCard answers). `customer`: a ticket for one of your customers to track and answer (you can pass it to BitoCard)."
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary.",
+            "minLength": 3,
+            "maxLength": 200
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "order",
+              "payment",
+              "account",
+              "product",
+              "technical",
+              "other"
+            ],
+            "description": "What it is about."
+          },
+          "message": {
+            "type": "string",
+            "description": "The question: the first message.",
+            "minLength": 3,
+            "maxLength": 5000
+          },
+          "order_id": {
+            "type": "string",
+            "description": "The order it is about."
+          },
+          "customer_reference": {
+            "type": "string",
+            "description": "Your own reference for the customer (customers’ tickets).",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "requester",
+          "subject",
+          "category",
+          "message"
+        ]
+      },
+      "TicketMessageDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The message.",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "all",
+              "staff"
+            ],
+            "default": "all",
+            "description": "`all`: the requester sees it too. `staff`: on a customer’s ticket, you and BitoCard only."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "EscalateTicketDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "For BitoCard: what you found and what the customer needs. The customer does not see it.",
+            "minLength": 10,
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "ResolveTicketDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "A last message to the requester.",
+            "maxLength": 5000
+          }
+        }
+      },
+      "UpdateTicketDto": {
+        "type": "object",
+        "properties": {
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          },
+          "assignee_id": {
+            "type": "object",
+            "description": "The team member to assign it to, or null for nobody.",
+            "nullable": true
+          }
+        }
       },
       "ResellerQuoteDto": {
         "type": "object",
@@ -36953,6 +38466,199 @@
         "description": "A dispute, without its messages (read them with `GET /v1/disputes/{id}`).",
         "additionalProperties": false
       },
+      "SupportTicketSummary": {
+        "type": "object",
+        "title": "SupportTicket",
+        "required": [
+          "object",
+          "id",
+          "reference",
+          "mode",
+          "requester",
+          "queue",
+          "status",
+          "category",
+          "priority",
+          "subject",
+          "source",
+          "store_id",
+          "customer_id",
+          "customer_reference",
+          "order_id",
+          "checkout_id",
+          "assignee_id",
+          "escalated_at",
+          "resolved_at",
+          "last_message_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `support_ticket`.",
+            "const": "support_ticket"
+          },
+          "id": {
+            "type": "string",
+            "description": "Ticket ID.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The reference people quote, for example `T-000123`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "requester": {
+            "type": "string",
+            "description": "Who asked: `customer` (a customer of yours) or `reseller` (you, to BitoCard).",
+            "enum": [
+              "customer",
+              "reseller"
+            ]
+          },
+          "queue": {
+            "type": "string",
+            "description": "Who answers: `reseller` (you) or `bitocard` (your own tickets, and customers’ tickets you passed to BitoCard).",
+            "enum": [
+              "reseller",
+              "bitocard"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` (waiting for whoever answers), `pending` (waiting for the requester) or `resolved`.",
+            "enum": [
+              "open",
+              "pending",
+              "resolved"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "description": "What it is about.",
+            "enum": [
+              "order",
+              "payment",
+              "account",
+              "product",
+              "technical",
+              "other"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "description": "Set by whoever answers.",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where it was opened: `form` (your store or SHQ), `api`, `chat` or `bot`.",
+            "enum": [
+              "form",
+              "api",
+              "chat",
+              "bot"
+            ]
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store it was opened at, for customers’ tickets on your hosted store.",
+            "format": "uuid"
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store customer, for tickets opened on your hosted store.",
+            "format": "uuid"
+          },
+          "customer_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own reference for the customer, for tickets you logged."
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order it is about, if any.",
+            "format": "uuid"
+          },
+          "checkout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store checkout it is about, if any.",
+            "format": "uuid"
+          },
+          "assignee_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The team member it is assigned to, if any (yours on the `reseller` queue).",
+            "format": "uuid"
+          },
+          "escalated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was passed to BitoCard.",
+            "format": "date-time"
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was resolved.",
+            "format": "date-time"
+          },
+          "last_message_at": {
+            "type": "string",
+            "description": "When the latest message was written.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was opened.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed.",
+            "format": "date-time"
+          }
+        },
+        "description": "A support ticket, without its messages (read them with `GET /v1/support/tickets/{id}`).",
+        "additionalProperties": false
+      },
       "OrderCompletedEvent": {
         "type": "object",
         "title": "order.completed event",
@@ -38192,6 +39898,183 @@
           }
         }
       },
+      "SupportTicketCreatedEvent": {
+        "type": "object",
+        "title": "support_ticket.created event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "support_ticket.created"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/SupportTicketSummary"
+              }
+            }
+          }
+        }
+      },
+      "SupportTicketUpdatedEvent": {
+        "type": "object",
+        "title": "support_ticket.updated event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "support_ticket.updated"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/SupportTicketSummary"
+              }
+            }
+          }
+        }
+      },
+      "SupportTicketMessageReceivedEvent": {
+        "type": "object",
+        "title": "support_ticket.message_received event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "support_ticket.message_received"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/SupportTicketSummary"
+              }
+            }
+          }
+        }
+      },
       "Error": {
         "type": "object",
         "title": "Error",
@@ -38427,7 +40310,9 @@
                         "stores:manage",
                         "customers:verify",
                         "disputes:read",
-                        "disputes:write"
+                        "disputes:write",
+                        "support:read",
+                        "support:write"
                       ]
                     },
                     "description": "What the credentials may do."
@@ -38475,7 +40360,9 @@
                         "stores:manage",
                         "customers:verify",
                         "disputes:read",
-                        "disputes:write"
+                        "disputes:write",
+                        "support:read",
+                        "support:write"
                       ]
                     },
                     "description": "What the credentials may do."
@@ -42143,7 +44030,9 @@
                 "stores:manage",
                 "customers:verify",
                 "disputes:read",
-                "disputes:write"
+                "disputes:write",
+                "support:read",
+                "support:write"
               ]
             },
             "description": "What the key may do."
@@ -42241,7 +44130,9 @@
                 "stores:manage",
                 "customers:verify",
                 "disputes:read",
-                "disputes:write"
+                "disputes:write",
+                "support:read",
+                "support:write"
               ]
             },
             "description": "What the key may do."
@@ -42358,7 +44249,10 @@
                 "dispute.escalated",
                 "dispute.returned",
                 "dispute.contested",
-                "dispute.resolved"
+                "dispute.resolved",
+                "support_ticket.created",
+                "support_ticket.updated",
+                "support_ticket.message_received"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -42483,7 +44377,10 @@
                 "dispute.escalated",
                 "dispute.returned",
                 "dispute.contested",
-                "dispute.resolved"
+                "dispute.resolved",
+                "support_ticket.created",
+                "support_ticket.updated",
+                "support_ticket.message_received"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -42610,7 +44507,10 @@
                   "dispute.escalated",
                   "dispute.returned",
                   "dispute.contested",
-                  "dispute.resolved"
+                  "dispute.resolved",
+                  "support_ticket.created",
+                  "support_ticket.updated",
+                  "support_ticket.message_received"
                 ]
               },
               "created_at": {
@@ -42745,7 +44645,10 @@
                   "dispute.escalated",
                   "dispute.returned",
                   "dispute.contested",
-                  "dispute.resolved"
+                  "dispute.resolved",
+                  "support_ticket.created",
+                  "support_ticket.updated",
+                  "support_ticket.message_received"
                 ]
               },
               "created_at": {
@@ -42928,6 +44831,15 @@
           },
           {
             "$ref": "#/components/schemas/DisputeResolvedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SupportTicketCreatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SupportTicketUpdatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/SupportTicketMessageReceivedEvent"
           }
         ]
       },
@@ -46868,7 +48780,9 @@
                 "stores:manage",
                 "customers:verify",
                 "disputes:read",
-                "disputes:write"
+                "disputes:write",
+                "support:read",
+                "support:write"
               ]
             },
             "description": "What the token may do: every scope, or only the `:read` ones when read-only."
@@ -47004,6 +48918,9 @@
               "bank_account.added",
               "dispute.opened",
               "dispute.updated",
+              "support.ticket_created",
+              "support.ticket_replied",
+              "support.ticket_updated",
               "chargeback.opened",
               "chargeback.closed",
               "plan.renewal_failed",
@@ -47198,6 +49115,9 @@
               "bank_account.added",
               "dispute.opened",
               "dispute.updated",
+              "support.ticket_created",
+              "support.ticket_replied",
+              "support.ticket_updated",
               "chargeback.opened",
               "chargeback.closed",
               "plan.renewal_failed",
@@ -48002,6 +49922,262 @@
           "visibility": {
             "type": "string",
             "description": "`all` (the customer sees it too) or `staff` (you and BitoCard only).",
+            "enum": [
+              "all",
+              "staff"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "description": "The message."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was written.",
+            "format": "date-time"
+          }
+        }
+      },
+      "SupportTicketDetail": {
+        "type": "object",
+        "title": "SupportTicketDetail",
+        "description": "A support ticket with its messages.",
+        "required": [
+          "object",
+          "id",
+          "reference",
+          "mode",
+          "requester",
+          "queue",
+          "status",
+          "category",
+          "priority",
+          "subject",
+          "source",
+          "store_id",
+          "customer_id",
+          "customer_reference",
+          "order_id",
+          "checkout_id",
+          "assignee_id",
+          "escalated_at",
+          "resolved_at",
+          "last_message_at",
+          "created_at",
+          "updated_at",
+          "messages"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `support_ticket`.",
+            "const": "support_ticket"
+          },
+          "id": {
+            "type": "string",
+            "description": "Ticket ID.",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The reference people quote, for example `T-000123`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "requester": {
+            "type": "string",
+            "description": "Who asked: `customer` (a customer of yours) or `reseller` (you, to BitoCard).",
+            "enum": [
+              "customer",
+              "reseller"
+            ]
+          },
+          "queue": {
+            "type": "string",
+            "description": "Who answers: `reseller` (you) or `bitocard` (your own tickets, and customers’ tickets you passed to BitoCard).",
+            "enum": [
+              "reseller",
+              "bitocard"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` (waiting for whoever answers), `pending` (waiting for the requester) or `resolved`.",
+            "enum": [
+              "open",
+              "pending",
+              "resolved"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "description": "What it is about.",
+            "enum": [
+              "order",
+              "payment",
+              "account",
+              "product",
+              "technical",
+              "other"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "description": "Set by whoever answers.",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "A short summary."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where it was opened: `form` (your store or SHQ), `api`, `chat` or `bot`.",
+            "enum": [
+              "form",
+              "api",
+              "chat",
+              "bot"
+            ]
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store it was opened at, for customers’ tickets on your hosted store.",
+            "format": "uuid"
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store customer, for tickets opened on your hosted store.",
+            "format": "uuid"
+          },
+          "customer_reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own reference for the customer, for tickets you logged."
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order it is about, if any.",
+            "format": "uuid"
+          },
+          "checkout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store checkout it is about, if any.",
+            "format": "uuid"
+          },
+          "assignee_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The team member it is assigned to, if any (yours on the `reseller` queue).",
+            "format": "uuid"
+          },
+          "escalated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was passed to BitoCard.",
+            "format": "date-time"
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was resolved.",
+            "format": "date-time"
+          },
+          "last_message_at": {
+            "type": "string",
+            "description": "When the latest message was written.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was opened.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed.",
+            "format": "date-time"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupportTicketMessage"
+            },
+            "description": "Its messages, oldest first: on your customers’ tickets, staff notes included."
+          }
+        }
+      },
+      "SupportTicketMessage": {
+        "type": "object",
+        "title": "SupportTicketMessage",
+        "required": [
+          "id",
+          "author",
+          "author_name",
+          "visibility",
+          "body",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Message ID.",
+            "format": "uuid"
+          },
+          "author": {
+            "type": "string",
+            "description": "Who wrote it: `customer`, `reseller` (you), `bitocard`, `bot` (a support assistant) or `system`.",
+            "enum": [
+              "customer",
+              "reseller",
+              "bitocard",
+              "bot",
+              "system"
+            ]
+          },
+          "author_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The person’s (or assistant’s) name, when known."
+          },
+          "visibility": {
+            "type": "string",
+            "description": "`all` (the requester sees it too) or `staff` (on a customer’s ticket, you and BitoCard only).",
             "enum": [
               "all",
               "staff"
@@ -51783,6 +53959,309 @@
                     "resolved_at": "2026-10-08T14:30:00.000Z",
                     "created_at": "2026-10-08T09:14:02.000Z",
                     "updated_at": "2026-10-08T14:30:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "support_ticket.created": {
+      "post": {
+        "operationId": "webhook_support_ticket_created",
+        "summary": "A support ticket was opened",
+        "description": "Fires once when a support ticket is opened: by a customer on your hosted store (`requester: customer`, `queue: reseller`), by you for one of your own customers (`POST /v1/support/tickets`), or by you to BitoCard (`requester: reseller`, `queue: bitocard`).\n\nAnswer customers’ tickets with `POST /v1/support/tickets/{id}/messages`, resolve them, or pass them to BitoCard. The messages are not in the event: read them with `GET /v1/support/tickets/{id}`.\n\nDoes not fire again for the same ticket: replies and changes are their own events.\n\nNothing comes before it. Followed by `support_ticket.message_received` and `support_ticket.updated`.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportTicketCreatedEvent"
+              },
+              "example": {
+                "id": "4bf2a3b4-c5d6-4e7f-8a8b-0c1d2e3f4a6c",
+                "object": "event",
+                "type": "support_ticket.created",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-19T09:12:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "support_ticket",
+                    "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "reference": "T-000042",
+                    "mode": "live",
+                    "requester": "customer",
+                    "queue": "reseller",
+                    "status": "open",
+                    "category": "order",
+                    "priority": "normal",
+                    "subject": "Where is my electricity token?",
+                    "source": "form",
+                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                    "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                    "customer_reference": null,
+                    "order_id": null,
+                    "checkout_id": null,
+                    "assignee_id": null,
+                    "escalated_at": null,
+                    "resolved_at": null,
+                    "last_message_at": "2026-10-19T09:12:00.000Z",
+                    "created_at": "2026-10-19T09:12:00.000Z",
+                    "updated_at": "2026-10-19T09:12:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "support_ticket.updated": {
+      "post": {
+        "operationId": "webhook_support_ticket_updated",
+        "summary": "A support ticket changed",
+        "description": "Fires when a ticket’s `status` or `queue` changes: answered and now waiting for the requester (`pending`), back to `open` when the requester replies, passed to BitoCard (`queue: bitocard`, `escalated_at`), sent back to you by BitoCard (`queue: reseller`), or `resolved`.\n\nDoes not fire for a message that changes neither (a staff note, or a reply on a ticket BitoCard is handling): see `support_ticket.message_received`.\n\nComes after `support_ticket.created`. Can come any number of times; a resolved ticket reopens when its requester replies.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportTicketUpdatedEvent"
+              },
+              "example": {
+                "id": "5c03b4c5-d6e7-4f8a-9b9c-1d2e3f4a5b7d",
+                "object": "event",
+                "type": "support_ticket.updated",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-19T09:40:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "support_ticket",
+                    "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "reference": "T-000042",
+                    "mode": "live",
+                    "requester": "customer",
+                    "queue": "reseller",
+                    "status": "pending",
+                    "category": "order",
+                    "priority": "normal",
+                    "subject": "Where is my electricity token?",
+                    "source": "form",
+                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                    "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                    "customer_reference": null,
+                    "order_id": null,
+                    "checkout_id": null,
+                    "assignee_id": null,
+                    "escalated_at": null,
+                    "resolved_at": null,
+                    "last_message_at": "2026-10-19T09:40:00.000Z",
+                    "created_at": "2026-10-19T09:12:00.000Z",
+                    "updated_at": "2026-10-19T09:40:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "support_ticket.message_received": {
+      "post": {
+        "operationId": "webhook_support_ticket_message_received",
+        "summary": "A support ticket has a new message",
+        "description": "Fires for each message the customer or BitoCard adds to one of your tickets. Read it with `GET /v1/support/tickets/{id}`; the text is never in the event.\n\nDoes not fire for your own messages.\n\nComes after `support_ticket.created`. Often comes with `support_ticket.updated` when the message reopens the ticket.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportTicketMessageReceivedEvent"
+              },
+              "example": {
+                "id": "6d14c5d6-e7f8-4a9b-8cad-2e3f4a5b6c8e",
+                "object": "event",
+                "type": "support_ticket.message_received",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-19T10:05:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "support_ticket",
+                    "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                    "reference": "T-000042",
+                    "mode": "live",
+                    "requester": "customer",
+                    "queue": "reseller",
+                    "status": "open",
+                    "category": "order",
+                    "priority": "normal",
+                    "subject": "Where is my electricity token?",
+                    "source": "form",
+                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                    "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                    "customer_reference": null,
+                    "order_id": null,
+                    "checkout_id": null,
+                    "assignee_id": null,
+                    "escalated_at": null,
+                    "resolved_at": null,
+                    "last_message_at": "2026-10-19T10:05:00.000Z",
+                    "created_at": "2026-10-19T09:12:00.000Z",
+                    "updated_at": "2026-10-19T10:05:00.000Z"
                   }
                 }
               }

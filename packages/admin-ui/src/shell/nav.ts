@@ -1,6 +1,6 @@
-import { AlertTriangle, Gift, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Gift, Inbox, LifeBuoy, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
 
-export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'settings';
+export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'support' | 'settings';
 
 export type NavItem<K extends string = SectionKey> = { key: K; label: string; href: string; icon: LucideIcon };
 
@@ -14,6 +14,7 @@ export const sections: NavItem[] = [
   { key: 'activity', label: 'Activity', href: '/activity', icon: History },
   { key: 'storefront', label: 'Storefront', href: '/storefront', icon: LayoutGrid },
   { key: 'crypto', label: 'Crypto', href: '/crypto', icon: Coins },
+  { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy },
   { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -21,6 +22,10 @@ export type SubNavItem = { label: string; href: string; icon?: LucideIcon; count
 
 /** Each section's menu (the second column). */
 export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> = {
+  support: {
+    title: 'Support',
+    items: [{ label: 'Tickets', href: '/support', icon: Inbox }],
+  },
   home: {
     title: 'Dashboard',
     items: [

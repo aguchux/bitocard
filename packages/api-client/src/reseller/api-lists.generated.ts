@@ -14,6 +14,8 @@ export const apiKeyScopes = [
   'customers:verify',
   'disputes:read',
   'disputes:write',
+  'support:read',
+  'support:write',
 ] as const;
 
 /** Event types an endpoint can subscribe to (`eventTypes` in the API); `*` means all, including later ones. */
@@ -39,4 +41,7 @@ export const webhookEventTypes = [
   'dispute.returned',
   'dispute.contested',
   'dispute.resolved',
+  'support_ticket.created',
+  'support_ticket.updated',
+  'support_ticket.message_received',
 ] as const;

@@ -38,6 +38,7 @@ import { StorefrontModule } from './storefront/storefront.module.js';
 import { MediaModule } from './media/media.module.js';
 import { ApiExceptionFilter } from './common/errors/api-exception.filter.js';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor.js';
+import { SupportModule } from './support/support.module.js';
 import { DisputesModule } from './disputes/disputes.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { ManualTopUpsModule } from './top-ups/manual-top-ups.module.js';
@@ -99,6 +100,7 @@ export class AppModule {
         MediaModule,
         OrdersModule,
         DisputesModule,
+        SupportModule,
         CryptoModule,
         NumbersModule,
         EsimsModule,

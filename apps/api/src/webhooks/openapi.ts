@@ -220,7 +220,62 @@ export const eventObjectSchemas: Record<string, Schema> = {
     description: 'A dispute, without its messages (read them with `GET /v1/disputes/{id}`).',
     additionalProperties: false,
   },
+  SupportTicketSummary: {
+    ...objectSchema('SupportTicket', {
+      object: str('Always `support_ticket`.', { const: 'support_ticket' }),
+      id: str('Ticket ID.', { format: 'uuid' }),
+      reference: str('The reference people quote, for example `T-000123`.'),
+      mode,
+      requester: str('Who asked: `customer` (a customer of yours) or `reseller` (you, to BitoCard).', { enum: ['customer', 'reseller'] }),
+      queue: str('Who answers: `reseller` (you) or `bitocard` (your own tickets, and customers’ tickets you passed to BitoCard).', { enum: ['reseller', 'bitocard'] }),
+      status: str('`open` (waiting for whoever answers), `pending` (waiting for the requester) or `resolved`.', { enum: ['open', 'pending', 'resolved'] }),
+      category: str('What it is about.', { enum: ['order', 'payment', 'account', 'product', 'technical', 'other'] }),
+      priority: str('Set by whoever answers.', { enum: ['low', 'normal', 'high', 'urgent'] }),
+      subject: str('A short summary.'),
+      source: str('Where it was opened: `form` (your store or SHQ), `api`, `chat` or `bot`.', { enum: ['form', 'api', 'chat', 'bot'] }),
+      store_id: nullableStr('The store it was opened at, for customers’ tickets on your hosted store.', { format: 'uuid' }),
+      customer_id: nullableStr('The store customer, for tickets opened on your hosted store.', { format: 'uuid' }),
+      customer_reference: nullableStr('Your own reference for the customer, for tickets you logged.'),
+      order_id: nullableStr('The order it is about, if any.', { format: 'uuid' }),
+      checkout_id: nullableStr('The store checkout it is about, if any.', { format: 'uuid' }),
+      assignee_id: nullableStr('The team member it is assigned to, if any (yours on the `reseller` queue).', { format: 'uuid' }),
+      escalated_at: nullableTime('When it was passed to BitoCard.'),
+      resolved_at: nullableTime('When it was resolved.'),
+      last_message_at: time('When the latest message was written.'),
+      created_at: time('When it was opened.'),
+      updated_at: time('When it last changed.'),
+    }),
+    description: 'A support ticket, without its messages (read them with `GET /v1/support/tickets/{id}`).',
+    additionalProperties: false,
+  },
 };
+
+/** A support ticket as events and lists carry it. */
+export const exampleTicket = (extra: Schema = {}) => ({
+  object: 'support_ticket',
+  id: '6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d',
+  reference: 'T-000042',
+  mode: 'live',
+  requester: 'customer',
+  queue: 'reseller',
+  status: 'open',
+  category: 'order',
+  priority: 'normal',
+  subject: 'Where is my electricity token?',
+  source: 'form',
+  store_id: '0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e',
+  customer_id: '1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9',
+  customer_reference: null,
+  order_id: null,
+  checkout_id: null,
+  assignee_id: null,
+  escalated_at: null,
+  resolved_at: null,
+  last_message_at: '2026-10-19T09:12:00.000Z',
+  created_at: '2026-10-19T09:12:00.000Z',
+  updated_at: '2026-10-19T09:12:00.000Z',
+  ...extra,
+});
 
 /** A dispute as events and lists carry it. */
 export const exampleDispute = (extra: Schema = {}) => ({
@@ -638,6 +693,37 @@ export const eventDocs: Record<EventType, EventDoc> = {
       updated_at: '2026-10-08T14:30:00.000Z',
     }),
   },
+  'support_ticket.created': {
+    schema: 'SupportTicketSummary',
+    summary: 'A support ticket was opened',
+    description: [
+      'Fires once when a support ticket is opened: by a customer on your hosted store (`requester: customer`, `queue: reseller`), by you for one of your own customers (`POST /v1/support/tickets`), or by you to BitoCard (`requester: reseller`, `queue: bitocard`).',
+      'Answer customers’ tickets with `POST /v1/support/tickets/{id}/messages`, resolve them, or pass them to BitoCard. The messages are not in the event: read them with `GET /v1/support/tickets/{id}`.',
+      'Does not fire again for the same ticket: replies and changes are their own events.',
+      'Nothing comes before it. Followed by `support_ticket.message_received` and `support_ticket.updated`.',
+    ].join('\n\n'),
+    example: exampleTicket(),
+  },
+  'support_ticket.updated': {
+    schema: 'SupportTicketSummary',
+    summary: 'A support ticket changed',
+    description: [
+      'Fires when a ticket’s `status` or `queue` changes: answered and now waiting for the requester (`pending`), back to `open` when the requester replies, passed to BitoCard (`queue: bitocard`, `escalated_at`), sent back to you by BitoCard (`queue: reseller`), or `resolved`.',
+      'Does not fire for a message that changes neither (a staff note, or a reply on a ticket BitoCard is handling): see `support_ticket.message_received`.',
+      'Comes after `support_ticket.created`. Can come any number of times; a resolved ticket reopens when its requester replies.',
+    ].join('\n\n'),
+    example: exampleTicket({ status: 'pending', last_message_at: '2026-10-19T09:40:00.000Z', updated_at: '2026-10-19T09:40:00.000Z' }),
+  },
+  'support_ticket.message_received': {
+    schema: 'SupportTicketSummary',
+    summary: 'A support ticket has a new message',
+    description: [
+      'Fires for each message the customer or BitoCard adds to one of your tickets. Read it with `GET /v1/support/tickets/{id}`; the text is never in the event.',
+      'Does not fire for your own messages.',
+      'Comes after `support_ticket.created`. Often comes with `support_ticket.updated` when the message reopens the ticket.',
+    ].join('\n\n'),
+    example: exampleTicket({ last_message_at: '2026-10-19T10:05:00.000Z', updated_at: '2026-10-19T10:05:00.000Z' }),
+  },
 };
 
 const exampleEventIds: Record<EventType, string> = {
@@ -662,6 +748,9 @@ const exampleEventIds: Record<EventType, string> = {
   'dispute.returned': '18c9d0e1-f2a3-4b4c-9d5e-7f8a9b0c1d2e',
   'dispute.contested': '29d0e1f2-a3b4-4c5d-8e6f-8a9b0c1d2e3f',
   'dispute.resolved': '3ae1f2a3-b4c5-4d6e-9f7a-9b0c1d2e3f4a',
+  'support_ticket.created': '4bf2a3b4-c5d6-4e7f-8a8b-0c1d2e3f4a6c',
+  'support_ticket.updated': '5c03b4c5-d6e7-4f8a-9b9c-1d2e3f4a5b7d',
+  'support_ticket.message_received': '6d14c5d6-e7f8-4a9b-8cad-2e3f4a5b6c8e',
 };
 
 const exampleTime = (object: object) => {

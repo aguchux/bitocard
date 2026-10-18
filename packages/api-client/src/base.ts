@@ -144,6 +144,7 @@ export const tagTypes = [
   'FeeRule',
   'Chargeback',
   'Dispute',
+  'SupportTicket',
   'Stock',
   'Number',
   'Crypto',

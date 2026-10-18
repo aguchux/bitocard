@@ -24,6 +24,9 @@ export const eventTypes = [
   'dispute.returned',
   'dispute.contested',
   'dispute.resolved',
+  'support_ticket.created',
+  'support_ticket.updated',
+  'support_ticket.message_received',
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

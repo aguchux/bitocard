@@ -314,6 +314,22 @@ export type StoreDispute = {
   messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'system'; author_name: string | null; visibility: 'all'; body: string; created_at: string }>;
 };
 
+/** A customer's support ticket to their store, as they see it (never staff notes or staff names). */
+export type StoreTicket = {
+  object: 'support_ticket';
+  id: string;
+  reference: string;
+  /** open: waiting for the store; pending: waiting for the customer; resolved. */
+  status: 'open' | 'pending' | 'resolved';
+  category: 'order' | 'payment' | 'account' | 'product' | 'technical' | 'other';
+  subject: string;
+  checkout_id: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; visibility: 'all'; body: string; created_at: string }>;
+};
+
 export type StoreCheckout = {
   object: 'checkout';
   id: string;

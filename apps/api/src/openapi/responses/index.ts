@@ -4,6 +4,7 @@ import { commerceDocs } from './commerce.js';
 import { dashboardDocs } from './dashboard.js';
 import { developersDocs } from './developers.js';
 import { disputesDocs } from './disputes.js';
+import { supportDocs } from './support.js';
 import { cryptoDocs } from './crypto.js';
 import { exchangeDocs } from './exchange.js';
 import { moneyDocs } from './money.js';
@@ -28,7 +29,7 @@ export type ResponseDoc = {
 /** One area of the API: its reusable object schemas, and the response of each operation (`'GET /v1/orders/{id}'`). */
 export type DocsArea = { schemas: Record<string, Schema>; responses: Record<string, ResponseDoc> };
 
-export const docsAreas: Record<string, DocsArea> = { accountDocs, commerceDocs, moneyDocs, developersDocs, storesDocs, dashboardDocs, disputesDocs, exchangeDocs, cryptoDocs, domainsDocs };
+export const docsAreas: Record<string, DocsArea> = { accountDocs, commerceDocs, moneyDocs, developersDocs, storesDocs, dashboardDocs, disputesDocs, supportDocs, exchangeDocs, cryptoDocs, domainsDocs };
 
 /** Every error has this shape; `param` is present only when the error is about one field. */
 export const errorSchema = objectSchema(

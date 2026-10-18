@@ -1,6 +1,6 @@
-import { Bell, Gift, KeyRound, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
+import { Bell, Gift, KeyRound, LifeBuoy, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 
-export type AccountSectionKey = "profile" | "security" | "identity" | "referrals" | "notifications";
+export type AccountSectionKey = "profile" | "security" | "identity" | "support" | "referrals" | "notifications";
 
 export type AccountSection = {
   key: AccountSectionKey;
@@ -23,6 +23,7 @@ export const accountSections: AccountSection[] = [
   { key: "profile", href: "/account/profile/details", label: "Profile", note: "Your name, email and country", icon: UserRound },
   { key: "security", href: "/account/profile/security", label: "Security", note: "Password and signing out", icon: KeyRound },
   { key: "identity", href: "/account/verification", label: "Identity check", note: "Needed once for some products in some countries", icon: ShieldCheck },
+  { key: "support", href: "/account/support", label: "Help & support", note: "Ask the store a question and follow its answers", icon: LifeBuoy },
   { key: "referrals", href: "/account/profile/referrals", label: "Referrals", note: "Invite friends to the store", icon: Gift, soon: true },
   { key: "notifications", href: "/account/profile/notifications", label: "Notifications", note: "Choose the updates you get", icon: Bell, soon: true },
 ];

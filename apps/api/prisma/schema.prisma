@@ -3575,3 +3575,66 @@ model StoreHomeVersion {
   @@unique([storeId, version])
   @@map("store_home_versions")
 }
+
+/// A support ticket (shown as T-000123): a store customer's question to their store, a reseller's to BitoCard, or one a
+/// reseller logs for a customer on their own systems. The store answers its customers first and can pass a ticket to
+/// BitoCard (`queue: bitocard`); BitoCard answers resellers' tickets and passed ones. Disputes about money stay disputes.
+model SupportTicket {
+  id                String                 @id @default(uuid()) @db.Uuid
+  number            Int                    @unique @default(autoincrement())
+  resellerId        String                 @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  /// customer (a store customer, or one on the reseller's own systems) or reseller (the reseller's own, to BitoCard).
+  requester         String
+  /// Who answers: reseller (the store) or bitocard.
+  queue             String
+  /// open (waiting for whoever answers), pending (waiting for the requester) or resolved.
+  status            String                 @default("open")
+  /// order, payment, account, product, technical or other.
+  category          String
+  /// low, normal, high or urgent (set by staff).
+  priority          String                 @default("normal")
+  subject           String
+  storeId           String?                @map("store_id") @db.Uuid
+  customerId        String?                @map("customer_id") @db.Uuid
+  /// The reseller's own reference for a customer on their own systems.
+  customerReference String?                @map("customer_reference")
+  /// The reseller team member who opened it (reseller tickets).
+  userId            String?                @map("user_id") @db.Uuid
+  orderId           String?                @map("order_id") @db.Uuid
+  checkoutId        String?                @map("checkout_id") @db.Uuid
+  /// form, api, chat or bot.
+  source            String                 @default("form")
+  /// The staff member it is assigned to: a reseller team member on the reseller queue, an admin on BitoCard's.
+  assigneeId        String?                @map("assignee_id") @db.Uuid
+  escalatedAt       DateTime?              @map("escalated_at")
+  resolvedAt        DateTime?              @map("resolved_at")
+  lastMessageAt     DateTime               @default(now()) @map("last_message_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  messages          SupportTicketMessage[]
+
+  @@index([resellerId, mode, status])
+  @@index([queue, status, lastMessageAt])
+  @@index([customerId, createdAt])
+  @@map("support_tickets")
+}
+
+/// One message on a support ticket.
+model SupportTicketMessage {
+  id         String        @id @default(uuid()) @db.Uuid
+  ticketId   String        @map("ticket_id") @db.Uuid
+  /// customer, reseller, bitocard, bot or system.
+  author     String
+  authorId   String?       @map("author_id") @db.Uuid
+  authorName String?       @map("author_name")
+  /// all: the requester sees it too; staff: those answering only (the reseller and BitoCard on a customer's ticket,
+  /// BitoCard only on a reseller's own).
+  visibility String        @default("all")
+  body       String
+  createdAt  DateTime      @default(now()) @map("created_at")
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
+}
