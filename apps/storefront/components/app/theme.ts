@@ -11,6 +11,7 @@ const tints: Record<string, GroupTint> = {
   esims: { card: "bg-violet-50", tile: "bg-violet-100", ink: "text-violet-600", chevron: "bg-violet-100 text-violet-600", subtitle: "Travel data" },
   software: { card: "bg-amber-50", tile: "bg-amber-100", ink: "text-amber-600", chevron: "bg-amber-100 text-amber-600", subtitle: "Licences and keys" },
   vpn: { card: "bg-teal-50", tile: "bg-teal-100", ink: "text-teal-600", chevron: "bg-teal-100 text-teal-600", subtitle: "30 days, 10 devices" },
+  rdp: { card: "bg-slate-50", tile: "bg-slate-100", ink: "text-slate-700", chevron: "bg-slate-100 text-slate-700", subtitle: "Remote desktops" },
   "virtual-cards": { card: "bg-sky-50", tile: "bg-sky-100", ink: "text-sky-600", chevron: "bg-sky-100 text-sky-600", subtitle: "Pay online" },
 };
 

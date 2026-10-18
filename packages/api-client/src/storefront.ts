@@ -4,7 +4,7 @@
  * without the RTK Query client. Amounts are minor units.
  */
 
-export type ProductCategory = 'gift_cards' | 'airtime' | 'data' | 'bills' | 'pay_tv' | 'esim' | 'software' | 'vpn' | 'virtual_numbers' | 'virtual_cards' | 'mobile_money';
+export type ProductCategory = 'gift_cards' | 'airtime' | 'data' | 'bills' | 'pay_tv' | 'esim' | 'software' | 'vpn' | 'rdp' | 'virtual_numbers' | 'virtual_cards' | 'mobile_money';
 
 export const categoryLabels: Record<ProductCategory, string> = {
   gift_cards: 'Gift cards',
@@ -16,6 +16,7 @@ export const categoryLabels: Record<ProductCategory, string> = {
   software: 'Software',
   virtual_numbers: 'Virtual numbers',
   vpn: 'VPN',
+  rdp: 'RDP',
   virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
 };

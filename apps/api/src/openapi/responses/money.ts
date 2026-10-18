@@ -26,7 +26,7 @@ const transactionTypes = [
   'conversion',
 ] as const;
 
-const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
+const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 const feeKinds = ['supplier_order', 'gateway_payment'] as const;
 const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations', 'onchain_crypto'] as const;
 

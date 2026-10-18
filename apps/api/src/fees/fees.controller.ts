@@ -8,7 +8,7 @@ import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { maxRatePpb, PlatformFeesService } from './platform-fees.service.js';
 
-const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
+const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 class FeesQueryDto extends PageDto {

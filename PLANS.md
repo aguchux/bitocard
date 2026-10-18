@@ -49,6 +49,7 @@ All **Decided**. BitoCard's own retail store (the parent store) is on the main s
 | eSIM data packages | Country, regional and global; top-ups where supported | Decided |
 | Software and licences | Consumer software, antivirus, Windows; retail/ESD, OEM and subscriptions kept separate | Decided |
 | VPN access | Fixed-term VPN access, initially 30 days with no automatic renewal; its own category, `vpn`, with its own Catalog menu group | Decided in principle; supplier, legal and market approval **To confirm** |
+| RDP | Remote desktop (RDP) servers; category `rdp` in the store's menu, showing Soon | Supplier **To confirm** |
 | Virtual numbers, voice, SMS | Capabilities shown per number; Africa, Asia and Europe where supported | Decided |
 | Virtual payment cards | Issued to verified storefront customers through a licensed issuer; card details shown only via the issuer's secure display | Decided; issuer approval **To confirm** |
 | Mobile money top-ups | Money sent to a customer's mobile money wallet (pawaPay payouts) in every country and provider the account supports; any amount within the provider's limits; customer verification by default | Decided (built); legal advice per country **To confirm** before live |

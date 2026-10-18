@@ -28,7 +28,7 @@ type Decimal = Prisma.Decimal;
 /** Categories sold at a face value in local currency, where resellers earn a markup or a discount. */
 export const faceValueCategories = new Set<ProductCategory>(['airtime', 'data', 'pay_tv', 'bills']);
 /** Categories bought for use anywhere, so any market can sell them without the international plan feature. */
-export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'esim', 'software', 'vpn', 'virtual_numbers']);
+export const worldwideCategories = new Set<ProductCategory>(['gift_cards', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers']);
 /** The country of products usable anywhere, such as BitoCard's own software licences (ISO's user-assigned "WW"). */
 export const worldwideCountry = 'WW';
 

@@ -601,6 +601,8 @@ enum ProductCategory {
   software
   /// Fixed-term VPN access (30 days, never renewed).
   vpn
+  /// Remote desktop (RDP) servers. No supplier yet.
+  rdp
   virtual_numbers
   virtual_cards
   /// Money sent to a customer's mobile money wallet (cash-in), for example through pawaPay.

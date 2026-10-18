@@ -103,7 +103,7 @@ describe('the public catalogue', () => {
     const navigation = (await visitor.get('/v1/store/navigation')).json;
     assert.deepEqual(
       navigation.groups.map(group => group.key),
-      ['gift-cards', 'mobile', 'bills', 'esims', 'software', 'vpn', 'virtual-cards'],
+      ['gift-cards', 'mobile', 'bills', 'esims', 'software', 'vpn', 'rdp', 'virtual-cards'],
       'the menus never come and go',
     );
     const mobile = navigation.groups.find(group => group.key === 'mobile');

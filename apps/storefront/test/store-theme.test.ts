@@ -69,9 +69,9 @@ describe("quick buy", () => {
 describe("quick links", () => {
   const group = (category: string, on_sale: boolean) => ({ key: category, label: category, on_sale, brands: [], categories: [{ object: "store_category" as const, category: category as never, label: category, group: null, icon_url: null, image_url: null, products: on_sale ? 1 : 0, on_sale }] });
   test("bitocard.com shows every quick link; a reseller's store only what it sells, and Crypto only on a crypto desk", () => {
-    expect(quickLinksFor([], null)).toEqual(["/catalogs/virtual_numbers", "/catalogs/virtual_cards", "/account/crypto"]);
+    expect(quickLinksFor([], null)).toEqual(["/catalogs/virtual_numbers", "/catalogs/rdp", "/catalogs/vpn", "/account/crypto"]);
     expect(quickLinksFor([group("gift_cards", true)], "gift_cards")).toEqual([]);
-    expect(quickLinksFor([group("virtual_numbers", true), group("virtual_cards", false)], "all_in_one")).toEqual(["/catalogs/virtual_numbers"]);
+    expect(quickLinksFor([group("virtual_numbers", true), group("rdp", false), group("vpn", true), group("virtual_cards", true)], "all_in_one")).toEqual(["/catalogs/virtual_numbers", "/catalogs/vpn"]);
     expect(quickLinksFor([], "crypto_desk")).toEqual(["/account/crypto"]);
   });
 });

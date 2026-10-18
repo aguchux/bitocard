@@ -16564,6 +16564,7 @@
                 "esim",
                 "software",
                 "vpn",
+                "rdp",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
@@ -17951,6 +17952,7 @@
                 "esim",
                 "software",
                 "vpn",
+                "rdp",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
@@ -23470,6 +23472,24 @@
                       "brands": []
                     },
                     {
+                      "key": "rdp",
+                      "label": "RDP",
+                      "on_sale": false,
+                      "categories": [
+                        {
+                          "object": "store_category",
+                          "category": "rdp",
+                          "label": "RDP",
+                          "group": "rdp",
+                          "icon_url": null,
+                          "image_url": null,
+                          "products": 0,
+                          "on_sale": false
+                        }
+                      ],
+                      "brands": []
+                    },
+                    {
                       "key": "virtual-cards",
                       "label": "Virtual cards",
                       "on_sale": false,
@@ -23609,6 +23629,7 @@
                 "esim",
                 "software",
                 "vpn",
+                "rdp",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
@@ -23629,6 +23650,7 @@
                 "esims",
                 "software",
                 "vpn",
+                "rdp",
                 "virtual-cards"
               ]
             }
@@ -24819,6 +24841,24 @@
                           "category": "vpn",
                           "label": "VPN",
                           "group": "vpn",
+                          "icon_url": null,
+                          "image_url": null,
+                          "products": 0,
+                          "on_sale": false
+                        }
+                      ],
+                      "brands": []
+                    },
+                    {
+                      "key": "rdp",
+                      "label": "RDP",
+                      "on_sale": false,
+                      "categories": [
+                        {
+                          "object": "store_category",
+                          "category": "rdp",
+                          "label": "RDP",
+                          "group": "rdp",
                           "icon_url": null,
                           "image_url": null,
                           "products": 0,
@@ -38773,6 +38813,7 @@
                     "esim",
                     "software",
                     "vpn",
+                    "rdp",
                     "virtual_numbers",
                     "virtual_cards",
                     "mobile_money"
@@ -39348,6 +39389,7 @@
               "esim",
               "software",
               "vpn",
+              "rdp",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -39615,6 +39657,7 @@
                         "esim",
                         "software",
                         "vpn",
+                        "rdp",
                         "virtual_numbers",
                         "virtual_cards",
                         "mobile_money"
@@ -39922,6 +39965,7 @@
                   "esim",
                   "software",
                   "vpn",
+                  "rdp",
                   "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
@@ -41371,6 +41415,7 @@
                   "esim",
                   "software",
                   "vpn",
+                  "rdp",
                   "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
@@ -41623,6 +41668,7 @@
                   "esim",
                   "software",
                   "vpn",
+                  "rdp",
                   "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
@@ -43525,6 +43571,7 @@
               "esim",
               "software",
               "vpn",
+              "rdp",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43702,6 +43749,7 @@
               "esim",
               "software",
               "vpn",
+              "rdp",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43913,6 +43961,7 @@
               "esim",
               "software",
               "vpn",
+              "rdp",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43934,6 +43983,7 @@
               "esims",
               "software",
               "vpn",
+              "rdp",
               "virtual-cards",
               null
             ],
@@ -43992,6 +44042,7 @@
               "esim",
               "software",
               "vpn",
+              "rdp",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -44013,6 +44064,7 @@
               "esims",
               "software",
               "vpn",
+              "rdp",
               "virtual-cards",
               null
             ],
@@ -44070,6 +44122,7 @@
               "esims",
               "software",
               "vpn",
+              "rdp",
               "virtual-cards"
             ]
           },
@@ -44399,6 +44452,7 @@
                         "esim",
                         "software",
                         "vpn",
+                        "rdp",
                         "virtual_numbers",
                         "virtual_cards",
                         "mobile_money"
@@ -44505,6 +44559,7 @@
                           "esim",
                           "software",
                           "vpn",
+                          "rdp",
                           "virtual_numbers",
                           "virtual_cards",
                           "mobile_money"
@@ -44626,6 +44681,7 @@
                           "esim",
                           "software",
                           "vpn",
+                          "rdp",
                           "virtual_numbers",
                           "virtual_cards",
                           "mobile_money"
@@ -45033,6 +45089,7 @@
                                   "esim",
                                   "software",
                                   "vpn",
+                                  "rdp",
                                   "virtual_numbers",
                                   "virtual_cards",
                                   "mobile_money"
@@ -46068,6 +46125,7 @@
                 "esim",
                 "software",
                 "vpn",
+                "rdp",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"

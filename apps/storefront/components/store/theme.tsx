@@ -1,4 +1,4 @@
-import { BarChart3, Clock, Coins, CreditCard, Gift, HandCoins, Globe, Laptop, Lock, Phone, ReceiptText, Shield, ShieldCheck, Signal, Smartphone, Star, Tv, Wifi, Zap, Headphones, type LucideIcon } from "lucide-react";
+import { BarChart3, Clock, Coins, CreditCard, Gift, HandCoins, Globe, Laptop, Lock, MonitorSmartphone, Phone, ReceiptText, Shield, ShieldCheck, Signal, Smartphone, Star, Tv, Wifi, Zap, Headphones, type LucideIcon } from "lucide-react";
 import type { ProductCategory, TrustIcon } from "@bitocard/api-client/storefront";
 
 /** Each category's icon and colours (tile background, icon colour, card gradient when a brand has no art). */
@@ -11,6 +11,7 @@ export const categoryTheme: Record<ProductCategory, { icon: LucideIcon; tile: st
   esim: { icon: Signal, tile: "bg-fuchsia-50", ink: "text-fuchsia-600", card: "from-fuchsia-500 to-pink-600" },
   software: { icon: Laptop, tile: "bg-orange-50", ink: "text-orange-600", card: "from-orange-400 to-amber-600" },
   virtual_numbers: { icon: Phone, tile: "bg-indigo-50", ink: "text-indigo-600", card: "from-indigo-500 to-blue-700" },
+  rdp: { icon: MonitorSmartphone, tile: "bg-slate-100", ink: "text-slate-700", card: "from-slate-600 to-slate-800" },
   vpn: { icon: ShieldCheck, tile: "bg-teal-50", ink: "text-teal-600", card: "from-teal-500 to-emerald-600" },
   virtual_cards: { icon: CreditCard, tile: "bg-sky-50", ink: "text-sky-600", card: "from-sky-500 to-cyan-600" },
   mobile_money: { icon: HandCoins, tile: "bg-lime-50", ink: "text-lime-700", card: "from-lime-500 to-green-600" },
@@ -24,6 +25,7 @@ export const groupIcon: Record<string, LucideIcon> = {
   esims: Signal,
   software: Laptop,
   vpn: ShieldCheck,
+  rdp: MonitorSmartphone,
   "virtual-cards": CreditCard,
 };
 
@@ -34,6 +36,7 @@ export const groupInk: Record<string, string> = {
   esims: "text-fuchsia-400",
   software: "text-amber-400",
   vpn: "text-teal-300",
+  rdp: "text-slate-300",
   "virtual-cards": "text-cyan-400",
 };
 

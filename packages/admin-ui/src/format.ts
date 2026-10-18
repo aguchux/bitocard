@@ -92,6 +92,7 @@ const categoryNames: Record<string, string> = {
   software: 'Software',
   virtual_numbers: 'Virtual numbers',
   vpn: 'VPN',
+  rdp: 'RDP',
   virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
 };

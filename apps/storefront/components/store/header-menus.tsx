@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, Coins, CreditCard, LayoutGrid, Menu, Phone, Store, X, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Coins, LayoutGrid, Menu, MonitorSmartphone, Phone, ShieldCheck, Store, X, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 
 const catalogueHref = (group: StoreNavigationGroup) => (group.categories.length === 1 ? `/catalogs/${group.categories[0].category}` : `/catalogs/${group.key}`);
 
-/** Straight to what people ask for most, beside the Catalog menu (and at the top of the phone menu). */
+/** Straight to what people ask for most, beside the Products menu (and at the top of the phone menu). */
 export const quickLinks: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/catalogs/virtual_numbers", label: "Virtual numbers", icon: Phone },
-  { href: "/catalogs/virtual_cards", label: "Virtual cards", icon: CreditCard },
+  { href: "/catalogs/rdp", label: "RDP", icon: MonitorSmartphone },
+  { href: "/catalogs/vpn", label: "VPN", icon: ShieldCheck },
   { href: "/account/crypto", label: "Crypto", icon: Coins },
 ];
 
@@ -33,7 +34,7 @@ function useDismiss(open: boolean, close: () => void) {
   return ref;
 }
 
-/** One group's categories and top brands: the right-hand side of the Catalog menu. */
+/** One group's categories and top brands: the right-hand side of the Products menu. */
 function GroupPanel({ group, close }: { group: StoreNavigationGroup; close: () => void }) {
   return (
     <div className="min-w-0 flex-1 p-4">
@@ -77,7 +78,7 @@ function GroupPanel({ group, close }: { group: StoreNavigationGroup; close: () =
 }
 
 /**
- * The Catalog menu: every group down the left (pointing at or focusing one shows its categories and brands on the
+ * The Products menu: every group down the left (pointing at or focusing one shows its categories and brands on the
  * right; choosing it opens its catalogue), and All products at the bottom.
  */
 function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
@@ -95,7 +96,7 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
         className="flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-navy-900 hover:bg-slate-50"
       >
         <LayoutGrid className="size-4" aria-hidden="true" />
-        Catalog
+        Products
         <ChevronDown className={`size-4 transition ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {open && group ? (
@@ -197,7 +198,7 @@ export function MobileMenu({ groups, signedIn = false, reseller = true, links }:
                     ))}
                   </ul>
                   ) : null}
-                  {groups.length ? <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Catalog</p> : null}
+                  {groups.length ? <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Products</p> : null}
                   {groups.map(group => (
                     <div key={group.key}>
                       <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-navy-900">
