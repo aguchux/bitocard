@@ -4,6 +4,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
+import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 export const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations', 'onchain_crypto'] as const;
@@ -21,6 +22,7 @@ export class PlansService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
+    private readonly inbox: InboxService,
   ) {}
 
   list() {
@@ -94,6 +96,37 @@ export class PlansService {
     }
     const after = await this.prisma.reseller.update({ where: { id }, data: { status: input.status, planCode: input.plan } });
     await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
+    if (after.status === 'suspended' && before.status !== 'suspended') {
+      await this.inbox.reseller(id, 'account.suspended', {
+        subject: `suspended:${after.updatedAt.toISOString()}`,
+        title: 'Your account is suspended',
+        body: 'Live orders and your store are paused, and your API keys stop working. Contact support to find out why and what to do next.',
+        link: '/settings/business',
+      });
+    }
+    return this.resellerDetail(id);
+  }
+
+  /**
+   * Lifts a suspension (operations, audited with the reason): back to active when the owner's identity is verified or
+   * the check was waived, otherwise to pending (they finish the identity check before going live). The team is told.
+   */
+  async unsuspend(actorId: string | null, id: string, input: { reason: string }) {
+    const before = await this.prisma.reseller.findUnique({ where: { id } });
+    if (!before || before.house) throw missingReseller();
+    if (before.status !== 'suspended') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
+    const status: ResellerStatus = before.verifiedAt || before.identityWaivedAt ? 'active' : 'pending';
+    // Claimed on the status, so two admins lifting it at once record it once.
+    const claimed = await this.prisma.reseller.updateMany({ where: { id, status: 'suspended' }, data: { status } });
+    if (claimed.count === 0) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
+    const after = await this.prisma.reseller.findUniqueOrThrow({ where: { id } });
+    await this.audit.record({ actorId, action: 'reseller.unsuspended', targetType: 'reseller', targetId: id, before, after: { ...after, reason: input.reason.trim() } });
+    await this.inbox.reseller(id, 'account.reinstated', {
+      subject: `reinstated:${after.updatedAt.toISOString()}`,
+      title: 'Your account is no longer suspended',
+      body: status === 'active' ? 'You can take live orders again, and your store and API keys work again.' : 'Finish the identity check to take live orders again.',
+      link: status === 'active' ? '/settings/business' : '/settings/verification',
+    });
     return this.resellerDetail(id);
   }
 

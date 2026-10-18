@@ -100,6 +100,31 @@ describe('admin: resellers', () => {
     assert.equal(history.json.data[0].after.status, 'suspended');
   });
 
+  test('operations lift a suspension: verified resellers are active again, unverified ones go back to pending; the team is told', async () => {
+    const { PrismaService } = await import('../dist/database/prisma.service.js');
+    const prisma = server.app.get(PrismaService);
+    const verified = await resellerClient(server);
+    await prisma.reseller.update({ where: { id: verified.resellerId }, data: { verifiedAt: new Date(), verifiedName: 'Ada Obi', status: 'active' } });
+    assert.equal((await admin.post(`/v1/admin/resellers/${verified.resellerId}/unsuspend`, { reason: 'Not suspended yet' })).json.error.code, 'not_suspended');
+    await admin.patch(`/v1/admin/resellers/${verified.resellerId}`, { status: 'suspended' });
+    assert.ok(await prisma.notification.findFirst({ where: { resellerId: verified.resellerId, type: 'account.suspended' } }), 'the team is told it is suspended');
+    const support = await adminClient(server, ['support']);
+    assert.equal((await support.post(`/v1/admin/resellers/${verified.resellerId}/unsuspend`, { reason: 'Cleared after review' })).status, 403);
+    assert.equal((await admin.post(`/v1/admin/resellers/${verified.resellerId}/unsuspend`, { reason: 'no' })).status, 400, 'a reason is required');
+    const lifted = await admin.post(`/v1/admin/resellers/${verified.resellerId}/unsuspend`, { reason: 'Cleared after review' });
+    assert.equal(lifted.status, 200, JSON.stringify(lifted.json));
+    assert.equal(lifted.json.status, 'active');
+    assert.ok(await prisma.notification.findFirst({ where: { resellerId: verified.resellerId, type: 'account.reinstated' } }), 'and when it is lifted');
+    const history = (await admin.get(`/v1/admin/resellers/${verified.resellerId}/history`)).json.data;
+    assert.deepEqual([history[0].action, history[0].after.reason], ['reseller.unsuspended', 'Cleared after review']);
+
+    // Suspended before the identity check: it can be lifted, but not straight to live.
+    const unverified = await resellerClient(server);
+    await admin.patch(`/v1/admin/resellers/${unverified.resellerId}`, { status: 'suspended' });
+    const pending = await admin.post(`/v1/admin/resellers/${unverified.resellerId}/unsuspend`, { reason: 'Cleared after review' });
+    assert.equal(pending.json.status, 'pending');
+  });
+
   test('invalid statuses, plans and ids are refused', async () => {
     const { resellerId } = await resellerClient(server);
     assert.equal((await admin.patch(`/v1/admin/resellers/${resellerId}`, { status: 'deleted' })).json.error.param, 'status');

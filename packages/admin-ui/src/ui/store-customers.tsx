@@ -1,7 +1,8 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Search } from 'lucide-react';
+import { ActionDialog } from './action-dialog';
 import { DataTable } from './data';
 import { Badge, Notice, StatusBadge } from './status';
 import { Button, Card, CardHeader, Input, KeyValue, Toggle } from './primitives';
@@ -99,7 +100,7 @@ export function StoreCustomersTable({
               <span className="block min-w-0">
                 <span className="flex items-center gap-2 font-semibold text-ink">
                   {customer.name}
-                  {customer.status === 'disabled' ? <Badge tone="red">Disabled</Badge> : null}
+                  {customer.status === 'disabled' ? <Badge tone="red">Suspended</Badge> : null}
                 </span>
                 <span className="block break-all text-sm text-muted">{customer.email}</span>
               </span>
@@ -165,7 +166,9 @@ export function StoreCustomerView({
   /** A link to review the customer's ID check, shown only when the owner may review it (never documents otherwise). */
   identityReview?: ReactNode;
 }) {
-  const disabled = customer.status === 'disabled';
+  // The API calls a suspended account `disabled`.
+  const suspended = customer.status === 'disabled';
+  const [confirming, setConfirming] = useState(false);
   return (
     <div className="space-y-6">
       {error ? <Notice tone="red">{error}</Notice> : null}
@@ -173,14 +176,30 @@ export function StoreCustomerView({
         <Card>
           <CardHeader
             title="Account"
-            description={disabled ? 'Disabled: cannot sign in or buy.' : 'Active.'}
+            description={suspended ? 'Suspended: cannot sign in or buy.' : 'Active.'}
             actions={
               canChange ? (
-                <Button size="sm" variant={disabled ? 'primary' : 'secondary'} loading={busy} onClick={() => onUpdate({ status: disabled ? 'active' : 'disabled' })}>
-                  {disabled ? 'Re-enable' : 'Disable'}
-                </Button>
+                suspended ? (
+                  <Button size="sm" loading={busy} onClick={() => onUpdate({ status: 'active' })}>
+                    Unsuspend
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="danger" loading={busy} onClick={() => setConfirming(true)}>
+                    Suspend
+                  </Button>
+                )
               ) : null
             }
+          />
+          <ActionDialog
+            open={confirming}
+            onClose={() => setConfirming(false)}
+            title={`Suspend ${customer.name}?`}
+            description="They are signed out everywhere and cannot sign in or buy until you unsuspend them. The orders and codes they bought stay theirs."
+            confirmLabel="Suspend"
+            tone="danger"
+            requireReason={false}
+            onConfirm={async () => onUpdate({ status: 'disabled' })}
           />
           <div className="space-y-4 p-5 sm:p-6">
             <KeyValue

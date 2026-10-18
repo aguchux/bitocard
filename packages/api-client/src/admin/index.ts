@@ -109,6 +109,11 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/identity-waiver/remove`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
     }),
+    /** Operations: lifts a suspension (active again when verified or waived, else pending). Audited with the reason. */
+    unsuspendReseller: build.mutation<ResellerDetail, { id: string; reason: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/unsuspend`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
     resellerWallet: build.query<ResellerWallet, string>({ query: id => `/v1/admin/resellers/${id}/wallet`, providesTags: (_result, _error, id) => [{ type: 'Reseller', id }] }),
     /** Finance: grants the startup allowance (verified reseller, switch on, once only). */
     grantStartupAllowance: build.mutation<StartupAllowance, string>({
@@ -390,6 +395,7 @@ export const {
   useUpdateResellerMutation,
   useWaiveResellerIdentityMutation,
   useRemoveResellerIdentityWaiverMutation,
+  useUnsuspendResellerMutation,
   usePlansQuery,
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,

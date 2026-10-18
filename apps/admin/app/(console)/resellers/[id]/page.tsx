@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { Ban, CheckCircle2, ReceiptText, ShieldCheck, ShieldOff } from "lucide-react";
+import { Ban, CheckCircle2, ReceiptText, RotateCcw, ShieldCheck, ShieldOff } from "lucide-react";
 import {
   ActionDialog,
   Button,
@@ -30,6 +30,7 @@ import {
   type ResellerStatus,
   usePlansQuery,
   useRemoveResellerIdentityWaiverMutation,
+  useUnsuspendResellerMutation,
   useResellerHistoryQuery,
   useResellerQuery,
   useUpdateResellerMutation,
@@ -50,6 +51,8 @@ export default function ResellerPage() {
   const [activateNow, setActivateNow] = useState(true);
   const [waive] = useWaiveResellerIdentityMutation();
   const [removeWaiver] = useRemoveResellerIdentityWaiverMutation();
+  const [unsuspend] = useUnsuspendResellerMutation();
+  const [lifting, setLifting] = useState(false);
   const operator = can(admin, "operations");
 
   const latestCheck = checks.data?.pages[0]?.data[0];
@@ -77,7 +80,11 @@ export default function ResellerPage() {
                     <ReceiptText className="size-4" aria-hidden />
                     Orders
                   </AppLink>
-                  {reseller.status !== "active" ? (
+                  {reseller.status === "suspended" ? (
+                    <Button icon={<RotateCcw className="size-4" aria-hidden />} onClick={() => setLifting(true)}>
+                      Unsuspend
+                    </Button>
+                  ) : reseller.status !== "active" ? (
                     <Button icon={<CheckCircle2 className="size-4" aria-hidden />} onClick={() => setAction("active")} disabled={!verified && !waived}>
                       Activate
                     </Button>
@@ -256,6 +263,19 @@ export default function ResellerPage() {
             tone={action === "suspended" ? "danger" : "primary"}
             requireReason={false}
             onConfirm={() => update({ id: reseller.id, status: action! }).unwrap()}
+          />
+
+          <ActionDialog
+            open={lifting}
+            onClose={() => setLifting(false)}
+            title={`Unsuspend ${reseller.name}?`}
+            description={
+              verified || waived
+                ? "They are active again: live orders, their store and their API keys work again. Your reason is kept in the audit log and the team is told."
+                : "Their identity check is not done, so they go back to pending and finish it before taking live orders. Your reason is kept in the audit log and the team is told."
+            }
+            confirmLabel="Unsuspend"
+            onConfirm={reason => unsuspend({ id: reseller.id, reason }).unwrap()}
           />
 
           <ActionDialog

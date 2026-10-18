@@ -88,6 +88,15 @@ export class AdminPlansController {
     return this.plans.waiveIdentity(adminId(caller), id, body);
   }
 
+  /** Lifts a suspension: active again when verified (or waived), else pending. Audited with the reason. */
+  @AdminRoles('operations')
+  @StepUp()
+  @Post('resellers/:id/unsuspend')
+  @HttpCode(HttpStatus.OK)
+  unsuspend(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: WaiverReasonDto) {
+    return this.plans.unsuspend(adminId(caller), id, body);
+  }
+
   /** Asks for the identity check again; an unverified active reseller goes back to pending. Audited with the reason. */
   @AdminRoles('operations')
   @StepUp()

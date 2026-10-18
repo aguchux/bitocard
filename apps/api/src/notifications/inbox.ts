@@ -46,6 +46,8 @@ type CustomerType = {
  */
 export const notificationTypes = {
   // Reseller accounts ------------------------------------------------------------------------------------------------
+  'account.suspended': { realm: 'reseller', roles: ['admin', 'developer', 'finance', 'support'], severity: 'critical', label: 'Account suspended' },
+  'account.reinstated': { realm: 'reseller', roles: ['admin', 'developer', 'finance', 'support'], severity: 'success', label: 'Account no longer suspended' },
   'connection.approved': { realm: 'reseller', roles: ['admin'], severity: 'success', label: 'Own integration approved' },
   'connection.rejected': { realm: 'reseller', roles: ['admin'], severity: 'warning', label: 'Own integration rejected' },
   'connection.suspended': { realm: 'reseller', roles: ['admin'], severity: 'critical', label: 'Own integration suspended' },
