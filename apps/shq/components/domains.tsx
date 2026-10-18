@@ -29,7 +29,7 @@ import {
 } from "@bitocard/api-client/reseller";
 
 const usd = (cents: number) => `US$${(cents / 100).toFixed(2)}`;
-const statusLabels: Record<StoreDomain["status"], string> = {
+export const statusLabels: Record<StoreDomain["status"], string> = {
   purchasing: "Buying",
   pending: "Waiting for DNS",
   active: "Live",
@@ -38,8 +38,8 @@ const statusLabels: Record<StoreDomain["status"], string> = {
   suspended: "Suspended",
   removed: "Removed",
 };
-const statusTone = (status: StoreDomain["status"]) => (status === "active" ? "green" : status === "pending" || status === "purchasing" ? "amber" : status === "suspended" || status === "expired" || status === "failed" ? "red" : "grey");
-const mailNames: Record<MailProvider, string> = { google: "Google Workspace", microsoft: "Microsoft 365", zoho: "Zoho Mail" };
+export const statusTone = (status: StoreDomain["status"]) => (status === "active" ? "green" : status === "pending" || status === "purchasing" ? "amber" : status === "suspended" || status === "expired" || status === "failed" ? "red" : "grey");
+export const mailNames: Record<MailProvider, string> = { google: "Google Workspace", microsoft: "Microsoft 365", zoho: "Zoho Mail" };
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -73,14 +73,14 @@ function RecordsToSet({ records }: { records: Array<{ type: string; name: string
 }
 
 /** Find a .com and buy it: price and renewal shown, then the registrant's details, then the wallet charge. */
-export function BuyDomain({ store, available, tlds, contactDefaults, live }: { store: string; available: boolean; tlds: string[]; contactDefaults: Partial<DomainContact>; live: boolean }) {
+export function BuyDomain({ store, available, tlds, contactDefaults, live, onBought }: { store: string; available: boolean; tlds: string[]; contactDefaults: Partial<DomainContact>; live: boolean; onBought?: (domain: StoreDomain) => void }) {
   const [query, setQuery] = useState("");
   const [search, results] = useLazySearchDomainsQuery();
   const [chosen, setChosen] = useState<DomainOffer | null>(null);
   if (!available) {
     return (
       <Card>
-        <CardHeader title="Buy a domain" description="Buying domains here is not open yet. You can connect a domain you already own below." />
+        <CardHeader title="Buy a domain" description="Buying domains here is not open yet. You can connect a domain you already own instead." />
         <div className="h-5" />
       </Card>
     );
@@ -124,12 +124,12 @@ export function BuyDomain({ store, available, tlds, contactDefaults, live }: { s
         </ul>
       ) : null}
       {!live ? <div className="px-5 pb-5 sm:px-6"><Notice tone="amber">Domains are bought with your live wallet. Switch to live to buy one.</Notice></div> : null}
-      {chosen ? <BuyDialog store={store} offer={chosen} defaults={contactDefaults} onClose={() => setChosen(null)} /> : null}
+      {chosen ? <BuyDialog store={store} offer={chosen} defaults={contactDefaults} onClose={() => setChosen(null)} onBought={onBought} /> : null}
     </Card>
   );
 }
 
-function BuyDialog({ store, offer, defaults, onClose }: { store: string; offer: DomainOffer; defaults: Partial<DomainContact>; onClose: () => void }) {
+function BuyDialog({ store, offer, defaults, onClose, onBought }: { store: string; offer: DomainOffer; defaults: Partial<DomainContact>; onClose: () => void; onBought?: (domain: StoreDomain) => void }) {
   const [contact, setContact] = useState<DomainContact>({ first_name: "", last_name: "", email: "", phone: "", address1: "", city: "", state: "", zip: "", country: "", ...defaults });
   const [buy, state] = useBuyDomainMutation();
   const set = (key: keyof DomainContact) => (event: { target: { value: string } }) => setContact(current => ({ ...current, [key]: event.target.value }));
@@ -154,7 +154,10 @@ function BuyDialog({ store, offer, defaults, onClose }: { store: string; offer: 
             onClick={() =>
               void buy({ store, domain: offer.domain, expected_price: offer.price!.amount, contact: { ...contact, country: contact.country.trim().toUpperCase() } })
                 .unwrap()
-                .then(onClose)
+                .then(domain => {
+                  onClose();
+                  onBought?.(domain);
+                })
                 .catch(() => undefined)
             }
           >
@@ -184,7 +187,7 @@ function BuyDialog({ store, offer, defaults, onClose }: { store: string; offer: 
 }
 
 /** Connect a domain bought elsewhere. */
-export function ConnectDomain({ store }: { store: string }) {
+export function ConnectDomain({ store, onConnected }: { store: string; onConnected?: (domain: StoreDomain) => void }) {
   const [name, setName] = useState("");
   const [connect, state] = useConnectDomainMutation();
   return (
@@ -194,7 +197,13 @@ export function ConnectDomain({ store }: { store: string }) {
         className="flex flex-col gap-3 px-5 pb-5 pt-4 sm:flex-row sm:px-6"
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
-          void connect({ store, domain: name.trim() }).unwrap().then(() => setName("")).catch(() => undefined);
+          void connect({ store, domain: name.trim() })
+            .unwrap()
+            .then(domain => {
+              setName("");
+              onConnected?.(domain);
+            })
+            .catch(() => undefined);
         }}
       >
         <div className="min-w-0 flex-1">
@@ -211,7 +220,7 @@ export function ConnectDomain({ store }: { store: string }) {
 }
 
 /** One of the store's domains: its status, what to set, DNS records, email and renewal. */
-export function DomainCard({ store, domain, owner, canManage }: { store: string; domain: StoreDomain; owner: boolean; canManage: boolean }) {
+export function DomainCard({ store, domain, owner, canManage, onRemoved }: { store: string; domain: StoreDomain; owner: boolean; canManage: boolean; onRemoved?: () => void }) {
   const ref = { store, id: domain.id };
   const [check, checking] = useCheckDomainMutation();
   const [update, updating] = useUpdateDomainMutation();
@@ -297,7 +306,7 @@ export function DomainCard({ store, domain, owner, canManage }: { store: string;
         confirmLabel={domain.status === "failed" ? "Dismiss" : "Disconnect"}
         tone="danger"
         requireReason={false}
-        onConfirm={() => remove(ref).unwrap()}
+        onConfirm={() => remove(ref).unwrap().then(() => onRemoved?.())}
       />
       {importing ? <ImportDialog store={store} domain={domain} onClose={() => setImporting(false)} /> : null}
     </Card>
