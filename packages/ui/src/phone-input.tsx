@@ -17,6 +17,7 @@ export function PhoneInput({
   className = '',
   inputClassName = '',
   errorClassName = '',
+  prefixClassName = 'border-brand-500 bg-brand-500 text-white',
   required,
   disabled,
 }: {
@@ -30,6 +31,8 @@ export function PhoneInput({
   className?: string;
   inputClassName?: string;
   errorClassName?: string;
+  /** The locked country prefix; the app's primary colour by default. */
+  prefixClassName?: string;
   required?: boolean;
   disabled?: boolean;
 }) {
@@ -44,7 +47,7 @@ export function PhoneInput({
         {label}
       </label>
       <div className="flex min-w-0 items-stretch">
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-l-xl border border-r-0 border-current/20 px-3 text-sm font-semibold tabular-nums" aria-label={`Country code ${dialCode(country)}`}>
+        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-l-xl border px-3 text-sm font-semibold tabular-nums ${prefixClassName}`} aria-label={`Country code ${dialCode(country)}`}>
           <span aria-hidden="true">{flagEmoji(country)}</span>
           {dialCode(country)}
         </span>
