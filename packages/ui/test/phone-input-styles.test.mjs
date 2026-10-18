@@ -14,7 +14,7 @@ function files(dir) {
   });
 }
 
-test('apps using PhoneInput have Tailwind read it, or it renders unstyled', () => {
+test('apps using PhoneInput have Tailwind read it and serve its flag images', () => {
   const apps = readdirSync(join(root, 'apps')).filter(app => {
     try {
       return files(join(root, 'apps', app)).some(file => readFileSync(file, 'utf8').includes('@bitocard/ui/phone-input'));
@@ -26,5 +26,6 @@ test('apps using PhoneInput have Tailwind read it, or it renders unstyled', () =
   for (const app of apps) {
     const css = readFileSync(join(root, 'apps', app, 'app', 'globals.css'), 'utf8');
     assert.match(css, /@source "\.\.\/\.\.\/\.\.\/packages\/ui\/src\/phone-input\.tsx";/, `${app}'s globals.css`);
+    assert.ok(statSync(join(root, 'apps', app, 'app', 'flags', '[code]', 'route.ts')).isFile(), `${app} serves /flags/<code>.svg for the country prefix`);
   }
 });

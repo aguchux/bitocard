@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { checkPhone, dialCode, flagEmoji, formatNational } from './phone';
+import { checkPhone, dialCode, formatNational } from './phone';
 
 /**
  * An account phone field locked to one country: its flag and dialling code are shown, not chosen, the number is
@@ -48,7 +48,8 @@ export function PhoneInput({
       </label>
       <div className="flex min-w-0 items-stretch">
         <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-l-xl border px-3 text-sm font-semibold tabular-nums ${prefixClassName}`} aria-label={`Country code ${dialCode(country)}`}>
-          <span aria-hidden="true">{flagEmoji(country)}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- the app's own tiny flag file (`/flags/<code>.svg`); emoji flags show as letters on Windows */}
+          <img src={`/flags/${country.toLowerCase()}.svg`} alt="" width={20} height={14} className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-white/40" />
           {dialCode(country)}
         </span>
         <input
