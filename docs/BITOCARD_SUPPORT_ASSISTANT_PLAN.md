@@ -126,6 +126,29 @@ Live chat and support tickets on every store, answered by people and, where the 
 
 An optional **Polish with AI** step rewrites the wording in the store's tone, without adding facts, before the owner reviews it. Nothing is applied until the owner presses **Apply**, which saves it as a new knowledge version.
 
+### Update knowledge base (keeping the store's data current)
+
+The store changes after the document is made: products listed and unlisted, a new template, payment methods, a domain, policies. **Update knowledge base** refreshes the document from the store's data as it is now, without losing what the owner wrote.
+
+- **Managed and owner sections.**
+  - Each part of a generated document is wrapped in markers, `<!-- bitocard:products -->` … `<!-- /bitocard:products -->`. The parts are the store, what it sells, products, delivery, buying and paying, refunds, accounts and verification.
+  - Everything outside the markers is the owner's: About the store, FAQs, support hours and contact, extra rules, and anything they add.
+  - An uploaded document gets markers only where it uses the template's headings. Anything else counts as the owner's.
+- **What an update does** (`POST /v1/support/bots/:id/knowledge/update`, and the same for admins):
+  1. Regenerates every managed section from current data.
+  2. Leaves the owner's sections untouched.
+  3. Returns a **draft with a section-by-section comparison**, for example "Products: 12 added, 3 removed" and "Payment methods: Mobile money added". Removed lines and added lines are shown side by side.
+- **Applying:**
+  - The owner applies it, or individual sections. Applying saves a **new knowledge version** (`source: refreshed`); earlier versions can be restored.
+  - **Managed sections edited by hand:** the update says so and asks before replacing them (Keep mine, or Use BitoCard's).
+- **When the data has moved on:**
+  - Each knowledge version keeps a **fingerprint of the store data it was made from** (`data_hash`: listed products, categories, template, payment methods, policies, domains, contact).
+  - The `support` cron (daily) compares it with the store now. When they differ, the Assistant page shows **"Your store has changed since the knowledge base was updated"**, the owner is told once (`support.knowledge_stale`), and the update shows exactly what changed.
+- **Automatic updates** (optional, per bot, off by default): `auto_refresh` applies the managed sections by itself when the fingerprint changes (at most daily), never touching owner sections or hand-edited managed ones, and records the new version. Owners who check every change leave it off.
+- **Prices and stock are never written into the document:** the bot reads them live through its tools. An update keeps the descriptions current (what is sold, how it is delivered, the policies).
+
+`support_bot_knowledge` gains `data_hash`, `managed_sections` (the hash of each managed section as generated, to detect hand edits) and the source `refreshed`. `support_bots` gains `auto_refresh` and `knowledge_stale_at`.
+
 ## Screens
 
 - **SHQ, Support (new section):**
@@ -136,7 +159,7 @@ An optional **Polish with AI** step rewrites the wording in the store's tone, wi
 - **The Assistant wizard** (`/support/assistant/new`, then `/support/assistant/<id>`):
   1. **Role and AI agent:** chat, tickets or both. The provider and model, paid by BitoCard (Premium: allowance shown) or by their own key (pick or add the connection).
   2. **Profile:** name, avatar (upload with `ImageField`, purpose `reseller_bot_avatar`), greeting, tone, extra instructions.
-  3. **Knowledge:** **Download template** (.md or .csv), **Upload**, or **Generate from BitoCard** (preview, edit, apply), with versions.
+  3. **Knowledge:** **Download template** (.md or .csv), **Upload**, or **Generate from BitoCard** (preview, edit, apply), with versions. Afterwards, **Update knowledge base** refreshes BitoCard's sections from the store's current data (comparison, apply all or per section), with the "store has changed" notice and the Automatic updates switch.
   4. **Assign to store:** stores without a bot. A store that already has one is shown with its bot.
   5. **Test:** a playground chat, then **Activate**.
 - **Admin:**
@@ -151,7 +174,7 @@ An optional **Polish with AI** step rewrites the wording in the store's tone, wi
 
 ## Notifications
 
-- **Resellers:** `support.chat_waiting`, `support.ticket_created`, `support.ticket_replied`, `support.ticket_escalated`, and `support.bot_paused` (key failed or allowance reached).
+- **Resellers:** `support.chat_waiting`, `support.ticket_created`, `support.ticket_replied`, `support.ticket_escalated`, `support.bot_paused` (key failed or allowance reached), and `support.knowledge_stale` (the store changed since the knowledge base was updated).
 - **Admins:** `admin.support.ticket_escalated`, `admin.support.chat_waiting`, `admin.support.issue_closed`.
 - **Customers:** `customer.support.ticket_replied`, `customer.support.ticket_resolved`.
 - **Email:** customers are emailed ticket replies under the store's brand.
@@ -181,7 +204,7 @@ An optional **Polish with AI** step rewrites the wording in the store's tone, wi
 1. **Tickets without AI:** models, customer, reseller and BitoCard ticket APIs, escalation between queues, webhooks, notifications, and SHQ, admin and storefront screens.
 2. **Chat without AI:** conversations, polling, staff inbox and takeover, the storefront widget, SHQ's chat with BitoCard.
 3. **AI providers:** the three adapters, integration settings and Test connection, own-key connections (`ai_provider`), usage metering and allowance, prices.
-4. **Bots:** model, wizard, knowledge (upload, template, versions), **Generate from BitoCard**, the playground, assign and activate.
+4. **Bots:** model, wizard, knowledge (upload, template, versions), **Generate from BitoCard** and **Update knowledge base** (managed sections, comparison, data fingerprint, stale notice, automatic updates), the playground, assign and activate.
 5. **Bot in chat and tickets:** the system prompt, tools with scoping and redaction, hand-off, ticket drafts and automatic replies, the safety tests (injection attempts, never codes or suppliers, money requests handed over).
 6. **Engineering escalation:** the GitHub integration, issue drafting, webhook back to the ticket.
 7. **Legal drafts**, AGENTS.md and PLANS.md, docs (support tickets guide, webhook events), then a pilot on bitocard.com and one reseller.
