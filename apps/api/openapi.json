@@ -23341,6 +23341,2052 @@
         ]
       }
     },
+    "/v1/crypto": {
+      "get": {
+        "description": "What you hold of each coin, what is on its way out, whether your plan lets you deposit, and the networks addresses can be saved on.",
+        "operationId": "ResellerCoinsController_balances",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your coin wallet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResellerCoins"
+                },
+                "example": {
+                  "object": "reseller_coins",
+                  "mode": "test",
+                  "onchain": true,
+                  "withdrawal_chains": [
+                    {
+                      "chain": "ETHEREUM",
+                      "name": "Ethereum"
+                    },
+                    {
+                      "chain": "TRON",
+                      "name": "TRON"
+                    }
+                  ],
+                  "assets": [
+                    {
+                      "asset": "USDT",
+                      "name": "Tether USD",
+                      "decimals": 6,
+                      "enabled": true,
+                      "available": "78.500000",
+                      "withdrawing": "0.000000"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your coin wallet",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/crypto/deposit-networks": {
+      "get": {
+        "description": "Premium. Only networks switched on, with a key and a provider for the mode.",
+        "operationId": "ResellerCoinsController_depositNetworks",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset",
+            "required": true,
+            "in": "query",
+            "description": "Coin code.",
+            "schema": {
+              "example": "USDT",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Networks open for deposits of the coin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CryptoDepositNetwork"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "crypto_network",
+                      "asset": "USDT",
+                      "chain": "ETHEREUM",
+                      "name": "Ethereum",
+                      "token": "ERC-20",
+                      "confirmations": 12
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the networks a coin can be deposited on",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/crypto/deposit-addresses": {
+      "post": {
+        "description": "Premium. Made once per network family and mode, then the same every time; showing it watches it closely for a week.",
+        "operationId": "ResellerCoinsController_depositAddress",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DepositAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your deposit address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoDepositAddress"
+                },
+                "example": {
+                  "object": "crypto_deposit_address",
+                  "mode": "test",
+                  "asset": "USDT",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+                  "contract": "0x7169d38820dfd117c3fa1f22a697dba58d90ba06",
+                  "confirmations": 12,
+                  "watch_until": "2026-10-25T09:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your deposit address for a coin and network",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ]
+      }
+    },
+    "/v1/crypto/deposits": {
+      "get": {
+        "description": "Newest first. Credited to your coin wallet once confirmed (and checked by a second provider when large).",
+        "operationId": "ResellerCoinsController_depositsList",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your latest 25 deposits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CryptoDeposit"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "crypto_deposit",
+                      "id": "3b0f1d0e-8a1c-4b55-9a52-0f2f4d9d1a11",
+                      "mode": "test",
+                      "asset": "USDT",
+                      "chain": "ETHEREUM",
+                      "network": "Ethereum",
+                      "tx_hash": "0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060",
+                      "amount": "100.000000",
+                      "status": "credited",
+                      "confirmations": 21,
+                      "confirmations_needed": 12,
+                      "created_at": "2026-10-18T09:00:00.000Z",
+                      "credited_at": "2026-10-18T09:03:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your coin deposits",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/crypto/withdrawal-addresses": {
+      "get": {
+        "operationId": "ResellerCoinsController_addresses",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your saved addresses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CryptoWithdrawalAddress"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "crypto_withdrawal_address",
+                      "id": "c2a3b4d5-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+                      "mode": "test",
+                      "chain": "ETHEREUM",
+                      "network": "Ethereum",
+                      "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                      "label": "Treasury",
+                      "usable_from": "2026-10-19T09:00:00.000Z",
+                      "ready": false,
+                      "created_at": "2026-10-18T09:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your saved withdrawal addresses",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      },
+      "post": {
+        "description": "Owner only. Checked for the network, never a BitoCard deposit address, screened against sanctions lists, usable 24 hours after it is added.",
+        "operationId": "ResellerCoinsController_addAddress",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawalAddressDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The saved address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoWithdrawalAddress"
+                },
+                "example": {
+                  "object": "crypto_withdrawal_address",
+                  "id": "c2a3b4d5-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+                  "mode": "test",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                  "label": "Treasury",
+                  "usable_from": "2026-10-19T09:00:00.000Z",
+                  "ready": false,
+                  "created_at": "2026-10-18T09:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save a withdrawal address",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": []
+      }
+    },
+    "/v1/crypto/withdrawal-addresses/{id}": {
+      "delete": {
+        "operationId": "ResellerCoinsController_removeAddress",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The address was removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "DeletedWithdrawalAddress",
+                  "required": [
+                    "object",
+                    "id",
+                    "deleted"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `crypto_withdrawal_address`.",
+                      "const": "crypto_withdrawal_address"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "Address ID.",
+                      "format": "uuid"
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "const": true,
+                      "description": "Always `true`."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "crypto_withdrawal_address",
+                  "id": "c2a3b4d5-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+                  "deleted": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a saved withdrawal address",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ]
+      }
+    },
+    "/v1/crypto/withdrawal-networks": {
+      "get": {
+        "description": "With each network's fee and minimum, and your daily limit and what is left of it.",
+        "operationId": "ResellerCoinsController_withdrawalNetworks",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asset",
+            "required": true,
+            "in": "query",
+            "description": "Coin code.",
+            "schema": {
+              "example": "USDT",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Networks open for withdrawals of the coin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoWithdrawalNetworks"
+                },
+                "example": {
+                  "object": "crypto_withdrawal_networks",
+                  "asset": "USDT",
+                  "daily_limit": "500.000000",
+                  "remaining_today": "480.000000",
+                  "data": [
+                    {
+                      "object": "crypto_network",
+                      "chain": "ETHEREUM",
+                      "name": "Ethereum",
+                      "fee": "1.500000",
+                      "minimum": "5.000000",
+                      "confirmations": 12
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the networks a coin can be withdrawn on",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/crypto/withdrawals": {
+      "post": {
+        "description": "The amount plus the network fee leaves your coin wallet at once and a 6-digit code is emailed to you. `preview: true` only shows the cost.",
+        "operationId": "ResellerCoinsController_create",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The withdrawal waiting for its emailed code, or with `preview: true` what it would cost.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CryptoWithdrawal"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CryptoWithdrawalPreview"
+                    }
+                  ]
+                },
+                "example": {
+                  "object": "crypto_withdrawal",
+                  "id": "7d1e2f3a-4b5c-4d6e-8f70-81920a1b2c3d",
+                  "number": "CW-000124",
+                  "mode": "test",
+                  "asset": "USDT",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                  "amount": "20.000000",
+                  "fee": "1.500000",
+                  "total": "21.500000",
+                  "status": "awaiting_code",
+                  "review_reason": null,
+                  "code_sent_at": "2026-10-18T10:00:00.000Z",
+                  "tx_hash": null,
+                  "confirmations": 0,
+                  "created_at": "2026-10-18T10:00:00.000Z",
+                  "completed_at": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask for a withdrawal",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ]
+      },
+      "get": {
+        "operationId": "ResellerCoinsController_list",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your latest 25 withdrawals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CryptoWithdrawal"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "crypto_withdrawal",
+                      "id": "7d1e2f3a-4b5c-4d6e-8f70-81920a1b2c3d",
+                      "number": "CW-000124",
+                      "mode": "test",
+                      "asset": "USDT",
+                      "chain": "ETHEREUM",
+                      "network": "Ethereum",
+                      "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                      "amount": "20.000000",
+                      "fee": "1.500000",
+                      "total": "21.500000",
+                      "status": "completed",
+                      "review_reason": null,
+                      "code_sent_at": null,
+                      "tx_hash": "0x7f1c9d2a3b4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcd",
+                      "confirmations": 12,
+                      "created_at": "2026-10-18T10:00:00.000Z",
+                      "completed_at": "2026-10-18T10:05:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your withdrawals",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/crypto/withdrawals/{id}": {
+      "get": {
+        "operationId": "ResellerCoinsController_get",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The withdrawal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoWithdrawal"
+                },
+                "example": {
+                  "object": "crypto_withdrawal",
+                  "id": "7d1e2f3a-4b5c-4d6e-8f70-81920a1b2c3d",
+                  "number": "CW-000124",
+                  "mode": "test",
+                  "asset": "USDT",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                  "amount": "20.000000",
+                  "fee": "1.500000",
+                  "total": "21.500000",
+                  "status": "completed",
+                  "review_reason": null,
+                  "code_sent_at": null,
+                  "tx_hash": "0x7f1c9d2a3b4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcd",
+                  "confirmations": 12,
+                  "created_at": "2026-10-18T10:00:00.000Z",
+                  "completed_at": "2026-10-18T10:05:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a withdrawal",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/crypto/withdrawals/{id}/confirm": {
+      "post": {
+        "description": "Only the person who asked. It then goes to BitoCard's signer, or waits for BitoCard's approval.",
+        "operationId": "ResellerCoinsController_confirm",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The confirmed withdrawal, queued for the signer or waiting for review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoWithdrawal"
+                },
+                "example": {
+                  "object": "crypto_withdrawal",
+                  "id": "7d1e2f3a-4b5c-4d6e-8f70-81920a1b2c3d",
+                  "number": "CW-000124",
+                  "mode": "test",
+                  "asset": "USDT",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                  "amount": "20.000000",
+                  "fee": "1.500000",
+                  "total": "21.500000",
+                  "status": "queued",
+                  "review_reason": null,
+                  "code_sent_at": null,
+                  "tx_hash": null,
+                  "confirmations": 0,
+                  "created_at": "2026-10-18T10:00:00.000Z",
+                  "completed_at": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm a withdrawal with its emailed code",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ]
+      }
+    },
+    "/v1/crypto/withdrawals/{id}/resend-code": {
+      "post": {
+        "description": "Once a minute; only the person who asked.",
+        "operationId": "ResellerCoinsController_resend",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The withdrawal with its new code’s time.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoWithdrawal"
+                },
+                "example": {
+                  "object": "crypto_withdrawal",
+                  "id": "7d1e2f3a-4b5c-4d6e-8f70-81920a1b2c3d",
+                  "number": "CW-000124",
+                  "mode": "test",
+                  "asset": "USDT",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                  "amount": "20.000000",
+                  "fee": "1.500000",
+                  "total": "21.500000",
+                  "status": "awaiting_code",
+                  "review_reason": null,
+                  "code_sent_at": "2026-10-18T10:00:00.000Z",
+                  "tx_hash": null,
+                  "confirmations": 0,
+                  "created_at": "2026-10-18T10:00:00.000Z",
+                  "completed_at": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Email a new code",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ]
+      }
+    },
+    "/v1/crypto/withdrawals/{id}/cancel": {
+      "post": {
+        "description": "While it waits for its code or BitoCard's approval: the coins go back to your coin wallet.",
+        "operationId": "ResellerCoinsController_cancel",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled withdrawal; the coins are back in your coin wallet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoWithdrawal"
+                },
+                "example": {
+                  "object": "crypto_withdrawal",
+                  "id": "7d1e2f3a-4b5c-4d6e-8f70-81920a1b2c3d",
+                  "number": "CW-000124",
+                  "mode": "test",
+                  "asset": "USDT",
+                  "chain": "ETHEREUM",
+                  "network": "Ethereum",
+                  "address": "0x52908400098527886E0F7030069857D2E4169EE7",
+                  "amount": "20.000000",
+                  "fee": "1.500000",
+                  "total": "21.500000",
+                  "status": "cancelled",
+                  "review_reason": null,
+                  "code_sent_at": null,
+                  "tx_hash": null,
+                  "confirmations": 0,
+                  "created_at": "2026-10-18T10:00:00.000Z",
+                  "completed_at": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a withdrawal",
+        "tags": [
+          "Crypto"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ]
+      }
+    },
     "/v1/numbers": {
       "get": {
         "description": "The numbers your orders bought, newest first, with when each is paid up to.",
@@ -25953,9 +27999,8 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "The 6-digit code that was sent to you.",
-            "pattern": "^\\d{6}$",
-            "example": "482913"
+            "description": "The 6-digit code emailed to the person who asked.",
+            "example": "482137"
           }
         },
         "required": [
@@ -26944,6 +28989,124 @@
         },
         "required": [
           "fallback_to_bitocard"
+        ]
+      },
+      "DepositAddressDto": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "Coin code.",
+            "example": "USDT"
+          },
+          "chain": {
+            "type": "string",
+            "description": "The network to deposit on, from the deposit networks.",
+            "example": "ETHEREUM",
+            "enum": [
+              "ETHEREUM",
+              "BSC",
+              "POLYGON",
+              "ARBITRUM",
+              "BASE",
+              "OPTIMISM",
+              "TRON",
+              "BITCOIN",
+              "LITECOIN",
+              "DOGECOIN",
+              "SOLANA"
+            ]
+          }
+        },
+        "required": [
+          "asset",
+          "chain"
+        ]
+      },
+      "WithdrawalAddressDto": {
+        "type": "object",
+        "properties": {
+          "chain": {
+            "type": "string",
+            "description": "The network the address is on (`withdrawal_chains`).",
+            "example": "ETHEREUM",
+            "enum": [
+              "ETHEREUM",
+              "BSC",
+              "POLYGON",
+              "ARBITRUM",
+              "BASE",
+              "OPTIMISM",
+              "TRON",
+              "BITCOIN",
+              "LITECOIN",
+              "DOGECOIN",
+              "SOLANA"
+            ]
+          },
+          "address": {
+            "type": "string",
+            "description": "The address, checked with the network’s checksum.",
+            "example": "0x52908400098527886E0F7030069857D2E4169EE7"
+          },
+          "label": {
+            "type": "string",
+            "description": "Your name for it.",
+            "example": "Treasury"
+          }
+        },
+        "required": [
+          "chain",
+          "address",
+          "label"
+        ]
+      },
+      "WithdrawalDto": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "description": "Coin code.",
+            "example": "USDT"
+          },
+          "chain": {
+            "type": "string",
+            "description": "The network to send on.",
+            "example": "ETHEREUM",
+            "enum": [
+              "ETHEREUM",
+              "BSC",
+              "POLYGON",
+              "ARBITRUM",
+              "BASE",
+              "OPTIMISM",
+              "TRON",
+              "BITCOIN",
+              "LITECOIN",
+              "DOGECOIN",
+              "SOLANA"
+            ]
+          },
+          "address_id": {
+            "type": "string",
+            "description": "A saved withdrawal address on that network, usable 24 hours after it was added.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "string",
+            "description": "What arrives, as a decimal string; the network fee is taken on top.",
+            "example": "20"
+          },
+          "preview": {
+            "type": "boolean",
+            "description": "Only show what it would send and cost; nothing moves."
+          }
+        },
+        "required": [
+          "asset",
+          "chain",
+          "address_id",
+          "amount"
         ]
       },
       "UpdateNumberDto": {
@@ -37915,6 +40078,635 @@
           "reserve": {
             "type": "string",
             "description": "Coin amount, as a decimal string in the asset’s units."
+          }
+        }
+      },
+      "ResellerCoins": {
+        "type": "object",
+        "title": "ResellerCoins",
+        "required": [
+          "object",
+          "mode",
+          "onchain",
+          "withdrawal_chains",
+          "assets"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `reseller_coins`.",
+            "const": "reseller_coins"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "onchain": {
+            "type": "boolean",
+            "description": "Whether your plan lets you deposit coins on chain (Premium). Withdrawing what you hold is always open."
+          },
+          "withdrawal_chains": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "chain",
+                "name"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "chain": {
+                  "type": "string",
+                  "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Network name."
+                }
+              }
+            },
+            "description": "The networks a withdrawal address can be saved on."
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "asset",
+                "name",
+                "decimals",
+                "enabled",
+                "available",
+                "withdrawing"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "asset": {
+                  "type": "string",
+                  "description": "Coin code."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Coin name."
+                },
+                "decimals": {
+                  "type": "integer",
+                  "description": "Decimal places of the coin."
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Whether BitoCard offers the coin now (one switched off is listed while you hold some)."
+                },
+                "available": {
+                  "type": "string",
+                  "description": "Coin amount, as a decimal string in the coin’s units."
+                },
+                "withdrawing": {
+                  "type": "string",
+                  "description": "On its way out on chain (asked, confirmed or being sent), in the coin’s units."
+                }
+              }
+            }
+          }
+        }
+      },
+      "CryptoDepositNetwork": {
+        "type": "object",
+        "title": "CryptoDepositNetwork",
+        "required": [
+          "object",
+          "asset",
+          "chain",
+          "name",
+          "token",
+          "confirmations"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_network`.",
+            "const": "crypto_network"
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "chain": {
+            "type": "string",
+            "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Network name."
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The token standard (`ERC-20`, `BEP-20`, `TRC-20`), or null for the network’s own coin."
+          },
+          "confirmations": {
+            "type": "integer",
+            "description": "Confirmations before a deposit is credited."
+          }
+        }
+      },
+      "CryptoDepositAddress": {
+        "type": "object",
+        "title": "CryptoDepositAddress",
+        "required": [
+          "object",
+          "mode",
+          "asset",
+          "chain",
+          "network",
+          "address",
+          "contract",
+          "confirmations",
+          "watch_until"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_deposit_address`.",
+            "const": "crypto_deposit_address"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "chain": {
+            "type": "string",
+            "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+          },
+          "network": {
+            "type": "string",
+            "description": "Network name."
+          },
+          "address": {
+            "type": "string",
+            "description": "Your deposit address on that network."
+          },
+          "contract": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The token contract to check before sending, or null for the network’s own coin."
+          },
+          "confirmations": {
+            "type": "integer",
+            "description": "Confirmations before a deposit is credited."
+          },
+          "watch_until": {
+            "type": "string",
+            "description": "Watched closely for deposits until then (renewed each time it is shown); later deposits are still found.",
+            "format": "date-time"
+          }
+        }
+      },
+      "CryptoDeposit": {
+        "type": "object",
+        "title": "CryptoDeposit",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "asset",
+          "chain",
+          "network",
+          "tx_hash",
+          "amount",
+          "status",
+          "confirmations",
+          "confirmations_needed",
+          "created_at",
+          "credited_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_deposit`.",
+            "const": "crypto_deposit"
+          },
+          "id": {
+            "type": "string",
+            "description": "Deposit ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "chain": {
+            "type": "string",
+            "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+          },
+          "network": {
+            "type": "string",
+            "description": "Network name."
+          },
+          "tx_hash": {
+            "type": "string",
+            "description": "The transaction on chain."
+          },
+          "amount": {
+            "type": "string",
+            "description": "Coin amount, as a decimal string in the coin’s units."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `credited`, `ignored` (too small or too large to credit) or `failed` (no longer on chain).",
+            "enum": [
+              "pending",
+              "credited",
+              "ignored",
+              "failed"
+            ]
+          },
+          "confirmations": {
+            "type": "integer",
+            "description": "Confirmations so far."
+          },
+          "confirmations_needed": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Confirmations needed before it is credited."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was first seen.",
+            "format": "date-time"
+          },
+          "credited_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it reached your coin wallet.",
+            "format": "date-time"
+          }
+        }
+      },
+      "CryptoWithdrawalAddress": {
+        "type": "object",
+        "title": "CryptoWithdrawalAddress",
+        "required": [
+          "object",
+          "id",
+          "mode",
+          "chain",
+          "network",
+          "address",
+          "label",
+          "usable_from",
+          "ready",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_withdrawal_address`.",
+            "const": "crypto_withdrawal_address"
+          },
+          "id": {
+            "type": "string",
+            "description": "Address ID.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "chain": {
+            "type": "string",
+            "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+          },
+          "network": {
+            "type": "string",
+            "description": "Network name."
+          },
+          "address": {
+            "type": "string",
+            "description": "The address, in its standard form."
+          },
+          "label": {
+            "type": "string",
+            "description": "Your name for it."
+          },
+          "usable_from": {
+            "type": "string",
+            "description": "Withdrawals to it can start from then (24 hours after it was added).",
+            "format": "date-time"
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "Whether it can be used now."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was added.",
+            "format": "date-time"
+          }
+        }
+      },
+      "CryptoWithdrawalNetworks": {
+        "type": "object",
+        "title": "CryptoWithdrawalNetworks",
+        "required": [
+          "object",
+          "asset",
+          "daily_limit",
+          "remaining_today",
+          "data"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_withdrawal_networks`.",
+            "const": "crypto_withdrawal_networks"
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "daily_limit": {
+            "type": "string",
+            "description": "Coin amount, as a decimal string in the coin’s units."
+          },
+          "remaining_today": {
+            "type": "string",
+            "description": "What can still be withdrawn in the next 24 hours, in the coin’s units."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "object",
+                "chain",
+                "name",
+                "fee",
+                "minimum",
+                "confirmations"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "object": {
+                  "type": "string",
+                  "description": "Always `crypto_network`.",
+                  "const": "crypto_network"
+                },
+                "chain": {
+                  "type": "string",
+                  "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Network name."
+                },
+                "fee": {
+                  "type": "string",
+                  "description": "BitoCard’s network fee, taken on top."
+                },
+                "minimum": {
+                  "type": "string",
+                  "description": "The smallest withdrawal."
+                },
+                "confirmations": {
+                  "type": "integer",
+                  "description": "Confirmations before it is settled."
+                }
+              }
+            }
+          }
+        }
+      },
+      "CryptoWithdrawal": {
+        "type": "object",
+        "title": "CryptoWithdrawal",
+        "required": [
+          "object",
+          "id",
+          "number",
+          "mode",
+          "asset",
+          "chain",
+          "network",
+          "address",
+          "amount",
+          "fee",
+          "total",
+          "status",
+          "review_reason",
+          "code_sent_at",
+          "tx_hash",
+          "confirmations",
+          "created_at",
+          "completed_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_withdrawal`.",
+            "const": "crypto_withdrawal"
+          },
+          "id": {
+            "type": "string",
+            "description": "Withdrawal ID.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Shown as `CW-000123`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "chain": {
+            "type": "string",
+            "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+          },
+          "network": {
+            "type": "string",
+            "description": "Network name."
+          },
+          "address": {
+            "type": "string",
+            "description": "Where it is sent."
+          },
+          "amount": {
+            "type": "string",
+            "description": "Coin amount, as a decimal string in the coin’s units."
+          },
+          "fee": {
+            "type": "string",
+            "description": "BitoCard’s network fee."
+          },
+          "total": {
+            "type": "string",
+            "description": "Amount plus fee: what left the coin wallet."
+          },
+          "status": {
+            "type": "string",
+            "description": "`awaiting_code` (the emailed code is needed), `review` (BitoCard approves it first), `queued`, `submitting`, `broadcast` (sent, waiting for confirmations), `completed`, `failed`, `rejected` or `cancelled`. Failed, rejected and cancelled ones return the coins.",
+            "enum": [
+              "awaiting_code",
+              "review",
+              "queued",
+              "submitting",
+              "broadcast",
+              "completed",
+              "failed",
+              "rejected",
+              "cancelled"
+            ]
+          },
+          "review_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "While it waits for review: `amount`, `unscreened` or `recent_card_top_up`."
+          },
+          "code_sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "While it waits for its code: when the latest one was emailed (another can be asked for a minute later).",
+            "format": "date-time"
+          },
+          "tx_hash": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The transaction, once broadcast."
+          },
+          "confirmations": {
+            "type": "integer",
+            "description": "Confirmations so far."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was asked for.",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was settled.",
+            "format": "date-time"
+          }
+        }
+      },
+      "CryptoWithdrawalPreview": {
+        "type": "object",
+        "title": "CryptoWithdrawalPreview",
+        "required": [
+          "object",
+          "mode",
+          "asset",
+          "chain",
+          "network",
+          "address",
+          "amount",
+          "fee",
+          "total",
+          "needs_approval"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `crypto_withdrawal_preview`.",
+            "const": "crypto_withdrawal_preview"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "asset": {
+            "type": "string",
+            "description": "Coin code."
+          },
+          "chain": {
+            "type": "string",
+            "description": "Network code, for example `ETHEREUM`, `TRON` or `BITCOIN`."
+          },
+          "network": {
+            "type": "string",
+            "description": "Network name."
+          },
+          "address": {
+            "type": "string",
+            "description": "Where it would be sent."
+          },
+          "amount": {
+            "type": "string",
+            "description": "Coin amount, as a decimal string in the coin’s units."
+          },
+          "fee": {
+            "type": "string",
+            "description": "BitoCard’s network fee."
+          },
+          "total": {
+            "type": "string",
+            "description": "What would leave the coin wallet."
+          },
+          "needs_approval": {
+            "type": "boolean",
+            "description": "Whether BitoCard approves it before it is sent."
           }
         }
       }

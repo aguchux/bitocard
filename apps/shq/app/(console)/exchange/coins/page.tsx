@@ -22,7 +22,7 @@ const linkClass = "inline-flex min-h-11 items-center gap-1.5 rounded-xl border b
 
 function Coins({ coins }: { coins: ResellerCoins }) {
   const { membership } = useReseller();
-  const mover = coins.onchain && can(membership, ...coinRoles);
+  const mover = can(membership, ...coinRoles);
   const reserves = useResellerExchangeReservesQuery();
   const reserve = new Map((reserves.data?.coins ?? []).map(coin => [coin.asset, coin.balance]));
   const rows: Row[] = coins.assets.map(coin => ({
@@ -36,7 +36,7 @@ function Coins({ coins }: { coins: ResellerCoins }) {
       <Card>
         <CardHeader
           title="Your coins"
-          description="Coins in your wallet are yours to sell back to BitoCard, move into your desk reserve or, on Premium, withdraw on chain. Coins in your desk reserve are what your customers can buy from you."
+          description="Coins in your wallet are yours to sell back to BitoCard, move into your desk reserve or, on Premium, withdraw on chain (deposits on Premium). Coins in your desk reserve are what your customers can buy from you."
         />
         <div className="mt-4">
           <DataTable<Row>
@@ -84,7 +84,7 @@ function Coins({ coins }: { coins: ResellerCoins }) {
                       align: "right" as const,
                       cell: (row: Row) => (
                         <div className="flex flex-wrap justify-end gap-2">
-                          {row.enabled ? (
+                          {row.enabled && coins.onchain ? (
                             <Link href={`/exchange/deposit?asset=${row.asset}`} className={linkClass}>
                               <ArrowDownToLine className="size-4" aria-hidden />
                               Deposit

@@ -5,11 +5,13 @@ import { pbkdf2Sync } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { HDKey } from '@scure/bip32';
 import { adminClient, adminCode, fakeService, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
+import { responseChecker } from './openapi-docs.mjs';
 
 let server;
 let admin;
 let prisma;
 let chain;
+let check;
 
 const seed = pbkdf2Sync('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about', 'mnemonic', 2048, 64, 'sha512');
 const testnet = HDKey.fromMasterSeed(seed, { private: 0x04358394, public: 0x043587cf });
@@ -34,6 +36,7 @@ before(async () => {
   server = await startApp({ env: { CRON_SECRET: 'cron-secret' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   admin = await adminClient(server);
+  check = await responseChecker(server.app);
   const update = async (id, values) => assert.equal((await admin.put(`/v1/admin/integrations/${id}`, { values, code: await adminCode(server, admin) })).status, 200);
   await update('crypto_keys', { CRYPTO_TEST_XPUB_EVM: testnet.derive("m/44'/60'/0'").publicExtendedKey });
   await update('getblock', { GETBLOCK_ETHEREUM_URL: `${chain.url}/evm`, GETBLOCK_SANDBOX: true });
@@ -60,11 +63,14 @@ async function depositOnChain(to, raw, n) {
 }
 
 describe('a reseller’s own coins on chain', () => {
-  test('Premium only; deposits credit the coin wallet; withdrawals need the asker’s emailed code and settle once', async () => {
+  test('deposits (Premium) credit the coin wallet; withdrawals need the asker’s emailed code and settle once', async () => {
     const { browser, email, resellerId } = await resellerClient(server);
     const standard = await browser.get('/v1/crypto/deposit-networks?asset=USDT', headers);
     assert.deepEqual([standard.status, standard.json.error.code], [403, 'premium_required']);
-    assert.equal((await browser.get('/v1/crypto', headers)).json.onchain, false);
+    const plain = await browser.get('/v1/crypto', headers);
+    check('GET /v1/crypto', 200, plain.json);
+    assert.equal(plain.json.onchain, false);
+    assert.ok(plain.json.withdrawal_chains.some(item => item.chain === 'ETHEREUM' && item.name === 'Ethereum'), 'the API lists the networks addresses can be saved on');
     const viaKey = await browser.get('/v1/crypto', { ...headers, authorization: 'Bearer bc_test_nope' });
     assert.equal(viaKey.status, 401, 'API keys never reach the coin wallet');
 
@@ -73,16 +79,21 @@ describe('a reseller’s own coins on chain', () => {
     assert.deepEqual([switchedOff.status, switchedOff.json.error.code], [409, 'exchange_not_enabled']);
     assert.equal((await admin.put('/v1/admin/switches/reseller_exchange', { enabled: true })).status, 200);
 
-    const networks = (await browser.get('/v1/crypto/deposit-networks?asset=USDT', headers)).json.data;
+    const networksRes = await browser.get('/v1/crypto/deposit-networks?asset=USDT', headers);
+    check('GET /v1/crypto/deposit-networks', 200, networksRes.json);
+    const networks = networksRes.json.data;
     assert.deepEqual(networks.map(item => item.chain), ['ETHEREUM']);
     const address = await browser.post('/v1/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' }, headers);
     assert.equal(address.status, 200, JSON.stringify(address.json));
+    check('POST /v1/crypto/deposit-addresses', 200, address.json);
     assert.equal((await browser.post('/v1/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' }, headers)).json.address, address.json.address, 'the same address every time');
     const row = await prisma.cryptoAddress.findFirstOrThrow({ where: { address: address.json.address } });
     assert.deepEqual([row.resellerId, row.customerId], [resellerId, null]);
 
     await depositOnChain(address.json.address, 100_000_000n, 1);
-    const deposits = (await browser.get('/v1/crypto/deposits', headers)).json.data;
+    const depositsRes = await browser.get('/v1/crypto/deposits', headers);
+    check('GET /v1/crypto/deposits', 200, depositsRes.json);
+    const deposits = depositsRes.json.data;
     assert.deepEqual(deposits.map(item => [item.status, item.amount]), [['credited', '100.000000']]);
     const held = asset => browser.get('/v1/crypto', headers).then(res => res.json.assets.find(item => item.asset === asset));
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['100.000000', '0.000000']);
@@ -92,13 +103,28 @@ describe('a reseller’s own coins on chain', () => {
 
     const added = await browser.post('/v1/crypto/withdrawal-addresses', { chain: 'ETHEREUM', address: outside, label: 'Treasury' }, headers);
     assert.equal(added.status, 201, JSON.stringify(added.json));
+    check('POST /v1/crypto/withdrawal-addresses', 201, added.json);
+    check('GET /v1/crypto/withdrawal-addresses', 200, (await browser.get('/v1/crypto/withdrawal-addresses', headers)).json);
+    const wnetworks = await browser.get('/v1/crypto/withdrawal-networks?asset=USDT', headers);
+    check('GET /v1/crypto/withdrawal-networks', 200, wnetworks.json);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'crypto.address_added', resellerId } }));
     const early = await browser.post('/v1/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '20' }, headers);
     assert.deepEqual([early.status, early.json.error.code], [409, 'address_not_ready']);
     await prisma.cryptoWithdrawalAddress.update({ where: { id: added.json.id }, data: { usableFrom: new Date(Date.now() - 1000) } });
 
+    const previewed = await browser.post('/v1/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '20', preview: true }, headers);
+    check('POST /v1/crypto/withdrawals', 201, previewed.json);
     const asked = await browser.post('/v1/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '20' }, headers);
     assert.equal(asked.status, 201, JSON.stringify(asked.json));
+    check('POST /v1/crypto/withdrawals', 201, asked.json);
+    assert.ok(asked.json.code_sent_at, 'it says when the code was sent, for the resend countdown');
+    const early2 = await browser.post(`/v1/crypto/withdrawals/${asked.json.id}/resend-code`, {}, headers);
+    assert.deepEqual([early2.status, early2.json.error.code], [429, 'code_recently_sent']);
+    await prisma.cryptoWithdrawal.update({ where: { id: asked.json.id }, data: { codeSentAt: new Date(Date.now() - 61_000) } });
+    const resent = await browser.post(`/v1/crypto/withdrawals/${asked.json.id}/resend-code`, {}, headers);
+    assert.equal(resent.status, 200, JSON.stringify(resent.json));
+    check('POST /v1/crypto/withdrawals/{id}/resend-code', 200, resent.json);
+    assert.ok(new Date(resent.json.code_sent_at).getTime() > Date.now() - 10_000, 'a new code moves the countdown');
     assert.deepEqual([asked.json.status, asked.json.total], ['awaiting_code', '21.500000']);
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['78.500000', '21.500000']);
     const code = await lastEmailCode(server.app, email);
@@ -110,11 +136,16 @@ describe('a reseller’s own coins on chain', () => {
     await prisma.cryptoWithdrawal.update({ where: { id: asked.json.id }, data: { requestedBy: requester } });
     const confirmed = await browser.post(`/v1/crypto/withdrawals/${asked.json.id}/confirm`, { code }, headers);
     assert.equal(confirmed.status, 200, JSON.stringify(confirmed.json));
+    check('POST /v1/crypto/withdrawals/{id}/confirm', 200, confirmed.json);
+    assert.equal(confirmed.json.code_sent_at, null);
     for (let i = 0; i < 3; i += 1) {
       await prisma.cryptoWithdrawal.updateMany({ where: { id: asked.json.id }, data: { nextCheckAt: null } });
       await cron('crypto');
     }
-    const done = (await browser.get(`/v1/crypto/withdrawals/${asked.json.id}`, headers)).json;
+    const doneRes = await browser.get(`/v1/crypto/withdrawals/${asked.json.id}`, headers);
+    check('GET /v1/crypto/withdrawals/{id}', 200, doneRes.json);
+    check('GET /v1/crypto/withdrawals', 200, (await browser.get('/v1/crypto/withdrawals', headers)).json);
+    const done = doneRes.json;
     assert.equal(done.status, 'completed', JSON.stringify(done));
     assert.deepEqual(await held('USDT').then(item => [item.available, item.withdrawing]), ['78.500000', '0.000000']);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'crypto.withdrawal_sent', resellerId } }));
@@ -126,13 +157,21 @@ describe('a reseller’s own coins on chain', () => {
 
     // A cancelled withdrawal returns the coins to the coin wallet.
     const second = await browser.post('/v1/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '10' }, headers);
-    assert.equal((await browser.post(`/v1/crypto/withdrawals/${second.json.id}/cancel`, {}, headers)).json.status, 'cancelled');
+    const cancelled = await browser.post(`/v1/crypto/withdrawals/${second.json.id}/cancel`, {}, headers);
+    check('POST /v1/crypto/withdrawals/{id}/cancel', 200, cancelled.json);
+    assert.equal(cancelled.json.status, 'cancelled');
     assert.equal(await held('USDT').then(item => item.available), '78.500000');
 
-    // Off Premium, nothing more moves on chain.
+    // Off Premium, no new deposits; the coins already held can still be withdrawn (never trapped).
     await prisma.reseller.update({ where: { id: resellerId }, data: { planCode: 'standard' } });
-    const downgraded = await browser.get('/v1/crypto/withdrawal-networks?asset=USDT', headers);
-    assert.deepEqual([downgraded.status, downgraded.json.error.code], [403, 'premium_required']);
+    const noDeposits = await browser.post('/v1/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' }, headers);
+    assert.deepEqual([noDeposits.status, noDeposits.json.error.code], [403, 'premium_required']);
+    assert.equal((await browser.get('/v1/crypto/withdrawal-networks?asset=USDT', headers)).status, 200);
+    const afterPremium = await browser.post('/v1/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '10' }, headers);
+    assert.equal(afterPremium.status, 201, JSON.stringify(afterPremium.json));
+    await browser.post(`/v1/crypto/withdrawals/${afterPremium.json.id}/cancel`, {}, headers);
+    const removed = await browser.delete(`/v1/crypto/withdrawal-addresses/${added.json.id}`, headers);
+    check('DELETE /v1/crypto/withdrawal-addresses/{id}', 200, removed.json);
     await ledgerOk();
   });
 

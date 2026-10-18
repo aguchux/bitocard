@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { ApiExcludeController } from '@nestjs/swagger';
+import { ApiExcludeController, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
@@ -159,11 +159,13 @@ class TradeDto {
 }
 
 export class DepositNetworksDto {
+  @ApiProperty({ description: 'Coin code.', example: 'USDT' })
   @Transform(upper) @assetCode()
   asset: string;
 }
 
 export class DepositAddressDto extends DepositNetworksDto {
+  @ApiProperty({ description: 'The network to deposit on, from the deposit networks.', example: 'ETHEREUM', enum: [...chains] })
   @Transform(upper) @IsIn([...chains])
   chain: string;
 }
@@ -215,35 +217,44 @@ export class CustomerCryptoController {
 }
 
 export class WithdrawalAddressDto {
+  @ApiProperty({ description: 'The network the address is on (`withdrawal_chains`).', example: 'ETHEREUM', enum: [...chains] })
   @Transform(upper) @IsIn([...chains])
   chain: string;
 
+  @ApiProperty({ description: 'The address, checked with the network’s checksum.', example: '0x52908400098527886E0F7030069857D2E4169EE7' })
   @IsString() @Length(20, 100)
   address: string;
 
+  @ApiProperty({ description: 'Your name for it.', example: 'Treasury' })
   @IsString() @Length(1, 40)
   label: string;
 }
 
 export class WithdrawalDto {
+  @ApiProperty({ description: 'Coin code.', example: 'USDT' })
   @Transform(upper) @assetCode()
   asset: string;
 
+  @ApiProperty({ description: 'The network to send on.', example: 'ETHEREUM', enum: [...chains] })
   @Transform(upper) @IsIn([...chains])
   chain: string;
 
+  @ApiProperty({ description: 'A saved withdrawal address on that network, usable 24 hours after it was added.', format: 'uuid' })
   @IsUUID()
   address_id: string;
 
+  @ApiProperty({ description: 'What arrives, as a decimal string; the network fee is taken on top.', example: '20' })
   @cryptoAmount()
   amount: string;
 
   /** Only show what it would send and cost. */
+  @ApiPropertyOptional({ description: 'Only show what it would send and cost; nothing moves.' })
   @IsOptional() @IsBoolean()
   preview?: boolean;
 }
 
 export class CodeDto {
+  @ApiProperty({ description: 'The 6-digit code emailed to the person who asked.', example: '482137' })
   @Matches(/^\d{6}$/, { message: 'code must be the 6 digits we emailed you' })
   code: string;
 }

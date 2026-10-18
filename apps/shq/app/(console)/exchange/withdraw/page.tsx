@@ -42,7 +42,7 @@ import {
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { coinAmount } from "../shared";
-import { choosableCoins, CoinSelect, coinRoles, PremiumNotice, shortHash, useChosenAsset, withdrawalChains, withdrawalInProgress, WithdrawalStatus } from "../coin-parts";
+import { choosableCoins, CoinSelect, coinRoles, shortHash, useChosenAsset, withdrawalInProgress, WithdrawalStatus } from "../coin-parts";
 
 /** Coins typed in: digits with up to the coin's decimal places, above zero. */
 const validAmount = (value: string, decimals: number) => new RegExp(`^\\d{1,12}(?:\\.\\d{1,${decimals}})?$`).test(value.trim()) && Number(value) > 0;
@@ -60,7 +60,8 @@ const reviewText: Record<string, string> = {
  */
 function CodeDialog({ withdrawal, onClose }: { withdrawal: CoinWithdrawal | null; onClose: () => void }) {
   const [code, setCode] = useState("");
-  const [sentAt, setSentAt] = useState<string | null>(withdrawal?.created_at ?? null);
+  // The countdown starts when the latest code was emailed (the API's `code_sent_at`), not when the withdrawal was asked for.
+  const [sentAt, setSentAt] = useState<string | null>(withdrawal?.code_sent_at ?? withdrawal?.created_at ?? null);
   const [now, setNow] = useState(() => Date.now());
   const [confirm, confirmState] = useConfirmCoinWithdrawalMutation();
   const [resend, resendState] = useResendCoinWithdrawalCodeMutation();
@@ -157,8 +158,8 @@ function CodeDialog({ withdrawal, onClose }: { withdrawal: CoinWithdrawal | null
             onClick={() =>
               void resend(withdrawal.id)
                 .unwrap()
-                .then(() => {
-                  setSentAt(new Date().toISOString());
+                .then(updated => {
+                  setSentAt(updated.code_sent_at ?? new Date().toISOString());
                   setCode("");
                 })
                 .catch(() => undefined)
@@ -183,7 +184,7 @@ function CodeDialog({ withdrawal, onClose }: { withdrawal: CoinWithdrawal | null
 }
 
 /** Saving an address: owners only (the API's `@Roles()`), usable 24 hours after it is added. Keyed by the chosen network, its default. */
-function AddAddress({ chain }: { chain: string }) {
+function AddAddress({ chain, chains }: { chain: string; chains: ResellerCoins["withdrawal_chains"] }) {
   const id = useId();
   const [network, setNetwork] = useState(chain);
   const [address, setAddress] = useState("");
@@ -212,7 +213,7 @@ function AddAddress({ chain }: { chain: string }) {
       <h3 className="text-sm font-bold text-ink sm:col-span-3">Add an address</h3>
       <Field label="Network" htmlFor={`${id}-chain`}>
         <Select id={`${id}-chain`} value={network} onChange={event => setNetwork(event.target.value)}>
-          {withdrawalChains.map(item => (
+          {chains.map(item => (
             <option key={item.chain} value={item.chain}>
               {item.name}
             </option>
@@ -244,7 +245,7 @@ function AddAddress({ chain }: { chain: string }) {
   );
 }
 
-function Addresses({ addresses, chain }: { addresses: CoinWithdrawalAddress[]; chain: string }) {
+function Addresses({ addresses, chain, chains }: { addresses: CoinWithdrawalAddress[]; chain: string; chains: ResellerCoins["withdrawal_chains"] }) {
   const { membership } = useReseller();
   const owner = can(membership);
   const remover = can(membership, ...coinRoles);
@@ -297,7 +298,7 @@ function Addresses({ addresses, chain }: { addresses: CoinWithdrawalAddress[]; c
         />
         {owner ? (
           <div className="px-5 pb-5 sm:px-6">
-            <AddAddress key={chain} chain={chain} />
+            <AddAddress key={chain} chain={chain} chains={chains} />
           </div>
         ) : null}
       </div>
@@ -618,15 +619,11 @@ function Withdraw({ coins }: { coins: ResellerCoins }) {
   const offered = choosableCoins(coins, "withdraw");
   const asset = useChosenAsset(offered);
   const coin = offered.find(item => item.asset === asset);
-  const networks = useCoinWithdrawalNetworksQuery(asset ?? "", {
-    skip: !coins.onchain || !asset,
-  });
-  const addresses = useCoinWithdrawalAddressesQuery(undefined, {
-    skip: !coins.onchain,
-  });
+  // Withdrawing what is held is open on every plan (only deposits are Premium), so coins are never trapped.
+  const networks = useCoinWithdrawalNetworksQuery(asset ?? "", { skip: !asset });
+  const addresses = useCoinWithdrawalAddressesQuery();
   const [asking, setAsking] = useState<CoinWithdrawal | null>(null);
-  const firstChain = networks.data?.data[0]?.chain ?? withdrawalChains[0]!.chain;
-  if (!coins.onchain) return <PremiumNotice />;
+  const firstChain = networks.data?.data[0]?.chain ?? coins.withdrawal_chains[0]?.chain ?? "";
   if (!asset || !coin) return <Notice tone="amber">No coins can be withdrawn now.</Notice>;
   return (
     <div className="space-y-4">
@@ -648,7 +645,7 @@ function Withdraw({ coins }: { coins: ResellerCoins }) {
           )}
         </div>
       </Card>
-      {addresses.data ? <Addresses addresses={addresses.data.data} chain={firstChain} /> : null}
+      {addresses.data ? <Addresses addresses={addresses.data.data} chain={firstChain} chains={coins.withdrawal_chains} /> : null}
       <Withdrawals onEnterCode={setAsking} />
       <CodeDialog key={asking?.id ?? "closed"} withdrawal={asking} onClose={() => setAsking(null)} />
     </div>

@@ -25,6 +25,7 @@ beforeEach(() => {
         object: 'reseller_coins',
         mode: 'test',
         onchain: true,
+        withdrawal_chains: [{ chain: 'ETHEREUM', name: 'Ethereum' }],
         assets: [],
       });
     if (input.method !== 'GET')

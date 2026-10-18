@@ -917,6 +917,8 @@ export class CryptoWithdrawalsService {
       status: row.status,
       /** Why it waits for BitoCard's approval (amount, unscreened, recent_card_top_up), while it does. */
       review_reason: row.status === 'review' ? row.reviewReason : null,
+      /** When the latest code was emailed, while it waits for one (another can be asked for a minute later). */
+      code_sent_at: row.status === 'awaiting_code' ? (row.codeSentAt?.toISOString() ?? null) : null,
       tx_hash: row.txHash,
       confirmations: row.confirmations,
       created_at: row.createdAt.toISOString(),

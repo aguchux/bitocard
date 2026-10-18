@@ -7,11 +7,15 @@ import type { List, Mode } from './common';
  * Typed by hand against `ResellerCoinsService` and the deposit and withdrawal presenters. Amounts are decimal strings.
  */
 
-/** `GET /v1/crypto`: the coin wallet per coin. `onchain` is the Premium feature that opens deposits and withdrawals. */
+/**
+ * `GET /v1/crypto`: the coin wallet per coin. `onchain` is the Premium feature that opens deposits; withdrawing what is
+ * held is open on every plan. `withdrawal_chains` are the networks an address can be saved on.
+ */
 export type ResellerCoins = {
   object: 'reseller_coins';
   mode: Mode;
   onchain: boolean;
+  withdrawal_chains: Array<{ chain: string; name: string }>;
   assets: Array<{
     asset: string;
     name: string;
@@ -119,6 +123,8 @@ export type CoinWithdrawal = {
   total: string;
   status: CoinWithdrawalStatus;
   review_reason: 'amount' | 'unscreened' | 'recent_card_top_up' | null;
+  /** While it waits for its code: when the latest one was emailed (the resend countdown starts there). */
+  code_sent_at: string | null;
   tx_hash: string | null;
   confirmations: number;
   created_at: string;

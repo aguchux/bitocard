@@ -12,11 +12,11 @@ export const coinRoles = ["admin", "finance"] as const;
 /** The plan page, where Premium is chosen. */
 export const planHref = "/settings/plan";
 
-/** Shown instead of the deposit and withdraw screens while the plan does not include moving coins on chain. */
+/** Shown instead of the deposit screen while the plan does not include depositing coins on chain. */
 export function PremiumNotice() {
   return (
-    <Notice tone="blue" title="Part of the Premium plan">
-      Depositing and withdrawing coins on chain is part of the Premium plan. Until then, your coins stay in your BitoCard coin wallet for trading.{" "}
+    <Notice tone="blue" title="Deposits are part of the Premium plan">
+      Depositing coins on chain is part of the Premium plan. Withdrawing the coins you hold is open on every plan.{" "}
       <Link href={planHref} className="font-semibold text-brand-600 underline-offset-2 hover:underline">
         See plans
       </Link>
@@ -86,16 +86,3 @@ export const withdrawalInProgress = (status: CoinWithdrawalStatus) => ["awaiting
 /** A long hash or address shortened for tables ("0x12ab…9f0c"); the full value stays in the title. */
 export const shortHash = (value: string) => (value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value);
 
-/** The networks coins can be withdrawn to (the API's `withdrawalChains`), for saving an address. */
-export const withdrawalChains: Array<{ chain: string; name: string }> = [
-  { chain: "ETHEREUM", name: "Ethereum" },
-  { chain: "BSC", name: "BNB Chain" },
-  { chain: "POLYGON", name: "Polygon" },
-  { chain: "ARBITRUM", name: "Arbitrum One" },
-  { chain: "BASE", name: "Base" },
-  { chain: "OPTIMISM", name: "OP Mainnet" },
-  { chain: "TRON", name: "TRON" },
-  { chain: "BITCOIN", name: "Bitcoin" },
-  { chain: "LITECOIN", name: "Litecoin" },
-  { chain: "DOGECOIN", name: "Dogecoin" },
-];
