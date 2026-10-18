@@ -702,6 +702,18 @@ model Store {
   primaryColor          String         @default("#070f4c") @map("primary_color")
   accentColor           String         @default("#ff2382") @map("accent_color")
   publishedAt           DateTime?      @map("published_at")
+  /// The store's template (`src/stores/templates.ts`): what it sells and the sections its editor offers.
+  template              String         @default("all_in_one")
+  /// The template's design variant and its colour theme.
+  variant               String         @default("classic")
+  theme                 String         @default("navy_pink")
+  /// Single product stores: the product key they sell.
+  focus                 String?
+  /// The home page being edited in SHQ, and the one shoppers see (null: the variant's starting page).
+  homeDraft             Json?          @map("home_draft")
+  homePublished         Json?          @map("home_published")
+  homeVersion           Int            @default(0) @map("home_version")
+  homePublishedAt       DateTime?      @map("home_published_at")
   /// The store's address on bitocard.com (its Cloudflare record and the storefront's Vercel domain): `pending` until set
   /// up (the `domains` job retries), `ready`, or `failed` (`hostError` says why).
   hostStatus            String         @default("pending") @map("host_status")
@@ -720,6 +732,7 @@ model Store {
   checkouts             Checkout[]
   domains               StoreDomain[]
   visitDays             StoreVisitDay[]
+  homeVersions          StoreHomeVersion[]
 
   @@index([resellerId])
   @@index([hostStatus])
@@ -3473,4 +3486,20 @@ model StoreVisitSalt {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("store_visit_salts")
+}
+
+/// Each published version of a reseller store's home page, so an earlier one can be restored into the draft.
+model StoreHomeVersion {
+  id            String   @id @default(uuid()) @db.Uuid
+  storeId       String   @map("store_id") @db.Uuid
+  version       Int
+  template      String
+  variant       String
+  sections      Json
+  publishedById String?  @map("published_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, version])
+  @@map("store_home_versions")
 }

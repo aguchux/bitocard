@@ -9,7 +9,9 @@ import { type Brand, type LedgerMode, Prisma, type Product, type ProductCategory
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
 import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
-import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema, storeHome } from './layout.js';
+import { storeLayout, verifyStorePreview } from '../stores/store-home.service.js';
+import { templateFor } from '../stores/templates.js';
+import { categoryLabels, categorySynonyms, defaultHome, navigationGroups, type Section, sections as sectionsSchema } from './layout.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;
@@ -60,7 +62,21 @@ type Prices = { currency: string; perUsd: Map<string, Decimal> };
  * What a request sees: the shopper's market, on a reseller's hosted store that reseller (their listings and offers),
  * and the signed-in customer's currency for prices (`prices`).
  */
-type Scope = { market: string | null; store?: { resellerId: string; country: string; mode: LedgerMode }; prices?: Prices };
+type StoreScope = {
+  id: string;
+  resellerId: string;
+  country: string;
+  mode: LedgerMode;
+  /** The store's template decides what it sells: its categories (null: all), or its one `focus` product. */
+  template: string;
+  variant: string;
+  focus: string | null;
+  homeDraft: Prisma.JsonValue;
+  homePublished: Prisma.JsonValue;
+  homeVersion: number;
+  homePublishedAt: Date | null;
+};
+type Scope = { market: string | null; store?: StoreScope; prices?: Prices };
 
 /**
  * BitoCard's own storefront (bitocard.com), read by anyone: the published home page with its sections filled in, the
@@ -134,7 +150,19 @@ export class StorefrontService {
     if (!store || store.status !== 'published' || store.reseller.status === 'suspended' || store.reseller.house || !store.reseller.country) {
       throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
     }
-    const scope = { resellerId: store.resellerId, country: store.reseller.country, mode: store.checkoutMode };
+    const scope: StoreScope = {
+      id: store.id,
+      resellerId: store.resellerId,
+      country: store.reseller.country,
+      mode: store.checkoutMode,
+      template: store.template,
+      variant: store.variant,
+      focus: store.focus,
+      homeDraft: store.homeDraft,
+      homePublished: store.homePublished,
+      homeVersion: store.homeVersion,
+      homePublishedAt: store.homePublishedAt,
+    };
     const prices = await this.prices(currency);
     return this.scope.run({ market: scope.country, store: scope, prices }, work);
   }
@@ -156,10 +184,13 @@ export class StorefrontService {
       this.prisma.countryCategory.findMany({ where: { enabled: true }, select: { countryCode: true, category: true } }),
       this.prisma.brand.findMany({ where: { visible: false }, select: { slug: true } }),
     ]);
-    const categories = new Set(enabled.map(row => row.category));
-    const worldwide = [...categories].filter(category => worldwideCategories.has(category));
     const market = this.scope.getStore()?.market ?? null;
     const store = this.scope.getStore()?.store;
+    // A reseller's store sells only what its template allows: its categories, or its one product.
+    const template = store ? templateFor(store.template) : null;
+    const allowed = template?.categories ? new Set(template.categories) : null;
+    const categories = new Set(enabled.map(row => row.category).filter(category => !allowed || allowed.has(category)));
+    const worldwide = [...categories].filter(category => worldwideCategories.has(category));
     const fromBitocard: Prisma.ProductWhereInput = { supplierProducts: { some: { available: true, supplier: { enabled: true } } } };
     return {
       categories,
@@ -173,7 +204,8 @@ export class StorefrontService {
         // bitocard.com: only products an admin listed (Catalog > Products > List); a reseller's store: what they listed.
         ...(store ? { listings: { some: { resellerId: store.resellerId } } } : { listed: true }),
         brand: { notIn: hidden.map(row => row.slug) },
-        OR: [...enabled.map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])],
+        ...(template?.single ? { key: store?.focus ?? '' } : {}),
+        OR: [...enabled.filter(row => categories.has(row.category)).map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])],
       },
     };
   }
@@ -578,8 +610,16 @@ export class StorefrontService {
    */
   async navigation() {
     const categories = await this.everyCategory();
+    // A reseller's store shows only the groups its template sells (a single product store: the product's group).
+    const store = this.scope.getStore()?.store;
+    const template = store ? templateFor(store.template) : null;
+    const groups = template?.single
+      ? navigationGroups.filter(group => categories.some(item => item.on_sale && group.categories.includes(item.category)))
+      : template?.categories
+        ? navigationGroups.filter(group => group.categories.some(category => template.categories!.includes(category)))
+        : navigationGroups;
     return Promise.all(
-      navigationGroups.map(async group => {
+      groups.map(async group => {
         const own = categories.filter(item => group.categories.includes(item.category));
         return {
           key: group.key,
@@ -623,7 +663,27 @@ export class StorefrontService {
             return { ...item, data: { categories: chosen } };
           }
           case 'brand_grid':
-            return { ...item, data: { brands: await this.brands({ tag: item.tag || undefined, limit: item.limit }) } };
+            return { ...item, data: { brands: await this.brands({ tag: item.tag || undefined, limit: item.limit, category: item.categories.length ? item.categories : undefined }) } };
+          case 'quick_buy': {
+            // The networks and billers the form offers, per tab (only categories on sale here).
+            const onSale = await this.categories();
+            const tabs = item.categories.filter(category => onSale.some(row => row.category === category));
+            return { ...item, data: { categories: await Promise.all(tabs.map(async category => ({ category, label: categoryLabels[category], brands: await this.brands({ category: [category], limit: 24 }) }))) } };
+          }
+          case 'crypto_quote': {
+            const assets = await this.prisma.cryptoAsset.findMany({ where: { enabled: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }], select: { code: true, name: true } });
+            const chosen = item.assets.length ? item.assets.map(code => assets.find(asset => asset.code === code.toUpperCase())).filter((asset): asset is { code: string; name: string } => Boolean(asset)) : assets;
+            return { ...item, data: { assets: chosen } };
+          }
+          case 'p2p_market': {
+            const asset = await this.prisma.cryptoAsset.findFirst({ where: { code: item.asset.toUpperCase(), enabled: true }, select: { code: true, name: true } });
+            return { ...item, data: { asset } };
+          }
+          case 'product_spotlight': {
+            const key = item.productKey || this.scope.getStore()?.store?.focus || '';
+            const product = key ? await this.product(key).catch(() => null) : null;
+            return { ...item, data: { product } };
+          }
           default:
             return { ...item, data: null };
         }
@@ -637,10 +697,23 @@ export class StorefrontService {
    * taken offline), the approved default layout (`defaultHome()`), so bitocard.com is always the store.
    */
   async home(previewToken?: string) {
-    if (this.onResellerStore) {
-      // A reseller's store: their listed products under their brand (the Storefront Manager is bitocard.com's).
-      const [sections, navigation, countries] = await Promise.all([this.resolve(storeHome()), this.navigation(), this.countries()]);
-      return { object: 'store_home' as const, preview: false, published: false, version: null, published_at: null, sections, navigation, countries };
+    const store = this.scope.getStore()?.store;
+    if (store) {
+      // A reseller's store: the home page they published in SHQ (the draft through a preview link), else their design's starting page.
+      const preview = previewToken ? verifyStorePreview(this.previewKey(), store.id, previewToken) : false;
+      if (previewToken && !preview) throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'preview_expired', 'This preview link has expired. Open a new one from SHQ.');
+      const published = !preview && Boolean(store.homePublished);
+      const [sections, navigation, countries] = await Promise.all([this.resolve(storeLayout(store, preview)), this.navigation(), this.countries()]);
+      return {
+        object: 'store_home' as const,
+        preview,
+        published,
+        version: published ? store.homeVersion : null,
+        published_at: published ? (store.homePublishedAt?.toISOString() ?? null) : null,
+        sections,
+        navigation,
+        countries,
+      };
     }
     const page = await this.prisma.storefrontPage.findUnique({ where: { key: homeKey } });
     const preview = previewToken ? this.verifyPreview(previewToken) : false;

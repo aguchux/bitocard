@@ -8,10 +8,12 @@ import { bankAccountCoolingOffMs } from '../payouts/payouts.service.js';
 import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.js';
 import { reservedSubdomains } from './reserved.js';
 import { StoreHostsService } from './store-hosts.service.js';
+import { designFor, storeTemplates, templateFor, type StoreTemplate } from './templates.js';
 
 export { reservedSubdomains };
 
-export const maxStoresPerReseller = 1;
+/** Stores a reseller can run, each with its own template, address, branding and domains. */
+export const maxStoresPerReseller = 5;
 
 const subdomainFormat = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
 
@@ -26,7 +28,20 @@ export function subdomainProblem(subdomain: string) {
   return null;
 }
 
+/** The store's look: its template, variant and theme, with the variant's style and the theme's colours (the store's own primary and accent win). */
+export function storeDesign(store: Pick<Store, 'template' | 'variant' | 'theme' | 'primaryColor' | 'accentColor'>) {
+  const { template, variant, theme } = designFor(store.template, store.variant, store.theme);
+  return {
+    template: template.key,
+    variant: variant.key,
+    theme: theme.key,
+    style: variant.style,
+    colors: { ...theme.colors, primary: store.primaryColor, accent: store.accentColor },
+  };
+}
+
 export function presentStore(store: Store) {
+  const { template, variant, theme } = designFor(store.template, store.variant, store.theme);
   return {
     object: 'store' as const,
     id: store.id,
@@ -35,6 +50,13 @@ export function presentStore(store: Store) {
     url: `https://${store.subdomain}.bitocard.com`,
     status: store.status,
     branding: { logo_url: store.logoUrl, primary_color: store.primaryColor, accent_color: store.accentColor },
+    /** The store's template (what it sells), design variant and colour theme. */
+    template: template.key,
+    variant: variant.key,
+    theme: theme.key,
+    /** Single product stores: the product key it sells; otherwise null. */
+    focus: template.single ? store.focus : null,
+    home: { version: store.homeVersion || null, published_at: store.homePublishedAt?.toISOString() ?? null },
     checkout_mode: store.checkoutMode,
     /** The account app's menu on desktop: `rail`, `bottom`, or null to follow BitoCard's default. */
     desktop_nav: store.desktopNav,
@@ -45,7 +67,22 @@ export function presentStore(store: Store) {
   };
 }
 
-export type StoreInput = { name?: string; subdomain?: string; logo_url?: string | null; primary_color?: string; accent_color?: string; checkout_mode?: LedgerMode; desktop_nav?: 'rail' | 'bottom' | null; customer_verification?: boolean };
+export type StoreInput = {
+  name?: string;
+  subdomain?: string;
+  logo_url?: string | null;
+  primary_color?: string;
+  accent_color?: string;
+  checkout_mode?: LedgerMode;
+  desktop_nav?: 'rail' | 'bottom' | null;
+  customer_verification?: boolean;
+  template?: string;
+  variant?: string;
+  theme?: string;
+  focus?: string | null;
+};
+
+const invalid = (code: string, message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 
 export type DesktopNav = 'rail' | 'bottom';
 
@@ -103,8 +140,9 @@ export class StoresService {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'Set your business country before creating a store.');
     }
     if (reseller.stores.length >= maxStoresPerReseller) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'store_limit_reached', 'You already have a store.');
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'store_limit_reached', `You can run up to ${maxStoresPerReseller} stores.`);
     }
+    const design = await this.chooseDesign(resellerId, { template: input.template ?? 'all_in_one', variant: input.variant, theme: input.theme, focus: input.focus ?? null });
     const subdomain = await this.assertSubdomain(input.subdomain);
     try {
       const store = await this.prisma.store.create({
@@ -113,8 +151,13 @@ export class StoresService {
           name: input.name,
           subdomain,
           logoUrl: input.logo_url ?? null,
-          primaryColor: input.primary_color?.toLowerCase(),
-          accentColor: input.accent_color?.toLowerCase(),
+          template: design.template.key,
+          variant: design.variant.key,
+          theme: design.theme.key,
+          focus: design.focus,
+          // The theme's colours, unless the reseller chose their own.
+          primaryColor: input.primary_color?.toLowerCase() ?? design.theme.colors.primary,
+          accentColor: input.accent_color?.toLowerCase() ?? design.theme.colors.accent,
         },
       });
       // Its address on bitocard.com is set up at once (DNS and HTTPS take a few minutes), so it is ready by publishing.
@@ -149,6 +192,19 @@ export class StoresService {
         throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'reseller_not_verified', 'Your store can take real payments once your business is verified. Use test checkout until then.', 'checkout_mode');
       }
     }
+    // A new template starts from its variant's home page (SHQ asks first); a new variant or theme keeps the page.
+    const templateChanged = input.template !== undefined && input.template !== store.template;
+    const variantChanged = input.variant !== undefined && input.variant !== store.variant;
+    const designChanged = templateChanged || variantChanged || (input.theme !== undefined && input.theme !== store.theme) || input.focus !== undefined;
+    const design = designChanged
+      ? await this.chooseDesign(resellerId, {
+          template: input.template ?? store.template,
+          variant: input.variant ?? (templateChanged ? undefined : store.variant),
+          theme: input.theme ?? (templateChanged || variantChanged ? undefined : store.theme),
+          focus: input.focus !== undefined ? input.focus : store.focus,
+        })
+      : null;
+    const themeChanged = Boolean(design && design.theme.key !== store.theme);
     let subdomain: string | undefined;
     if (input.subdomain && input.subdomain.toLowerCase() !== store.subdomain) {
       if (store.status !== 'draft') {
@@ -163,8 +219,11 @@ export class StoresService {
           name: input.name,
           subdomain,
           logoUrl: input.logo_url,
-          primaryColor: input.primary_color?.toLowerCase(),
-          accentColor: input.accent_color?.toLowerCase(),
+          // A new theme brings its colours, unless the reseller sends their own.
+          primaryColor: input.primary_color?.toLowerCase() ?? (themeChanged ? design!.theme.colors.primary : undefined),
+          accentColor: input.accent_color?.toLowerCase() ?? (themeChanged ? design!.theme.colors.accent : undefined),
+          ...(design ? { template: design.template.key, variant: design.variant.key, theme: design.theme.key, focus: design.focus } : {}),
+          ...(templateChanged ? { homeDraft: Prisma.DbNull, homePublished: Prisma.DbNull } : {}),
           checkoutMode: input.checkout_mode,
           desktopNav: input.desktop_nav,
           customerVerification: input.customer_verification,
@@ -212,6 +271,8 @@ export class StoresService {
       name: store.name,
       subdomain: store.subdomain,
       branding: { logo_url: store.logoUrl, primary_color: store.primaryColor, accent_color: store.accentColor },
+      design: storeDesign(store),
+      focus: templateFor(store.template)?.single ? store.focus : null,
       country: store.reseller.country,
       currency: store.reseller.countryRef?.currency ?? null,
       checkout_mode: store.checkoutMode,
@@ -227,6 +288,61 @@ export class StoresService {
     const after = await this.prisma.store.update({ where: { id }, data: { status } });
     await this.audit.record({ actorId, action: `store.${status}`, targetType: 'store', targetId: id, before, after });
     return presentStore(after);
+  }
+
+  /** Whether a template is open to the reseller, and why not. The crypto desk needs their exchange or P2P switched on. */
+  async templateAvailability(resellerId: string, template: StoreTemplate) {
+    if (!template.crypto) return { available: true, reason: null };
+    const on = (await this.settings.isOn('crypto_exchange', resellerId)) || (await this.settings.isOn('p2p_trading', resellerId));
+    return on ? { available: true, reason: null } : { available: false, reason: 'Crypto trading is not switched on for your stores yet.' };
+  }
+
+  /** Every template, its variants and themes, and whether each is open to the reseller. */
+  async templates(resellerId: string) {
+    return {
+      object: 'list' as const,
+      data: await Promise.all(
+        storeTemplates.map(async template => ({
+          object: 'store_template' as const,
+          key: template.key,
+          name: template.name,
+          tagline: template.tagline,
+          description: template.description,
+          categories: template.categories,
+          single_product: template.single,
+          crypto: template.crypto,
+          sections: template.sections,
+          ...(await this.templateAvailability(resellerId, template)),
+          variants: template.variants.map(variant => ({
+            key: variant.key,
+            name: variant.name,
+            description: variant.description,
+            style: variant.style,
+            themes: variant.themes.map(theme => ({ key: theme.key, name: theme.name, colors: theme.colors })),
+          })),
+        })),
+      ),
+    };
+  }
+
+  /** Checks a template, variant, theme and (single product stores) the product, all of which must exist and be open. */
+  private async chooseDesign(resellerId: string, input: { template: string; variant?: string; theme?: string; focus: string | null }) {
+    const template = templateFor(input.template);
+    if (!template) throw invalid('template_unknown', 'Choose one of the store templates.', 'template');
+    const { available, reason } = await this.templateAvailability(resellerId, template);
+    if (!available) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'template_unavailable', reason ?? 'This template is not available.', 'template');
+    if (input.variant !== undefined && !template.variants.some(item => item.key === input.variant)) throw invalid('variant_unknown', `Choose one of the ${template.name} designs.`, 'variant');
+    const { variant, theme } = designFor(template.key, input.variant);
+    const chosenTheme = input.theme !== undefined ? variant.themes.find(item => item.key === input.theme) : theme;
+    if (!chosenTheme) throw invalid('theme_unknown', `Choose one of the ${variant.name} colour themes.`, 'theme');
+    let focus: string | null = null;
+    if (template.single) {
+      if (!input.focus) throw invalid('focus_required', 'Choose the product this store sells.', 'focus');
+      const listed = await this.prisma.resellerListing.findFirst({ where: { resellerId, product: { key: input.focus, active: true } } });
+      if (!listed) throw invalid('focus_not_listed', 'List this product in your catalogue first, then choose it for the store.', 'focus');
+      focus = input.focus;
+    }
+    return { template, variant, theme: chosenTheme, focus };
   }
 
   private async assertSubdomain(raw: string) {

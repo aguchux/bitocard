@@ -5250,6 +5250,1277 @@
         ]
       }
     },
+    "/v1/stores/{id}/home": {
+      "get": {
+        "description": "The draft (else what is published, else the design’s starting page), what is published, and the sections the store’s template offers.",
+        "operationId": "StoresController_getHome",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The store’s home page in the editor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreHomeEditor"
+                },
+                "example": {
+                  "object": "store_home_editor",
+                  "store_id": "4d5e6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f7a",
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "sections_allowed": [
+                    "hero",
+                    "product_rail",
+                    "category_grid",
+                    "brand_grid",
+                    "promo",
+                    "trust_bar",
+                    "quick_buy",
+                    "features",
+                    "faq"
+                  ],
+                  "draft": [
+                    {
+                      "id": "a1b2c3d4",
+                      "type": "hero",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Digital products,",
+                      "accent": "delivered fast.",
+                      "subtitle": "Gift cards, top-ups, bills and more.",
+                      "search": true,
+                      "categoryChips": true
+                    },
+                    {
+                      "id": "b2c3d4e5",
+                      "type": "quick_buy",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Top up now",
+                      "subtitle": "",
+                      "categories": [
+                        "airtime",
+                        "data"
+                      ]
+                    }
+                  ],
+                  "published": true,
+                  "version": 3,
+                  "published_at": "2026-10-17T10:00:00.000Z",
+                  "updated_at": "2026-10-18T11:58:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a store’s home page editor",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
+    "/v1/stores/{id}/home/draft": {
+      "put": {
+        "description": "Validated against the store’s template; shoppers see nothing until it is published.",
+        "operationId": "StoresController_saveHome",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreHomeDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The saved draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreHomeEditor"
+                },
+                "example": {
+                  "object": "store_home_editor",
+                  "store_id": "4d5e6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f7a",
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "sections_allowed": [
+                    "hero",
+                    "product_rail",
+                    "category_grid",
+                    "brand_grid",
+                    "promo",
+                    "trust_bar",
+                    "quick_buy",
+                    "features",
+                    "faq"
+                  ],
+                  "draft": [
+                    {
+                      "id": "a1b2c3d4",
+                      "type": "hero",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Digital products,",
+                      "accent": "delivered fast.",
+                      "subtitle": "Gift cards, top-ups, bills and more.",
+                      "search": true,
+                      "categoryChips": true
+                    },
+                    {
+                      "id": "b2c3d4e5",
+                      "type": "quick_buy",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Top up now",
+                      "subtitle": "",
+                      "categories": [
+                        "airtime",
+                        "data"
+                      ]
+                    }
+                  ],
+                  "published": true,
+                  "version": 3,
+                  "published_at": "2026-10-17T10:00:00.000Z",
+                  "updated_at": "2026-10-18T11:58:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Save a store’s home page draft",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
+    "/v1/stores/{id}/home/publish": {
+      "post": {
+        "description": "The draft becomes the next version; the store shows it within a minute.",
+        "operationId": "StoresController_publishHome",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page, now published as the next version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreHomeEditor"
+                },
+                "example": {
+                  "object": "store_home_editor",
+                  "store_id": "4d5e6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f7a",
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "sections_allowed": [
+                    "hero",
+                    "product_rail",
+                    "category_grid",
+                    "brand_grid",
+                    "promo",
+                    "trust_bar",
+                    "quick_buy",
+                    "features",
+                    "faq"
+                  ],
+                  "draft": [
+                    {
+                      "id": "a1b2c3d4",
+                      "type": "hero",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Digital products,",
+                      "accent": "delivered fast.",
+                      "subtitle": "Gift cards, top-ups, bills and more.",
+                      "search": true,
+                      "categoryChips": true
+                    },
+                    {
+                      "id": "b2c3d4e5",
+                      "type": "quick_buy",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Top up now",
+                      "subtitle": "",
+                      "categories": [
+                        "airtime",
+                        "data"
+                      ]
+                    }
+                  ],
+                  "published": true,
+                  "version": 4,
+                  "published_at": "2026-10-18T12:00:00.000Z",
+                  "updated_at": "2026-10-18T11:58:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Publish a store’s home page",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
+    "/v1/stores/{id}/home/reset": {
+      "post": {
+        "description": "The draft becomes the design’s starting page; what is published stays until the next publish.",
+        "operationId": "StoresController_resetHome",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft, back to the design’s starting page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreHomeEditor"
+                },
+                "example": {
+                  "object": "store_home_editor",
+                  "store_id": "4d5e6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f7a",
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "sections_allowed": [
+                    "hero",
+                    "product_rail",
+                    "category_grid",
+                    "brand_grid",
+                    "promo",
+                    "trust_bar",
+                    "quick_buy",
+                    "features",
+                    "faq"
+                  ],
+                  "draft": [
+                    {
+                      "id": "a1b2c3d4",
+                      "type": "hero",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Digital products,",
+                      "accent": "delivered fast.",
+                      "subtitle": "Gift cards, top-ups, bills and more.",
+                      "search": true,
+                      "categoryChips": true
+                    },
+                    {
+                      "id": "b2c3d4e5",
+                      "type": "quick_buy",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Top up now",
+                      "subtitle": "",
+                      "categories": [
+                        "airtime",
+                        "data"
+                      ]
+                    }
+                  ],
+                  "published": true,
+                  "version": 3,
+                  "published_at": "2026-10-17T10:00:00.000Z",
+                  "updated_at": "2026-10-18T11:58:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a store’s home page again",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
+    "/v1/stores/{id}/home/versions": {
+      "get": {
+        "operationId": "StoresController_homeVersions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published versions, newest first (the latest 50).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreHomeVersion"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "store_home_version",
+                      "version": 3,
+                      "template": "all_in_one",
+                      "variant": "classic",
+                      "sections": 6,
+                      "restorable": true,
+                      "published_at": "2026-10-17T10:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List a store’s published home page versions",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
+    "/v1/stores/{id}/home/restore": {
+      "post": {
+        "operationId": "StoresController_restoreHome",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreHomeRestoreDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft, now that version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreHomeEditor"
+                },
+                "example": {
+                  "object": "store_home_editor",
+                  "store_id": "4d5e6f7a-8b9c-4d0e-9f1a-2b3c4d5e6f7a",
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "sections_allowed": [
+                    "hero",
+                    "product_rail",
+                    "category_grid",
+                    "brand_grid",
+                    "promo",
+                    "trust_bar",
+                    "quick_buy",
+                    "features",
+                    "faq"
+                  ],
+                  "draft": [
+                    {
+                      "id": "a1b2c3d4",
+                      "type": "hero",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Digital products,",
+                      "accent": "delivered fast.",
+                      "subtitle": "Gift cards, top-ups, bills and more.",
+                      "search": true,
+                      "categoryChips": true
+                    },
+                    {
+                      "id": "b2c3d4e5",
+                      "type": "quick_buy",
+                      "span": {
+                        "lg": 12,
+                        "md": 6,
+                        "rows": 1
+                      },
+                      "hidden": false,
+                      "title": "Top up now",
+                      "subtitle": "",
+                      "categories": [
+                        "airtime",
+                        "data"
+                      ]
+                    }
+                  ],
+                  "published": true,
+                  "version": 3,
+                  "published_at": "2026-10-17T10:00:00.000Z",
+                  "updated_at": "2026-10-18T11:58:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restore a published version into the draft",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
+    "/v1/stores/{id}/home/preview": {
+      "post": {
+        "description": "A link to the draft on the store’s own address, valid 30 minutes.",
+        "operationId": "StoresController_previewHome",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A preview link to the draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreHomePreview"
+                },
+                "example": {
+                  "object": "store_home_preview",
+                  "url": "https://adadigital.bitocard.com/preview?token=1792332000000.c2lnbmF0dXJl",
+                  "token": "1792332000000.c2lnbmF0dXJl",
+                  "expires_at": "2026-10-18T12:30:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Preview a store’s home page draft",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ]
+      }
+    },
     "/v1/stores/subdomains/{subdomain}": {
       "get": {
         "operationId": "StoresController_availability",
@@ -5425,6 +6696,14 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "theme": "navy_pink",
+                  "focus": null,
+                  "home": {
+                    "version": 2,
+                    "published_at": "2026-10-03T09:12:00.000Z"
+                  },
                   "checkout_mode": "test",
                   "desktop_nav": null,
                   "customer_verification": true,
@@ -5569,6 +6848,14 @@
                         "primary_color": "#070f4c",
                         "accent_color": "#ff2382"
                       },
+                      "template": "all_in_one",
+                      "variant": "classic",
+                      "theme": "navy_pink",
+                      "focus": null,
+                      "home": {
+                        "version": 2,
+                        "published_at": "2026-10-03T09:12:00.000Z"
+                      },
                       "checkout_mode": "live",
                       "desktop_nav": null,
                       "customer_verification": true,
@@ -5696,6 +6983,14 @@
                     "logo_url": "https://cdn.bitocard.com/bitocard/resellers/2f1e0d9c-8b7a-4c6d-9e5f-4a3b2c1d0e9f/store/logos/6b1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.png",
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
+                  },
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "theme": "navy_pink",
+                  "focus": null,
+                  "home": {
+                    "version": 2,
+                    "published_at": "2026-10-03T09:12:00.000Z"
                   },
                   "checkout_mode": "live",
                   "desktop_nav": null,
@@ -5849,6 +7144,14 @@
                     "logo_url": "https://cdn.bitocard.com/bitocard/resellers/2f1e0d9c-8b7a-4c6d-9e5f-4a3b2c1d0e9f/store/logos/6b1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.png",
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
+                  },
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "theme": "navy_pink",
+                  "focus": null,
+                  "home": {
+                    "version": 2,
+                    "published_at": "2026-10-03T09:12:00.000Z"
                   },
                   "checkout_mode": "live",
                   "desktop_nav": null,
@@ -6183,6 +7486,14 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "template": "all_in_one",
+                  "variant": "classic",
+                  "theme": "navy_pink",
+                  "focus": null,
+                  "home": {
+                    "version": 2,
+                    "published_at": "2026-10-03T09:12:00.000Z"
+                  },
                   "checkout_mode": "live",
                   "desktop_nav": null,
                   "customer_verification": true,
@@ -6332,6 +7643,31 @@
                     "primary_color": "#070f4c",
                     "accent_color": "#ff2382"
                   },
+                  "design": {
+                    "template": "all_in_one",
+                    "variant": "classic",
+                    "theme": "navy_pink",
+                    "style": {
+                      "mode": "light",
+                      "hero": "search",
+                      "corners": "round",
+                      "cards": "raised",
+                      "font": "sans",
+                      "density": "comfortable"
+                    },
+                    "colors": {
+                      "primary": "#070f4c",
+                      "accent": "#ff2382",
+                      "background": "#f6f7fb",
+                      "surface": "#ffffff",
+                      "ink": "#0b1033",
+                      "muted": "#5b6180",
+                      "heroFrom": "#070f4c",
+                      "heroTo": "#1d2a8a",
+                      "heroInk": "#ffffff"
+                    }
+                  },
+                  "focus": null,
                   "country": "NG",
                   "currency": "NGN",
                   "checkout_mode": "live",
@@ -6404,6 +7740,353 @@
           "Stores"
         ],
         "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/store-templates": {
+      "get": {
+        "description": "Every template with its design variants and their colour themes; `available` says whether you can use it now, and `reason` why not.",
+        "operationId": "StoreTemplatesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Every store template with its design variants and colour themes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreTemplate"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "store_template",
+                      "key": "all_in_one",
+                      "name": "All-in-one store",
+                      "tagline": "Everything you sell, in one store.",
+                      "description": "Gift cards, top-ups, bills, eSIMs, software and more: a full catalogue with search, categories, brands and product rails.",
+                      "categories": null,
+                      "single_product": false,
+                      "crypto": false,
+                      "sections": [
+                        "hero",
+                        "product_rail",
+                        "category_grid",
+                        "brand_grid",
+                        "promo",
+                        "trust_bar",
+                        "quick_buy",
+                        "features",
+                        "faq"
+                      ],
+                      "available": true,
+                      "reason": null,
+                      "variants": [
+                        {
+                          "key": "classic",
+                          "name": "Classic",
+                          "description": "A deep hero with search and category chips, then product rails, categories and brands.",
+                          "style": {
+                            "mode": "light",
+                            "hero": "search",
+                            "corners": "round",
+                            "cards": "raised",
+                            "font": "sans",
+                            "density": "comfortable"
+                          },
+                          "themes": [
+                            {
+                              "key": "navy_pink",
+                              "name": "Navy and pink",
+                              "colors": {
+                                "primary": "#070f4c",
+                                "accent": "#ff2382",
+                                "background": "#f6f7fb",
+                                "surface": "#ffffff",
+                                "ink": "#0b1033",
+                                "muted": "#5b6180",
+                                "heroFrom": "#070f4c",
+                                "heroTo": "#1d2a8a",
+                                "heroInk": "#ffffff"
+                              }
+                            },
+                            {
+                              "key": "emerald",
+                              "name": "Emerald",
+                              "colors": {
+                                "primary": "#065f46",
+                                "accent": "#f59e0b",
+                                "background": "#f4faf7",
+                                "surface": "#ffffff",
+                                "ink": "#062a20",
+                                "muted": "#4b6b60",
+                                "heroFrom": "#064e3b",
+                                "heroTo": "#0f766e",
+                                "heroInk": "#ffffff"
+                              }
+                            },
+                            {
+                              "key": "royal",
+                              "name": "Royal purple",
+                              "colors": {
+                                "primary": "#4c1d95",
+                                "accent": "#ec4899",
+                                "background": "#f8f6fd",
+                                "surface": "#ffffff",
+                                "ink": "#1e1035",
+                                "muted": "#625a78",
+                                "heroFrom": "#3b0764",
+                                "heroTo": "#6d28d9",
+                                "heroInk": "#ffffff"
+                              }
+                            },
+                            {
+                              "key": "ocean",
+                              "name": "Ocean",
+                              "colors": {
+                                "primary": "#075985",
+                                "accent": "#22d3ee",
+                                "background": "#f3f9fc",
+                                "surface": "#ffffff",
+                                "ink": "#082032",
+                                "muted": "#4f6b7d",
+                                "heroFrom": "#0c4a6e",
+                                "heroTo": "#0369a1",
+                                "heroInk": "#ffffff"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "key": "bold",
+                          "name": "Bold",
+                          "description": "A bright gradient hero with big category tiles beside it, promos and a top-up form up front.",
+                          "style": {
+                            "mode": "light",
+                            "hero": "gradient",
+                            "corners": "round",
+                            "cards": "flat",
+                            "font": "display",
+                            "density": "comfortable"
+                          },
+                          "themes": [
+                            {
+                              "key": "sunset",
+                              "name": "Sunset",
+                              "colors": {
+                                "primary": "#ea580c",
+                                "accent": "#db2777",
+                                "background": "#fff8f3",
+                                "surface": "#ffffff",
+                                "ink": "#2a1206",
+                                "muted": "#7a5a4a",
+                                "heroFrom": "#f97316",
+                                "heroTo": "#db2777",
+                                "heroInk": "#ffffff"
+                              }
+                            },
+                            {
+                              "key": "electric",
+                              "name": "Electric",
+                              "colors": {
+                                "primary": "#4338ca",
+                                "accent": "#06b6d4",
+                                "background": "#f5f6ff",
+                                "surface": "#ffffff",
+                                "ink": "#111433",
+                                "muted": "#5a5f85",
+                                "heroFrom": "#4338ca",
+                                "heroTo": "#06b6d4",
+                                "heroInk": "#ffffff"
+                              }
+                            },
+                            {
+                              "key": "lime",
+                              "name": "Lime",
+                              "colors": {
+                                "primary": "#3f6212",
+                                "accent": "#facc15",
+                                "background": "#f9fbf1",
+                                "surface": "#ffffff",
+                                "ink": "#1a2406",
+                                "muted": "#5f6b48",
+                                "heroFrom": "#65a30d",
+                                "heroTo": "#15803d",
+                                "heroInk": "#ffffff"
+                              }
+                            },
+                            {
+                              "key": "berry",
+                              "name": "Berry",
+                              "colors": {
+                                "primary": "#9d174d",
+                                "accent": "#7c3aed",
+                                "background": "#fdf4f8",
+                                "surface": "#ffffff",
+                                "ink": "#2b0a1a",
+                                "muted": "#7a5466",
+                                "heroFrom": "#be185d",
+                                "heroTo": "#7c3aed",
+                                "heroInk": "#ffffff"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "key": "minimal",
+                          "name": "Minimal",
+                          "description": "White space, a plain headline with search, and products as clean lists.",
+                          "style": {
+                            "mode": "light",
+                            "hero": "minimal",
+                            "corners": "soft",
+                            "cards": "outline",
+                            "font": "sans",
+                            "density": "airy"
+                          },
+                          "themes": [
+                            {
+                              "key": "ink",
+                              "name": "Ink",
+                              "colors": {
+                                "primary": "#111827",
+                                "accent": "#2563eb",
+                                "background": "#ffffff",
+                                "surface": "#ffffff",
+                                "ink": "#111827",
+                                "muted": "#6b7280",
+                                "heroFrom": "#ffffff",
+                                "heroTo": "#f3f4f6",
+                                "heroInk": "#111827"
+                              }
+                            },
+                            {
+                              "key": "sand",
+                              "name": "Sand",
+                              "colors": {
+                                "primary": "#78350f",
+                                "accent": "#b45309",
+                                "background": "#fdfbf7",
+                                "surface": "#ffffff",
+                                "ink": "#292018",
+                                "muted": "#7c6f60",
+                                "heroFrom": "#fdfbf7",
+                                "heroTo": "#f5ecdd",
+                                "heroInk": "#292018"
+                              }
+                            },
+                            {
+                              "key": "mint",
+                              "name": "Mint",
+                              "colors": {
+                                "primary": "#0f766e",
+                                "accent": "#10b981",
+                                "background": "#fbfefd",
+                                "surface": "#ffffff",
+                                "ink": "#0f2a27",
+                                "muted": "#5c7470",
+                                "heroFrom": "#fbfefd",
+                                "heroTo": "#e6f7f3",
+                                "heroInk": "#0f2a27"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List store templates",
+        "tags": [
+          "Stores"
+        ],
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "stores:manage"
+        ],
+        "x-bitocard-auth": "api_key"
       }
     },
     "/v1/auth/signup/email": {
@@ -21496,6 +23179,7 @@
                       "title": "Popular brands",
                       "subtitle": "Find the brands you love.",
                       "tag": "",
+                      "categories": [],
                       "limit": 12,
                       "data": {
                         "brands": [
@@ -31972,6 +33656,34 @@
           }
         }
       },
+      "StoreHomeDraftDto": {
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "description": "The page’s sections in order (see the store home page).",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "sections"
+        ]
+      },
+      "StoreHomeRestoreDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "description": "The published version to copy into the draft.",
+            "example": 3
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
       "CreateStoreDto": {
         "type": "object",
         "properties": {
@@ -32019,6 +33731,32 @@
           "customer_verification": {
             "type": "boolean",
             "description": "Ask your store’s customers for the identity check where BitoCard’s market rules require one (`true`, the default), or never (`false`: you take responsibility for knowing your customers). You can also turn it off for one customer in SHQ."
+          },
+          "template": {
+            "type": "string",
+            "description": "The store template: what the store sells and the sections its editor offers (`GET /v1/store-templates`). Changing it starts the home page again from the new template’s design.",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "description": "The template’s design variant; default its first. Keeps the home page.",
+            "example": "classic"
+          },
+          "theme": {
+            "type": "string",
+            "description": "The variant’s colour theme; default its first. Sets the store’s primary and accent colours unless you send your own.",
+            "example": "navy_pink"
+          },
+          "focus": {
+            "type": "object",
+            "description": "Single product stores: the product key it sells (one you have listed).",
+            "example": "esim:WW:global:10gb-30d"
           }
         }
       },
@@ -32069,6 +33807,32 @@
           "customer_verification": {
             "type": "boolean",
             "description": "Ask your store’s customers for the identity check where BitoCard’s market rules require one (`true`, the default), or never (`false`: you take responsibility for knowing your customers). You can also turn it off for one customer in SHQ."
+          },
+          "template": {
+            "type": "string",
+            "description": "The store template: what the store sells and the sections its editor offers (`GET /v1/store-templates`). Changing it starts the home page again from the new template’s design.",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "description": "The template’s design variant; default its first. Keeps the home page.",
+            "example": "classic"
+          },
+          "theme": {
+            "type": "string",
+            "description": "The variant’s colour theme; default its first. Sets the store’s primary and accent colours unless you send your own.",
+            "example": "navy_pink"
+          },
+          "focus": {
+            "type": "object",
+            "description": "Single product stores: the product key it sells (one you have listed).",
+            "example": "esim:WW:global:10gb-30d"
           }
         }
       },
@@ -40298,6 +42062,11 @@
           "url",
           "status",
           "branding",
+          "template",
+          "variant",
+          "theme",
+          "focus",
+          "home",
           "checkout_mode",
           "desktop_nav",
           "customer_verification",
@@ -40364,6 +42133,58 @@
                 "type": "string",
                 "description": "Accent colour, as lower-case hex.",
                 "pattern": "^#[0-9a-f]{6}$"
+              }
+            }
+          },
+          "template": {
+            "type": "string",
+            "description": "The store template: what it sells and the sections its editor offers (see `GET /v1/store-templates`).",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "description": "The template’s design variant, for example `classic`."
+          },
+          "theme": {
+            "type": "string",
+            "description": "The variant’s colour theme, for example `navy_pink`."
+          },
+          "focus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Single product stores: the product key the store sells; null for other templates."
+          },
+          "home": {
+            "type": "object",
+            "description": "The store’s home page.",
+            "required": [
+              "version",
+              "published_at"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "version": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "The published home page version; null until one is published (the design’s starting page is shown)."
+              },
+              "published_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When it was published.",
+                "format": "date-time"
               }
             }
           },
@@ -40448,6 +42269,8 @@
           "name",
           "subdomain",
           "branding",
+          "design",
+          "focus",
           "country",
           "currency",
           "checkout_mode",
@@ -40497,6 +42320,16 @@
                 "pattern": "^#[0-9a-f]{6}$"
               }
             }
+          },
+          "design": {
+            "$ref": "#/components/schemas/StoreDesign"
+          },
+          "focus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Single product stores: the product key the store sells; null for other templates."
           },
           "country": {
             "type": [
@@ -41865,6 +43698,7 @@
                     "title",
                     "subtitle",
                     "tag",
+                    "categories",
                     "limit",
                     "data"
                   ],
@@ -41934,6 +43768,26 @@
                     "tag": {
                       "type": "string",
                       "description": "Only brands with this tag; empty means featured brands first."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "Product category.",
+                        "enum": [
+                          "gift_cards",
+                          "airtime",
+                          "data",
+                          "bills",
+                          "pay_tv",
+                          "esim",
+                          "software",
+                          "virtual_numbers",
+                          "virtual_cards",
+                          "mobile_money"
+                        ]
+                      },
+                      "description": "Only brands selling in these categories; empty means every category."
                     },
                     "limit": {
                       "type": "integer",
@@ -42185,7 +44039,13 @@
                               "card",
                               "globe",
                               "shield",
-                              "support"
+                              "support",
+                              "gift",
+                              "phone",
+                              "coin",
+                              "chart",
+                              "clock",
+                              "star"
                             ]
                           },
                           "title": {
@@ -42199,6 +44059,738 @@
                         }
                       },
                       "description": "1 to 4 items."
+                    },
+                    "data": {
+                      "type": "null",
+                      "description": "Always null."
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "quick_buy section",
+                  "description": "Reseller stores: a form to top up or pay a bill at once.",
+                  "required": [
+                    "id",
+                    "type",
+                    "span",
+                    "hidden",
+                    "title",
+                    "subtitle",
+                    "categories",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Section ID, unique on the page."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Always `quick_buy`.",
+                      "const": "quick_buy"
+                    },
+                    "span": {
+                      "type": "object",
+                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
+                      "required": [
+                        "lg",
+                        "md",
+                        "rows"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "lg": {
+                          "type": "integer",
+                          "description": "Desktop width out of 12 columns.",
+                          "enum": [
+                            3,
+                            4,
+                            6,
+                            8,
+                            9,
+                            12
+                          ]
+                        },
+                        "md": {
+                          "type": "integer",
+                          "description": "Tablet width out of 6 columns.",
+                          "enum": [
+                            3,
+                            6
+                          ]
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        }
+                      }
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Always false here: hidden sections are left out."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Heading."
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "description": "Subheading; may be empty."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A tab.",
+                        "enum": [
+                          "airtime",
+                          "data",
+                          "bills",
+                          "pay_tv",
+                          "mobile_money"
+                        ]
+                      },
+                      "description": "The form’s tabs, in order."
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "categories"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "categories": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "category",
+                              "label",
+                              "brands"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "category": {
+                                "type": "string",
+                                "description": "Product category.",
+                                "enum": [
+                                  "gift_cards",
+                                  "airtime",
+                                  "data",
+                                  "bills",
+                                  "pay_tv",
+                                  "esim",
+                                  "software",
+                                  "virtual_numbers",
+                                  "virtual_cards",
+                                  "mobile_money"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "description": "Tab label."
+                              },
+                              "brands": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/StoreBrandListing"
+                                },
+                                "description": "Its networks or billers."
+                              }
+                            }
+                          },
+                          "description": "The tabs on sale here, with their networks or billers."
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "crypto_quote section",
+                  "description": "Reseller stores (crypto desk): an instant buy and sell quote form.",
+                  "required": [
+                    "id",
+                    "type",
+                    "span",
+                    "hidden",
+                    "title",
+                    "subtitle",
+                    "assets",
+                    "side",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Section ID, unique on the page."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Always `crypto_quote`.",
+                      "const": "crypto_quote"
+                    },
+                    "span": {
+                      "type": "object",
+                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
+                      "required": [
+                        "lg",
+                        "md",
+                        "rows"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "lg": {
+                          "type": "integer",
+                          "description": "Desktop width out of 12 columns.",
+                          "enum": [
+                            3,
+                            4,
+                            6,
+                            8,
+                            9,
+                            12
+                          ]
+                        },
+                        "md": {
+                          "type": "integer",
+                          "description": "Tablet width out of 6 columns.",
+                          "enum": [
+                            3,
+                            6
+                          ]
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        }
+                      }
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Always false here: hidden sections are left out."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Heading."
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "description": "Subheading; may be empty."
+                    },
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A coin code."
+                      },
+                      "description": "Coins offered first; empty means every coin on sale."
+                    },
+                    "side": {
+                      "type": "string",
+                      "description": "The side shown first.",
+                      "enum": [
+                        "buy",
+                        "sell"
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "assets"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "assets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "name"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "description": "Coin code, for example `USDT`."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Coin name."
+                              }
+                            }
+                          },
+                          "description": "Coins offered, in order."
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "p2p_market section",
+                  "description": "Reseller stores (crypto desk): the P2P market for a coin.",
+                  "required": [
+                    "id",
+                    "type",
+                    "span",
+                    "hidden",
+                    "title",
+                    "subtitle",
+                    "asset",
+                    "limit",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Section ID, unique on the page."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Always `p2p_market`.",
+                      "const": "p2p_market"
+                    },
+                    "span": {
+                      "type": "object",
+                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
+                      "required": [
+                        "lg",
+                        "md",
+                        "rows"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "lg": {
+                          "type": "integer",
+                          "description": "Desktop width out of 12 columns.",
+                          "enum": [
+                            3,
+                            4,
+                            6,
+                            8,
+                            9,
+                            12
+                          ]
+                        },
+                        "md": {
+                          "type": "integer",
+                          "description": "Tablet width out of 6 columns.",
+                          "enum": [
+                            3,
+                            6
+                          ]
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        }
+                      }
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Always false here: hidden sections are left out."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Heading."
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "description": "Subheading; may be empty."
+                    },
+                    "asset": {
+                      "type": "string",
+                      "description": "Coin code."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Most offers to show."
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "asset"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "asset": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "code",
+                                "name"
+                              ],
+                              "additionalProperties": false,
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "description": "Coin code."
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "Coin name."
+                                }
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "product_spotlight section",
+                  "description": "One product in full with its buy form (the store’s focus product unless another is named).",
+                  "required": [
+                    "id",
+                    "type",
+                    "span",
+                    "hidden",
+                    "title",
+                    "subtitle",
+                    "productKey",
+                    "bullets",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Section ID, unique on the page."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Always `product_spotlight`.",
+                      "const": "product_spotlight"
+                    },
+                    "span": {
+                      "type": "object",
+                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
+                      "required": [
+                        "lg",
+                        "md",
+                        "rows"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "lg": {
+                          "type": "integer",
+                          "description": "Desktop width out of 12 columns.",
+                          "enum": [
+                            3,
+                            4,
+                            6,
+                            8,
+                            9,
+                            12
+                          ]
+                        },
+                        "md": {
+                          "type": "integer",
+                          "description": "Tablet width out of 6 columns.",
+                          "enum": [
+                            3,
+                            6
+                          ]
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        }
+                      }
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Always false here: hidden sections are left out."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Heading; empty uses the product’s name."
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "description": "Text; may be empty."
+                    },
+                    "productKey": {
+                      "type": "string",
+                      "description": "A product key; empty means the store’s focus product."
+                    },
+                    "bullets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A selling point."
+                      }
+                    },
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "product"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "product": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/StoreProductDetail"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "imageUrl": {
+                      "type": "string",
+                      "description": "Image address (https)."
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "features section",
+                  "description": "Features or steps as icon cards.",
+                  "required": [
+                    "id",
+                    "type",
+                    "span",
+                    "hidden",
+                    "title",
+                    "subtitle",
+                    "items",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Section ID, unique on the page."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Always `features`.",
+                      "const": "features"
+                    },
+                    "span": {
+                      "type": "object",
+                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
+                      "required": [
+                        "lg",
+                        "md",
+                        "rows"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "lg": {
+                          "type": "integer",
+                          "description": "Desktop width out of 12 columns.",
+                          "enum": [
+                            3,
+                            4,
+                            6,
+                            8,
+                            9,
+                            12
+                          ]
+                        },
+                        "md": {
+                          "type": "integer",
+                          "description": "Tablet width out of 6 columns.",
+                          "enum": [
+                            3,
+                            6
+                          ]
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        }
+                      }
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Always false here: hidden sections are left out."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Heading."
+                    },
+                    "subtitle": {
+                      "type": "string",
+                      "description": "Subheading; may be empty."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "icon",
+                          "title",
+                          "body"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "icon": {
+                            "type": "string",
+                            "description": "Icon.",
+                            "enum": [
+                              "lock",
+                              "bolt",
+                              "card",
+                              "globe",
+                              "shield",
+                              "support",
+                              "gift",
+                              "phone",
+                              "coin",
+                              "chart",
+                              "clock",
+                              "star"
+                            ]
+                          },
+                          "title": {
+                            "type": "string",
+                            "description": "Title."
+                          },
+                          "body": {
+                            "type": "string",
+                            "description": "Text; may be empty."
+                          }
+                        }
+                      },
+                      "description": "1 to 6 items."
+                    },
+                    "data": {
+                      "type": "null",
+                      "description": "Always null."
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "faq section",
+                  "description": "Questions and answers.",
+                  "required": [
+                    "id",
+                    "type",
+                    "span",
+                    "hidden",
+                    "title",
+                    "items",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Section ID, unique on the page."
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Always `faq`.",
+                      "const": "faq"
+                    },
+                    "span": {
+                      "type": "object",
+                      "description": "Where the section sits on the grid. Phones show every section full width, in order.",
+                      "required": [
+                        "lg",
+                        "md",
+                        "rows"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "lg": {
+                          "type": "integer",
+                          "description": "Desktop width out of 12 columns.",
+                          "enum": [
+                            3,
+                            4,
+                            6,
+                            8,
+                            9,
+                            12
+                          ]
+                        },
+                        "md": {
+                          "type": "integer",
+                          "description": "Tablet width out of 6 columns.",
+                          "enum": [
+                            3,
+                            6
+                          ]
+                        },
+                        "rows": {
+                          "type": "integer",
+                          "description": "Rows tall on desktop and tablet (2 lets a tall section sit beside two stacked ones).",
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        }
+                      }
+                    },
+                    "hidden": {
+                      "type": "boolean",
+                      "description": "Always false here: hidden sections are left out."
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Heading."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "question",
+                          "answer"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "question": {
+                            "type": "string",
+                            "description": "Question."
+                          },
+                          "answer": {
+                            "type": "string",
+                            "description": "Answer."
+                          }
+                        }
+                      },
+                      "description": "1 to 12 items."
                     },
                     "data": {
                       "type": "null",
@@ -42376,6 +44968,718 @@
               }
             },
             "description": "Every day in the period, oldest first, with zeros on days without visits."
+          }
+        }
+      },
+      "StoreDesign": {
+        "type": "object",
+        "title": "Store design",
+        "description": "How a store looks: its template, the variant’s style and the theme’s colours (the store’s own primary and accent colours win).",
+        "required": [
+          "template",
+          "variant",
+          "theme",
+          "style",
+          "colors"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "template": {
+            "type": "string",
+            "description": "The store template.",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "description": "The design variant."
+          },
+          "theme": {
+            "type": "string",
+            "description": "The colour theme."
+          },
+          "style": {
+            "type": "object",
+            "description": "How the variant draws the store.",
+            "required": [
+              "mode",
+              "hero",
+              "corners",
+              "cards",
+              "font",
+              "density"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "description": "Light or dark pages.",
+                "enum": [
+                  "light",
+                  "dark"
+                ]
+              },
+              "hero": {
+                "type": "string",
+                "description": "The hero’s layout.",
+                "enum": [
+                  "search",
+                  "gradient",
+                  "minimal",
+                  "quick_buy",
+                  "networks",
+                  "billers",
+                  "card_wall",
+                  "boutique",
+                  "neon",
+                  "terminal",
+                  "market",
+                  "swap",
+                  "spotlight",
+                  "split",
+                  "story"
+                ]
+              },
+              "corners": {
+                "type": "string",
+                "description": "Corner style.",
+                "enum": [
+                  "sharp",
+                  "soft",
+                  "round"
+                ]
+              },
+              "cards": {
+                "type": "string",
+                "description": "Card style.",
+                "enum": [
+                  "flat",
+                  "raised",
+                  "outline",
+                  "glass"
+                ]
+              },
+              "font": {
+                "type": "string",
+                "description": "Type style.",
+                "enum": [
+                  "sans",
+                  "display",
+                  "mono",
+                  "serif"
+                ]
+              },
+              "density": {
+                "type": "string",
+                "description": "Spacing between sections.",
+                "enum": [
+                  "compact",
+                  "comfortable",
+                  "airy"
+                ]
+              }
+            }
+          },
+          "colors": {
+            "type": "object",
+            "description": "The colour theme.",
+            "required": [
+              "primary",
+              "accent",
+              "background",
+              "surface",
+              "ink",
+              "muted",
+              "heroFrom",
+              "heroTo",
+              "heroInk"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "primary": {
+                "type": "string",
+                "description": "Buttons, links and highlights.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "accent": {
+                "type": "string",
+                "description": "Badges, prices and the second highlight.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "background": {
+                "type": "string",
+                "description": "The page behind everything.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "surface": {
+                "type": "string",
+                "description": "Cards and panels.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "ink": {
+                "type": "string",
+                "description": "Body text.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "muted": {
+                "type": "string",
+                "description": "Secondary text.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "heroFrom": {
+                "type": "string",
+                "description": "Where the hero’s gradient starts.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "heroTo": {
+                "type": "string",
+                "description": "Where it ends.",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "heroInk": {
+                "type": "string",
+                "description": "Text on the hero.",
+                "pattern": "^#[0-9a-f]{6}$"
+              }
+            }
+          }
+        }
+      },
+      "StoreTemplate": {
+        "type": "object",
+        "title": "Store template",
+        "description": "A store template with its design variants and colour themes.",
+        "required": [
+          "object",
+          "key",
+          "name",
+          "tagline",
+          "description",
+          "categories",
+          "single_product",
+          "crypto",
+          "sections",
+          "available",
+          "reason",
+          "variants"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_template`.",
+            "const": "store_template"
+          },
+          "key": {
+            "type": "string",
+            "description": "Template key, sent as `template` when creating or changing a store.",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "tagline": {
+            "type": "string",
+            "description": "One line saying what it is for."
+          },
+          "description": {
+            "type": "string",
+            "description": "What the store sells and how it looks."
+          },
+          "categories": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "description": "Product category.",
+              "enum": [
+                "gift_cards",
+                "airtime",
+                "data",
+                "bills",
+                "pay_tv",
+                "esim",
+                "software",
+                "virtual_numbers",
+                "virtual_cards",
+                "mobile_money"
+              ]
+            },
+            "description": "The categories the store sells; null for every category, empty for none (the crypto desk sells crypto, not catalogue products)."
+          },
+          "single_product": {
+            "type": "boolean",
+            "description": "The store sells one product, chosen as its `focus`."
+          },
+          "crypto": {
+            "type": "boolean",
+            "description": "The crypto desk: offered where crypto trading is switched on for you."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A section type.",
+              "enum": [
+                "hero",
+                "product_rail",
+                "category_grid",
+                "brand_grid",
+                "promo",
+                "trust_bar",
+                "quick_buy",
+                "crypto_quote",
+                "p2p_market",
+                "product_spotlight",
+                "features",
+                "faq"
+              ]
+            },
+            "description": "Sections the store’s editor offers."
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether you can use it now."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why not, when it is not available."
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "name",
+                "description",
+                "style",
+                "themes"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Variant key, sent as `variant`."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Its name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "How it looks."
+                },
+                "style": {
+                  "type": "object",
+                  "description": "How the variant draws the store.",
+                  "required": [
+                    "mode",
+                    "hero",
+                    "corners",
+                    "cards",
+                    "font",
+                    "density"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "description": "Light or dark pages.",
+                      "enum": [
+                        "light",
+                        "dark"
+                      ]
+                    },
+                    "hero": {
+                      "type": "string",
+                      "description": "The hero’s layout.",
+                      "enum": [
+                        "search",
+                        "gradient",
+                        "minimal",
+                        "quick_buy",
+                        "networks",
+                        "billers",
+                        "card_wall",
+                        "boutique",
+                        "neon",
+                        "terminal",
+                        "market",
+                        "swap",
+                        "spotlight",
+                        "split",
+                        "story"
+                      ]
+                    },
+                    "corners": {
+                      "type": "string",
+                      "description": "Corner style.",
+                      "enum": [
+                        "sharp",
+                        "soft",
+                        "round"
+                      ]
+                    },
+                    "cards": {
+                      "type": "string",
+                      "description": "Card style.",
+                      "enum": [
+                        "flat",
+                        "raised",
+                        "outline",
+                        "glass"
+                      ]
+                    },
+                    "font": {
+                      "type": "string",
+                      "description": "Type style.",
+                      "enum": [
+                        "sans",
+                        "display",
+                        "mono",
+                        "serif"
+                      ]
+                    },
+                    "density": {
+                      "type": "string",
+                      "description": "Spacing between sections.",
+                      "enum": [
+                        "compact",
+                        "comfortable",
+                        "airy"
+                      ]
+                    }
+                  }
+                },
+                "themes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "key",
+                      "name",
+                      "colors"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "description": "Theme key, sent as `theme`."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Its name."
+                      },
+                      "colors": {
+                        "type": "object",
+                        "description": "The colour theme.",
+                        "required": [
+                          "primary",
+                          "accent",
+                          "background",
+                          "surface",
+                          "ink",
+                          "muted",
+                          "heroFrom",
+                          "heroTo",
+                          "heroInk"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "primary": {
+                            "type": "string",
+                            "description": "Buttons, links and highlights.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "accent": {
+                            "type": "string",
+                            "description": "Badges, prices and the second highlight.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "background": {
+                            "type": "string",
+                            "description": "The page behind everything.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "surface": {
+                            "type": "string",
+                            "description": "Cards and panels.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "ink": {
+                            "type": "string",
+                            "description": "Body text.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "muted": {
+                            "type": "string",
+                            "description": "Secondary text.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "heroFrom": {
+                            "type": "string",
+                            "description": "Where the hero’s gradient starts.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "heroTo": {
+                            "type": "string",
+                            "description": "Where it ends.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          },
+                          "heroInk": {
+                            "type": "string",
+                            "description": "Text on the hero.",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "description": "Its colour themes; the first is the default."
+                }
+              }
+            },
+            "description": "Its design variants; the first is the default."
+          }
+        }
+      },
+      "StoreHomeEditor": {
+        "type": "object",
+        "title": "Store home editor",
+        "description": "A store’s home page in SHQ’s editor.",
+        "required": [
+          "object",
+          "store_id",
+          "template",
+          "variant",
+          "sections_allowed",
+          "draft",
+          "published",
+          "version",
+          "published_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_home_editor`.",
+            "const": "store_home_editor"
+          },
+          "store_id": {
+            "type": "string",
+            "description": "Store ID.",
+            "format": "uuid"
+          },
+          "template": {
+            "type": "string",
+            "description": "The store template.",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "description": "The design variant."
+          },
+          "sections_allowed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A section type.",
+              "enum": [
+                "hero",
+                "product_rail",
+                "category_grid",
+                "brand_grid",
+                "promo",
+                "trust_bar",
+                "quick_buy",
+                "crypto_quote",
+                "p2p_market",
+                "product_spotlight",
+                "features",
+                "faq"
+              ]
+            },
+            "description": "Section types the store’s template offers."
+          },
+          "draft": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A section as saved: `id`, `type`, `span`, `hidden` and its own fields (as on the store home page, without `data`).",
+              "required": [
+                "id",
+                "type",
+                "span",
+                "hidden"
+              ],
+              "additionalProperties": true,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Section ID, unique on the page."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Section type.",
+                  "enum": [
+                    "hero",
+                    "product_rail",
+                    "category_grid",
+                    "brand_grid",
+                    "promo",
+                    "trust_bar",
+                    "quick_buy",
+                    "crypto_quote",
+                    "p2p_market",
+                    "product_spotlight",
+                    "features",
+                    "faq"
+                  ]
+                },
+                "span": {
+                  "type": "object"
+                },
+                "hidden": {
+                  "type": "boolean",
+                  "description": "Kept in the page but not shown."
+                }
+              }
+            },
+            "description": "The page being edited: the draft, else what is published, else the design’s starting page."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "False while shoppers see the design’s starting page."
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The published version; null until one is published."
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it was published.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When the store was last changed.",
+            "format": "date-time"
+          }
+        }
+      },
+      "StoreHomeVersion": {
+        "type": "object",
+        "title": "Store home version",
+        "required": [
+          "object",
+          "version",
+          "template",
+          "variant",
+          "sections",
+          "restorable",
+          "published_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_home_version`.",
+            "const": "store_home_version"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Version number."
+          },
+          "template": {
+            "type": "string",
+            "description": "The template it was made with.",
+            "enum": [
+              "all_in_one",
+              "topups",
+              "gift_cards",
+              "crypto_desk",
+              "single_product"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "description": "The variant it was made with."
+          },
+          "sections": {
+            "type": "integer",
+            "description": "How many sections it had."
+          },
+          "restorable": {
+            "type": "boolean",
+            "description": "Whether it can be restored (made with the store’s current template)."
+          },
+          "published_at": {
+            "type": "string",
+            "description": "When it was published.",
+            "format": "date-time"
+          }
+        }
+      },
+      "StoreHomePreview": {
+        "type": "object",
+        "title": "Store home preview",
+        "required": [
+          "object",
+          "url",
+          "token",
+          "expires_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_home_preview`.",
+            "const": "store_home_preview"
+          },
+          "url": {
+            "type": "string",
+            "description": "The draft on the store’s own address.",
+            "format": "uri"
+          },
+          "token": {
+            "type": "string",
+            "description": "The preview token in the link."
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "When the link stops working (30 minutes).",
+            "format": "date-time"
           }
         }
       },

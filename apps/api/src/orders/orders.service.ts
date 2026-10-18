@@ -1,3 +1,4 @@
+import { orderStore, pickOrderStore } from '../stores/order-store.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -303,7 +304,7 @@ export class OrdersService {
 
   /** The customer receipt: BitoCard (the regional Golojan entity) as seller of record, under the reseller's store brand. */
   async receipt(resellerId: string, mode: LedgerMode, id: string) {
-    const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode }, include: { product: true, reseller: { include: { stores: true } } } });
+    const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode }, include: { product: true, customer: { select: { storeId: true } }, reseller: { include: { stores: { orderBy: { createdAt: 'asc' } } } } } });
     if (!order) throw notFound();
     if (order.source === 'own') throw conflict('receipt_unavailable', 'You are the seller of orders through your own supplier, so BitoCard does not issue their receipts.');
     if (order.status !== 'completed' || order.receiptNumber === null) throw conflict('receipt_unavailable', 'Receipts are issued for completed orders.');
@@ -317,7 +318,7 @@ export class OrdersService {
       mode: order.mode,
       issued_at: (order.completedAt ?? order.updatedAt).toISOString(),
       seller: { name: seller.name, [seller.companyNumberLabel.toLowerCase().replaceAll(' ', '_')]: seller.companyNumber, registered_address: seller.registeredAddress },
-      sold_through: order.reseller.stores[0]?.name ?? order.reseller.name,
+      sold_through: pickOrderStore(order.reseller.stores, order.customer?.storeId)?.name ?? order.reseller.name,
       currency: order.currency,
       items: [{ description: order.product.name, quantity: order.quantity, unit_price: minor(unit), amount: minor(order.priceMinor) }],
       subtotal: minor(order.priceMinor - order.taxMinor),
@@ -605,7 +606,7 @@ export class OrdersService {
     try {
       const encryption = this.encryption();
       const [store, reseller] = await Promise.all([
-        this.prisma.store.findFirst({ where: { resellerId: order.resellerId }, select: { name: true } }),
+        orderStore(this.prisma, order),
         this.prisma.reseller.findUniqueOrThrow({ where: { id: order.resellerId }, select: { name: true } }),
       ]);
       const deliveries: EmailedDelivery[] = coded.map(delivery => ({

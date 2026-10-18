@@ -1,4 +1,5 @@
-import { categoryLabels, navigationGroups, productSources } from '../../storefront/layout.js';
+import { categoryLabels, navigationGroups, productSources, quickBuyCategories, sectionIcons } from '../../storefront/layout.js';
+import { storeTemplates, templateKeys } from '../../stores/templates.js';
 import { array, bool, constant, int, list, listExample, nullable, nullableInt, nullableStr, nullableTime, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import { category, features } from './commerce.js';
 import type { DocsArea } from './index.js';
@@ -27,6 +28,11 @@ const store = objectSchema(
     url: str('The store’s full address.', { format: 'uri' }),
     status: oneOf('`draft` (not shown to anyone), `published` (live), or `suspended` by BitoCard (contact support).', ['draft', 'published', 'suspended']),
     branding,
+    template: oneOf('The store template: what it sells and the sections its editor offers (see `GET /v1/store-templates`).', templateKeys),
+    variant: str('The template’s design variant, for example `classic`.'),
+    theme: str('The variant’s colour theme, for example `navy_pink`.'),
+    focus: nullableStr('Single product stores: the product key the store sells; null for other templates.'),
+    home: shape({ version: nullableInt('The published home page version; null until one is published (the design’s starting page is shown).'), published_at: nullableTime('When it was published.') }, 'The store’s home page.'),
     checkout_mode: oneOf(
       'Customer checkout on the store: `test` (sandbox: simulated payments and orders, for trying the store) until you switch it to `live`, which needs a verified business.',
       ['test', 'live'],
@@ -47,6 +53,11 @@ const storeExample = {
   url: 'https://adadigital.bitocard.com',
   status: 'published',
   branding: { logo_url: 'https://cdn.bitocard.com/bitocard/resellers/2f1e0d9c-8b7a-4c6d-9e5f-4a3b2c1d0e9f/store/logos/6b1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.png', primary_color: '#070f4c', accent_color: '#ff2382' },
+  template: 'all_in_one',
+  variant: 'classic',
+  theme: 'navy_pink',
+  focus: null,
+  home: { version: 2, published_at: '2026-10-03T09:12:00.000Z' },
   checkout_mode: 'live',
   desktop_nav: null,
   customer_verification: true,
@@ -72,6 +83,110 @@ const storeTraffic = objectSchema(
   'Visits to your store, counted on BitoCard’s storefront without cookies or anything kept about your visitors.',
 );
 
+const colorField = (description: string) => str(description, { pattern: '^#[0-9a-f]{6}$' });
+const themeColors = shape(
+  {
+    primary: colorField('Buttons, links and highlights.'),
+    accent: colorField('Badges, prices and the second highlight.'),
+    background: colorField('The page behind everything.'),
+    surface: colorField('Cards and panels.'),
+    ink: colorField('Body text.'),
+    muted: colorField('Secondary text.'),
+    heroFrom: colorField('Where the hero’s gradient starts.'),
+    heroTo: colorField('Where it ends.'),
+    heroInk: colorField('Text on the hero.'),
+  },
+  'The colour theme.',
+);
+const variantStyle = shape(
+  {
+    mode: oneOf('Light or dark pages.', ['light', 'dark']),
+    hero: oneOf('The hero’s layout.', ['search', 'gradient', 'minimal', 'quick_buy', 'networks', 'billers', 'card_wall', 'boutique', 'neon', 'terminal', 'market', 'swap', 'spotlight', 'split', 'story']),
+    corners: oneOf('Corner style.', ['sharp', 'soft', 'round']),
+    cards: oneOf('Card style.', ['flat', 'raised', 'outline', 'glass']),
+    font: oneOf('Type style.', ['sans', 'display', 'mono', 'serif']),
+    density: oneOf('Spacing between sections.', ['compact', 'comfortable', 'airy']),
+  },
+  'How the variant draws the store.',
+);
+const storeDesign = objectSchema(
+  'Store design',
+  {
+    template: oneOf('The store template.', templateKeys),
+    variant: str('The design variant.'),
+    theme: str('The colour theme.'),
+    style: variantStyle,
+    colors: themeColors,
+  },
+  'How a store looks: its template, the variant’s style and the theme’s colours (the store’s own primary and accent colours win).',
+);
+const sectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq'];
+const storeTemplate = objectSchema(
+  'Store template',
+  {
+    object: constant('store_template'),
+    key: oneOf('Template key, sent as `template` when creating or changing a store.', templateKeys),
+    name: str('Its name.'),
+    tagline: str('One line saying what it is for.'),
+    description: str('What the store sells and how it looks.'),
+    categories: { type: ['array', 'null'], items: category(), description: 'The categories the store sells; null for every category, empty for none (the crypto desk sells crypto, not catalogue products).' },
+    single_product: bool('The store sells one product, chosen as its `focus`.'),
+    crypto: bool('The crypto desk: offered where crypto trading is switched on for you.'),
+    sections: array(str('A section type.', { enum: sectionTypes }), 'Sections the store’s editor offers.'),
+    available: bool('Whether you can use it now.'),
+    reason: nullableStr('Why not, when it is not available.'),
+    variants: array(
+      shape({
+        key: str('Variant key, sent as `variant`.'),
+        name: str('Its name.'),
+        description: str('How it looks.'),
+        style: variantStyle,
+        themes: array(shape({ key: str('Theme key, sent as `theme`.'), name: str('Its name.'), colors: themeColors }), 'Its colour themes; the first is the default.'),
+      }),
+      'Its design variants; the first is the default.',
+    ),
+  },
+  'A store template with its design variants and colour themes.',
+);
+const editorSection: Schema = {
+  type: 'object',
+  description: 'A section as saved: `id`, `type`, `span`, `hidden` and its own fields (as on the store home page, without `data`).',
+  required: ['id', 'type', 'span', 'hidden'],
+  additionalProperties: true,
+  properties: { id: str('Section ID, unique on the page.'), type: str('Section type.', { enum: sectionTypes }), span: { type: 'object' }, hidden: bool('Kept in the page but not shown.') },
+};
+const storeHomeEditor = objectSchema(
+  'Store home editor',
+  {
+    object: constant('store_home_editor'),
+    store_id: uuid('Store ID.'),
+    template: oneOf('The store template.', templateKeys),
+    variant: str('The design variant.'),
+    sections_allowed: array(str('A section type.', { enum: sectionTypes }), 'Section types the store’s template offers.'),
+    draft: array(editorSection, 'The page being edited: the draft, else what is published, else the design’s starting page.'),
+    published: bool('False while shoppers see the design’s starting page.'),
+    version: nullableInt('The published version; null until one is published.'),
+    published_at: nullableTime('When it was published.'),
+    updated_at: time('When the store was last changed.'),
+  },
+  'A store’s home page in SHQ’s editor.',
+);
+const storeHomeVersion = objectSchema('Store home version', {
+  object: constant('store_home_version'),
+  version: int('Version number.'),
+  template: oneOf('The template it was made with.', templateKeys),
+  variant: str('The variant it was made with.'),
+  sections: int('How many sections it had.'),
+  restorable: bool('Whether it can be restored (made with the store’s current template).'),
+  published_at: time('When it was published.'),
+});
+const storeHomePreview = objectSchema('Store home preview', {
+  object: constant('store_home_preview'),
+  url: str('The draft on the store’s own address.', { format: 'uri' }),
+  token: str('The preview token in the link.'),
+  expires_at: time('When the link stops working (30 minutes).'),
+});
+
 const subdomainAvailability = objectSchema('Subdomain availability', {
   object: constant('subdomain_availability'),
   subdomain: str('The name checked, in lower case.'),
@@ -86,6 +201,8 @@ const storefront = objectSchema(
     name: str('Store name.'),
     subdomain: str('The store address: `<subdomain>.bitocard.com`.'),
     branding,
+    design: ref('StoreDesign'),
+    focus: nullableStr('Single product stores: the product key the store sells; null for other templates.'),
     country: nullableStr('ISO 3166-1 alpha-2 country of the reseller’s business.'),
     currency: nullableStr('ISO 4217 currency the store sells in.'),
     checkout_mode: oneOf('`live`, or `test` while the store’s checkout is the sandbox (show shoppers that orders are not real).', ['test', 'live']),
@@ -236,7 +353,7 @@ const sections = [
   section(
     'brand_grid',
     'Brand tiles.',
-    { ...heading, tag: str('Only brands with this tag; empty means featured brands first.'), limit: int('Most brands to show.') },
+    { ...heading, tag: str('Only brands with this tag; empty means featured brands first.'), categories: array(category(), 'Only brands selling in these categories; empty means every category.'), limit: int('Most brands to show.') },
     shape({ brands: array(ref('StoreBrandListing')) }),
   ),
   section(
@@ -255,9 +372,41 @@ const sections = [
   section(
     'trust_bar',
     'Reassurances in a row.',
-    { items: array(shape({ icon: oneOf('Icon.', ['lock', 'bolt', 'card', 'globe', 'shield', 'support']), title: str('Title.'), body: str('Text; may be empty.') }), '1 to 4 items.') },
+    { items: array(shape({ icon: oneOf('Icon.', sectionIcons), title: str('Title.'), body: str('Text; may be empty.') }), '1 to 4 items.') },
     { type: 'null', description: 'Always null.' },
   ),
+  section(
+    'quick_buy',
+    'Reseller stores: a form to top up or pay a bill at once.',
+    { ...heading, categories: array(oneOf('A tab.', quickBuyCategories), 'The form’s tabs, in order.') },
+    shape({ categories: array(shape({ category: category(), label: str('Tab label.'), brands: array(ref('StoreBrandListing'), 'Its networks or billers.') }), 'The tabs on sale here, with their networks or billers.') }),
+  ),
+  section(
+    'crypto_quote',
+    'Reseller stores (crypto desk): an instant buy and sell quote form.',
+    { ...heading, assets: array(str('A coin code.'), 'Coins offered first; empty means every coin on sale.'), side: oneOf('The side shown first.', ['buy', 'sell']) },
+    shape({ assets: array(shape({ code: str('Coin code, for example `USDT`.'), name: str('Coin name.') }), 'Coins offered, in order.') }),
+  ),
+  section(
+    'p2p_market',
+    'Reseller stores (crypto desk): the P2P market for a coin.',
+    { ...heading, asset: str('Coin code.'), limit: int('Most offers to show.') },
+    shape({ asset: nullable(shape({ code: str('Coin code.'), name: str('Coin name.') })) }),
+  ),
+  section(
+    'product_spotlight',
+    'One product in full with its buy form (the store’s focus product unless another is named).',
+    { title: str('Heading; empty uses the product’s name.'), subtitle: str('Text; may be empty.'), productKey: str('A product key; empty means the store’s focus product.'), bullets: array(str('A selling point.')) },
+    shape({ product: nullable(ref('StoreProductDetail')) }),
+    { imageUrl: str('Image address (https).') },
+  ),
+  section(
+    'features',
+    'Features or steps as icon cards.',
+    { ...heading, items: array(shape({ icon: oneOf('Icon.', sectionIcons), title: str('Title.'), body: str('Text; may be empty.') }), '1 to 6 items.') },
+    { type: 'null', description: 'Always null.' },
+  ),
+  section('faq', 'Questions and answers.', { title: str('Heading.'), items: array(shape({ question: str('Question.'), answer: str('Answer.') }), '1 to 12 items.') }, { type: 'null', description: 'Always null.' }),
 ];
 
 const storeHome = objectSchema(
@@ -441,7 +590,7 @@ const homeExample = {
       data: null,
     },
     { id: 'd4e5f6a7', type: 'category_grid', span: { lg: 12, md: 6, rows: 1 }, hidden: false, title: 'Shop by category', subtitle: 'Everything digital, in one place.', categories: [], data: { categories: [giftCards, airtime, data, bills, payTv] } },
-    { id: 'e5f6a7b8', type: 'brand_grid', span: { lg: 12, md: 6, rows: 1 }, hidden: false, title: 'Popular brands', subtitle: 'Find the brands you love.', tag: '', limit: 12, data: { brands: brandListings } },
+    { id: 'e5f6a7b8', type: 'brand_grid', span: { lg: 12, md: 6, rows: 1 }, hidden: false, title: 'Popular brands', subtitle: 'Find the brands you love.', tag: '', categories: [], limit: 12, data: { brands: brandListings } },
     {
       id: 'f6a7b8c9',
       type: 'trust_bar',
@@ -456,6 +605,43 @@ const homeExample = {
   ],
   navigation,
   countries,
+};
+
+const designExample = {
+  template: 'all_in_one',
+  variant: 'classic',
+  theme: 'navy_pink',
+  style: storeTemplates[0].variants[0].style,
+  colors: { ...storeTemplates[0].variants[0].themes[0].colors, primary: '#070f4c', accent: '#ff2382' },
+};
+const templateExamples = storeTemplates.slice(0, 1).map(template => ({
+  object: 'store_template',
+  key: template.key,
+  name: template.name,
+  tagline: template.tagline,
+  description: template.description,
+  categories: template.categories,
+  single_product: template.single,
+  crypto: template.crypto,
+  sections: template.sections,
+  available: true,
+  reason: null,
+  variants: template.variants.map(variant => ({ key: variant.key, name: variant.name, description: variant.description, style: variant.style, themes: variant.themes.map(item => ({ key: item.key, name: item.name, colors: item.colors })) })),
+}));
+const editorExample = {
+  object: 'store_home_editor',
+  store_id: storeExample.id,
+  template: 'all_in_one',
+  variant: 'classic',
+  sections_allowed: storeTemplates[0].sections,
+  draft: [
+    { id: 'a1b2c3d4', type: 'hero', span: { lg: 12, md: 6, rows: 1 }, hidden: false, title: 'Digital products,', accent: 'delivered fast.', subtitle: 'Gift cards, top-ups, bills and more.', search: true, categoryChips: true },
+    { id: 'b2c3d4e5', type: 'quick_buy', span: { lg: 12, md: 6, rows: 1 }, hidden: false, title: 'Top up now', subtitle: '', categories: ['airtime', 'data'] },
+  ],
+  published: true,
+  version: 3,
+  published_at: '2026-10-17T10:00:00.000Z',
+  updated_at: '2026-10-18T11:58:00.000Z',
 };
 
 export const storesDocs: DocsArea = {
@@ -475,6 +661,11 @@ export const storesDocs: DocsArea = {
     StoreHome: storeHome,
     StoreSearch: storeSearch,
     StoreTraffic: storeTraffic,
+    StoreDesign: storeDesign,
+    StoreTemplate: storeTemplate,
+    StoreHomeEditor: storeHomeEditor,
+    StoreHomeVersion: storeHomeVersion,
+    StoreHomePreview: storeHomePreview,
   },
   responses: {
     'GET /v1/stores/subdomains/{subdomain}': {
@@ -509,12 +700,47 @@ export const storesDocs: DocsArea = {
       },
     },
     'POST /v1/stores/{id}/publish': { status: 200, description: 'The store, now published.', schema: 'Store', example: storeExample },
+    'GET /v1/store-templates': {
+      status: 200,
+      description: 'Every store template with its design variants and colour themes.',
+      schema: list(ref('StoreTemplate'), {}, false),
+      example: { object: 'list', data: templateExamples },
+    },
+    'GET /v1/stores/{id}/home': { status: 200, description: 'The store’s home page in the editor.', schema: 'StoreHomeEditor', example: editorExample },
+    'PUT /v1/stores/{id}/home/draft': { status: 200, description: 'The saved draft.', schema: 'StoreHomeEditor', example: editorExample },
+    'POST /v1/stores/{id}/home/publish': { status: 200, description: 'The page, now published as the next version.', schema: 'StoreHomeEditor', example: { ...editorExample, version: 4, published_at: '2026-10-18T12:00:00.000Z' } },
+    'POST /v1/stores/{id}/home/reset': { status: 200, description: 'The draft, back to the design’s starting page.', schema: 'StoreHomeEditor', example: editorExample },
+    'GET /v1/stores/{id}/home/versions': {
+      status: 200,
+      description: 'Published versions, newest first (the latest 50).',
+      schema: list(ref('StoreHomeVersion'), {}, false),
+      example: { object: 'list', data: [{ object: 'store_home_version', version: 3, template: 'all_in_one', variant: 'classic', sections: 6, restorable: true, published_at: '2026-10-17T10:00:00.000Z' }] },
+    },
+    'POST /v1/stores/{id}/home/restore': { status: 200, description: 'The draft, now that version.', schema: 'StoreHomeEditor', example: editorExample },
+    'POST /v1/stores/{id}/home/preview': {
+      status: 200,
+      description: 'A preview link to the draft.',
+      schema: 'StoreHomePreview',
+      example: { object: 'store_home_preview', url: 'https://adadigital.bitocard.com/preview?token=1792332000000.c2lnbmF0dXJl', token: '1792332000000.c2lnbmF0dXJl', expires_at: '2026-10-18T12:30:00.000Z' },
+    },
     'POST /v1/stores/{id}/unpublish': { status: 200, description: 'The store, back to a draft (a suspended store is returned unchanged).', schema: 'Store', example: { ...storeExample, status: 'draft' } },
     'GET /v1/storefronts/{subdomain}': {
       status: 200,
       description: 'The published store. Drafts, suspended stores and unknown addresses are not found.',
       schema: 'Storefront',
-      example: { object: 'storefront', name: storeExample.name, subdomain: storeExample.subdomain, branding: storeExample.branding, country: 'NG', currency: 'NGN', checkout_mode: 'live', app: { desktop_nav: 'rail' }, domain: 'adadigital.com' },
+      example: {
+        object: 'storefront',
+        name: storeExample.name,
+        subdomain: storeExample.subdomain,
+        branding: storeExample.branding,
+        design: designExample,
+        focus: null,
+        country: 'NG',
+        currency: 'NGN',
+        checkout_mode: 'live',
+        app: { desktop_nav: 'rail' },
+        domain: 'adadigital.com',
+      },
     },
     'GET /v1/store/home': { status: 200, description: 'The home page. Until a layout is published, the default layout (`published: false`).', schema: 'StoreHome', example: homeExample },
     'GET /v1/store/products': {

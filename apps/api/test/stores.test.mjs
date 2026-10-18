@@ -58,11 +58,12 @@ describe('creating and updating', () => {
     assert.equal((await browser.get('/v1/stores')).json.data.length, 1);
   });
 
-  test('one store per reseller for now', async () => {
+  test('up to five stores per reseller, each on its own address', async () => {
     const { browser } = await resellerClient(server);
-    await browser.post('/v1/stores', { name: 'One', subdomain: sub('one') });
-    const second = await browser.post('/v1/stores', { name: 'Two', subdomain: sub('two') });
-    assert.equal(second.json.error.code, 'store_limit_reached');
+    for (const name of ['one', 'two', 'three', 'four', 'five']) assert.equal((await browser.post('/v1/stores', { name, subdomain: sub(name) })).status, 201);
+    assert.equal((await browser.get('/v1/stores')).json.data.length, 5);
+    const sixth = await browser.post('/v1/stores', { name: 'Six', subdomain: sub('six') });
+    assert.deepEqual([sixth.status, sixth.json.error.code], [409, 'store_limit_reached']);
   });
 
   test('branding is validated; logos must be HTTPS', async () => {

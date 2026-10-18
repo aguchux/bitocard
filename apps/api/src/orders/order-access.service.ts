@@ -1,3 +1,4 @@
+import { orderStore, pickOrderStore } from '../stores/order-store.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
@@ -35,7 +36,7 @@ const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 're
 const proofRequired = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'access_required', 'Sign in, or enter the code we email you, to see this order.');
 const codeInvalid = () => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
 
-type AccessOrder = Order & { product: Product; deliveries: OrderDelivery[]; reseller: Reseller & { stores: Store[] } };
+type AccessOrder = Order & { product: Product; deliveries: OrderDelivery[]; reseller: Reseller & { stores: Store[] }; customer: { storeId: string } | null };
 type AccessRow = OrderAccess & { order: AccessOrder };
 
 /** `a***@example.com`: enough for the customer to recognise their address, never the whole of it. */
@@ -84,7 +85,7 @@ export class OrderAccessService {
         row = await this.prisma.orderAccess.findUniqueOrThrow({ where: { orderId: order.id } });
       }
     }
-    return this.presentLink(row, await this.urlFor(order.resellerId, this.encryption().decrypt(row.tokenEncrypted)));
+    return this.presentLink(row, await this.urlFor(order.id, this.encryption().decrypt(row.tokenEncrypted)));
   }
 
   /** A new link for the order; the old one, and every pass made with it, stop working at once. */
@@ -97,17 +98,19 @@ export class OrderAccessService {
       await tx.orderAccessCode.updateMany({ where: { orderId, consumedAt: null }, data: { consumedAt: new Date() } });
       return tx.orderAccess.update({ where: { orderId }, data: { tokenHash: sha256(token), tokenEncrypted: this.encryption().encrypt(token), replacedAt: new Date() } });
     });
-    return this.presentLink(row, await this.urlFor(resellerId, token));
+    return this.presentLink(row, await this.urlFor(orderId, token));
   }
 
   private presentLink(row: OrderAccess, url: string) {
     return { object: 'order_access_link' as const, url, revealed_at: row.revealedAt?.toISOString() ?? null, replaced_at: row.replacedAt?.toISOString() ?? null };
   }
 
-  /** On the reseller's published hosted store; otherwise BitoCard's store address (a neutral page). */
-  private async urlFor(resellerId: string, token: string) {
+  /** On the order's store (its customer's, else the reseller's oldest published one); otherwise BitoCard's store address (a neutral page). */
+  private async urlFor(orderId: string, token: string) {
     const base = new URL(this.integrations.config.STOREFRONT_URL);
-    const store = await this.prisma.store.findFirst({ where: { resellerId, status: 'published' }, select: { subdomain: true } });
+    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { resellerId: true, customerId: true } });
+    const store = await orderStore(this.prisma, order);
+    if (store && store.status !== 'published') return `${base.protocol}//${base.host}/a/${token}`;
     const host = store && store.subdomain !== 'bitocard' ? `${store.subdomain}.${base.host}` : base.host;
     return `${base.protocol}//${host}/a/${token}`;
   }
@@ -118,7 +121,7 @@ export class OrderAccessService {
     if (!tokenPattern.test(token)) throw notFound();
     const access = await this.prisma.orderAccess.findUnique({
       where: { tokenHash: sha256(token) },
-      include: { order: { include: { product: true, deliveries: true, reseller: { include: { stores: true } } } } },
+      include: { order: { include: { product: true, deliveries: true, customer: { select: { storeId: true } }, reseller: { include: { stores: { orderBy: { createdAt: 'asc' } } } } } } },
     });
     if (!access) throw notFound();
     return access as AccessRow;
@@ -269,7 +272,7 @@ export class OrderAccessService {
   }
 
   private presentStore(order: AccessOrder) {
-    const store = order.reseller.stores.find(item => item.status === 'published') ?? null;
+    const store = pickOrderStore(order.reseller.stores, order.customer?.storeId);
     return { name: store?.name ?? order.reseller.name, subdomain: store?.subdomain ?? null, logo_url: store?.logoUrl ?? null, primary_color: store?.primaryColor ?? '#070f4c' };
   }
 

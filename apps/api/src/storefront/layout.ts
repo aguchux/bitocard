@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { HttpStatus } from '@nestjs/common';
 import { z } from 'zod';
+import { ApiError } from '../common/errors/api-error.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
 
 /** Every product category, as the storefront names it. */
@@ -122,6 +124,8 @@ const brandGrid = z.object({
   subtitle: text(200).default(''),
   /** Only brands with this tag (for example gaming); empty means featured brands first. */
   tag: text(40).default(''),
+  /** Only brands selling in these categories (for example the networks for airtime); empty means every category. */
+  categories: z.array(z.enum(categories)).max(10).default([]),
   limit: z.number().int().min(1).max(24).default(12),
 });
 
@@ -140,16 +144,81 @@ const promo = z.object({
   illustration: z.enum(['store', 'esim', 'gift', 'globe', 'none']).default('none'),
 });
 
+export const sectionIcons = ['lock', 'bolt', 'card', 'globe', 'shield', 'support', 'gift', 'phone', 'coin', 'chart', 'clock', 'star'] as const;
+
 const trustBar = z.object({
   ...base,
   type: z.literal('trust_bar'),
   items: z
-    .array(z.object({ icon: z.enum(['lock', 'bolt', 'card', 'globe', 'shield', 'support']), title: text(60).min(1), body: text(120).default('') }))
+    .array(z.object({ icon: z.enum(sectionIcons), title: text(60).min(1), body: text(120).default('') }))
     .min(1)
     .max(4),
 });
 
-export const section = z.discriminatedUnion('type', [hero, productRail, categoryGrid, brandGrid, promo, trustBar]);
+/** Categories a quick-buy form can sell: things bought for a phone number, meter or smartcard. */
+export const quickBuyCategories = ['airtime', 'data', 'bills', 'pay_tv', 'mobile_money'] as const;
+
+/** Reseller stores: a form to top up or pay a bill at once (choose the network or biller, the number, the amount). */
+const quickBuy = z.object({
+  ...base,
+  type: z.literal('quick_buy'),
+  title: text(80).min(1),
+  subtitle: text(200).default(''),
+  /** Tabs of the form, in order. */
+  categories: z.array(z.enum(quickBuyCategories)).min(1).max(5).default(['airtime', 'data']),
+});
+
+/** Reseller stores (crypto desk): a buy and sell quote form on the store's exchange desk. */
+const cryptoQuote = z.object({
+  ...base,
+  type: z.literal('crypto_quote'),
+  title: text(80).min(1),
+  subtitle: text(200).default(''),
+  /** Coins offered first (codes such as USDT, BTC), in order; empty means every coin on sale. */
+  assets: z.array(text(10).min(2)).max(9).default([]),
+  side: z.enum(['buy', 'sell']).default('buy'),
+});
+
+/** Reseller stores (crypto desk): the P2P market's best offers for a coin, linking to the market. */
+const p2pMarket = z.object({
+  ...base,
+  type: z.literal('p2p_market'),
+  title: text(80).min(1),
+  subtitle: text(200).default(''),
+  asset: text(10).min(2).default('USDT'),
+  limit: z.number().int().min(1).max(10).default(5),
+});
+
+/** One product in full with its buy form (single product stores; the store's focus product unless another is named). */
+const productSpotlight = z.object({
+  ...base,
+  type: z.literal('product_spotlight'),
+  title: text(80).default(''),
+  subtitle: text(240).default(''),
+  /** A product key; empty means the store's focus product. */
+  productKey: text(200).default(''),
+  bullets: z.array(text(80).min(1)).max(6).default([]),
+  imageUrl: imageUrl.optional(),
+});
+
+const features = z.object({
+  ...base,
+  type: z.literal('features'),
+  title: text(80).min(1),
+  subtitle: text(200).default(''),
+  items: z.array(z.object({ icon: z.enum(sectionIcons), title: text(60).min(1), body: text(200).default('') })).min(1).max(6),
+});
+
+const faq = z.object({
+  ...base,
+  type: z.literal('faq'),
+  title: text(80).min(1),
+  items: z.array(z.object({ question: text(160).min(1), answer: text(800).min(1) })).min(1).max(12),
+});
+
+export const section = z.discriminatedUnion('type', [hero, productRail, categoryGrid, brandGrid, promo, trustBar, quickBuy, cryptoQuote, p2pMarket, productSpotlight, features, faq]);
+/** Sections for bitocard.com's Storefront Manager (the others are reseller store templates'). */
+export const bitocardSectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar'] as const;
 export const sections = z
   .array(section)
   .max(40)
@@ -160,6 +229,24 @@ export const sections = z
       seen.add(item.id);
     });
   });
+
+/**
+ * Parses a layout and refuses sections of a type the page does not offer (bitocard.com's Storefront Manager, or a
+ * reseller store's template): the same issues shape as zod's, so the editor outlines the field.
+ */
+export function parseLayout(input: unknown, allowed: readonly string[]) {
+  const parsed = sections.safeParse(input);
+  if (!parsed.success) return parsed;
+  const issues = parsed.data.flatMap((item, index) => (allowed.includes(item.type) ? [] : [{ code: 'custom' as const, message: 'This section is not available on this page.', path: [index, 'type'] }]));
+  return issues.length ? ({ success: false as const, error: { issues } }) : parsed;
+}
+
+/** A layout refused: the first issue, with `param` naming its field (for example `sections[2].cta.href`). */
+export function invalidLayout(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  const first = issues[0];
+  const param = `sections${first.path.map(part => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`)).join('')}`;
+  return new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'layout_invalid', first.message, param);
+}
 
 export type Section = z.infer<typeof section>;
 export type Sections = z.infer<typeof sections>;

@@ -20,6 +20,7 @@ import { paymentRef, PaymentsService } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { CustomerWalletsService, walletMethod } from './customer-wallets.js';
 import { type PaymentOption, StoreSellers } from './store-sellers.js';
+import { templateSells } from '../stores/templates.js';
 
 const minute = 60 * 1000;
 /** Refunds that fail this many times are left for an admin (they stay `refund_pending`, and admins are told). */
@@ -218,6 +219,8 @@ export class CheckoutService implements OnModuleInit {
     const product = await this.prisma.product.findUnique({ where: { id: input.product_id } });
     const listed = product && (this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } }));
     if (!product || !listed) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');
+    // A reseller's store sells only what its template allows (its categories, or its one product).
+    if (!this.stores.isHouse(store) && !templateSells(store, product)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');
 
     // Wallets on: the customer buys only from their wallet. Off: at checkout, or from a balance they still have.
     const walletsOn = await this.customerWallets.enabled(seller);

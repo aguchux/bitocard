@@ -1,3 +1,4 @@
+import { orderStore } from '../stores/order-store.js';
 import { timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { PricingService } from '../catalogue/pricing.service.js';
@@ -376,7 +377,7 @@ export class NumbersService {
       if (note) await this.inbox.reseller(number.resellerId, note.type, { subject: `${number.id}:${stage}:${number.expiresAt.toISOString()}`, title: note.title, body: note.body, link: '/numbers', mode: number.mode });
       const to = await this.customerEmail(number);
       if (!to) return;
-      const [store, link] = await Promise.all([this.storeName(number.resellerId), this.access.link({ id: number.orderId, resellerId: number.resellerId }).then(result => result.url)]);
+      const [store, link] = await Promise.all([this.storeName(number.order), this.access.link({ id: number.orderId, resellerId: number.resellerId }).then(result => result.url)]);
       await this.email.send(numberReminderEmail(to, { store, number: number.number, stage, expiresAt: number.expiresAt, deleteAt, link }), { resellerId: number.resellerId, name: store });
     } catch (error) {
       this.logger.warn({ err: error instanceof Error ? error.message : 'unknown', numberId: number.id, stage }, 'Could not send a number reminder');
@@ -389,11 +390,9 @@ export class NumbersService {
     return typeof email === 'string' && email.includes('@') ? email : null;
   }
 
-  private async storeName(resellerId: string) {
-    const [store, reseller] = await Promise.all([
-      this.prisma.store.findFirst({ where: { resellerId, status: 'published' }, select: { name: true } }),
-      this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { name: true } }),
-    ]);
+  /** The name of the store the number's order came from (its customer's, else the reseller's first published), else the reseller's. */
+  private async storeName(order: { resellerId: string; customerId: string | null }) {
+    const [store, reseller] = await Promise.all([orderStore(this.prisma, order), this.prisma.reseller.findUniqueOrThrow({ where: { id: order.resellerId }, select: { name: true } })]);
     return store?.name ?? reseller.name;
   }
 
@@ -641,7 +640,7 @@ export class NumbersService {
         link: '/numbers',
         mode: number.mode,
       });
-      const store = await this.storeName(number.resellerId);
+      const store = await this.storeName(number.order);
       throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'store_cannot_renew', `${store} cannot renew this number right now. Contact them.`);
     }
     return this.forOrder(orderId);

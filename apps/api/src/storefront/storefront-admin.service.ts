@@ -5,7 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { Prisma, type ProductCategory, type StorefrontPage } from '../generated/prisma/client.js';
 import { brandInitials, brandRegistry, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl } from './brand-registry.js';
-import { categoryLabels, defaultHome, sections as sectionsSchema } from './layout.js';
+import { bitocardSectionTypes, categoryLabels, defaultHome, invalidLayout, parseLayout } from './layout.js';
 import { StorefrontService } from './storefront.service.js';
 
 const homeKey = 'home';
@@ -25,11 +25,6 @@ export type BrandInput = {
 };
 
 /** Turns a layout validation failure into the API's error shape, naming the field. */
-function invalidLayout(issues: Array<{ path: PropertyKey[]; message: string }>) {
-  const first = issues[0];
-  const param = `sections${first.path.map(part => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`)).join('')}`;
-  return new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'layout_invalid', first.message, param);
-}
 
 /**
  * The Storefront Manager (admin app): the home page's draft, publishing it (each publish is a version that can be
@@ -74,7 +69,7 @@ export class StorefrontAdminService {
 
   /** Saves the draft (validated; defaults filled in). Visitors see nothing until it is published. */
   async saveDraft(actorId: string | null, sections: unknown) {
-    const parsed = sectionsSchema.safeParse(sections);
+    const parsed = parseLayout(sections, bitocardSectionTypes);
     if (!parsed.success) throw invalidLayout(parsed.error.issues);
     await this.page();
     const page = await this.prisma.storefrontPage.update({ where: { key: homeKey }, data: { draft: parsed.data as Prisma.InputJsonValue, updatedById: actorId } });
@@ -84,7 +79,7 @@ export class StorefrontAdminService {
   /** Publishes the draft as the next version: bitocard.com shows it within a minute. */
   async publish(actorId: string | null) {
     const before = await this.page();
-    const parsed = sectionsSchema.safeParse(before.draft);
+    const parsed = parseLayout(before.draft, bitocardSectionTypes);
     if (!parsed.success) throw invalidLayout(parsed.error.issues);
     const page = await this.prisma.$transaction(async tx => {
       // Locked, so two admins publishing at once get consecutive versions.
