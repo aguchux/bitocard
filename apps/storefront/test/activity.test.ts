@@ -41,10 +41,10 @@ describe("the activity screen's address", () => {
     expect(activityShow(undefined)).toBe("money");
     expect(activityShow("crypto")).toBe("crypto");
     expect(activityShow("anything")).toBe("money");
-    expect(activityHref("money")).toBe("/account/wallet/activity");
-    expect(activityHref("crypto")).toBe("/account/wallet/activity?show=crypto");
-    expect(activityHref("crypto", id)).toBe(`/account/wallet/activity?show=crypto&after=${id}`);
-    expect(activityHref("money", id)).toBe(`/account/wallet/activity?after=${id}`);
+    expect(activityHref("money")).toBe("/account/wallet/transactions");
+    expect(activityHref("crypto")).toBe("/account/wallet/transactions?show=crypto");
+    expect(activityHref("crypto", id)).toBe(`/account/wallet/transactions?show=crypto&after=${id}`);
+    expect(activityHref("money", id)).toBe(`/account/wallet/transactions?after=${id}`);
   });
 
   test("only an ID is passed on as the cursor", () => {

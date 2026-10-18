@@ -44,19 +44,19 @@ describe("desktop sub rails", () => {
     expect(active("/account/disputes/new", "checkout=chk_1")).toBe("/account/disputes");
   });
 
-  test("Wallet lists the country's wallet, US dollars, the coins and the activity", () => {
-    expect(subMenusFor(context)[2]!.items.map(item => item.label)).toEqual(["NGN wallet", "US dollars", "Crypto", "Activity"]);
-    // The activity screen has its own item, whatever its list or page; the wallets are not current there.
-    expect(active("/account/wallet/activity")).toBe("/account/wallet/activity");
-    expect(active("/account/wallet/activity", "show=crypto&after=x")).toBe("/account/wallet/activity");
+  test("Wallet lists the country's wallet, US dollars, the coins and the transactions", () => {
+    expect(subMenusFor(context)[2]!.items.map(item => item.label)).toEqual(["NGN wallet", "US dollars", "Crypto", "Transactions"]);
+    // The Transactions screen has its own item, whatever its list or page; the wallets are not current there.
+    expect(active("/account/wallet/transactions")).toBe("/account/wallet/transactions");
+    expect(active("/account/wallet/transactions", "show=crypto&after=x")).toBe("/account/wallet/transactions");
     expect(active("/account/wallet")).toBe("/account/wallet");
     expect(active("/account/wallet", "wallet=usd")).toBe("/account/wallet?wallet=USD");
     expect(active("/account/wallet", "wallet=crypto&back=/account/p/x")).toBe("/account/wallet?wallet=crypto");
     expect(active("/account/wallet", "wallet=NGN")).toBe("/account/wallet");
     // A dollar country has one money wallet; an account without a country its default.
-    expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Crypto", "Activity"]);
+    expect(subMenusFor({ ...context, currency: "USD" })[2]!.items.map(item => item.label)).toEqual(["US dollars", "Crypto", "Transactions"]);
     expect(active("/account/wallet", "wallet=USD", { ...context, currency: "USD" })).toBe("/account/wallet");
-    expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Crypto", "Activity"]);
+    expect(subMenusFor({ ...context, currency: null })[2]!.items.map(item => item.label)).toEqual(["Your wallet", "Crypto", "Transactions"]);
   });
 
   test("every crypto page shows the Crypto rail, with the most specific item current", () => {

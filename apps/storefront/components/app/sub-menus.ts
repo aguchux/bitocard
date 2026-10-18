@@ -86,7 +86,7 @@ export const walletSections = (currency: string | null): SubMenuItem[] => [
   { href: "/account/wallet", label: !currency ? "Your wallet" : currency === "USD" ? "US dollars" : `${currency} wallet`, icon: Wallet },
   ...(currency && currency !== "USD" ? [{ href: "/account/wallet?wallet=USD", label: "US dollars", icon: DollarSign }] : []),
   { href: "/account/wallet?wallet=crypto", label: "Crypto", icon: Coins },
-  { href: "/account/wallet/activity", label: "Activity", icon: ReceiptText },
+  { href: "/account/wallet/transactions", label: "Transactions", icon: ReceiptText },
 ];
 
 /** The tabs with places of their own, in the app's tab order, shown as a second rail beside the app's rail on desktop. */

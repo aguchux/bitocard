@@ -7,6 +7,8 @@ export default createNextConfig({
   async redirects() {
     return [
       { source: "/legal", destination: legals, permanent: true },
+      // The wallet's Activity screen is now Transactions.
+      { source: "/account/wallet/activity", destination: "/account/wallet/transactions", permanent: true },
       { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/documents/:doc`, permanent: true },
       // Resellers' stores (<subdomain>.bitocard.com) are their own brand: BitoCard's reseller page lives on bitocard.com only.
       { source: "/resellers", has: [{ type: "host", value: "(?!www\\.)[a-z0-9-]+\\.bitocard\\.com" }], destination: "https://bitocard.com/resellers", permanent: false },

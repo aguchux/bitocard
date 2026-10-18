@@ -67,8 +67,8 @@ export function CryptoActivityList({ items }: { items: StoreCryptoTransaction[] 
   );
 }
 
-/** An activity card's heading, with an optional note beneath and View all on the right (to the activity screen). */
-export function ActivityHeading({ id, note, viewAll, children = "Activity" }: { id: string; note?: string; viewAll?: string; children?: ReactNode }) {
+/** A wallet card's Transactions heading, with an optional note beneath and View all on the right (to the Transactions screen). */
+export function ActivityHeading({ id, note, viewAll, children = "Transactions" }: { id: string; note?: string; viewAll?: string; children?: ReactNode }) {
   return (
     <div className="mb-2 flex items-start justify-between gap-3">
       <div className="min-w-0">

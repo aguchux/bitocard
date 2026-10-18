@@ -1,6 +1,6 @@
 import type { StoreCryptoTransaction } from "@bitocard/api-client/storefront";
 
-/** How far back the wallet page's recent activity looks, and how many it shows; the rest are on the activity screen. */
+/** How far back the wallet page's recent transactions look, and how many it shows; the rest are on the Transactions screen. */
 export const recentWindowMs = 24 * 60 * 60 * 1000;
 export const recentLimit = 5;
 
@@ -26,5 +26,5 @@ export const activityCursor = (value: string | undefined) => (value && uuid.test
 /** The activity screen's address: the list shown and, for older pages, the cursor. */
 export function activityHref(show: ActivityShow, after?: string | null) {
   const query = new URLSearchParams({ ...(show === "crypto" ? { show } : {}), ...(after ? { after } : {}) }).toString();
-  return `/account/wallet/activity${query ? `?${query}` : ""}`;
+  return `/account/wallet/transactions${query ? `?${query}` : ""}`;
 }

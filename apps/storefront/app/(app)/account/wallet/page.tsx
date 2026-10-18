@@ -177,7 +177,7 @@ function CryptoWallets({ wallets, activity, exchange }: { wallets: StoreCryptoWa
         {recent.length ? (
           <CryptoActivityList items={recent} />
         ) : (
-          <p className="text-slate-600">{moves.length ? "Nothing in the last 24 hours. View all for older activity." : "Deposits and trades show here."}</p>
+          <p className="text-slate-600">{moves.length ? "Nothing in the last 24 hours. View all for older transactions." : "Deposits and trades show here."}</p>
         )}
       </section>
     </>
@@ -200,6 +200,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     showCrypto ? customerApi<StoreExchange>("GET", "/v1/store/exchange") : null,
   ]);
   const wallet = chosen ?? (asked ? await walletFor() : null);
+  // The money wallets' last 24 hours (a few); everything else is on Transactions.
+  const recentMoney = activity?.ok ? recentItems(activity.data.data) : [];
   // The Crypto tab is there where the store offers crypto, or while the customer still holds coins or P2P money.
   const crypto = overview.ok && (overview.data.enabled || heldAssets(overview.data).length > 0 || hasP2pMoney(overview.data)) ? overview.data : null;
   const cryptoTab = showCrypto && crypto !== null;
@@ -313,11 +315,12 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       {cryptoTab ? null : (
       <section aria-labelledby="activity" className={card}>
-        <ActivityHeading id="activity" viewAll={activityHref("money")} />
-        {activity?.ok && activity.data.data.length ? (
-          <MoneyActivityList items={activity.data.data} />
+        {/* Only the last day here, to keep the page short; View all opens Transactions with everything. */}
+        <ActivityHeading id="activity" note="Last 24 hours" viewAll={activityHref("money")} />
+        {recentMoney.length ? (
+          <MoneyActivityList items={recentMoney} />
         ) : (
-          <p className="text-slate-600">Top-ups and purchases show here.</p>
+          <p className="text-slate-600">{activity?.ok && activity.data.data.length ? "Nothing in the last 24 hours. View all for older transactions." : "Top-ups and purchases show here."}</p>
         )}
       </section>
       )}

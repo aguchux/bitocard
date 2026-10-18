@@ -7,7 +7,7 @@ import { ActivityHeading, CryptoActivityList, MoneyActivityList } from "@/compon
 import { activityCursor, activityHref, activityShow, cryptoMoves, type ActivityShow } from "@/lib/activity";
 import { customerApi } from "@/lib/customer";
 
-export const metadata: Metadata = { title: "Activity" };
+export const metadata: Metadata = { title: "Transactions" };
 
 /** Items asked for a page: the coins' list leaves out lock moves, so it asks for more. */
 const pageSize: Record<ActivityShow, number> = { money: 25, crypto: 50 };
@@ -19,7 +19,7 @@ type Search = { show?: string; after?: string };
  * currencies) or, where the store offers crypto or the customer holds some, the coins. Older pages follow the API's
  * cursor (`starting_after`); Latest goes back to the start.
  */
-export default async function WalletActivityPage({ searchParams }: { searchParams: Promise<Search> }) {
+export default async function WalletTransactionsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
   const asked = activityShow(params.show);
   const after = activityCursor(params.after);
@@ -42,12 +42,12 @@ export default async function WalletActivityPage({ searchParams }: { searchParam
         <Link href={show === "crypto" ? "/account/wallet?wallet=crypto" : "/account/wallet"} className="-ml-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900 lg:hidden">
           <ChevronLeft className="size-4" aria-hidden="true" /> Wallet
         </Link>
-        <h1 className="text-2xl font-extrabold">Activity</h1>
+        <h1 className="text-2xl font-extrabold">Transactions</h1>
         <p className="mt-1 text-sm text-slate-600">Everything that went in and out of your wallets, newest first.</p>
       </div>
 
       {hasCrypto ? (
-        <nav aria-label="Activity of" className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 sm:max-w-sm">
+        <nav aria-label="Transactions of" className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 sm:max-w-sm">
           {(["money", "crypto"] as const).map(item => (
             <Link
               key={item}
@@ -62,7 +62,7 @@ export default async function WalletActivityPage({ searchParams }: { searchParam
       ) : null}
 
       <section aria-labelledby="all-activity" className={card}>
-        <ActivityHeading id="all-activity" note={after ? "Older activity" : undefined}>
+        <ActivityHeading id="all-activity" note={after ? "Older transactions" : undefined}>
           {show === "crypto" ? "Crypto activity" : "Money activity"}
         </ActivityHeading>
         {!result.ok ? (
