@@ -1105,3 +1105,92 @@ export async function fakeDomains() {
     },
   };
 }
+
+/**
+ * Remita Vending Bills (RemitaConnect gateway): categories, providers per category, products (two per page, filtered by
+ * country and category), account checks, vends and requeries under /api/v1/vending. `state.reply` sets the next vend's
+ * answer: `ok`, `pending` ("03"), `refuse` ("11", insufficient balance) or `lost` (vended, but the reply is a gateway
+ * timeout). `state.vends[reference]` is what a requery finds; a repeat of a reference is answered "94" (duplicate).
+ */
+export async function fakeRemita() {
+  const electricity = new Set(['101', '102', '201']);
+  const products = [
+    { code: '101', name: 'Eko PREPAID', provider: 'ekedc', categoryCode: 'electricity', countryCode: 'NGA', feeType: 'DYNAMIC', amount: 0.0 },
+    { code: '102', name: 'Eko POSTPAID', provider: 'ekedc', categoryCode: 'electricity', countryCode: 'NGA', feeType: 'DYNAMIC', amount: 0.0 },
+    { code: '201', name: 'Ikeja Prepaid', provider: 'ikedc', categoryCode: 'electricity', countryCode: 'NGA', feeType: 'DYNAMIC', amount: 0.0 },
+    { code: 'dstv-padi', name: 'DStv Padi', provider: 'dstv', categoryCode: 'cable_tv', countryCode: 'NGA', feeType: 'FIXED', amount: 4400 },
+    { code: 'gotv-smallie', name: 'GOtv Smallie', provider: 'gotv', categoryCode: 'cable_tv', countryCode: 'NGA', feeType: 'FIXED', amount: 1900 },
+    { code: 'mtn-vtu', name: 'MTN Airtime', provider: 'mtn', categoryCode: 'airtime', countryCode: 'NGA', feeType: 'DYNAMIC', amount: 0.0 },
+    { code: 'mtn-gh-vtu', name: 'MTN Ghana Airtime', provider: 'mtn_gh', categoryCode: 'airtime', countryCode: 'GHA', feeType: 'DYNAMIC', amount: 0.0 },
+    { code: 'mtn-1gb', name: 'MTN 1GB 30 Days', provider: 'mtn', categoryCode: 'internet_data_subscription', countryCode: 'NGA', feeType: 'FIXED', amount: 1000 },
+    { code: 'smile-5gb', name: 'Smile 5GB', provider: 'smile', categoryCode: 'internet_data_subscription', countryCode: 'NGA', feeType: 'FIXED', amount: 5000 },
+  ];
+  const categories = [
+    { id: 1, name: 'electricity', code: 'electricity' },
+    { id: 2, name: 'Airtime', code: 'airtime' },
+    { id: 3, name: 'Internet Data Subscription', code: 'internet_data_subscription' },
+    { id: 4, name: 'Cable TV', code: 'cable_tv' },
+    { id: 5, name: 'Educations', code: 'educations' },
+  ];
+  const providers = {
+    1: [{ code: 'ekedc', name: 'Eko Electricity Distribution Company', logoUrl: 'https://res.cloudinary.com/remita/eko.png' }, { code: 'ikedc', name: 'Ikeja Electricity Distribution Company', logoUrl: '' }],
+    2: [{ code: 'mtn', name: 'MTN' }, { code: 'mtn_gh', name: 'MTN Ghana' }],
+    3: [{ code: 'mtn', name: 'MTN' }, { code: 'smile', name: 'Smile' }],
+    4: [{ code: 'dstv', name: 'DStv' }, { code: 'gotv', name: 'GoTV' }],
+  };
+  const accounts = { 12345678910: 'Adene Jonah', 2022075342: 'TEST DSTV CUSTOMER', 1402000001: 'SMILE CUSTOMER' };
+  const state = { reply: 'ok', vends: {}, sent: [] };
+  const ok = data => ({ body: { message: 'Approved or completed successfully', status: '00', data } });
+  const vend = (body, status) => ({
+    amount: body.amount,
+    productCode: body.productCode,
+    categoryCode: electricity.has(body.productCode) ? 'electricity' : 'other',
+    token: electricity.has(body.productCode) ? '1123-4567-8567-8597-6545' : null,
+    extraTokens: null,
+    unit: electricity.has(body.productCode) ? '333.300' : null,
+    clientReference: body.clientReference,
+    paymentIdentifier: '1729988839525188',
+    status,
+  });
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (headers.secretkey !== 'remita-secret') return { status: 401, body: { status: '04', message: 'Authentication error' } };
+    const route = path.replace(/^\/api\/v1\/vending/, '');
+    if (method === 'GET' && route === '/categories') return ok({ totalPage: 1, totalContent: categories.length, items: categories });
+    const byCategory = /^\/providers\/category\/(\d+)$/.exec(route);
+    if (method === 'GET' && byCategory) return ok(providers[byCategory[1]] ?? []);
+    if (method === 'GET' && route === '/products') {
+      const found = products.filter(item => item.countryCode === query.get('countryCode') && item.categoryCode === query.get('categoryCode') && (!query.get('provider') || item.provider === query.get('provider')));
+      const page = Number(query.get('page') ?? 0);
+      return ok({ totalPage: Math.max(1, Math.ceil(found.length / 2)), totalContent: found.length, items: found.slice(page * 2, page * 2 + 2) });
+    }
+    if (method === 'POST' && route === '/validate') {
+      const name = accounts[body.accountNumber];
+      if (!name) return { body: { status: '02', message: 'Customer info could not be retrieved' } };
+      return ok({ name, accountNumber: body.accountNumber, productCode: body.productCode, minAmount: 500, maxAmount: null, outstandingBalance: null, address: '34 Tokai, Abuja' });
+    }
+    if (method === 'POST' && route === '/transactions') {
+      state.sent.push(body);
+      if (state.vends[body.clientReference]) return { body: { status: '94', message: 'Duplicate Transaction' } };
+      if (state.reply === 'refuse') return { status: 400, body: { status: '11', message: 'Insufficient balance' } };
+      if (state.reply === 'pending') {
+        state.vends[body.clientReference] = vend(body, 'pending');
+        return { body: { status: '03', message: 'Transaction pending', data: { clientReference: body.clientReference } } };
+      }
+      state.vends[body.clientReference] = vend(body, 'completed');
+      if (state.reply === 'lost') return { status: 504, body: '<html>Gateway timeout</html>', headers: { 'content-type': 'text/html' } };
+      return ok(state.vends[body.clientReference]);
+    }
+    const requery = /^\/query-transaction\/(.+)$/.exec(route);
+    if (method === 'GET' && requery) {
+      const found = state.vends[decodeURIComponent(requery[1])];
+      if (!found) return { body: { status: '22', message: 'Unknown payment reference' } };
+      if (found.status === 'pending') return { body: { status: '03', message: 'Transaction pending' } };
+      if (found.status === 'failed') return { body: { status: '01', message: 'Transaction failed' } };
+      return ok(found);
+    }
+    return { status: 404, body: { status: '02', message: `Fake Remita has no ${path}` } };
+  });
+  return { ...service, state, env: { REMITA_SECRET_KEY: 'remita-secret', REMITA_API_URL: service.url, REMITA_CONTACT_PHONE: '08011111111' } };
+}

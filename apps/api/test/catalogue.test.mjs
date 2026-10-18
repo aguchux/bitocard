@@ -42,9 +42,9 @@ const byKey = async (browser, key, headers) => {
 };
 
 describe('supplier registry and sync', () => {
-  test('all 33 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
+  test('all 34 suppliers are registered (BitoCard stock is not listed); only Reloadly and VTpass start enabled', async () => {
     const { data } = (await admin.get('/v1/admin/suppliers')).json;
-    assert.equal(data.length, 33);
+    assert.equal(data.length, 34);
     assert.equal(data.find(s => s.code === 'zendit').enabled, false, 'Zendit starts switched off');
     assert.deepEqual(data.filter(s => s.enabled).map(s => s.code).sort(), ['reloadly', 'vtpass']);
     const reloadlyRecord = data.find(s => s.code === 'reloadly');

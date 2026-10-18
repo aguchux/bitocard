@@ -14,7 +14,7 @@ Every sale follows the same path: **quote → order → outcome**.
 - the price your customer pays (`price`), and your wholesale cost (`wholesale`), in your wallet currency;
 - the exchange rate, if the product is priced in another currency;
 - any tax BitoCard collects as seller of record;
-- the recipient check: a valid mobile number for airtime and data, or the smartcard or meter number for pay-TV and bills (the quote returns the `account_name` so your customer can confirm it).
+- the recipient check: a valid mobile number for airtime and data, or the smartcard, meter or account number for pay-TV and bills (`recipient_type` `smartcard`, `meter` or `account`, for example an internet subscription) (the quote returns the `account_name` so your customer can confirm it).
 
 Show your customer the quote before they pay. An expired quote cannot be used: create a new one.
 

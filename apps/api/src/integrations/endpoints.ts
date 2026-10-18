@@ -22,6 +22,7 @@ const addresses: Record<string, Address[]> = {
   didww: [{ key: 'DIDWW_API_URL', live: 'https://api.didww.com/v3', sandbox: 'https://sandbox-api.didww.com/v3' }],
   zendit: [{ key: 'ZENDIT_API_URL', live: 'https://api.zendit.io/v1', sandbox: 'https://test-api.zendit.io/v1' }],
   pawapay: [{ key: 'PAWAPAY_API_URL', live: 'https://api.pawapay.io', sandbox: 'https://api.sandbox.pawapay.io' }],
+  remita: [{ key: 'REMITA_API_URL', live: 'https://api-gateway.remita.net', sandbox: 'https://api-demo.systemspecsng.com/services/connect-gateway' }],
   africas_talking: [
     { key: 'AFRICAS_TALKING_API_URL', live: 'https://api.africastalking.com', sandbox: 'https://api.sandbox.africastalking.com' },
     { key: 'AFRICAS_TALKING_DATA_URL', live: 'https://bundles.africastalking.com', sandbox: 'https://bundles.sandbox.africastalking.com' },
@@ -40,6 +41,7 @@ export const sandboxSwitches = {
   didww: 'DIDWW_SANDBOX',
   zendit: 'ZENDIT_SANDBOX',
   pawapay: 'PAWAPAY_SANDBOX',
+  remita: 'REMITA_SANDBOX',
   africas_talking: 'AFRICAS_TALKING_SANDBOX',
   monnify: 'MONNIFY_SANDBOX',
   flutterwave: 'FLUTTERWAVE_SANDBOX',

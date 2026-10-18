@@ -240,7 +240,7 @@ function OrderForm({ product, onChange }: { product: Product; onChange: () => vo
         ? { phone: phone.trim() }
         : product.recipient_type === "smartcard"
           ? { account_number: account.trim(), transaction_type: transactionType }
-          : product.recipient_type === "meter"
+          : product.recipient_type === "meter" || product.recipient_type === "account"
             ? { account_number: account.trim() }
             : undefined;
     const result = await createQuote({
@@ -324,9 +324,9 @@ function OrderForm({ product, onChange }: { product: Product; onChange: () => vo
               <Input id={`${id}-phone`} type="tel" inputMode="tel" autoComplete="off" required minLength={5} maxLength={20} value={phone} onChange={event => changed(setPhone)(event.target.value)} />
             </Field>
           ) : null}
-          {product.recipient_type === "smartcard" || product.recipient_type === "meter" ? (
+          {product.recipient_type === "smartcard" || product.recipient_type === "meter" || product.recipient_type === "account" ? (
             <Field
-              label={product.recipient_type === "meter" ? "Meter number" : "Smartcard or IUC number"}
+              label={product.recipient_type === "meter" ? "Meter number" : product.recipient_type === "account" ? "Account number" : "Smartcard or IUC number"}
               htmlFor={`${id}-account`}
               hint="We check it and show the account name before you place the order."
             >

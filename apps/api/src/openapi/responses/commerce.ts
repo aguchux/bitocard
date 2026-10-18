@@ -8,7 +8,7 @@ import type { DocsArea } from './index.js';
 export const categories = Object.values(ProductCategory);
 export const category = (description = 'Product category.') => oneOf(description, categories);
 export const features = array(oneOf('Something the product can do.', productFeatureKeys), 'What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products.');
-const recipientTypes = ['phone', 'smartcard', 'meter', 'none'] as const;
+const recipientTypes = ['phone', 'smartcard', 'meter', 'account', 'none'] as const;
 const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number', 'esim', 'vpn_account'] as const;
 
 const product = objectSchema(

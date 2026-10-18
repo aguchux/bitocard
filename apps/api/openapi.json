@@ -39471,6 +39471,7 @@
               "phone",
               "smartcard",
               "meter",
+              "account",
               "none"
             ]
           },
@@ -43897,11 +43898,12 @@
           },
           "recipient_type": {
             "type": "string",
-            "description": "What the customer gives when buying: `phone`, `smartcard`, `meter`, or `none`.",
+            "description": "What the customer gives when buying: `phone`, `smartcard`, `meter`, `account` (an account number, such as an internet subscription's), or `none`.",
             "enum": [
               "phone",
               "smartcard",
               "meter",
+              "account",
               "none"
             ]
           },
@@ -47447,6 +47449,7 @@
               "didww",
               "zendit",
               "pawapay",
+              "remita",
               "africas_talking",
               "esim_access",
               "flutterwave",
@@ -47596,6 +47599,7 @@
               "didww",
               "zendit",
               "pawapay",
+              "remita",
               "africas_talking",
               "esim_access",
               "flutterwave",

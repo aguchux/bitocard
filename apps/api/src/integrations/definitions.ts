@@ -128,6 +128,10 @@ const integrationKeyList = [
   'AFRICAS_TALKING_DATA_PRODUCT',
   'AFRICAS_TALKING_DATA_PLANS',
   'AFRICAS_TALKING_CALLBACK_TOKEN',
+  'REMITA_SECRET_KEY',
+  'REMITA_SANDBOX',
+  'REMITA_API_URL',
+  'REMITA_CONTACT_PHONE',
   'ESIM_ACCESS_ACCESS_CODE',
   'ESIM_ACCESS_SECRET_KEY',
   'ESIM_ACCESS_API_URL',
@@ -442,6 +446,18 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     ],
   },
   {
+    id: 'remita',
+    name: 'Remita',
+    description:
+      'Remita Vending Bills: electricity tokens, cable TV, airtime, data and internet subscriptions, paid from BitoCard’s Remita balance, with meter, smartcard and account checks. Without the secret key it serves only the sandbox, never live orders. Remita sends no order updates: orders are checked on schedule.',
+    fields: [
+      secret('REMITA_SECRET_KEY', 'Secret key', { help: 'RemitaConnect (connect.remita.net) > API keys: the Secret Key. Test and production keys differ; production also needs Vending subscribed and approved, and BitoCard’s server IP addresses whitelisted by Remita.' }),
+      field('REMITA_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: Remita’s demo gateway (api-demo.systemspecsng.com) with the test key, for Test connection only; Remita is not synced or used for live orders. Off: live (api-gateway.remita.net).' }),
+      field('REMITA_CONTACT_PHONE', 'Contact phone', { required: false, help: 'Sent with electricity and TV payments when the customer gave no phone number, for example 08011111111.' }),
+      field('REMITA_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default: the address follows the Sandbox switch.' }),
+    ],
+  },
+  {
     id: 'esim_access',
     name: 'eSIM Access',
     description:
@@ -501,7 +517,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
 ];
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
-const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access', 'africas_talking']);
+const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access', 'africas_talking', 'remita']);
 /** Credential groups whose adapter transport is implemented. They stay unavailable until their Supplier row and markets are enabled. */
 const builtCredentialSuppliers = new Set(['vpnresellers']);
 

@@ -3,6 +3,7 @@ import { isTestKey, type Environment } from '../integrations/endpoints.js';
 import { ProviderError, providerRequest } from '../payments/provider-error.js';
 import { africasTalkingCheck } from '../suppliers/africas-talking.adapter.js';
 import { EsimAccessAdapter } from '../suppliers/esim-access.adapter.js';
+import { RemitaAdapter } from '../suppliers/remita.adapter.js';
 
 export type ConnectableKind = 'supplier' | 'payment_gateway';
 
@@ -17,7 +18,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -125,6 +126,17 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       await providerRequest('pawapay', `${urls.PAWAPAY_API_URL}/v2/active-conf?operationType=PAYOUT`, { headers: { authorization: `Bearer ${(values.api_token ?? '').trim().replace(/^bearer\s+/i, '')}` } });
     },
     fromSettings: config => ({ api_token: config.PAWAPAY_API_TOKEN, payout_fee_percent: config.PAWAPAY_PAYOUT_FEE_PERCENT }),
+  },
+  {
+    id: 'remita',
+    kind: 'supplier',
+    name: 'Remita',
+    description: 'Electricity, cable TV, airtime, data and internet subscriptions paid from your own Remita balance (Vending Bills).',
+    fields: [secret('secret_key', 'Secret key', { help: 'RemitaConnect > API keys: the Secret Key, with Vending subscribed and approved. Remita must whitelist BitoCard’s server addresses for production.' })],
+    check: async (values, urls) => {
+      await new RemitaAdapter({ secretKey: values.secret_key, baseUrl: urls.REMITA_API_URL }).check();
+    },
+    fromSettings: config => ({ secret_key: config.REMITA_SECRET_KEY }),
   },
   {
     id: 'africas_talking',

@@ -271,7 +271,7 @@ const storeProductDetail = objectSchema(
     ...productProperties,
     denominations: { type: ['array', 'null'], items: { type: 'integer' }, description: 'Face values to choose from, in minor units of `face_currency`; null for a range.' },
     range: { ...shape({ min: int('Lowest face value, in minor units.'), max: int('Highest face value, in minor units.') }), type: ['object', 'null'], description: 'The range a customer may enter; null for fixed values.' },
-    recipient_type: oneOf('What the customer gives when buying: `phone`, `smartcard`, `meter`, or `none`.', ['phone', 'smartcard', 'meter', 'none']),
+    recipient_type: oneOf('What the customer gives when buying: `phone`, `smartcard`, `meter`, `account` (an account number, such as an internet subscription\'s), or `none`.', ['phone', 'smartcard', 'meter', 'account', 'none']),
     redeem_instructions: nullableStr('How to redeem it, where it applies.'),
     other_countries: array(ref('StoreProduct'), 'The same brand’s products elsewhere (up to 8).'),
     related: array(ref('StoreProduct'), 'Other brands in the same category (up to 8).'),

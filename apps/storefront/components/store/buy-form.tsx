@@ -177,9 +177,9 @@ export function BuyForm({
       {product.recipient_type === "phone" ? (
         <TextField key={`phone-${prefill.number}`} defaultValue={prefill.number} label="Mobile number" name="recipient_phone" type="tel" autoComplete="tel" required state={state} hint={`A ${product.country_name} number, for example with its country code.`} />
       ) : null}
-      {product.recipient_type === "smartcard" || product.recipient_type === "meter" ? (
+      {product.recipient_type === "smartcard" || product.recipient_type === "meter" || product.recipient_type === "account" ? (
         <TextField
-          label={product.recipient_type === "smartcard" ? "Smartcard or IUC number" : "Meter number"}
+          label={product.recipient_type === "smartcard" ? "Smartcard or IUC number" : product.recipient_type === "account" ? "Account number" : "Meter number"}
           name="recipient_account_number"
           inputMode="numeric"
           required

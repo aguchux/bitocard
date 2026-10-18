@@ -16,7 +16,8 @@ export type CatalogueItem = {
   fixedValues: bigint[];
   minValue?: bigint;
   maxValue?: bigint;
-  recipientType: 'phone' | 'smartcard' | 'meter' | 'none';
+  /** `account`: a customer account number other than a meter or smartcard (internet subscriptions), checked like them. */
+  recipientType: 'phone' | 'smartcard' | 'meter' | 'account' | 'none';
   description?: string;
   redeemInstructions?: string;
   logoUrl?: string;

@@ -7,7 +7,7 @@ export const catalogueCategories = ['gift_cards', 'airtime', 'data', 'bills', 'p
 export type CatalogueCategory = (typeof catalogueCategories)[number];
 
 /** What the customer must give when buying: a phone number, a smartcard or IUC number, a meter number, or nothing. */
-export type RecipientType = 'phone' | 'smartcard' | 'meter' | 'none';
+export type RecipientType = 'phone' | 'smartcard' | 'meter' | 'account' | 'none';
 
 export type Denomination = { type: 'fixed'; values: number[] } | { type: 'range'; min: number; max: number };
 

@@ -227,6 +227,13 @@ export const configSchema = z.object({
   /** In the status callback addresses set in its dashboard: /v1/webhooks/africas-talking?token=<this>. */
   AFRICAS_TALKING_CALLBACK_TOKEN: z.string().optional(),
   /** eSIM Access (eSIM data packages): the access code and secret key from its console (Developer). No sandbox exists. */
+  /** Remita Vending Bills (RemitaConnect): the account's secret key, sent as the secretKey header. */
+  REMITA_SECRET_KEY: z.string().optional(),
+  REMITA_SANDBOX: flag.prefault('off'),
+  /** Leave at the default to follow REMITA_SANDBOX (the demo gateway); any other value overrides it. */
+  REMITA_API_URL: z.string().url().default('https://api-gateway.remita.net'),
+  /** The phone number sent with bill and TV payments when the customer gave none (Remita asks for one). */
+  REMITA_CONTACT_PHONE: z.string().optional(),
   ESIM_ACCESS_ACCESS_CODE: z.string().optional(),
   ESIM_ACCESS_SECRET_KEY: z.string().optional(),
   ESIM_ACCESS_API_URL: z.string().url().default('https://api.esimaccess.com'),

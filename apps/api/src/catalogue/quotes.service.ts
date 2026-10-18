@@ -108,7 +108,7 @@ export class QuotesService {
     if (quantity > 1 && !multiples.has(product.category)) throw invalid('Only gift cards, software licences and eSIMs can be bought several at a time; quote each top-up or payment separately.', 'quantity');
     const recipient: RecipientRecord = {};
     if (product.recipientType === 'phone') recipient.phone = this.phone(product, input.recipient?.phone);
-    if (product.recipientType === 'smartcard' || product.recipientType === 'meter') {
+    if (product.recipientType === 'smartcard' || product.recipientType === 'meter' || product.recipientType === 'account') {
       const number = input.recipient?.account_number?.trim();
       if (!number) throw invalid(`recipient.account_number is required (the ${product.recipientType} number).`, 'recipient.account_number');
       recipient.account_number = number;
@@ -208,7 +208,7 @@ export class QuotesService {
     return parsed.number;
   }
 
-  /** Validates a smartcard or meter number with the routed supplier (simulated in the sandbox). */
+  /** Validates a smartcard, meter or account number with the routed supplier (simulated in the sandbox). */
   private async checkAccount(mode: LedgerMode, product: Product, offer: PricedOffer, accountNumber: string, resellerId: string, own: boolean) {
     let check: RecipientCheck;
     if (mode === 'test') {

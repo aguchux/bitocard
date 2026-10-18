@@ -11,6 +11,7 @@ import { ReloadlyAdapter } from './reloadly.adapter.js';
 import { StockAdapter } from './stock.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
 import { PawapayAdapter } from './pawapay.adapter.js';
+import { RemitaAdapter } from './remita.adapter.js';
 import { ZenditAdapter } from './zendit.adapter.js';
 import { VpnresellersAdapter } from './vpnresellers.adapter.js';
 
@@ -63,6 +64,7 @@ export class SupplierAdapters {
           dataProduct: config.AFRICAS_TALKING_DATA_PRODUCT,
           dataPlans: config.AFRICAS_TALKING_DATA_PLANS,
         }),
+        new RemitaAdapter({ secretKey: live('remita') ? config.REMITA_SECRET_KEY : undefined, baseUrl: config.REMITA_API_URL, contactPhone: config.REMITA_CONTACT_PHONE }),
         new EsimAccessAdapter({ accessCode: config.ESIM_ACCESS_ACCESS_CODE, secretKey: config.ESIM_ACCESS_SECRET_KEY, baseUrl: config.ESIM_ACCESS_API_URL }),
         new VpnresellersAdapter((() => {
           const credentials = integrations.supplier('vpnresellers');
@@ -92,6 +94,7 @@ export class SupplierAdapters {
     if (code === 'didww') return new DidwwAdapter({ apiKey: credentials.api_key, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL, connectionId });
     if (code === 'zendit') return new ZenditAdapter({ apiKey: credentials.api_key, baseUrl: config.ZENDIT_API_URL });
     if (code === 'esim_access') return new EsimAccessAdapter({ accessCode: credentials.access_code, secretKey: credentials.secret_key, baseUrl: config.ESIM_ACCESS_API_URL });
+    if (code === 'remita') return new RemitaAdapter({ secretKey: credentials.secret_key, baseUrl: config.REMITA_API_URL, contactPhone: config.REMITA_CONTACT_PHONE });
     if (code === 'pawapay') return new PawapayAdapter({ apiToken: credentials.api_token, baseUrl: config.PAWAPAY_API_URL, feePercent: credentials.payout_fee_percent });
     if (code === 'africas_talking') {
       return new AfricasTalkingAdapter({

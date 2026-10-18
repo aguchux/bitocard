@@ -116,6 +116,7 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | 32 | expressPay | Bills, airtime, data | Ghana | Qualify (confirm fulfilment, not only collections) |
 | 33 | Zendit | Gift cards, airtime, bundles and data (eSIMs and bill payments not yet used) | 150+ countries claimed; the live feed decides | **Pilot** (adapter built; prepaid USD wallet, separate test mode) |
 | 34 | pawaPay | Mobile money top-ups (payouts to customers' wallets) | The countries and providers on the pawaPay account (Sub-Saharan Africa) | **Pilot** (adapter built; prefunded wallet per country; legal advice before live) |
+| 36 | Remita (SystemSpecs) | Vending Bills: electricity, cable TV, airtime, data and internet subscriptions | Nigeria (its catalogue also lists Ghana, UK and US airtime) | **Pilot** (adapter built, off; production needs Vending approved on RemitaConnect, IP whitelisting and an agreed commission) |
 | 35 | VPNresellers | Fixed-term VPN access | Markets approved in writing only | **Pilot** (adapter, provisioning, lifecycle and reconciliation built; supplier, markets and listing off pending written resale and market approval, legal and commercial qualification) |
 
 **Platform vendors** (also behind adapters)
