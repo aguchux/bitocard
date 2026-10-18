@@ -108,6 +108,22 @@ describe('the templates', () => {
   });
 });
 
+describe('admins’ switch per template', () => {
+  test('a template switched off is closed to new choices, while stores already using it keep it', async () => {
+    const reseller = await seller();
+    const store = await published(reseller, { template: 'gift_cards' });
+    assert.equal((await admin.put('/v1/admin/switches/store_template_gift_cards', { reseller_id: reseller.resellerId, enabled: false })).status, 200);
+    const listed = (await reseller.browser.get('/v1/store-templates')).json.data.find(item => item.key === 'gift_cards');
+    assert.deepEqual([listed.available, listed.reason], [false, 'BitoCard does not offer this template for your stores at the moment.']);
+    const refused = await reseller.browser.post('/v1/stores', { name: 'More gifts', subdomain: sub('gifts'), template: 'gift_cards' });
+    assert.deepEqual([refused.status, refused.json.error.code], [403, 'template_unavailable']);
+    // The existing store still changes its design and colours, and still sells.
+    const kept = await reseller.browser.patch(`/v1/stores/${store.id}`, { variant: 'boutique', theme: 'noir' });
+    assert.equal(kept.status, 200, JSON.stringify(kept.json));
+    assert.deepEqual(await storeKeys(store.subdomain), [giftCard.key]);
+  });
+});
+
 describe('choosing a design', () => {
   test('template, variant and theme are checked; the theme brings its colours unless the reseller chose their own', async () => {
     const reseller = await seller();

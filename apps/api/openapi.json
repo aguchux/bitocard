@@ -1705,6 +1705,11 @@
                     "reseller_exchange": false,
                     "reseller_desks": false,
                     "spin_rewards": false,
+                    "store_template_all_in_one": true,
+                    "store_template_topups": true,
+                    "store_template_gift_cards": true,
+                    "store_template_crypto_desk": true,
+                    "store_template_single_product": true,
                     "manual_reseller_approval": false
                   }
                 }
@@ -38122,6 +38127,11 @@
               "reseller_exchange",
               "reseller_desks",
               "spin_rewards",
+              "store_template_all_in_one",
+              "store_template_topups",
+              "store_template_gift_cards",
+              "store_template_crypto_desk",
+              "store_template_single_product",
               "manual_reseller_approval"
             ],
             "additionalProperties": false,
@@ -38177,6 +38187,26 @@
               "spin_rewards": {
                 "type": "boolean",
                 "description": "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared."
+              },
+              "store_template_all_in_one": {
+                "type": "boolean",
+                "description": "Resellers can choose the All-in-one store template for a store. Stores already using it keep it. On unless switched off."
+              },
+              "store_template_topups": {
+                "type": "boolean",
+                "description": "Resellers can choose the Top-up and bills store template. Stores already using it keep it. On unless switched off."
+              },
+              "store_template_gift_cards": {
+                "type": "boolean",
+                "description": "Resellers can choose the Gift card shop store template. Stores already using it keep it. On unless switched off."
+              },
+              "store_template_crypto_desk": {
+                "type": "boolean",
+                "description": "Resellers can choose the Crypto desk store template (also needs the reseller's crypto exchange or P2P trading on). Stores already using it keep it. On unless switched off."
+              },
+              "store_template_single_product": {
+                "type": "boolean",
+                "description": "Resellers can choose the Single product store template. Stores already using it keep it. On unless switched off."
               },
               "manual_reseller_approval": {
                 "type": "boolean",

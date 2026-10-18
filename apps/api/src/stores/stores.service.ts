@@ -202,7 +202,7 @@ export class StoresService {
           variant: input.variant ?? (templateChanged ? undefined : store.variant),
           theme: input.theme ?? (templateChanged || variantChanged ? undefined : store.theme),
           focus: input.focus !== undefined ? input.focus : store.focus,
-        })
+        }, store.template)
       : null;
     const themeChanged = Boolean(design && design.theme.key !== store.theme);
     let subdomain: string | undefined;
@@ -290,8 +290,12 @@ export class StoresService {
     return presentStore(after);
   }
 
-  /** Whether a template is open to the reseller, and why not. The crypto desk needs their exchange or P2P switched on. */
+  /**
+   * Whether a template is open to the reseller, and why not: its admin switch (`store_template_<key>`, on by default),
+   * and for the crypto desk their exchange or P2P switched on.
+   */
   async templateAvailability(resellerId: string, template: StoreTemplate) {
+    if (!(await this.settings.isOn(`store_template_${template.key}`, resellerId))) return { available: false, reason: 'BitoCard does not offer this template for your stores at the moment.' };
     if (!template.crypto) return { available: true, reason: null };
     const on = (await this.settings.isOn('crypto_exchange', resellerId)) || (await this.settings.isOn('p2p_trading', resellerId));
     return on ? { available: true, reason: null } : { available: false, reason: 'Crypto trading is not switched on for your stores yet.' };
@@ -326,10 +330,11 @@ export class StoresService {
   }
 
   /** Checks a template, variant, theme and (single product stores) the product, all of which must exist and be open. */
-  private async chooseDesign(resellerId: string, input: { template: string; variant?: string; theme?: string; focus: string | null }) {
+  private async chooseDesign(resellerId: string, input: { template: string; variant?: string; theme?: string; focus: string | null }, current?: string) {
     const template = templateFor(input.template);
     if (!template) throw invalid('template_unknown', 'Choose one of the store templates.', 'template');
-    const { available, reason } = await this.templateAvailability(resellerId, template);
+    // A store keeps the template it has (its design and colours can still change); only choosing one is checked.
+    const { available, reason } = template.key === current ? { available: true, reason: null } : await this.templateAvailability(resellerId, template);
     if (!available) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'template_unavailable', reason ?? 'This template is not available.', 'template');
     if (input.variant !== undefined && !template.variants.some(item => item.key === input.variant)) throw invalid('variant_unknown', `Choose one of the ${template.name} designs.`, 'variant');
     const { variant, theme } = designFor(template.key, input.variant);

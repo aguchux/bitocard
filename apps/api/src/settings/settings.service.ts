@@ -62,6 +62,31 @@ export const switchDefinitions = {
     scopes: ['global', 'country', 'reseller'],
     description: "Spin and win: each store customer (one per person across every store) wins $1 in crypto (BNB, USDT, USDC) over 50 to 100 spins, a few a day, paid into their crypto wallet by BitoCard. Needs crypto wallets on too. Off until the promotion's terms are cleared.",
   },
+  store_template_all_in_one: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description: 'Resellers can choose the All-in-one store template for a store. Stores already using it keep it. On unless switched off.',
+  },
+  store_template_topups: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description: 'Resellers can choose the Top-up and bills store template. Stores already using it keep it. On unless switched off.',
+  },
+  store_template_gift_cards: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description: 'Resellers can choose the Gift card shop store template. Stores already using it keep it. On unless switched off.',
+  },
+  store_template_crypto_desk: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description: "Resellers can choose the Crypto desk store template (also needs the reseller's crypto exchange or P2P trading on). Stores already using it keep it. On unless switched off.",
+  },
+  store_template_single_product: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description: 'Resellers can choose the Single product store template. Stores already using it keep it. On unless switched off.',
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
