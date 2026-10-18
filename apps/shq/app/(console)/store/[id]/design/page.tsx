@@ -68,7 +68,7 @@ function DesignChoice({ store, templates }: { store: Store; templates: StoreTemp
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
         <VariantAndTheme template={template} variant={store.variant} theme={store.theme} disabled={state.isLoading} onChange={next => void update({ id: store.id, ...next }).unwrap().catch(() => undefined)} />
       </div>
-      <Dialog open={choosing} onClose={() => setChoosing(false)} title="Change template" description="A template decides what the store sells and which sections its home page offers.">
+      <Dialog size="full" open={choosing} onClose={() => setChoosing(false)} title="Change template" description="A template decides what the store sells and which sections its home page offers.">
         <TemplateCards
           templates={templates}
           value={store.template}

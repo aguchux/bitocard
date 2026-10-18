@@ -74,7 +74,7 @@ export function ThemeDots({ colors }: { colors: StoreThemeColors }) {
 /** The five templates as cards; one closed to the reseller shows why. */
 export function TemplateCards({ templates, value, onChange, disabled }: { templates: StoreTemplate[]; value: StoreTemplateKey; onChange: (key: StoreTemplateKey) => void; disabled?: boolean }) {
   return (
-    <div role="radiogroup" aria-label="Template" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div role="radiogroup" aria-label="Template" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
       {templates.map(template => {
         const Icon = templateIcons[template.key];
         const selected = template.key === value;

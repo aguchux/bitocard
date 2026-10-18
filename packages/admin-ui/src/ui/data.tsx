@@ -200,7 +200,25 @@ export function Tabs<V extends string>({ value, onChange, items, variant = 'unde
  * A modal built on the native <dialog>: focus moves inside, Escape closes, the page behind is inert.
  * The parent controls `open`.
  */
-export function Dialog({ open, onClose, title, description, children, footer }: { open: boolean; onClose: () => void; title: string; description?: ReactNode; children: ReactNode; footer?: ReactNode }) {
+/** `size="full"` fills the screen (a 1rem margin) for choices that need room to be seen at once, such as templates. */
+export function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  size = "default",
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  size?: "default" | "full";
+}) {
+  const full = size === "full";
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -217,10 +235,15 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
         event.preventDefault();
         onClose();
       }}
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-0 text-ink shadow-xl"
+      data-size={size}
+      className={
+        full
+          ? "m-auto h-[calc(100dvh-2rem)] max-h-none w-[calc(100vw-2rem)] max-w-none rounded-2xl border border-line bg-white p-0 text-ink shadow-xl"
+          : "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-0 text-ink shadow-xl"
+      }
     >
       {open ? (
-        <div className="flex max-h-[85vh] flex-col">
+        <div className={full ? "flex h-full flex-col" : "flex max-h-[85vh] flex-col"}>
           <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
             <div>
               <h2 id="dialog-title" className="text-lg font-bold">
@@ -232,7 +255,7 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
               <X className="size-5" aria-hidden />
             </button>
           </div>
-          <div className="overflow-y-auto px-6 py-5">{children}</div>
+          <div className={full ? "min-h-0 flex-1 overflow-y-auto px-6 py-5" : "overflow-y-auto px-6 py-5"}>{children}</div>
           {footer ? <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{footer}</div> : null}
         </div>
       ) : null}

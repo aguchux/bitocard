@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { categoryName, CodeInput, DataTable, formatBps, ImageField, formatMoney, formatRelative, LineChart, Notice, percentChange, StatusBadge, Trend } from '../src';
+import { categoryName, CodeInput, DataTable, Dialog, formatBps, ImageField, formatMoney, formatRelative, LineChart, Notice, percentChange, StatusBadge, Trend } from '../src';
 import { useState } from 'react';
 import { AdminGate, AdminProviders, AdminShell, can, NotificationBell, NotificationsInbox, PushSettings, useAdmin } from '../src/shell';
 import { pushServiceWorker } from '../src/push-worker';
@@ -434,5 +434,19 @@ describe('Notice', () => {
     expect(within(box).getByText('Identity not verified')).toBeTruthy();
     fireEvent.click(within(box).getByRole('button', { name: "Don't ask for ID" }));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Dialog', () => {
+  test('fills the screen when asked, and is the usual width otherwise', () => {
+    const { container, rerender } = render(<Dialog open onClose={() => undefined} title="Change template">Cards</Dialog>);
+    const dialog = container.querySelector('dialog')!;
+    expect(dialog.dataset.size).toBe('default');
+    expect(dialog.className).toContain('32rem');
+    rerender(<Dialog size="full" open onClose={() => undefined} title="Change template">Cards</Dialog>);
+    expect(dialog.dataset.size).toBe('full');
+    expect(dialog.className).toContain('w-[calc(100vw-2rem)]');
+    expect(dialog.className).toContain('h-[calc(100dvh-2rem)]');
+    expect(screen.getByText('Cards').className).toContain('flex-1');
   });
 });
