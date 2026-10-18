@@ -49,7 +49,7 @@ export function ExchangeLimits({
   }
   return (
     <div className="space-y-3 px-4 pb-5 sm:px-6">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         <Field label="Most a reseller desk may mark up (%)" htmlFor={`exchange-cap-${code}`} error={capProblem ?? undefined} hint={`On the market price, in ${country}. At most 20%.`}>
           <Input id={`exchange-cap-${code}`} inputMode="decimal" autoComplete="off" value={cap} onChange={event => setCap(event.target.value)} />
         </Field>
@@ -57,7 +57,8 @@ export function ExchangeLimits({
           <Input id={`exchange-alert-${code}`} inputMode="decimal" autoComplete="off" placeholder="No alert" value={alert} onChange={event => setAlert(event.target.value)} />
         </Field>
       </div>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+        <p className="min-w-0 flex-1 basis-64 text-xs text-muted">A lower cap applies to reseller desks the next time they price a trade. BitoCard&apos;s own markups are set on Crypto &gt; Exchange.</p>
         <Button
           size="sm"
           loading={state.isLoading}
@@ -67,7 +68,6 @@ export function ExchangeLimits({
           Save
         </Button>
       </div>
-      <p className="text-xs text-muted">A lower cap applies to reseller desks the next time they price a trade. BitoCard&apos;s own markups are set on Crypto &gt; Exchange.</p>
       {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
     </div>
   );

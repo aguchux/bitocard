@@ -14,8 +14,8 @@ export function SpinLimit({ code, country, limit, editable }: { code: string; co
   const [update, state] = useUpdateCountryMutation();
   return (
     <div className="space-y-3 px-4 pb-5 sm:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor={`spin-limit-${code}`} className="text-sm text-muted">{`Spins per customer per day in ${country}`}</label>
+      <div className="space-y-1.5">
+        <label htmlFor={`spin-limit-${code}`} className="block text-sm font-semibold text-ink">{`Spins per customer per day in ${country}`}</label>
         <div className="w-32">
           <Select
             id={`spin-limit-${code}`}

@@ -1,6 +1,7 @@
 export * from './format';
 export { DataTable, Dialog, LoadMore, StatCard, Tabs, type Column } from './ui/data';
 export { LineChart, type ChartSeries } from './ui/line-chart';
+export { PanelNav, SettingsPanel } from './ui/settings-panel';
 export { Button, Card, CardHeader, Field, FilterSelect, Input, KeyValue, PageHeader, Select, Skeleton, Textarea, Toggle, type ButtonProps } from './ui/primitives';
 export { ActionDialog } from './ui/action-dialog';
 export { CodeInput } from './ui/code-input';

@@ -16,8 +16,8 @@ export function IdentityProvider({ code, country, provider, editable }: { code: 
   const [update, state] = useUpdateCountryMutation();
   return (
     <div className="space-y-3 px-4 pb-5 sm:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor={`identity-provider-${code}`} className="text-sm text-muted">{`Checks in ${country}`}</label>
+      <div className="space-y-1.5">
+        <label htmlFor={`identity-provider-${code}`} className="block text-sm font-semibold text-ink">{`Checks in ${country}`}</label>
         <div className="w-full max-w-md">
           <Select
             id={`identity-provider-${code}`}
