@@ -50,8 +50,8 @@ Launch blockers requiring written answers or an executed agreement:
 ### 2. Consolidated product decision — started
 
 - Add VPN access to `PLANS.md` as a fixed-term software service.
-- Keep `software` as the MVP category and `WW` as the catalogue country, while availability remains gated by the buyer's enabled market.
-- Use product key `software:WW:bitocard:vpn-access-30d` and supplier SKU configured only when stage 5 is ready.
+- VPN is its own category, `vpn` (18 October 2026; it started under `software`), with its own Catalog menu group, `WW` as the catalogue country, and availability gated by the buyer's enabled market (`vpn` is off in every market by migration). Being its own category keeps it to one per order and out of delivery emails, which software allows.
+- Use product key `vpn:WW:bitocard:vpn-access-30d` and supplier SKU configured only when stage 5 is ready.
 - Snapshot the expected cost for the whole sold term. Reconcile the actual daily supplier cost separately.
 - Do not call the product “monthly” or promise automatic renewal.
 
@@ -81,7 +81,7 @@ Launch blockers requiring written answers or an executed agreement:
 
 ### 6. Order provisioning — complete
 
-- [x] Create the fixed 30-day supplier offer and BitoCard product through the existing catalogue sync/linkage (`software:WW:bitocard:vpn-access-30d`, SKU `vpn-30-day`, face value and cost the integration's expected monthly cost).
+- [x] Create the fixed 30-day supplier offer and BitoCard product through the existing catalogue sync/linkage (`vpn:WW:bitocard:vpn-access-30d`, SKU `vpn-30-day`, face value and cost the integration's expected monthly cost).
 - [x] Provision only from the authoritative paid order transition (`OrdersService.attempt`; the sandbox never calls the supplier).
 - [x] Use the existing order attempt, polling, wallet settlement, reversal, and exception queue.
 - [x] A clear supplier refusal fails through the existing reversal policy. A timeout stays pending and is reconciled before any retry: `check_username` first, then the project's accounts; the status check never creates.

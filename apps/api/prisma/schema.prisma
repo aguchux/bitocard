@@ -599,6 +599,8 @@ enum ProductCategory {
   pay_tv
   esim
   software
+  /// Fixed-term VPN access (30 days, never renewed).
+  vpn
   virtual_numbers
   virtual_cards
   /// Money sent to a customer's mobile money wallet (cash-in), for example through pawaPay.

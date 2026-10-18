@@ -32,7 +32,7 @@ const accountPath = (accountId: string) => `/accounts/${encodeURIComponent(accou
 
 /** The one VPN product sold: 30 days of access, never renewed automatically. */
 export const vpnSku = 'vpn-30-day';
-export const vpnProductKey = 'software:WW:bitocard:vpn-access-30d';
+export const vpnProductKey = 'vpn:WW:bitocard:vpn-access-30d';
 export const vpnTermDays = 30;
 export const vpnDeviceLimit = 10;
 
@@ -91,7 +91,7 @@ function account(value: RawAccount | null | undefined): VpnresellersAccount {
  */
 export class VpnresellersAdapter implements SupplierAdapter {
   readonly code = 'vpnresellers';
-  readonly syncs: ProductCategory[] = ['software'];
+  readonly syncs: ProductCategory[] = ['vpn'];
   readonly vpn: VpnSupplier = {
     status: async id => this.state(await this.getAccount(id)),
     enable: async id => this.state(await this.enableAccount(id)),
@@ -114,7 +114,7 @@ export class VpnresellersAdapter implements SupplierAdapter {
       {
         sku: vpnSku,
         productKey: vpnProductKey,
-        category: 'software',
+        category: 'vpn',
         country: 'WW',
         brand: 'bitocard',
         name: 'VPN access (30 days)',

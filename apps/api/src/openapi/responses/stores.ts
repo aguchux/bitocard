@@ -538,6 +538,7 @@ const navigation = [
   { key: 'bills', label: 'Bills', on_sale: true, categories: [bills, payTv], brands: [listing(dstvBrand, 6, false)] },
   { key: 'esims', label: 'eSIMs', on_sale: false, categories: [category_('esim', 'esims', 0)], brands: [] },
   { key: 'software', label: 'Software', on_sale: false, categories: [category_('software', 'software', 0)], brands: [] },
+  { key: 'vpn', label: 'VPN', on_sale: false, categories: [category_('vpn', 'vpn', 0)], brands: [] },
   { key: 'virtual-cards', label: 'Virtual cards', on_sale: false, categories: [category_('virtual_cards', 'virtual-cards', 0)], brands: [] },
 ];
 

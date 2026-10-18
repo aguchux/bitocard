@@ -91,6 +91,7 @@ const categoryNames: Record<string, string> = {
   esim: 'eSIM',
   software: 'Software',
   virtual_numbers: 'Virtual numbers',
+  vpn: 'VPN',
   virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
 };

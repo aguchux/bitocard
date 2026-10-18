@@ -40,7 +40,7 @@ describe('admin management', () => {
     const { json } = await admin.get('/v1/admin/countries');
     const ng = json.data.find(c => c.code === 'NG');
     assert.deepEqual([ng.markup_cap_percent, ng.payout_hold_days, ng.min_withdrawal_minor, ng.reserved_accounts], [100, 15, 1500000, true]);
-    assert.equal(ng.categories.length, 10, 'every category, on or off');
+    assert.equal(ng.categories.length, 11, 'every category, on or off');
     assert.deepEqual([ng.categories.find(c => c.category === 'mobile_money')?.enabled, ng.categories.find(c => c.category === 'mobile_money')?.customer_verification], [false, true], 'mobile money: off, customers verify');
   });
 

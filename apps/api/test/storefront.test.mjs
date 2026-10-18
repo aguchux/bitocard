@@ -103,13 +103,15 @@ describe('the public catalogue', () => {
     const navigation = (await visitor.get('/v1/store/navigation')).json;
     assert.deepEqual(
       navigation.groups.map(group => group.key),
-      ['gift-cards', 'mobile', 'bills', 'esims', 'software', 'virtual-cards'],
+      ['gift-cards', 'mobile', 'bills', 'esims', 'software', 'vpn', 'virtual-cards'],
       'the menus never come and go',
     );
     const mobile = navigation.groups.find(group => group.key === 'mobile');
     assert.ok(mobile.on_sale && mobile.brands.length > 0);
     const cards = navigation.groups.find(group => group.key === 'virtual-cards');
     assert.deepEqual([cards.on_sale, cards.brands, cards.categories.map(item => [item.category, item.on_sale, item.products])], [false, [], [['virtual_cards', false, 0]]], 'not open yet: listed, marked, empty');
+    const vpn = navigation.groups.find(group => group.key === 'vpn');
+    assert.deepEqual([vpn.label, vpn.on_sale, vpn.categories.map(item => [item.category, item.label, item.on_sale])], ['VPN', false, [['vpn', 'VPN', false]]], 'VPN has its own group, closed until a market is approved');
     assert.ok(navigation.countries.some(item => item.code === 'NG' && item.name === 'Nigeria'));
     const markets = await prisma.country.findMany();
     for (const market of markets) assert.ok(navigation.countries.some(item => item.code === market.code && item.name === market.name), `market ${market.code} is in the picker, with or without products`);

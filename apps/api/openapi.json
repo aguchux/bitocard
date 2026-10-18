@@ -16563,6 +16563,7 @@
                 "pay_tv",
                 "esim",
                 "software",
+                "vpn",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
@@ -17949,6 +17950,7 @@
                 "pay_tv",
                 "esim",
                 "software",
+                "vpn",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
@@ -23450,6 +23452,24 @@
                       "brands": []
                     },
                     {
+                      "key": "vpn",
+                      "label": "VPN",
+                      "on_sale": false,
+                      "categories": [
+                        {
+                          "object": "store_category",
+                          "category": "vpn",
+                          "label": "VPN",
+                          "group": "vpn",
+                          "icon_url": null,
+                          "image_url": null,
+                          "products": 0,
+                          "on_sale": false
+                        }
+                      ],
+                      "brands": []
+                    },
+                    {
                       "key": "virtual-cards",
                       "label": "Virtual cards",
                       "on_sale": false,
@@ -23588,6 +23608,7 @@
                 "pay_tv",
                 "esim",
                 "software",
+                "vpn",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"
@@ -23607,6 +23628,7 @@
                 "bills",
                 "esims",
                 "software",
+                "vpn",
                 "virtual-cards"
               ]
             }
@@ -24779,6 +24801,24 @@
                           "category": "software",
                           "label": "Software",
                           "group": "software",
+                          "icon_url": null,
+                          "image_url": null,
+                          "products": 0,
+                          "on_sale": false
+                        }
+                      ],
+                      "brands": []
+                    },
+                    {
+                      "key": "vpn",
+                      "label": "VPN",
+                      "on_sale": false,
+                      "categories": [
+                        {
+                          "object": "store_category",
+                          "category": "vpn",
+                          "label": "VPN",
+                          "group": "vpn",
                           "icon_url": null,
                           "image_url": null,
                           "products": 0,
@@ -38732,6 +38772,7 @@
                     "pay_tv",
                     "esim",
                     "software",
+                    "vpn",
                     "virtual_numbers",
                     "virtual_cards",
                     "mobile_money"
@@ -39306,6 +39347,7 @@
               "pay_tv",
               "esim",
               "software",
+              "vpn",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -39572,6 +39614,7 @@
                         "pay_tv",
                         "esim",
                         "software",
+                        "vpn",
                         "virtual_numbers",
                         "virtual_cards",
                         "mobile_money"
@@ -39878,6 +39921,7 @@
                   "pay_tv",
                   "esim",
                   "software",
+                  "vpn",
                   "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
@@ -41326,6 +41370,7 @@
                   "pay_tv",
                   "esim",
                   "software",
+                  "vpn",
                   "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
@@ -41577,6 +41622,7 @@
                   "pay_tv",
                   "esim",
                   "software",
+                  "vpn",
                   "virtual_numbers",
                   "virtual_cards",
                   "mobile_money"
@@ -43478,6 +43524,7 @@
               "pay_tv",
               "esim",
               "software",
+              "vpn",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43654,6 +43701,7 @@
               "pay_tv",
               "esim",
               "software",
+              "vpn",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43864,6 +43912,7 @@
               "pay_tv",
               "esim",
               "software",
+              "vpn",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43884,6 +43933,7 @@
               "bills",
               "esims",
               "software",
+              "vpn",
               "virtual-cards",
               null
             ],
@@ -43941,6 +43991,7 @@
               "pay_tv",
               "esim",
               "software",
+              "vpn",
               "virtual_numbers",
               "virtual_cards",
               "mobile_money"
@@ -43961,6 +44012,7 @@
               "bills",
               "esims",
               "software",
+              "vpn",
               "virtual-cards",
               null
             ],
@@ -44017,6 +44069,7 @@
               "bills",
               "esims",
               "software",
+              "vpn",
               "virtual-cards"
             ]
           },
@@ -44345,6 +44398,7 @@
                         "pay_tv",
                         "esim",
                         "software",
+                        "vpn",
                         "virtual_numbers",
                         "virtual_cards",
                         "mobile_money"
@@ -44450,6 +44504,7 @@
                           "pay_tv",
                           "esim",
                           "software",
+                          "vpn",
                           "virtual_numbers",
                           "virtual_cards",
                           "mobile_money"
@@ -44570,6 +44625,7 @@
                           "pay_tv",
                           "esim",
                           "software",
+                          "vpn",
                           "virtual_numbers",
                           "virtual_cards",
                           "mobile_money"
@@ -44976,6 +45032,7 @@
                                   "pay_tv",
                                   "esim",
                                   "software",
+                                  "vpn",
                                   "virtual_numbers",
                                   "virtual_cards",
                                   "mobile_money"
@@ -46010,6 +46067,7 @@
                 "pay_tv",
                 "esim",
                 "software",
+                "vpn",
                 "virtual_numbers",
                 "virtual_cards",
                 "mobile_money"

@@ -336,7 +336,7 @@ export class PlatformFeesService {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     // Minimum fees are set per country, so they are in its currency (the reseller's wallet currency).
     const currency = reseller.country ? ((await this.prisma.country.findUnique({ where: { code: reseller.country }, select: { currency: true } }))?.currency ?? null) : null;
-    const categories: Array<ProductCategory | null> = [null, 'gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'virtual_numbers', 'virtual_cards', 'mobile_money'];
+    const categories: Array<ProductCategory | null> = [null, 'gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'virtual_numbers', 'virtual_cards', 'mobile_money'];
     const data = [];
     for (const kind of ['supplier_order', 'gateway_payment'] as const) {
       for (const category of kind === 'gateway_payment' ? [null] : categories) {

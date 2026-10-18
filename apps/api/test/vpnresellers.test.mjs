@@ -101,8 +101,8 @@ describe('VPNresellers adapter foundation', () => {
     assert.equal(adapter().configured(), true);
     assert.equal(new VpnresellersAdapter({ apiToken: 'x', projectId: '0', monthlyCostUsd: '1.99', baseUrl }).configured(), false);
     const catalogue = await adapter().catalogue();
-    assert.deepEqual([catalogue.length, catalogue[0].sku, catalogue[0].productKey, catalogue[0].category, catalogue[0].fixedValues], [1, 'vpn-30-day', 'software:WW:bitocard:vpn-access-30d', 'software', [199n]]);
-    assert.deepEqual(adapter().syncs, ['software']);
+    assert.deepEqual([catalogue.length, catalogue[0].sku, catalogue[0].productKey, catalogue[0].category, catalogue[0].fixedValues], [1, 'vpn-30-day', 'vpn:WW:bitocard:vpn-access-30d', 'vpn', [199n]]);
+    assert.deepEqual(adapter().syncs, ['vpn']);
   });
 
   test('creates and reads an account with bearer authentication and normalised state', async () => {
@@ -160,7 +160,7 @@ describe('VPNresellers adapter foundation', () => {
     reference: 'stage6',
     sku: 'vpn-30-day',
     meta: { term_days: 30 },
-    category: 'software',
+    category: 'vpn',
     country: 'WW',
     faceValue: 199n,
     faceCurrency: 'USD',

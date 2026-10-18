@@ -78,14 +78,14 @@ before(async () => {
   for (const source of ['open_exchange_rates', 'flutterwave']) {
     await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
   }
-  await prisma.countryCategory.update({ where: { countryCode_category: { countryCode: 'NG', category: 'software' } }, data: { enabled: true, taxable: false, customerVerification: false } });
+  await prisma.countryCategory.update({ where: { countryCode_category: { countryCode: 'NG', category: 'vpn' } }, data: { enabled: true, taxable: false, customerVerification: false } });
   const saved = await admin.put('/v1/admin/integrations/vpnresellers', {
     values: { VPNRESELLERS_API_TOKEN: 'vpn-token', VPNRESELLERS_PROJECT_ID: '7', VPNRESELLERS_MONTHLY_COST_USD: '1.99', VPNRESELLERS_API_URL: vpn.url, VPNRESELLERS_LOW_BALANCE_USD: '50' },
     code: await adminCode(server, admin),
   });
   assert.equal(saved.status, 200, JSON.stringify(saved.json));
   assert.equal((await admin.patch('/v1/admin/suppliers/vpnresellers', { enabled: true })).status, 200);
-  assert.equal((await admin.put('/v1/admin/suppliers/vpnresellers/markets/NG/software', { enabled: true })).status, 200);
+  assert.equal((await admin.put('/v1/admin/suppliers/vpnresellers/markets/NG/vpn', { enabled: true })).status, 200);
   const sync = await admin.post('/v1/admin/suppliers/vpnresellers/sync');
   assert.equal(sync.status, 200, JSON.stringify(sync.json));
 });
@@ -103,7 +103,7 @@ async function reseller() {
 }
 
 async function buy(browser) {
-  const product = await prisma.product.findUniqueOrThrow({ where: { key: 'software:WW:bitocard:vpn-access-30d' } });
+  const product = await prisma.product.findUniqueOrThrow({ where: { key: 'vpn:WW:bitocard:vpn-access-30d' } });
   const quote = await browser.post('/v1/quotes', { product_id: product.id, face_value: Number(product.fixedValues[0]) });
   assert.equal(quote.status, 201, JSON.stringify(quote.json));
   const order = await browser.post('/v1/orders', { quote_id: quote.json.id });
@@ -117,8 +117,8 @@ const named = value => /vpn ?resellers/i.test(JSON.stringify(value));
 
 describe('VPN orders', () => {
   test('the product is one fixed 30-day offer that never names the supplier', async () => {
-    const product = await prisma.product.findUniqueOrThrow({ where: { key: 'software:WW:bitocard:vpn-access-30d' }, include: { supplierProducts: true } });
-    assert.deepEqual([product.category, product.country, product.fixedValues.map(Number), product.supplierProducts[0].sku], ['software', 'WW', [199], 'vpn-30-day']);
+    const product = await prisma.product.findUniqueOrThrow({ where: { key: 'vpn:WW:bitocard:vpn-access-30d' }, include: { supplierProducts: true } });
+    assert.deepEqual([product.category, product.country, product.fixedValues.map(Number), product.supplierProducts[0].sku], ['vpn', 'WW', [199], 'vpn-30-day']);
     assert.ok(!named([product.name, product.description, product.redeemInstructions]));
   });
 

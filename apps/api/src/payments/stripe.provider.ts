@@ -60,7 +60,7 @@ export function stripeFee(balance: BalanceTransaction, chargeCurrency: string) {
  * Stripe product tax codes by what is paid for (Managed Payments requires one, and accepts only digital products):
  * software is downloadable software for personal use. Other categories get the account's default code, if set.
  */
-export const stripeTaxCodes: Record<string, string> = { software: 'txcd_10202000' };
+export const stripeTaxCodes: Record<string, string> = { software: 'txcd_10202000', vpn: 'txcd_10202000' };
 
 export class StripeProvider implements CheckoutProvider {
   readonly name = 'stripe';

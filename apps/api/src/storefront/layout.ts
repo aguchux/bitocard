@@ -13,6 +13,7 @@ export const categoryLabels: Record<ProductCategory, string> = {
   pay_tv: 'Pay-TV',
   esim: 'eSIMs',
   software: 'Software',
+  vpn: 'VPN',
   virtual_numbers: 'Virtual numbers',
   virtual_cards: 'Virtual cards',
   mobile_money: 'Mobile money',
@@ -25,6 +26,7 @@ export const navigationGroups: Array<{ key: string; label: string; categories: P
   { key: 'bills', label: 'Bills', categories: ['bills', 'pay_tv'] },
   { key: 'esims', label: 'eSIMs', categories: ['esim'] },
   { key: 'software', label: 'Software', categories: ['software'] },
+  { key: 'vpn', label: 'VPN', categories: ['vpn'] },
   { key: 'virtual-cards', label: 'Virtual cards', categories: ['virtual_cards'] },
 ];
 
@@ -37,6 +39,7 @@ export const categorySynonyms: Record<ProductCategory, string[]> = {
   pay_tv: ['tv', 'pay-tv', 'pay tv', 'cable', 'subscription', 'satellite'],
   esim: ['esim', 'e-sim', 'travel data', 'roaming', 'travel'],
   software: ['software', 'licence', 'license', 'antivirus', 'windows', 'office', 'key'],
+  vpn: ['vpn', 'virtual private network', 'privacy', 'secure browsing', 'proxy'],
   virtual_numbers: ['virtual number', 'phone number', 'number', 'sms', 'did'],
   virtual_cards: ['virtual card', 'card', 'debit card', 'dollar card'],
   mobile_money: ['mobile money', 'momo', 'm-pesa', 'mpesa', 'wallet', 'send money', 'cash in'],
