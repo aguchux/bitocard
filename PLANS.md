@@ -477,6 +477,7 @@ Questions to ask each supplier are listed per category in `AGENTS.md`.
 
 - **Standard plan:** free. Chargebacks are absorbed by the reseller (taken from their wallet). **Decided**
 - **Premium plan:** a single paid plan, monthly, charged from the wallet, with its price set by admins. BitoCard handles chargebacks and provides priority support including chat, plus further benefits. **Decided** Exact protection terms go in the reseller terms.
+- **Support assistant (planned):** live chat and support tickets on every store, answered by people and by one AI support bot per store (Anthropic, OpenAI or DeepSeek; the store's own key, or BitoCard's within a Premium allowance), with knowledge uploaded as Markdown or generated from the store's data, tickets escalating from customer to reseller to BitoCard to a GitHub issue. Plan: `docs/BITOCARD_SUPPORT_ASSISTANT_PLAN.md`.
 - **No API fees.** API features can be restricted by plan, but every feature is enabled on every plan by default. **Decided**
 
 ### Commercial model (Decided)
