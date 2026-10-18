@@ -4,6 +4,7 @@ import { currentCustomer } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
+import { storeShell } from "@/lib/store-theme";
 
 /** On a reseller's store: its name in every title, and its own address as the canonical one. */
 export async function generateMetadata(): Promise<Metadata> {
@@ -40,8 +41,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     );
   }
   const [{ groups, countries }, market, customer] = await Promise.all([storeNavigation(), currentMarket(), currentCustomer()]);
+  // A reseller's store wears its template's variant and colour theme.
   return (
-    <div className={shell}>
+    <div className={shell} {...storeShell(store?.design)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>

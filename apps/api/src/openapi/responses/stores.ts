@@ -379,7 +379,7 @@ const sections = [
     'quick_buy',
     'Reseller stores: a form to top up or pay a bill at once.',
     { ...heading, categories: array(oneOf('A tab.', quickBuyCategories), 'The form’s tabs, in order.') },
-    shape({ categories: array(shape({ category: category(), label: str('Tab label.'), brands: array(ref('StoreBrandListing'), 'Its networks or billers.') }), 'The tabs on sale here, with their networks or billers.') }),
+    shape({ categories: array(shape({ category: category(), label: str('Tab label.'), brands: array(ref('StoreBrandListing'), 'Its networks or billers.'), products: array(ref('StoreProduct'), 'Its products (up to 48): each network’s top-up or bundles, each biller’s payment.') }), 'The tabs on sale here, with their networks or billers.') }),
   ),
   section(
     'crypto_quote',

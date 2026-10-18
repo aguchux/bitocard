@@ -128,7 +128,7 @@ export type ProductRailSection = SectionBase & {
   viewAllHref?: string;
 };
 export type CategoryGridSection = SectionBase & { type: 'category_grid'; title: string; subtitle: string; categories: ProductCategory[] };
-export type BrandGridSection = SectionBase & { type: 'brand_grid'; title: string; subtitle: string; tag: string; limit: number };
+export type BrandGridSection = SectionBase & { type: 'brand_grid'; title: string; subtitle: string; tag: string; categories?: ProductCategory[]; limit: number };
 export type PromoTheme = 'pink' | 'sky' | 'navy' | 'light' | 'sunset';
 export type PromoIllustration = 'store' | 'esim' | 'gift' | 'globe' | 'none';
 export type PromoSection = SectionBase & {
@@ -142,11 +142,23 @@ export type PromoSection = SectionBase & {
   theme: PromoTheme;
   illustration: PromoIllustration;
 };
-export type TrustIcon = 'lock' | 'bolt' | 'card' | 'globe' | 'shield' | 'support';
+export type TrustIcon = 'lock' | 'bolt' | 'card' | 'globe' | 'shield' | 'support' | 'gift' | 'phone' | 'coin' | 'chart' | 'clock' | 'star';
 export type TrustBarSection = SectionBase & { type: 'trust_bar'; items: Array<{ icon: TrustIcon; title: string; body: string }> };
 
 export type Section = HeroSection | ProductRailSection | CategoryGridSection | BrandGridSection | PromoSection | TrustBarSection;
 export type SectionType = Section['type'];
+
+// Reseller store templates' sections (bitocard.com's Storefront Manager offers the six above).
+export type QuickBuyCategory = 'airtime' | 'data' | 'bills' | 'pay_tv' | 'mobile_money';
+export type QuickBuySection = SectionBase & { type: 'quick_buy'; title: string; subtitle: string; categories: QuickBuyCategory[] };
+export type CryptoQuoteSection = SectionBase & { type: 'crypto_quote'; title: string; subtitle: string; assets: string[]; side: 'buy' | 'sell' };
+export type P2pMarketSection = SectionBase & { type: 'p2p_market'; title: string; subtitle: string; asset: string; limit: number };
+export type ProductSpotlightSection = SectionBase & { type: 'product_spotlight'; title: string; subtitle: string; productKey: string; bullets: string[]; imageUrl?: string };
+export type FeaturesSection = SectionBase & { type: 'features'; title: string; subtitle: string; items: Array<{ icon: TrustIcon; title: string; body: string }> };
+export type FaqSection = SectionBase & { type: 'faq'; title: string; items: Array<{ question: string; answer: string }> };
+export type StoreSection = Section | QuickBuySection | CryptoQuoteSection | P2pMarketSection | ProductSpotlightSection | FeaturesSection | FaqSection;
+export type StoreSectionType = StoreSection['type'];
+export type CryptoAssetRef = { code: string; name: string };
 
 /** A section as the home page returns it: with what it shows. */
 export type ResolvedSection =
@@ -155,7 +167,27 @@ export type ResolvedSection =
   | (CategoryGridSection & { data: { categories: StoreCategory[] } })
   | (BrandGridSection & { data: { brands: StoreBrand[] } })
   | (PromoSection & { data: null })
-  | (TrustBarSection & { data: null });
+  | (TrustBarSection & { data: null })
+  | (QuickBuySection & { data: { categories: Array<{ category: QuickBuyCategory; label: string; brands: StoreBrand[]; products: StoreProduct[] }> } })
+  | (CryptoQuoteSection & { data: { assets: CryptoAssetRef[] } })
+  | (P2pMarketSection & { data: { asset: CryptoAssetRef | null } })
+  | (ProductSpotlightSection & { data: { product: StoreProductDetail | null } })
+  | (FeaturesSection & { data: null })
+  | (FaqSection & { data: null });
+
+// -- Store templates: how a reseller's store looks (`GET /v1/storefronts/:subdomain` `design`) ----------------------
+
+export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product';
+export type StoreThemeColors = { primary: string; accent: string; background: string; surface: string; ink: string; muted: string; heroFrom: string; heroTo: string; heroInk: string };
+export type StoreVariantStyle = {
+  mode: 'light' | 'dark';
+  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story';
+  corners: 'sharp' | 'soft' | 'round';
+  cards: 'flat' | 'raised' | 'outline' | 'glass';
+  font: 'sans' | 'display' | 'mono' | 'serif';
+  density: 'compact' | 'comfortable' | 'airy';
+};
+export type StoreDesign = { template: StoreTemplateKey; variant: string; theme: string; style: StoreVariantStyle; colors: StoreThemeColors };
 
 export type StoreHome = {
   object: 'store_home';

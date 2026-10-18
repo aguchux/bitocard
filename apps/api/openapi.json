@@ -39517,14 +39517,15 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "description": "What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`) or `esim` (the LPA activation string in `code`, a secret: whoever holds it can install the eSIM once; the ICCID in `serial`).",
+                  "description": "What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`), `esim` (the secret LPA activation string in `code`; ICCID in `serial`) or `vpn_account` (password in `code`; username in `serial`).",
                   "enum": [
                     "gift_card",
                     "licence_key",
                     "token",
                     "confirmation",
                     "virtual_number",
-                    "esim"
+                    "esim",
+                    "vpn_account"
                   ]
                 },
                 "code": {
@@ -39532,7 +39533,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "The gift card code, licence key or electricity token. A secret: show it only to your customer."
+                  "description": "The gift card code, licence key, electricity token, eSIM activation string or VPN password. A secret: show it only to your customer."
                 },
                 "pin": {
                   "type": [
@@ -39546,7 +39547,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "A serial number, or the phone number for `virtual_number`."
+                  "description": "A serial number, virtual phone number, eSIM ICCID, or VPN username."
                 },
                 "details": {
                   "type": "object",
@@ -44172,7 +44173,8 @@
                             "required": [
                               "category",
                               "label",
-                              "brands"
+                              "brands",
+                              "products"
                             ],
                             "additionalProperties": false,
                             "properties": {
@@ -44202,6 +44204,13 @@
                                   "$ref": "#/components/schemas/StoreBrandListing"
                                 },
                                 "description": "Its networks or billers."
+                              },
+                              "products": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/StoreProduct"
+                                },
+                                "description": "Its products (up to 48): each network’s top-up or bundles, each biller’s payment."
                               }
                             }
                           },

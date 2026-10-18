@@ -8,6 +8,7 @@ import type { HostedStore } from "@/lib/store";
 import { CountryPicker } from "./country-picker";
 import { CurrencyMenu } from "./currency-menu";
 import { MarketChooser } from "./market-chooser";
+import { quickLinksFor } from "@/lib/quick-links";
 import { DesktopNav, MobileMenu } from "./header-menus";
 
 /** A reseller's store name, with its logo when it has one. */
@@ -57,7 +58,7 @@ export function StoreHeader({
             <Brand />
           </Link>
         )}
-        <DesktopNav groups={groups} />
+        <DesktopNav groups={groups} links={quickLinksFor(groups, store?.design?.template)} />
         <div className="-mr-2 ml-auto flex items-center gap-1 sm:mr-0 sm:gap-3">
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
@@ -85,7 +86,7 @@ export function StoreHeader({
               Start Reselling
             </Link>
           )}
-          <MobileMenu groups={groups} signedIn={signedIn} reseller={!store} />
+          <MobileMenu groups={groups} signedIn={signedIn} reseller={!store} links={quickLinksFor(groups, store?.design?.template)} />
         </div>
       </div>
     </header>

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useId, useState, useTransition } from "react";
+import { useActionState, useId, useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { Lock, Wallet } from "lucide-react";
 import { formatFace, localFace, type StoreCountry, type StorePaymentMethod, type StoreProductDetail, type StoreWallet } from "@bitocard/api-client/storefront";
 import { type FormState, startCheckout } from "@/lib/account-actions";
 import { type PaymentChoice, paymentMethodsFor } from "@/lib/payment-methods";
+import { prefillFrom } from "@/lib/quick-buy";
 import { FormMessage, Submit, TextField } from "./account-forms";
 
 /** Bought several at a time, each its own code. */
@@ -40,6 +41,9 @@ function rangeInLocal(product: StoreProductDetail) {
   return min && max ? `, about ${formatFace(min.amount, min.currency)} to ${formatFace(max.amount, max.currency)}` : "";
 }
 
+/** The page's address does not change under the form, so there is nothing to listen to. */
+const noSubscription = () => () => {};
+
 /**
  * Buying on a product page: the value, how many, who it is for, where the customer pays from and how. With wallets on
  * the customer pays from their wallet (topping it up first); otherwise the price is confirmed on the payment page, and
@@ -73,6 +77,9 @@ export function BuyForm({
 }) {
   const id = useId();
   const [state, action, pending] = useActionState<FormState, FormData>(startCheckout, {});
+  // Quick buy opens this page with the number (and amount) in its address: they start the form.
+  const search = useSyncExternalStore(noSubscription, () => window.location.search, () => "");
+  const prefill = useMemo(() => prefillFrom(search), [search]);
   const values = product.denominations ?? [];
   const [market, setMarket] = useState(country ?? (product.global ? "" : product.country));
   // The country the last attempt was for: its error is hidden once the shopper picks another country.
@@ -145,6 +152,8 @@ export function BuyForm({
           name="face_value"
           inputMode="decimal"
           required
+          key={`amount-${prefill.amount}`}
+          defaultValue={prefill.amount}
           state={state}
           hint={`From ${formatFace(product.range.min, product.face_currency)} to ${formatFace(product.range.max, product.face_currency)}${rangeInLocal(product)}.`}
         />
@@ -166,7 +175,7 @@ export function BuyForm({
       ) : null}
 
       {product.recipient_type === "phone" ? (
-        <TextField label="Mobile number" name="recipient_phone" type="tel" autoComplete="tel" required state={state} hint={`A ${product.country_name} number, for example with its country code.`} />
+        <TextField key={`phone-${prefill.number}`} defaultValue={prefill.number} label="Mobile number" name="recipient_phone" type="tel" autoComplete="tel" required state={state} hint={`A ${product.country_name} number, for example with its country code.`} />
       ) : null}
       {product.recipient_type === "smartcard" || product.recipient_type === "meter" ? (
         <TextField
@@ -174,6 +183,8 @@ export function BuyForm({
           name="recipient_account_number"
           inputMode="numeric"
           required
+          key={`account-${prefill.number}`}
+          defaultValue={prefill.number}
           state={state}
           hint="We check it with the provider before you pay."
         />

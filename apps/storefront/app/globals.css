@@ -15,4 +15,9 @@
   :focus-visible { outline: 3px solid var(--color-brand-700); outline-offset: 5px; }
   :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
 }
+/* Reseller store variants (lib/store-theme.ts): flat and outline cards have no shadows (outline keeps the borders);
+   glass cards blur what is behind their see-through surface. */
+[data-cards="flat"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl),
+[data-cards="outline"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl) { box-shadow: none; }
+[data-cards="glass"] .bg-white { backdrop-filter: blur(12px); }
 /* Spin and win's styles are its own CSS module: components/app/spin/spin.module.css. */

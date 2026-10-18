@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
+import type { StoreDesign } from "@bitocard/api-client/storefront";
 import { apiUrl } from "./api";
 
 /**
@@ -23,6 +24,10 @@ export type HostedStore = {
   app?: { desktop_nav: "rail" | "bottom" };
   /** The store's own main domain while it works, else null. */
   domain?: string | null;
+  /** Its template, variant and colour theme: how it looks (`lib/store-theme.ts`). */
+  design?: StoreDesign;
+  /** Single product stores: the product key it sells. */
+  focus?: string | null;
 };
 
 /** BitoCard's own hosts (its domain, local development and Vercel previews): never a reseller's own domain. */

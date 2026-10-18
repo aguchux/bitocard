@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Your order", robots: { index: false,
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
 const dateTime = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
-const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key", "token", "esim"]);
+const secretKinds = new Set<AccessDelivery["kind"]>(["gift_card", "licence_key", "token", "esim", "vpn_account"]);
 
 function Shell({ store, children }: { store: AccessStore | null; children: React.ReactNode }) {
   const name = store?.name ?? brand.name;

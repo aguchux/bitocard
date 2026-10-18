@@ -14,7 +14,7 @@ import { minor } from '../ledger/mode.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { resellerNotVerified, testModeOnly } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
-import type { Delivery, FulfilmentRequest, FulfilmentResult, SuppliedEsim, SuppliedNumber } from '../suppliers/adapter.js';
+import type { Delivery, FulfilmentRequest, FulfilmentResult, SuppliedEsim, SuppliedNumber, SuppliedVpnSubscription } from '../suppliers/adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
 import { EventsService } from '../webhooks/events.service.js';
 import { PlatformFeesService } from '../fees/platform-fees.service.js';
@@ -457,7 +457,7 @@ export class OrdersService {
   }
 
   /** Records the delivery and takes the held money: wholesale as revenue, tax as tax payable, and the supplier cost. */
-  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[]; esims?: SuppliedEsim[]; reportedCost?: FulfilmentResult['reportedCost'] }) {
+  private async complete(order: Order, result: { supplierTransactionId?: string; deliveries?: Delivery[]; numbers?: SuppliedNumber[]; esims?: SuppliedEsim[]; vpns?: SuppliedVpnSubscription[]; reportedCost?: FulfilmentResult['reportedCost'] }) {
     const deliveries = result.deliveries ?? [];
     // What the supplier said it charged now, else what it said when it accepted the order.
     const earlier = order.supplierReportedCostMinor !== null && order.supplierCurrency ? { amountMinor: order.supplierReportedCostMinor, currency: order.supplierCurrency } : undefined;
@@ -481,17 +481,21 @@ export class OrdersService {
         },
       });
       if (updated.count === 0) return false;
+      let vpnDeliveryId: string | null = null;
       for (const delivery of deliveries) {
-        await tx.orderDelivery.create({
-          data: {
+        const data = {
             orderId: order.id,
             kind: delivery.kind,
             codeEncrypted: delivery.code && encryption ? encryption.encrypt(delivery.code) : null,
             pinEncrypted: delivery.pin && encryption ? encryption.encrypt(delivery.pin) : null,
             serial: delivery.serial ?? null,
             details: delivery.details ?? undefined,
-          },
-        });
+        };
+        // Stage 5 prepares VPN credentials before the supplier call. Completion reuses that encrypted delivery rather
+        // than creating a second password record.
+        const prepared = delivery.kind === 'vpn_account' ? await tx.orderDelivery.findFirst({ where: { orderId: order.id, kind: 'vpn_account' } }) : null;
+        const saved = prepared ? await tx.orderDelivery.update({ where: { id: prepared.id }, data }) : await tx.orderDelivery.create({ data });
+        if (delivery.kind === 'vpn_account') vpnDeliveryId = saved.id;
       }
       for (const number of numbers) {
         await tx.virtualNumber.create({
@@ -522,6 +526,35 @@ export class OrdersService {
             expiresAt: esim.expiresAt,
             dataTotalBytes: esim.totalBytes,
             topUps: esim.topUps,
+          },
+        });
+      }
+      for (const vpn of result.vpns ?? []) {
+        const deliveryId = vpnDeliveryId ?? (await tx.orderDelivery.findFirst({ where: { orderId: order.id, kind: 'vpn_account' }, select: { id: true } }))?.id;
+        if (!deliveryId) throw new Error('A VPN subscription requires its encrypted credential delivery');
+        await tx.vpnSubscription.upsert({
+          where: { orderId: order.id },
+          create: {
+            orderId: order.id,
+            deliveryId,
+            resellerId: order.resellerId,
+            mode: order.mode,
+            productId: order.productId,
+            supplierCode: order.supplierCode,
+            supplierAccountId: vpn.supplierAccountId,
+            status: vpn.status,
+            supplierStatus: vpn.supplierStatus,
+            startsAt: vpn.startsAt,
+            expiresAt: vpn.expiresAt,
+            lastSyncedAt: new Date(),
+          },
+          update: {
+            supplierAccountId: vpn.supplierAccountId,
+            status: vpn.status,
+            supplierStatus: vpn.supplierStatus,
+            startsAt: vpn.startsAt,
+            expiresAt: vpn.expiresAt,
+            lastSyncedAt: new Date(),
           },
         });
       }

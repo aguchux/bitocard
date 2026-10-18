@@ -9,7 +9,7 @@ export const categories = Object.values(ProductCategory);
 export const category = (description = 'Product category.') => oneOf(description, categories);
 export const features = array(oneOf('Something the product can do.', productFeatureKeys), 'What the product can do, for example `sms_in` (receives SMS) or `app_codes` (receives sign-in codes from apps) on a virtual number. Empty for most products.');
 const recipientTypes = ['phone', 'smartcard', 'meter', 'none'] as const;
-const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number', 'esim'] as const;
+const deliveryKinds = ['gift_card', 'licence_key', 'token', 'confirmation', 'virtual_number', 'esim', 'vpn_account'] as const;
 
 const product = objectSchema(
   'Product',
@@ -275,10 +275,10 @@ const orderSchema = eventObjectSchemas.Order as { title: string; required: strin
 
 const delivery = shape(
   {
-    kind: oneOf('What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`) or `esim` (the LPA activation string in `code`, a secret: whoever holds it can install the eSIM once; the ICCID in `serial`).', deliveryKinds),
-    code: nullableStr('The gift card code, licence key or electricity token. A secret: show it only to your customer.'),
+    kind: oneOf('What was delivered: `gift_card` (code and often a PIN), `licence_key` (software key), `token` (electricity token in `code`), `confirmation` (airtime, data and pay-TV: nothing to hand over), `virtual_number` (the number in `serial`), `esim` (the secret LPA activation string in `code`; ICCID in `serial`) or `vpn_account` (password in `code`; username in `serial`).', deliveryKinds),
+    code: nullableStr('The gift card code, licence key, electricity token, eSIM activation string or VPN password. A secret: show it only to your customer.'),
     pin: nullableStr('The gift card PIN, where it has one. A secret.'),
-    serial: nullableStr('A serial number, or the phone number for `virtual_number`.'),
+    serial: nullableStr('A serial number, virtual phone number, eSIM ICCID, or VPN username.'),
     details: stringMap('More about the delivery, for example `units` for an electricity token, `redemption_url` and `expires_at` for some gift cards, `duration` for a software licence (for example `1 year` or `Lifetime`), or `number` and `number_type` for a virtual number.'),
   },
   'One delivered item.',

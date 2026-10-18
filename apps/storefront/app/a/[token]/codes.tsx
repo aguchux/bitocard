@@ -7,7 +7,7 @@ import { EsimCard } from "@/components/store/esim-card";
 import { revealCodes, type RevealState } from "./actions";
 
 const detailLabels: Record<string, string> = { duration: "Licence term", expires_at: "Expires", redemption_url: "Redeem at", units: "Units" };
-const names: Record<AccessDelivery["kind"], string> = { gift_card: "Code", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Number", esim: "eSIM" };
+const names: Record<AccessDelivery["kind"], string> = { gift_card: "Code", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Number", esim: "eSIM", vpn_account: "VPN access" };
 
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);

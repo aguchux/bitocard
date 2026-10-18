@@ -12,6 +12,7 @@ import { StockAdapter } from './stock.adapter.js';
 import { VtpassAdapter } from './vtpass.adapter.js';
 import { PawapayAdapter } from './pawapay.adapter.js';
 import { ZenditAdapter } from './zendit.adapter.js';
+import { VpnresellersAdapter } from './vpnresellers.adapter.js';
 
 /** Reloadly on given credentials, at the gift card and top-up addresses given (live, or an override in tests). */
 function reloadly(config: { RELOADLY_AUTH_URL: string; RELOADLY_GIFTCARDS_URL?: string; RELOADLY_TOPUPS_URL?: string }, credentials: { clientId?: string; clientSecret?: string }) {
@@ -63,6 +64,15 @@ export class SupplierAdapters {
           dataPlans: config.AFRICAS_TALKING_DATA_PLANS,
         }),
         new EsimAccessAdapter({ accessCode: config.ESIM_ACCESS_ACCESS_CODE, secretKey: config.ESIM_ACCESS_SECRET_KEY, baseUrl: config.ESIM_ACCESS_API_URL }),
+        new VpnresellersAdapter((() => {
+          const credentials = integrations.supplier('vpnresellers');
+          return {
+            apiToken: credentials.API_TOKEN,
+            projectId: credentials.PROJECT_ID,
+            monthlyCostUsd: credentials.MONTHLY_COST_USD,
+            baseUrl: credentials.API_URL,
+          };
+        })()),
         this.stock,
       ];
       return new Map(adapters.map(adapter => [adapter.code, adapter]));

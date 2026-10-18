@@ -58,6 +58,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   nexway: [site('https://www.nexway.com/')],
   esim_access: [site('https://esimaccess.com/'), docs('https://docs.esimaccess.com/')],
   esimerge: [site('https://esimerge.com/')],
+  vpnresellers: [site('https://www.vpnresellers.com/'), docs('https://api.vpnresellers.com/docs/v4_1/')],
   ingram_micro: [site('https://www.ingrammicro.com/'), { label: 'Developer portal', url: 'https://developer.ingrammicro.com/' }],
   td_synnex: [site('https://www.tdsynnex.com/')],
   pax8: [site('https://www.pax8.com/'), { label: 'Developer portal', url: 'https://devx.pax8.com/' }],

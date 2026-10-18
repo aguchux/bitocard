@@ -32,7 +32,7 @@ import { EsimsCard } from "@/components/esims";
 /** How often a processing order is checked while its page is open. */
 const orderPollMs = 5000;
 
-const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number", esim: "eSIM" };
+const deliveryNames: Record<OrderDelivery["kind"], string> = { gift_card: "Gift card", licence_key: "Licence key", token: "Token", confirmation: "Confirmation", virtual_number: "Phone number", esim: "eSIM", vpn_account: "VPN access" };
 
 /** A secret (code, PIN, token): masked until revealed, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {

@@ -42,7 +42,7 @@ export type RecipientCheck =
  * What the customer receives. Codes and PINs are secrets: encrypted at rest, never logged or sent in webhooks. An `esim`'s
  * code is its LPA activation string (`LPA:1$<SM-DP+ address>$<activation code>`): whoever holds it owns the eSIM.
  */
-export type Delivery = { kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number' | 'esim'; code?: string; pin?: string; serial?: string; details?: Record<string, string> };
+export type Delivery = { kind: 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number' | 'esim' | 'vpn_account'; code?: string; pin?: string; serial?: string; details?: Record<string, string> };
 
 /**
  * A supplier outcome. `pending` means not yet confirmed (including timeouts and unclear replies): the order waits
@@ -58,6 +58,8 @@ export type FulfilmentResult = {
   numbers?: SuppliedNumber[];
   /** eSIMs delivered by the order, with the supplier's own IDs for them (internal: never shown). */
   esims?: SuppliedEsim[];
+  /** Fixed-term VPN accounts created by the order (internal lifecycle IDs and state; credentials are a delivery). */
+  vpns?: SuppliedVpnSubscription[];
   /** What the supplier says it charged for the whole order, when its reply says (for reconciliation; internal). */
   reportedCost?: { amountMinor: bigint; currency: string };
 };
@@ -67,6 +69,31 @@ export type SuppliedNumber = { supplierNumberId: string; number: string; expires
 
 /** An eSIM a supplier issued: kept for its status, data use, top-ups and cancelling. */
 export type SuppliedEsim = { supplierEsimId: string; iccid: string; expiresAt: Date | null; totalBytes: bigint | null; topUps: EsimTopUpKind };
+
+/** A VPN account a supplier issued. Its username/password are delivered separately and encrypted as `vpn_account`. */
+export type SuppliedVpnSubscription = {
+  supplierAccountId: string;
+  status: 'active' | 'disabled' | 'expired' | 'unknown';
+  supplierStatus: string | null;
+  startsAt: Date | null;
+  expiresAt: Date;
+};
+
+export type VpnState = {
+  supplierAccountId: string;
+  status: SuppliedVpnSubscription['status'];
+  supplierStatus: string | null;
+  expiresAt: Date | null;
+};
+
+/** Managing a VPN account after issue. It stays with the supplier that created it. */
+export interface VpnSupplier {
+  status(supplierAccountId: string): Promise<VpnState>;
+  enable(supplierAccountId: string): Promise<VpnState>;
+  disable(supplierAccountId: string): Promise<VpnState>;
+  changePassword(supplierAccountId: string, password: string): Promise<VpnState>;
+  expire(supplierAccountId: string, expiresOn: string): Promise<VpnState>;
+}
 
 /** Whether an eSIM takes top-ups: `data` (more data), `days` (a day pass extended by days) or `none`. */
 export type EsimTopUpKind = 'none' | 'data' | 'days';
@@ -161,6 +188,8 @@ export interface SupplierAdapter {
   readonly numbers?: NumberSupplier;
   /** eSIM suppliers: status, usage, top-ups and cancelling for eSIMs already issued. */
   readonly esims?: EsimSupplier;
+  /** VPN suppliers: status, expiry, access control and password replacement for an issued account. */
+  readonly vpn?: VpnSupplier;
 }
 
 /** A supplier whose API access is not confirmed yet: present in the registry, never configured, offers nothing. */

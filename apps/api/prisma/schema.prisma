@@ -1538,6 +1538,7 @@ model Order {
   access                    OrderAccess?
   virtualNumber             VirtualNumber?
   esims                     Esim[]
+  vpnSubscription           VpnSubscription?
   attempts                  OrderAttempt[]
 
   @@index([resellerId, createdAt])
@@ -1546,11 +1547,12 @@ model Order {
   @@map("orders")
 }
 
-/// What the customer receives: gift card codes and PINs, electricity tokens, confirmations. Codes and PINs are encrypted.
+/// What the customer receives: gift card codes, licence keys, electricity tokens, eSIM activation strings, VPN
+/// credentials and confirmations. Every code, PIN and password is encrypted.
 model OrderDelivery {
   id            String   @id @default(uuid()) @db.Uuid
   orderId       String   @map("order_id") @db.Uuid
-  /// gift_card, token, confirmation or virtual_number.
+  /// gift_card, licence_key, token, confirmation, virtual_number, esim or vpn_account.
   kind          String
   codeEncrypted String?  @map("code_encrypted")
   pinEncrypted  String?  @map("pin_encrypted")
@@ -1558,9 +1560,42 @@ model OrderDelivery {
   details       Json?
   createdAt     DateTime @default(now()) @map("created_at")
   order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vpnSubscription VpnSubscription?
 
   @@index([orderId])
   @@map("order_deliveries")
+}
+
+/// A fixed-term VPN account issued for one order. The password is never stored here: it is encrypted on the related
+/// `vpn_account` order delivery, which can be created before the supplier call so an uncertain retry uses the same value.
+model VpnSubscription {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @unique @map("order_id") @db.Uuid
+  deliveryId        String        @unique @map("delivery_id") @db.Uuid
+  resellerId        String        @map("reseller_id") @db.Uuid
+  mode              LedgerMode
+  productId         String        @map("product_id") @db.Uuid
+  supplierCode      String        @map("supplier_code")
+  /// Null while credentials are prepared but the supplier has not confirmed account creation.
+  supplierAccountId String?       @map("supplier_account_id")
+  /// provisioning, active, disabled, expired, failed or needs_review.
+  status            String        @default("provisioning")
+  supplierStatus    String?       @map("supplier_status")
+  startsAt          DateTime?     @map("starts_at")
+  expiresAt         DateTime?     @map("expires_at")
+  disabledAt        DateTime?     @map("disabled_at")
+  lastSyncedAt      DateTime?     @map("last_synced_at")
+  nextSyncAt        DateTime?     @map("next_sync_at")
+  credentialVersion Int           @default(1) @map("credential_version")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  delivery          OrderDelivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+
+  @@unique([supplierCode, supplierAccountId])
+  @@index([status, nextSyncAt])
+  @@index([resellerId, mode, createdAt])
+  @@map("vpn_subscriptions")
 }
 
 /// The order's page link (`/a/<token>` on the store's address): permanent, but the reseller can replace it, which ends

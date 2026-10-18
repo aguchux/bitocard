@@ -29,7 +29,7 @@ import {
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useOrderQuery, useRefundOrderMutation, useRequeryOrderMutation, useResolveOrderMutation } from "@bitocard/api-client/admin";
 
-type Delivery = { kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number"; code: string; pin: string; serial: string };
+type Delivery = { kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number" | "esim" | "vpn_account"; code: string; pin: string; serial: string };
 const emptyDelivery = (): Delivery => ({ kind: "gift_card", code: "", pin: "", serial: "" });
 
 export default function OrderPage() {

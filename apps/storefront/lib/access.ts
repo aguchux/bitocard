@@ -5,7 +5,7 @@ import { customerCookie, shopperHeader } from "./customer";
 
 /** One delivered item on an order's page. Codes, PINs and tokens are null (`hidden`) until the customer presses Reveal. */
 export type AccessDelivery = {
-  kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number" | "esim";
+  kind: "gift_card" | "licence_key" | "token" | "confirmation" | "virtual_number" | "esim" | "vpn_account";
   hidden: boolean;
   code: string | null;
   pin: string | null;

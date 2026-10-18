@@ -130,11 +130,13 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
   );
 }
 
-export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
+/** `links`: the quick links this store shows (`quickLinksFor`); every one when not given. */
+export function DesktopNav({ groups, links }: { groups: StoreNavigationGroup[]; links?: string[] }) {
+  const shown = links ? quickLinks.filter(link => links.includes(link.href)) : quickLinks;
   return (
     <nav aria-label="Categories" className="hidden items-center gap-0.5 xl:flex">
-      <CatalogMenu groups={groups} />
-      {quickLinks.map(link => (
+      {groups.length ? <CatalogMenu groups={groups} /> : null}
+      {shown.map(link => (
         <Link key={link.href} href={link.href} className="flex min-h-11 items-center rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-navy-900 hover:bg-slate-50">
           {link.label}
         </Link>
@@ -147,7 +149,8 @@ export function DesktopNav({ groups }: { groups: StoreNavigationGroup[] }) {
  * Phones and tablets: the menu in a drawer, rendered into <body>: the sticky header's backdrop blur makes the header
  * the containing block of fixed elements inside it, which clipped the drawer to the header's height.
  */
-export function MobileMenu({ groups, signedIn = false, reseller = true }: { groups: StoreNavigationGroup[]; signedIn?: boolean; reseller?: boolean }) {
+export function MobileMenu({ groups, signedIn = false, reseller = true, links }: { groups: StoreNavigationGroup[]; signedIn?: boolean; reseller?: boolean; links?: string[] }) {
+  const shown = links ? quickLinks.filter(link => links.includes(link.href)) : quickLinks;
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -182,8 +185,9 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
                   </button>
                 </div>
                 <nav aria-label="Categories" className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
+                  {shown.length ? (
                   <ul className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-4">
-                    {quickLinks.map(link => (
+                    {shown.map(link => (
                       <li key={link.href}>
                         <Link href={link.href} onClick={() => setOpen(false)} className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 text-center text-xs font-semibold text-navy-900 hover:bg-slate-100">
                           <link.icon className="size-5 text-brand-500" aria-hidden="true" />
@@ -192,7 +196,8 @@ export function MobileMenu({ groups, signedIn = false, reseller = true }: { grou
                       </li>
                     ))}
                   </ul>
-                  <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Catalog</p>
+                  ) : null}
+                  {groups.length ? <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Catalog</p> : null}
                   {groups.map(group => (
                     <div key={group.key}>
                       <Link href={catalogueHref(group)} onClick={() => setOpen(false)} className="font-display flex min-h-12 items-center gap-2.5 text-lg font-bold text-navy-900">

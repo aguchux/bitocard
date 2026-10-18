@@ -30,6 +30,17 @@ export const supplierCredentialGroups: SupplierCredentialGroup[] = [
   // Software and eSIMs (pilots).
   { code: 'nexway', name: 'Nexway Connect', description: 'Downloadable consumer software and antivirus.', fields: [id('PARTNER_ID', 'Partner ID'), secret('SECRET_KEY', 'API secret'), address('Nexway Connect API base address (sandbox or live)')] },
   { code: 'esimerge', name: 'eSimerge', description: 'eSIM data packages (second choice).', fields: [key('API key'), optionalSecret('WEBHOOK_SECRET', 'Webhook secret'), address('eSimerge API base address (sandbox or live)')] },
+  {
+    code: 'vpnresellers',
+    name: 'VPNresellers',
+    description: 'Fixed-term VPN access. Registered for the pilot; customer sales stay off until provisioning and expiry reconciliation are complete.',
+    fields: [
+      secret('API_TOKEN', 'API token', 'VPNresellers dashboard > API access. Sent as a bearer token and never exposed outside the supplier adapter.'),
+      id('PROJECT_ID', 'Project ID', 'The VPNresellers project used for BitoCard customer accounts.'),
+      id('MONTHLY_COST_USD', 'Expected monthly cost (USD)', 'The contracted cost of one active account, used for catalogue costing only after provisioning is enabled. Confirm whenever the volume tier changes.'),
+      address('Default: https://api.vpnresellers.com/v4_1'),
+    ],
+  },
   // Software (later).
   { code: 'ingram_micro', name: 'Ingram Micro', description: 'Microsoft and broad software distribution.', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), id('CUSTOMER_NUMBER', 'Customer number'), address('Sandbox: https://api.ingrammicro.com:443/sandbox')] },
   { code: 'td_synnex', name: 'TD SYNNEX', description: 'Software distribution (Digital Bridge, StreamOne).', fields: [id('CLIENT_ID', 'Client ID'), secret('CLIENT_SECRET', 'Client secret'), optional('ACCOUNT_ID', 'Account or reseller ID'), address('TD SYNNEX API base address (sandbox or live)')] },

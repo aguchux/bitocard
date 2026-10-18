@@ -1,4 +1,4 @@
-import { CreditCard, Gift, HandCoins, Globe, Laptop, Lock, Phone, ReceiptText, Shield, Signal, Smartphone, Tv, Wifi, Zap, Headphones, type LucideIcon } from "lucide-react";
+import { BarChart3, Clock, Coins, CreditCard, Gift, HandCoins, Globe, Laptop, Lock, Phone, ReceiptText, Shield, Signal, Smartphone, Star, Tv, Wifi, Zap, Headphones, type LucideIcon } from "lucide-react";
 import type { ProductCategory, TrustIcon } from "@bitocard/api-client/storefront";
 
 /** Each category's icon and colours (tile background, icon colour, card gradient when a brand has no art). */
@@ -34,4 +34,17 @@ export const groupInk: Record<string, string> = {
   "virtual-cards": "text-cyan-400",
 };
 
-export const trustIcon: Record<TrustIcon, LucideIcon> = { lock: Lock, bolt: Zap, card: CreditCard, globe: Globe, shield: Shield, support: Headphones };
+export const trustIcon: Record<TrustIcon, LucideIcon> = {
+  lock: Lock,
+  bolt: Zap,
+  card: CreditCard,
+  globe: Globe,
+  shield: Shield,
+  support: Headphones,
+  gift: Gift,
+  phone: Phone,
+  coin: Coins,
+  chart: BarChart3,
+  clock: Clock,
+  star: Star,
+};

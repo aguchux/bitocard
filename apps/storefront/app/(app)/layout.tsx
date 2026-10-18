@@ -13,6 +13,7 @@ import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
 import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
+import { storeShell } from "@/lib/store-theme";
 import { currentStore, storeSubdomain } from "@/lib/store";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -59,8 +60,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";
   const rail = desktopNav === "rail";
   const name = store?.name ?? brand.name;
+  // A reseller's store wears its template's colour theme in the account app too.
   return (
-    <div className={shell}>
+    <div className={shell} {...storeShell(store?.design)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>

@@ -7,7 +7,7 @@ export const orderStatuses = ['processing', 'completed', 'failed', 'refunded'] a
 export type OrderStatus = (typeof orderStatuses)[number];
 
 /** An `esim`'s code is its LPA activation string (a secret: whoever holds it can install the eSIM once); its ICCID is `serial`. */
-export type OrderDeliveryKind = 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number' | 'esim';
+export type OrderDeliveryKind = 'gift_card' | 'licence_key' | 'token' | 'confirmation' | 'virtual_number' | 'esim' | 'vpn_account';
 /**
  * What was delivered. Codes, PINs and tokens are secrets: they appear only on the single order, never in lists or
  * webhooks. A virtual number's phone number is in `details.number` (and `serial`).

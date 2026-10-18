@@ -16,7 +16,7 @@ const minute = 60_000;
 /** Access links: `bca_` and 32 random bytes, base64url. */
 const tokenPattern = /^bca_[A-Za-z0-9_-]{40,60}$/;
 /** Deliveries whose code and PIN are secrets: hidden until the customer presses Reveal. */
-const secretKinds = new Set(['gift_card', 'licence_key', 'token', 'esim']);
+const secretKinds = new Set(['gift_card', 'licence_key', 'token', 'esim', 'vpn_account']);
 /** What the page may show of the recipient: what the customer typed, nothing BitoCard added. */
 const recipientFields = ['phone', 'account_number', 'account_name', 'current_package', 'email'] as const;
 const codeLifetimeMs = 10 * minute;

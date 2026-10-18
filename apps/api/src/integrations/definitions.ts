@@ -502,6 +502,8 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
 
 /** Suppliers with a built adapter, whose groups live with the platform settings above. */
 const builtSuppliers = new Set(['reloadly', 'vtpass', 'didww', 'zendit', 'pawapay', 'esim_access', 'africas_talking']);
+/** Credential groups whose adapter transport is implemented. They stay unavailable until their Supplier row and markets are enabled. */
+const builtCredentialSuppliers = new Set(['vpnresellers']);
 
 export const integrationGroups: IntegrationGroup[] = [
   ...platformGroups.map(group => ({ ...group, section: builtSuppliers.has(group.id) ? ('suppliers' as const) : ('platform' as const), adapterReady: true })),
@@ -510,7 +512,7 @@ export const integrationGroups: IntegrationGroup[] = [
     name: group.name,
     description: group.description,
     section: 'suppliers' as const,
-    adapterReady: false,
+    adapterReady: builtCredentialSuppliers.has(group.code),
     fields: [
       ...group.fields.map(item => ({ key: supplierCredentialKey(group.code, item.suffix), label: item.label, secret: item.secret, kind: item.kind, required: item.required, help: item.help })),
       {

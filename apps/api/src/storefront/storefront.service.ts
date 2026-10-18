@@ -668,7 +668,19 @@ export class StorefrontService {
             // The networks and billers the form offers, per tab (only categories on sale here).
             const onSale = await this.categories();
             const tabs = item.categories.filter(category => onSale.some(row => row.category === category));
-            return { ...item, data: { categories: await Promise.all(tabs.map(async category => ({ category, label: categoryLabels[category], brands: await this.brands({ category: [category], limit: 24 }) }))) } };
+            return {
+              ...item,
+              data: {
+                categories: await Promise.all(
+                  tabs.map(async category => ({
+                    category,
+                    label: categoryLabels[category],
+                    brands: await this.brands({ category: [category], limit: 24 }),
+                    products: (await this.products({ category, limit: 48 })).data,
+                  })),
+                ),
+              },
+            };
           }
           case 'crypto_quote': {
             const assets = await this.prisma.cryptoAsset.findMany({ where: { enabled: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }], select: { code: true, name: true } });

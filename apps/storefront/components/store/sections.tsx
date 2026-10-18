@@ -1,12 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check, CreditCard, Gift, Globe2, Signal, Smartphone } from "lucide-react";
-import type { ResolvedSection, StoreBrand, StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/storefront";
+import type { ResolvedSection, StoreBrand, StoreCountry, StoreDesign, StoreNavigationGroup } from "@bitocard/api-client/storefront";
+import { densityGap } from "@/lib/store-theme";
 import { brand as site } from "@bitocard/ui/site";
 import { BrandArt, ProductCard, ProductRow } from "./product-card";
 import { SearchForm } from "./layout";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 import { groupInk, trustIcon } from "./theme";
+import { CryptoQuote, Faq, Features, P2pMarket, ProductSpotlight, QuickBuy, VariantHero } from "./template-sections";
 
 // Literal class names, so Tailwind generates them.
 const lgSpan = { 3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 9: "lg:col-span-9", 12: "lg:col-span-12" } as const;
@@ -324,7 +326,7 @@ function TrustBar({ section }: { section: Extract<ResolvedSection, { type: "trus
           return (
             // Phones: the icon above the text, so two columns keep a readable line length.
             <li key={item.title} className="flex flex-col items-start gap-2.5 sm:flex-row sm:gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-pink-100 text-brand-600">
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-600">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               <span>
@@ -339,28 +341,55 @@ function TrustBar({ section }: { section: Extract<ResolvedSection, { type: "trus
   );
 }
 
-/** The home page: each section on the grid (12 columns on desktop, 6 on tablets, one on phones), densely packed. */
-export function HomeSections({ sections, groups, countries }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[] }) {
+/** A section with nothing to show (no products, brands, tabs or coins on sale yet): left out of a reseller's store. */
+function isEmpty(section: ResolvedSection) {
+  switch (section.type) {
+    case "product_rail":
+      return section.data.products.length === 0;
+    case "brand_grid":
+      return section.data.brands.length === 0;
+    case "category_grid":
+      return section.data.categories.length === 0;
+    case "quick_buy":
+      return !section.data.categories.some(tab => tab.products.length);
+    case "crypto_quote":
+      return section.data.assets.length === 0;
+    default:
+      return false;
+  }
+}
+
+/**
+ * The home page: each section on the grid (12 columns on desktop, 6 on tablets, one on phones), densely packed. A
+ * reseller's store passes its `design`: its variant's hero, spacing and the template sections' shapes.
+ */
+export function HomeSections({ sections, groups, countries, design }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[]; design?: StoreDesign | null }) {
   // A full-width hero at the top runs edge to edge under the header (full bleed); the rest sit in the grid.
   const [first, ...others] = sections;
   const bleed = first?.type === "hero" && first.span.lg === 12 ? first : null;
   const grid = bleed ? others : sections;
+  const style = design?.style;
+  // bitocard.com's own hero, and the Classic variant's, is the globe banner; every other variant draws its own.
+  const hero = (section: Extract<ResolvedSection, { type: "hero" }>, full: boolean) =>
+    style && style.hero !== "search" ? <VariantHero section={section} style={style} groups={groups} countries={countries} bleed={full} /> : <Hero section={section} groups={groups} countries={countries} bleed={full} />;
   return (
     <>
-      {bleed ? (
-        <div className="relative z-20 -mt-6 mb-6 lg:mb-7">
-          <Hero section={bleed} groups={groups} countries={countries} bleed />
-        </div>
-      ) : null}
-    <div className="grid grid-flow-row-dense grid-cols-1 gap-8 md:grid-cols-6 md:gap-6 lg:grid-cols-12 lg:gap-7">
-      {grid.map(section => (
+      {bleed ? <div className="relative z-20 -mt-6 mb-6 lg:mb-7">{hero(bleed, true)}</div> : null}
+    <div className={`grid grid-flow-row-dense grid-cols-1 md:grid-cols-6 lg:grid-cols-12 ${densityGap[style?.density ?? "comfortable"]}`}>
+      {grid.filter(section => !(style && isEmpty(section))).map(section => (
         <div key={section.id} className={`min-w-0 ${mdSpan[section.span.md]} ${lgSpan[section.span.lg]} ${section.span.rows === 2 ? "md:row-span-2" : ""}`}>
-          {section.type === "hero" ? <Hero section={section} groups={groups} countries={countries} /> : null}
+          {section.type === "hero" ? hero(section, false) : null}
           {section.type === "product_rail" ? <ProductRail section={section} /> : null}
           {section.type === "category_grid" ? <CategoryGrid section={section} /> : null}
           {section.type === "brand_grid" ? <BrandGrid section={section} /> : null}
           {section.type === "promo" ? <Promo section={section} /> : null}
           {section.type === "trust_bar" ? <TrustBar section={section} /> : null}
+          {section.type === "quick_buy" && style ? <QuickBuy section={section} style={style} /> : null}
+          {section.type === "crypto_quote" && style ? <CryptoQuote section={section} style={style} /> : null}
+          {section.type === "p2p_market" && style ? <P2pMarket section={section} style={style} /> : null}
+          {section.type === "product_spotlight" && style ? <ProductSpotlight section={section} style={style} /> : null}
+          {section.type === "features" ? <Features section={section} /> : null}
+          {section.type === "faq" ? <Faq section={section} /> : null}
         </div>
       ))}
     </div>
