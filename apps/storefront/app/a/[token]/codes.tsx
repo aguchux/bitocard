@@ -112,6 +112,11 @@ export function Codes({ token, deliveries, instructions }: { token: string; deli
       {hidden ? (
         <form action={reveal} className="mt-4">
           <input type="hidden" name="token" value={token} />
+          {shown[0].kind === "vpn_account" ? (
+            <p className="mb-3 text-sm text-slate-600">
+              Until they are shown you can cancel within 14 days of buying for a full refund. Once they are shown, your access has started and cannot be cancelled just because you change your mind.
+            </p>
+          ) : null}
           <button type="submit" disabled={pending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-navy-900 px-5 font-semibold text-white hover:bg-navy-800 disabled:opacity-60 sm:w-auto">
             <Eye className="size-5" aria-hidden="true" /> {pending ? "Revealing…" : shown[0].kind === "esim" ? (shown.length > 1 ? "Show eSIMs" : "Show eSIM") : shown[0].kind === "vpn_account" ? "Show sign-in details" : shown.length > 1 ? "Reveal codes" : "Reveal code"}
           </button>

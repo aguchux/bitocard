@@ -44,7 +44,7 @@ Launch blockers requiring written answers or an executed agreement:
 - [ ] API rate limits, maintenance behaviour, status/outage communication, and support escalation are recorded.
 - [ ] Funding minimum, top-up routes and fees, taxes, volume tier calculation, price-change notice, balance endpoint, and low-balance behaviour are recorded in the supplier funding profile.
 - [ ] Retail cancellation/refund rules are approved, including what happens before and after credentials are revealed.
-- [ ] BitoCard end-user terms, acceptable-use rules, privacy notice, and support procedure are approved.
+- [ ] BitoCard end-user terms, acceptable-use rules, privacy notice, and support procedure are approved. Drafted on 18 October 2026 (terms of use section 5, the privacy notice's VPN access part, the reseller terms' products section); awaiting legal review and the supplier's logging answers.
 - [ ] Marketing has evidence for every privacy, security, logging, location, protocol, speed, device, and platform claim. Do not publish “anonymous” or “no logs” without approved evidence.
 
 ### 2. Consolidated product decision — started

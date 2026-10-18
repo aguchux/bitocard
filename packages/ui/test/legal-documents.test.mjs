@@ -39,4 +39,17 @@ describe('legal documents', () => {
     assert.match(terms, /This is a draft/);
     for (const id of ['stores', 'content', 'domains', 'customers', 'disputes', 'wallet']) assert.match(terms, new RegExp(`<Section id="${id}"`), `section ${id}`);
   });
+
+  test('VPN access has its terms of sale and its privacy entry, and is never sold on renewal', () => {
+    const terms = readFileSync(new URL('app/(site)/documents/terms/page.tsx', legals), 'utf8');
+    const privacy = readFileSync(new URL('app/(site)/documents/privacy/page.tsx', legals), 'utf8');
+    assert.match(terms, /<Section id="vpn" title="5\. VPN access">/);
+    for (const id of ['vpn-what', 'vpn-term', 'vpn-refunds', 'vpn-limits', 'vpn-use']) assert.match(terms, new RegExp(`id="${id}"`), id);
+    assert.match(terms, /never renews automatically/);
+    const numbers = [...terms.matchAll(/<Section id="[a-z-]+" title="(\d+)\./g)].map(([, n]) => Number(n));
+    assert.deepEqual(numbers, numbers.map((_, index) => index + 1), 'sections are numbered in order');
+    assert.match(privacy, /When you buy VPN access/);
+    // No unproven claims, and the supplier is never named.
+    for (const page of [terms, privacy]) assert.doesNotMatch(page, /no[- ]logs?\b|anonymous VPN|VPNresellers/i);
+  });
 });

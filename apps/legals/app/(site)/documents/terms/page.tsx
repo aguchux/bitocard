@@ -28,6 +28,7 @@ export default function TermsOfUse() {
           <li>Setup times, including our five-minute store setup goal, are goals, not promises. Verification, funding and readiness to take orders may take longer.</li>
         </ul>
         <p>Crypto wallets and peer-to-peer (P2P) trading are not offered in any country yet. Section 4 explains how they will work where we switch them on.</p>
+        <p>VPN access is not sold in any country yet either. Section 5 sets out its terms for when it is.</p>
         <p>When a service launches, it will be governed by separate terms, such as our <Link href="/documents/reseller-terms">reseller terms</Link> and customer terms of sale, which you will need to accept before using it.</p>
       </Section>
 
@@ -115,7 +116,7 @@ export default function TermsOfUse() {
           <li>Blockchain networks can be congested, change their rules or stop working, and their fees can change. Transfers on them cannot be reversed.</li>
           <li>Laws on crypto are changing and may require us to limit or stop the service in your country.</li>
           <li>You are responsible for any tax on your crypto and your trades.</li>
-          <li>We do not give investment advice (see section 5). Only buy crypto you can afford to lose.</li>
+          <li>We do not give investment advice (see section 6). Only buy crypto you can afford to lose.</li>
         </ul>
 
         <h3 id="crypto-prohibited">What you must not do</h3>
@@ -140,11 +141,57 @@ export default function TermsOfUse() {
         </ul>
       </Section>
 
-      <Section id="no-advice" title="5. No financial advice">
+      <Section id="vpn" title="5. VPN access">
+        <p>This section applies only where we sell VPN access. <strong>We do not sell it in any country yet.</strong> We will offer it country by country, only where we may lawfully sell it, and a store may choose not to sell it. Where it is not on sale to you, nothing in this section is an offer.</p>
+
+        <h3 id="vpn-what">What you buy</h3>
+        <ul>
+          <li>Access to a VPN service for a fixed term of 30 days, used through the VPN apps and settings shown on your order, on up to the number of devices shown when you buy (10 at present) at the same time.</li>
+          <li>BitoCard sells it to you, whichever store you buy from, and a VPN network provider runs the service for us. You get a username and password for it on your order&apos;s page.</li>
+          <li>It is for you and the people in your household. You must not sell, share publicly or give away your sign-in details.</li>
+        </ul>
+
+        <h3 id="vpn-term">When it starts and ends</h3>
+        <ul>
+          <li>Access starts when your sign-in details are ready, usually within minutes of paying. It lasts at least 30 full days and ends at midnight UTC after that, at the time shown on your order&apos;s page.</li>
+          <li><strong>It never renews automatically</strong> and we never charge you again for it. To keep using a VPN after it ends, buy VPN access again: each purchase is a new access with new sign-in details.</li>
+          <li>You can change your password on your order&apos;s page while your access is active. Every device using the old password is then signed out.</li>
+        </ul>
+
+        <h3 id="vpn-refunds">Cancelling and refunds</h3>
+        <ul>
+          <li><strong>If we cannot set up your access</strong>, the order fails and you are refunded in full, the way you paid.</li>
+          <li><strong>Before your sign-in details are first shown to you</strong>, you can cancel within 14 days of buying and be refunded in full: report a problem with the order (section 3).</li>
+          <li><strong>Once they have been shown to you</strong>, the service has started at your request and, where the law allows, you can no longer cancel it just because you change your mind. If the VPN does not work for you and neither the store nor BitoCard can fix it, you will be refunded in full.</li>
+          <li>Refunds go back the way you paid, and a refund ends your access straight away.</li>
+          <li>This does not affect your statutory rights as a consumer.</li>
+        </ul>
+
+        <h3 id="vpn-limits">What a VPN does and does not do</h3>
+        <ul>
+          <li>A VPN is designed to encrypt the connection between your device and the VPN server, and to show the websites you visit the server&apos;s address instead of yours. It does not make you anonymous, does not protect you from viruses, scams or the websites and apps you use, and does not stop the websites you sign in to from knowing who you are.</li>
+          <li>We do not promise any speed or server location, or that a particular website, app or streaming service will work through it. Some services refuse VPN connections.</li>
+          <li>Using a VPN is restricted or illegal in some countries. You are responsible for using it lawfully where you are.</li>
+        </ul>
+
+        <h3 id="vpn-use">What you must not do</h3>
+        <p>You must not use VPN access to break the law, or to:</p>
+        <ul>
+          <li>send spam, run scams or phishing, or commit fraud;</li>
+          <li>attack, scan or gain unauthorised access to any system or network, or spread malware;</li>
+          <li>share or obtain material that sexually exploits children, or any other illegal content;</li>
+          <li>infringe anyone&apos;s copyright or other rights;</li>
+          <li>harass or threaten anyone;</li>
+          <li>overload the service, or resell or share access beyond your household.</li>
+        </ul>
+        <p>If you do, or if the VPN network provider reports abuse of your access, we may suspend or end it without a refund, and report it to the authorities where the law requires it. If we suspend your access by mistake, we will restore it, or refund you in full if you prefer. If the service stops for good for reasons that are not your fault, you will be refunded in full.</p>
+      </Section>
+
+      <Section id="no-advice" title="6. No financial advice">
         <p>Nothing on these websites is financial, investment, legal or tax advice, and we do not promise any level of income or profit from reselling.</p>
       </Section>
 
-      <Section id="use" title="6. Using the websites">
+      <Section id="use" title="7. Using the websites">
         <p>You may use the websites for lawful, personal or business information purposes. You must not:</p>
         <ul>
           <li>break any law or anyone’s rights while using them;</li>
@@ -156,26 +203,26 @@ export default function TermsOfUse() {
         <p>If you believe you have found a security vulnerability, please report it to <ContactEmail />.</p>
       </Section>
 
-      <Section id="ip" title="7. Intellectual property">
+      <Section id="ip" title="8. Intellectual property">
         <p>The BitoCard name and logo, and the text, design and code of these websites, belong to the Golojan group or its licensors and are protected by intellectual property laws. You may view and share links to our pages, but you may not copy, adapt or use our brand or content for commercial purposes without our written permission.</p>
         <p>Other product and brand names, including gift card brands, belong to their owners. Their mention does not imply endorsement or a relationship with us.</p>
       </Section>
 
-      <Section id="links" title="8. Links to other websites">
+      <Section id="links" title="9. Links to other websites">
         <p>Where we link to other websites, we do so for convenience. We do not control them and are not responsible for their content or practices.</p>
       </Section>
 
-      <Section id="availability" title="9. Availability and changes">
+      <Section id="availability" title="10. Availability and changes">
         <p>We may change, suspend or withdraw any part of the websites at any time. We do not guarantee that they will always be available, uninterrupted or free from errors.</p>
       </Section>
 
-      <Section id="liability" title="10. Our responsibility to you">
+      <Section id="liability" title="11. Our responsibility to you">
         <p>We provide the websites free of charge and “as is”. To the extent the law allows, we make no warranties about their content, accuracy or availability.</p>
         <p>To the extent the law allows, we are not liable for any indirect or consequential loss, or for loss of profit, revenue, business or data, arising from your use of the websites or your reliance on their content.</p>
         <p>Nothing in these terms limits or excludes liability that cannot be limited or excluded by law, including liability for death or personal injury caused by negligence, or for fraud. Nothing in these terms affects your statutory rights as a consumer.</p>
       </Section>
 
-      <Section id="law" title="11. Governing law and disputes">
+      <Section id="law" title="12. Governing law and disputes">
         <p>These terms are governed by the law that applies to the company you contract with:</p>
         <ul>
           {legalEntities.map(entity => (
@@ -186,11 +233,11 @@ export default function TermsOfUse() {
         <p>Before starting formal proceedings, please contact us at <ContactEmail /> so we can try to resolve the issue.</p>
       </Section>
 
-      <Section id="general" title="12. General">
+      <Section id="general" title="13. General">
         <p>If any part of these terms is found to be unenforceable, the rest remains in effect. If we do not enforce a term straight away, we can still enforce it later. We may update these terms; the version on this page at the time you use the websites applies. Our <Link href="/documents/privacy">privacy notice</Link> and <Link href="/documents/cookies">cookie notice</Link> explain how we handle personal information.</p>
       </Section>
 
-      <Section id="contact" title="13. Contact us">
+      <Section id="contact" title="14. Contact us">
         <p>Email <ContactEmail /> with any question about these terms.</p>
       </Section>
     </LegalPage>
