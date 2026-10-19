@@ -40,6 +40,13 @@ export default function TermsOfUse() {
           <li><strong>Refunds go back to how you paid.</strong> If you are refunded, the money returns to the card, bank account or mobile money wallet you paid with. Banks and mobile money providers can take a few days to show it.</li>
         </ul>
         <p>We tell you by email or in your account when your problem has a reply or a decision. Reporting a problem does not affect your statutory rights as a consumer, or your right to dispute a card payment with your bank. If you dispute a payment with your bank, we may share your order&apos;s details with the payment provider and the store to respond to it.</p>
+        <h3 id="help">Help, chat and AI assistants</h3>
+        <p>You can ask a store a question from your account (&ldquo;Help &amp; support&rdquo;) or chat with it. The store answers first and can pass your question to BitoCard.</p>
+        <ul>
+          <li><strong>Some stores use an AI assistant.</strong> It always says it is an AI assistant, may answer your chat or your question, and can make mistakes. It cannot make refunds, promises or decisions about your money: those are made by the store and BitoCard, through &ldquo;Report a problem&rdquo; on your order.</li>
+          <li><strong>You can ask for a person at any time</strong> (&ldquo;Talk to a person&rdquo;), and the assistant hands over by itself when it should.</li>
+          <li><strong>Never send codes, PINs, passwords or card numbers</strong> in a chat or question. Neither a store nor BitoCard will ask for them, and the assistant hides them if you do.</li>
+        </ul>
       </Section>
 
       <Section id="crypto" title="4. Crypto wallets and P2P trading">

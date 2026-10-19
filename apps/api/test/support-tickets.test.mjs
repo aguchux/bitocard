@@ -207,3 +207,16 @@ describe('BitoCard’s own store and resellers’ questions', () => {
     assert.deepEqual([opened.json.source, opened.json.mode, opened.json.queue, opened.json.customer_reference], ['api', 'test', 'reseller', 'cust_42']);
   });
 });
+
+describe('retention', () => {
+  test('tickets resolved more than two years ago are deleted; open and recent ones stay', async () => {
+    const tickets = server.app.get((await import('../dist/support/tickets.service.js')).TicketsService);
+    const reseller = await resellerClient(server);
+    const base = { resellerId: reseller.resellerId, mode: 'live', requester: 'reseller', queue: 'bitocard', category: 'other', subject: 'Old' };
+    const old = await prisma.supportTicket.create({ data: { ...base, status: 'resolved', resolvedAt: new Date(Date.now() - 800 * 24 * 3600_000) } });
+    const open = await prisma.supportTicket.create({ data: { ...base, status: 'open', createdAt: new Date(Date.now() - 800 * 24 * 3600_000) } });
+    assert.ok((await tickets.purgeOld()) >= 1);
+    assert.equal(await prisma.supportTicket.count({ where: { id: old.id } }), 0);
+    assert.equal(await prisma.supportTicket.count({ where: { id: open.id } }), 1);
+  });
+});

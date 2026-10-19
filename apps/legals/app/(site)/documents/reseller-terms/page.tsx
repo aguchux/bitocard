@@ -148,6 +148,15 @@ export default function ResellerTerms() {
         </ul>
       </Section>
 
+      <Section id="assistants" title="12a. Support assistants">
+        <ul>
+          <li><strong>What it says is yours.</strong> Your store&apos;s AI assistant answers from the information you give it (and what BitoCard generates from your store, which you review before applying). You are responsible for that information being true and for checking its answers; BitoCard&apos;s fixed rules (never asking for codes or secrets, never promising refunds, handing over to a person) always apply and cannot be switched off.</li>
+          <li><strong>It says it is an AI.</strong> Customers are always told they are talking to an AI assistant and can ask for a person. Keep a person available to answer what it hands over.</li>
+          <li><strong>Your own AI key</strong> is yours: you pay the provider and follow its terms, and its provider receives your customers&apos; messages as our privacy notice says. On Premium, BitoCard&apos;s AI is included within a monthly allowance of replies per store, which we set and may change; past it, people answer until the month resets.</li>
+          <li><strong>We may suspend an assistant</strong> that breaks these terms or the law, or says what it must not, and tell you why.</li>
+        </ul>
+      </Section>
+
       <Section id="integrations" title="13. Your own suppliers and payment gateways">
         <p>This section applies once we allow you to connect your own supplier or payment gateway accounts.</p>
         <ul>

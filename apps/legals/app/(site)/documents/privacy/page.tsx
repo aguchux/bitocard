@@ -73,6 +73,10 @@ export default function PrivacyNotice() {
           <li>if you connect your own supplier or payment gateway accounts, their credentials, kept encrypted and used only for your own orders and payments, and the orders and payments made through them, which we process on your behalf;</li>
           <li>your API keys (only a hash and their last characters) and your webhook endpoints and their delivery logs.</li>
         </ul>
+        <h3>When you chat with a store or ask for help</h3>
+        <p>Your chats and questions (support tickets) with a store or with BitoCard: what you and those answering write, when, who answered (the store, BitoCard or an AI assistant), the order it is about if you choose one, and notes the store and BitoCard write for each other, which you do not see. The store you bought from sees your chats and questions with it; BitoCard sees them too and answers those passed to it.</p>
+        <p><strong>AI assistants.</strong> Where a store (or BitoCard) has switched on an AI assistant, your messages are sent to the AI provider it chose, Anthropic, OpenAI or DeepSeek, to write the answer, with the store&apos;s own information about its business. Before anything is sent, card and account numbers, codes, PINs and passwords are hidden. The assistant can look up only what the store sells and your own orders at that store (what, when and their status, never codes). DeepSeek processes data in China. A store that uses its own account with one of these providers chooses that provider for its customers. We tell you in the chat that you are talking to an AI assistant, and you can ask for a person at any time.</p>
+        <p><strong>Engineering.</strong> If your question shows a problem in our systems, we may describe it to our engineers on GitHub, with no names, email addresses, phone numbers, codes or account numbers.</p>
         <h3>When you contact us</h3>
         <p>If you email us, we receive your email address, your name if you include it, and the content of your message.</p>
         <h3>What we do not collect</h3>
@@ -98,6 +102,7 @@ export default function PrivacyNotice() {
               <tr><th scope="row">Show resellers how many people visit their stores</th><td>Technical information, reduced to daily counts the same day</td><td>Our legitimate interests, and the reseller&apos;s, in knowing how their store is used, in a way that keeps nothing about you</td></tr>
               <tr><th scope="row">Check that our wallets hold what we hold for customers</th><td>Crypto balances and on-chain data</td><td>Legal obligation, or our legitimate interests in keeping customers&apos; crypto safe</td></tr>
               <tr><th scope="row">Keep accounting and tax records</th><td>Order and payment information</td><td>Legal obligation</td></tr>
+              <tr><th scope="row">Answer your chats and questions, with people and, where a store or BitoCard has switched one on, an AI assistant</th><td>Your messages and those answering them; your account and, if you choose one, an order</td><td>Performance of our contract with you, and our legitimate interests (and the store&apos;s) in helping customers quickly</td></tr>
               <tr><th scope="row">Reply to your enquiries</th><td>Contact details and message</td><td>Our legitimate interests in responding to you, or steps you ask us to take before entering into a contract</td></tr>
               <tr><th scope="row">Meet legal obligations, and establish or defend legal claims</th><td>Any of the above, where relevant</td><td>Legal obligation, or our legitimate interests</td></tr>
             </tbody>
@@ -119,6 +124,7 @@ export default function PrivacyNotice() {
           <li><strong>The store you buy from</strong>, when it is a registered business whose own checks we have verified: its staff review your identity check and see your documents, only to verify you.</li>
           <li><strong>The store you bought from</strong>, if it is a reseller&apos;s store: it sees your account details, your orders and your disputes with it, so it can serve you and answer your problems. Each store also has its own privacy notice for what it does with your information.</li>
           <li><strong>The companies that fulfil your order</strong>, such as the mobile network, pay-TV operator or utility, which receive only what they need to deliver it (for example the number to top up). <strong>The VPN network provider</strong> that runs VPN access receives only a username and password we make for your order, never your name or contact details (see section 3).</li>
+          <li><strong>AI providers</strong>, Anthropic, OpenAI and DeepSeek (which processes data in China), where a store or BitoCard has switched on an AI assistant: they receive your chat and question messages, with card and account numbers, codes, PINs and passwords hidden, and the store&apos;s information about its business, to write answers.</li>
           <li><strong>Golojan group companies</strong> listed above, where needed to run BitoCard or answer you.</li>
           <li><strong>Authorities, courts and advisers</strong>, where the law requires it or to protect our rights, users or the public.</li>
           <li><strong>A buyer or successor</strong>, if all or part of our business is reorganised or sold, subject to this notice.</li>
@@ -145,6 +151,7 @@ export default function PrivacyNotice() {
           <li>Saved withdrawal addresses and bank accounts are kept until you remove them, and then only with the records of the withdrawals and payouts that used them. Your nickname is kept while your account is open and with the records of your trades.</li>
           <li>Blockchain transactions stay on the blockchain permanently. We cannot change or erase them.</li>
           <li>Identity check outcomes are kept while your account is open and for up to five years after, where anti-fraud or anti-money-laundering rules require it.</li>
+          <li>Chats are deleted 12 months after they end; support questions two years after they are resolved, with their messages.</li>
           <li>Correspondence is kept for as long as we need it to deal with your enquiry, then for up to two years, unless a longer period is needed to meet a legal obligation or to establish or defend a legal claim.</li>
         </ul>
       </Section>

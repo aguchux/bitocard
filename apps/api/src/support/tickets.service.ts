@@ -440,6 +440,12 @@ export class TicketsService {
     return ticket;
   }
 
+  /** Retention: tickets resolved more than two years ago are deleted with their messages (the daily `support` job). */
+  async purgeOld(now = new Date()) {
+    const before = new Date(now.getTime() - 2 * 365 * 24 * 3600_000);
+    return (await this.prisma.supportTicket.deleteMany({ where: { status: 'resolved', resolvedAt: { lt: before } } })).count;
+  }
+
   // -- Shared ------------------------------------------------------------------------------------------------------
 
   /** The requester writes: whoever answers has the next turn, and a resolved ticket reopens. */

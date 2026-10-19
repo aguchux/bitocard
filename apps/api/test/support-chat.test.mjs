@@ -160,3 +160,16 @@ describe('BitoCard’s chats', () => {
     assert.equal((await prisma.supportTicket.findUniqueOrThrow({ where: { id: made.json.ticket_id } })).queue, 'bitocard');
   });
 });
+
+describe('retention', () => {
+  test('chats that ended more than 12 months ago are deleted; recent and open ones stay', async () => {
+    const chats = server.app.get((await import('../dist/support/chats.service.js')).ChatsService);
+    const reseller = await resellerClient(server);
+    const old = await prisma.supportConversation.create({ data: { resellerId: reseller.resellerId, mode: 'live', requester: 'reseller', queue: 'bitocard', status: 'closed', closedAt: new Date(Date.now() - 400 * 24 * 3600_000), messages: { create: [{ author: 'reseller', body: 'Long ago' }] } } });
+    const recent = await prisma.supportConversation.create({ data: { resellerId: reseller.resellerId, mode: 'test', requester: 'reseller', queue: 'bitocard', status: 'closed', closedAt: new Date(Date.now() - 30 * 24 * 3600_000) } });
+    assert.ok((await chats.purgeOld()) >= 1);
+    assert.equal(await prisma.supportConversation.count({ where: { id: old.id } }), 0);
+    assert.equal(await prisma.supportChatMessage.count({ where: { conversationId: old.id } }), 0);
+    assert.equal(await prisma.supportConversation.count({ where: { id: recent.id } }), 1);
+  });
+});

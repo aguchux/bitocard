@@ -273,6 +273,12 @@ export class ChatsService {
     return this.present((await this.load({ id }))!, 'admin');
   }
 
+  /** Retention: chats that ended more than 12 months ago are deleted with their messages (the daily `support` job). */
+  async purgeOld(now = new Date()) {
+    const before = new Date(now.getTime() - 365 * 24 * 3600_000);
+    return (await this.prisma.supportConversation.deleteMany({ where: { status: 'closed', closedAt: { lt: before } } })).count;
+  }
+
   // -- Shared ------------------------------------------------------------------------------------------------------
 
   /** The requester's open chat, or a new one. Two tabs starting at once get the same chat (one open per requester). */

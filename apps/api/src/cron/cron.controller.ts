@@ -32,7 +32,9 @@ import { CryptoDepositsService, depositBudgetMs } from '../crypto/chains/deposit
 import { CryptoReconciliationService } from '../crypto/custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from '../crypto/withdrawals.service.js';
 import { BotsService } from '../support/bots.service.js';
+import { ChatsService } from '../support/chats.service.js';
 import { RepliesService } from '../support/replies.service.js';
+import { TicketsService } from '../support/tickets.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -74,6 +76,8 @@ export class CronController {
     vpn: VpnService,
     bots: BotsService,
     replies: RepliesService,
+    chats: ChatsService,
+    tickets: TicketsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -93,8 +97,8 @@ export class CronController {
       vpn: () => vpn.job(),
       /** Daily: the VPN supplier's Active accounts and credit against BitoCard's active VPN access. */
       'vpn-reconcile': () => vpn.reconcile(),
-      /** Daily: support assistants whose store changed since their knowledge base was updated (flagged, or updated by itself). */
-      support: () => bots.checkStale(),
+      /** Daily: assistants whose store changed since their knowledge base was updated (flagged, or updated by itself); chats ended over 12 months ago and tickets resolved over two years ago deleted. */
+      support: async () => ({ knowledge: await bots.checkStale(), chats_deleted: await chats.purgeOld(), tickets_deleted: await tickets.purgeOld() }),
       /** Every 5 minutes: chats and tickets an assistant's answer after the reply never reached. */
       'support-replies': () => replies.job(),
       /**

@@ -11,6 +11,7 @@ export const guides = [
   { slug: "try-it", title: "Try it in the docs", group: "Get started" },
   { slug: "orders", title: "Orders", group: "Guides" },
   { slug: "webhooks", title: "Webhooks", group: "Guides" },
+  { slug: "support", title: "Support tickets", group: "Guides" },
   { slug: "errors", title: "Errors", group: "Guides" },
   { slug: "idempotency", title: "Idempotency", group: "Guides" },
   { slug: "pagination", title: "Pagination", group: "Guides" },
