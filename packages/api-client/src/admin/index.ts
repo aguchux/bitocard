@@ -435,6 +435,7 @@ export * from './fees';
 export * from './chargebacks';
 export * from './disputes';
 export * from './support';
+export * from '../support-bots';
 export * from './storefront';
 export * from './stock';
 export * from './payment-methods';

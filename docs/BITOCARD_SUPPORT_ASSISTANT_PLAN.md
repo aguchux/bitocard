@@ -1,6 +1,6 @@
 # BitoCard Support Assistant: implementation plan
 
-**Status:** phase 1 (tickets without AI) built on 19 October 2026: statuses are `open`, `pending` and `resolved` with a `queue` (`reseller` or `bitocard`) for who answers, in place of the longer status list below. Phase 2 (live chat without AI) and phase 3 (AI providers, keys, allowance and usage) built the same day; own keys are the reseller's own `ai_keys` on any plan rather than an own-integration connection. Phases 4 to 7 to follow.
+**Status:** phase 1 (tickets without AI) built on 19 October 2026: statuses are `open`, `pending` and `resolved` with a `queue` (`reseller` or `bitocard`) for who answers, in place of the longer status list below. Phase 2 (live chat without AI) and phase 3 (AI providers, keys, allowance and usage) built the same day; own keys are the reseller's own `ai_keys` on any plan rather than an own-integration connection. Phase 4 (bots: wizard, knowledge, Generate from BitoCard, Update knowledge base, playground, activation) built the same day. Phases 5 to 7 to follow.
 
 ## What we are building
 

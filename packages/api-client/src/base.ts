@@ -147,6 +147,7 @@ export const tagTypes = [
   'SupportTicket',
   'SupportChat',
   'SupportAi',
+  'SupportBot',
   'Stock',
   'Number',
   'Crypto',

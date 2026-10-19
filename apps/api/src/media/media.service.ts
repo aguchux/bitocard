@@ -196,14 +196,14 @@ export class MediaService {
     return { object: 'list' as const, data: page.map(asset => presentMedia(asset, uses.get(asset.url) ?? [])), has_more: rows.length > limit };
   }
 
-  /** Where each address is used: brands, products, suppliers, categories, stores and storefront pages. */
+  /** Where each address is used: brands, products, suppliers, categories, stores, assistants and storefront pages. */
   async usage(urls: string[]) {
     const uses = new Map<string, string[]>();
     if (!urls.length) return uses;
     const add = (url: string | null, label: string) => {
       if (url && urls.includes(url)) uses.set(url, [...(uses.get(url) ?? []), label]);
     };
-    const [brands, products, suppliers, categories, stores, pages, registry] = await Promise.all([
+    const [brands, products, suppliers, categories, stores, pages, registry, bots] = await Promise.all([
       this.prisma.brand.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { imageUrl: { in: urls } }] }, select: { slug: true, logoUrl: true, imageUrl: true } }),
       this.prisma.product.findMany({ where: { imageUrl: { in: urls } }, select: { key: true, imageUrl: true } }),
       this.prisma.supplier.findMany({ where: { logoUrl: { in: urls } }, select: { code: true, logoUrl: true } }),
@@ -211,6 +211,7 @@ export class MediaService {
       this.prisma.store.findMany({ where: { logoUrl: { in: urls } }, select: { subdomain: true, logoUrl: true } }),
       this.prisma.storefrontPage.findMany({ select: { key: true, draft: true, published: true } }),
       this.prisma.brandAsset.findMany({ where: { OR: [{ logoUrl: { in: urls } }, { cardUrl: { in: urls } }] } }),
+      this.prisma.supportBot.findMany({ where: { avatarUrl: { in: urls } }, select: { name: true, avatarUrl: true } }),
     ]);
     for (const entry of registry) {
       add(entry.logoUrl, `registry:${entry.slug}:logo`);
@@ -227,6 +228,7 @@ export class MediaService {
       add(category.imageUrl, `category:${category.category}:image`);
     }
     for (const store of stores) add(store.logoUrl, `store:${store.subdomain}`);
+    for (const bot of bots) add(bot.avatarUrl, `assistant:${bot.name}`);
     for (const page of pages) {
       const draft = JSON.stringify(page.draft);
       const published = JSON.stringify(page.published ?? null);

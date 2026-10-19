@@ -9,6 +9,7 @@
     "./format": "./src/format.ts",
     "./push-worker": "./src/push-worker.ts",
     "./storefront": "./src/storefront/index.ts",
+    "./support": "./src/support/index.ts",
     "./styles.css": "./src/styles.css"
   },
   "scripts": {

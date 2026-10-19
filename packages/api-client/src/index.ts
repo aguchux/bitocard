@@ -3,3 +3,4 @@ export { type AppStore, makeStore, type RootState } from './store';
 export * from './notifications';
 export * from './push';
 export * from './media';
+export * from './support-bots';

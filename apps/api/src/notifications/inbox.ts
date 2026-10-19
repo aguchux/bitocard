@@ -84,6 +84,8 @@ export const notificationTypes = {
   'support.ticket_updated': { realm: 'reseller', roles: ['admin', 'support'], severity: 'info', label: 'Support ticket updated' },
   'support.chat_waiting': { realm: 'reseller', roles: ['admin', 'support'], severity: 'warning', label: 'A customer is waiting in chat' },
   'support.chat_replied': { realm: 'reseller', roles: ['admin', 'support'], severity: 'info', label: 'BitoCard replied in chat' },
+  'support.bot_paused': { realm: 'reseller', roles: ['admin'], severity: 'warning', label: 'Assistant paused' },
+  'support.knowledge_stale': { realm: 'reseller', roles: ['admin'], severity: 'info', label: 'Assistant knowledge out of date' },
   'chargeback.opened': { realm: 'reseller', roles: ['finance'], severity: 'critical', label: 'Chargeback opened' },
   'chargeback.closed': { realm: 'reseller', roles: ['finance'], severity: 'warning', label: 'Chargeback decided' },
   'plan.renewal_failed': { realm: 'reseller', roles: ['finance'], severity: 'critical', label: 'Plan renewal failed' },

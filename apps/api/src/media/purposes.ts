@@ -51,6 +51,8 @@ const purposeTable = {
   storefront_image: { label: 'Storefront image', realm: 'admin', folder: () => 'platform/storefront/images', maxBytes: 5 * MB, types: rasterTypes },
   store_logo: { label: 'Store logo', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/logos`, maxBytes: 1 * MB, types: rasterTypes },
   store_image: { label: 'Store image', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/store/images`, maxBytes: 5 * MB, types: rasterTypes },
+  bot_avatar: { label: 'Assistant avatar', realm: 'reseller', folder: (_target, reseller) => `resellers/${reseller}/bots/avatars`, maxBytes: 1 * MB, types: rasterTypes },
+  platform_bot_avatar: { label: 'BitoCard assistant avatar', realm: 'admin', folder: () => 'platform/bots/avatars', maxBytes: 1 * MB, types: rasterTypes },
 } satisfies Record<string, MediaPurpose>;
 
 export type MediaPurposeKey = keyof typeof purposeTable;

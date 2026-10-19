@@ -74,6 +74,10 @@ export type { AiProviderName, AiUsageList, AiUsageRow } from '../reseller/suppor
 
 export const adminAiApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
+    adminSupportAi: build.query<{ object: 'support_ai_admin'; bitocard_models: Array<{ provider: import('../reseller/support').AiProviderName; model: string }>; replies_per_store: number }, void>({
+      query: () => '/v1/admin/support/ai',
+      providesTags: [{ type: 'SupportAi', id: 'OVERVIEW' }],
+    }),
     adminAiUsage: build.query<import('../reseller/support').AiUsageList, { month?: string } | void>({
       query: filter => ({ url: '/v1/admin/support/ai/usage', params: { ...(filter ?? {}) } }),
       providesTags: [{ type: 'SupportAi', id: 'USAGE' }],
@@ -81,4 +85,4 @@ export const adminAiApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useAdminAiUsageQuery } = adminAiApi;
+export const { useAdminAiUsageQuery, useAdminSupportAiQuery } = adminAiApi;

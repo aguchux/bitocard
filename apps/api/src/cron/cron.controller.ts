@@ -31,6 +31,7 @@ import { VpnService } from '../vpn/vpn.service.js';
 import { CryptoDepositsService, depositBudgetMs } from '../crypto/chains/deposits.service.js';
 import { CryptoReconciliationService } from '../crypto/custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from '../crypto/withdrawals.service.js';
+import { BotsService } from '../support/bots.service.js';
 
 /**
  * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
@@ -70,6 +71,7 @@ export class CronController {
     storeHosts: StoreHostsService,
     storeVisits: StoreVisitsService,
     vpn: VpnService,
+    bots: BotsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -89,6 +91,8 @@ export class CronController {
       vpn: () => vpn.job(),
       /** Daily: the VPN supplier's Active accounts and credit against BitoCard's active VPN access. */
       'vpn-reconcile': () => vpn.reconcile(),
+      /** Daily: support assistants whose store changed since their knowledge base was updated (flagged, or updated by itself). */
+      support: () => bots.checkStale(),
       /**
        * Every 15 minutes: stores' bitocard.com addresses, past days' visitor hashes and salts, then domain purchases, DNS
        * checks, renewals and reminders.

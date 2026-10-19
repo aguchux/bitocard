@@ -58,6 +58,12 @@ export class AiController {
 export class AdminAiController {
   constructor(private readonly ai: AiService) {}
 
+  /** The models offered on BitoCard's AI, for BitoCard's own assistants. */
+  @Get()
+  overview() {
+    return { object: 'support_ai_admin' as const, bitocard_models: this.ai.bitocardModels(), replies_per_store: this.ai.allowance() };
+  }
+
   @Get('usage')
   usage(@CurrentCaller() caller: Caller, @Query() query: MonthDto) {
     adminId(caller);

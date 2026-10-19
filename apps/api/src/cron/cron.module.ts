@@ -13,6 +13,7 @@ import { ResellerIntegrationsModule } from '../reseller-integrations/reseller-in
 import { DomainsModule } from '../domains/domains.module.js';
 import { StoresModule } from '../stores/stores.module.js';
 import { CronController } from './cron.controller.js';
+import { SupportModule } from '../support/support.module.js';
 
-@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule], controllers: [CronController] })
+@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule], controllers: [CronController] })
 export class CronModule {}

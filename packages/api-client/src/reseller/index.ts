@@ -19,3 +19,4 @@ export * from './esims';
 export * from './vpn';
 export * from './disputes';
 export * from './support';
+export * from '../support-bots';

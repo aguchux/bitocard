@@ -3739,3 +3739,67 @@ model AiUsage {
   @@index([createdAt])
   @@map("ai_usage")
 }
+
+/// A support bot (assistant): one per store (or BitoCard's one for resellers in SHQ, `scope: platform`). It answers
+/// chats and/or tickets with an AI agent (BitoCard's keys on Premium, or the reseller's own), from its knowledge.
+model SupportBot {
+  id               String    @id @default(uuid()) @db.Uuid
+  resellerId       String    @map("reseller_id") @db.Uuid
+  /// store (a store's customers) or platform (BitoCard's assistant for resellers in SHQ).
+  scope            String    @default("store")
+  storeId          String?   @unique @map("store_id") @db.Uuid
+  /// chat and/or tickets.
+  roles            String[]  @default([])
+  /// auto (sends ticket replies) or draft (staff send them).
+  ticketReplyMode  String    @default("draft") @map("ticket_reply_mode")
+  /// anthropic, openai or deepseek.
+  provider         String
+  model            String
+  /// bitocard (its keys, Premium) or own (the reseller's key).
+  funding          String
+  name             String
+  avatarUrl        String?   @map("avatar_url")
+  greeting         String?
+  /// friendly, formal or brief.
+  tone             String    @default("friendly")
+  instructions     String?
+  /// draft, active, paused (by its owner) or suspended (by BitoCard).
+  status           String    @default("draft")
+  suspendedReason  String?   @map("suspended_reason")
+  knowledgeId      String?   @map("knowledge_id") @db.Uuid
+  /// Applies BitoCard's sections by itself when the store's data changes (never the owner's).
+  autoRefresh      Boolean   @default(false) @map("auto_refresh")
+  /// When the store's data first differed from the knowledge in use.
+  knowledgeStaleAt DateTime? @map("knowledge_stale_at")
+  createdById      String?   @map("created_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  knowledge        SupportBotKnowledge[]
+
+  @@index([resellerId])
+  @@index([status])
+  @@map("support_bots")
+}
+
+/// A version of a bot's knowledge document (Markdown). Never edited in place: a change is a new version.
+model SupportBotKnowledge {
+  id               String     @id @default(uuid()) @db.Uuid
+  botId            String     @map("bot_id") @db.Uuid
+  version          Int
+  /// upload, generated (by BitoCard from the store), edited or refreshed (BitoCard's sections updated).
+  source           String
+  /// md, or csv (FAQs, turned into Markdown when uploaded).
+  format           String     @default("md")
+  content          String
+  chars            Int
+  /// A fingerprint of the store data BitoCard's sections were made from (null for a document with none).
+  dataHash         String?    @map("data_hash")
+  /// Each BitoCard section's hash as BitoCard wrote it, to tell when the owner edited one.
+  managedSections  Json       @default("{}") @map("managed_sections")
+  createdById      String?    @map("created_by_id") @db.Uuid
+  createdAt        DateTime   @default(now()) @map("created_at")
+  bot              SupportBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@unique([botId, version])
+  @@map("support_bot_knowledge")
+}

@@ -337,14 +337,14 @@ describe('signed uploads', () => {
     const categories = await client(server.base).get('/v1/store/categories');
     assert.equal(categories.json.data.find(item => item.category === 'gift_cards').icon_url, icon.completed.json.url);
     const admins = await admin.get('/v1/admin/storefront/categories');
-    assert.equal(admins.json.data.length, 10, 'every category, on sale or not');
+    assert.equal(admins.json.data.length, 12, 'every category, on sale or not');
   });
 
   test('resellers upload store images into their own folder and never see anyone else’s files', async () => {
     const owner = await resellerClient(server);
     const other = await resellerClient(server, { business: 'Other Shop' });
     const settings = await owner.browser.get('/v1/media/settings');
-    assert.deepEqual(settings.json.purposes.map(item => item.purpose).sort(), ['store_image', 'store_logo']);
+    assert.deepEqual(settings.json.purposes.map(item => item.purpose).sort(), ['bot_avatar', 'store_image', 'store_logo']);
 
     const logo = await upload(owner.browser, '/v1/media', { purpose: 'store_logo' }, jpeg(300, 120));
     assert.deepEqual([logo.completed.status, logo.completed.json.error.code], [400, 'upload_invalid'], 'a JPEG declared as PNG is refused');
