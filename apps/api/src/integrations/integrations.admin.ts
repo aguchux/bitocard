@@ -22,6 +22,7 @@ import { integrationGroups, isPlatformKey, type IntegrationField, type Integrati
 import { inSandbox, urlsFor } from './endpoints.js';
 import { IntegrationsService, schemaFor } from './integrations.service.js';
 import { linksFor } from './links.js';
+import { aiProvider, type AiProviderName, aiProviderLabels } from '../support/ai/providers.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -61,6 +62,7 @@ export class IntegrationsAdminService {
     if (group.section === 'blockchain') return this.testBlockchain(adminId, group);
     if (group.id === 'domains') return this.testDomains(adminId);
     if (group.id === 'store_hosts') return this.testStoreHosts(adminId);
+    if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -87,6 +89,29 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
     return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** An AI provider for support bots: its model list read with BitoCard's key. */
+  private async testAi(adminId: string, provider: AiProviderName) {
+    await this.integrations.refresh(true);
+    const config = this.integrations.config;
+    const apiKey = String(config[`${provider.toUpperCase()}_API_KEY` as keyof typeof config] ?? '').trim();
+    const baseUrl = String(config[`${provider.toUpperCase()}_API_URL` as keyof typeof config] ?? '');
+    let ok = false;
+    let message: string | null = null;
+    if (!apiKey) message = 'Set the API key first.';
+    else {
+      try {
+        const models = await aiProvider(provider, { apiKey, baseUrl }).check();
+        ok = true;
+        message = models.length ? `The key can use ${models.length} models.` : null;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.replace(new RegExp(`^${provider}: `), '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `${aiProviderLabels[provider]} refused this key (${detail}).` : `Could not reach ${aiProviderLabels[provider]} (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: provider, before: null, after: { environment: 'live', ok } });
+    return { object: 'integration_test' as const, integration: provider, environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** Domains: the storefront project read with the token and team (proves all three). */

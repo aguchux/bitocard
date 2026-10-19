@@ -1194,3 +1194,42 @@ export async function fakeRemita() {
   });
   return { ...service, state, env: { REMITA_SECRET_KEY: 'remita-secret', REMITA_API_URL: service.url, REMITA_CONTACT_PHONE: '08011111111' } };
 }
+
+/**
+ * Anthropic's Messages API, OpenAI's and DeepSeek's Chat Completions, and their model lists, on one address. Keys that
+ * start with `good` are accepted. `state.next` is the next reply's text, or `state.tool` a tool call to make once.
+ */
+export async function fakeAi() {
+  const state = { next: 'Hello from the assistant.', tool: null, calls: [] };
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const path = url.split('?')[0];
+    const anthropic = path.startsWith('/v1/messages') || (path === '/v1/models' && headers['x-api-key']);
+    const key = anthropic ? headers['x-api-key'] : String(headers.authorization ?? '').replace(/^Bearer /, '');
+    if (!String(key).startsWith('good')) return { status: 401, body: { error: anthropic ? { type: 'authentication_error', message: 'invalid x-api-key' } : { message: 'Incorrect API key provided' } } };
+    if (method === 'GET' && (path === '/v1/models' || path === '/models')) {
+      return { body: { data: anthropic ? [{ id: 'claude-haiku-5-5' }, { id: 'claude-sonnet-5-5' }] : path === '/models' ? [{ id: 'deepseek-chat' }] : [{ id: 'gpt-5-mini' }] } };
+    }
+    state.calls.push({ path, headers, body });
+    const tool = state.tool;
+    state.tool = null;
+    if (method === 'POST' && path === '/v1/messages') {
+      return {
+        body: {
+          content: tool ? [{ type: 'text', text: 'Let me check.' }, { type: 'tool_use', id: 'toolu_1', name: tool.name, input: tool.arguments }] : [{ type: 'text', text: state.next }],
+          stop_reason: tool ? 'tool_use' : 'end_turn',
+          usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 900, cache_creation_input_tokens: 0 },
+        },
+      };
+    }
+    if (method === 'POST' && (path === '/v1/chat/completions' || path === '/chat/completions')) {
+      return {
+        body: {
+          choices: [{ message: { content: tool ? null : state.next, ...(tool ? { tool_calls: [{ id: 'call_1', type: 'function', function: { name: tool.name, arguments: JSON.stringify(tool.arguments) } }] } : {}) }, finish_reason: tool ? 'tool_calls' : 'stop' }],
+          usage: path === '/chat/completions' ? { prompt_tokens: 1000, completion_tokens: 30, prompt_cache_hit_tokens: 800 } : { prompt_tokens: 1000, completion_tokens: 30, prompt_tokens_details: { cached_tokens: 700 } },
+        },
+      };
+    }
+    return { status: 404, body: { error: { message: `Fake AI has no ${path}` } } };
+  });
+  return { ...service, state, env: { ANTHROPIC_API_URL: service.url, OPENAI_API_URL: service.url, DEEPSEEK_API_URL: service.url } };
+}

@@ -15,7 +15,7 @@ import { signerLinks } from '../crypto/custody/signer.js';
 export type IntegrationLink = { label: string; url: string };
 
 /** Integrations without an outside provider account: nothing to sign up for. */
-export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys']);
+export const internalIntegrations = new Set(['general', 'web_push', 'checkout', 'crypto_keys', 'support_ai']);
 
 const signUp = (url: string): IntegrationLink => ({ label: 'Sign up', url });
 const keys = (url: string, label = 'Get API keys'): IntegrationLink => ({ label, url });
@@ -69,6 +69,9 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   vonage: [signUp('https://dashboard.nexmo.com/sign-up'), keys('https://dashboard.nexmo.com/settings', 'API key and secret'), docs('https://developer.vonage.com/')],
   twilio: [signUp('https://www.twilio.com/try-twilio'), keys('https://console.twilio.com/', 'Account SID and auth token'), docs('https://www.twilio.com/docs')],
   plivo: [signUp('https://console.plivo.com/accounts/register/'), keys('https://console.plivo.com/dashboard/', 'Auth ID and token'), docs('https://www.plivo.com/docs/')],
+  anthropic: [signUp('https://console.anthropic.com/'), keys('https://console.anthropic.com/settings/keys', 'API keys'), docs('https://docs.anthropic.com/en/api/messages')],
+  openai: [signUp('https://platform.openai.com/signup'), keys('https://platform.openai.com/api-keys', 'API keys'), docs('https://platform.openai.com/docs/api-reference/chat')],
+  deepseek: [signUp('https://platform.deepseek.com/'), keys('https://platform.deepseek.com/api_keys', 'API keys'), docs('https://api-docs.deepseek.com/')],
   remita: [signUp('https://connect.remita.net/auth/register'), keys('https://connect.remita.net', 'RemitaConnect API keys'), docs('https://api.remita.net/')],
   africas_talking: [signUp('https://account.africastalking.com/auth/register'), keys('https://account.africastalking.com/apps', 'Apps and API keys'), docs('https://developers.africastalking.com/docs/airtime/sending'), { label: 'Mobile data docs', url: 'https://developers.africastalking.com/docs/data/overview' }],
   maplerad: [site('https://maplerad.com/'), docs('https://maplerad.dev/')],

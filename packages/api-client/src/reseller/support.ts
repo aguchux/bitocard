@@ -168,3 +168,36 @@ export const {
   useSendBitocardChatMutation,
   useCloseBitocardChatMutation,
 } = resellerChatsApi;
+
+export type AiProviderName = 'anthropic' | 'openai' | 'deepseek';
+
+/** The AI behind the reseller's assistants: BitoCard's (Premium, an allowance per store) or their own keys. */
+export type SupportAi = {
+  object: 'support_ai';
+  premium: boolean;
+  allowance: { replies_per_store: number; month_start: string; stores: Array<{ store_id: string; store_name: string; bitocard_replies: number }> };
+  providers: Array<{
+    provider: AiProviderName;
+    label: string;
+    /** Models offered on BitoCard's AI (Premium). */
+    bitocard_models: string[];
+    own_key: { provider: AiProviderName; last4: string; models: string[]; checked_at: string; failed_at: string | null } | null;
+  }>;
+};
+
+export type AiUsageRow = { reseller_id?: string; store_id: string | null; funding: 'bitocard' | 'own'; provider: AiProviderName; model: string; calls: number; input_tokens: number; cached_tokens: number; output_tokens: number; cost_usd: number };
+export type AiUsageList = { object: 'list'; month: string; data: AiUsageRow[] };
+
+export const resellerAiApi = bitocardApi.injectEndpoints({
+  endpoints: build => ({
+    supportAi: build.query<SupportAi, void>({ query: () => '/v1/support/ai', providesTags: [{ type: 'SupportAi', id: 'OVERVIEW' }] }),
+    saveAiKey: build.mutation<SupportAi['providers'][number]['own_key'], { provider: AiProviderName; api_key: string }>({
+      query: ({ provider, ...body }) => ({ url: `/v1/support/ai/keys/${provider}`, method: 'PUT', body }),
+      invalidatesTags: [{ type: 'SupportAi', id: 'OVERVIEW' }],
+    }),
+    deleteAiKey: build.mutation<void, AiProviderName>({ query: provider => ({ url: `/v1/support/ai/keys/${provider}`, method: 'DELETE' }), invalidatesTags: [{ type: 'SupportAi', id: 'OVERVIEW' }] }),
+    aiUsage: build.query<AiUsageList, { month?: string } | void>({ query: filter => ({ url: '/v1/support/ai/usage', params: params({ ...(filter ?? {}) }) }), providesTags: [{ type: 'SupportAi', id: 'USAGE' }] }),
+  }),
+});
+
+export const { useSupportAiQuery, useSaveAiKeyMutation, useDeleteAiKeyMutation, useAiUsageQuery } = resellerAiApi;

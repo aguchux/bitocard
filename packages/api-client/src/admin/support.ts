@@ -69,3 +69,16 @@ export const adminChatsApi = bitocardApi.injectEndpoints({
 });
 
 export const { useAdminChatsQuery, useAdminChatQuery, useReplyAdminChatMutation, useTakeAdminChatMutation, useCloseAdminChatMutation, useAdminChatTicketMutation } = adminChatsApi;
+
+export type { AiProviderName, AiUsageList, AiUsageRow } from '../reseller/support';
+
+export const adminAiApi = bitocardApi.injectEndpoints({
+  endpoints: build => ({
+    adminAiUsage: build.query<import('../reseller/support').AiUsageList, { month?: string } | void>({
+      query: filter => ({ url: '/v1/admin/support/ai/usage', params: { ...(filter ?? {}) } }),
+      providesTags: [{ type: 'SupportAi', id: 'USAGE' }],
+    }),
+  }),
+});
+
+export const { useAdminAiUsageQuery } = adminAiApi;

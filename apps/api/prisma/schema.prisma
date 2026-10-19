@@ -3691,3 +3691,51 @@ model SupportChatMessage {
   @@index([conversationId, createdAt])
   @@map("support_chat_messages")
 }
+
+/// A reseller's own key for an AI provider, for their support bots (they pay the provider; no BitoCard allowance).
+/// Encrypted with ENCRYPTION_KEY, checked with the provider before it is saved, never returned (only its last four).
+model AiKey {
+  id           String    @id @default(uuid()) @db.Uuid
+  resellerId   String    @map("reseller_id") @db.Uuid
+  /// anthropic, openai or deepseek.
+  provider     String
+  keyEncrypted String    @map("key_encrypted")
+  last4        String
+  /// The models the key could use when last checked.
+  models       String[]  @default([])
+  checkedAt    DateTime  @map("checked_at")
+  /// When a bot's call was refused for the key (it stops using it until it is replaced).
+  failedAt     DateTime? @map("failed_at")
+  createdById  String?   @map("created_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([resellerId, provider])
+  @@map("ai_keys")
+}
+
+/// One AI call for support: who it was for, how it was paid (BitoCard's keys or the store's own), its tokens and cost.
+model AiUsage {
+  id           String     @id @default(uuid()) @db.Uuid
+  resellerId   String     @map("reseller_id") @db.Uuid
+  storeId      String?    @map("store_id") @db.Uuid
+  botId        String?    @map("bot_id") @db.Uuid
+  mode         LedgerMode
+  /// bitocard (its keys, counted against the store's allowance) or own (the store's key).
+  funding      String
+  provider     String
+  model        String
+  /// chat, ticket, generate or test.
+  kind         String
+  inputTokens  Int        @map("input_tokens")
+  cachedTokens Int        @map("cached_tokens")
+  outputTokens Int        @map("output_tokens")
+  /// Millionths of a US dollar, from the admin's price list (0 without a price).
+  costMicros   BigInt     @map("cost_micros")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([storeId, funding, createdAt])
+  @@index([resellerId, createdAt])
+  @@index([createdAt])
+  @@map("ai_usage")
+}
