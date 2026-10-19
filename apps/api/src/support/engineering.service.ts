@@ -12,6 +12,8 @@ import { ticketReference } from './tickets.service.js';
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such ticket.');
 const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONFLICT, 'conflict_error', code, message);
+/** How long an escalation holds its ticket while GitHub is asked (its calls time out after 20 seconds). */
+const escalationLeaseMs = 60_000;
 
 /**
  * Escalating a ticket to engineering: BitoCard's operations open a GitHub issue (drafted from the ticket by BitoCard's
@@ -73,6 +75,19 @@ export class EngineeringService {
     if (ticket.githubIssueNumber) throw conflict('ticket_has_issue', `This ticket is already issue #${ticket.githubIssueNumber}.`);
     const github = this.github();
     if (!github.configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'github_not_configured', 'Set up Engineering (GitHub) in Settings > Integrations first.');
+    // One escalation at a time: claimed on engineeringAt (a lease longer than GitHub's timeout), so two admins clicking
+    // at once never open two issues. A failed call gives the claim back.
+    const claimedAt = new Date();
+    const claim = await this.prisma.supportTicket.updateMany({
+      where: { id: ticketId, githubIssueNumber: null, OR: [{ engineeringAt: null }, { engineeringAt: { lt: new Date(claimedAt.getTime() - escalationLeaseMs) } }] },
+      data: { engineeringAt: claimedAt },
+    });
+    if (claim.count === 0) {
+      const current = await this.prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { githubIssueNumber: true } });
+      if (current?.githubIssueNumber) throw conflict('ticket_has_issue', `This ticket is already issue #${current.githubIssueNumber}.`);
+      throw conflict('escalation_in_progress', 'This ticket is being escalated already. Refresh in a moment.');
+    }
+    const release = () => this.prisma.supportTicket.updateMany({ where: { id: ticketId, githubIssueNumber: null, engineeringAt: claimedAt }, data: { engineeringAt: null } });
     let issue: { number: number; html_url: string; state: string };
     try {
       issue = await github.createIssue({
@@ -81,6 +96,7 @@ export class EngineeringService {
         labels: ['support', input.kind],
       });
     } catch (error) {
+      await release();
       if (error instanceof ProviderError && error.definite) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'github_refused', `GitHub refused the issue: ${error.message.replace(/^github: /, '')}`);
       throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'github_unreachable', 'GitHub could not be reached. Try again in a moment.');
     }
@@ -111,12 +127,20 @@ export class EngineeringService {
     if (ticket.githubIssueState === (closed ? 'closed' : 'open')) return 'unchanged';
     const now = new Date();
     const fixed = closed && payload.issue.state_reason !== 'not_planned';
-    await this.prisma.$transaction([
-      this.prisma.supportTicket.update({ where: { id: ticket.id }, data: { githubIssueState: closed ? 'closed' : 'open', ...(closed ? { status: 'open', resolvedAt: null } : {}), lastMessageAt: now } }),
-      this.prisma.supportTicketMessage.create({
-        data: { ticketId: ticket.id, author: 'system', visibility: 'staff', createdAt: now, body: closed ? `Engineering closed issue #${payload.issue.number}${fixed ? ' as done' : ' as not planned'}: confirm with the requester and resolve the ticket.` : `Engineering reopened issue #${payload.issue.number}.` },
-      }),
-    ]);
+    const number = payload.issue.number;
+    // Claimed on the issue's state, so parallel repeats of one notification note it once.
+    const changed = await this.prisma.$transaction(async tx => {
+      const claim = await tx.supportTicket.updateMany({
+        where: { id: ticket.id, githubIssueState: ticket.githubIssueState },
+        data: { githubIssueState: closed ? 'closed' : 'open', ...(closed ? { status: 'open', resolvedAt: null } : {}), lastMessageAt: now },
+      });
+      if (claim.count === 0) return false;
+      await tx.supportTicketMessage.create({
+        data: { ticketId: ticket.id, author: 'system', visibility: 'staff', createdAt: now, body: closed ? `Engineering closed issue #${number}${fixed ? ' as done' : ' as not planned'}: confirm with the requester and resolve the ticket.` : `Engineering reopened issue #${number}.` },
+      });
+      return true;
+    });
+    if (!changed) return 'unchanged';
     if (closed) {
       await this.inbox.admins('admin.support.issue_closed', { subject: `${ticket.id}:${payload.issue.number}:${now.getTime()}`, title: `Issue #${payload.issue.number} closed: ${ticketReference(ticket.number)}`, body: 'Confirm the fix with the requester, then resolve the ticket.', link: `/support/${ticket.id}`, mode: ticket.mode });
     }

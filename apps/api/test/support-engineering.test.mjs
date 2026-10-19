@@ -17,6 +17,7 @@ before(async () => {
     if (headers.authorization !== 'Bearer ghp_good') return { status: 401, body: { message: 'Bad credentials' } };
     if (method === 'GET' && url === '/repos/golojan/bitocard') return { body: { full_name: 'golojan/bitocard', has_issues: true } };
     if (method === 'POST' && url === '/repos/golojan/bitocard/issues') {
+      if (body.title.startsWith('REFUSE')) return { status: 422, body: { message: 'Validation Failed' } };
       issues.push(body);
       return { status: 201, body: { number: 41 + issues.length, html_url: `https://github.com/golojan/bitocard/issues/${41 + issues.length}`, state: 'open' } };
     }
@@ -80,6 +81,29 @@ describe('engineering escalations', () => {
     assert.ok(await prisma.notification.findFirst({ where: { type: 'admin.support.issue_closed' } }));
     assert.deepEqual((await hook('issues', { action: 'closed', issue: { number: opened.github_issue.number }, repository })).json.outcome, 'unchanged', 'a repeat changes nothing');
     assert.deepEqual((await hook('issues', { action: 'reopened', issue: { number: opened.github_issue.number }, repository })).json.outcome, 'reopened');
+  });
+
+  test('parallel escalations open one issue; a refused one gives the ticket back; parallel repeats are noted once', async () => {
+    const reseller = await resellerClient(server);
+    const ticket = (await reseller.browser.post('/v1/support/tickets', { requester: 'reseller', subject: 'Refunds stall', category: 'technical', message: 'Refunds stay pending.' })).json;
+    const before = issues.length;
+    const tries = await Promise.all([1, 2, 3].map(n => admin.post(`/v1/admin/support/tickets/${ticket.id}/github-issue`, { title: `Refunds stall ${n}`, body: 'Steps: refund an order.', kind: 'bug' })));
+    assert.equal(tries.filter(res => res.status === 201).length, 1, JSON.stringify(tries.map(res => res.json)));
+    assert.ok(tries.filter(res => res.status !== 201).every(res => ['ticket_has_issue', 'escalation_in_progress'].includes(res.json.error.code)));
+    assert.equal(issues.length, before + 1, 'GitHub asked once');
+
+    const other = (await reseller.browser.post('/v1/support/tickets', { requester: 'reseller', subject: 'Labels refused', category: 'technical', message: 'Something else.' })).json;
+    const refused = await admin.post(`/v1/admin/support/tickets/${other.id}/github-issue`, { title: 'REFUSE this issue', body: 'GitHub says no to this one.', kind: 'bug' });
+    assert.equal(refused.json.error?.code, 'github_refused', JSON.stringify(refused.json));
+    assert.equal((await prisma.supportTicket.findUniqueOrThrow({ where: { id: other.id } })).engineeringAt, null, 'a failed call gives the claim back');
+    const retried = await admin.post(`/v1/admin/support/tickets/${other.id}/github-issue`, { title: 'Labels refused', body: 'GitHub takes this one.', kind: 'bug' });
+    assert.equal(retried.status, 201, 'and it can be escalated again at once');
+
+    const number = (await prisma.supportTicket.findUniqueOrThrow({ where: { id: ticket.id } })).githubIssueNumber;
+    const repository = { full_name: 'golojan/bitocard' };
+    const outcomes = (await Promise.all([1, 2, 3].map(() => hook('issues', { action: 'closed', issue: { number, state: 'closed', state_reason: 'completed' }, repository })))).map(res => res.json.outcome);
+    assert.equal(outcomes.filter(outcome => outcome === 'closed').length, 1, JSON.stringify(outcomes));
+    assert.equal(await prisma.supportTicketMessage.count({ where: { ticketId: ticket.id, body: { startsWith: 'Engineering closed issue' } } }), 1);
   });
 
   test('Test connection reads the repository with the token', async () => {
