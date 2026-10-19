@@ -10,6 +10,8 @@ export type DisputeThreadMessage = {
   id: string;
   author: 'customer' | 'reseller' | 'bitocard' | 'system' | (string & {});
   author_name: string | null;
+  /** A support assistant's picture (support tickets). */
+  author_avatar_url?: string | null;
   visibility: 'all' | 'staff' | (string & {});
   body: string;
   created_at: string;
@@ -64,6 +66,10 @@ export function DisputeThread({ messages, viewer, requester = 'customer' }: { me
             )}
           >
             <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+              {message.author === 'bot' && message.author_avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- the assistant's uploaded picture
+                <img src={message.author_avatar_url} alt="" className="size-6 rounded-full object-cover ring-1 ring-violet-100" />
+              ) : null}
               <span className="font-semibold text-ink">{authorLabel(message, viewer)}</span>
               <span title={formatDateTime(message.created_at)}>{formatRelative(message.created_at)}</span>
               {message.visibility === 'staff' ? (

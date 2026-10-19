@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ChatPanel, type ChatPanelMessage } from '../src';
+import { ChatPanel, type ChatPanelMessage, RequesterCard } from '../src';
 
 afterEach(cleanup);
 
@@ -26,6 +26,14 @@ describe('ChatPanel', () => {
     expect(screen.getByText('You')).toBeTruthy();
     expect(screen.getByText('AO')).toBeTruthy();
     expect(screen.getByText(/Ada Obi joined the chat/)).toBeTruthy();
+  });
+
+  test('an assistant shows its own face; staff see who the chat is with', () => {
+    const { container } = render(<ChatPanel side="reseller" messages={[message({ id: 'q' }), message({ id: 'b', author: 'bot', author_name: 'Kemi', author_avatar_url: 'https://cdn.example.com/kemi.png', body: 'Hi Chidi', created_at: at(1) })]} />);
+    expect(container.querySelector('img[src="https://cdn.example.com/kemi.png"]')).toBeTruthy();
+    cleanup();
+    render(<RequesterCard profile={{ kind: 'customer', name: 'Chidi Okafor', email: 'chidi@example.com', phone: '+2348012345678', country: 'NG', country_name: 'Nigeria', currency: 'NGN', business: null }} />);
+    for (const text of ['Chidi Okafor', 'chidi@example.com', '+2348012345678', 'Nigeria (NG)', 'NGN', 'Customer']) expect(screen.getByText(text)).toBeTruthy();
   });
 
   test('sends with Enter from a compact composer; a chosen file is sent with its caption', async () => {

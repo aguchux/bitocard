@@ -24,6 +24,8 @@ export type AiRequest = {
   system: string;
   /** Long, stable context (the knowledge document): cached by the provider where it can. */
   context?: string;
+  /** Per-conversation facts (who the requester is), after the cached context so the cache still matches. */
+  about?: string;
   messages: AiTurn[];
   tools?: AiTool[];
   maxTokens: number;
@@ -97,7 +99,7 @@ export class AnthropicProvider implements AiProvider {
   }
 
   async reply(request: AiRequest): Promise<AiReply> {
-    const system = [{ type: 'text', text: request.system }, ...(request.context ? [{ type: 'text', text: request.context, cache_control: { type: 'ephemeral' } }] : [])];
+    const system = [{ type: 'text', text: request.system }, ...(request.context ? [{ type: 'text', text: request.context, cache_control: { type: 'ephemeral' } }] : []), ...(request.about ? [{ type: 'text', text: request.about }] : [])];
     const messages: Array<{ role: 'user' | 'assistant'; content: unknown }> = [];
     for (const turn of request.messages) {
       if (turn.role === 'user') messages.push({ role: 'user', content: turn.content });
@@ -167,7 +169,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
   }
 
   async reply(request: AiRequest): Promise<AiReply> {
-    const system = request.context ? `${request.context}\n\n${request.system}` : request.system;
+    const system = [request.context, request.system, request.about].filter(Boolean).join('\n\n');
     const messages: unknown[] = [{ role: 'system', content: system }];
     for (const turn of request.messages) {
       if (turn.role === 'user') messages.push({ role: 'user', content: turn.content });

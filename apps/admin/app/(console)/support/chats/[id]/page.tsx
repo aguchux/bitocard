@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
-import { ActionDialog, Button, Card, ChatPanel, chatStatusLabels, Field, Input, PageHeader, QueryView, Select, Skeleton, StatusBadge, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
+import { ActionDialog, Button, Card, ChatPanel, chatStatusLabels, RequesterCard, Field, Input, PageHeader, QueryView, Select, Skeleton, StatusBadge, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, useAdmin } from "@bitocard/admin-ui/shell";
 import { type AdminChat, chatFile, type TicketCategory, ticketCategories, useAdminChatQuery, useAdminChatTicketMutation, useAttachAdminChatMutation, useCloseAdminChatMutation, useReplyAdminChatMutation, useTakeAdminChatMutation } from "@bitocard/api-client/admin";
 
@@ -56,14 +56,8 @@ function ChatView({ chat, adminId }: { chat: AdminChat; adminId: string }) {
           <p>
             <StatusBadge status={chat.status === "waiting" ? "open" : chat.status === "closed" ? "resolved" : "pending"} label={chatStatusLabels[chat.status]} />
           </p>
-          {chat.visitor ? (
-            <div className="rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
-              <p className="font-semibold">Visitor, not signed in</p>
-              <p>{chat.visitor.name}</p>
-              <p className="break-all">{chat.visitor.email}</p>
-              <p className="mt-1 text-xs">The email is as they typed it, not confirmed. They are emailed when you reply.</p>
-            </div>
-          ) : null}
+          <RequesterCard profile={chat.requester_profile} />
+          {chat.visitor ? <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-200">The email is as they typed it, not confirmed. They are emailed when you reply.</p> : null}
           <p>
             <AppLink href={`/resellers/${chat.reseller_id}`} className="font-semibold text-brand-600 hover:underline">
               View reseller

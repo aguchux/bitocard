@@ -327,7 +327,7 @@ export type StoreTicket = {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
-  messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; visibility: 'all'; body: string; created_at: string }>;
+  messages: Array<{ id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; author_avatar_url: string | null; visibility: 'all'; body: string; created_at: string }>;
 };
 
 /** The customer's (or visitor's) live chat with their store. */
@@ -346,7 +346,7 @@ export type StoreAssistant = { name: string; avatar_url: string | null; greeting
 /** A photo or PDF sent in a chat (read through the store's own server). */
 export type StoreChatAttachment = { id: string; name: string; content_type: 'image/jpeg' | 'image/png' | 'application/pdf'; size: number; width: number | null; height: number | null };
 /** Messages carry who wrote them: the person answering by name, or the assistant by its name. */
-export type StoreChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; body: string; attachments: StoreChatAttachment[]; created_at: string };
+export type StoreChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; author_avatar_url: string | null; body: string; attachments: StoreChatAttachment[]; created_at: string };
 /** A signed-out visitor chatting with the store: the name and email they gave. */
 export type StoreChatVisitor = { name: string; email: string };
 

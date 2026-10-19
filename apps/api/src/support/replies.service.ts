@@ -7,6 +7,7 @@ import { formatMoney } from '../notifications/templates.js';
 import { AiService } from './ai/ai.service.js';
 import type { AiProviderName, AiTool, AiToolCall, AiTurn } from './ai/providers.js';
 import { ChatsService } from './chats.service.js';
+import { profileContext, requesterProfile } from './people.js';
 import { knowledgeContext, systemPrompt } from './prompt.js';
 import { redact } from './redact.js';
 import { ticketCategories, ticketReference, TicketsService, type TicketCategory } from './tickets.service.js';
@@ -17,7 +18,7 @@ const claimMs = 90_000;
 const maxRounds = 4;
 const handoverText = 'I have asked a person to help with this. They will reply here as soon as they can.';
 
-type Scope = { bot: SupportBot; storeName: string; customerId: string | null; resellerId: string; storeId: string | null; requester: 'customer' | 'reseller' };
+type Scope = { bot: SupportBot; storeName: string; customerId: string | null; resellerId: string; storeId: string | null; requester: 'customer' | 'reseller'; profile: string | null };
 
 const tool = (name: string, description: string, properties: Record<string, unknown> = {}, required: string[] = []): AiTool => ({ name, description, parameters: { type: 'object', properties, required, additionalProperties: false } });
 
@@ -64,9 +65,10 @@ export class RepliesService {
     return this.prisma.supportBot.findFirst({ where: { storeId: ticket.storeId, status: 'active', roles: { has: 'tickets' } } });
   }
 
-  private async scope(bot: SupportBot, input: { storeId: string | null; customerId: string | null; resellerId: string; requester: string }): Promise<Scope> {
-    const store = input.storeId ? await this.prisma.store.findUnique({ where: { id: input.storeId }, select: { name: true } }) : null;
-    return { bot, storeName: store?.name ?? 'the store', customerId: input.customerId, resellerId: input.resellerId, storeId: input.storeId, requester: input.requester === 'reseller' ? 'reseller' : 'customer' };
+  /** Who answers and for whom: the store, and the requester's own details (name, email, mobile, country, currency) to address them personally. */
+  private async scope(bot: SupportBot, input: { storeId: string | null; customerId: string | null; resellerId: string; requester: string; userId: string | null; visitorId?: string | null }): Promise<Scope> {
+    const [store, profile] = await Promise.all([input.storeId ? this.prisma.store.findUnique({ where: { id: input.storeId }, select: { name: true } }) : null, requesterProfile(this.prisma, input)]);
+    return { bot, storeName: store?.name ?? 'the store', customerId: input.customerId, resellerId: input.resellerId, storeId: input.storeId, requester: input.requester === 'reseller' ? 'reseller' : 'customer', profile: profileContext(profile) };
   }
 
   // -- Chats -------------------------------------------------------------------------------------------------------
@@ -210,7 +212,7 @@ export class RepliesService {
     for (let round = 0; round < maxRounds; round += 1) {
       const reply = await this.ai.reply(
         { funding: scope.bot.funding as 'bitocard' | 'own', provider: scope.bot.provider as AiProviderName, model: scope.bot.model, resellerId: scope.bot.resellerId, storeId: scope.storeId, botId: scope.bot.id, mode: 'live', kind: place.kind },
-        { system, context: knowledgeContext(knowledge?.content), messages, tools, maxTokens: 700 },
+        { system, context: knowledgeContext(knowledge?.content), ...(scope.profile ? { about: scope.profile } : {}), messages, tools, maxTokens: 700 },
       );
       if (!reply.toolCalls.length) return { text: reply.text ? redact(reply.text) : null, handover: null as string | null };
       messages.push({ role: 'assistant', content: reply.text, toolCalls: reply.toolCalls });

@@ -118,6 +118,26 @@ describe('chats with an assistant', () => {
     assert.equal(usage.funding, 'own');
   });
 
+  test('the assistant answers with its face and knows who it is talking to; staff see the same details', async () => {
+    const store = await storeWithAssistant();
+    const face = 'https://cdn.example.com/bots/kemi.png';
+    await prisma.supportBot.update({ where: { id: store.botId }, data: { avatarUrl: face } });
+    const shopper = await customer(store.subdomain);
+    await prisma.customer.update({ where: { id: shopper.id }, data: { phone: '+2348012345678', phoneVerifiedAt: new Date() } });
+    ai.state.next = 'Hi Chidi, happy to help.';
+    const chat = (await shopper.post('/v1/store/support/chat/messages', { body: 'Hello' })).json;
+    const answered = await until(async () => (await shopper.get(`/v1/store/support/chat/${chat.id}/messages`)).json.data.find(item => item.author === 'bot'));
+    assert.deepEqual([answered.author_name, answered.author_avatar_url], ['Kemi', face]);
+    const request = ai.state.calls.at(-1).body;
+    assert.ok(request.system[1].cache_control, 'the knowledge stays the cached block');
+    const about = request.system[2].text;
+    for (const fact of ['Chidi Okafor', shopper.email ?? '@example.com', '+2348012345678', '(NG)', 'NGN', 'first name']) assert.ok(about.includes(fact), `${fact} in ${about}`);
+    assert.ok(!request.system[0].text.includes('Chidi'), 'the rules block is the same for everyone');
+    const staffView = (await store.browser.get(`/v1/support/chats/${chat.id}`)).json;
+    assert.deepEqual([staffView.requester_profile.kind, staffView.requester_profile.phone, staffView.requester_profile.currency], ['customer', '+2348012345678', 'NGN']);
+    assert.equal(staffView.messages.find(item => item.author === 'bot').author_avatar_url, face);
+  });
+
   test('tools: products the store lists; handing over stops the assistant and pages staff', async () => {
     const product = await giftCard('Amazon Reply Card');
     const store = await storeWithAssistant();

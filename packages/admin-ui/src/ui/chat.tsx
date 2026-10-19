@@ -6,7 +6,7 @@ import { chatFileAccept, formatFileSize, initials, prepareChatFile, startsRun } 
 import { cn, formatDateTime } from '../format';
 
 export type ChatPanelAttachment = { id: string; name: string; content_type: string; size: number; width: number | null; height: number | null };
-export type ChatPanelMessage = { id: string; author: string; author_name: string | null; body: string; attachments?: ChatPanelAttachment[]; created_at: string };
+export type ChatPanelMessage = { id: string; author: string; author_name: string | null; author_avatar_url?: string | null; body: string; attachments?: ChatPanelAttachment[]; created_at: string };
 
 const roles: Record<string, string> = { customer: 'Customer', reseller: 'Store', bitocard: 'BitoCard', bot: 'Assistant', system: 'Update' };
 const time = (iso: string) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
@@ -195,7 +195,7 @@ export function ChatPanel({
           const who = nameOf(message);
           return (
             <li key={message.id} className={cn('flex items-end gap-2', ours ? 'flex-row-reverse' : 'flex-row', first ? 'pt-2' : '')}>
-              {first ? <ChatAvatar name={who} author={message.author} ours={ours} src={message.author === 'bot' ? assistantAvatar : null} /> : <span className="w-8 shrink-0" aria-hidden />}
+              {first ? <ChatAvatar name={who} author={message.author} ours={ours} src={message.author === 'bot' ? (message.author_avatar_url ?? assistantAvatar) : null} /> : <span className="w-8 shrink-0" aria-hidden />}
               <div className={cn('flex max-w-[78%] flex-col gap-1', ours ? 'items-end' : 'items-start')}>
                 {first ? (
                   <p className="flex items-center gap-1 px-1 text-xs text-muted" title={formatDateTime(message.created_at)}>
@@ -267,6 +267,37 @@ export function ChatPanel({
           {problem ?? error}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/** Who the chat is with, from their account: name, email, mobile, country and currency. */
+export function RequesterCard({ profile }: { profile: { kind: string; name: string | null; email: string | null; phone: string | null; country: string | null; country_name: string | null; currency: string | null; business: string | null } | null }) {
+  if (!profile) return null;
+  const rows: Array<[string, string | null]> = [
+    ['Email', profile.email],
+    ['Mobile', profile.phone],
+    ['Business', profile.business],
+    ['Country', profile.country ? `${profile.country_name ?? profile.country} (${profile.country})` : null],
+    ['Currency', profile.currency],
+  ];
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <ChatAvatar name={profile.name} author={profile.kind === 'reseller' ? 'reseller' : 'customer'} />
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink">{profile.name ?? 'Unknown'}</p>
+          <p className="text-xs text-muted">{profile.kind === 'visitor' ? 'Visitor, not signed in' : profile.kind === 'reseller' ? 'Reseller' : 'Customer'}</p>
+        </div>
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        {rows.filter(([, value]) => value).map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted">{label}</dt>
+            <dd className="break-all text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

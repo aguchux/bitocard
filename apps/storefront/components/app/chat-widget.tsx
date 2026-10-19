@@ -284,6 +284,8 @@ export function ChatWidget({ store, aboveNav = false }: { store: string; aboveNa
   };
 
   const withAssistant = Boolean(assistant) && (status === null || status === "bot");
+  // The assistant's face as it last answered, else as the store set it now.
+  const assistantFace = [...messages].reverse().find(message => message.author === "bot" && message.author_avatar_url)?.author_avatar_url ?? assistant?.avatar_url;
   const staff = answeringPerson(messages);
   const title = withAssistant && assistant ? assistant.name : status === "with_staff" && staff ? staff : `Chat with ${store}`;
   const canSend = !busy && (Boolean(file) || Boolean(body.trim()));
@@ -315,7 +317,7 @@ export function ChatWidget({ store, aboveNav = false }: { store: string; aboveNa
             <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" aria-hidden="true" />
             <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                {withAssistant ? <Avatar name={assistant?.name ?? null} author="bot" src={assistant?.avatar_url} size="size-10" /> : <Avatar name={status === "with_staff" && staff ? staff : store} author="store" size="size-10" />}
+                {withAssistant ? <Avatar name={assistant?.name ?? null} author="bot" src={assistantFace} size="size-10" /> : <Avatar name={status === "with_staff" && staff ? staff : store} author="store" size="size-10" />}
                 <div className="min-w-0">
                   <h2 className="flex items-center gap-1.5 truncate font-bold text-navy-900">
                     {title}
@@ -372,7 +374,7 @@ export function ChatWidget({ store, aboveNav = false }: { store: string; aboveNa
                     const name = ours ? (message.author_name ?? visitor?.name ?? "You") : chatAuthor(message, store);
                     return (
                       <li key={message.id} className={`flex items-end gap-2 ${ours ? "flex-row-reverse" : ""} ${first ? "pt-2" : ""}`}>
-                        {first ? <Avatar name={name} author={message.author} src={message.author === "bot" ? assistant?.avatar_url : null} /> : <span className="w-8 shrink-0" aria-hidden="true" />}
+                        {first ? <Avatar name={name} author={message.author} src={message.author === "bot" ? (message.author_avatar_url ?? assistant?.avatar_url) : null} /> : <span className="w-8 shrink-0" aria-hidden="true" />}
                         <div className={`flex max-w-[78%] flex-col gap-1 ${ours ? "items-end" : "items-start"}`}>
                           {first ? (
                             <p className="flex items-center gap-1 px-1 text-xs text-slate-500">

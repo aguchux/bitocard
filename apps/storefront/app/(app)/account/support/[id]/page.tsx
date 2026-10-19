@@ -49,6 +49,10 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
         {ticket.messages.map(message => (
           <li key={message.id} className={`rounded-2xl p-4 ${message.author === "customer" ? "bg-navy-900 text-white" : message.author === "system" ? "border border-dashed border-slate-200 bg-slate-50" : "bg-white ring-1 ring-slate-100"}`}>
             <p className={`mb-1 text-xs ${message.author === "customer" ? "text-white/70" : "text-slate-500"}`}>
+              {message.author === "bot" && message.author_avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element -- the assistant's uploaded picture
+                <img src={message.author_avatar_url} alt="" className="mr-1.5 inline-block size-6 rounded-full object-cover align-middle ring-1 ring-violet-100" />
+              ) : null}
               <strong>{ticketAuthor(message, store)}</strong> · {date(message.created_at)}
             </p>
             <p className="whitespace-pre-wrap break-words">{message.body}</p>

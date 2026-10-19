@@ -27,7 +27,7 @@ export type TicketSource = (typeof ticketSources)[number];
 type Audience = 'customer' | 'reseller' | 'admin';
 type TicketWithMessages = SupportTicket & { messages: SupportTicketMessage[] };
 type TicketEvent = Extract<EventType, `support_ticket.${string}`>;
-export type TicketAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; id: string | null; name: string | null };
+export type TicketAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; id: string | null; name: string | null; avatar?: string | null };
 
 /** At most this many unresolved tickets per customer, so a store's queue cannot be flooded. */
 export const maxOpenCustomerTickets = 10;
@@ -58,6 +58,7 @@ function presentMessage(message: SupportTicketMessage, audience: Audience) {
     author: message.author,
     // Customers see who answered by role (and a bot by its name), never staff names.
     author_name: audience === 'customer' && message.author !== 'customer' && message.author !== 'bot' ? null : message.authorName,
+    author_avatar_url: message.author === 'bot' ? message.authorAvatarUrl : null,
     visibility: message.visibility,
     body: message.body,
     ...(audience === 'customer' ? {} : { draft: message.draft }),
@@ -466,7 +467,7 @@ export class TicketsService {
   async botReply(ticketId: string, bot: SupportBot, body: string) {
     const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } });
     if (!ticket || ticket.status !== 'open') return;
-    const done = await this.transition(ticketId, { status: 'open' }, { status: 'pending' }, ['support_ticket.updated'], { author: { kind: 'bot', id: bot.id, name: bot.name }, body, visibility: 'all' });
+    const done = await this.transition(ticketId, { status: 'open' }, { status: 'pending' }, ['support_ticket.updated'], { author: { kind: 'bot', id: bot.id, name: bot.name, avatar: bot.avatarUrl }, body, visibility: 'all' });
     if (!done) return;
     if (ticket.requester === 'customer') await this.tellCustomer(ticket, 'customer.support.ticket_replied', 'Your ticket has a reply');
     else await this.tellReseller(ticket, 'support.ticket_replied', 'BitoCard’s assistant replied to your ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
@@ -474,12 +475,12 @@ export class TicketsService {
 
   /** An assistant's suggested reply for staff to send, edit or discard. */
   async botDraft(ticketId: string, bot: SupportBot, body: string) {
-    await this.prisma.supportTicketMessage.create({ data: { ticketId, author: 'bot', authorId: bot.id, authorName: bot.name, body: body.trim(), visibility: 'staff', draft: true } });
+    await this.prisma.supportTicketMessage.create({ data: { ticketId, author: 'bot', authorId: bot.id, authorName: bot.name, authorAvatarUrl: bot.avatarUrl, body: body.trim(), visibility: 'staff', draft: true } });
   }
 
   /** A note from an assistant for those answering (for example why it handed over). */
   async botNote(ticketId: string, bot: SupportBot, body: string) {
-    await this.prisma.supportTicketMessage.create({ data: { ticketId, author: 'bot', authorId: bot.id, authorName: bot.name, body: body.trim(), visibility: 'staff' } });
+    await this.prisma.supportTicketMessage.create({ data: { ticketId, author: 'bot', authorId: bot.id, authorName: bot.name, authorAvatarUrl: bot.avatarUrl, body: body.trim(), visibility: 'staff' } });
   }
 
   /** Staff send an assistant's draft, as it is (the assistant's words) or edited (theirs), to the requester. */
@@ -490,7 +491,7 @@ export class TicketsService {
     if (!draft) throw notFound();
     if (ticket.status === 'resolved') throw conflict('ticket_resolved', 'This ticket is resolved.');
     const body = edited?.trim() || draft.body;
-    const writer: TicketAuthor = edited?.trim() && edited.trim() !== draft.body ? author : { kind: 'bot', id: draft.authorId, name: draft.authorName };
+    const writer: TicketAuthor = edited?.trim() && edited.trim() !== draft.body ? author : { kind: 'bot', id: draft.authorId, name: draft.authorName, avatar: draft.authorAvatarUrl };
     await this.prisma.supportTicketMessage.delete({ where: { id: draft.id } });
     const answering = (ticket.queue === 'reseller' && author.kind === 'reseller') || (ticket.queue === 'bitocard' && author.kind === 'bitocard');
     await this.staffReplied(ticket, writer, body, 'all', answering, author.kind === 'bitocard');
@@ -524,7 +525,7 @@ export class TicketsService {
   private async create(data: Omit<Prisma.SupportTicketUncheckedCreateInput, 'subject'> & { subject: string }, author: TicketAuthor, message: string, visibility: TicketVisibility = 'all') {
     const created = await this.prisma.$transaction(async tx => {
       const ticket = await tx.supportTicket.create({ data: { ...data, subject: data.subject.trim().slice(0, 200) } });
-      await tx.supportTicketMessage.create({ data: { ticketId: ticket.id, author: author.kind, authorId: author.id, authorName: author.name, body: message.trim(), visibility } });
+      await tx.supportTicketMessage.create({ data: { ticketId: ticket.id, author: author.kind, authorId: author.id, authorName: author.name, authorAvatarUrl: author.avatar ?? null, body: message.trim(), visibility } });
       await this.recordEvent(tx, ticket.id, 'support_ticket.created');
       return tx.supportTicket.findUniqueOrThrow({ where: { id: ticket.id }, include: { messages: { orderBy: { createdAt: 'asc' } } } });
     });
@@ -542,7 +543,7 @@ export class TicketsService {
       const claimed = await tx.supportTicket.updateMany({ where: { id, ...where }, data: { ...data, ...(message ? { lastMessageAt: now } : {}), updatedAt: now } });
       if (claimed.count === 0) return false;
       if (message) {
-        await tx.supportTicketMessage.create({ data: { ticketId: id, author: message.author.kind, authorId: message.author.id, authorName: message.author.name, body: message.body.trim(), visibility: message.visibility, createdAt: now } });
+        await tx.supportTicketMessage.create({ data: { ticketId: id, author: message.author.kind, authorId: message.author.id, authorName: message.author.name, authorAvatarUrl: message.author.avatar ?? null, body: message.body.trim(), visibility: message.visibility, createdAt: now } });
       }
       for (const type of types) await this.recordEvent(tx, id, type);
       return true;

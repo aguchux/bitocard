@@ -67,7 +67,7 @@ export const {
   useCreateTicketIssueMutation,
 } = adminSupportApi;
 
-export type { Chat, ChatAttachment, ChatMessage, ChatStatus, ChatSummary } from '../reseller/support';
+export type { Chat, ChatAttachment, ChatMessage, ChatRequesterProfile, ChatStatus, ChatSummary } from '../reseller/support';
 
 export type AdminChatSummary = ChatSummary & { reseller_id: string };
 export type AdminChat = Chat & { reseller_id: string };

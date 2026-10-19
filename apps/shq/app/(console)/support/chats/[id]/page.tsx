@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Button, Card, ChatPanel, chatStatusLabels, Dialog, Field, Input, Notice, PageHeader, QueryView, Select, Skeleton, StatusBadge, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
+import { Button, Card, ChatPanel, chatStatusLabels, RequesterCard, Dialog, Field, Input, Notice, PageHeader, QueryView, Select, Skeleton, StatusBadge, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
 import { type Chat, chatFile, type TicketCategory, ticketCategories, useAttachChatMutation, useChatQuery, useChatTicketMutation, useCloseChatMutation, useReplyChatMutation, useTakeChatMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
@@ -106,14 +106,8 @@ function ChatView({ chat, userId }: { chat: Chat; userId: string | null }) {
           <p>
             <StatusBadge status={chat.status === "waiting" ? "open" : chat.status === "closed" ? "resolved" : "pending"} label={chatStatusLabels[chat.status]} />
           </p>
-          {chat.visitor ? (
-            <div className="rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
-              <p className="font-semibold">Visitor, not signed in</p>
-              <p>{chat.visitor.name}</p>
-              <p className="break-all">{chat.visitor.email}</p>
-              <p className="mt-1 text-xs">The email is as they typed it, not confirmed. They are emailed when you reply.</p>
-            </div>
-          ) : null}
+          <RequesterCard profile={chat.requester_profile} />
+          {chat.visitor ? <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-200">The email is as they typed it, not confirmed. They are emailed when you reply.</p> : null}
           {chat.assignee_id ? <p className="text-muted">{chat.assignee_id === userId ? "You are answering." : "Another team member is answering."}</p> : null}
           {chat.ticket_id ? (
             <p>

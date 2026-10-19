@@ -14,6 +14,8 @@ export type TicketMessage = {
   id: string;
   author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system';
   author_name: string | null;
+  /** The support assistant's picture on its messages. */
+  author_avatar_url: string | null;
   /** `all`: the requester sees it too; `staff`: those answering only. */
   visibility: 'all' | 'staff';
   body: string;
@@ -119,7 +121,9 @@ export type ChatStatus = 'bot' | 'waiting' | 'with_staff' | 'closed';
 
 /** A photo or PDF sent in a chat; read it from the chat's `files/:id` route. */
 export type ChatAttachment = { id: string; name: string; content_type: 'image/jpeg' | 'image/png' | 'application/pdf'; size: number; width: number | null; height: number | null };
-export type ChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; body: string; attachments: ChatAttachment[]; created_at: string };
+export type ChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; author_avatar_url: string | null; body: string; attachments: ChatAttachment[]; created_at: string };
+/** Who a chat is with, from their account (a visitor: as typed): to address them personally. */
+export type ChatRequesterProfile = { kind: 'customer' | 'visitor' | 'reseller'; name: string | null; email: string | null; phone: string | null; country: string | null; country_name: string | null; currency: string | null; business: string | null };
 
 /** A live chat as staff (or the reseller asking BitoCard) see it. */
 export type Chat = {
@@ -130,6 +134,7 @@ export type Chat = {
   requester_name: string | null;
   /** A signed-out visitor's name and email, as they gave them (not confirmed); null for customers and resellers. */
   visitor: { name: string; email: string } | null;
+  requester_profile: ChatRequesterProfile | null;
   queue: TicketQueue;
   status: ChatStatus;
   store_id: string | null;

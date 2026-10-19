@@ -12,6 +12,7 @@ import { KycStorage } from '../kyc/storage.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { chatReplyEmail } from '../notifications/templates.js';
+import { type RequesterProfile, requesterProfile } from './people.js';
 import { type TicketCategory, ticketReference, TicketsService } from './tickets.service.js';
 
 export const chatStatuses = ['bot', 'waiting', 'with_staff', 'closed'] as const;
@@ -63,15 +64,16 @@ function presentMessage(message: MessageWithFiles) {
   return {
     id: message.id,
     author: message.author,
-    // Everyone sees who answered: the person's name, or the assistant's.
+    // Everyone sees who answered: the person's name, or the assistant's (with its picture).
     author_name: message.authorName,
+    author_avatar_url: message.author === 'bot' ? message.authorAvatarUrl : null,
     body: message.body,
     attachments: (message.attachments ?? []).map(presentAttachment),
     created_at: message.createdAt.toISOString(),
   };
 }
 
-type Extras = { requester_name?: string | null; ticket_reference?: string | null; visitor?: { name: string; email: string } | null };
+type Extras = { requester_name?: string | null; ticket_reference?: string | null; visitor?: { name: string; email: string } | null; profile?: RequesterProfile | null };
 
 /** A chat as each side sees it. The requester sees whether someone is answering; staff see everything. */
 export function presentChat(chat: ChatWithMessages, audience: Audience, extra: Extras = {}) {
@@ -87,6 +89,8 @@ export function presentChat(chat: ChatWithMessages, audience: Audience, extra: E
     requester_name: extra.requester_name ?? null,
     /** A signed-out visitor's name and email (as they gave them, not confirmed); null for customers and resellers. */
     visitor: extra.visitor ?? null,
+    /** Who they are, from their account (a visitor: as they typed it): name, email, confirmed mobile, country and currency. */
+    requester_profile: extra.profile ?? null,
     queue: chat.queue as 'reseller' | 'bitocard',
     status: chat.status as ChatStatus,
     store_id: chat.storeId,
@@ -146,13 +150,14 @@ export class ChatsService {
   }
 
   private async extras(chat: SupportConversation): Promise<Extras> {
-    const [customer, user, ticket, visitor] = await Promise.all([
+    const [customer, user, ticket, visitor, profile] = await Promise.all([
       chat.customerId ? this.prisma.customer.findUnique({ where: { id: chat.customerId }, select: { name: true } }) : null,
       chat.userId ? this.prisma.user.findUnique({ where: { id: chat.userId }, select: { name: true } }) : null,
       chat.ticketId ? this.prisma.supportTicket.findUnique({ where: { id: chat.ticketId }, select: { number: true } }) : null,
       chat.visitorId ? this.prisma.supportVisitor.findUnique({ where: { id: chat.visitorId }, select: { name: true, email: true } }) : null,
+      requesterProfile(this.prisma, chat),
     ]);
-    return { requester_name: customer?.name ?? user?.name ?? visitor?.name ?? null, ticket_reference: ticket ? ticketReference(ticket.number) : null, visitor };
+    return { requester_name: customer?.name ?? user?.name ?? visitor?.name ?? null, ticket_reference: ticket ? ticketReference(ticket.number) : null, visitor, profile };
   }
 
   private async present(chat: ChatWithMessages, audience: Audience) {
@@ -536,7 +541,7 @@ export class ChatsService {
   async botWrote(chatId: string, bot: SupportBot, body: string) {
     const now = new Date();
     await this.prisma.$transaction([
-      this.prisma.supportChatMessage.create({ data: { conversationId: chatId, author: 'bot', authorId: bot.id, authorName: bot.name, body: body.slice(0, maxChatMessage), createdAt: now } }),
+      this.prisma.supportChatMessage.create({ data: { conversationId: chatId, author: 'bot', authorId: bot.id, authorName: bot.name, authorAvatarUrl: bot.avatarUrl, body: body.slice(0, maxChatMessage), createdAt: now } }),
       this.prisma.supportConversation.updateMany({ where: { id: chatId, status: 'bot' }, data: { lastMessageAt: now } }),
     ]);
   }
@@ -551,10 +556,10 @@ export class ChatsService {
     const now = new Date();
     const claimed = await this.prisma.supportConversation.updateMany({ where: { id: chatId, status: 'bot' }, data: { status: 'waiting', lastMessageAt: now } });
     if (!claimed.count) return 'not_with_assistant';
-    const bot = chat.botId ? await this.prisma.supportBot.findUnique({ where: { id: chat.botId }, select: { id: true, name: true } }) : null;
+    const bot = chat.botId ? await this.prisma.supportBot.findUnique({ where: { id: chat.botId }, select: { id: true, name: true, avatarUrl: true } }) : null;
     await this.prisma.supportChatMessage.createMany({
       data: [
-        ...(text ? [{ conversationId: chatId, author: 'bot', authorId: bot?.id ?? null, authorName: bot?.name ?? null, body: text.slice(0, maxChatMessage), createdAt: now }] : []),
+        ...(text ? [{ conversationId: chatId, author: 'bot', authorId: bot?.id ?? null, authorName: bot?.name ?? null, authorAvatarUrl: bot?.avatarUrl ?? null, body: text.slice(0, maxChatMessage), createdAt: now }] : []),
         { conversationId: chatId, author: 'system', body: 'A person will reply here as soon as they can.', createdAt: new Date(now.getTime() + 1) },
       ],
     });

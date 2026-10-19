@@ -3637,6 +3637,8 @@ model SupportTicketMessage {
   author     String
   authorId   String?       @map("author_id") @db.Uuid
   authorName String?       @map("author_name")
+  /// The assistant's picture when it wrote (bot messages), so each answer shows its face.
+  authorAvatarUrl String?   @map("author_avatar_url")
   /// all: the requester sees it too; staff: those answering only (the reseller and BitoCard on a customer's ticket,
   /// BitoCard only on a reseller's own).
   visibility String        @default("all")
@@ -3704,6 +3706,8 @@ model SupportChatMessage {
   author         String
   authorId       String?             @map("author_id") @db.Uuid
   authorName     String?             @map("author_name")
+  /// The assistant's picture when it wrote (bot messages), so each answer shows its face.
+  authorAvatarUrl String?            @map("author_avatar_url")
   body           String
   createdAt      DateTime            @default(now()) @map("created_at")
   conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
