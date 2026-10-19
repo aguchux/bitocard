@@ -22,15 +22,15 @@
 [data-cards="glass"] .bg-white { backdrop-filter: blur(12px); }
 /* Spin and win's styles are its own CSS module: components/app/spin/spin.module.css. */
 
-/* The store's chat: a sheet pulled up from the bottom on phones, a full-height panel flying in from the left above. */
+/* The store's chat: a sheet pulled up from the bottom on phones, a full-height panel sliding in from the right above. */
 @keyframes chat-up {
   from {
     transform: translateY(100%);
   }
 }
-@keyframes chat-left {
+@keyframes chat-right {
   from {
-    transform: translateX(-100%);
+    transform: translateX(100%);
   }
 }
 @keyframes chat-fade {
@@ -46,7 +46,7 @@
 }
 @media (min-width: 640px) {
   .chat-sheet {
-    animation-name: chat-left;
+    animation-name: chat-right;
   }
 }
 @media (prefers-reduced-motion: reduce) {

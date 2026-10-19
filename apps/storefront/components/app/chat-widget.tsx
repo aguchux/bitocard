@@ -132,8 +132,8 @@ function Introduce({ store, onStarted }: { store: string; onStarted: (chat: Stor
 }
 
 /**
- * Chat with the store, on every store and account page: a button that opens a full-height panel flying in from the
- * left (a sheet pulled up from the bottom on phones). Signed-in customers chat as themselves; visitors give their name
+ * Chat with the store, on every store and account page: a button that opens a full-height panel sliding in from the
+ * right (a sheet pulled up from the bottom on phones). Signed-in customers chat as themselves; visitors give their name
  * and email first. It loads the open chat, polls for new messages every 3 seconds while open, sends with Enter, and
  * takes photos and PDFs. `?chat=1` opens it on arrival. `aboveNav` lifts the button over the account app's bottom bar.
  */
@@ -312,7 +312,7 @@ export function ChatWidget({ store, aboveNav = false }: { store: string; aboveNa
             role="dialog"
             aria-modal="true"
             aria-label={`Chat with ${store}`}
-            className="chat-sheet absolute inset-x-0 bottom-0 flex h-[88svh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:inset-y-0 sm:right-auto sm:left-0 sm:h-svh sm:w-[420px] sm:rounded-none sm:rounded-r-3xl"
+            className="chat-sheet absolute inset-x-0 bottom-0 flex h-[88svh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:inset-y-0 sm:right-0 sm:left-auto sm:h-svh sm:w-[420px] sm:rounded-none sm:rounded-l-3xl"
           >
             <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-slate-200 sm:hidden" aria-hidden="true" />
             <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
