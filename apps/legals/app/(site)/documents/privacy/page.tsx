@@ -75,6 +75,8 @@ export default function PrivacyNotice() {
         </ul>
         <h3>When you chat with a store or ask for help</h3>
         <p>Your chats and questions (support tickets) with a store or with BitoCard: what you and those answering write, when, who answered (the store, BitoCard or an AI assistant), the order it is about if you choose one, and notes the store and BitoCard write for each other, which you do not see. The store you bought from sees your chats and questions with it; BitoCard sees them too and answers those passed to it.</p>
+        <p><strong>Chatting without an account.</strong> If you chat with a store without signing in, we ask your name and email address so the store can answer you and email you when it replies while you are away. We do not check the email address. A cookie (<code>bc_chat</code>) keeps the chat on your browser for 30 days.</p>
+        <p><strong>Photos and files.</strong> Photos (JPEG, PNG) and PDFs you or the store send in a chat are kept with the chat, encrypted, in private storage in the United States, seen only by you, the store and BitoCard, and deleted with the chat. We remove the hidden details phones add to photos (such as where they were taken). They are never sent to an AI assistant.</p>
         <p><strong>AI assistants.</strong> Where a store (or BitoCard) has switched on an AI assistant, your messages are sent to the AI provider it chose, Anthropic, OpenAI or DeepSeek, to write the answer, with the store&apos;s own information about its business. Before anything is sent, card and account numbers, codes, PINs and passwords are hidden. The assistant can look up only what the store sells and your own orders at that store (what, when and their status, never codes). DeepSeek processes data in China. A store that uses its own account with one of these providers chooses that provider for its customers. We tell you in the chat that you are talking to an AI assistant, and you can ask for a person at any time.</p>
         <p><strong>Engineering.</strong> If your question shows a problem in our systems, we may describe it to our engineers on GitHub, with no names, email addresses, phone numbers, codes or account numbers.</p>
         <h3>When you contact us</h3>
@@ -151,7 +153,7 @@ export default function PrivacyNotice() {
           <li>Saved withdrawal addresses and bank accounts are kept until you remove them, and then only with the records of the withdrawals and payouts that used them. Your nickname is kept while your account is open and with the records of your trades.</li>
           <li>Blockchain transactions stay on the blockchain permanently. We cannot change or erase them.</li>
           <li>Identity check outcomes are kept while your account is open and for up to five years after, where anti-fraud or anti-money-laundering rules require it.</li>
-          <li>Chats are deleted 12 months after they end; support questions two years after they are resolved, with their messages.</li>
+          <li>Chats are deleted 12 months after they end, with their photos and files (and the name and email a visitor gave, once they have no chat left and have not been back for 12 months); support questions two years after they are resolved, with their messages.</li>
           <li>Correspondence is kept for as long as we need it to deal with your enquiry, then for up to two years, unless a longer period is needed to meet a legal obligation or to establish or defend a legal claim.</li>
         </ul>
       </Section>

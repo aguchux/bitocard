@@ -1,4 +1,6 @@
 import { bitocardApi } from '../base';
+import { chatForm } from '../reseller/support';
+export { chatFile } from '../reseller/support';
 import type { Chat, ChatStatus, ChatSummary, Ticket, TicketCategory, TicketPriority, TicketQueue, TicketRequester, TicketStatus, TicketSummary } from '../reseller/support';
 import type { List } from './types';
 
@@ -65,7 +67,7 @@ export const {
   useCreateTicketIssueMutation,
 } = adminSupportApi;
 
-export type { Chat, ChatMessage, ChatStatus, ChatSummary } from '../reseller/support';
+export type { Chat, ChatAttachment, ChatMessage, ChatStatus, ChatSummary } from '../reseller/support';
 
 export type AdminChatSummary = ChatSummary & { reseller_id: string };
 export type AdminChat = Chat & { reseller_id: string };
@@ -84,6 +86,10 @@ export const adminChatsApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/support/chats/${id}/messages`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => chatTags(id),
     }),
+    attachAdminChat: build.mutation<AdminChat, { id: string; file: File; body?: string }>({
+      query: ({ id, file, body }) => ({ url: `/v1/admin/support/chats/${id}/attachments`, method: 'POST', body: chatForm(file, body) }),
+      invalidatesTags: (_result, _error, { id }) => chatTags(id),
+    }),
     takeAdminChat: build.mutation<AdminChat, string>({ query: id => ({ url: `/v1/admin/support/chats/${id}/take`, method: 'POST' }), invalidatesTags: (_result, _error, id) => chatTags(id) }),
     closeAdminChat: build.mutation<AdminChat, string>({ query: id => ({ url: `/v1/admin/support/chats/${id}/close`, method: 'POST' }), invalidatesTags: (_result, _error, id) => chatTags(id) }),
     adminChatTicket: build.mutation<AdminChat, { id: string; subject: string; category: TicketCategory }>({
@@ -93,7 +99,7 @@ export const adminChatsApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useAdminChatsQuery, useAdminChatQuery, useReplyAdminChatMutation, useTakeAdminChatMutation, useCloseAdminChatMutation, useAdminChatTicketMutation } = adminChatsApi;
+export const { useAdminChatsQuery, useAdminChatQuery, useReplyAdminChatMutation, useAttachAdminChatMutation, useTakeAdminChatMutation, useCloseAdminChatMutation, useAdminChatTicketMutation } = adminChatsApi;
 
 export type { AiProviderName, AiUsageList, AiUsageRow } from '../reseller/support';
 

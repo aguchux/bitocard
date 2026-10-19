@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
-import { AdminChatsController, BitocardChatController, ChatsController, CustomerChatController } from './chats.controller.js';
+import { KycStorage } from '../kyc/storage.js';
+import { AdminChatsController, BitocardChatController, ChatsController, CustomerChatController, VisitorChatController } from './chats.controller.js';
 import { ChatsService } from './chats.service.js';
 import { AdminAiController, AiController } from './ai/ai.controller.js';
 import { AiService } from './ai/ai.service.js';
@@ -17,8 +18,8 @@ import { TicketsService } from './tickets.service.js';
 /** Support: tickets now; chat and support bots come next (docs/BITOCARD_SUPPORT_ASSISTANT_PLAN.md). */
 @Module({
   imports: [CheckoutModule, SettingsModule],
-  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, GithubWebhookController],
-  providers: [TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService],
+  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, VisitorChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, GithubWebhookController],
+  providers: [KycStorage, TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService],
   exports: [TicketsService, ChatsService, AiService, BotsService, RepliesService],
 })
 export class SupportModule {}

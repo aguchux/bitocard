@@ -257,9 +257,9 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
   },
   {
     id: 'kyc_storage',
-    name: 'Identity documents (DigitalOcean Spaces)',
+    name: 'Private files (DigitalOcean Spaces)',
     description:
-      'BitoCard Verify’s ID photos, selfies, liveness frames and business documents. Use a private bucket of its own (never the public media bucket), in the US with the database. Files are encrypted by the API before they are stored and only ever read back through the API by reviewers. Verify cannot take uploads until the key, secret and bucket are set.',
+      'BitoCard Verify’s ID photos, selfies, liveness frames and business documents, and the photos and PDFs people send in support chats. Use a private bucket of its own (never the public media bucket), in the US with the database. Files are encrypted by the API before they are stored and only ever read back through the API. Verify and chat cannot take files until the key, secret and bucket are set.',
     fields: [
       field('KYC_SPACES_KEY', 'Access key', { required: true, help: 'A Spaces access key limited to this private bucket (DigitalOcean > Spaces Object Storage > Access Keys).' }),
       secret('KYC_SPACES_SECRET', 'Secret key'),

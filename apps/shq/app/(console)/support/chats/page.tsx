@@ -45,6 +45,7 @@ export default function ChatsPage() {
                   cell: row => (
                     <Link href={`/support/chats/${row.id}`} className="font-semibold text-brand-600 hover:underline">
                       {row.requester_name ?? "Customer"}
+                      {row.visitor ? <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Visitor</span> : null}
                     </Link>
                   ),
                 },

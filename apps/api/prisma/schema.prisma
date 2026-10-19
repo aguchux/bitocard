@@ -3679,9 +3679,15 @@ model SupportConversation {
   botId          String?              @map("bot_id") @db.Uuid
   botClaimedAt   DateTime?            @map("bot_claimed_at")
   closedAt       DateTime?            @map("closed_at")
+  /// A signed-out visitor who gave their name and email (store chats without an account).
+  visitorId      String?              @map("visitor_id") @db.Uuid
+  visitor        SupportVisitor?      @relation(fields: [visitorId], references: [id])
+  /// When a visitor was last emailed that staff replied (at most every 10 minutes per conversation).
+  requesterAlertedAt DateTime?        @map("requester_alerted_at")
   createdAt      DateTime             @default(now()) @map("created_at")
   updatedAt      DateTime             @updatedAt @map("updated_at")
   messages       SupportChatMessage[]
+  attachments    SupportChatAttachment[]
 
   @@index([queue, status, lastMessageAt])
   @@index([resellerId, mode, status])
@@ -3701,9 +3707,46 @@ model SupportChatMessage {
   body           String
   createdAt      DateTime            @default(now()) @map("created_at")
   conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments    SupportChatAttachment[]
 
   @@index([conversationId, createdAt])
   @@map("support_chat_messages")
+}
+
+/// A file sent in a chat (a photo or a PDF), sealed by the API in the private bucket and only read back through it.
+model SupportChatAttachment {
+  id             String              @id @default(uuid()) @db.Uuid
+  conversationId String              @map("conversation_id") @db.Uuid
+  messageId      String              @map("message_id") @db.Uuid
+  objectKey      String              @map("object_key")
+  /// The file's name as sent (shown; never part of the storage key).
+  name           String
+  contentType    String              @map("content_type")
+  size           Int
+  width          Int?
+  height         Int?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        SupportChatMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([messageId])
+  @@map("support_chat_attachments")
+}
+
+/// A signed-out visitor chatting with a store: the name and email they gave, and their browser's token (hash only).
+model SupportVisitor {
+  id            String                @id @default(uuid()) @db.Uuid
+  storeId       String                @map("store_id") @db.Uuid
+  name          String
+  email         String
+  tokenHash     String                @unique @map("token_hash")
+  lastSeenAt    DateTime              @default(now()) @map("last_seen_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  conversations SupportConversation[]
+
+  @@index([storeId])
+  @@map("support_visitors")
 }
 
 /// A reseller's own key for an AI provider, for their support bots (they pay the provider; no BitoCard allowance).

@@ -21,3 +21,37 @@
 [data-cards="outline"] :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl) { box-shadow: none; }
 [data-cards="glass"] .bg-white { backdrop-filter: blur(12px); }
 /* Spin and win's styles are its own CSS module: components/app/spin/spin.module.css. */
+
+/* The store's chat: a sheet pulled up from the bottom on phones, a full-height panel flying in from the left above. */
+@keyframes chat-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes chat-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes chat-fade {
+  from {
+    opacity: 0;
+  }
+}
+.chat-sheet {
+  animation: chat-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.chat-backdrop {
+  animation: chat-fade 0.2s ease-out;
+}
+@media (min-width: 640px) {
+  .chat-sheet {
+    animation-name: chat-left;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-sheet,
+  .chat-backdrop {
+    animation: none;
+  }
+}

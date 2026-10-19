@@ -89,7 +89,7 @@ export class RepliesService {
       const scope = await this.scope(bot, chat);
       const turns: AiTurn[] = messages
         .filter(message => message.author !== 'system')
-        .map(message => (message.author === chat.requester ? { role: 'user' as const, content: redact(message.body) } : { role: 'assistant' as const, content: message.body }));
+        .map(message => (message.author === chat.requester ? { role: 'user' as const, content: redact(message.body || '(sent a file)') } : { role: 'assistant' as const, content: message.body }));
       const outcome = await this.converse(scope, turns, { chatId: chat.id, kind: 'chat' });
       if (outcome.handover) return this.chats.handOver(chat.id, outcome.handover, outcome.text ?? undefined);
       if (outcome.text) await this.chats.botWrote(chat.id, bot, outcome.text);
@@ -154,7 +154,8 @@ export class RepliesService {
       if (scope.customerId) list.push(tool('my_orders', 'The customer’s latest orders at this store: what, when and their status. Never codes: those are on the order page after Reveal.'));
     }
     if (scope.requester === 'reseller') list.push(tool('my_account', 'The reseller’s account: verification, plan, stores and wallet status (never balances).'));
-    if (place.chatId) list.push(tool('create_ticket', 'Open a support ticket from this chat for something that needs following up over time.', { subject: { type: 'string' }, category: { type: 'string', enum: [...ticketCategories] } }, ['subject', 'category']));
+    // A visitor (no account) cannot follow a ticket.
+    if (place.chatId && (scope.requester === 'reseller' || scope.customerId)) list.push(tool('create_ticket', 'Open a support ticket from this chat for something that needs following up over time.', { subject: { type: 'string' }, category: { type: 'string', enum: [...ticketCategories] } }, ['subject', 'category']));
     return list;
   }
 

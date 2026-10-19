@@ -1,4 +1,4 @@
-import { bitocardApi } from '../base';
+import { apiFetch, bitocardApi } from '../base';
 import { type List, type Mode, params } from './common';
 
 export type TicketStatus = 'open' | 'pending' | 'resolved';
@@ -117,7 +117,9 @@ export const {
 
 export type ChatStatus = 'bot' | 'waiting' | 'with_staff' | 'closed';
 
-export type ChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; body: string; created_at: string };
+/** A photo or PDF sent in a chat; read it from the chat's `files/:id` route. */
+export type ChatAttachment = { id: string; name: string; content_type: 'image/jpeg' | 'image/png' | 'application/pdf'; size: number; width: number | null; height: number | null };
+export type ChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; body: string; attachments: ChatAttachment[]; created_at: string };
 
 /** A live chat as staff (or the reseller asking BitoCard) see it. */
 export type Chat = {
@@ -126,6 +128,8 @@ export type Chat = {
   mode: Mode;
   requester: TicketRequester;
   requester_name: string | null;
+  /** A signed-out visitor's name and email, as they gave them (not confirmed); null for customers and resellers. */
+  visitor: { name: string; email: string } | null;
   queue: TicketQueue;
   status: ChatStatus;
   store_id: string | null;
@@ -141,6 +145,21 @@ export type Chat = {
   messages: ChatMessage[];
 };
 export type ChatSummary = Omit<Chat, 'messages'>;
+
+/** A chat's file, read with the console's cookies and account headers (an `<img>` cannot send them). */
+export async function chatFile(path: string) {
+  const res = await apiFetch(path);
+  if (!res.ok) throw new Error('This file could not be opened.');
+  return res.blob();
+}
+
+/** A chat file upload: the file, and an optional caption. */
+export function chatForm(file: File, body?: string) {
+  const form = new FormData();
+  if (body?.trim()) form.set('body', body.trim());
+  form.set('file', file, file.name);
+  return form;
+}
 
 const chatTags = (id: string) => [{ type: 'SupportChat' as const, id }, { type: 'SupportChat' as const, id: 'LIST' }];
 
@@ -159,6 +178,10 @@ export const resellerChatsApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/support/chats/${id}/messages`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => chatTags(id),
     }),
+    attachChat: build.mutation<Chat, { id: string; file: File; body?: string }>({
+      query: ({ id, file, body }) => ({ url: `/v1/support/chats/${id}/attachments`, method: 'POST', body: chatForm(file, body) }),
+      invalidatesTags: (_result, _error, { id }) => chatTags(id),
+    }),
     takeChat: build.mutation<Chat, string>({ query: id => ({ url: `/v1/support/chats/${id}/take`, method: 'POST' }), invalidatesTags: (_result, _error, id) => chatTags(id) }),
     closeChat: build.mutation<Chat, string>({ query: id => ({ url: `/v1/support/chats/${id}/close`, method: 'POST' }), invalidatesTags: (_result, _error, id) => chatTags(id) }),
     chatTicket: build.mutation<Chat, { id: string; subject: string; category: TicketCategory }>({
@@ -168,6 +191,10 @@ export const resellerChatsApi = bitocardApi.injectEndpoints({
     bitocardChat: build.query<{ object: 'support_chat_current'; chat: Chat | null }, void>({ query: () => '/v1/support/bitocard-chat', providesTags: [{ type: 'SupportChat', id: 'BITOCARD' }] }),
     sendBitocardChat: build.mutation<Chat, { body: string }>({
       query: body => ({ url: '/v1/support/bitocard-chat/messages', method: 'POST', body }),
+      invalidatesTags: [{ type: 'SupportChat', id: 'BITOCARD' }],
+    }),
+    attachBitocardChat: build.mutation<Chat, { file: File; body?: string }>({
+      query: ({ file, body }) => ({ url: '/v1/support/bitocard-chat/attachments', method: 'POST', body: chatForm(file, body) }),
       invalidatesTags: [{ type: 'SupportChat', id: 'BITOCARD' }],
     }),
     closeBitocardChat: build.mutation<Chat, string>({
@@ -181,6 +208,8 @@ export const {
   useChatsQuery,
   useChatQuery,
   useReplyChatMutation,
+  useAttachChatMutation,
+  useAttachBitocardChatMutation,
   useTakeChatMutation,
   useCloseChatMutation,
   useChatTicketMutation,

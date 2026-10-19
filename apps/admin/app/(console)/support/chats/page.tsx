@@ -30,7 +30,7 @@ export default function AdminChatsPage() {
               header: "From",
               cell: row => (
                 <AppLink href={`/support/chats/${row.id}`} className="font-semibold text-brand-600 hover:underline">
-                  {`${row.requester_name ?? "Someone"} · ${row.requester === "reseller" ? "Reseller" : "Customer"}`}
+                  {`${row.requester_name ?? "Someone"} · ${row.requester === "reseller" ? "Reseller" : row.visitor ? "Visitor" : "Customer"}`}
                 </AppLink>
               ),
             },

@@ -18,6 +18,25 @@ export function setRequestContext(next: { reseller?: string | null; mode?: 'live
 
 const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
+/**
+ * A raw request to the API with the same cookies and account headers as the RTK Query client: for files (a chat's
+ * photos and PDFs, read as blobs because an `<img>` cannot name the account) and multipart uploads.
+ */
+export function apiFetch(path: string, init: RequestInit = {}) {
+  const method = (init.method ?? 'GET').toUpperCase();
+  return fetch(`${apiBaseUrl()}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      ...(requestContext.reseller ? { 'bitocard-reseller': requestContext.reseller } : {}),
+      ...(requestContext.mode === 'test' ? { 'bitocard-mode': 'test' } : {}),
+      ...(method === 'POST' ? { 'idempotency-key': newKey() } : {}),
+      ...(init.headers as Record<string, string> | undefined),
+    },
+  });
+}
+
+
 /** Turns any failure into an ApiError, so screens show the API's own message. */
 export function toApiError(status: number | string, data: unknown): ApiError {
   const body = (data as { error?: { type?: string; code?: string; message?: string; param?: string; request_id?: string } } | undefined)?.error;

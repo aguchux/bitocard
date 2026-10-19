@@ -58,12 +58,12 @@ function limiterFor(config: AppConfig, limit: number): Limiter {
 }
 
 /**
- * Sign-in, password and code routes (guessing targets, and senders of email and SMS): POSTs held to a strict limit per
+ * Sign-in, password and code routes (guessing targets, and senders of email and SMS), and visitors starting a chat: POSTs held to a strict limit per
  * address (AUTH_RATE_LIMIT_PER_MINUTE). Unlike every other limit, a Redis outage does not switch it off: each instance
  * keeps counting in memory instead.
  */
 const sensitivePath =
-  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?)|admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|store\/account\/(signup|signin|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|kyc\/session)(\?|$)/;
+  /^\/v1\/(auth\/(signin|signup(\/email(\/verify)?)?|password\/(forgot|reset|change)|email\/(verify|resend)|emails(\/verify|\/primary)?|phone(\/verify)?)|admin\/auth\/(start|signin|mfa\/verify|password\/forgot|password-link(\/complete)?)|store\/account\/(signup|signin|password\/(forgot|reset|change)|email\/(resend|verify))|store\/access\/[^/]+\/(code|verify)|store\/support\/visitor-chat|kyc\/session)(\?|$)/;
 
 export const isSensitive = (method: string, url: string) => method === 'POST' && sensitivePath.test(url);
 

@@ -102,7 +102,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       {/* Chat with the store (it reads ?chat=1, so it sits in a Suspense). */}
       <Suspense fallback={null}>
-        <ChatWidget store={name} />
+        <ChatWidget store={name} aboveNav />
       </Suspense>
     </div>
   );

@@ -51,6 +51,11 @@ export class KycStorage {
     return `${this.require().root}/kyc/${caseId}/${file}`;
   }
 
+  /** Where a file sent in a chat lives: under the chat, named by a random id (never the file's own name). */
+  chatKey(chatId: string, file: string) {
+    return `${this.require().root}/chat/${chatId}/${file}`;
+  }
+
   private dataKey() {
     const secret = this.integrations.env.ENCRYPTION_KEY;
     if (!secret) throw new Error('ENCRYPTION_KEY is not configured');

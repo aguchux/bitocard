@@ -4,7 +4,7 @@ import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button, Card, ChatPanel, chatStatusLabels, Dialog, Field, Input, Notice, PageHeader, QueryView, Select, Skeleton, StatusBadge, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
-import { type Chat, type TicketCategory, ticketCategories, useChatQuery, useChatTicketMutation, useCloseChatMutation, useReplyChatMutation, useTakeChatMutation } from "@bitocard/api-client/reseller";
+import { type Chat, chatFile, type TicketCategory, ticketCategories, useAttachChatMutation, useChatQuery, useChatTicketMutation, useCloseChatMutation, useReplyChatMutation, useTakeChatMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -60,11 +60,12 @@ function TicketDialog({ chat, open, onClose }: { chat: Chat; open: boolean; onCl
 
 function ChatView({ chat, userId }: { chat: Chat; userId: string | null }) {
   const [reply, replyState] = useReplyChatMutation();
+  const [attach, attachState] = useAttachChatMutation();
   const [take, takeState] = useTakeChatMutation();
   const [close, closeState] = useCloseChatMutation();
   const [ticketing, setTicketing] = useState(false);
   const open = chat.status !== "closed";
-  const error = replyState.error ?? takeState.error ?? closeState.error;
+  const error = replyState.error ?? attachState.error ?? takeState.error ?? closeState.error;
   return (
     <>
       <PageHeader
@@ -95,6 +96,8 @@ function ChatView({ chat, userId }: { chat: Chat; userId: string | null }) {
             side="reseller"
             requesterLabel={chat.requester_name ?? "Customer"}
             onSend={open ? async body => Boolean(await reply({ id: chat.id, body }).unwrap().catch(() => null)) : undefined}
+            onAttach={open ? async (file, body) => Boolean(await attach({ id: chat.id, file, body }).unwrap().catch(() => null)) : undefined}
+            loadFile={file => chatFile(`/v1/support/chats/${chat.id}/files/${file}`)}
             error={error ? errorMessage(error) : null}
             placeholder="Answer the customer"
           />
@@ -103,6 +106,14 @@ function ChatView({ chat, userId }: { chat: Chat; userId: string | null }) {
           <p>
             <StatusBadge status={chat.status === "waiting" ? "open" : chat.status === "closed" ? "resolved" : "pending"} label={chatStatusLabels[chat.status]} />
           </p>
+          {chat.visitor ? (
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
+              <p className="font-semibold">Visitor, not signed in</p>
+              <p>{chat.visitor.name}</p>
+              <p className="break-all">{chat.visitor.email}</p>
+              <p className="mt-1 text-xs">The email is as they typed it, not confirmed. They are emailed when you reply.</p>
+            </div>
+          ) : null}
           {chat.assignee_id ? <p className="text-muted">{chat.assignee_id === userId ? "You are answering." : "Another team member is answering."}</p> : null}
           {chat.ticket_id ? (
             <p>

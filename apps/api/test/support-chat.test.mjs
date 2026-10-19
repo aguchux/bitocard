@@ -1,5 +1,5 @@
 // Live chat: a customer writes and the store is told (once per wait), staff answer and take it over, the customer polls
-// for new messages and never sees staff names, chats close and become tickets; resellers chat with BitoCard;
+// for new messages and sees who answered, chats close and become tickets; resellers chat with BitoCard;
 // bitocard.com's customers reach BitoCard; one open chat per requester, and a cap on how fast they write.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
@@ -66,7 +66,7 @@ async function resellerStore() {
 const waitingNotices = resellerId => prisma.notification.count({ where: { type: 'support.chat_waiting', resellerId } });
 
 describe('a customer chats with their store', () => {
-  test('the store is told once, answers (taking it), the customer polls new messages without staff names, the store ends it', async () => {
+  test('the store is told once, answers (taking it), the customer polls new messages with who answered, the store ends it', async () => {
     const store = await resellerStore();
     const shopper = await customer(store.subdomain);
     assert.equal((await shopper.get('/v1/store/support/chat')).json.chat, null, 'no chat yet');
@@ -85,7 +85,7 @@ describe('a customer chats with their store', () => {
     const replied = await store.browser.post(`/v1/support/chats/${first.json.id}/messages`, { body: 'Yes, it works on amazon.com.' });
     assert.deepEqual([replied.status, replied.json.status, replied.json.assignee_id], [201, 'with_staff', store.userId]);
     const polled = (await shopper.get(`/v1/store/support/chat/${first.json.id}/messages?after=${lastSeen}`)).json;
-    assert.deepEqual([polled.status, polled.data.map(item => [item.author, item.author_name, item.body])], ['with_staff', [['reseller', null, 'Yes, it works on amazon.com.']]]);
+    assert.deepEqual([polled.status, polled.data.map(item => [item.author, item.author_name, item.body])], ['with_staff', [['reseller', 'Ada Obi', 'Yes, it works on amazon.com.']]]);
     assert.ok(await prisma.notification.findFirst({ where: { type: 'customer.support.chat_replied', customerId: shopper.id } }));
 
     await shopper.post('/v1/store/support/chat/messages', { body: 'Thanks!' });

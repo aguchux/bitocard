@@ -17,7 +17,8 @@
     "./styles/tokens.css": "./src/styles/tokens.css",
     "./tokens": "./src/tokens.ts",
     "./phone": "./src/phone.ts",
-    "./phone-input": "./src/phone-input.tsx"
+    "./phone-input": "./src/phone-input.tsx",
+    "./chat": "./src/chat.ts"
   },
   "scripts": {
     "lint": "eslint .",

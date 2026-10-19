@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { ChatWidget } from "@/components/app/chat-widget";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
 import { currentCustomer } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
@@ -57,6 +59,10 @@ export default async function StoreLayout({ children }: { children: React.ReactN
         {children}
       </main>
       <StoreFooter groups={groups} store={store} />
+      {/* Chat with the store: signed-in customers as themselves, visitors after giving their name and email (?chat=1 opens it). */}
+      <Suspense fallback={null}>
+        <ChatWidget store={store?.name ?? "BitoCard"} />
+      </Suspense>
     </div>
   );
 }

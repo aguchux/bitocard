@@ -526,3 +526,18 @@ export function verifyOutcomeEmail(to: string, input: { brand: string; outcome: 
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', `Sent by BitoCard Verify for ${input.brand}.`].join('\n') };
 }
+
+/** A signed-out visitor is told the store replied in their chat (at most every 10 minutes), with the link back to it. */
+export function chatReplyEmail(to: string, input: { store: string; name: string; link: string }): EmailMessage {
+  const heading = `${input.store} replied to your chat`;
+  const paragraphs = [`Hi ${input.name}, ${input.store} answered your message. Open the store to read it and reply: the chat opens where you left it, on the same browser.`, 'Never send codes, PINs or passwords in a chat.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open the chat</a></p>`,
+    `<p style="font-size:13px;color:#5b6488">Sent for ${escape(input.store)}.</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', `Sent for ${input.store}.`].join('\n') };
+}

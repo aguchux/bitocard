@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { ActionDialog, Button, Card, ChatPanel, chatStatusLabels, Field, Input, PageHeader, QueryView, Select, Skeleton, StatusBadge, errorMessage, ticketCategoryLabels } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, useAdmin } from "@bitocard/admin-ui/shell";
-import { type AdminChat, type TicketCategory, ticketCategories, useAdminChatQuery, useAdminChatTicketMutation, useCloseAdminChatMutation, useReplyAdminChatMutation, useTakeAdminChatMutation } from "@bitocard/api-client/admin";
+import { type AdminChat, chatFile, type TicketCategory, ticketCategories, useAdminChatQuery, useAdminChatTicketMutation, useAttachAdminChatMutation, useCloseAdminChatMutation, useReplyAdminChatMutation, useTakeAdminChatMutation } from "@bitocard/api-client/admin";
 
 function ChatView({ chat, adminId }: { chat: AdminChat; adminId: string }) {
   const [reply, replyState] = useReplyAdminChatMutation();
+  const [attach, attachState] = useAttachAdminChatMutation();
   const [take, takeState] = useTakeAdminChatMutation();
   const [close, closeState] = useCloseAdminChatMutation();
   const [makeTicket] = useAdminChatTicketMutation();
@@ -15,12 +16,12 @@ function ChatView({ chat, adminId }: { chat: AdminChat; adminId: string }) {
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<TicketCategory>("other");
   const open = chat.status !== "closed";
-  const error = replyState.error ?? takeState.error ?? closeState.error;
+  const error = replyState.error ?? attachState.error ?? takeState.error ?? closeState.error;
   return (
     <>
       <PageHeader
         title={`Chat with ${chat.requester_name ?? "someone"}`}
-        description={`${chat.requester === "reseller" ? "A reseller’s team" : "A bitocard.com customer"}${open ? "" : " · ended"}`}
+        description={`${chat.requester === "reseller" ? "A reseller’s team" : chat.visitor ? "A visitor (not signed in)" : "A customer"}${open ? "" : " · ended"}`}
         actions={
           open ? (
             <>
@@ -46,6 +47,8 @@ function ChatView({ chat, adminId }: { chat: AdminChat; adminId: string }) {
             side="bitocard"
             requesterLabel={chat.requester_name ?? undefined}
             onSend={open ? async body => Boolean(await reply({ id: chat.id, body }).unwrap().catch(() => null)) : undefined}
+            onAttach={open ? async (file, body) => Boolean(await attach({ id: chat.id, file, body }).unwrap().catch(() => null)) : undefined}
+            loadFile={file => chatFile(`/v1/admin/support/chats/${chat.id}/files/${file}`)}
             error={error ? errorMessage(error) : null}
           />
         </Card>
@@ -53,6 +56,14 @@ function ChatView({ chat, adminId }: { chat: AdminChat; adminId: string }) {
           <p>
             <StatusBadge status={chat.status === "waiting" ? "open" : chat.status === "closed" ? "resolved" : "pending"} label={chatStatusLabels[chat.status]} />
           </p>
+          {chat.visitor ? (
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-900 ring-1 ring-amber-200">
+              <p className="font-semibold">Visitor, not signed in</p>
+              <p>{chat.visitor.name}</p>
+              <p className="break-all">{chat.visitor.email}</p>
+              <p className="mt-1 text-xs">The email is as they typed it, not confirmed. They are emailed when you reply.</p>
+            </div>
+          ) : null}
           <p>
             <AppLink href={`/resellers/${chat.reseller_id}`} className="font-semibold text-brand-600 hover:underline">
               View reseller
