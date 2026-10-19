@@ -3607,6 +3607,8 @@ model SupportTicket {
   source            String                 @default("form")
   /// The staff member it is assigned to: a reseller team member on the reseller queue, an admin on BitoCard's.
   assigneeId        String?                @map("assignee_id") @db.Uuid
+  /// When an assistant run claimed the next reply (so two runs never reply at once).
+  botClaimedAt      DateTime?              @map("bot_claimed_at")
   escalatedAt       DateTime?              @map("escalated_at")
   resolvedAt        DateTime?              @map("resolved_at")
   lastMessageAt     DateTime               @default(now()) @map("last_message_at")
@@ -3632,6 +3634,8 @@ model SupportTicketMessage {
   /// BitoCard only on a reseller's own).
   visibility String        @default("all")
   body       String
+  /// An assistant's suggested reply waiting for staff to send, edit or discard (never shown to the requester).
+  draft      Boolean       @default(false)
   createdAt  DateTime      @default(now()) @map("created_at")
   ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
@@ -3664,6 +3668,9 @@ model SupportConversation {
   lastAskedAt    DateTime             @default(now()) @map("last_asked_at")
   /// When staff were last told it is waiting (at most every 10 minutes per conversation).
   alertedAt      DateTime?            @map("alerted_at")
+  /// The assistant answering it (status `bot`), and when one run claimed the next answer (so two runs never answer at once).
+  botId          String?              @map("bot_id") @db.Uuid
+  botClaimedAt   DateTime?            @map("bot_claimed_at")
   closedAt       DateTime?            @map("closed_at")
   createdAt      DateTime             @default(now()) @map("created_at")
   updatedAt      DateTime             @updatedAt @map("updated_at")

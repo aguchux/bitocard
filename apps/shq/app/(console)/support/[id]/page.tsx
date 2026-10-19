@@ -20,13 +20,25 @@ import {
   Skeleton,
   StatusBadge,
   Textarea,
+  TicketDrafts,
   errorMessage,
   formatDateTime,
   ticketCategoryLabels,
   ticketPriorityLabels,
   ticketSourceLabels,
 } from "@bitocard/admin-ui";
-import { type Ticket, type TicketPriority, ticketPriorities, useEscalateTicketMutation, useReplyTicketMutation, useResolveTicketMutation, useTicketQuery, useUpdateTicketMutation } from "@bitocard/api-client/reseller";
+import {
+  type Ticket,
+  type TicketPriority,
+  ticketPriorities,
+  useDiscardTicketDraftMutation,
+  useEscalateTicketMutation,
+  useReplyTicketMutation,
+  useResolveTicketMutation,
+  useSendTicketDraftMutation,
+  useTicketQuery,
+  useUpdateTicketMutation,
+} from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { shqTicketStatus, ticketTone } from "@/components/support";
@@ -113,6 +125,9 @@ function ResolveDialog({ ticket, open, onClose }: { ticket: Ticket; open: boolea
 function TicketView({ ticket, userId }: { ticket: Ticket; userId: string | null }) {
   const [reply, replyState] = useReplyTicketMutation();
   const [update, updateState] = useUpdateTicketMutation();
+  const [sendDraft, sendState] = useSendTicketDraftMutation();
+  const [discardDraft] = useDiscardTicketDraftMutation();
+  const drafts = ticket.messages.filter(message => message.draft);
   const [escalating, setEscalating] = useState(false);
   const [resolving, setResolving] = useState(false);
   const customer = ticket.requester === "customer";
@@ -148,7 +163,18 @@ function TicketView({ ticket, userId }: { ticket: Ticket; userId: string | null 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card className="p-5 sm:p-6">
           <CardHeader title="Messages" className="px-0 pt-0 pb-4" />
-          <DisputeThread messages={ticket.messages} viewer="reseller" />
+          <DisputeThread messages={ticket.messages.filter(message => !message.draft)} viewer="reseller" />
+          {drafts.length ? (
+            <div className="mt-4">
+              {sendState.error ? <Notice tone="red">{errorMessage(sendState.error)}</Notice> : null}
+              <TicketDrafts
+                drafts={drafts}
+                disabled={resolved}
+                onSend={async (draft, body) => Boolean(await sendDraft({ id: ticket.id, draft, ...(body !== undefined ? { body } : {}) }).unwrap().catch(() => null))}
+                onDiscard={async draft => Boolean(await discardDraft({ id: ticket.id, draft }).unwrap().catch(() => null))}
+              />
+            </div>
+          ) : null}
           {canWrite ? (
             <div className="mt-5 border-t border-line pt-5">
               <DisputeReply

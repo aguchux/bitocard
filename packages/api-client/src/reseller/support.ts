@@ -17,6 +17,8 @@ export type TicketMessage = {
   /** `all`: the requester sees it too; `staff`: those answering only. */
   visibility: 'all' | 'staff';
   body: string;
+  /** A reply the store's assistant suggested, waiting for staff to send or discard. */
+  draft?: boolean;
   created_at: string;
 };
 
@@ -86,6 +88,14 @@ export const resellerSupportApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/support/tickets/${id}/resolve`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
     }),
+    sendTicketDraft: build.mutation<Ticket, { id: string; draft: string; body?: string }>({
+      query: ({ id, draft, ...body }) => ({ url: `/v1/support/tickets/${id}/drafts/${draft}/send`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => tags(id),
+    }),
+    discardTicketDraft: build.mutation<Ticket, { id: string; draft: string }>({
+      query: ({ id, draft }) => ({ url: `/v1/support/tickets/${id}/drafts/${draft}/discard`, method: 'POST' }),
+      invalidatesTags: (_result, _error, { id }) => tags(id),
+    }),
     updateTicket: build.mutation<Ticket, { id: string; priority?: TicketPriority; assignee_id?: string | null }>({
       query: ({ id, ...body }) => ({ url: `/v1/support/tickets/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
@@ -93,7 +103,17 @@ export const resellerSupportApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useTicketsQuery, useTicketQuery, useOpenTicketMutation, useReplyTicketMutation, useEscalateTicketMutation, useResolveTicketMutation, useUpdateTicketMutation } = resellerSupportApi;
+export const {
+  useTicketsQuery,
+  useTicketQuery,
+  useOpenTicketMutation,
+  useReplyTicketMutation,
+  useEscalateTicketMutation,
+  useResolveTicketMutation,
+  useUpdateTicketMutation,
+  useSendTicketDraftMutation,
+  useDiscardTicketDraftMutation,
+} = resellerSupportApi;
 
 export type ChatStatus = 'bot' | 'waiting' | 'with_staff' | 'closed';
 

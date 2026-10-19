@@ -5,7 +5,7 @@ import { StoreSellers } from '../checkout/store-sellers.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { LedgerMode, Prisma, SupportTicket, SupportTicketMessage } from '../generated/prisma/client.js';
+import type { LedgerMode, Prisma, SupportBot, SupportTicket, SupportTicketMessage } from '../generated/prisma/client.js';
 import type { Tx } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { EventsService } from '../webhooks/events.service.js';
@@ -45,6 +45,7 @@ const system: TicketAuthor = { kind: 'system', id: null, name: null };
  */
 function visibleTo(ticket: SupportTicket, audience: Audience) {
   return (message: SupportTicketMessage) => {
+    if (message.draft && audience === 'customer') return false;
     if (message.visibility === 'all') return true;
     if (audience === 'admin') return true;
     return audience === 'reseller' && ticket.requester === 'customer';
@@ -59,6 +60,7 @@ function presentMessage(message: SupportTicketMessage, audience: Audience) {
     author_name: audience === 'customer' && message.author !== 'customer' && message.author !== 'bot' ? null : message.authorName,
     visibility: message.visibility,
     body: message.body,
+    ...(audience === 'customer' ? {} : { draft: message.draft }),
     created_at: message.createdAt.toISOString(),
   };
 }
@@ -132,6 +134,13 @@ type Page = { limit?: number; starting_after?: string };
  */
 @Injectable()
 export class TicketsService {
+  /** Set by the assistants: told when a requester opens a ticket or writes on one. */
+  private requesterListener: ((ticket: SupportTicket) => void) | null = null;
+
+  onRequesterMessage(listener: (ticket: SupportTicket) => void) {
+    this.requesterListener = listener;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sellers: StoreSellers,
@@ -175,6 +184,7 @@ export class TicketsService {
     );
     if (house) await this.tellAdmins(ticket, 'admin.support.ticket_created', `${ticketReference(ticket.number)}: ${ticket.subject}`);
     else await this.tellReseller(ticket, 'support.ticket_created', 'A customer opened a support ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    this.requesterListener?.(ticket);
     return presentTicket(ticket, 'customer');
   }
 
@@ -251,7 +261,10 @@ export class TicketsService {
       input.message,
       'all',
     );
-    if (own) await this.tellAdmins(ticket, 'admin.support.ticket_created', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    if (own) {
+      await this.tellAdmins(ticket, 'admin.support.ticket_created', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+      this.requesterListener?.(ticket);
+    }
     return presentTicket(ticket, 'reseller');
   }
 
@@ -436,6 +449,54 @@ export class TicketsService {
     await this.transition(ticket.id, {}, reopen ? { status: 'open', resolvedAt: null } : {}, types, { author, body, visibility: 'all' });
     if (ticket.queue === 'bitocard') await this.tellAdmins(ticket, 'admin.support.ticket_replied', `${ticketReference(ticket.number)} has a reply`);
     else await this.tellReseller(ticket, 'support.ticket_replied', 'A customer replied to a ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    this.requesterListener?.({ ...ticket, status: 'open' });
+  }
+
+  // -- Assistants --------------------------------------------------------------------------------------------------
+
+  /** An assistant's automatic reply: the requester's turn next, and they are told, as for a person's answer. */
+  async botReply(ticketId: string, bot: SupportBot, body: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.status !== 'open') return;
+    const done = await this.transition(ticketId, { status: 'open' }, { status: 'pending' }, ['support_ticket.updated'], { author: { kind: 'bot', id: bot.id, name: bot.name }, body, visibility: 'all' });
+    if (!done) return;
+    if (ticket.requester === 'customer') await this.tellCustomer(ticket, 'customer.support.ticket_replied', 'Your ticket has a reply');
+    else await this.tellReseller(ticket, 'support.ticket_replied', 'BitoCard’s assistant replied to your ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+  }
+
+  /** An assistant's suggested reply for staff to send, edit or discard. */
+  async botDraft(ticketId: string, bot: SupportBot, body: string) {
+    await this.prisma.supportTicketMessage.create({ data: { ticketId, author: 'bot', authorId: bot.id, authorName: bot.name, body: body.trim(), visibility: 'staff', draft: true } });
+  }
+
+  /** A note from an assistant for those answering (for example why it handed over). */
+  async botNote(ticketId: string, bot: SupportBot, body: string) {
+    await this.prisma.supportTicketMessage.create({ data: { ticketId, author: 'bot', authorId: bot.id, authorName: bot.name, body: body.trim(), visibility: 'staff' } });
+  }
+
+  /** Staff send an assistant's draft, as it is (the assistant's words) or edited (theirs), to the requester. */
+  async sendDraft(scope: { resellerId?: string; mode?: LedgerMode }, ticketId: string, draftId: string, author: TicketAuthor, edited?: string) {
+    const ticket = await this.load({ id: ticketId, ...(scope.resellerId ? { resellerId: scope.resellerId, mode: scope.mode } : {}) });
+    if (!ticket) throw notFound();
+    const draft = ticket.messages.find(message => message.id === draftId && message.draft);
+    if (!draft) throw notFound();
+    if (ticket.status === 'resolved') throw conflict('ticket_resolved', 'This ticket is resolved.');
+    const body = edited?.trim() || draft.body;
+    const writer: TicketAuthor = edited?.trim() && edited.trim() !== draft.body ? author : { kind: 'bot', id: draft.authorId, name: draft.authorName };
+    await this.prisma.supportTicketMessage.delete({ where: { id: draft.id } });
+    const answering = (ticket.queue === 'reseller' && author.kind === 'reseller') || (ticket.queue === 'bitocard' && author.kind === 'bitocard');
+    await this.staffReplied(ticket, writer, body, 'all', answering, author.kind === 'bitocard');
+    if (ticket.requester === 'customer') await this.tellCustomer(ticket, 'customer.support.ticket_replied', 'Your ticket has a reply');
+    else await this.tellReseller(ticket, 'support.ticket_replied', 'BitoCard replied to your ticket', `${ticketReference(ticket.number)}: ${ticket.subject}`);
+    return (await this.load({ id: ticketId }))!;
+  }
+
+  async discardDraft(scope: { resellerId?: string; mode?: LedgerMode }, ticketId: string, draftId: string) {
+    const ticket = await this.prisma.supportTicket.findFirst({ where: { id: ticketId, ...(scope.resellerId ? { resellerId: scope.resellerId, mode: scope.mode } : {}) } });
+    if (!ticket) throw notFound();
+    const deleted = await this.prisma.supportTicketMessage.deleteMany({ where: { id: draftId, ticketId, draft: true } });
+    if (!deleted.count) throw notFound();
+    return (await this.load({ id: ticketId }))!;
   }
 
   /**

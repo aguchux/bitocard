@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { setRequest } from "./request";
 import { chatAuthor, chatStatusLine } from "@/components/app/chat-widget";
 
-const { endChat, loadChat, pollChat, sendChatMessage } = await import("@/lib/chat-actions");
+const { askForPerson, endChat, loadChat, pollChat, sendChatMessage } = await import("@/lib/chat-actions");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
 const id = "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d";
@@ -52,13 +52,20 @@ describe("chat actions", () => {
   });
 
   test("loading reads the open chat; an ended session asks to sign in; ending closes it", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ object: "support_chat_current", chat: null }), { status: 200 })));
-    expect(await loadChat()).toEqual({ ok: true, chat: null });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ object: "support_chat_current", chat: null, assistant: { name: "Kemi", avatar_url: null, greeting: "Hi!" } }), { status: 200 })));
+    expect(await loadChat()).toEqual({ ok: true, chat: null, assistant: { name: "Kemi", avatar_url: null, greeting: "Hi!" } });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { type: "authentication_error", code: "session_expired", message: "Sign in", request_id: "r" } }), { status: 401 })));
     expect(await loadChat()).toEqual({ ok: false, error: "Sign in", signIn: true });
     const fetch = vi.fn(async () => new Response(JSON.stringify({ object: "support_chat", id, status: "closed", messages: [] }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
     expect(await endChat(id)).toEqual({ ok: true, chat: null });
     expect((fetch.mock.calls as unknown as Call[])[0][0]).toBe(`http://api.test/v1/store/support/chat/${id}/close`);
+  });
+
+  test("asking for a person posts to the chat and shows it waiting", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ object: "support_chat", id, status: "waiting", messages: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await askForPerson(id)).toMatchObject({ ok: true, chat: { status: "waiting" } });
+    expect((fetch.mock.calls as unknown as Call[])[0][0]).toBe(`http://api.test/v1/store/support/chat/${id}/human`);
   });
 });

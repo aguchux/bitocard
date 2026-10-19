@@ -8,6 +8,7 @@ import { AiService } from './ai/ai.service.js';
 import { AdminBotsController, AdminKnowledgeTemplateController, BotsController, KnowledgeTemplateController } from './bots.controller.js';
 import { BotsService } from './bots.service.js';
 import { StoreKnowledgeService } from './knowledge.js';
+import { RepliesService } from './replies.service.js';
 import { AdminTicketsController, CustomerTicketsController, TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
 
@@ -15,7 +16,7 @@ import { TicketsService } from './tickets.service.js';
 @Module({
   imports: [CheckoutModule, SettingsModule],
   controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController],
-  providers: [TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService],
-  exports: [TicketsService, ChatsService, AiService, BotsService],
+  providers: [TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService],
+  exports: [TicketsService, ChatsService, AiService, BotsService, RepliesService],
 })
 export class SupportModule {}

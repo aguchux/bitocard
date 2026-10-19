@@ -18,6 +18,7 @@ import {
   Skeleton,
   StatusBadge,
   Textarea,
+  TicketDrafts,
   errorMessage,
   formatDateTime,
   ticketCategoryLabels,
@@ -26,7 +27,18 @@ import {
   ticketStatusLabel,
 } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, useAdmin } from "@bitocard/admin-ui/shell";
-import { type AdminTicket, type TicketPriority, ticketPriorities, useAdminTicketQuery, useReplyAdminTicketMutation, useResolveAdminTicketMutation, useReturnTicketMutation, useUpdateAdminTicketMutation } from "@bitocard/api-client/admin";
+import {
+  type AdminTicket,
+  type TicketPriority,
+  ticketPriorities,
+  useAdminTicketQuery,
+  useDiscardAdminTicketDraftMutation,
+  useReplyAdminTicketMutation,
+  useResolveAdminTicketMutation,
+  useReturnTicketMutation,
+  useSendAdminTicketDraftMutation,
+  useUpdateAdminTicketMutation,
+} from "@bitocard/api-client/admin";
 
 const houseStoreId = "00000000-0000-4000-8000-0000000000b2";
 
@@ -35,6 +47,9 @@ function TicketView({ ticket, adminId }: { ticket: AdminTicket; adminId: string 
   const [resolve] = useResolveAdminTicketMutation();
   const [sendBack] = useReturnTicketMutation();
   const [update, updateState] = useUpdateAdminTicketMutation();
+  const [sendDraft, sendState] = useSendAdminTicketDraftMutation();
+  const [discardDraft] = useDiscardAdminTicketDraftMutation();
+  const drafts = ticket.messages.filter(message => message.draft);
   const [resolving, setResolving] = useState(false);
   const [returning, setReturning] = useState(false);
   const [note, setNote] = useState("");
@@ -64,7 +79,18 @@ function TicketView({ ticket, adminId }: { ticket: AdminTicket; adminId: string 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Card className="p-5 sm:p-6">
           <CardHeader title="Messages" className="px-0 pt-0 pb-4" />
-          <DisputeThread messages={ticket.messages} viewer="admin" requester={requester} />
+          <DisputeThread messages={ticket.messages.filter(message => !message.draft)} viewer="admin" requester={requester} />
+          {drafts.length ? (
+            <div className="mt-4">
+              {sendState.error ? <Notice tone="red">{errorMessage(sendState.error)}</Notice> : null}
+              <TicketDrafts
+                drafts={drafts}
+                disabled={resolved}
+                onSend={async (draft, body) => Boolean(await sendDraft({ id: ticket.id, draft, ...(body !== undefined ? { body } : {}) }).unwrap().catch(() => null))}
+                onDiscard={async draft => Boolean(await discardDraft({ id: ticket.id, draft }).unwrap().catch(() => null))}
+              />
+            </div>
+          ) : null}
           {!resolved ? (
             <div className="mt-5 border-t border-line pt-5">
               <DisputeReply

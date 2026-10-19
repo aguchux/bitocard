@@ -27771,6 +27771,7 @@
                       "author_name": "Ada Obi",
                       "visibility": "all",
                       "body": "Our endpoint answers 200 but deliveries show as failed.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:12:00.000Z"
                     }
                   ]
@@ -27932,6 +27933,7 @@
                       "author_name": "Chidi Okafor",
                       "visibility": "all",
                       "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:12:00.000Z"
                     }
                   ]
@@ -28119,6 +28121,7 @@
                       "author_name": "Chidi Okafor",
                       "visibility": "all",
                       "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:12:00.000Z"
                     }
                   ]
@@ -28308,6 +28311,7 @@
                       "author_name": "Chidi Okafor",
                       "visibility": "all",
                       "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:12:00.000Z"
                     },
                     {
@@ -28316,6 +28320,7 @@
                       "author_name": "Ada Obi",
                       "visibility": "all",
                       "body": "Sorry for the wait: your token is on the order page now.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:40:00.000Z"
                     }
                   ]
@@ -28505,6 +28510,7 @@
                       "author_name": "Chidi Okafor",
                       "visibility": "all",
                       "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:12:00.000Z"
                     },
                     {
@@ -28513,6 +28519,7 @@
                       "author_name": "Ada Obi",
                       "visibility": "staff",
                       "body": "The order shows delivered but the customer has no token: please check with the biller.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:30:00.000Z"
                     }
                   ]
@@ -28702,6 +28709,7 @@
                       "author_name": "Chidi Okafor",
                       "visibility": "all",
                       "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:12:00.000Z"
                     },
                     {
@@ -28710,6 +28718,7 @@
                       "author_name": "Ada Obi",
                       "visibility": "all",
                       "body": "Sorry for the wait: your token is on the order page now.",
+                      "draft": false,
                       "created_at": "2026-10-19T09:40:00.000Z"
                     }
                   ]
@@ -28815,6 +28824,401 @@
           }
         ],
         "summary": "Resolve a support ticket",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/support/tickets/{id}/drafts/{draft}/send": {
+      "post": {
+        "description": "Send your support assistant’s suggested reply to the customer, as it is or with your changes (`body`).",
+        "operationId": "TicketsController_sendDraft",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "draft",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ticket with the assistant’s draft sent (by the assistant when unchanged, by you when edited).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "reseller",
+                  "status": "pending",
+                  "category": "order",
+                  "priority": "normal",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": null,
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:12:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:12:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    },
+                    {
+                      "id": "8b7c6d5e-4f3a-4b2c-9d1e-0f9a8b7c6d5e",
+                      "author": "bot",
+                      "author_name": "Kemi",
+                      "visibility": "all",
+                      "body": "Your token is on your order page: open it and press Reveal.",
+                      "draft": false,
+                      "created_at": "2026-10-19T09:40:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send an assistant’s draft",
+        "tags": [
+          "Support"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/support/tickets/{id}/drafts/{draft}/discard": {
+      "post": {
+        "description": "Remove your support assistant’s suggested reply without sending it.",
+        "operationId": "TicketsController_discardDraft",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "draft",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ticket without the draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketDetail"
+                },
+                "example": {
+                  "object": "support_ticket",
+                  "id": "6a5b4c3d-2e1f-4a0b-9c8d-7e6f5a4b3c2d",
+                  "reference": "T-000042",
+                  "mode": "live",
+                  "requester": "customer",
+                  "queue": "reseller",
+                  "status": "open",
+                  "category": "order",
+                  "priority": "normal",
+                  "subject": "Where is my electricity token?",
+                  "source": "form",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "customer_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+                  "customer_reference": null,
+                  "order_id": null,
+                  "checkout_id": null,
+                  "assignee_id": null,
+                  "escalated_at": null,
+                  "resolved_at": null,
+                  "last_message_at": "2026-10-19T09:12:00.000Z",
+                  "created_at": "2026-10-19T09:12:00.000Z",
+                  "updated_at": "2026-10-19T09:12:00.000Z",
+                  "messages": [
+                    {
+                      "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                      "author": "customer",
+                      "author_name": "Chidi Okafor",
+                      "visibility": "all",
+                      "body": "I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.",
+                      "draft": false,
+                      "created_at": "2026-10-19T09:12:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Discard an assistant’s draft",
         "tags": [
           "Support"
         ],
@@ -37010,6 +37414,10 @@
           }
         }
       },
+      "SendDraftDto": {
+        "type": "object",
+        "properties": {}
+      },
       "UpdateTicketDto": {
         "type": "object",
         "properties": {
@@ -40254,7 +40662,8 @@
                     "priority_support",
                     "international_selling",
                     "own_integrations",
-                    "onchain_crypto"
+                    "onchain_crypto",
+                    "ai_assistant"
                   ]
                 },
                 "description": "What the plan adds, for example `chargeback_protection`."
@@ -48921,6 +49330,10 @@
               "support.ticket_created",
               "support.ticket_replied",
               "support.ticket_updated",
+              "support.chat_waiting",
+              "support.chat_replied",
+              "support.bot_paused",
+              "support.knowledge_stale",
               "chargeback.opened",
               "chargeback.closed",
               "plan.renewal_failed",
@@ -49118,6 +49531,10 @@
               "support.ticket_created",
               "support.ticket_replied",
               "support.ticket_updated",
+              "support.chat_waiting",
+              "support.chat_replied",
+              "support.bot_paused",
+              "support.knowledge_stale",
               "chargeback.opened",
               "chargeback.closed",
               "plan.renewal_failed",
@@ -50148,6 +50565,7 @@
           "author_name",
           "visibility",
           "body",
+          "draft",
           "created_at"
         ],
         "additionalProperties": false,
@@ -50186,6 +50604,10 @@
           "body": {
             "type": "string",
             "description": "The message."
+          },
+          "draft": {
+            "type": "boolean",
+            "description": "A reply your support assistant suggested, waiting for you to send or discard (never shown to the customer)."
           },
           "created_at": {
             "type": "string",

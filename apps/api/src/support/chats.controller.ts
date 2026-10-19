@@ -54,7 +54,16 @@ export class CustomerChatController {
 
   @Get()
   async current(@CurrentCustomer() caller: CustomerCaller) {
-    return { object: 'support_chat_current' as const, chat: await this.chats.currentForCustomer(caller.customer) };
+    const [chat, assistant] = await Promise.all([this.chats.currentForCustomer(caller.customer), this.chats.assistantProfile(caller.customer)]);
+    return { object: 'support_chat_current' as const, chat, assistant };
+  }
+
+  /** The customer asks for a person: the assistant stops answering. */
+  @Post(':id/human')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  human(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.chats.askForPerson(caller.customer, id);
   }
 
   @Post('messages')

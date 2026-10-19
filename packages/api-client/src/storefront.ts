@@ -341,6 +341,8 @@ export type StoreChat = {
   closed_at: string | null;
   messages: StoreChatMessage[];
 };
+/** The store's chat assistant as customers see it. */
+export type StoreAssistant = { name: string; avatar_url: string | null; greeting: string | null };
 export type StoreChatMessage = { id: string; author: 'customer' | 'reseller' | 'bitocard' | 'bot' | 'system'; author_name: string | null; body: string; created_at: string };
 
 export type StoreCheckout = {

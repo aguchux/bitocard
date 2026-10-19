@@ -31,6 +31,14 @@ export const adminSupportApi = bitocardApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/v1/admin/support/tickets/${id}/resolve`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
     }),
+    sendAdminTicketDraft: build.mutation<AdminTicket, { id: string; draft: string; body?: string }>({
+      query: ({ id, draft, ...body }) => ({ url: `/v1/admin/support/tickets/${id}/drafts/${draft}/send`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => tags(id),
+    }),
+    discardAdminTicketDraft: build.mutation<AdminTicket, { id: string; draft: string }>({
+      query: ({ id, draft }) => ({ url: `/v1/admin/support/tickets/${id}/drafts/${draft}/discard`, method: 'POST' }),
+      invalidatesTags: (_result, _error, { id }) => tags(id),
+    }),
     updateAdminTicket: build.mutation<AdminTicket, { id: string; priority?: TicketPriority; assignee_id?: string | null }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/support/tickets/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
@@ -38,7 +46,16 @@ export const adminSupportApi = bitocardApi.injectEndpoints({
   }),
 });
 
-export const { useAdminTicketsQuery, useAdminTicketQuery, useReplyAdminTicketMutation, useReturnTicketMutation, useResolveAdminTicketMutation, useUpdateAdminTicketMutation } = adminSupportApi;
+export const {
+  useAdminTicketsQuery,
+  useAdminTicketQuery,
+  useReplyAdminTicketMutation,
+  useReturnTicketMutation,
+  useResolveAdminTicketMutation,
+  useUpdateAdminTicketMutation,
+  useSendAdminTicketDraftMutation,
+  useDiscardAdminTicketDraftMutation,
+} = adminSupportApi;
 
 export type { Chat, ChatMessage, ChatStatus, ChatSummary } from '../reseller/support';
 

@@ -16,6 +16,7 @@ import {
   ticketPriorities,
   type TicketQueue,
   ticketQueues,
+  presentTicket,
   TicketsService,
   type TicketStatus,
   ticketStatuses,
@@ -124,6 +125,11 @@ class AdminTicketFilterDto extends TicketFilterDto {
   reseller_id?: string;
 }
 
+class SendDraftDto {
+  @IsOptional() @IsString() @Length(1, 5000)
+  body?: string;
+}
+
 class ReturnTicketDto {
   @IsString() @Length(3, 5000)
   note: string;
@@ -195,6 +201,22 @@ export class TicketsController {
   @HttpCode(HttpStatus.OK)
   async resolve(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveTicketDto) {
     return this.tickets.resolveAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
+  }
+
+  @ApiOperation({ summary: 'Send an assistant’s draft', description: 'Send your support assistant’s suggested reply to the customer, as it is or with your changes (`body`).' })
+  @Scopes('support:write')
+  @Post(':id/drafts/:draft/send')
+  @HttpCode(HttpStatus.OK)
+  async sendDraft(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string, @Body() body: SendDraftDto) {
+    return presentTicket(await this.tickets.sendDraft({ resellerId: resellerOf(caller), mode }, id, draft, await authorOf(this.prisma, caller, 'reseller'), body.body), 'reseller');
+  }
+
+  @ApiOperation({ summary: 'Discard an assistant’s draft', description: 'Remove your support assistant’s suggested reply without sending it.' })
+  @Scopes('support:write')
+  @Post(':id/drafts/:draft/discard')
+  @HttpCode(HttpStatus.OK)
+  async discardDraft(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string) {
+    return presentTicket(await this.tickets.discardDraft({ resellerId: resellerOf(caller), mode }, id, draft), 'reseller');
   }
 
   @ApiOperation({ summary: 'Update a support ticket', description: 'Set the priority or the team member a customer’s ticket is assigned to.' })
@@ -281,5 +303,17 @@ export class AdminTicketsController {
   @Patch(':id')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateTicketDto) {
     return this.tickets.updateAsAdmin(id, body);
+  }
+
+  @Post(':id/drafts/:draft/send')
+  @HttpCode(HttpStatus.OK)
+  async sendDraft(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string, @Body() body: SendDraftDto) {
+    return presentTicket(await this.tickets.sendDraft({}, id, draft, await authorOf(this.prisma, caller, 'bitocard'), body.body), 'admin');
+  }
+
+  @Post(':id/drafts/:draft/discard')
+  @HttpCode(HttpStatus.OK)
+  async discardDraft(@Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string) {
+    return presentTicket(await this.tickets.discardDraft({}, id, draft), 'admin');
   }
 }

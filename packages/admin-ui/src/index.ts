@@ -13,6 +13,7 @@ export { ExternalLinks } from './ui/external-links';
 export { amountToMinor, bpsToPercent, percentToBps, PriceBreakdown, PricingSchemes, type BreakdownRow } from './ui/pricing';
 export { ticketCategoryLabels, ticketPriorityLabels, ticketSourceLabels, ticketStatusLabel } from './ui/support';
 export { ChatPanel, chatStatusLabels, type ChatPanelMessage } from './ui/chat';
+export { TicketDrafts, type TicketDraft } from './ui/ticket-drafts';
 export { DisputeReply, DisputeThread, disputeActionLabels, disputeKindLabels, disputeOutcomeLabels, disputeTopicLabels, type DisputeThreadMessage } from './ui/disputes';
 export { searchDelayMs, useDebouncedValue } from './ui/hooks';
 export { StoreCustomersTable, StoreCustomerView, type StoreCustomerDetailView, type StoreCustomerPurchase, type StoreCustomerRow } from './ui/store-customers';

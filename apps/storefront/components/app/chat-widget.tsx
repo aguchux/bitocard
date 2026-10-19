@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { Bot, MessageCircle, Send, X } from "lucide-react";
-import type { StoreChat, StoreChatMessage } from "@bitocard/api-client/storefront";
-import { endChat, loadChat, pollChat, sendChatMessage } from "@/lib/chat-actions";
+import { Bot, MessageCircle, Send, UserRound, X } from "lucide-react";
+import type { StoreAssistant, StoreChat, StoreChatMessage } from "@bitocard/api-client/storefront";
+import { askForPerson, endChat, loadChat, pollChat, sendChatMessage } from "@/lib/chat-actions";
 
 const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
@@ -32,6 +32,7 @@ export function ChatWidget({ store }: { store: string }) {
   const [chat, setChat] = useState<StoreChat | null>(null);
   const [messages, setMessages] = useState<StoreChatMessage[]>([]);
   const [status, setStatus] = useState<StoreChat["status"] | null>(null);
+  const [assistant, setAssistant] = useState<StoreAssistant | null>(null);
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +57,10 @@ export function ChatWidget({ store }: { store: string }) {
     let live = true;
     void loadChat().then(result => {
       if (!live) return;
-      if (result.ok) apply(result.chat);
-      else setError(result.error);
+      if (result.ok) {
+        apply(result.chat);
+        setAssistant(result.assistant ?? null);
+      } else setError(result.error);
     });
     return () => {
       live = false;
@@ -101,6 +104,12 @@ export function ChatWidget({ store }: { store: string }) {
       void send();
     }
   };
+  const person = async () => {
+    if (!chat) return;
+    const result = await askForPerson(chat.id);
+    if (result.ok) apply(result.chat);
+    else setError(result.error);
+  };
   const finish = async () => {
     if (!chat) return;
     const result = await endChat(chat.id);
@@ -127,15 +136,38 @@ export function ChatWidget({ store }: { store: string }) {
           className="fixed inset-x-0 bottom-0 z-40 flex max-h-[80svh] flex-col rounded-t-3xl bg-white shadow-2xl ring-1 ring-slate-200 sm:inset-x-auto sm:right-4 sm:bottom-[calc(9rem+env(safe-area-inset-bottom))] sm:w-96 sm:rounded-3xl lg:bottom-24"
         >
           <header className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
-            <div className="min-w-0">
-              <h2 className="font-bold text-navy-900">Chat with {store}</h2>
-              <p className="text-xs text-slate-500">{chatStatusLine(status, store)}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              {assistant && (status === null || status === "bot") ? (
+                assistant.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- the assistant's uploaded face on the storage CDN
+                  <img src={assistant.avatar_url} alt="" className="size-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+                ) : (
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-violet-50 text-violet-600">
+                    <Bot className="size-5" aria-hidden="true" />
+                  </span>
+                )
+              ) : null}
+              <div className="min-w-0">
+                <h2 className="font-bold text-navy-900">{assistant && (status === null || status === "bot") ? `${assistant.name} · AI assistant` : `Chat with ${store}`}</h2>
+                <p className="text-xs text-slate-500">{chatStatusLine(status, store)}</p>
+              </div>
             </div>
             <button type="button" onClick={() => setOpen(false)} className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50" aria-label="Close chat">
               <X className="size-5" aria-hidden="true" />
             </button>
           </header>
           <ol className="min-h-40 flex-1 space-y-2 overflow-y-auto bg-slate-50 p-3" aria-live="polite" aria-label="Messages">
+            {!messages.length && assistant ? (
+              <li className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl bg-violet-50 px-3.5 py-2.5 text-sm text-navy-900 ring-1 ring-violet-100">
+                  <p className="mb-0.5 flex items-center gap-1 text-xs text-slate-500">
+                    <Bot className="size-3" aria-hidden="true" />
+                    <span className="font-semibold">{`${assistant.name} (assistant)`}</span>
+                  </p>
+                  <p>{assistant.greeting ?? `Hi! I’m ${assistant.name}, ${store}’s AI assistant. How can I help?`}</p>
+                </div>
+              </li>
+            ) : null}
             {messages.map(message =>
               message.author === "system" ? (
                 <li key={message.id} className="text-center text-xs text-slate-500">
@@ -179,6 +211,11 @@ export function ChatWidget({ store }: { store: string }) {
               <span className="sr-only sm:not-sr-only">Send</span>
             </button>
           </form>
+          {chat && status === "bot" ? (
+            <button type="button" onClick={() => void person()} className="mx-3 mb-1 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold text-navy-900 hover:bg-slate-50">
+              <UserRound className="size-4" aria-hidden="true" /> Talk to a person
+            </button>
+          ) : null}
           {chat && status !== "closed" ? (
             <button type="button" onClick={() => void finish()} className="mx-3 mb-3 min-h-10 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50">
               End chat

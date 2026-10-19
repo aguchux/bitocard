@@ -4,7 +4,7 @@ import { StoreSellers } from '../checkout/store-sellers.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { LedgerMode, Prisma, SupportChatMessage, SupportConversation } from '../generated/prisma/client.js';
+import type { LedgerMode, Prisma, SupportBot, SupportChatMessage, SupportConversation } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { type TicketCategory, ticketReference, TicketsService } from './tickets.service.js';
 
@@ -76,6 +76,19 @@ export function presentChat(chat: ChatWithMessages, audience: Audience, extra: {
  */
 @Injectable()
 export class ChatsService {
+  /** Set by the assistants: told after each requester message to a chat an assistant has. */
+  private requesterListener: ((chat: SupportConversation) => void) | null = null;
+  /** Set by the assistants: the active chat assistant for a new chat, if any. */
+  private assistantResolver: ((chat: Pick<SupportConversation, 'storeId' | 'requester'>) => Promise<SupportBot | null>) | null = null;
+
+  onRequesterMessage(listener: (chat: SupportConversation) => void) {
+    this.requesterListener = listener;
+  }
+
+  assistantFor(resolver: (chat: Pick<SupportConversation, 'storeId' | 'requester'>) => Promise<SupportBot | null>) {
+    this.assistantResolver = resolver;
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sellers: StoreSellers,
@@ -107,6 +120,20 @@ export class ChatsService {
   async currentForCustomer(customer: CustomerWithStore) {
     const chat = await this.load({ customerId: customer.id, status: { not: 'closed' } });
     return chat ? this.present(chat, 'customer') : null;
+  }
+
+  /** The store's chat assistant as customers see it (name, face, greeting), or null when none is answering chats. */
+  async assistantProfile(customer: CustomerWithStore) {
+    const bot = await this.assistantResolver?.({ storeId: customer.storeId, requester: 'customer' });
+    return bot ? { name: bot.name, avatar_url: bot.avatarUrl, greeting: bot.greeting } : null;
+  }
+
+  /** The customer asks for a person: the assistant stops and staff are told. */
+  async askForPerson(customer: CustomerWithStore, id: string) {
+    const chat = await this.prisma.supportConversation.findFirst({ where: { id, customerId: customer.id } });
+    if (!chat) throw notFound();
+    if (chat.status === 'bot') await this.handOver(chat.id, 'The customer asked for a person.');
+    return this.present((await this.load({ id }))!, 'customer');
   }
 
   /** The customer writes: their open chat, or a new one with the store (BitoCard at bitocard.com). */
@@ -253,7 +280,10 @@ export class ChatsService {
     const open = await this.prisma.supportConversation.findFirst({ where });
     if (open) return open;
     try {
-      return await this.prisma.supportConversation.create({ data: await data() });
+      const values = await data();
+      // A store (or BitoCard) with an active chat assistant: it answers first.
+      const bot = await this.assistantResolver?.({ storeId: values.storeId ?? null, requester: values.requester });
+      return await this.prisma.supportConversation.create({ data: { ...values, ...(bot ? { status: 'bot', botId: bot.id } : {}) } });
     } catch (error) {
       if ((error as { code?: string }).code !== 'P2002') throw error;
       return this.prisma.supportConversation.findFirstOrThrow({ where });
@@ -271,7 +301,46 @@ export class ChatsService {
       this.prisma.supportChatMessage.create({ data: { conversationId: chat.id, author: author.kind, authorId: author.id, authorName: author.name, body: text, createdAt: now } }),
       this.prisma.supportConversation.update({ where: { id: chat.id }, data: { lastMessageAt: now, lastAskedAt: now, ...(chat.status === 'closed' ? { status: 'waiting', closedAt: null } : {}) } }),
     ]);
-    if (chat.status !== 'with_staff') await this.alertStaff(chat);
+    if (chat.status === 'bot') this.requesterListener?.(chat);
+    else if (chat.status !== 'with_staff') await this.alertStaff(chat);
+  }
+
+  /** The assistant's answer in a chat it still has. */
+  async botWrote(chatId: string, bot: SupportBot, body: string) {
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.supportChatMessage.create({ data: { conversationId: chatId, author: 'bot', authorId: bot.id, authorName: bot.name, body: body.slice(0, maxChatMessage), createdAt: now } }),
+      this.prisma.supportConversation.updateMany({ where: { id: chatId, status: 'bot' }, data: { lastMessageAt: now } }),
+    ]);
+  }
+
+  /**
+   * The assistant steps back (it handed over, failed, or the requester asked for a person): the chat waits for a person,
+   * the requester is told, and staff are alerted.
+   */
+  async handOver(chatId: string, reason: string, text?: string) {
+    const chat = await this.prisma.supportConversation.findUnique({ where: { id: chatId } });
+    if (!chat || chat.status !== 'bot') return 'not_with_assistant';
+    const now = new Date();
+    const claimed = await this.prisma.supportConversation.updateMany({ where: { id: chatId, status: 'bot' }, data: { status: 'waiting', lastMessageAt: now } });
+    if (!claimed.count) return 'not_with_assistant';
+    const bot = chat.botId ? await this.prisma.supportBot.findUnique({ where: { id: chat.botId }, select: { id: true, name: true } }) : null;
+    await this.prisma.supportChatMessage.createMany({
+      data: [
+        ...(text ? [{ conversationId: chatId, author: 'bot', authorId: bot?.id ?? null, authorName: bot?.name ?? null, body: text.slice(0, maxChatMessage), createdAt: now }] : []),
+        { conversationId: chatId, author: 'system', body: 'A person will reply here as soon as they can.', createdAt: new Date(now.getTime() + 1) },
+      ],
+    });
+    await this.alertStaff({ ...chat, status: 'waiting' }, reason);
+    return 'handed_over';
+  }
+
+  /** The assistant turns the chat into a ticket (its `create_ticket` tool). Returns the ticket's reference. */
+  async ticketByAssistant(chatId: string, input: { subject: string; category: TicketCategory }) {
+    const chat = await this.load({ id: chatId });
+    if (!chat) throw notFound();
+    const reference = await this.toTicket(chat, input, 'bot');
+    return reference;
   }
 
   /** Staff write: a person is answering now, and the chat is theirs unless someone else has it. */
@@ -315,6 +384,7 @@ export class ChatsService {
     const ticket = await this.tickets.fromChat(chat, { subject: input.subject, category: input.category, transcript, source });
     await this.prisma.supportConversation.update({ where: { id: chat.id }, data: { ticketId: ticket.id } });
     await this.close(chat, system, `This chat is now ticket ${ticketReference(ticket.number)}: we reply there, and tell you when we do.`);
+    return ticketReference(ticket.number);
   }
 
   private async since(chat: SupportConversation, after: string | undefined, audience: Audience) {
@@ -340,11 +410,11 @@ export class ChatsService {
   }
 
   /** Staff are told a chat is waiting, at most every 10 minutes per chat (claimed, so parallel messages tell once). */
-  private async alertStaff(chat: SupportConversation) {
+  private async alertStaff(chat: SupportConversation, reason?: string) {
     const now = new Date();
     const claimed = await this.prisma.supportConversation.updateMany({ where: { id: chat.id, OR: [{ alertedAt: null }, { alertedAt: { lt: new Date(now.getTime() - alertEveryMs) } }] }, data: { alertedAt: now } });
     if (!claimed.count) return;
-    const content = { subject: `${chat.id}:${now.getTime()}`, title: chat.requester === 'reseller' ? 'A reseller is waiting in chat' : 'A customer is waiting in chat', body: 'Open the chat to answer.', mode: chat.mode };
+    const content = { subject: `${chat.id}:${now.getTime()}`, title: chat.requester === 'reseller' ? 'A reseller is waiting in chat' : 'A customer is waiting in chat', body: reason ? `The assistant handed over: ${reason}` : 'Open the chat to answer.', mode: chat.mode };
     if (chat.queue === 'bitocard') await this.inbox.admins('admin.support.chat_waiting', { ...content, link: `/support/chats/${chat.id}` });
     else await this.inbox.reseller(chat.resellerId, 'support.chat_waiting', { ...content, link: `/support/chats/${chat.id}` });
   }

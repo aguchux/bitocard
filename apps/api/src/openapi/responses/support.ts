@@ -1,6 +1,6 @@
 import { ticketVisibilities } from '../../support/tickets.service.js';
 import { eventObjectSchemas, exampleTicket } from '../../webhooks/openapi.js';
-import { array, list, listExample, nullableStr, objectSchema, oneOf, ref, type Schema, str, time, uuid } from '../schema.js';
+import { array, bool, list, listExample, nullableStr, objectSchema, oneOf, ref, type Schema, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 /** The ticket's own fields: defined once with the webhook events (`SupportTicketSummary`), which carry the same object. */
@@ -12,6 +12,7 @@ const SupportTicketMessage = objectSchema('SupportTicketMessage', {
   author_name: nullableStr('The person’s (or assistant’s) name, when known.'),
   visibility: oneOf('`all` (the requester sees it too) or `staff` (on a customer’s ticket, you and BitoCard only).', ticketVisibilities),
   body: str('The message.'),
+  draft: bool('A reply your support assistant suggested, waiting for you to send or discard (never shown to the customer).'),
   created_at: time('When it was written.'),
 });
 
@@ -36,6 +37,7 @@ const question = {
   author_name: 'Chidi Okafor',
   visibility: 'all',
   body: 'I paid for ₦5,000 of Ikeja Electric an hour ago and have no token yet.',
+  draft: false,
   created_at: '2026-10-19T09:12:00.000Z',
 };
 
@@ -45,6 +47,7 @@ const answer = {
   author_name: 'Ada Obi',
   visibility: 'all',
   body: 'Sorry for the wait: your token is on the order page now.',
+  draft: false,
   created_at: '2026-10-19T09:40:00.000Z',
 };
 
@@ -81,6 +84,13 @@ export const supportDocs: DocsArea = {
       schema: 'SupportTicketDetail',
       example: { ...customerTicket, status: 'resolved', resolved_at: '2026-10-19T10:00:00.000Z', updated_at: '2026-10-19T10:00:00.000Z', messages: [question, answer] },
     },
+    'POST /v1/support/tickets/{id}/drafts/{draft}/send': {
+      status: 200,
+      description: 'The ticket with the assistant’s draft sent (by the assistant when unchanged, by you when edited).',
+      schema: 'SupportTicketDetail',
+      example: { ...customerTicket, status: 'pending', messages: [question, { ...answer, author: 'bot', author_name: 'Kemi', body: 'Your token is on your order page: open it and press Reveal.' }] },
+    },
+    'POST /v1/support/tickets/{id}/drafts/{draft}/discard': { status: 200, description: 'The ticket without the draft.', schema: 'SupportTicketDetail', example: { ...customerTicket, messages: [question] } },
     'PATCH /v1/support/tickets/{id}': {
       status: 200,
       description: 'The ticket with its new priority or assignee.',

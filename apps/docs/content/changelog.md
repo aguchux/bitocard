@@ -14,6 +14,7 @@ Webhook payloads carry their own `api_version`; see [Webhooks → Versioning](/g
 
 ## October 2026
 
+- **Support assistant drafts.** Ticket messages carry `draft` (a reply your support assistant suggested, never shown to the customer). New: `POST /v1/support/tickets/{id}/drafts/{draft}/send` and `…/discard`.
 - **Support tickets.** New: `GET/POST /v1/support/tickets`, `GET/PATCH /v1/support/tickets/{id}`, `POST …/messages`, `POST …/escalate` (pass a customer’s ticket to BitoCard) and `POST …/resolve`, with the scopes `support:read` and `support:write`, and the events `support_ticket.created`, `support_ticket.updated` and `support_ticket.message_received`. Customers on your hosted store open tickets from their account.
 - **Account numbers.** Products can have `recipient_type: "account"` (for example internet subscriptions): send the customer's account number as `recipient.account_number`; it is checked like a meter number and the quote returns `account_name`.
 - **VPN access (not on sale yet).** Orders for VPN access deliver a `vpn_account` (username in `serial`, password in `code`, on `GET /v1/orders/{id}` only). New: `GET /v1/vpn-subscriptions`, `GET /v1/vpn-subscriptions/{id}` and `POST /v1/vpn-subscriptions/{id}/password-reset`, and the `vpn_subscription.updated` event when access becomes active, expires or is stopped. Access lasts 30 days and never renews automatically. VPN products have their own category, `vpn`, one per order.
