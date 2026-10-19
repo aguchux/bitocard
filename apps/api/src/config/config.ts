@@ -253,6 +253,11 @@ export const configSchema = z.object({
   AI_BITOCARD_MODELS: z.string().default('anthropic:claude-haiku-5-5, anthropic:claude-sonnet-5-5, openai:gpt-5-mini, deepseek:deepseek-chat'),
   /** Bot replies a month per store on BitoCard's keys (the Premium allowance). */
   AI_MONTHLY_REPLIES: z.coerce.number().int().min(0).max(1_000_000).default(2000),
+  /** Engineering escalations: the repository issues go to (owner/name), a fine-grained token with Issues read and write, and the webhook secret. */
+  GITHUB_REPO: z.string().optional(),
+  GITHUB_TOKEN: z.string().optional(),
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
+  GITHUB_API_URL: z.string().url().default('https://api.github.com'),
 
   // File storage (DigitalOcean Spaces, S3-compatible): logos, icons and images uploaded by admins and resellers.
   // Browsers upload straight to the bucket with signed links; uploads are refused until the key, secret and bucket are set.

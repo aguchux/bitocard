@@ -7,7 +7,8 @@ export { ticketCategories, ticketPriorities } from '../reseller/support';
 
 /** As admins see it: with the reseller it belongs to. */
 export type AdminTicketSummary = TicketSummary & { reseller_id: string };
-export type AdminTicket = Ticket & { reseller_id: string };
+export type TicketIssue = { number: number; url: string | null; state: string | null };
+export type AdminTicket = Ticket & { reseller_id: string; github_issue: TicketIssue | null };
 
 const tags = (id: string) => [{ type: 'SupportTicket' as const, id }, { type: 'SupportTicket' as const, id: 'LIST' }, 'Activity' as const];
 
@@ -29,6 +30,11 @@ export const adminSupportApi = bitocardApi.injectEndpoints({
     }),
     resolveAdminTicket: build.mutation<AdminTicket, { id: string; note?: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/support/tickets/${id}/resolve`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => tags(id),
+    }),
+    ticketIssueDraft: build.query<{ title: string; body: string; drafted_by: 'ai' | 'template' }, string>({ query: id => `/v1/admin/support/tickets/${id}/github-issue/draft`, keepUnusedDataFor: 0 }),
+    createTicketIssue: build.mutation<AdminTicket, { id: string; title: string; body: string; kind: 'bug' | 'feature' }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/support/tickets/${id}/github-issue`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => tags(id),
     }),
     sendAdminTicketDraft: build.mutation<AdminTicket, { id: string; draft: string; body?: string }>({
@@ -55,6 +61,8 @@ export const {
   useUpdateAdminTicketMutation,
   useSendAdminTicketDraftMutation,
   useDiscardAdminTicketDraftMutation,
+  useLazyTicketIssueDraftQuery,
+  useCreateTicketIssueMutation,
 } = adminSupportApi;
 
 export type { Chat, ChatMessage, ChatStatus, ChatSummary } from '../reseller/support';

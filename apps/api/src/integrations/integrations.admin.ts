@@ -23,6 +23,7 @@ import { inSandbox, urlsFor } from './endpoints.js';
 import { IntegrationsService, schemaFor } from './integrations.service.js';
 import { linksFor } from './links.js';
 import { aiProvider, type AiProviderName, aiProviderLabels } from '../support/ai/providers.js';
+import { GithubIssues } from '../support/github.js';
 
 type Source = 'admin' | 'environment' | 'default' | 'unset';
 type Submitted = string | number | boolean | null;
@@ -63,6 +64,7 @@ export class IntegrationsAdminService {
     if (group.id === 'domains') return this.testDomains(adminId);
     if (group.id === 'store_hosts') return this.testStoreHosts(adminId);
     if (group.id === 'anthropic' || group.id === 'openai' || group.id === 'deepseek') return this.testAi(adminId, group.id);
+    if (group.id === 'github') return this.testGithub(adminId);
     const integration = connectable(groupId);
     if (!integration) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'integration_not_testable', `${group.name} cannot be tested yet: BitoCard’s adapter for it is still to be built.`);
@@ -89,6 +91,27 @@ export class IntegrationsAdminService {
     }
     await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: group.id, before: null, after: { environment, ok } });
     return { object: 'integration_test' as const, integration: group.id, environment, ok, message, tested_at: new Date().toISOString() };
+  }
+
+  /** Engineering escalations: the repository read with the token. */
+  private async testGithub(adminId: string) {
+    await this.integrations.refresh(true);
+    const config = this.integrations.config;
+    const github = new GithubIssues({ token: config.GITHUB_TOKEN as string | undefined, repo: config.GITHUB_REPO as string | undefined, baseUrl: String(config.GITHUB_API_URL ?? 'https://api.github.com') });
+    let ok = false;
+    let message: string | null = null;
+    if (!github.configured()) message = 'Set the repository (owner/name) and the access token first.';
+    else {
+      try {
+        message = `Issues go to ${await github.check()}.`;
+        ok = true;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.replace(/^github: /, '') : 'unknown error';
+        message = error instanceof ProviderError && error.definite ? `GitHub refused (${detail}).` : `Could not reach GitHub (${detail}). Try again in a moment.`;
+      }
+    }
+    await this.audit.record({ actorId: adminId || null, action: 'integration.tested', targetType: 'integration', targetId: 'github', before: null, after: { environment: 'live', ok } });
+    return { object: 'integration_test' as const, integration: 'github', environment: 'live' as const, ok, message, tested_at: new Date().toISOString() };
   }
 
   /** An AI provider for support bots: its model list read with BitoCard's key. */

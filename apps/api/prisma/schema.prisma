@@ -3609,6 +3609,12 @@ model SupportTicket {
   assigneeId        String?                @map("assignee_id") @db.Uuid
   /// When an assistant run claimed the next reply (so two runs never reply at once).
   botClaimedAt      DateTime?              @map("bot_claimed_at")
+  /// The engineering issue it became (GitHub): its repository, number, address and state (open or closed).
+  githubRepo        String?                @map("github_repo")
+  githubIssueNumber Int?                   @map("github_issue_number")
+  githubIssueUrl    String?                @map("github_issue_url")
+  githubIssueState  String?                @map("github_issue_state")
+  engineeringAt     DateTime?              @map("engineering_at")
   escalatedAt       DateTime?              @map("escalated_at")
   resolvedAt        DateTime?              @map("resolved_at")
   lastMessageAt     DateTime               @default(now()) @map("last_message_at")
@@ -3619,6 +3625,7 @@ model SupportTicket {
   @@index([resellerId, mode, status])
   @@index([queue, status, lastMessageAt])
   @@index([customerId, createdAt])
+  @@index([githubRepo, githubIssueNumber])
   @@map("support_tickets")
 }
 

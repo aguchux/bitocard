@@ -107,7 +107,9 @@ export function presentTicket(ticket: TicketWithMessages, audience: Audience) {
     last_message_at: ticket.lastMessageAt.toISOString(),
     created_at: ticket.createdAt.toISOString(),
     updated_at: ticket.updatedAt.toISOString(),
-    ...(audience === 'admin' ? { reseller_id: ticket.resellerId } : {}),
+    ...(audience === 'admin'
+      ? { reseller_id: ticket.resellerId, github_issue: ticket.githubIssueNumber ? { number: ticket.githubIssueNumber, url: ticket.githubIssueUrl, state: ticket.githubIssueState } : null }
+      : {}),
     messages,
   };
 }

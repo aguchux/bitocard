@@ -7,6 +7,7 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
+import { EngineeringService } from './engineering.service.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import {
   type TicketAuthor,
@@ -128,6 +129,17 @@ class AdminTicketFilterDto extends TicketFilterDto {
 class SendDraftDto {
   @IsOptional() @IsString() @Length(1, 5000)
   body?: string;
+}
+
+class GithubIssueDto {
+  @IsString() @Length(5, 200)
+  title: string;
+
+  @IsString() @Length(10, 20000)
+  body: string;
+
+  @IsIn(['bug', 'feature'])
+  kind: 'bug' | 'feature';
 }
 
 class ReturnTicketDto {
@@ -271,7 +283,23 @@ export class AdminTicketsController {
   constructor(
     private readonly tickets: TicketsService,
     private readonly prisma: PrismaService,
+    private readonly engineering: EngineeringService,
   ) {}
+
+  /** A draft engineering issue from the ticket (BitoCard's AI when set up, else a template), with no personal data. */
+  @Get(':id/github-issue/draft')
+  @AdminRoles('operations')
+  issueDraft(@Param('id', ParseUUIDPipe) id: string) {
+    return this.engineering.draft(id);
+  }
+
+  /** Opens the GitHub issue and links it to the ticket (operations; audited). */
+  @Post(':id/github-issue')
+  @AdminRoles('operations')
+  async issue(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: GithubIssueDto) {
+    await this.engineering.escalate(adminId(caller), id, body);
+    return this.tickets.getForAdmin(id);
+  }
 
   @Get()
   list(@Query() filter: AdminTicketFilterDto) {

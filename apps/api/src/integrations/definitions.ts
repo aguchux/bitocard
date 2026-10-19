@@ -147,6 +147,10 @@ const integrationKeyList = [
   'DEEPSEEK_PRICES',
   'AI_BITOCARD_MODELS',
   'AI_MONTHLY_REPLIES',
+  'GITHUB_REPO',
+  'GITHUB_TOKEN',
+  'GITHUB_WEBHOOK_SECRET',
+  'GITHUB_API_URL',
   'DIDIT_API_KEY',
   'DIDIT_WORKFLOW_ID',
   'DIDIT_WEBHOOK_SECRET',
@@ -521,6 +525,18 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
     fields: [
       field('AI_BITOCARD_MODELS', 'Models on BitoCard’s keys', { help: 'provider:model, separated by commas, for example anthropic:claude-haiku-5-5, openai:gpt-5-mini, deepseek:deepseek-chat. Cheaper models keep the allowance affordable.' }),
       field('AI_MONTHLY_REPLIES', 'Bot replies a month per store', { kind: 'number', help: 'The Premium allowance on BitoCard’s keys. Default: 2000. Stores on their own keys have no BitoCard limit.' }),
+    ],
+  },
+  {
+    id: 'github',
+    name: 'Engineering (GitHub)',
+    description: 'Where support tickets escalated to engineering become issues, with no personal data. When an issue is closed, its ticket comes back to BitoCard to confirm the fix. Test connection reads the repository.',
+    webhookPath: '/v1/webhooks/github',
+    fields: [
+      field('GITHUB_REPO', 'Repository', { required: true, help: 'owner/name, for example golojan/bitocard.' }),
+      secret('GITHUB_TOKEN', 'Access token', { help: 'GitHub > Settings > Developer settings > Fine-grained tokens: only this repository, Issues read and write.' }),
+      secret('GITHUB_WEBHOOK_SECRET', 'Webhook secret', { required: false, help: 'In the repository: Settings > Webhooks > Add webhook, payload URL https://api.bitocard.com/v1/webhooks/github, content type application/json, this secret, the Issues event. Without it, closed issues are not reported back.' }),
+      field('GITHUB_API_URL', 'API address override', { kind: 'url', help: 'Leave as the default (https://api.github.com).' }),
     ],
   },
   {

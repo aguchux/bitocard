@@ -26,7 +26,8 @@ import {
   ticketSourceLabels,
   ticketStatusLabel,
 } from "@bitocard/admin-ui";
-import { AdminShell, AppLink, useAdmin } from "@bitocard/admin-ui/shell";
+import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { EngineeringIssue } from "@/components/engineering-issue";
 import {
   type AdminTicket,
   type TicketPriority,
@@ -42,7 +43,7 @@ import {
 
 const houseStoreId = "00000000-0000-4000-8000-0000000000b2";
 
-function TicketView({ ticket, adminId }: { ticket: AdminTicket; adminId: string | null }) {
+function TicketView({ ticket, adminId, canEscalate }: { ticket: AdminTicket; adminId: string | null; canEscalate: boolean }) {
   const [reply, replyState] = useReplyAdminTicketMutation();
   const [resolve] = useResolveAdminTicketMutation();
   const [sendBack] = useReturnTicketMutation();
@@ -116,6 +117,7 @@ function TicketView({ ticket, adminId }: { ticket: AdminTicket; adminId: string 
               ]}
             />
           </Card>
+          <EngineeringIssue ticket={ticket} canEscalate={canEscalate} />
           {ours ? (
             <Card className="space-y-3 p-5">
               <CardHeader title="Handling" className="px-0 pt-0 pb-1" />
@@ -187,7 +189,7 @@ export default function SupportTicketPage() {
   return (
     <AdminShell section="support" current="/support" crumbs={[{ label: "Support", href: "/support" }, { label: query.data?.reference ?? "Ticket" }]}>
       <QueryView query={query} loading={<Skeleton className="h-96 w-full" />}>
-        {ticket => <TicketView ticket={ticket} adminId={admin.id} />}
+        {ticket => <TicketView ticket={ticket} adminId={admin.id} canEscalate={can(admin, "operations")} />}
       </QueryView>
     </AdminShell>
   );

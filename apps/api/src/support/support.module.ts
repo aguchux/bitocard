@@ -9,14 +9,16 @@ import { AdminBotsController, AdminKnowledgeTemplateController, BotsController, 
 import { BotsService } from './bots.service.js';
 import { StoreKnowledgeService } from './knowledge.js';
 import { RepliesService } from './replies.service.js';
+import { EngineeringService } from './engineering.service.js';
+import { GithubWebhookController } from './github.controller.js';
 import { AdminTicketsController, CustomerTicketsController, TicketsController } from './tickets.controller.js';
 import { TicketsService } from './tickets.service.js';
 
 /** Support: tickets now; chat and support bots come next (docs/BITOCARD_SUPPORT_ASSISTANT_PLAN.md). */
 @Module({
   imports: [CheckoutModule, SettingsModule],
-  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController],
-  providers: [TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService],
+  controllers: [TicketsController, CustomerTicketsController, AdminTicketsController, ChatsController, BitocardChatController, CustomerChatController, AdminChatsController, AiController, AdminAiController, BotsController, KnowledgeTemplateController, AdminBotsController, AdminKnowledgeTemplateController, GithubWebhookController],
+  providers: [TicketsService, ChatsService, AiService, StoreKnowledgeService, BotsService, RepliesService, EngineeringService],
   exports: [TicketsService, ChatsService, AiService, BotsService, RepliesService],
 })
 export class SupportModule {}

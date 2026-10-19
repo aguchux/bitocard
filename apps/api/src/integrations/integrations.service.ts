@@ -24,7 +24,7 @@ export function schemaFor(key: string): z.ZodType | null {
     }, 'paste an account extended public key (xpub, zpub, tpub or vpub), never a private key');
   }
   // Custody calls carry signed transfer requests and sanctions answers: never over plain HTTP (a local fake in tests aside).
-  if (['CRYPTO_SIGNER_URL', 'CHAINALYSIS_API_URL', 'TRM_API_URL', 'COINGECKO_API_URL', 'COINBASE_PRICE_URL', 'AFRICASTALKING_API_URL', 'KYC_SPACES_ENDPOINT', 'VERCEL_API_URL', 'DOMAIN_DNS_LOOKUP_URL', 'CLOUDFLARE_API_URL', 'ANTHROPIC_API_URL', 'OPENAI_API_URL', 'DEEPSEEK_API_URL'].includes(key)) return z.string().url().refine(secureUrl, 'use an https:// address');
+  if (['CRYPTO_SIGNER_URL', 'CHAINALYSIS_API_URL', 'TRM_API_URL', 'COINGECKO_API_URL', 'COINBASE_PRICE_URL', 'AFRICASTALKING_API_URL', 'KYC_SPACES_ENDPOINT', 'VERCEL_API_URL', 'DOMAIN_DNS_LOOKUP_URL', 'CLOUDFLARE_API_URL', 'ANTHROPIC_API_URL', 'OPENAI_API_URL', 'DEEPSEEK_API_URL', 'GITHUB_API_URL'].includes(key)) return z.string().url().refine(secureUrl, 'use an https:// address');
   return field.kind === 'url' ? z.string().url() : z.string().min(1);
 }
 

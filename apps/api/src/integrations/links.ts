@@ -69,6 +69,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   vonage: [signUp('https://dashboard.nexmo.com/sign-up'), keys('https://dashboard.nexmo.com/settings', 'API key and secret'), docs('https://developer.vonage.com/')],
   twilio: [signUp('https://www.twilio.com/try-twilio'), keys('https://console.twilio.com/', 'Account SID and auth token'), docs('https://www.twilio.com/docs')],
   plivo: [signUp('https://console.plivo.com/accounts/register/'), keys('https://console.plivo.com/dashboard/', 'Auth ID and token'), docs('https://www.plivo.com/docs/')],
+  github: [signUp('https://github.com/signup'), keys('https://github.com/settings/personal-access-tokens', 'Fine-grained tokens'), docs('https://docs.github.com/en/rest/issues/issues')],
   anthropic: [signUp('https://console.anthropic.com/'), keys('https://console.anthropic.com/settings/keys', 'API keys'), docs('https://docs.anthropic.com/en/api/messages')],
   openai: [signUp('https://platform.openai.com/signup'), keys('https://platform.openai.com/api-keys', 'API keys'), docs('https://platform.openai.com/docs/api-reference/chat')],
   deepseek: [signUp('https://platform.deepseek.com/'), keys('https://platform.deepseek.com/api_keys', 'API keys'), docs('https://api-docs.deepseek.com/')],
