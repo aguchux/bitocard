@@ -57,9 +57,9 @@ async function published(reseller, body) {
 const storeKeys = async subdomain => (await fetch(`${server.base}/v1/store/products?store=${subdomain}`).then(res => res.json())).data.map(product => product.key);
 
 describe('the templates', () => {
-  test('five templates, each unique, with at least three variants of at least three colour themes, whose pages use only their sections', () => {
+  test('seven templates, each unique, with at least three variants of at least three colour themes, whose pages use only their sections', () => {
     const { storeTemplates, starterHome } = templates;
-    assert.deepEqual(storeTemplates.map(template => template.key), ['all_in_one', 'topups', 'gift_cards', 'crypto_desk', 'single_product']);
+    assert.deepEqual(storeTemplates.map(template => template.key), ['all_in_one', 'topups', 'gift_cards', 'crypto_desk', 'single_product', 'vpn_shop', 'rdp_shop']);
     const heroes = new Set();
     for (const template of storeTemplates) {
       assert.ok(template.variants.length >= 3, `${template.key}: three variants`);
@@ -86,6 +86,10 @@ describe('the templates', () => {
     assert.equal(templateSells({ template: 'all_in_one', focus: null }, card), true);
     assert.equal(templateSells({ template: 'single_product', focus: card.key }, card), true);
     assert.equal(templateSells({ template: 'single_product', focus: 'other' }, card), false);
+    assert.equal(templateSells({ template: 'vpn_shop', focus: null }, card), false);
+    assert.equal(templateSells({ template: 'vpn_shop', focus: null }, { key: 'vpn:WW:bitocard:vpn-access-30d', category: 'vpn' }), true);
+    assert.equal(templateSells({ template: 'rdp_shop', focus: null }, { key: 'rdp:WW:x:y', category: 'rdp' }), true);
+    assert.equal(templateSells({ template: 'rdp_shop', focus: null }, { key: 'vpn:WW:bitocard:vpn-access-30d', category: 'vpn' }), false);
   });
 
   test('the list, with the crypto desk open only once the reseller’s exchange or P2P is switched on', async () => {
@@ -181,6 +185,34 @@ describe('what a store sells', () => {
     const storefront = await fetch(`${server.base}/v1/storefronts/${gifts.subdomain}`).then(res => res.json());
     check('GET /v1/storefronts/{subdomain}', 200, storefront);
     assert.deepEqual([storefront.design.template, storefront.design.variant, storefront.design.style.hero], ['gift_cards', 'card_wall', 'card_wall']);
+  });
+});
+
+describe('the VPN and RDP shops', () => {
+  test('a VPN shop sells only VPN, its spotlight finding the plan by itself; an RDP shop with nothing on sale is empty', async () => {
+    const plan = await prisma.product.create({ data: { ...(await prisma.product.findUniqueOrThrow({ where: { id: software.id }, select: { name: true, brand: true, country: true, fixedValues: true, faceCurrency: true, denominationType: true } })), key: `vpn:WW:bitocard:template-${Date.now()}`, category: 'vpn', active: true } });
+    const offer = await prisma.supplierProduct.findFirstOrThrow({ where: { productId: software.id } });
+    await prisma.supplierProduct.create({ data: { supplierCode: offer.supplierCode, sku: `${offer.sku}-vpn`, costCurrency: offer.costCurrency, costRatio: offer.costRatio, meta: offer.meta ?? undefined, syncedAt: new Date(), productId: plan.id } });
+    await prisma.countryCategory.upsert({ where: { countryCode_category: { countryCode: 'NG', category: 'vpn' } }, create: { countryCode: 'NG', category: 'vpn', enabled: true }, update: { enabled: true } });
+    const reseller = await seller();
+    await listForTest(server, { resellerId: reseller.resellerId, productIds: [plan.id] });
+
+    const vpn = await published(reseller, { template: 'vpn_shop', variant: 'tunnel', theme: 'aurora_green' });
+    assert.deepEqual([vpn.template, vpn.variant, vpn.theme, vpn.branding.primary_color], ['vpn_shop', 'tunnel', 'aurora_green', '#4ade80']);
+    assert.deepEqual(await storeKeys(vpn.subdomain), [plan.key]);
+    const home = await fetch(`${server.base}/v1/store/home?store=${vpn.subdomain}`).then(res => res.json());
+    assert.equal(home.sections.find(item => item.type === 'product_spotlight')?.data.product?.key, plan.key, 'the plan, with no product chosen');
+    const storefront = await fetch(`${server.base}/v1/storefronts/${vpn.subdomain}`).then(res => res.json());
+    check('GET /v1/storefronts/{subdomain}', 200, storefront);
+    assert.equal(storefront.design.style.hero, 'tunnel');
+
+    const rdp = await published(reseller, { template: 'rdp_shop' });
+    assert.deepEqual([rdp.variant, rdp.theme], ['desktop', 'azure']);
+    assert.deepEqual(await storeKeys(rdp.subdomain), []);
+
+    // Switched off by an admin, the template cannot be chosen.
+    assert.equal((await admin.put('/v1/admin/switches/store_template_vpn_shop', { reseller_id: reseller.resellerId, enabled: false })).status, 200);
+    assert.equal((await reseller.browser.post('/v1/stores', { name: 'Again', subdomain: sub('vpn'), template: 'vpn_shop' })).json.error.code, 'template_unavailable');
   });
 });
 

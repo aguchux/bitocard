@@ -34,7 +34,7 @@ export type StoreTheme = { key: string; name: string; colors: ThemeColors };
 export type VariantStyle = {
   mode: 'light' | 'dark';
   /** The hero's layout. */
-  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story';
+  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint';
   corners: 'sharp' | 'soft' | 'round';
   cards: 'flat' | 'raised' | 'outline' | 'glass';
   font: 'sans' | 'display' | 'mono' | 'serif';
@@ -44,7 +44,7 @@ export type VariantStyle = {
 
 export type TemplateVariant = { key: string; name: string; description: string; style: VariantStyle; themes: StoreTheme[]; starter: () => unknown[] };
 
-export type TemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product';
+export type TemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop';
 
 export type StoreTemplate = {
   key: TemplateKey;
@@ -504,7 +504,205 @@ const singleProduct: StoreTemplate = {
   ],
 };
 
-export const storeTemplates: StoreTemplate[] = [allInOne, topups, giftCards, cryptoDesk, singleProduct];
+// -- 6. VPN shop ------------------------------------------------------------------------------------------------------
+
+// Only what BitoCard's VPN access is (30 days, up to 10 devices, never renewed by itself, details on the order page):
+// no privacy, logging, location or speed claims until they are evidenced (see VPN access in AGENTS.md).
+const vpnFeatures = (title: string) => ({
+  id: id(),
+  type: 'features',
+  span: full,
+  title,
+  items: [
+    { icon: 'clock', title: '30 days of access', body: 'From the day you buy.' },
+    { icon: 'phone', title: 'Up to 10 devices', body: 'Your phone, laptop, tablet and more.' },
+    { icon: 'shield', title: 'No surprise renewals', body: 'It never renews by itself. Buy again when you want more.' },
+    { icon: 'lock', title: 'Your sign-in details', body: 'On your order page, shown only to you.' },
+  ],
+});
+const vpnFaq = {
+  id: id(),
+  type: 'faq',
+  span: full,
+  title: 'Questions',
+  items: [
+    { question: 'How long does it last?', answer: '30 days from the day you buy it.' },
+    { question: 'Does it renew automatically?', answer: 'No. When the 30 days are up it simply ends; buy again whenever you want more.' },
+    { question: 'How many devices can I use?', answer: 'Up to 10 devices with the same sign-in details.' },
+    { question: 'Where are my sign-in details?', answer: 'On your order page, once you have paid.' },
+  ],
+};
+const vpnTrust = trust([
+  ['lock', 'Secure checkout', 'Your information is protected.'],
+  ['bolt', 'Ready after payment', 'Your sign-in details are on your order page.'],
+  ['clock', 'No subscription', 'Pay once for 30 days.'],
+  ['support', 'Help setting up', 'We are here if anything goes wrong.'],
+]);
+
+const vpnShop: StoreTemplate = {
+  key: 'vpn_shop',
+  name: 'VPN shop',
+  tagline: 'VPN access, ready to use after payment.',
+  description: 'A store for VPN access only: the plan and its buy form up front, what it includes and the questions customers ask.',
+  categories: ['vpn'],
+  single: false,
+  crypto: false,
+  sections: ['hero', 'product_spotlight', 'product_rail', 'features', 'faq', 'promo', 'trust_bar'],
+  variants: [
+    {
+      key: 'shield',
+      name: 'Shield',
+      description: 'A big shield beside the headline, then the plan with its buy form and what it includes.',
+      style: { mode: 'light', hero: 'shield', corners: 'round', cards: 'raised', font: 'display', density: 'comfortable' },
+      themes: [
+        theme('guard_blue', 'Guard blue', { primary: '#1d4ed8', accent: '#10b981', background: '#f5f8ff', surface: '#ffffff', ink: '#0b1736', muted: '#56627f', heroFrom: '#1e3a8a', heroTo: '#2563eb', heroInk: '#ffffff' }),
+        theme('safe_green', 'Safe green', { primary: '#047857', accent: '#0ea5e9', background: '#f3fbf7', surface: '#ffffff', ink: '#06261b', muted: '#4b6b5e', heroFrom: '#064e3b', heroTo: '#059669', heroInk: '#ffffff' }),
+        theme('violet_lock', 'Violet lock', { primary: '#6d28d9', accent: '#f472b6', background: '#f9f7ff', surface: '#ffffff', ink: '#1c1033', muted: '#665d7d', heroFrom: '#4c1d95', heroTo: '#7c3aed', heroInk: '#ffffff' }),
+        theme('coral', 'Coral', { primary: '#e11d48', accent: '#070f4c', background: '#fff7f8', surface: '#ffffff', ink: '#2a0a12', muted: '#7d5c65', heroFrom: '#9f1239', heroTo: '#e11d48', heroInk: '#ffffff' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Browse your way,', accent: 'on every device.', subtitle: 'VPN access for 30 days on up to 10 devices. No subscription.', search: false, categoryChips: false },
+        { id: id(), type: 'product_spotlight', span: full, title: 'Get VPN access', bullets: ['30 days from the day you buy', 'Up to 10 devices', 'Never renews by itself'] },
+        vpnFeatures('What you get'),
+        vpnFaq,
+        vpnTrust,
+      ],
+    },
+    {
+      key: 'devices',
+      name: 'Every device',
+      description: 'Light and friendly: the devices it works on in the hero, then the plan and plain answers.',
+      style: { mode: 'light', hero: 'devices', corners: 'soft', cards: 'outline', font: 'sans', density: 'airy' },
+      themes: [
+        theme('cloud', 'Cloud', { primary: '#0369a1', accent: '#f59e0b', background: '#ffffff', surface: '#f7fafc', ink: '#0b2133', muted: '#58707f', heroFrom: '#e0f2fe', heroTo: '#ffffff', heroInk: '#0b2133' }),
+        theme('mint_leaf', 'Mint leaf', { primary: '#0f766e', accent: '#e11d74', background: '#ffffff', surface: '#f5fbfa', ink: '#082624', muted: '#567370', heroFrom: '#ccfbf1', heroTo: '#ffffff', heroInk: '#082624' }),
+        theme('apricot', 'Apricot', { primary: '#c2410c', accent: '#1d4ed8', background: '#ffffff', surface: '#fffaf6', ink: '#2a1206', muted: '#7d6152', heroFrom: '#ffedd5', heroTo: '#ffffff', heroInk: '#2a1206' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'One plan,', accent: 'up to 10 devices.', subtitle: 'Phones, laptops and tablets on the same sign-in details for 30 days.', search: false, categoryChips: false },
+        vpnFeatures('Simple by design'),
+        { id: id(), type: 'product_spotlight', span: full, title: 'Ready when you are', bullets: ['Pay once', 'Sign-in details on your order page'] },
+        vpnFaq,
+      ],
+    },
+    {
+      key: 'tunnel',
+      name: 'Night tunnel',
+      description: 'Dark and glowing: light trails through a tunnel, the plan on glass cards.',
+      style: { mode: 'dark', hero: 'tunnel', corners: 'round', cards: 'glass', font: 'display', density: 'comfortable' },
+      themes: [
+        theme('cyan_glow', 'Cyan glow', { primary: '#22d3ee', accent: '#a78bfa', background: '#050b14', surface: '#0d1828', ink: '#e6f6ff', muted: '#8ea5bd', heroFrom: '#050b14', heroTo: '#0c2a45', heroInk: '#ffffff' }),
+        theme('aurora_green', 'Aurora green', { primary: '#4ade80', accent: '#22d3ee', background: '#04100b', surface: '#0b1f17', ink: '#e7fbf0', muted: '#93b7a4', heroFrom: '#04100b', heroTo: '#0f3d2a', heroInk: '#ffffff' }),
+        theme('magenta_night', 'Magenta night', { primary: '#f472b6', accent: '#facc15', background: '#0c0610', surface: '#1a0f22', ink: '#fdeaf5', muted: '#b39cb8', heroFrom: '#0c0610', heroTo: '#3d0b3b', heroInk: '#ffffff' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Your connection,', accent: 'your way.', subtitle: 'VPN access for 30 days on up to 10 devices.', search: false, categoryChips: false },
+        { id: id(), type: 'product_spotlight', span: full, bullets: ['30 days', 'Up to 10 devices', 'No subscription'] },
+        vpnFaq,
+        vpnTrust,
+      ],
+    },
+  ],
+};
+
+// -- 7. RDP shop ------------------------------------------------------------------------------------------------------
+
+const rdpFeatures = {
+  id: id(),
+  type: 'features',
+  span: full,
+  title: 'How it works',
+  items: [
+    { icon: 'star', title: 'Choose a server', body: 'Pick the plan that fits what you run.' },
+    { icon: 'lock', title: 'Get your details', body: 'Connection details on your order page, shown only to you.' },
+    { icon: 'globe', title: 'Connect from anywhere', body: 'With a Remote Desktop app on your computer, phone or tablet.' },
+  ],
+};
+const rdpFaq = {
+  id: id(),
+  type: 'faq',
+  span: full,
+  title: 'Questions',
+  items: [
+    { question: 'What is an RDP server?', answer: 'A computer in a data centre that you use from your own device over Remote Desktop.' },
+    { question: 'How do I connect?', answer: 'Open a Remote Desktop app and enter the details from your order page.' },
+    { question: 'Which devices can I connect from?', answer: 'Windows, Mac, iPhone, iPad and Android all have Remote Desktop apps.' },
+  ],
+};
+const rdpTrust = trust([
+  ['lock', 'Secure checkout', 'Your information is protected.'],
+  ['bolt', 'Digital delivery', 'Connection details on your order page.'],
+  ['globe', 'Use it anywhere', 'From any device with a Remote Desktop app.'],
+  ['support', 'Help connecting', 'We are here if anything goes wrong.'],
+]);
+
+const rdpShop: StoreTemplate = {
+  key: 'rdp_shop',
+  name: 'RDP shop',
+  tagline: 'Remote desktop servers, ready to connect.',
+  description: 'A store for RDP servers only: the plans side by side, how connecting works and the questions customers ask.',
+  categories: ['rdp'],
+  single: false,
+  crypto: false,
+  sections: ['hero', 'product_rail', 'product_spotlight', 'features', 'faq', 'promo', 'trust_bar'],
+  variants: [
+    {
+      key: 'desktop',
+      name: 'Desktop window',
+      description: 'A remote desktop window drawn beside the headline, then the plans and how to connect.',
+      style: { mode: 'light', hero: 'desktop', corners: 'round', cards: 'raised', font: 'sans', density: 'comfortable' },
+      themes: [
+        theme('azure', 'Azure', { primary: '#0063b1', accent: '#ff2382', background: '#f4f8fc', surface: '#ffffff', ink: '#0a1a2e', muted: '#55677c', heroFrom: '#0b3d91', heroTo: '#0078d4', heroInk: '#ffffff' }),
+        theme('slate_orange', 'Slate and orange', { primary: '#334155', accent: '#f97316', background: '#f8fafc', surface: '#ffffff', ink: '#0f172a', muted: '#64748b', heroFrom: '#1e293b', heroTo: '#475569', heroInk: '#ffffff' }),
+        theme('indigo', 'Indigo', { primary: '#4338ca', accent: '#22c55e', background: '#f6f6ff', surface: '#ffffff', ink: '#13123a', muted: '#5d5f88', heroFrom: '#312e81', heroTo: '#4f46e5', heroInk: '#ffffff' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Your desktop,', accent: 'in the cloud.', subtitle: 'Remote desktop servers you can reach from any device.', search: false, categoryChips: false },
+        { id: id(), type: 'product_rail', span: full, title: 'Server plans', source: 'category', category: 'rdp', limit: 8, viewAllHref: '/catalogs/rdp' },
+        rdpFeatures,
+        rdpFaq,
+        rdpTrust,
+      ],
+    },
+    {
+      key: 'rack',
+      name: 'Server rack',
+      description: 'Dark and technical: a lit server rack in the hero, the plans as a list.',
+      style: { mode: 'dark', hero: 'rack', corners: 'sharp', cards: 'flat', font: 'mono', density: 'compact' },
+      themes: [
+        theme('datacentre', 'Data centre', { primary: '#38bdf8', accent: '#22c55e', background: '#060a10', surface: '#0e1520', ink: '#e6eef8', muted: '#8b9bb0', heroFrom: '#060a10', heroTo: '#10233a', heroInk: '#ffffff' }),
+        theme('amber_led', 'Amber LED', { primary: '#f59e0b', accent: '#ef4444', background: '#0a0805', surface: '#17120b', ink: '#fbf3e4', muted: '#a99e88', heroFrom: '#0a0805', heroTo: '#2d1f08', heroInk: '#ffffff' }),
+        theme('green_led', 'Green LED', { primary: '#22c55e', accent: '#38bdf8', background: '#05090a', surface: '#0d1614', ink: '#e6f5ee', muted: '#8aa59a', heroFrom: '#05090a', heroTo: '#0d2a1d', heroInk: '#ffffff' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Servers', accent: 'ready to connect.', subtitle: 'Pick a plan, pay, and connect with the details on your order page.', search: false, categoryChips: false },
+        { id: id(), type: 'product_rail', span: full, title: 'Plans', source: 'category', category: 'rdp', limit: 8, layout: 'list', viewAllHref: '/catalogs/rdp' },
+        rdpFaq,
+        rdpTrust,
+      ],
+    },
+    {
+      key: 'blueprint',
+      name: 'Blueprint',
+      description: 'Clean lines on a blueprint grid, one featured plan with its buy form, then the rest.',
+      style: { mode: 'light', hero: 'blueprint', corners: 'soft', cards: 'outline', font: 'display', density: 'airy' },
+      themes: [
+        theme('blueprint_blue', 'Blueprint blue', { primary: '#1e40af', accent: '#f59e0b', background: '#ffffff', surface: '#f7f9fe', ink: '#0d1a3a', muted: '#58648a', heroFrom: '#eef3ff', heroTo: '#ffffff', heroInk: '#0d1a3a' }),
+        theme('graph_paper', 'Graph paper', { primary: '#111827', accent: '#e11d48', background: '#ffffff', surface: '#fafafa', ink: '#111827', muted: '#6b7280', heroFrom: '#f4f4f5', heroTo: '#ffffff', heroInk: '#111827' }),
+        theme('teal_line', 'Teal line', { primary: '#0f766e', accent: '#7c3aed', background: '#ffffff', surface: '#f6fbfa', ink: '#082624', muted: '#567370', heroFrom: '#e6f6f4', heroTo: '#ffffff', heroInk: '#082624' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Built for', accent: 'getting work done.', subtitle: 'Remote desktop servers, delivered online.', search: false, categoryChips: false },
+        { id: id(), type: 'product_spotlight', span: full, title: 'Featured plan', bullets: ['Connection details on your order page', 'Use it from any device'] },
+        { id: id(), type: 'product_rail', span: full, title: 'All plans', source: 'category', category: 'rdp', limit: 8, viewAllHref: '/catalogs/rdp' },
+        rdpFeatures,
+        rdpFaq,
+      ],
+    },
+  ],
+};
+
+export const storeTemplates: StoreTemplate[] = [allInOne, topups, giftCards, cryptoDesk, singleProduct, vpnShop, rdpShop];
 export const templateKeys = storeTemplates.map(template => template.key) as [TemplateKey, ...TemplateKey[]];
 
 export function templateFor(key: string) {

@@ -101,7 +101,7 @@ const themeColors = shape(
 const variantStyle = shape(
   {
     mode: oneOf('Light or dark pages.', ['light', 'dark']),
-    hero: oneOf('The hero’s layout.', ['search', 'gradient', 'minimal', 'quick_buy', 'networks', 'billers', 'card_wall', 'boutique', 'neon', 'terminal', 'market', 'swap', 'spotlight', 'split', 'story']),
+    hero: oneOf('The hero’s layout.', ['search', 'gradient', 'minimal', 'quick_buy', 'networks', 'billers', 'card_wall', 'boutique', 'neon', 'terminal', 'market', 'swap', 'spotlight', 'split', 'story', 'shield', 'devices', 'tunnel', 'desktop', 'rack', 'blueprint']),
     corners: oneOf('Corner style.', ['sharp', 'soft', 'round']),
     cards: oneOf('Card style.', ['flat', 'raised', 'outline', 'glass']),
     font: oneOf('Type style.', ['sans', 'display', 'mono', 'serif']),

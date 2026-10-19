@@ -179,11 +179,11 @@ export type ResolvedSection =
 
 // -- Store templates: how a reseller's store looks (`GET /v1/storefronts/:subdomain` `design`) ----------------------
 
-export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product';
+export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop';
 export type StoreThemeColors = { primary: string; accent: string; background: string; surface: string; ink: string; muted: string; heroFrom: string; heroTo: string; heroInk: string };
 export type StoreVariantStyle = {
   mode: 'light' | 'dark';
-  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story';
+  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint';
   corners: 'sharp' | 'soft' | 'round';
   cards: 'flat' | 'raised' | 'outline' | 'glass';
   font: 'sans' | 'display' | 'mono' | 'serif';

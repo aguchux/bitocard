@@ -8,6 +8,7 @@ import { QuickBuyForm } from "./quick-buy";
 import { SearchForm } from "./layout";
 import { GroupIcon } from "./category-icon";
 import { trustIcon } from "./theme";
+import { isServiceHero, ServiceHero } from "./service-heroes";
 
 /**
  * Reseller store templates' sections, drawn in the store's variant (`design.style`) with its theme's colours (the
@@ -76,6 +77,8 @@ export function VariantHero({ section, style, groups, countries, bleed }: { sect
       <SearchForm countries={countries} size="md" />
     </div>
   ) : null;
+
+  if (isServiceHero(style.hero)) return <ServiceHero kind={style.hero} section={section} id={id} frame={frame} inner={bleed ? inner : "px-6"} />;
 
   switch (style.hero) {
     case "minimal":

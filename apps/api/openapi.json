@@ -1710,6 +1710,8 @@
                     "store_template_gift_cards": true,
                     "store_template_crypto_desk": true,
                     "store_template_single_product": true,
+                    "store_template_vpn_shop": true,
+                    "store_template_rdp_shop": true,
                     "manual_reseller_approval": false
                   }
                 }
@@ -36151,7 +36153,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "variant": {
@@ -36227,7 +36231,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "variant": {
@@ -41217,6 +41223,8 @@
               "store_template_gift_cards",
               "store_template_crypto_desk",
               "store_template_single_product",
+              "store_template_vpn_shop",
+              "store_template_rdp_shop",
               "manual_reseller_approval"
             ],
             "additionalProperties": false,
@@ -41292,6 +41300,14 @@
               "store_template_single_product": {
                 "type": "boolean",
                 "description": "Resellers can choose the Single product store template. Stores already using it keep it. On unless switched off."
+              },
+              "store_template_vpn_shop": {
+                "type": "boolean",
+                "description": "Resellers can choose the VPN shop store template (it sells only once VPN is on sale in their market). Stores already using it keep it. On unless switched off."
+              },
+              "store_template_rdp_shop": {
+                "type": "boolean",
+                "description": "Resellers can choose the RDP shop store template (it sells only once RDP is on sale in their market). Stores already using it keep it. On unless switched off."
               },
               "manual_reseller_approval": {
                 "type": "boolean",
@@ -45346,7 +45362,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "variant": {
@@ -48225,7 +48243,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "variant": {
@@ -48275,7 +48295,13 @@
                   "swap",
                   "spotlight",
                   "split",
-                  "story"
+                  "story",
+                  "shield",
+                  "devices",
+                  "tunnel",
+                  "desktop",
+                  "rack",
+                  "blueprint"
                 ]
               },
               "corners": {
@@ -48416,7 +48442,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "name": {
@@ -48561,7 +48589,13 @@
                         "swap",
                         "spotlight",
                         "split",
-                        "story"
+                        "story",
+                        "shield",
+                        "devices",
+                        "tunnel",
+                        "desktop",
+                        "rack",
+                        "blueprint"
                       ]
                     },
                     "corners": {
@@ -48732,7 +48766,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "variant": {
@@ -48864,7 +48900,9 @@
               "topups",
               "gift_cards",
               "crypto_desk",
-              "single_product"
+              "single_product",
+              "vpn_shop",
+              "rdp_shop"
             ]
           },
           "variant": {

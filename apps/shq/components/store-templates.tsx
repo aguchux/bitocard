@@ -2,13 +2,13 @@
 
 import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftRight, Check, Gift, Layers, Lock, Smartphone, Sparkles } from "lucide-react";
+import { ArrowLeftRight, Check, Gift, Layers, Lock, MonitorSmartphone, ShieldCheck, Smartphone, Sparkles } from "lucide-react";
 import { Badge, cn, Select } from "@bitocard/admin-ui";
 import type { Store, StoreTemplate } from "@bitocard/api-client/reseller";
 import type { StoreTemplateKey, StoreThemeColors, StoreVariantStyle } from "@bitocard/api-client/storefront";
 
 /** Each template's icon, for cards and lists. */
-export const templateIcons: Record<StoreTemplateKey, typeof Layers> = { all_in_one: Layers, topups: Smartphone, gift_cards: Gift, crypto_desk: ArrowLeftRight, single_product: Sparkles };
+export const templateIcons: Record<StoreTemplateKey, typeof Layers> = { all_in_one: Layers, topups: Smartphone, gift_cards: Gift, crypto_desk: ArrowLeftRight, single_product: Sparkles, vpn_shop: ShieldCheck, rdp_shop: MonitorSmartphone };
 
 export type Design = { template: StoreTemplateKey; variant: string; theme: string };
 

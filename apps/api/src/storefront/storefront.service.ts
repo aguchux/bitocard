@@ -205,7 +205,12 @@ export class StorefrontService {
         ...(store ? { listings: { some: { resellerId: store.resellerId } } } : { listed: true }),
         brand: { notIn: hidden.map(row => row.slug) },
         ...(template?.single ? { key: store?.focus ?? '' } : {}),
-        OR: [...enabled.filter(row => categories.has(row.category)).map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])],
+        // An empty OR would match everything (Prisma), so a store with none of its categories on sale (an RDP shop
+        // before RDP opens, the crypto desk) matches nothing.
+        ...(() => {
+          const open: Prisma.ProductWhereInput[] = [...enabled.filter(row => categories.has(row.category)).map(row => ({ country: row.countryCode, category: row.category })), ...(worldwide.length ? [{ category: { in: worldwide } }] : [])];
+          return open.length ? { OR: open } : { id: { in: [] } };
+        })(),
       },
     };
   }
@@ -692,7 +697,11 @@ export class StorefrontService {
             return { ...item, data: { asset } };
           }
           case 'product_spotlight': {
-            const key = item.productKey || this.scope.getStore()?.store?.focus || '';
+            const store = this.scope.getStore()?.store;
+            let key = item.productKey || store?.focus || '';
+            // A one-category store (VPN shop, RDP shop) with no product chosen: its first product on sale.
+            const only = store ? templateFor(store.template)?.categories : null;
+            if (!key && only?.length === 1) key = (await this.products({ category: only[0], limit: 1 })).data[0]?.key ?? '';
             const product = key ? await this.product(key).catch(() => null) : null;
             return { ...item, data: { product } };
           }
