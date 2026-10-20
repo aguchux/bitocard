@@ -2000,9 +2000,20 @@
     },
     "/v1/plans": {
       "get": {
-        "description": "Standard is free; Premium adds chargeback handling, priority support and international selling.",
+        "description": "Standard is free; Premium adds what BitoCard places on it (`feature_details` names each feature). With `currency`, each plan carries `local_price`: what it costs a month in that currency, a fixed price BitoCard set (`fixed: true`) or the US dollar price at today's rate.",
         "operationId": "PlansController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "A currency (ISO 4217): each plan then carries its monthly price in it as `local_price`.",
+            "schema": {
+              "example": "NGN",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The reseller plans, cheapest first.",
@@ -2041,7 +2052,14 @@
                         "currency": "USD",
                         "interval": "month"
                       },
-                      "features": []
+                      "features": [],
+                      "description": "Everything you need to run your store and sell through the API.",
+                      "feature_details": [],
+                      "local_price": {
+                        "amount": 0,
+                        "currency": "NGN",
+                        "fixed": true
+                      }
                     },
                     {
                       "object": "plan",
@@ -2055,14 +2073,52 @@
                       "features": [
                         "chargeback_protection",
                         "priority_support",
-                        "international_selling",
-                        "own_integrations",
-                        "own_payment_gateways",
-                        "onchain_crypto",
-                        "ai_assistant"
-                      ]
+                        "international_selling"
+                      ],
+                      "description": "More protection, more reach and more tools, billed monthly from your wallet.",
+                      "feature_details": [
+                        {
+                          "code": "chargeback_protection",
+                          "name": "Chargeback protection",
+                          "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
+                        },
+                        {
+                          "code": "priority_support",
+                          "name": "Priority support",
+                          "description": "Faster answers from BitoCard, including chat."
+                        },
+                        {
+                          "code": "international_selling",
+                          "name": "International selling",
+                          "description": "Sell to customers outside your country."
+                        }
+                      ],
+                      "local_price": {
+                        "amount": 3500000,
+                        "currency": "NGN",
+                        "fixed": true
+                      }
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
                 }
               }
             }
@@ -16312,12 +16368,31 @@
                     "features": [
                       "chargeback_protection",
                       "priority_support",
-                      "international_selling",
-                      "own_integrations",
-                      "own_payment_gateways",
-                      "onchain_crypto",
-                      "ai_assistant"
-                    ]
+                      "international_selling"
+                    ],
+                    "description": "More protection, more reach and more tools, billed monthly from your wallet.",
+                    "feature_details": [
+                      {
+                        "code": "chargeback_protection",
+                        "name": "Chargeback protection",
+                        "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
+                      },
+                      {
+                        "code": "priority_support",
+                        "name": "Priority support",
+                        "description": "Faster answers from BitoCard, including chat."
+                      },
+                      {
+                        "code": "international_selling",
+                        "name": "International selling",
+                        "description": "Sell to customers outside your country."
+                      }
+                    ],
+                    "local_price": {
+                      "amount": 3500000,
+                      "currency": "NGN",
+                      "fixed": true
+                    }
                   },
                   "renews_at": "2026-11-06T09:00:00.000Z",
                   "cancel_at_period_end": false,
@@ -16431,12 +16506,31 @@
                     "features": [
                       "chargeback_protection",
                       "priority_support",
-                      "international_selling",
-                      "own_integrations",
-                      "own_payment_gateways",
-                      "onchain_crypto",
-                      "ai_assistant"
-                    ]
+                      "international_selling"
+                    ],
+                    "description": "More protection, more reach and more tools, billed monthly from your wallet.",
+                    "feature_details": [
+                      {
+                        "code": "chargeback_protection",
+                        "name": "Chargeback protection",
+                        "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
+                      },
+                      {
+                        "code": "priority_support",
+                        "name": "Priority support",
+                        "description": "Faster answers from BitoCard, including chat."
+                      },
+                      {
+                        "code": "international_selling",
+                        "name": "International selling",
+                        "description": "Sell to customers outside your country."
+                      }
+                    ],
+                    "local_price": {
+                      "amount": 3500000,
+                      "currency": "NGN",
+                      "fixed": true
+                    }
                   },
                   "renews_at": "2026-11-06T09:00:00.000Z",
                   "cancel_at_period_end": false,
@@ -44621,7 +44715,10 @@
           "code",
           "name",
           "price",
-          "features"
+          "features",
+          "description",
+          "feature_details",
+          "local_price"
         ],
         "additionalProperties": false,
         "properties": {
@@ -44650,7 +44747,7 @@
             "properties": {
               "amount": {
                 "type": "integer",
-                "description": "Monthly price in US cents (0 for Standard). Charged in your currency at the `pay` rate when billed."
+                "description": "Monthly price in US cents (0 for Standard). You are charged `local_price` in your currency."
               },
               "currency": {
                 "type": "string",
@@ -44679,7 +44776,86 @@
                 "ai_assistant"
               ]
             },
-            "description": "What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant)."
+            "description": "What the plan includes: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant). BitoCard decides which are on the free plan and which need Premium."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "What the plan is for."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feature_details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A feature the plan includes.",
+              "required": [
+                "code",
+                "name",
+                "description"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "description": "The feature.",
+                  "enum": [
+                    "chargeback_protection",
+                    "priority_support",
+                    "international_selling",
+                    "own_integrations",
+                    "own_payment_gateways",
+                    "onchain_crypto",
+                    "ai_assistant"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Its name."
+                },
+                "description": {
+                  "type": "string",
+                  "description": "What it does."
+                }
+              }
+            },
+            "description": "The features in words, in the order they are shown."
+          },
+          "local_price": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "What the plan costs a month in your currency: on `GET /v1/plans?currency=`, and on your subscription. Null when not asked for, or when it cannot be priced right now.",
+                "required": [
+                  "amount",
+                  "currency",
+                  "fixed"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "description": "Monthly price in minor units of `currency`."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "ISO 4217 currency code."
+                  },
+                  "fixed": {
+                    "type": "boolean",
+                    "description": "True when BitoCard set this price for the currency; false when it is the US dollar price at today’s rate (it moves with the rate)."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },

@@ -675,10 +675,25 @@ model Plan {
   features        String[]
   /// API features switched off for this plan. Empty means every API feature is on (the default).
   apiRestrictions String[]   @default([]) @map("api_restrictions")
+  /// What the plan is for, shown with it (admins edit it).
+  description     String?
   updatedAt       DateTime   @updatedAt @map("updated_at")
   resellers       Reseller[]
+  localPrices     PlanPrice[]
 
   @@map("plans")
+}
+
+/// A plan's fixed monthly price in one currency (minor units). Without one, the US dollar price is converted when charged.
+model PlanPrice {
+  planCode    String   @map("plan_code")
+  currency    String   @db.Char(3)
+  amountMinor BigInt   @map("amount_minor")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  plan        Plan     @relation(fields: [planCode], references: [code], onDelete: Cascade)
+
+  @@id([planCode, currency])
+  @@map("plan_prices")
 }
 
 enum StoreStatus {

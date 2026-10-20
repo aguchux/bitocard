@@ -16,6 +16,13 @@ export type ResellerRef = { object: 'reseller'; id: string; name: string; countr
 export type Membership = { object: 'membership'; role: ResellerRole; reseller: ResellerRef };
 export type Session = { object: 'session'; user: User; memberships: Membership[] };
 export type Plan = { object: 'plan'; code: string; name: string; price: { amount: number; currency: string; interval: 'month' }; features: string[] };
+/** A plan as listed (`/v1/plans`) and on your subscription: its description, features in words and price in your currency. */
+export type PlanDetail = Plan & {
+  description: string | null;
+  feature_details: Array<{ code: string; name: string; description: string }>;
+  /** What it costs a month in your currency: fixed by BitoCard (`fixed`), or the US dollar price at today's rate. */
+  local_price: { amount: number; currency: string; fixed: boolean } | null;
+};
 export type Account = {
   object: 'account';
   reseller: ResellerRef;

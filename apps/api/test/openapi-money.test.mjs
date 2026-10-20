@@ -127,6 +127,8 @@ describe('live wallet money', () => {
   test('plans: the list, the subscription and upgrading from the live wallet', async () => {
     const plans = await expect(client(server.base), 'GET', '/v1/plans', 'GET /v1/plans', 200);
     assert.deepEqual(plans.data.map(plan => plan.code), ['standard', 'premium']);
+    const priced = await expect(client(server.base), 'GET', '/v1/plans?currency=NGN', 'GET /v1/plans', 200);
+    assert.equal(priced.data[0].local_price.currency, 'NGN');
     const { browser, resellerId } = await resellerClient(server);
     await wallets.adjust(null, { resellerId, mode: 'live', balance: 'funding', amount: 5_000_000, reason: 'Top-up' });
     await expect(browser, 'GET', '/v1/subscription', 'GET /v1/subscription', 200);

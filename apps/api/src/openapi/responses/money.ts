@@ -1,3 +1,4 @@
+import { planFeatures } from '../../plans/plans.service.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, num, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
@@ -28,7 +29,6 @@ const transactionTypes = [
 
 const categories = ['gift_cards', 'airtime', 'data', 'bills', 'pay_tv', 'esim', 'software', 'vpn', 'rdp', 'virtual_numbers', 'virtual_cards', 'mobile_money'] as const;
 const feeKinds = ['supplier_order', 'gateway_payment'] as const;
-const planFeatures = ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations', 'own_payment_gateways', 'onchain_crypto', 'ai_assistant'] as const;
 
 const currency = str('ISO 4217 currency of the amounts: the wallet\'s, your country\'s currency (for example `NGN`, `GHS` or `KES`) or `USD`.');
 const nano = (description: string) => str(`${description} In billionths of a minor unit, as a string of digits so no precision is lost.`, { pattern: '^\\d+$' });
@@ -350,13 +350,28 @@ const Plan = objectSchema(
     name: str('Plan name.'),
     price: shape(
       {
-        amount: int('Monthly price in US cents (0 for Standard). Charged in your currency at the `pay` rate when billed.'),
+        amount: int('Monthly price in US cents (0 for Standard). You are charged `local_price` in your currency.'),
         currency: constant('USD'),
         interval: constant('month'),
       },
       'The price.',
     ),
-    features: array(oneOf('A plan feature.', planFeatures), 'What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant).'),
+    features: array(oneOf('A plan feature.', planFeatures), 'What the plan includes: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant). BitoCard decides which are on the free plan and which need Premium.'),
+    description: nullable(str('What the plan is for.')),
+    feature_details: array(
+      shape({ code: oneOf('The feature.', planFeatures), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
+      'The features in words, in the order they are shown.',
+    ),
+    local_price: nullable(
+      shape(
+        {
+          amount: int('Monthly price in minor units of `currency`.'),
+          currency: str('ISO 4217 currency code.'),
+          fixed: bool('True when BitoCard set this price for the currency; false when it is the US dollar price at today’s rate (it moves with the rate).'),
+        },
+        'What the plan costs a month in your currency: on `GET /v1/plans?currency=`, and on your subscription. Null when not asked for, or when it cannot be priced right now.',
+      ),
+    ),
   },
   'A reseller plan.',
 );
@@ -514,13 +529,29 @@ const payout = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const standardPlan = { object: 'plan', code: 'standard', name: 'Standard', price: { amount: 0, currency: 'USD', interval: 'month' }, features: [] };
+const standardPlan = {
+  object: 'plan',
+  code: 'standard',
+  name: 'Standard',
+  price: { amount: 0, currency: 'USD', interval: 'month' },
+  features: [],
+  description: 'Everything you need to run your store and sell through the API.',
+  feature_details: [],
+  local_price: { amount: 0, currency: 'NGN', fixed: true },
+};
 const premiumPlan = {
   object: 'plan',
   code: 'premium',
   name: 'Premium',
   price: { amount: 2_500, currency: 'USD', interval: 'month' },
-  features: ['chargeback_protection', 'priority_support', 'international_selling', 'own_integrations', 'own_payment_gateways', 'onchain_crypto', 'ai_assistant'],
+  features: ['chargeback_protection', 'priority_support', 'international_selling'],
+  description: 'More protection, more reach and more tools, billed monthly from your wallet.',
+  feature_details: [
+    { code: 'chargeback_protection', name: 'Chargeback protection', description: 'Chargebacks are handled by BitoCard, not taken from your wallet.' },
+    { code: 'priority_support', name: 'Priority support', description: 'Faster answers from BitoCard, including chat.' },
+    { code: 'international_selling', name: 'International selling', description: 'Sell to customers outside your country.' },
+  ],
+  local_price: { amount: 3_500_000, currency: 'NGN', fixed: true },
 };
 
 const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '2026-11-06T09:00:00.000Z', cancel_at_period_end: false, past_due_since: null };

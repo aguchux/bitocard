@@ -1,6 +1,6 @@
 import { bitocardApi } from '../base';
 import { cursorPages, type List, type Mode, params } from './common';
-import type { Plan } from './session';
+import type { PlanDetail } from './session';
 
 /**
  * Withdrawals of earnings (`/v1/payouts`), the bank accounts they go to (`/v1/bank-accounts`, `/v1/banks`) and the
@@ -43,7 +43,7 @@ export type Payout = {
 
 export type Subscription = {
   object: 'subscription';
-  plan: Plan;
+  plan: PlanDetail;
   /** Null when the plan is not billed (Standard, or set by BitoCard). */
   renews_at: string | null;
   /** Premium ends (back to Standard) when the paid month ends. */
@@ -83,8 +83,11 @@ export const resellerPayoutsApi = bitocardApi.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Payout', id }, { type: 'Payout', id: 'LIST' }, 'Wallet'],
     }),
 
-    /** Named apart from the admin app's `plans` endpoint, which shares this API slice. */
-    resellerPlans: build.query<List<Plan>, void>({ query: () => '/v1/plans', providesTags: ['Plan'] }),
+    /** Named apart from the admin app's `plans` endpoint, which shares this API slice. With a currency, each plan's price in it. */
+    resellerPlans: build.query<List<PlanDetail>, { currency?: string } | void>({
+      query: arg => ({ url: '/v1/plans', params: arg?.currency ? { currency: arg.currency } : undefined }),
+      providesTags: ['Plan'],
+    }),
     subscription: build.query<Subscription, void>({ query: () => '/v1/subscription', providesTags: ['Subscription'] }),
     /** Upgrading charges the first month from the live wallet at once; moving to Standard keeps Premium to the end of the paid month. */
     changePlan: build.mutation<Subscription, { plan: string }>({

@@ -24,6 +24,8 @@ import type {
   OrderStatus,
   Overview,
   Plan,
+  PlanFeatureTier,
+  PlanSettings,
   PricingRule,
   PricingRuleInput,
   AdminPricePreview,
@@ -42,6 +44,7 @@ import type {
   Verification,
   VerificationStatus,
   TaxRate,
+  UpdatePlanInput,
 } from './types';
 
 export * from './types';
@@ -126,6 +129,18 @@ export const adminApi = bitocardApi.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, 'Activity'],
     }),
     plans: build.query<List<Plan>, void>({ query: () => '/v1/plans', providesTags: ['Plan'] }),
+    /** Settings > Plans: prices per market currency and where each feature sits. */
+    planSettings: build.query<PlanSettings, void>({ query: () => '/v1/admin/plans', providesTags: ['Plan'] }),
+    /** Finance: name, description, US dollar price and fixed prices per currency (null goes back to converting). */
+    updatePlan: build.mutation<Plan, UpdatePlanInput>({
+      query: ({ code, ...body }) => ({ url: `/v1/admin/plans/${code}`, method: 'PATCH', body }),
+      invalidatesTags: ['Plan', 'Reseller', 'Activity'],
+    }),
+    /** Finance: a feature on every plan (`free`) or on paid plans only (`premium`). */
+    setPlanFeatureTier: build.mutation<PlanSettings, { feature: string; tier: PlanFeatureTier }>({
+      query: ({ feature, tier }) => ({ url: `/v1/admin/plan-features/${feature}`, method: 'PUT', body: { tier } }),
+      invalidatesTags: ['Plan', 'Reseller', 'Activity'],
+    }),
 
     verifications: build.infiniteQuery<List<Verification>, { status?: VerificationStatus; subject?: 'reseller' | 'customer'; reseller_id?: string }, string>({
       infiniteQueryOptions: cursorPages,
@@ -397,6 +412,9 @@ export const {
   useRemoveResellerIdentityWaiverMutation,
   useUnsuspendResellerMutation,
   usePlansQuery,
+  usePlanSettingsQuery,
+  useUpdatePlanMutation,
+  useSetPlanFeatureTierMutation,
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,
   useOrdersInfiniteQuery,

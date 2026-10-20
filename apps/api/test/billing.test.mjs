@@ -45,7 +45,25 @@ describe('upgrading', () => {
     assert.ok(days > 27 && days < 32, 'renews in a month');
     assert.equal((await browser.get('/v1/wallet')).json.available, 5_000_000 - premiumNgn);
     const [capture] = (await browser.get('/v1/wallet/transactions')).json.data;
-    assert.match(capture.description, /Premium plan: NGN 38,062\.50 \(US\$25\.00 at 1522\.5\)/);
+    assert.match(capture.description, /Premium plan: NGN 38,062\.50 \(US\$25\.00 at today's rate\)/);
+    assert.deepEqual(upgraded.json.plan.local_price, { amount: premiumNgn, currency: 'NGN', fixed: false }, 'the price in their currency');
+  });
+
+  test('a fixed price in the reseller\'s currency is what they pay, whatever the rate', async () => {
+    const admin = await adminClient(server, ['finance']);
+    assert.equal((await admin.patch('/v1/admin/plans/premium', { local_prices: { NGN: 3_000_000 } })).status, 200);
+    try {
+      const { browser } = await funded(5_000_000);
+      const listed = (await browser.get('/v1/plans?currency=NGN')).json.data.find(plan => plan.code === 'premium');
+      assert.deepEqual(listed.local_price, { amount: 3_000_000, currency: 'NGN', fixed: true });
+      const upgraded = await browser.post('/v1/subscription', { plan: 'premium' });
+      assert.equal(upgraded.status, 200, JSON.stringify(upgraded.json));
+      assert.equal((await browser.get('/v1/wallet')).json.available, 2_000_000);
+      const [capture] = (await browser.get('/v1/wallet/transactions')).json.data;
+      assert.match(capture.description, /Premium plan: NGN 30,000\.00 \(monthly price\)/);
+    } finally {
+      await admin.patch('/v1/admin/plans/premium', { local_prices: { NGN: null } });
+    }
   });
 
   test('without enough money nothing changes', async () => {

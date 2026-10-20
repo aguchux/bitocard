@@ -40,6 +40,57 @@ describe('plans', () => {
     assert.equal((await support.patch('/v1/admin/plans/premium', { price_cents: 1 })).status, 403);
     assert.equal((await admin.patch('/v1/admin/plans/premium', { features: ['flying'] })).json.error.param, 'features');
   });
+
+  test('admins rename Premium, describe it and fix its price per market currency; the free plan is never charged', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const saved = await finance.patch('/v1/admin/plans/premium', { name: 'Premium Plus', description: 'For growing stores.', local_prices: { ngn: 4_000_000, GHS: 50_000 } });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.deepEqual([saved.json.name, saved.json.description, saved.json.local_prices], ['Premium Plus', 'For growing stores.', { GHS: 50_000, NGN: 4_000_000 }]);
+    assert.ok(await server.app.get((await import('../dist/database/prisma.service.js')).PrismaService).auditLog.findFirst({ where: { action: 'plan.updated', targetId: 'premium' } }));
+
+    const overview = (await finance.get('/v1/admin/plans')).json;
+    const premium = overview.plans.find(plan => plan.code === 'premium');
+    assert.deepEqual(premium.local_prices.find(row => row.currency === 'NGN').fixed, 4_000_000);
+    assert.equal(premium.local_prices.find(row => row.currency === 'NGN').charged, 4_000_000);
+    assert.ok(premium.local_prices.find(row => row.currency === 'NGN').markets.includes('Nigeria'));
+    assert.equal(overview.plans.find(plan => plan.code === 'standard').free, true);
+
+    const publicList = (await client(server.base).get('/v1/plans?currency=GHS')).json.data;
+    assert.deepEqual(publicList.find(plan => plan.code === 'premium').local_price, { amount: 50_000, currency: 'GHS', fixed: true });
+    assert.equal(publicList.find(plan => plan.code === 'premium').description, 'For growing stores.');
+
+    assert.equal((await finance.patch('/v1/admin/plans/premium', { local_prices: { EUR: 100 } })).json.error.param, 'local_prices', 'only market currencies');
+    assert.equal((await finance.patch('/v1/admin/plans/premium', { local_prices: { NGN: 0 } })).json.error.param, 'local_prices');
+    assert.equal((await finance.patch('/v1/admin/plans/standard', { price_cents: 500 })).json.error.param, 'price_cents', 'the free plan stays free');
+    assert.equal((await finance.patch('/v1/admin/plans/premium', { price_cents: 0 })).json.error.param, 'price_cents');
+    const reset = await finance.patch('/v1/admin/plans/premium', { name: 'Premium', local_prices: { NGN: null, GHS: null } });
+    assert.deepEqual(reset.json.local_prices, {});
+  });
+
+  test('admins put each feature on the free plan or on Premium only, and resellers follow at once', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const { browser } = await resellerClient(server);
+    assert.equal((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), false);
+
+    const free = await finance.put('/v1/admin/plan-features/international_selling', { tier: 'free' });
+    assert.equal(free.status, 200, JSON.stringify(free.json));
+    assert.equal(free.json.features.find(item => item.code === 'international_selling').tier, 'free');
+    assert.ok((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), 'Standard resellers have it now');
+    assert.ok(free.json.plans.find(plan => plan.code === 'premium').features.includes('international_selling'), 'and Premium keeps it');
+    const standard = (await client(server.base).get('/v1/plans')).json.data[0];
+    assert.deepEqual(standard.feature_details.map(item => item.name), ['International selling']);
+
+    const premium = await finance.put('/v1/admin/plan-features/international_selling', { tier: 'premium' });
+    assert.equal(premium.json.features.find(item => item.code === 'international_selling').tier, 'premium');
+    assert.equal((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), false);
+    const notices = (await browser.get('/v1/notifications')).json.data;
+    assert.ok(notices.some(item => item.type === 'plan.feature_changed' && item.title === 'International selling is now part of Premium'), 'Standard resellers are told');
+    assert.ok(await server.app.get((await import('../dist/database/prisma.service.js')).PrismaService).auditLog.findFirst({ where: { action: 'plan.feature_tier_changed', targetId: 'international_selling' } }));
+
+    assert.equal((await finance.put('/v1/admin/plan-features/flying', { tier: 'free' })).status, 404);
+    assert.equal((await finance.put('/v1/admin/plan-features/international_selling', { tier: 'gold' })).status, 400);
+    assert.equal((await (await adminClient(server, ['support'])).put('/v1/admin/plan-features/international_selling', { tier: 'free' })).status, 403);
+  });
 });
 
 describe('plan API restrictions', () => {

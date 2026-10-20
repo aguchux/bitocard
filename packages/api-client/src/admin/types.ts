@@ -88,6 +88,33 @@ export type AuditEntry = {
 
 export type ResellerStatus = 'pending' | 'active' | 'suspended';
 export type Plan = { object: 'plan'; code: string; name: string; price: { amount: number; currency: string; interval: string }; features: string[] };
+/** Where a plan feature sits: on every plan (`free`) or on paid plans only (`premium`). */
+export type PlanFeatureTier = 'free' | 'premium';
+/** Settings > Plans: every plan with its prices per market currency, and every plan feature with its tier. */
+export type PlanSettings = {
+  object: 'plan_settings';
+  plans: Array<
+    Plan & {
+      description: string | null;
+      /** The free plan: never charged; features placed "free" are on it. */
+      free: boolean;
+      api_restrictions: string[];
+      /** Resellers on the plan now. */
+      resellers: number;
+      local_prices: Array<{
+        currency: string;
+        /** The markets that use the currency. */
+        markets: string[];
+        /** The fixed monthly price in minor units; null when the US dollar price is converted. */
+        fixed: number | null;
+        /** What a charge would take today (null without an exchange rate). */
+        charged: number | null;
+      }>;
+    }
+  >;
+  features: Array<{ code: string; name: string; description: string; tier: PlanFeatureTier }>;
+};
+export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null> };
 export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; plan: string; created_at: string };
 export type ResellerDetail = {
   object: 'reseller';

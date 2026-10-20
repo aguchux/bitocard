@@ -44,6 +44,7 @@ const protectedRoutes = [
   ['patch', '/v1/admin/currencies/NGN', {}],
   ['put', '/v1/admin/exchange/markups', {}],
   ['patch', '/v1/admin/plans/premium', {}],
+  ['put', '/v1/admin/plan-features/priority_support', { tier: 'premium' }],
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver/remove`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/unsuspend`, { reason: 'x' }],

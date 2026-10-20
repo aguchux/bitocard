@@ -1,12 +1,11 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Reseller } from '../generated/prisma/client.js';
-import { FxService } from '../fx/fx.service.js';
+import type { Plan, Reseller } from '../generated/prisma/client.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { formatMoney, planEndedEmail, planRenewalFailedEmail } from '../notifications/templates.js';
-import { presentPlan } from '../plans/plans.service.js';
+import { PlansService, presentPlanDetail } from '../plans/plans.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 
 /** Days a Premium plan stays on after a failed renewal before it drops to Standard. */
@@ -20,8 +19,10 @@ function addMonth(date: Date) {
 }
 
 /**
- * Premium billing: monthly, from the live wallet, priced in US dollars and charged in the reseller's currency at
- * BitoCard's rate. Cancelling keeps Premium to the end of the paid month. A failed renewal gives a grace period.
+ * Premium billing: monthly, from the live wallet, in the reseller's own currency: the price BitoCard fixed for that
+ * currency, else the US dollar price at BitoCard's rate on the day. A country wallet short of it is topped up from the
+ * dollar wallet's funds as for any hold. Cancelling keeps Premium to the end of the paid month. A failed renewal gives a
+ * grace period.
  */
 @Injectable()
 export class BillingService {
@@ -30,16 +31,18 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wallets: WalletService,
-    private readonly fx: FxService,
+    private readonly plans: PlansService,
     private readonly email: EmailService,
     private readonly inbox: InboxService,
   ) {}
 
   async subscription(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { plan: true } });
+    const { currency } = await this.wallets.currencyOf(resellerId);
     return {
       object: 'subscription' as const,
-      plan: presentPlan(reseller.plan),
+      /** With `local_price`: what the plan costs a month in your currency. */
+      plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency)),
       /** Null when the plan is not billed (Standard, or set by BitoCard). */
       renews_at: reseller.planRenewsAt?.toISOString() ?? null,
       cancel_at_period_end: reseller.planCancelAtPeriodEnd,
@@ -65,7 +68,7 @@ export class BillingService {
       return this.subscription(resellerId);
     }
     const now = new Date();
-    await this.charge(reseller, plan.priceCents, plan.name, `plan:${resellerId}:${planCode}:${now.toISOString()}`);
+    await this.charge(reseller, plan, `plan:${resellerId}:${planCode}:${now.toISOString()}`);
     await this.prisma.reseller.update({
       where: { id: resellerId },
       data: { planCode, planRenewsAt: addMonth(now), planCancelAtPeriodEnd: false, planPastDueSince: null },
@@ -73,13 +76,21 @@ export class BillingService {
     return this.subscription(resellerId);
   }
 
-  /** Takes the plan price from the live wallet (topped-up funds first, then earnings) as BitoCard revenue. */
-  private async charge(reseller: Reseller, priceCents: number, planName: string, reference: string) {
-    if (priceCents === 0) return;
+  /** What the plan costs this reseller a month, in their currency (thrown when it cannot be priced today). */
+  private async priceFor(reseller: Reseller, plan: Plan) {
     const { currency } = await this.wallets.currencyOf(reseller.id);
-    const { amount, rate } = await this.fx.chargeForUsdCents(priceCents, currency);
-    const hold = await this.wallets.hold({ resellerId: reseller.id, mode: 'live', amount, reference, description: `${planName} plan` });
-    await this.wallets.captureHold(hold.id, `${planName} plan: ${formatMoney(amount, currency)} (US$${(priceCents / 100).toFixed(2)} at ${rate.pay.toDecimalPlaces(4).toString()})`);
+    const price = await this.plans.localPrice(plan, currency);
+    if (!price) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'conversion_unavailable', `${plan.name} cannot be priced in ${currency} right now. Try again later.`);
+    return price;
+  }
+
+  /** Takes the plan price from the live wallet (topped-up funds first, then earnings) as BitoCard revenue. */
+  private async charge(reseller: Reseller, plan: Plan, reference: string) {
+    if (plan.priceCents === 0) return;
+    const price = await this.priceFor(reseller, plan);
+    const hold = await this.wallets.hold({ resellerId: reseller.id, mode: 'live', amount: price.amount, reference, description: `${plan.name} plan` });
+    const how = price.fixed ? 'monthly price' : `US$${(plan.priceCents / 100).toFixed(2)} at today's rate`;
+    await this.wallets.captureHold(hold.id, `${plan.name} plan: ${formatMoney(price.amount, price.currency)} (${how})`);
   }
 
   /** Renews or ends Premium plans that are due. Run daily. */
@@ -93,7 +104,7 @@ export class BillingService {
         continue;
       }
       try {
-        await this.charge(reseller, reseller.plan.priceCents, reseller.plan.name, `plan:${reseller.id}:${reseller.planCode}:${reseller.planRenewsAt!.toISOString()}`);
+        await this.charge(reseller, reseller.plan, `plan:${reseller.id}:${reseller.planCode}:${reseller.planRenewsAt!.toISOString()}`);
         await this.prisma.reseller.update({
           where: { id: reseller.id },
           data: { planRenewsAt: addMonth(reseller.planRenewsAt!), planPastDueSince: null },
@@ -108,7 +119,8 @@ export class BillingService {
         }
         if (!reseller.planPastDueSince) {
           await this.prisma.reseller.update({ where: { id: reseller.id }, data: { planPastDueSince: now } });
-          const price = `US$${(reseller.plan.priceCents / 100).toFixed(2)}`;
+          const local = await this.priceFor(reseller, reseller.plan).catch(() => null);
+          const price = local ? formatMoney(local.amount, local.currency) : `US$${(reseller.plan.priceCents / 100).toFixed(2)}`;
           await this.notify(reseller.id, to => planRenewalFailedEmail(to, reseller.plan.name, price, renewalGraceDays));
           await this.inbox.reseller(reseller.id, 'plan.renewal_failed', {
             subject: `${reseller.id}:${now.toISOString().slice(0, 10)}`,

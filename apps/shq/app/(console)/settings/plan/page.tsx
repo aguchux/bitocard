@@ -2,37 +2,26 @@
 
 import { useState } from "react";
 import { Check, Sparkles } from "lucide-react";
-import { ActionDialog, Badge, Button, Card, cn, ErrorState, errorMessage, formatDate, formatMoney, humanise, Notice, PageHeader, RefreshFailed, Skeleton } from "@bitocard/admin-ui";
-import { type Plan, type Subscription, useChangePlanMutation, useExchangeRatesQuery, useResellerPlansQuery, useSubscriptionQuery, useWalletQuery } from "@bitocard/api-client/reseller";
+import { ActionDialog, Badge, Button, Card, cn, ErrorState, errorMessage, formatDate, formatMoney, Notice, PageHeader, RefreshFailed, Skeleton } from "@bitocard/admin-ui";
+import { type PlanDetail, type Subscription, useChangePlanMutation, useResellerPlansQuery, useSubscriptionQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
-/** Plain words for the feature codes plans carry. */
-const featureText: Record<string, string> = {
-  chargeback_protection: "Chargebacks handled by BitoCard, not taken from your wallet",
-  priority_support: "Priority support, including chat",
-  international_selling: "Sell to customers outside your country",
-  onchain_crypto: "Deposit and withdraw your own coins on chain",
-};
-const standardBasics = ["Your own store and the reseller API", "Sell to customers in your country", "Chargebacks are taken from your wallet"];
+const standardBasics = ["Your own store and the reseller API", "Sell to customers in your country"];
 
 const usd = (cents: number) => formatMoney(cents, "USD");
 
-/** The plan price in the reseller's currency at BitoCard's current `pay` rate (what a charge would use today). */
-function useLocalPrice(priceCents: number, currency: string | undefined) {
-  const rates = useExchangeRatesQuery(undefined, { skip: !currency || currency === "USD" || priceCents === 0 });
-  const rate = rates.data?.data.find(item => item.currency === currency);
-  if (!currency || currency === "USD" || !rate?.available || !rate.pay) return null;
-  const major = (priceCents / 100) * Number(rate.pay);
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency, currencyDisplay: "code", maximumFractionDigits: 0 }).format(major).replace(/ /g, " ");
+/** What the plan costs you a month, in your currency when it can be priced (else US dollars). */
+function priceText(plan: PlanDetail) {
+  return plan.local_price ? formatMoney(plan.local_price.amount, plan.local_price.currency) : usd(plan.price.amount);
 }
 
-function PlanCard({ plan, subscription, currency, onChoose, canChange }: { plan: Plan; subscription: Subscription; currency?: string; onChoose: (plan: Plan) => void; canChange: boolean }) {
+function PlanCard({ plan, subscription, onChoose, canChange }: { plan: PlanDetail; subscription: Subscription; onChoose: (plan: PlanDetail) => void; canChange: boolean }) {
   const current = subscription.plan.code === plan.code;
   const ending = current && subscription.cancel_at_period_end;
-  const local = useLocalPrice(plan.price.amount, currency);
   const free = plan.price.amount === 0;
-  const features = plan.features.length ? plan.features.map(code => featureText[code] ?? humanise(code)) : plan.code === "standard" ? standardBasics : [];
+  const local = plan.local_price && plan.local_price.currency !== "USD" ? plan.local_price : null;
+  const features = [...(free ? standardBasics : []), ...plan.feature_details.map(item => item.description)];
   // Choosing a plan you already have does nothing, except taking back a Premium cancellation.
   const action = current ? (ending ? "Keep this plan" : null) : free ? `Move to ${plan.name}` : `Upgrade to ${plan.name}`;
 
@@ -42,11 +31,14 @@ function PlanCard({ plan, subscription, currency, onChoose, canChange }: { plan:
         <h2 className="text-lg font-bold text-ink">{plan.name}</h2>
         {current ? <Badge tone={ending ? "amber" : "pink"}>{ending ? "Ends soon" : "Current plan"}</Badge> : null}
       </div>
+      {plan.description ? <p className="mt-1 text-sm text-muted">{plan.description}</p> : null}
       <p className="mt-3">
-        <span className="text-3xl font-extrabold tracking-tight text-ink">{free ? "Free" : usd(plan.price.amount)}</span>
+        <span className="text-3xl font-extrabold tracking-tight text-ink">{free ? "Free" : priceText(plan)}</span>
         {free ? null : <span className="text-sm text-muted"> a month</span>}
       </p>
-      {local ? <p className="mt-0.5 text-xs text-muted">{`About ${local} a month at today's rate.`}</p> : null}
+      {!free && local ? (
+        <p className="mt-0.5 text-xs text-muted">{local.fixed ? `Charged in ${local.currency} from your wallet.` : `${usd(plan.price.amount)} at today's rate, charged in ${local.currency}.`}</p>
+      ) : null}
       <ul className="mt-4 flex-1 space-y-2">
         {features.map(text => (
           <li key={text} className="flex gap-2 text-sm text-ink">
@@ -69,28 +61,29 @@ export default function PlanPage() {
   // Plans are paid from the live wallet, so they are changed in live mode only (the API refuses the sandbox).
   const canChange = can(membership, "finance") && mode === "live";
   const subscription = useSubscriptionQuery();
-  const plans = useResellerPlansQuery();
-  // The wallet gives the currency charges are taken in (the live wallet; the sandbox one has the same currency).
-  const wallet = useWalletQuery(undefined, { skip: !can(membership, "admin", "finance", "developer") });
   const [change] = useChangePlanMutation();
-  const [choosing, setChoosing] = useState<Plan | null>(null);
+  const [choosing, setChoosing] = useState<PlanDetail | null>(null);
   const [changed, setChanged] = useState<string | null>(null);
   const sub = subscription.data;
-  const currency = wallet.data?.currency;
+  // The subscription's price says which currency you are charged in; the plans are then priced in it.
+  const currency = sub?.plan.local_price?.currency;
+  const plans = useResellerPlansQuery(currency ? { currency } : undefined, { skip: !sub });
   const loadError = subscription.error ?? plans.error;
   const retry = () => {
     void subscription.refetch();
-    void plans.refetch();
+    // The plans wait for the subscription (its currency), so they are asked again only once it has loaded.
+    if (sub) void plans.refetch();
   };
 
-  const confirmText = (plan: Plan, current: Subscription) => {
+  const confirmText = (plan: PlanDetail, current: Subscription) => {
     if (plan.code === current.plan.code) return `${plan.name} carries on and renews ${formatDate(current.renews_at)}. Nothing is charged now.`;
     if (plan.price.amount === 0) {
       return current.renews_at
         ? `You keep ${current.plan.name} until ${formatDate(current.renews_at)}, then move to ${plan.name}. Nothing more is charged.`
         : `You move to ${plan.name} straight away.`;
     }
-    return `${usd(plan.price.amount)} is charged now from your live wallet${currency ? ` in ${currency} at BitoCard's exchange rate` : ""}, then every month until you cancel. Make sure your live wallet has enough available.`;
+    const fixed = plan.local_price?.fixed !== false;
+    return `${priceText(plan)} is charged now from your live wallet${fixed ? "" : " (the US dollar price at today's rate; later months at the rate on the day)"}, then every month until you cancel. Make sure your live wallet has enough available.`;
   };
 
   return (
@@ -125,15 +118,17 @@ export default function PlanPage() {
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             {plans.data.data.map(plan => (
-              <PlanCard key={plan.code} plan={plan} subscription={sub} currency={currency} onChoose={setChoosing} canChange={canChange} />
+              <PlanCard key={plan.code} plan={plan} subscription={sub} onChoose={setChoosing} canChange={canChange} />
             ))}
           </div>
-          <p className="text-xs text-muted">Prices are set in US dollars and charged in your currency at the exchange rate on the day, including BitoCard&apos;s disclosed conversion margin.</p>
+          <p className="text-xs text-muted">
+            Plans are charged in your currency. Where BitoCard has not set a price in it, the US dollar price is converted at the exchange rate on the day, including BitoCard&apos;s disclosed conversion margin.
+          </p>
           <ActionDialog
             open={choosing !== null}
             onClose={() => setChoosing(null)}
             title={choosing ? (choosing.code === sub.plan.code ? `Keep ${choosing.name}?` : `Move to ${choosing.name}?`) : ""}
-            confirmLabel={choosing && choosing.price.amount > 0 && choosing.code !== sub.plan.code ? `Pay ${usd(choosing.price.amount)} and upgrade` : "Confirm"}
+            confirmLabel={choosing && choosing.price.amount > 0 && choosing.code !== sub.plan.code ? `Pay ${priceText(choosing)} and upgrade` : "Confirm"}
             requireReason={false}
             onConfirm={async () => {
               if (!choosing) return;

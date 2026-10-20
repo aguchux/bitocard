@@ -1,17 +1,31 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { ApiExcludeController, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
+import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp, requireStepUp } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { ResellerStatus } from '../generated/prisma/client.js';
-import { PlansService, presentPlan } from './plans.service.js';
+import { PlansService } from './plans.service.js';
 
 const statuses = ['pending', 'active', 'suspended'] as const;
 
 class UpdatePlanDto {
+  @IsOptional() @IsString() @Length(1, 40) name?: string;
+  @IsOptional() @IsString() @Length(0, 300) description?: string | null;
   @IsOptional() @IsInt() @Min(0) @Max(1_000_000) price_cents?: number;
+  /** Fixed monthly prices per market currency, in minor units (`{ NGN: 3500000 }`); null goes back to converting. */
+  @IsOptional() @IsObject() local_prices?: Record<string, number | null>;
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) features?: string[];
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) api_restrictions?: string[];
+}
+
+class FeatureTierDto {
+  /** `free`: on every plan; `premium`: on paid plans only. */
+  @IsIn(['free', 'premium']) tier: 'free' | 'premium';
+}
+
+class PlansQueryDto {
+  @ApiPropertyOptional({ description: 'A currency (ISO 4217): each plan then carries its monthly price in it as `local_price`.', example: 'NGN' })
+  @IsOptional() @Matches(/^[A-Za-z]{3}$/) currency?: string;
 }
 
 class UpdateResellerDto {
@@ -40,10 +54,14 @@ class ResellerFilterDto {
 export class PlansController {
   constructor(private readonly plans: PlansService) {}
 
-  @ApiOperation({ summary: 'List reseller plans', description: 'Standard is free; Premium adds chargeback handling, priority support and international selling.' })
+  @ApiOperation({
+    summary: 'List reseller plans',
+    description:
+      'Standard is free; Premium adds what BitoCard places on it (`feature_details` names each feature). With `currency`, each plan carries `local_price`: what it costs a month in that currency, a fixed price BitoCard set (`fixed: true`) or the US dollar price at today\'s rate.',
+  })
   @Get()
-  async list() {
-    return { object: 'list' as const, data: (await this.plans.list()).map(presentPlan) };
+  async list(@Query() query: PlansQueryDto) {
+    return { object: 'list' as const, data: await this.plans.publicList(query.currency) };
   }
 }
 
@@ -52,6 +70,21 @@ export class PlansController {
 @Controller('admin')
 export class AdminPlansController {
   constructor(private readonly plans: PlansService) {}
+
+  /** Every plan with its prices per market currency, and where each plan feature sits (free or Premium). */
+  @AdminRoles('finance', 'operations', 'support')
+  @Get('plans')
+  overview() {
+    return this.plans.adminOverview();
+  }
+
+  /** Puts a plan feature on every plan (`free`) or on paid plans only (`premium`). Audited. */
+  @AdminRoles('finance')
+  @StepUp()
+  @Put('plan-features/:feature')
+  setFeatureTier(@CurrentCaller() caller: Caller, @Param('feature') feature: string, @Body() body: FeatureTierDto) {
+    return this.plans.setFeatureTier(adminId(caller), feature, body.tier);
+  }
 
   @AdminRoles('finance')
   @StepUp()
