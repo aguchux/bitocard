@@ -172,6 +172,10 @@ describe('your own integrations', () => {
     assert.equal((await browser.put('/v1/integrations/reloadly/connection/routing', { routing: 'fallback' })).status, 204);
     const listed = expect('GET /v1/integrations', 200, await browser.get('/v1/integrations'));
     assert.ok(listed.data.some(item => item.connection?.catalogue.synced_at));
+    const collector = expect('GET /v1/integrations/payment-collector', 200, await browser.get('/v1/integrations/payment-collector'));
+    assert.equal(collector.collector, 'own');
+    const chosen = expect('PUT /v1/integrations/payment-collector', 200, await browser.put('/v1/integrations/payment-collector', { collector: 'bitocard' }));
+    assert.deepEqual([chosen.collecting, chosen.reason], ['bitocard', 'chosen']);
 
     // An order update from the reseller's own Reloadly account, to its own address.
     const body = JSON.stringify({ type: 'giftcard_transaction.status', data: { transactionId: 48213, customIdentifier: 'NO-SUCH-ORDER', status: 'SUCCESSFUL' } });

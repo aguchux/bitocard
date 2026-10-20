@@ -1697,6 +1697,7 @@
                     "reserved_accounts": true,
                     "custom_domains": false,
                     "own_integrations": false,
+                    "own_payment_gateways": false,
                     "customer_app_bottom_bar_desktop": false,
                     "customer_wallets": true,
                     "crypto_wallets": false,
@@ -2056,7 +2057,9 @@
                         "priority_support",
                         "international_selling",
                         "own_integrations",
-                        "onchain_crypto"
+                        "own_payment_gateways",
+                        "onchain_crypto",
+                        "ai_assistant"
                       ]
                     }
                   ]
@@ -16311,7 +16314,9 @@
                       "priority_support",
                       "international_selling",
                       "own_integrations",
-                      "onchain_crypto"
+                      "own_payment_gateways",
+                      "onchain_crypto",
+                      "ai_assistant"
                     ]
                   },
                   "renews_at": "2026-11-06T09:00:00.000Z",
@@ -16428,7 +16433,9 @@
                       "priority_support",
                       "international_selling",
                       "own_integrations",
-                      "onchain_crypto"
+                      "own_payment_gateways",
+                      "onchain_crypto",
+                      "ai_assistant"
                     ]
                   },
                   "renews_at": "2026-11-06T09:00:00.000Z",
@@ -21508,6 +21515,240 @@
         ]
       }
     },
+    "/v1/integrations/payment-collector": {
+      "get": {
+        "description": "Whether your own payment gateway or BitoCard’s collects your hosted stores’ customer payments in this mode, what you chose, and why BitoCard collects when it does (`reason`).",
+        "operationId": "ResellerIntegrationsController_collector",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Who collects your customers’ payments in this mode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCollector"
+                },
+                "example": {
+                  "object": "payment_collector",
+                  "mode": "live",
+                  "collector": "own",
+                  "collecting": "own",
+                  "reason": null,
+                  "gateways": [
+                    {
+                      "integration_id": "monnify",
+                      "name": "Monnify",
+                      "routing": "preferred"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "See who collects your customers’ payments",
+        "tags": [
+          "Integrations"
+        ],
+        "x-bitocard-auth": "session"
+      },
+      "put": {
+        "description": "Your own payment gateway (`own`, a Premium service where switched on for your market) or BitoCard’s (`bitocard`). With your own collecting, your store’s customers pay at checkout through it and the store wallet takes no top-ups.",
+        "operationId": "ResellerIntegrationsController_setCollector",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved: who collects now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCollector"
+                },
+                "example": {
+                  "object": "payment_collector",
+                  "mode": "live",
+                  "collector": "bitocard",
+                  "collecting": "bitocard",
+                  "reason": "chosen",
+                  "gateways": [
+                    {
+                      "integration_id": "monnify",
+                      "name": "Monnify",
+                      "routing": "preferred"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Choose who collects your customers’ payments",
+        "tags": [
+          "Integrations"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "admin"
+        ]
+      }
+    },
     "/v1/integrations": {
       "get": {
         "description": "Integrations offered in your country, each with its fields and your connection in this mode, plus whether your account may connect them (`access`).",
@@ -21533,7 +21774,9 @@
                   "required": [
                     "object",
                     "data",
-                    "access"
+                    "access",
+                    "gateway_access",
+                    "payment_collector"
                   ],
                   "additionalProperties": false,
                   "properties": {
@@ -21550,7 +21793,7 @@
                     },
                     "access": {
                       "type": "object",
-                      "description": "Whether you can connect, and why not.",
+                      "description": "Whether you can connect your own suppliers, and why not.",
                       "required": [
                         "allowed",
                         "reason"
@@ -21579,6 +21822,41 @@
                           ]
                         }
                       }
+                    },
+                    "gateway_access": {
+                      "type": "object",
+                      "description": "Whether you can connect your own payment gateway (Premium, switched on per market), and why not.",
+                      "required": [
+                        "allowed",
+                        "reason"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "allowed": {
+                          "type": "boolean",
+                          "description": "Whether your account may connect its own integrations in this mode."
+                        },
+                        "reason": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "Why not: `switch_off` (not switched on for your account), `plan` (your plan does not include it), `no_country` (choose your business country) or `not_verified` (live needs a verified account).",
+                              "enum": [
+                                "switch_off",
+                                "plan",
+                                "not_verified",
+                                "no_country"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "payment_collector": {
+                      "$ref": "#/components/schemas/PaymentCollector"
                     }
                   }
                 },
@@ -21587,6 +21865,24 @@
                   "access": {
                     "allowed": true,
                     "reason": null
+                  },
+                  "gateway_access": {
+                    "allowed": true,
+                    "reason": null
+                  },
+                  "payment_collector": {
+                    "object": "payment_collector",
+                    "mode": "live",
+                    "collector": "own",
+                    "collecting": "own",
+                    "reason": null,
+                    "gateways": [
+                      {
+                        "integration_id": "monnify",
+                        "name": "Monnify",
+                        "routing": "preferred"
+                      }
+                    ]
                   },
                   "data": [
                     {
@@ -37158,6 +37454,22 @@
           "routing"
         ]
       },
+      "CollectorDto": {
+        "type": "object",
+        "properties": {
+          "collector": {
+            "type": "string",
+            "enum": [
+              "own",
+              "bitocard"
+            ],
+            "description": "`own`: your own payment gateway collects your stores’ customer payments (where you may use one and have one connected); `bitocard`: BitoCard’s gateways collect and the money reaches your wallet."
+          }
+        },
+        "required": [
+          "collector"
+        ]
+      },
       "ConnectDto": {
         "type": "object",
         "properties": {
@@ -40680,6 +40992,7 @@
                     "priority_support",
                     "international_selling",
                     "own_integrations",
+                    "own_payment_gateways",
                     "onchain_crypto",
                     "ai_assistant"
                   ]
@@ -41222,6 +41535,7 @@
               "reserved_accounts",
               "custom_domains",
               "own_integrations",
+              "own_payment_gateways",
               "customer_app_bottom_bar_desktop",
               "customer_wallets",
               "crypto_wallets",
@@ -41259,7 +41573,11 @@
               },
               "own_integrations": {
                 "type": "boolean",
-                "description": "Resellers connect their own supplier and payment gateway accounts (on plans with own integrations, for integrations offered in their country)."
+                "description": "Resellers connect their own supplier accounts (on plans with own integrations, for integrations offered in their country)."
+              },
+              "own_payment_gateways": {
+                "type": "boolean",
+                "description": "Resellers connect their own payment gateway (on plans with own payment gateways, for gateways offered in their country) and can choose it to collect their hosted stores' customer payments. Off, BitoCard's gateways collect and the money reaches their wallet."
               },
               "customer_app_bottom_bar_desktop": {
                 "type": "boolean",
@@ -44356,10 +44674,12 @@
                 "priority_support",
                 "international_selling",
                 "own_integrations",
-                "onchain_crypto"
+                "own_payment_gateways",
+                "onchain_crypto",
+                "ai_assistant"
               ]
             },
-            "description": "What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations`, `onchain_crypto` (depositing and withdrawing coins on chain)."
+            "description": "What the plan adds: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant)."
           }
         }
       },
@@ -49802,6 +50122,102 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "PaymentCollector": {
+        "type": "object",
+        "title": "PaymentCollector",
+        "description": "Who collects your hosted stores’ customer payments.",
+        "required": [
+          "object",
+          "mode",
+          "collector",
+          "collecting",
+          "reason",
+          "gateways"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `payment_collector`.",
+            "const": "payment_collector"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "collector": {
+            "type": "string",
+            "description": "What you chose: `own` (your own payment gateway) or `bitocard` (BitoCard’s gateways).",
+            "enum": [
+              "own",
+              "bitocard"
+            ]
+          },
+          "collecting": {
+            "type": "string",
+            "description": "Who collects now: `own` only when you chose it, may use your own gateway and have one active; otherwise `bitocard`, the money reaching your wallet.",
+            "enum": [
+              "own",
+              "bitocard"
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Why BitoCard collects: `chosen` (you chose it), `switch_off` (own gateways not switched on for your account or market), `plan` (own gateways come with Premium), `no_country`, `not_verified` (live needs a verified account) or `no_gateway` (no active gateway connected). Null when your own collects.",
+                "enum": [
+                  "chosen",
+                  "switch_off",
+                  "plan",
+                  "not_verified",
+                  "no_country",
+                  "no_gateway"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gateways": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "An active gateway connection.",
+              "required": [
+                "integration_id",
+                "name",
+                "routing"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "integration_id": {
+                  "type": "string",
+                  "description": "The gateway integration."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Its name."
+                },
+                "routing": {
+                  "type": "string",
+                  "description": "`preferred` gateways are offered first, then `fallback` ones.",
+                  "enum": [
+                    "preferred",
+                    "fallback"
+                  ]
+                }
+              }
+            },
+            "description": "Your active payment gateway connections in this mode, in the order customers see them."
           }
         }
       },

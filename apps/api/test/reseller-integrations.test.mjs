@@ -43,11 +43,12 @@ after(async () => {
   await provider?.close();
 });
 
-/** A verified (active) reseller on Premium with the switch on. */
+/** A verified (active) reseller on Premium with own suppliers and own payment gateways switched on. */
 async function allowedReseller(country = 'NG') {
   const reseller = await resellerClient(server, { country });
   await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active', planCode: 'premium' } });
   assert.equal((await admin.put('/v1/admin/switches/own_integrations', { reseller_id: reseller.resellerId, enabled: true })).status, 200);
+  assert.equal((await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: reseller.resellerId, enabled: true })).status, 200);
   return reseller;
 }
 
@@ -124,6 +125,11 @@ describe('gates', () => {
     assert.equal(await reason(testMode), null, 'the sandbox does not need the identity check');
     const refused = await browser.put('/v1/integrations/reloadly/connection', { values: reloadly });
     assert.deepEqual([refused.status, refused.json.error.code], [403, 'own_integrations_not_verified']);
+    // Payment gateways have their own switch: own suppliers being on does not open them.
+    const gateway = async headers => (await browser.get('/v1/integrations', headers)).json.gateway_access.reason;
+    assert.equal(await gateway(testMode), 'switch_off');
+    await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: resellerId, enabled: true });
+    assert.equal(await gateway(testMode), null);
   });
 
   test('API keys cannot manage integrations, and only owners and admins connect them', async () => {

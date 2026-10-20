@@ -6,7 +6,7 @@ import { adminId } from '../countries/countries.controller.js';
 import type { ConnectionStatus, LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
 import { modeHeader } from '../ledger/wallet.controller.js';
-import { type ConnectionDecision, ResellerIntegrationsService } from './reseller-integrations.service.js';
+import { type ConnectionDecision, type PaymentCollector, paymentCollectors, ResellerIntegrationsService } from './reseller-integrations.service.js';
 import { OwnSuppliersService } from './own-suppliers.service.js';
 
 class ConnectDto {
@@ -22,6 +22,12 @@ class RoutingDto {
   @ApiProperty({ enum: ['preferred', 'fallback', 'off'], description: '`preferred`: used before BitoCard’s suppliers; `fallback`: only when BitoCard has no offer; `off`: never.' })
   @IsIn(['preferred', 'fallback', 'off'])
   routing: 'preferred' | 'fallback' | 'off';
+}
+
+class CollectorDto {
+  @ApiProperty({ enum: paymentCollectors, description: '`own`: your own payment gateway collects your stores’ customer payments (where you may use one and have one connected); `bitocard`: BitoCard’s gateways collect and the money reaches your wallet.' })
+  @IsIn(paymentCollectors)
+  collector: PaymentCollector;
 }
 
 class AccessDto {
@@ -103,6 +109,25 @@ export class ResellerIntegrationsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   routing(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id') id: string, @Body() body: RoutingDto) {
     return this.ownSuppliers.setRouting(resellerOf(caller), mode, integrationId(id), body.routing);
+  }
+
+  @ApiOperation({
+    summary: 'See who collects your customers’ payments',
+    description: 'Whether your own payment gateway or BitoCard’s collects your hosted stores’ customer payments in this mode, what you chose, and why BitoCard collects when it does (`reason`).',
+  })
+  @Get('payment-collector')
+  collector(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
+    return this.integrations.collector(resellerOf(caller), mode);
+  }
+
+  @ApiOperation({
+    summary: 'Choose who collects your customers’ payments',
+    description: 'Your own payment gateway (`own`, a Premium service where switched on for your market) or BitoCard’s (`bitocard`). With your own collecting, your store’s customers pay at checkout through it and the store wallet takes no top-ups.',
+  })
+  @Roles('admin')
+  @Put('payment-collector')
+  setCollector(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: CollectorDto) {
+    return this.integrations.setCollector(resellerOf(caller), mode, personOf(caller), body.collector);
   }
 
   @ApiOperation({

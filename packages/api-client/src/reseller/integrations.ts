@@ -67,7 +67,28 @@ export type ResellerIntegration = {
   connection: ResellerConnection | null;
 };
 
-export type ResellerIntegrationList = { object: 'list'; access: { allowed: boolean; reason: IntegrationAccessReason }; data: ResellerIntegration[] };
+/** Who collects your hosted stores' customer payments: your own gateway (Premium, switched on for your market) or BitoCard's. */
+export type PaymentCollector = {
+  object: 'payment_collector';
+  mode: 'live' | 'test';
+  /** What you chose. */
+  collector: 'own' | 'bitocard';
+  /** Who collects now. */
+  collecting: 'own' | 'bitocard';
+  /** Why BitoCard collects (null when your own does). */
+  reason: 'chosen' | 'no_gateway' | Exclude<IntegrationAccessReason, null> | null;
+  gateways: Array<{ integration_id: string; name: string; routing: 'preferred' | 'fallback' }>;
+};
+
+export type ResellerIntegrationList = {
+  object: 'list';
+  /** Whether you may connect your own suppliers. */
+  access: { allowed: boolean; reason: IntegrationAccessReason };
+  /** Whether you may connect your own payment gateway. */
+  gateway_access: { allowed: boolean; reason: IntegrationAccessReason };
+  payment_collector: PaymentCollector;
+  data: ResellerIntegration[];
+};
 
 /** Your own supplier and payment gateway accounts (`/v1/integrations`), per mode. */
 export const resellerIntegrationsApi = bitocardApi.injectEndpoints({
@@ -97,6 +118,11 @@ export const resellerIntegrationsApi = bitocardApi.injectEndpoints({
       query: ({ queryArg: id, pageParam }) => ({ url: `/v1/integrations/${id}/connection/notifications`, params: pageParam ? { starting_after: pageParam } : {} }),
       providesTags: ['SupplierNotification'],
     }),
+    /** Chooses who collects your customers' payments: your own gateway or BitoCard's. */
+    setPaymentCollector: build.mutation<PaymentCollector, 'own' | 'bitocard'>({
+      query: collector => ({ url: '/v1/integrations/payment-collector', method: 'PUT', body: { collector } }),
+      invalidatesTags: ['ResellerIntegration'],
+    }),
     disconnectIntegration: build.mutation<void, string>({
       query: id => ({ url: `/v1/integrations/${id}/connection`, method: 'DELETE' }),
       invalidatesTags: ['ResellerIntegration'],
@@ -112,4 +138,5 @@ export const {
   useDisconnectIntegrationMutation,
   useSyncIntegrationMutation,
   useSetIntegrationRoutingMutation,
+  useSetPaymentCollectorMutation,
 } = resellerIntegrationsApi;

@@ -25,7 +25,12 @@ export const switchDefinitions = {
   },
   own_integrations: {
     scopes: ['global', 'country', 'reseller'],
-    description: "Resellers connect their own supplier and payment gateway accounts (on plans with own integrations, for integrations offered in their country).",
+    description: "Resellers connect their own supplier accounts (on plans with own integrations, for integrations offered in their country).",
+  },
+  own_payment_gateways: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "Resellers connect their own payment gateway (on plans with own payment gateways, for gateways offered in their country) and can choose it to collect their hosted stores' customer payments. Off, BitoCard's gateways collect and the money reaches their wallet.",
   },
   customer_app_bottom_bar_desktop: {
     scopes: ['global', 'country', 'reseller'],

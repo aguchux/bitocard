@@ -180,7 +180,7 @@ export class CheckoutService implements OnModuleInit {
   async methodsFor(store: Store, countryCode: string) {
     const mode = this.stores.mode(store);
     const seller = await this.sellerOrNull(store, countryCode);
-    if (seller && (await this.customerWallets.enabled(seller))) return { object: 'list' as const, mode, wallet_required: true, data: [walletMethod] };
+    if (seller && (await this.customerWallets.enabled(seller, mode))) return { object: 'list' as const, mode, wallet_required: true, data: [walletMethod] };
     const options = seller ? await this.stores.paymentOptions(store, seller, mode) : [];
     const country = seller?.country ? await this.prisma.country.findUnique({ where: { code: seller.country } }) : null;
     const shown = options.filter(option => option.gateway !== 'sandbox');
@@ -223,7 +223,7 @@ export class CheckoutService implements OnModuleInit {
     if (!this.stores.isHouse(store) && !templateSells(store, product)) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');
 
     // Wallets on: the customer buys only from their wallet. Off: at checkout, or from a balance they still have.
-    const walletsOn = await this.customerWallets.enabled(seller);
+    const walletsOn = await this.customerWallets.enabled(seller, mode);
     if (walletsOn && input.method && input.method !== 'wallet') {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'payment_method_unavailable', 'This store takes payment from your wallet: top it up, then buy.', 'method');
     }

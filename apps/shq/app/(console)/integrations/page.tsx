@@ -6,6 +6,7 @@ import { ActionDialog, Badge, Button, Card, CardHeader, Dialog, EmptyState, Erro
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   type IntegrationAccessReason,
+  type PaymentCollector,
   type ResellerIntegration,
   useCheckIntegrationMutation,
   useConnectIntegrationMutation,
@@ -13,6 +14,7 @@ import {
   useIntegrationNotificationsInfiniteQuery,
   useResellerIntegrationsQuery,
   useSetIntegrationRoutingMutation,
+  useSetPaymentCollectorMutation,
   useSyncIntegrationMutation,
 } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
@@ -74,6 +76,88 @@ const routingLabels = {
   fallback: "Use only when BitoCard has no offer",
   off: "Don’t use for orders",
 } as const;
+
+const gatewayRoutingLabels = {
+  preferred: "Offer first at checkout",
+  fallback: "Offer after your other gateways",
+  off: "Don’t use for payments",
+} as const;
+
+/** Where this gateway sits at checkout when your own gateways collect. */
+function GatewayControls({ integration, manage }: { integration: ResellerIntegration; manage: boolean }) {
+  const [setRouting, state] = useSetIntegrationRoutingMutation();
+  const id = `gateway-${integration.id}`;
+  return (
+    <div className="space-y-2 rounded-lg bg-canvas p-3">
+      {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      <Field label="Checkout" htmlFor={id} hint="Used when your own gateway collects your customers’ payments (above).">
+        <Select id={id} value={integration.connection!.routing} disabled={!manage || state.isLoading} onChange={event => setRouting({ id: integration.id, routing: event.target.value as keyof typeof gatewayRoutingLabels })}>
+          {Object.entries(gatewayRoutingLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </div>
+  );
+}
+
+/** Why BitoCard's gateways collect although you chose your own. */
+const collectorReasons: Record<Exclude<PaymentCollector["reason"], null | "chosen">, { text: string; href?: string; action?: string }> = {
+  switch_off: { text: "Your own payment gateway is not switched on for your account or market yet. Contact BitoCard support to ask for it." },
+  plan: { text: "Your own payment gateway comes with Premium.", href: "/settings/plan", action: "See plans" },
+  not_verified: { text: "Live payments need a live account: the business owner completes the identity check first.", href: "/settings/verification", action: "Identity check" },
+  no_country: { text: "Choose your business country first.", href: "/settings", action: "Business settings" },
+  no_gateway: { text: "Connect a payment gateway below (and keep it in use) for it to collect." },
+};
+
+/**
+ * Who collects your hosted stores' customer payments. Your own gateway (Premium, where BitoCard switched it on for your
+ * market): customers pay into your account at checkout and BitoCard takes its fee and the order's cost from your
+ * wallet. BitoCard's gateways: BitoCard collects and your margin reaches your wallet.
+ */
+function CollectorCard({ collector, manage }: { collector: PaymentCollector; manage: boolean }) {
+  const [choose, state] = useSetPaymentCollectorMutation();
+  const why = collector.reason && collector.reason !== "chosen" ? collectorReasons[collector.reason] : null;
+  const options = [
+    { value: "own" as const, title: "My own payment gateway", text: "Customers pay into your own account at checkout. BitoCard takes its fee and the order’s cost from your wallet. Premium." },
+    { value: "bitocard" as const, title: "BitoCard", text: "BitoCard’s gateways collect; your margin reaches your wallet. Customers can also pay from their store wallet." },
+  ];
+  return (
+    <Card>
+      <CardHeader
+        title="Who collects your customers’ payments"
+        description={collector.collecting === "own" ? `Now: your own gateway (${collector.gateways.map(item => item.name).join(", ")}).` : "Now: BitoCard’s gateways."}
+        actions={<StatusBadge status={collector.collecting === "own" ? "active" : "pending"} label={collector.collecting === "own" ? "Your gateway" : "BitoCard"} />}
+      />
+      <div className="space-y-3 px-5 pb-5 sm:px-6">
+        <div role="radiogroup" aria-label="Who collects your customers’ payments" className="grid gap-3 sm:grid-cols-2">
+          {options.map(option => (
+            <label key={option.value} className={`flex cursor-pointer gap-3 rounded-xl p-3 ring-1 ${collector.collector === option.value ? "bg-brand-50 ring-brand-300" : "bg-white ring-line"}`}>
+              <input type="radio" name="collector" value={option.value} checked={collector.collector === option.value} disabled={!manage || state.isLoading} onChange={() => choose(option.value)} className="mt-1" />
+              <span>
+                <span className="block font-semibold text-ink">{option.title}</span>
+                <span className="block text-sm text-muted">{option.text}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {why ? (
+          <Notice tone="amber" title="BitoCard collects for now">
+            {why.text}{" "}
+            {why.href ? (
+              <AppLink href={why.href} className="font-semibold underline">
+                {why.action}
+              </AppLink>
+            ) : null}
+          </Notice>
+        ) : null}
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+      </div>
+    </Card>
+  );
+}
 
 const notificationStatus = { received: "Checking", processed: "Matched", unmatched: "No matching order", failed: "Not processed" } as const;
 
@@ -244,6 +328,7 @@ function IntegrationCard({
         )}
         {integration.kind === "supplier" && connection?.status === "active" ? <SupplierControls integration={integration} manage={manage} /> : null}
         {integration.kind === "supplier" && connection?.notifications && status !== "rejected" ? <OrderUpdates integration={integration} /> : null}
+        {integration.kind === "payment_gateway" && connection?.status === "active" ? <GatewayControls integration={integration} manage={manage} /> : null}
         {connection?.decision_note ? <Notice tone={status === "suspended" || status === "rejected" ? "red" : "grey"}>{connection.decision_note}</Notice> : null}
         {connection?.last_check ? (
           <p className={connection.last_check.ok === false ? "text-xs text-red-700" : "text-xs text-muted"}>
@@ -307,13 +392,14 @@ export default function IntegrationsPage() {
   const current = data?.data.find(item => item.id === connecting) ?? null;
   const toRemove = data?.data.find(item => item.id === removing) ?? null;
   const help = data?.access.reason ? accessHelp[data.access.reason] : null;
-  const allowed = Boolean(data?.access.allowed);
+  // Own suppliers and own payment gateways are allowed separately.
+  const allowedFor = (integration: ResellerIntegration) => Boolean(integration.kind === "payment_gateway" ? data?.gateway_access.allowed : data?.access.allowed);
 
   const card = (integration: ResellerIntegration) => (
     <IntegrationCard
       key={integration.id}
       integration={integration}
-      manage={manage && allowed}
+      manage={manage && allowedFor(integration)}
       sandbox={sandbox}
       // The sandbox and live connections are separate; switching shows the other (for the whole dashboard).
       onSandbox={on => setMode(on ? "test" : "live")}
@@ -343,8 +429,9 @@ export default function IntegrationsPage() {
       ) : (
         <div className="space-y-6">
           {error && !isFetching ? <RefreshFailed message={errorMessage(error)} onRetry={refetch} /> : null}
+          <CollectorCard collector={data.payment_collector} manage={manage} />
           {help ? (
-            <Notice tone="amber" title="Not available on your account yet">
+            <Notice tone="amber" title="Your own suppliers are not available on your account yet">
               {help.text}{" "}
               {help.href ? (
                 <AppLink href={help.href} className="font-semibold underline">

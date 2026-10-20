@@ -382,6 +382,31 @@ const schemas = {
     'Your own account with the integration, in one mode. Credentials are never returned.',
   ),
 
+  PaymentCollector: objectSchema(
+    'PaymentCollector',
+    {
+      object: constant('payment_collector'),
+      mode,
+      collector: oneOf('What you chose: `own` (your own payment gateway) or `bitocard` (BitoCard’s gateways).', ['own', 'bitocard']),
+      collecting: oneOf('Who collects now: `own` only when you chose it, may use your own gateway and have one active; otherwise `bitocard`, the money reaching your wallet.', ['own', 'bitocard']),
+      reason: nullable(
+        oneOf('Why BitoCard collects: `chosen` (you chose it), `switch_off` (own gateways not switched on for your account or market), `plan` (own gateways come with Premium), `no_country`, `not_verified` (live needs a verified account) or `no_gateway` (no active gateway connected). Null when your own collects.', [
+          'chosen',
+          'switch_off',
+          'plan',
+          'not_verified',
+          'no_country',
+          'no_gateway',
+        ]),
+      ),
+      gateways: array(
+        shape({ integration_id: str('The gateway integration.'), name: str('Its name.'), routing: oneOf('`preferred` gateways are offered first, then `fallback` ones.', ['preferred', 'fallback']) }, 'An active gateway connection.'),
+        'Your active payment gateway connections in this mode, in the order customers see them.',
+      ),
+    },
+    'Who collects your hosted stores’ customer payments.',
+  ),
+
   ResellerIntegration: objectSchema(
     'ResellerIntegration',
     {
@@ -468,6 +493,8 @@ const phonesExample = {
   ],
 };
 const notice202 = (description: string, message: string) => ({ status: 202 as const, description, schema: 'Notice', example: notice(message) });
+
+const collectorExample = { object: 'payment_collector', mode: 'live', collector: 'own', collecting: 'own', reason: null, gateways: [{ integration_id: 'monnify', name: 'Monnify', routing: 'preferred' }] };
 
 export const dashboardDocs: DocsArea = {
   schemas,
@@ -637,12 +664,34 @@ export const dashboardDocs: DocsArea = {
                 ]),
               ),
             },
-            'Whether you can connect, and why not.',
+            'Whether you can connect your own suppliers, and why not.',
           ),
+          gateway_access: shape(
+            {
+              allowed: bool('Whether your account may connect its own integrations in this mode.'),
+              reason: nullable(
+                oneOf('Why not: `switch_off` (not switched on for your account), `plan` (your plan does not include it), `no_country` (choose your business country) or `not_verified` (live needs a verified account).', [
+                  'switch_off',
+                  'plan',
+                  'not_verified',
+                  'no_country',
+                ]),
+              ),
+            },
+            'Whether you can connect your own payment gateway (Premium, switched on per market), and why not.',
+          ),
+          payment_collector: ref('PaymentCollector'),
         },
         false,
       ),
-      example: { object: 'list', access: { allowed: true, reason: null }, data: [reloadlyExample, monnifyExample] },
+      example: { object: 'list', access: { allowed: true, reason: null }, gateway_access: { allowed: true, reason: null }, payment_collector: collectorExample, data: [reloadlyExample, monnifyExample] },
+    },
+    'GET /v1/integrations/payment-collector': { status: 200, description: 'Who collects your customers’ payments in this mode.', schema: 'PaymentCollector', example: collectorExample },
+    'PUT /v1/integrations/payment-collector': {
+      status: 200,
+      description: 'Saved: who collects now.',
+      schema: 'PaymentCollector',
+      example: { ...collectorExample, collector: 'bitocard', collecting: 'bitocard', reason: 'chosen' },
     },
     'PUT /v1/integrations/{id}/connection': {
       status: 200,

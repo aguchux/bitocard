@@ -409,6 +409,9 @@ enum ResellerStatus {
 /// A reseller business. Stores, wallets and countries attach to it in later milestones.
 model Reseller {
   id                    String                 @id @default(uuid()) @db.Uuid
+  /// Who collects their hosted stores' customer payments: `own` (their own payment gateway, where they may use and have
+  /// one; Premium and switched on for their market) or `bitocard` (BitoCard's gateways, the money reaching their wallet).
+  paymentCollector      String                 @default("own") @map("payment_collector")
   name                  String
   /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
   country               String?                @db.Char(2)

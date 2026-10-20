@@ -87,22 +87,24 @@ export class StoreSellers {
    * adds their own gateway connections (active, not switched off): `preferred` ones first, replacing BitoCard's same
    * gateway, `fallback` ones after BitoCard's methods when BitoCard does not offer that gateway.
    */
+  /**
+   * How a store's customers pay at checkout. The reseller's own gateway collects when it is theirs to use and they chose
+   * it (`payment_collector: own`): then only their gateways are offered (`preferred` ones first), and BitoCard's only if
+   * none of theirs takes the country's currency. Otherwise (they chose BitoCard, have no usable gateway, or are not on
+   * a plan and market with own gateways) BitoCard's gateways collect and the money reaches their wallet.
+   */
   async paymentOptions(store: Store, seller: Reseller, mode: LedgerMode): Promise<PaymentOption[]> {
     const country = await this.prisma.country.findUniqueOrThrow({ where: { code: seller.country! } });
     const bitocard: PaymentOption[] = (await this.methods.offered('checkout', country, mode)).map(gateway => ({ gateway }));
-    if (this.isHouse(store)) return bitocard;
+    if (this.isHouse(store) || seller.paymentCollector === 'bitocard') return bitocard;
     const own = await this.ownOptions(seller, mode, country);
-    const preferred = own.filter(item => item.routing === 'preferred').map(item => item.option);
-    const fallback = own.filter(item => item.routing === 'fallback').map(item => item.option);
-    const taken = new Set(preferred.map(item => item.gateway));
-    const middle = bitocard.filter(item => !taken.has(item.gateway));
-    const offered = new Set([...preferred, ...middle].map(item => item.gateway));
-    return [...preferred, ...middle, ...fallback.filter(item => !offered.has(item.gateway))];
+    if (!own.length) return bitocard;
+    return [...own.filter(item => item.routing === 'preferred'), ...own.filter(item => item.routing === 'fallback')].map(item => item.option);
   }
 
   /** The reseller's usable own gateway connections in this mode, able to take this country's currency. */
   private async ownOptions(seller: Reseller, mode: LedgerMode, country: { code: string; currency: string }) {
-    if (!(await this.integrations.access(seller.id, mode)).allowed) return [];
+    if (!(await this.integrations.access(seller.id, mode, 'payment_gateway')).allowed) return [];
     const rows = await this.prisma.resellerConnection.findMany({ where: { resellerId: seller.id, mode, status: 'active', routing: { not: 'off' } }, orderBy: { createdAt: 'asc' } });
     const options: Array<{ routing: 'preferred' | 'fallback'; option: PaymentOption }> = [];
     for (const row of rows) {

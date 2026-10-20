@@ -313,7 +313,7 @@ describe('payments into a reseller’s own gateway', () => {
   /** A live reseller store with their own Stripe account connected and money in their wallet. */
   async function ownGatewayStore({ funding = 5_000_000 } = {}) {
     const store = await resellerStore([product], { live: true, premium: true });
-    await admin.put('/v1/admin/switches/own_integrations', { reseller_id: store.resellerId, enabled: true });
+    await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: store.resellerId, enabled: true });
     if (funding) await wallets.adjust(null, { resellerId: store.resellerId, mode: 'live', balance: 'funding', amount: funding, reason: 'Test funding' });
     const connected = await store.browser.put('/v1/integrations/stripe/connection', { values: { secret_key: 'sk_live_reseller_own' } });
     assert.equal(connected.status, 200, JSON.stringify(connected.json));
@@ -325,7 +325,9 @@ describe('payments into a reseller’s own gateway', () => {
     const store = await ownGatewayStore();
     const shopper = await customer(store.subdomain);
     const methods = await shopper.get('/v1/store/payment-methods?country=NG');
-    assert.deepEqual(methods.json.data.map(item => item.id), ['stripe', 'flutterwave'], 'their own Stripe replaces BitoCard’s');
+    assert.deepEqual(methods.json.data.map(item => item.id), ['stripe'], 'their own gateway collects: BitoCard’s are not offered');
+    const collector = (await store.browser.get('/v1/integrations/payment-collector')).json;
+    assert.deepEqual([collector.collector, collector.collecting, collector.reason, collector.gateways.map(item => item.integration_id)], ['own', 'own', null, ['stripe']]);
 
     const fundingBefore = await balance(store.resellerId, 'live', 'reseller_funding');
     const started = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', method: 'stripe', return_url: returnUrl });
@@ -391,13 +393,20 @@ describe('payments into a reseller’s own gateway', () => {
     assert.ok(note);
   });
 
-  test('switched to fallback, BitoCard’s gateway is used where it offers the same method; switched off, never', async () => {
+  test('choosing BitoCard as collector uses BitoCard’s gateways; a gateway routed off or switched off by admins is never used', async () => {
     const store = await ownGatewayStore();
-    assert.equal((await store.browser.put('/v1/integrations/stripe/connection/routing', { routing: 'fallback' })).status, 204);
+    const chosen = await store.browser.put('/v1/integrations/payment-collector', { collector: 'bitocard' });
+    assert.deepEqual([chosen.status, chosen.json.collecting, chosen.json.reason], [200, 'bitocard', 'chosen']);
+    assert.ok(await prisma.auditLog.findFirst({ where: { action: 'reseller.payment_collector_changed', targetId: store.resellerId } }));
     const shopper = await customer(store.subdomain);
+    assert.deepEqual((await shopper.get('/v1/store/payment-methods?country=NG')).json.data.map(item => item.id), ['stripe', 'flutterwave'], 'BitoCard’s gateways');
     const started = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', method: 'stripe', return_url: returnUrl });
     assert.equal(started.status, 201, JSON.stringify(started.json));
     assert.equal((await checkoutRow(started.json.id)).connectionId, null, 'BitoCard’s Stripe');
+    assert.equal((await store.browser.put('/v1/integrations/payment-collector', { collector: 'own' })).json.collecting, 'own');
+    assert.equal((await store.browser.put('/v1/integrations/stripe/connection/routing', { routing: 'off' })).status, 204);
+    const off = (await store.browser.get('/v1/integrations/payment-collector')).json;
+    assert.deepEqual([off.collecting, off.reason], ['bitocard', 'no_gateway'], 'routed off: no gateway of theirs collects');
     assert.equal((await admin.put('/v1/admin/integrations/stripe/reseller-access', { enabled: false })).status, 200);
     try {
       assert.equal((await store.browser.put('/v1/integrations/stripe/connection/routing', { routing: 'preferred' })).status, 204);
@@ -406,6 +415,43 @@ describe('payments into a reseller’s own gateway', () => {
     } finally {
       assert.equal((await admin.put('/v1/admin/integrations/stripe/reseller-access', { enabled: true })).status, 200);
     }
+  });
+
+  test('own gateways are Premium and switched on per market: otherwise BitoCard collects and connecting is refused', async () => {
+    const store = await ownGatewayStore();
+    const shopper = await customer(store.subdomain);
+    // An admin switches own gateways off for the reseller's market: their own Stripe stops collecting at once.
+    await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: store.resellerId, enabled: null });
+    assert.equal((await admin.put('/v1/admin/switches/own_payment_gateways', { country_code: 'NG', enabled: false })).status, 200);
+    try {
+      const collector = (await store.browser.get('/v1/integrations/payment-collector')).json;
+      assert.deepEqual([collector.collecting, collector.reason], ['bitocard', 'switch_off']);
+      const started = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', method: 'stripe', return_url: returnUrl });
+      assert.equal((await checkoutRow(started.json.id)).connectionId, null, 'BitoCard’s gateway');
+      const refused = await store.browser.put('/v1/integrations/stripe/connection', { values: { secret_key: 'sk_live_reseller_own' } });
+      assert.deepEqual([refused.status, refused.json.error.code], [403, 'own_payment_gateways_switch_off']);
+      const listed = (await store.browser.get('/v1/integrations')).json;
+      assert.deepEqual([listed.gateway_access.reason, listed.payment_collector.collecting], ['switch_off', 'bitocard']);
+    } finally {
+      await admin.put('/v1/admin/switches/own_payment_gateways', { country_code: 'NG', enabled: null });
+    }
+    // On the standard plan, BitoCard collects.
+    await admin.put('/v1/admin/switches/own_payment_gateways', { reseller_id: store.resellerId, enabled: true });
+    await prisma.reseller.update({ where: { id: store.resellerId }, data: { planCode: 'standard' } });
+    const standard = (await store.browser.get('/v1/integrations/payment-collector')).json;
+    assert.deepEqual([standard.collecting, standard.reason], ['bitocard', 'plan']);
+  });
+
+  test('with store wallets on, BitoCard collecting means wallet only; their own gateway collecting means paying at checkout', async () => {
+    const store = await ownGatewayStore();
+    await admin.put('/v1/admin/switches/customer_wallets', { reseller_id: store.resellerId, enabled: true });
+    const shopper = await customer(store.subdomain);
+    const own = (await shopper.get('/v1/store/payment-methods?country=NG')).json;
+    assert.deepEqual([own.wallet_required, own.data.map(item => item.id)], [false, ['stripe']]);
+    assert.equal((await shopper.post('/v1/store/wallet/top-ups', { amount: 100000, return_url: returnUrl })).json.error.code, 'wallets_not_enabled', 'no top-ups: their gateway collects');
+    await store.browser.put('/v1/integrations/payment-collector', { collector: 'bitocard' });
+    const bitocard = (await shopper.get('/v1/store/payment-methods?country=NG')).json;
+    assert.deepEqual([bitocard.wallet_required, bitocard.data.map(item => item.id)], [true, ['wallet']]);
   });
 
   test('an unpaid payment on a gateway that can no longer be checked is closed, and BitoCard’s fee hold returned', async () => {

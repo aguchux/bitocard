@@ -13,11 +13,20 @@ import { connectionEmail } from '../notifications/templates.js';
 import { linksFor } from '../integrations/links.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { connectable, connectableIntegrations, type ConnectableIntegration } from './connectable.js';
+import { connectable, connectableIntegrations, type ConnectableIntegration, type ConnectableKind } from './connectable.js';
 
 /** Why a reseller cannot connect their own integrations yet (null: they can). */
 export type AccessReason = 'switch_off' | 'plan' | 'not_verified' | 'no_country' | null;
 export type ConnectionDecision = 'approve' | 'reject' | 'suspend' | 'reinstate';
+/** Who collects a reseller's hosted-store customer payments. */
+export const paymentCollectors = ['own', 'bitocard'] as const;
+export type PaymentCollector = (typeof paymentCollectors)[number];
+
+/** The switch and plan feature each kind of integration needs: own suppliers and own payment gateways are separate. */
+const gates = {
+  supplier: { switch: 'own_integrations', feature: 'own_integrations' },
+  payment_gateway: { switch: 'own_payment_gateways', feature: 'own_payment_gateways' },
+} as const satisfies Record<ConnectableKind, { switch: string; feature: string }>;
 
 const maxValueLength = 1000;
 const hintOf = (value: string) => (value.length > 8 ? `…${value.slice(-4)}` : '…');
@@ -52,12 +61,16 @@ export class ResellerIntegrationsService {
     private readonly inbox: InboxService,
   ) {}
 
-  /** Whether the reseller may connect their own integrations in this mode. */
-  async access(resellerId: string, mode: LedgerMode): Promise<{ allowed: boolean; reason: AccessReason }> {
+  /**
+   * Whether the reseller may connect (and use) their own integrations of a kind in this mode: suppliers need the
+   * `own_integrations` switch and plan feature, payment gateways `own_payment_gateways` (Premium, switched on per market).
+   */
+  async access(resellerId: string, mode: LedgerMode, kind: ConnectableKind = 'supplier'): Promise<{ allowed: boolean; reason: AccessReason }> {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { plan: true } });
-    const reason: AccessReason = !(await this.settings.isOn('own_integrations', resellerId))
+    const gate = gates[kind];
+    const reason: AccessReason = !(await this.settings.isOn(gate.switch, resellerId))
       ? 'switch_off'
-      : !reseller.plan.features.includes('own_integrations')
+      : !reseller.plan.features.includes(gate.feature)
         ? 'plan'
         : !reseller.country
           ? 'no_country'
@@ -70,8 +83,10 @@ export class ResellerIntegrationsService {
   /** Integrations offered in the reseller's country, with their connection in this mode. */
   async list(resellerId: string, mode: LedgerMode) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-    const [access, offers, connections] = await Promise.all([
+    const [access, gatewayAccess, collector, offers, connections] = await Promise.all([
       this.access(resellerId, mode),
+      this.access(resellerId, mode, 'payment_gateway'),
+      this.collector(resellerId, mode),
       this.prisma.integrationOffer.findMany(),
       this.prisma.resellerConnection.findMany({ where: { resellerId, mode } }),
     ]);
@@ -84,15 +99,15 @@ export class ResellerIntegrationsService {
         const offer = offers.find(row => row.integrationId === item.id);
         return presentIntegration(item, offer?.approval ?? 'review', connections.find(row => row.integrationId === item.id) ?? null, this.apiBase);
       });
-    return { object: 'list' as const, access, data };
+    return { object: 'list' as const, access, gateway_access: gatewayAccess, payment_collector: collector, data };
   }
 
   /** Connects (or replaces the credentials of) the reseller's own account. Blank secrets keep the saved ones. */
   async connect(resellerId: string, mode: LedgerMode, userId: string, integrationId: string, submitted: Record<string, unknown>) {
     const integration = connectable(integrationId);
     if (!integration) throw notFound();
-    const access = await this.access(resellerId, mode);
-    if (!access.allowed) throw accessDenied(access.reason);
+    const access = await this.access(resellerId, mode, integration.kind);
+    if (!access.allowed) throw accessDenied(access.reason, integration.kind);
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const offer = await this.prisma.integrationOffer.findUnique({ where: { integrationId } });
     if (!offer || !offeredIn(offer, reseller.country)) throw notFound();
@@ -187,6 +202,43 @@ export class ResellerIntegrationsService {
    */
   async credentials(resellerId: string, integrationId: string, mode: LedgerMode) {
     return (await this.active(resellerId, integrationId, mode))?.credentials ?? null;
+  }
+
+  /**
+   * Who collects the reseller's hosted-store customer payments in this mode. Their own gateway collects only when they
+   * chose it (`own`), may use own gateways (switch, plan, country, live: verified) and have one active (not routed off,
+   * its reseller access on); otherwise BitoCard's gateways do (`reason` says why), and the money reaches their wallet.
+   */
+  async collector(resellerId: string, mode: LedgerMode) {
+    const [reseller, access, rows] = await Promise.all([
+      this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { paymentCollector: true } }),
+      this.access(resellerId, mode, 'payment_gateway'),
+      this.prisma.resellerConnection.findMany({ where: { resellerId, mode, status: 'active', routing: { not: 'off' } }, orderBy: { createdAt: 'asc' } }),
+    ]);
+    const gateways = [];
+    for (const row of rows) {
+      const integration = connectable(row.integrationId);
+      if (integration?.kind !== 'payment_gateway' || !(await this.accessOn(row.integrationId))) continue;
+      gateways.push({ integration_id: row.integrationId, name: integration.name, routing: row.routing as 'preferred' | 'fallback' });
+    }
+    const chosen = reseller.paymentCollector === 'bitocard' ? 'bitocard' : 'own';
+    const reason = chosen === 'bitocard' ? 'chosen' : !access.allowed ? access.reason : gateways.length ? null : 'no_gateway';
+    return { object: 'payment_collector' as const, mode, collector: chosen as PaymentCollector, collecting: (reason ? 'bitocard' : 'own') as PaymentCollector, reason, gateways };
+  }
+
+  /** Whether the reseller's own gateway collects their stores' customer payments (then the store wallet takes no top-ups). */
+  async ownCollects(resellerId: string, mode: LedgerMode) {
+    return (await this.collector(resellerId, mode)).collecting === 'own';
+  }
+
+  /** The reseller chooses who collects: their own gateway (where they can) or BitoCard's. Audited. */
+  async setCollector(resellerId: string, mode: LedgerMode, userId: string, collector: PaymentCollector) {
+    const before = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { paymentCollector: true } });
+    if (before.paymentCollector !== collector) {
+      await this.prisma.reseller.update({ where: { id: resellerId }, data: { paymentCollector: collector } });
+      await this.audit.record({ actorId: userId, action: 'reseller.payment_collector_changed', targetType: 'reseller', targetId: resellerId, before: { payment_collector: before.paymentCollector }, after: { payment_collector: collector } });
+    }
+    return this.collector(resellerId, mode);
   }
 
   /** An active connection's ID and decrypted credentials, or null. */
@@ -379,14 +431,15 @@ const offeredIn = (offer: { resellerAccess: boolean; global: boolean; countries:
 
 const sorted = (values: Record<string, string>) => Object.fromEntries(Object.entries(values).sort(([a], [b]) => a.localeCompare(b)));
 
-function accessDenied(reason: AccessReason) {
+function accessDenied(reason: AccessReason, kind: ConnectableKind = 'supplier') {
+  const what = kind === 'payment_gateway' ? 'payment gateway' : 'integrations';
   const messages: Record<Exclude<AccessReason, null>, string> = {
-    switch_off: 'Connecting your own integrations is not switched on for your account. Contact BitoCard to ask for it.',
-    plan: 'Your plan does not include your own integrations. Change plan to use them.',
+    switch_off: `Connecting your own ${what} is not switched on for your account or market. Contact BitoCard to ask for it.`,
+    plan: kind === 'payment_gateway' ? 'Your own payment gateway comes with Premium. Change plan to use it.' : 'Your plan does not include your own integrations. Change plan to use them.',
     not_verified: 'Your account goes live after the identity check; live integrations need a live account.',
     no_country: 'Choose your business country first.',
   };
-  return new ApiError(HttpStatus.FORBIDDEN, 'permission_error', `own_integrations_${reason}`, messages[reason as Exclude<AccessReason, null>]);
+  return new ApiError(HttpStatus.FORBIDDEN, 'permission_error', `${kind === 'payment_gateway' ? 'own_payment_gateways' : 'own_integrations'}_${reason}`, messages[reason as Exclude<AccessReason, null>]);
 }
 
 /** Checks the submitted values against the integration's fields. Blank or missing secrets keep the saved ones. */
