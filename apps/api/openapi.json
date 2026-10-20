@@ -2000,7 +2000,7 @@
     },
     "/v1/plans": {
       "get": {
-        "description": "Standard is free; Premium adds what BitoCard places on it (`feature_details` names each feature). With `currency`, each plan carries `local_price`: what it costs a month in that currency, a fixed price BitoCard set (`fixed: true`) or the US dollar price at today's rate.",
+        "description": "Startup is free; Premium adds what BitoCard places on it (`feature_details` names each feature). With `currency`, each plan carries `local_price`: what it costs a month in that currency, a fixed price BitoCard set (`fixed: true`) or the US dollar price at today's rate.",
         "operationId": "PlansController_list",
         "parameters": [
           {
@@ -2046,7 +2046,7 @@
                     {
                       "object": "plan",
                       "code": "standard",
-                      "name": "Standard",
+                      "name": "Startup",
                       "price": {
                         "amount": 0,
                         "currency": "USD",
@@ -12092,7 +12092,7 @@
                   "plan": {
                     "object": "plan",
                     "code": "standard",
-                    "name": "Standard",
+                    "name": "Startup",
                     "price": {
                       "amount": 0,
                       "currency": "USD",
@@ -16536,7 +16536,7 @@
         "x-bitocard-auth": "api_key"
       },
       "post": {
-        "description": "Dashboard only, and live only: a plan is paid from your live wallet, so the sandbox refuses the change (`live_only`). Upgrading charges the first month straight away, in your currency at the rate shown on the exchange-rates list. Moving to Standard keeps Premium until the end of the paid month.",
+        "description": "Dashboard only, and live only: a plan is paid from your live wallet, so the sandbox refuses the change (`live_only`). Upgrading charges the first month straight away, in your currency at the rate shown on the exchange-rates list. Moving to Startup keeps Premium until the end of the paid month.",
         "operationId": "BillingController_change",
         "parameters": [],
         "requestBody": {
@@ -44832,7 +44832,7 @@
             "properties": {
               "amount": {
                 "type": "integer",
-                "description": "Monthly price in US cents (0 for Standard). You are charged `local_price` in your currency."
+                "description": "Monthly price in US cents (0 for Startup). You are charged `local_price` in your currency."
               },
               "currency": {
                 "type": "string",
@@ -45058,7 +45058,7 @@
               "string",
               "null"
             ],
-            "description": "When the plan is next charged; null when it is not billed (Standard, or a plan set by BitoCard).",
+            "description": "When the plan is next charged; null when it is not billed (Startup, or a plan set by BitoCard).",
             "format": "date-time"
           },
           "cancel_at_period_end": {

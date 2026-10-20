@@ -112,7 +112,7 @@ describe('plans', () => {
     assert.ok(off.json.plans.find(plan => plan.code === 'premium').features.includes('international_selling'), 'other plans keep it');
     assert.equal((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), false);
     const notices = (await browser.get('/v1/notifications')).json.data;
-    assert.ok(notices.some(item => item.type === 'plan.feature_changed' && item.title === 'International selling is no longer part of Standard'), 'resellers on the plan are told');
+    assert.ok(notices.some(item => item.type === 'plan.feature_changed' && item.title === 'International selling is no longer part of Startup'), 'resellers on the plan are told');
     assert.ok(await prismaOf().auditLog.findFirst({ where: { action: 'plan.feature_changed', targetId: 'standard' } }));
 
     assert.equal((await finance.put('/v1/admin/plans/standard/features/flying', { enabled: true })).status, 404);
@@ -153,12 +153,33 @@ describe('plans', () => {
       refusedWith(await browser.get(`/v1/stores/${store.id}/domains`), 'custom_domains');
       refusedWith(await browser.post('/v1/support/bitocard-chat/messages', { body: 'Hello' }), 'priority_support');
       const message = (await browser.get(`/v1/stores/${store.id}/traffic`)).json.error.message;
-      assert.match(message, /Store traffic is not part of your Standard plan/);
+      assert.match(message, /Store traffic is not part of your Startup plan/);
     } finally {
       for (const feature of ['multiple_stores', 'store_traffic', 'team_members', 'custom_domains']) await finance.put(`/v1/admin/plans/standard/features/${feature}`, { enabled: true });
     }
     assert.equal((await browser.get(`/v1/stores/${store.id}/traffic`)).status, 200, 'on again: allowed');
     assert.equal((await browser.post('/v1/stores', { name: 'Second Store', subdomain: `second${Date.now().toString(36)}` })).status, 201);
+  });
+});
+
+describe('Startup, Premium and Enterprise', () => {
+  test('the free plan is Startup; Enterprise has every feature and no limits, hidden until an admin shows it', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const overview = (await finance.get('/v1/admin/plans')).json;
+    assert.deepEqual(overview.plans.map(plan => plan.code).slice(0, 3), ['standard', 'premium', 'enterprise']);
+    assert.equal(overview.plans[0].name, 'Startup');
+    const enterprise = overview.plans.find(plan => plan.code === 'enterprise');
+    assert.deepEqual([enterprise.available, enterprise.free], [false, false]);
+    assert.deepEqual(enterprise.features, overview.features.map(feature => feature.code), 'every feature');
+    assert.ok(Object.values(enterprise.limits).every(value => value === null), 'no limits');
+    assert.ok(!(await client(server.base).get('/v1/plans')).json.data.some(plan => plan.code === 'enterprise'), 'hidden from resellers');
+    // An admin can still put a reseller on it while hidden, and resellers see it once shown.
+    assert.equal((await finance.patch('/v1/admin/plans/enterprise', { available: true })).status, 200);
+    try {
+      assert.ok((await client(server.base).get('/v1/plans')).json.data.some(plan => plan.code === 'enterprise'));
+    } finally {
+      await finance.patch('/v1/admin/plans/enterprise', { available: false });
+    }
   });
 });
 

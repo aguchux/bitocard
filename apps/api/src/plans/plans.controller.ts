@@ -27,7 +27,7 @@ class CreatePlanDto {
   @IsString() @Length(2, 30) code: string;
   @IsString() @Length(1, 40) name: string;
   @IsOptional() @IsString() @Length(0, 300) description?: string | null;
-  /** The monthly price in US cents (above zero: only Standard is free). */
+  /** The monthly price in US cents (above zero: only Startup is free). */
   @IsInt() @Min(1) @Max(1_000_000) price_cents: number;
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) features?: string[];
   @IsOptional() @IsBoolean() available?: boolean;
@@ -80,7 +80,7 @@ export class PlansController {
   @ApiOperation({
     summary: 'List reseller plans',
     description:
-      'Standard is free; Premium adds what BitoCard places on it (`feature_details` names each feature). With `currency`, each plan carries `local_price`: what it costs a month in that currency, a fixed price BitoCard set (`fixed: true`) or the US dollar price at today\'s rate.',
+      'Startup is free; Premium adds what BitoCard places on it (`feature_details` names each feature). With `currency`, each plan carries `local_price`: what it costs a month in that currency, a fixed price BitoCard set (`fixed: true`) or the US dollar price at today\'s rate.',
   })
   @Get()
   async list(@Query() query: PlansQueryDto) {
@@ -125,7 +125,7 @@ export class AdminPlansController {
     return this.plans.setLimit(adminId(caller), code, limit, body);
   }
 
-  /** Deletes a plan nobody is on (never Standard). Audited. */
+  /** Deletes a plan nobody is on (never Startup). Audited. */
   @AdminRoles('finance')
   @StepUp()
   @Delete('plans/:code')

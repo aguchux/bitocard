@@ -167,14 +167,14 @@ export class PlansService {
   }
 
   /**
-   * Admin: a new plan (paid: only the Standard plan is free) with the features it includes. Resellers can choose it at
+   * Admin: a new plan (paid: only the Startup plan is free) with the features it includes. Resellers can choose it at
    * once unless it is created hidden (`available: false`). Audited.
    */
   async create(actorId: string | null, input: { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean; sort_order?: number }) {
     const code = input.code.trim().toLowerCase();
     const invalid = (message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', message, param);
     if (!/^[a-z][a-z0-9_]{1,29}$/.test(code)) throw invalid('Use 2 to 30 lower-case letters, numbers and underscores, starting with a letter.', 'code');
-    if (!Number.isSafeInteger(input.price_cents) || input.price_cents <= 0) throw invalid('A new plan needs a price: only the Standard plan is free.', 'price_cents');
+    if (!Number.isSafeInteger(input.price_cents) || input.price_cents <= 0) throw invalid('A new plan needs a price: only the Startup plan is free.', 'price_cents');
     const unknown = input.features?.find(feature => !isPlanFeature(feature));
     if (unknown) throw invalid(`Unknown feature ${unknown}.`, 'features');
     if (await this.prisma.plan.findUnique({ where: { code } })) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_exists', `There is already a plan called ${code}.`, 'code');

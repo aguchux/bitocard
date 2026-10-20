@@ -171,7 +171,7 @@ export function planRenewalFailedEmail(to: string, plan: string, amount: string,
     subject: `We could not renew your ${plan} plan`,
     ...layout(`Your ${plan} plan needs funds`, [
       `We could not take ${amount} from your wallet to renew your ${plan} plan.`,
-      `Top up your wallet within ${graceDays} days to keep it; after that your account moves to the Standard plan.`,
+      `Top up your wallet within ${graceDays} days to keep it; after that your account moves to the Startup plan.`,
     ]),
   };
 }
@@ -196,7 +196,7 @@ export function connectionEmail(
 }
 
 export function planEndedEmail(to: string, plan: string): EmailMessage {
-  return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Standard plan. You can upgrade again at any time.']) };
+  return { to, subject: `Your ${plan} plan has ended`, ...layout(`Your ${plan} plan has ended`, ['Your account is now on the Startup plan. You can upgrade again at any time.']) };
 }
 
 export function webhookEndpointDisabledEmail(to: string, url: string, mode: string, link: string): EmailMessage {

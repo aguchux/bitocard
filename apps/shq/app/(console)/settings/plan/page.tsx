@@ -88,7 +88,7 @@ export default function PlanPage() {
 
   return (
     <ShqShell section="settings" current="/settings/plan" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plan" }]}>
-      <PageHeader title="Plan" description="Standard is free. Paid plans are billed monthly from your wallet and unlock the features listed with them." />
+      <PageHeader title="Plan" description="Startup is free. Paid plans are billed monthly from your wallet and unlock the features listed with them." />
       {changed ? <Notice tone="green">{changed}</Notice> : null}
       {mode === "test" ? <Notice tone="amber">Plans are paid from your live wallet, so they cannot be changed in the sandbox. Switch to live to change your plan.</Notice> : null}
       {!can(membership, "finance") ? <Notice tone="grey">Only the owner and finance members can change the plan.</Notice> : null}
@@ -109,10 +109,10 @@ export default function PlanPage() {
           {loadError && !subscription.isFetching && !plans.isFetching ? <RefreshFailed message={errorMessage(loadError, "Could not load your plan.")} onRetry={retry} /> : null}
           {sub.past_due_since ? (
             <Notice tone="red" title="Renewal failed">
-              {`We could not take the ${sub.plan.name} renewal from your wallet on ${formatDate(sub.past_due_since)}. Top up your live wallet: we try again daily, and the plan moves to Standard if the renewal still fails after 7 days.`}
+              {`We could not take the ${sub.plan.name} renewal from your wallet on ${formatDate(sub.past_due_since)}. Top up your live wallet: we try again daily, and the plan moves to Startup if the renewal still fails after 7 days.`}
             </Notice>
           ) : sub.cancel_at_period_end && sub.renews_at ? (
-            <Notice tone="amber">{`${sub.plan.name} ends on ${formatDate(sub.renews_at)} and you move to Standard. Nothing more is charged.`}</Notice>
+            <Notice tone="amber">{`${sub.plan.name} ends on ${formatDate(sub.renews_at)} and you move to Startup. Nothing more is charged.`}</Notice>
           ) : sub.renews_at ? (
             <Notice tone="blue">{`${sub.plan.name} renews on ${formatDate(sub.renews_at)}, charged from your live wallet.`}</Notice>
           ) : null}

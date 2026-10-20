@@ -239,7 +239,7 @@ export const accountDocs: DocsArea = {
       example: {
         object: 'account',
         reseller: exampleReseller,
-        plan: { object: 'plan', code: 'standard', name: 'Standard', price: { amount: 0, currency: 'USD', interval: 'month' }, features: [] },
+        plan: { object: 'plan', code: 'standard', name: 'Startup', price: { amount: 0, currency: 'USD', interval: 'month' }, features: [] },
         authenticated_as: { type: 'api_key', api_key_id: '6b1f2e3d-4c5a-4b6c-8d7e-9f0a1b2c3d4e', mode: 'test', scopes: ['catalogue:read', 'quotes:write', 'orders:read', 'orders:write', 'wallet:read'] },
       },
     },

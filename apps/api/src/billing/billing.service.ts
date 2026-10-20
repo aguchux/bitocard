@@ -9,7 +9,7 @@ import { PlansService, presentPlanDetail } from '../plans/plans.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { freePlanCode } from '../plans/features.js';
 
-/** Days a Premium plan stays on after a failed renewal before it drops to Standard. */
+/** Days a Premium plan stays on after a failed renewal before it drops to Startup. */
 export const renewalGraceDays = 7;
 const day = 24 * 60 * 60 * 1000;
 
@@ -44,7 +44,7 @@ export class BillingService {
       object: 'subscription' as const,
       /** With `local_price`: what the plan costs a month in your currency. */
       plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency), this.plans.limitsOf(reseller.plan)),
-      /** Null when the plan is not billed (Standard, or set by BitoCard). */
+      /** Null when the plan is not billed (Startup, or set by BitoCard). */
       renews_at: reseller.planRenewsAt?.toISOString() ?? null,
       cancel_at_period_end: reseller.planCancelAtPeriodEnd,
       past_due_since: reseller.planPastDueSince?.toISOString() ?? null,
@@ -149,7 +149,7 @@ export class BillingService {
     await this.inbox.reseller(resellerId, 'plan.ended', {
       subject: `${resellerId}:${Date.now()}`,
       title: `${planName} ended`,
-      body: `Your ${planName} plan was not paid and has ended; you are on the Standard plan now.`,
+      body: `Your ${planName} plan was not paid and has ended; you are on the Startup plan now.`,
       link: '/settings/plan',
       mode: 'live',
     });

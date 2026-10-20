@@ -351,7 +351,7 @@ const Plan = objectSchema(
     name: str('Plan name.'),
     price: shape(
       {
-        amount: int('Monthly price in US cents (0 for Standard). You are charged `local_price` in your currency.'),
+        amount: int('Monthly price in US cents (0 for Startup). You are charged `local_price` in your currency.'),
         currency: constant('USD'),
         interval: constant('month'),
       },
@@ -386,7 +386,7 @@ const Subscription = objectSchema(
   {
     object: constant('subscription'),
     plan: ref('Plan'),
-    renews_at: nullableTime('When the plan is next charged; null when it is not billed (Standard, or a plan set by BitoCard).'),
+    renews_at: nullableTime('When the plan is next charged; null when it is not billed (Startup, or a plan set by BitoCard).'),
     cancel_at_period_end: bool('True when the plan ends at the end of the paid month instead of renewing.'),
     past_due_since: nullableTime('When a renewal failed for lack of funds; the plan stays on for a grace period of 7 days.'),
   },
@@ -537,7 +537,7 @@ const payout = (overrides: Record<string, unknown> = {}) => ({
 const standardPlan = {
   object: 'plan',
   code: 'standard',
-  name: 'Standard',
+  name: 'Startup',
   price: { amount: 0, currency: 'USD', interval: 'month' },
   features: ['multiple_stores', 'store_traffic', 'team_members'],
   description: 'Everything you need to run your store and sell through the API.',

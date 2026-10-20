@@ -44,9 +44,9 @@ export type Payout = {
 export type Subscription = {
   object: 'subscription';
   plan: PlanDetail;
-  /** Null when the plan is not billed (Standard, or set by BitoCard). */
+  /** Null when the plan is not billed (Startup, or set by BitoCard). */
   renews_at: string | null;
-  /** Premium ends (back to Standard) when the paid month ends. */
+  /** Premium ends (back to Startup) when the paid month ends. */
   cancel_at_period_end: boolean;
   /** A renewal failed; the plan stays on for a grace period. */
   past_due_since: string | null;
@@ -89,7 +89,7 @@ export const resellerPayoutsApi = bitocardApi.injectEndpoints({
       providesTags: ['Plan'],
     }),
     subscription: build.query<Subscription, void>({ query: () => '/v1/subscription', providesTags: ['Subscription'] }),
-    /** Upgrading charges the first month from the live wallet at once; moving to Standard keeps Premium to the end of the paid month. */
+    /** Upgrading charges the first month from the live wallet at once; moving to Startup keeps Premium to the end of the paid month. */
     changePlan: build.mutation<Subscription, { plan: string }>({
       query: body => ({ url: '/v1/subscription', method: 'POST', body }),
       // The plan charge appears on the fee statement.

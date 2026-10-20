@@ -29,7 +29,7 @@ export class BillingController {
   @ApiOperation({
     summary: 'Change your plan',
     description:
-      'Dashboard only, and live only: a plan is paid from your live wallet, so the sandbox refuses the change (`live_only`). Upgrading charges the first month straight away, in your currency at the rate shown on the exchange-rates list. Moving to Standard keeps Premium until the end of the paid month.',
+      'Dashboard only, and live only: a plan is paid from your live wallet, so the sandbox refuses the change (`live_only`). Upgrading charges the first month straight away, in your currency at the rate shown on the exchange-rates list. Moving to Startup keeps Premium until the end of the paid month.',
   })
   @SessionOnly()
   @Roles('finance')

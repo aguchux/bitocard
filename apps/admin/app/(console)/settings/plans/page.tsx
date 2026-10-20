@@ -498,7 +498,7 @@ export default function PlansPage() {
     <AdminShell section="settings" current="/settings/plans" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plans" }]}>
       <PageHeader
         title="Plans"
-        description="Standard is free. Other plans are billed monthly from the reseller's live wallet, in their own currency, and include the features you switch on for them."
+        description="Startup is free. Other plans are billed monthly from the reseller's live wallet, in their own currency, and include the features you switch on for them."
         actions={
           editable && settings.data ? (
             <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
