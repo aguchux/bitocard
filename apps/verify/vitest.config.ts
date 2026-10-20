@@ -5,5 +5,5 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
   // `request.ts` mocks `next/headers` and `server-only` before any helper loads.
-  test: { environment: "node", pool: "threads", include: ["test/**/*.test.ts"], setupFiles: ["test/request.ts"] },
+  test: { environment: "node", pool: "threads", include: ["test/**/*.test.ts", "test/**/*.test.tsx"], setupFiles: ["test/request.ts"] },
 });

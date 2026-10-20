@@ -243,7 +243,8 @@ export function PasswordForm() {
   );
 }
 
-export function VerificationForm({ country, countryName, provider }: { country: string; countryName: string; provider?: "bitocard" | "didit" }) {
+/** `resume`: a BitoCard Verify check is open; starting again opens a fresh link into it (links work once). */
+export function VerificationForm({ country, countryName, provider, resume }: { country: string; countryName: string; provider?: "bitocard" | "didit"; resume?: boolean }) {
   const [state, action, pending] = useActionState(startVerification, empty);
   const [consent, setConsent] = useState(false);
   // BitoCard Verify needs no BVN; the BVN check is asked only where it does not run.
@@ -283,7 +284,7 @@ export function VerificationForm({ country, countryName, provider }: { country: 
           I agree to BitoCard checking my identity{nigeria ? " with my BVN" : ", including a check of my face against my ID (biometric data)"}, as the privacy notice explains.
         </span>
       </label>
-      <Submit pending={pending}>Start the check</Submit>
+      <Submit pending={pending}>{resume ? "Continue your check" : "Start the check"}</Submit>
     </form>
   );
 }

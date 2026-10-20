@@ -192,6 +192,12 @@ describe('a registered business’s KYB', () => {
     const person = await applicant(started.json.url);
     const again = await call('POST', '/v1/kyc/session', { body: { token: person.token } });
     assert.deepEqual([again.status, again.json.error.code], [404, 'kyc_link_invalid'], 'a link works once');
+    // Reads never hand out the spent link; continuing asks again and gets a fresh one into the same case.
+    const open = (await reseller.browser.get('/v1/account/verification')).json;
+    assert.deepEqual([open.status, open.url], ['in_progress', null]);
+    const resumed = await reseller.browser.post('/v1/account/verification', { consent: true });
+    assert.notEqual(resumed.json.url, started.json.url);
+    assert.equal((await applicant(resumed.json.url)).case.id, person.case.id, 'the same case, resumed');
     assert.equal((await call('GET', '/v1/kyc/case', { headers: { 'bitocard-kyc-session': 'bks_made_up' } })).status, 401);
     assert.deepEqual([person.case.kind, person.case.status, person.case.brand.name], ['kyb', 'draft', 'BitoCard']);
     assert.ok(person.case.id_types.some(item => item.code === 'nin_slip'), 'Nigerian ID types');

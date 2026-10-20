@@ -56,7 +56,10 @@ function Outcome({ check }: { check: Verification }) {
 function StartCheck({ check }: { check: Verification }) {
   const [consent, setConsent] = useState(false);
   const [start, state] = useStartAccountVerificationMutation();
-  const resume = check.status === "in_progress" ? check.url : null;
+  const inProgress = check.status === "in_progress";
+  // Didit's page can be reopened; a BitoCard Verify link works once, so continuing asks the API for a fresh one.
+  const resume = inProgress ? check.url : null;
+  const reopen = inProgress && !resume && check.provider === "bitocard";
 
   const begin = async () => {
     const result = await start({ consent: true })
@@ -65,11 +68,14 @@ function StartCheck({ check }: { check: Verification }) {
     if (result?.url) goTo(result.url);
   };
 
-  if (resume) {
+  if (resume || reopen) {
     return (
-      <Button icon={<ExternalLink className="size-4" aria-hidden />} onClick={() => goTo(resume)}>
-        Continue the check
-      </Button>
+      <div className="space-y-3">
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        <Button icon={<ExternalLink className="size-4" aria-hidden />} loading={state.isLoading} onClick={() => (resume ? goTo(resume) : void begin())}>
+          Continue the check
+        </Button>
+      </div>
     );
   }
 

@@ -11,7 +11,9 @@ const noop = () => () => undefined;
  * so the applicant goes back there. When the referring page was a BitoCard site, it is named and linked.
  */
 export function LinkProblem({ unreachable }: { unreachable?: boolean }) {
-  const back = useSyncExternalStore(noop, () => returnHint(document.referrer), () => null);
+  // The snapshot must be stable between calls (a string), or React re-renders forever; the hint is worked out from it.
+  const referrer = useSyncExternalStore(noop, () => document.referrer, () => "");
+  const back = returnHint(referrer);
   if (unreachable) {
     return (
       <section className="space-y-3 rounded-3xl border border-line bg-white p-6 text-center shadow-card">

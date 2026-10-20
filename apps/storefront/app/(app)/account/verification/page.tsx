@@ -60,7 +60,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         ) : (
           <>
             {status?.ok && status.data.latest?.reason ? <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Your last check did not pass: {reasonText(status.data.latest.reason)}.</p> : null}
-            <VerificationForm country={country} countryName={name} provider={status?.ok ? status.data.provider : undefined} />
+            <VerificationForm country={country} countryName={name} provider={status?.ok ? status.data.provider : undefined} resume={status?.ok && status.data.latest?.status === "in_progress"} />
           </>
         )}
       </section>

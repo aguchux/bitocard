@@ -150,6 +150,14 @@ export class IdentityService {
     return africanCountries.has(code) ? 'bitocard' : 'didit';
   }
 
+  /**
+   * A BitoCard Verify link works once and for 30 minutes, so reads never hand out the stored one (it is almost always
+   * spent): the applicant continues by starting the check again, which opens a fresh link into the same case.
+   */
+  private withoutSpentLink<T extends IdentityVerification | null>(record: T): T {
+    return record && record.provider === verifyProvider ? { ...record, url: null } : record;
+  }
+
   /** An open BitoCard Verify check gets a fresh single-use link (the last one may have been used or expired). */
   private async freshLink(record: IdentityVerification) {
     if (record.provider !== verifyProvider || record.status !== 'in_progress') return record;
@@ -162,7 +170,7 @@ export class IdentityService {
   async resellerVerification(resellerId: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     const record = await this.prisma.identityVerification.findFirst({ where: { resellerId, subject: 'reseller', method: 'document' }, orderBy: { createdAt: 'desc' } });
-    return presentResellerVerification(record, reseller, await this.providerFor(reseller.country));
+    return presentResellerVerification(this.withoutSpentLink(record), reseller, await this.providerFor(reseller.country));
   }
 
   /** The business owner's check. Returns the Didit page to send them to; an unfinished session is reused for a day. */
@@ -297,7 +305,7 @@ export class IdentityService {
   async customerVerification(resellerId: string, mode: LedgerMode, reference: string) {
     const record = await this.latestCustomer(resellerId, mode, reference);
     if (!record) throw notFound();
-    return presentCustomerVerification(record);
+    return presentCustomerVerification(this.withoutSpentLink(record));
   }
 
   /** True when BitoCard has verified this customer of the reseller (for hosted storefront gating). */
