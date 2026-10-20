@@ -381,6 +381,20 @@ const Plan = objectSchema(
   'A reseller plan.',
 );
 
+const StoreSubscription = objectSchema(
+  'StoreSubscription',
+  {
+    object: constant('store_subscription'),
+    store: shape({ id: uuid('The store.'), name: str('Its name.') }, 'The store.'),
+    plan: ref('Plan'),
+    renews_at: nullableTime('When the store’s plan is next charged; null when it is not billed (Startup, or a plan set by BitoCard).'),
+    cancel_at_period_end: bool('True when the plan ends at `renews_at` and the store goes back to Startup.'),
+    next_plan: nullable(shape({ code: str('Plan code.'), name: str('Plan name.') }, 'A cheaper plan taking over at `renews_at`.')),
+    past_due_since: nullableTime('When a renewal failed for lack of funds; the plan stays on for 7 days.'),
+  },
+  'A store’s plan and its billing. Each store pays for its own plan.',
+);
+
 const Subscription = objectSchema(
   'Subscription',
   {
@@ -557,12 +571,22 @@ const premiumPlan = {
   local_price: { amount: 3_500_000, currency: 'NGN', fixed: true },
 };
 
+const storeSubscription = {
+  object: 'store_subscription',
+  store: { id: '6f1c2a8e-3b7d-4e19-9a42-0c5d8b7e1f30', name: 'Ada Gifts' },
+  plan: premiumPlan,
+  renews_at: '2026-11-20T09:00:00.000Z',
+  cancel_at_period_end: false,
+  next_plan: null,
+  past_due_since: null,
+};
+
 const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '2026-11-06T09:00:00.000Z', cancel_at_period_end: false, past_due_since: null };
 
 const noMore = (item: Schema) => list(item, {}, false);
 
 export const moneyDocs: DocsArea = {
-  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, Subscription },
+  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, StoreSubscription, Subscription },
   responses: {
     'GET /v1/wallet': { status: 200, description: 'Your wallet in the mode of the key or session.', schema: 'Wallet', example: wallet },
     'GET /v1/wallet/transactions': { status: 200, description: 'Wallet transactions, newest first.', schema: list(ref('WalletTransaction')), example: listExample(transactions, true) },
@@ -708,5 +732,13 @@ export const moneyDocs: DocsArea = {
     'GET /v1/plans': { status: 200, description: 'The reseller plans, cheapest first.', schema: noMore(ref('Plan')), example: { object: 'list', data: [standardPlan, premiumPlan] } },
     'GET /v1/subscription': { status: 200, description: 'Your current plan.', schema: 'Subscription', example: subscription },
     'POST /v1/subscription': { status: 200, description: 'Your plan after the change.', schema: 'Subscription', example: subscription },
+    'GET /v1/subscriptions': {
+      status: 200,
+      description: 'Every store’s plan, and the account’s plan (the highest among your stores).',
+      schema: shape({ object: constant('list'), account_plan: shape({ code: str('Plan code.'), name: str('Plan name.') }, 'The account’s plan: account-wide features and limits follow it.'), data: array(ref('StoreSubscription'), 'Your stores, oldest first.') }, 'Your stores’ plans.'),
+      example: { object: 'list', account_plan: { code: 'premium', name: 'Premium' }, data: [storeSubscription] },
+    },
+    'GET /v1/stores/{store}/subscription': { status: 200, description: 'The store’s plan.', schema: 'StoreSubscription', example: storeSubscription },
+    'POST /v1/stores/{store}/subscription': { status: 200, description: 'The store’s plan after the change.', schema: 'StoreSubscription', example: storeSubscription },
   },
 };

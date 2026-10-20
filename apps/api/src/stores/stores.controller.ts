@@ -232,7 +232,7 @@ export class StoresController {
   @Get(':id/traffic')
   async traffic(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Query('days') days?: string) {
     const store = await this.stores.get(resellerOf(caller), id);
-    await this.planAccess.require(resellerOf(caller), 'store_traffic');
+    await this.planAccess.requireForStore(store.id, 'store_traffic');
     return this.visits.traffic(store.id, Number(days ?? 30));
   }
 

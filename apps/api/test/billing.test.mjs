@@ -24,13 +24,18 @@ after(() => server?.close());
 
 const premiumNgn = 3_806_250;
 
+/** A reseller with one store (plans are per store; `/v1/subscription` acts on it). */
 async function funded(amount) {
   const reseller = await resellerClient(server);
+  await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
+  const store = await reseller.browser.post('/v1/stores', { name: 'Plan Store', subdomain: `plan${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` });
+  assert.equal(store.status, 201, JSON.stringify(store.json));
+  reseller.storeId = store.json.id;
   if (amount) await wallets.adjust(null, { resellerId: reseller.resellerId, mode: 'live', balance: 'funding', amount, reason: 'Top-up' });
   return reseller;
 }
 
-const renewsAt = async resellerId => (await prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } })).planRenewsAt;
+const renewsAt = async resellerId => (await prisma.storeSubscription.findFirstOrThrow({ where: { resellerId } })).renewsAt;
 
 describe('upgrading', () => {
   test('Premium charges the first month from the live wallet at the published rate', async () => {
@@ -45,7 +50,7 @@ describe('upgrading', () => {
     assert.ok(days > 27 && days < 32, 'renews in a month');
     assert.equal((await browser.get('/v1/wallet')).json.available, 5_000_000 - premiumNgn);
     const [capture] = (await browser.get('/v1/wallet/transactions')).json.data;
-    assert.match(capture.description, /Premium plan: NGN 38,062\.50 \(US\$25\.00 at today's rate\)/);
+    assert.match(capture.description, /Premium plan for Plan Store: NGN 38,062\.50 \(NGN 38,062\.50 a month\)/);
     assert.deepEqual(upgraded.json.plan.local_price, { amount: premiumNgn, currency: 'NGN', fixed: false }, 'the price in their currency');
   });
 
@@ -60,7 +65,7 @@ describe('upgrading', () => {
       assert.equal(upgraded.status, 200, JSON.stringify(upgraded.json));
       assert.equal((await browser.get('/v1/wallet')).json.available, 2_000_000);
       const [capture] = (await browser.get('/v1/wallet/transactions')).json.data;
-      assert.match(capture.description, /Premium plan: NGN 30,000\.00 \(monthly price\)/);
+      assert.match(capture.description, /Premium plan for Plan Store: NGN 30,000\.00/);
     } finally {
       await admin.patch('/v1/admin/plans/premium', { local_prices: { NGN: null } });
     }
@@ -108,10 +113,10 @@ describe('cancelling and renewing', () => {
     const { browser, resellerId } = await funded(10_000_000);
     await browser.post('/v1/subscription', { plan: 'premium' });
     const dueAt = new Date(Date.now() - 1000);
-    await prisma.reseller.update({ where: { id: resellerId }, data: { planRenewsAt: dueAt } });
+    await prisma.storeSubscription.updateMany({ where: { resellerId }, data: { renewsAt: dueAt } });
     await billing.renewDue();
     // Run the same renewal again, as a retried job would: the month is not charged twice.
-    await prisma.reseller.update({ where: { id: resellerId }, data: { planRenewsAt: dueAt } });
+    await prisma.storeSubscription.updateMany({ where: { resellerId }, data: { renewsAt: dueAt } });
     await billing.renewDue();
     assert.equal((await browser.get('/v1/wallet')).json.available, 10_000_000 - 2 * premiumNgn);
     assert.ok((await renewsAt(resellerId)) > new Date(), 'next renewal a month on');
@@ -128,14 +133,14 @@ describe('cancelling and renewing', () => {
     assert.deepEqual([pastDue.plan.code, Boolean(pastDue.past_due_since)], ['premium', true]);
     const { EmailService } = await import('../dist/notifications/email.service.js');
     const outbox = server.app.get(EmailService).outbox;
-    assert.match(outbox.findLast(m => m.to === email).subject, /could not renew your Premium plan/);
+    assert.match(outbox.findLast(m => m.to === email).subject, /could not renew your Premium \(Plan Store\) plan/);
     assert.ok((await browser.get('/v1/notifications')).json.data.some(item => item.type === 'plan.renewal_failed' && item.link === '/settings/plan'));
 
     await billing.renewDue(new Date(due.getTime() + 2 * 86_400_000));
     assert.equal((await browser.get('/v1/subscription')).json.plan.code, 'premium', 'still inside the grace period');
     await billing.renewDue(new Date(Date.now() + 8 * 86_400_000 + (due.getTime() - Date.now())));
     assert.equal((await browser.get('/v1/subscription')).json.plan.code, 'standard');
-    assert.match(outbox.findLast(m => m.to === email).subject, /Premium plan has ended/);
+    assert.match(outbox.findLast(m => m.to === email).subject, /Premium \(Plan Store\) plan has ended/);
   });
 
   test('a plan set by an admin is not billed, and moving to Standard ends it at once', async () => {

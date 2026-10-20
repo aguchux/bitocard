@@ -436,7 +436,8 @@ model Reseller {
   /// When BitoCard approved the business's KYB (registered businesses: documents checked). Registered, KYB-verified,
   /// active resellers review their own customers' identity checks.
   kybVerifiedAt         DateTime?              @map("kyb_verified_at")
-  /// Standard or Premium (M3). Premium is billed monthly from the wallet once wallets exist (M4).
+  /// The account's plan: the highest plan among its stores' subscriptions (Startup without one), kept by
+  /// `StoreSubscriptionsService.syncAccountPlan`. Account-wide features and limits read it.
   planCode              String                 @default("standard") @map("plan_code")
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
@@ -686,6 +687,7 @@ model Plan {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   resellers       Reseller[]
   localPrices     PlanPrice[]
+  storeSubscriptions StoreSubscription[]
 
   @@map("plans")
 }
@@ -761,10 +763,44 @@ model Store {
   domains               StoreDomain[]
   visitDays             StoreVisitDay[]
   homeVersions          StoreHomeVersion[]
+  subscription          StoreSubscription?
 
   @@index([resellerId])
   @@index([hostStatus])
   @@map("stores")
+}
+
+/**
+ * A store's paid plan. A store without one is on the free plan (Startup). Each is billed on its own from the reseller's
+ * live wallet; the account's plan (`resellers.plan_code`) is the highest plan among its stores.
+ */
+model StoreSubscription {
+  storeId            String    @id @map("store_id") @db.Uuid
+  resellerId         String    @map("reseller_id") @db.Uuid
+  planCode           String    @map("plan_code")
+  /// When the next monthly charge is due. Null: not billed (set by BitoCard).
+  renewsAt           DateTime? @map("renews_at")
+  /// When the paid month began, and what was paid for it (minor units, currency): the credit on an upgrade.
+  periodStartedAt    DateTime? @map("period_started_at")
+  paidMinor          BigInt    @default(0) @map("paid_minor")
+  paidCurrency       String?   @map("paid_currency") @db.Char(3)
+  /// Ends at the next renewal instead of charging.
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  /// A cheaper plan taking over at the next renewal.
+  nextPlanCode       String?   @map("next_plan_code")
+  /// Set when a renewal charge failed; the store goes back to Startup after the grace period.
+  pastDueSince       DateTime? @map("past_due_since")
+  /// Moved from the account's plan when plans became per store: the reseller is told before its first renewal.
+  migrated           Boolean   @default(false)
+  transitionNoticeAt DateTime? @map("transition_notice_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  store              Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  plan               Plan      @relation(fields: [planCode], references: [code])
+
+  @@index([resellerId])
+  @@index([renewsAt])
+  @@map("store_subscriptions")
 }
 
 /// Who changed what in the admin app. Written for every admin change; never edited.

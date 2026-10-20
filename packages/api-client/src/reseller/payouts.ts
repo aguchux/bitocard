@@ -52,6 +52,16 @@ export type Subscription = {
   past_due_since: string | null;
 };
 
+/** A store's plan: each store is on Startup or pays for its own plan (`/v1/stores/:store/subscription`). */
+export type StoreSubscription = Omit<Subscription, 'object'> & {
+  object: 'store_subscription';
+  store: { id: string; name: string };
+  /** A cheaper plan taking over at `renews_at`. */
+  next_plan: { code: string; name: string } | null;
+};
+/** Every store's plan, and the account's (the highest among them: account-wide features follow it). */
+export type StoreSubscriptions = { object: 'list'; account_plan: { code: string; name: string }; data: StoreSubscription[] };
+
 export const resellerPayoutsApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     banks: build.query<List<Bank>, void>({ query: () => '/v1/banks' }),
@@ -90,6 +100,12 @@ export const resellerPayoutsApi = bitocardApi.injectEndpoints({
     }),
     subscription: build.query<Subscription, void>({ query: () => '/v1/subscription', providesTags: ['Subscription'] }),
     /** Upgrading charges the first month from the live wallet at once; moving to Startup keeps Premium to the end of the paid month. */
+    storeSubscriptions: build.query<StoreSubscriptions, void>({ query: () => '/v1/subscriptions', providesTags: ['Subscription'] }),
+    /** Up: charged now less this month's unused days; down or to Startup: at the end of the paid month. Live only. */
+    changeStorePlan: build.mutation<StoreSubscription, { store: string; plan: string }>({
+      query: ({ store, plan }) => ({ url: `/v1/stores/${store}/subscription`, method: 'POST', body: { plan } }),
+      invalidatesTags: ['Subscription', 'Account', 'Wallet', 'Fee'],
+    }),
     changePlan: build.mutation<Subscription, { plan: string }>({
       query: body => ({ url: '/v1/subscription', method: 'POST', body }),
       // The plan charge appears on the fee statement.
@@ -110,4 +126,6 @@ export const {
   useResellerPlansQuery,
   useSubscriptionQuery,
   useChangePlanMutation,
+  useStoreSubscriptionsQuery,
+  useChangeStorePlanMutation,
 } = resellerPayoutsApi;

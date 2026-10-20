@@ -39,7 +39,7 @@ export class HouseService {
     const existing = await this.prisma.reseller.findFirst({ where: { house: true, country: code } });
     if (existing) return existing;
     try {
-      return await this.prisma.reseller.create({ data: { name: 'BitoCard', country: code, status: 'active', planCode: 'premium', house: true, verifiedAt: new Date() } });
+      return await this.prisma.reseller.create({ data: { name: 'BitoCard', country: code, status: 'active', planCode: 'enterprise', house: true, verifiedAt: new Date() } });
     } catch (error) {
       // Another request created it at the same moment.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.reseller.findFirstOrThrow({ where: { house: true, country: code } });

@@ -275,7 +275,8 @@ export class PlansService {
     const plan = await this.prisma.plan.findUnique({ where: { code }, include: { localPrices: true } });
     if (!plan) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
     if (code === freePlanCode) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_in_use', 'The free plan cannot be deleted: every reseller starts on it.');
-    const using = await this.prisma.reseller.count({ where: { planCode: code } });
+    // Accounts on it, and stores subscribed to it (plans are per store).
+    const using = (await this.prisma.reseller.count({ where: { planCode: code } })) + (await this.prisma.storeSubscription.count({ where: { planCode: code } }));
     if (using) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_in_use', `${using} account${using === 1 ? ' is' : 's are'} on ${plan.name}. Hide it instead, or move them to another plan first.`);
     }
@@ -355,7 +356,18 @@ export class PlansService {
     if (input.status === 'active' && before.status !== 'active' && !before.verifiedAt && !before.identityWaivedAt) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'verification_required', "The owner's identity has not been verified yet. Verify it, or waive the check first.", 'status');
     }
-    const after = await this.prisma.reseller.update({ where: { id }, data: { status: input.status, planCode: input.plan } });
+    const after = await this.prisma.$transaction(async tx => {
+      if (input.plan) {
+        // Plans are per store: an admin's plan goes on every store, not billed (as BitoCard set it); Startup clears them.
+        if (input.plan === freePlanCode) await tx.storeSubscription.deleteMany({ where: { resellerId: id } });
+        else {
+          const stores = await tx.store.findMany({ where: { resellerId: id }, select: { id: true } });
+          const data = { planCode: input.plan, renewsAt: null, periodStartedAt: null, paidMinor: 0n, paidCurrency: null, cancelAtPeriodEnd: false, nextPlanCode: null, pastDueSince: null, migrated: false };
+          for (const store of stores) await tx.storeSubscription.upsert({ where: { storeId: store.id }, create: { storeId: store.id, resellerId: id, ...data }, update: data });
+        }
+      }
+      return tx.reseller.update({ where: { id }, data: { status: input.status, planCode: input.plan, ...(input.plan ? { planRenewsAt: null, planCancelAtPeriodEnd: false, planPastDueSince: null } : {}) } });
+    });
     await this.audit.record({ actorId, action: 'reseller.updated', targetType: 'reseller', targetId: id, before, after });
     if (after.status === 'suspended' && before.status !== 'suspended') {
       await this.inbox.reseller(id, 'account.suspended', {

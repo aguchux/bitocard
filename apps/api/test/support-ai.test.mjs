@@ -104,10 +104,13 @@ describe('keys, plans, allowance and usage', () => {
 
   test('BitoCard’s AI needs Premium, counts replies against the store’s allowance, and records cost', async () => {
     const reseller = await resellerClient(server);
-    const call = { funding: 'bitocard', provider: 'anthropic', model: 'claude-haiku-5-5', resellerId: reseller.resellerId, storeId: '0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e', botId: null, mode: 'live', kind: 'chat' };
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
+    const store = (await reseller.browser.post('/v1/stores', { name: 'AI Store', subdomain: `aistore${Date.now().toString(36)}` })).json;
+    const call = { funding: 'bitocard', provider: 'anthropic', model: 'claude-haiku-5-5', resellerId: reseller.resellerId, storeId: store.id, botId: null, mode: 'live', kind: 'chat' };
     const asks = { system: 'Be helpful.', messages: [{ role: 'user', content: 'Hi' }], maxTokens: 100 };
     await assert.rejects(service.reply(call, asks), error => error.code === 'ai_plan_required');
-    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'premium' } });
+    // The assistant is per store: the store's own plan includes it.
+    await prisma.storeSubscription.create({ data: { storeId: store.id, resellerId: reseller.resellerId, planCode: 'premium' } });
     await assert.rejects(service.reply({ ...call, model: 'claude-opus-5-5' }, asks), error => error.code === 'ai_model_unavailable');
     await service.reply(call, asks);
     await service.reply({ ...call, kind: 'test' }, asks);

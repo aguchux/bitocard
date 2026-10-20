@@ -219,7 +219,7 @@ export class BotsService {
     if (bot.scope === 'store' && !bot.storeId) missing.push('Assign it to a store.');
     if (!bot.knowledgeId) missing.push('Add its knowledge: upload a document or generate one from BitoCard.');
     if (bot.funding === 'bitocard') {
-      if (!(await this.ai.premium(bot.resellerId))) missing.push('BitoCard’s AI needs the Premium plan: change plan, or use your own AI key.');
+      if (!(await this.ai.premium(bot.resellerId, bot.storeId))) missing.push('BitoCard’s AI needs the Premium plan: change plan, or use your own AI key.');
       if (!this.ai.bitocardModels().some(item => item.provider === bot.provider && item.model === bot.model)) missing.push('Its model is no longer offered on BitoCard’s AI: choose another.');
     } else {
       const key = (await this.ai.keysFor(bot.resellerId)).find(item => item.provider === bot.provider);

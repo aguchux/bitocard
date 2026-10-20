@@ -94,7 +94,8 @@ describe('creating an assistant', () => {
     await reseller.browser.put(`/v1/support/bots/${bot.id}/knowledge`, { content: '# About\nWe sell gift cards.' });
     const refused = await reseller.browser.post(`/v1/support/bots/${bot.id}/activate`);
     assert.match(refused.json.error.message, /Premium/);
-    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'premium' } });
+    // The assistant is per store: its store's own plan includes BitoCard's AI.
+    await prisma.storeSubscription.create({ data: { storeId: bot.store_id, resellerId: reseller.resellerId, planCode: 'premium' } });
     assert.equal((await reseller.browser.post(`/v1/support/bots/${bot.id}/activate`)).json.status, 'active');
     await reseller.browser.delete('/v1/support/ai/keys/anthropic');
     const switched = await reseller.browser.patch(`/v1/support/bots/${bot.id}`, { funding: 'own' });

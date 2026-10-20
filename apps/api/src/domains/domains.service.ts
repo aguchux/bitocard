@@ -97,7 +97,7 @@ export class DomainsService {
     if (!(await this.settings.isOn('custom_domains', resellerId))) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'domains_not_enabled', 'Custom domains are not open for your account yet.');
     }
-    await this.planAccess.require(resellerId, 'custom_domains');
+    await this.planAccess.requireForStore(store.id, 'custom_domains');
     return store;
   }
 
@@ -109,9 +109,8 @@ export class DomainsService {
   }
 
   private async assertRoom(storeId: string) {
-    const store = await this.prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { resellerId: true } });
     const used = await this.prisma.storeDomain.count({ where: { storeId, status: { notIn: ['removed', 'failed'] } } });
-    await this.planAccess.requireRoom(store.resellerId, 'domains_per_store', used, { code: 'too_many_domains', param: 'domain' });
+    await this.planAccess.requireStoreRoom(storeId, 'domains_per_store', used, { code: 'too_many_domains', param: 'domain' });
   }
 
   private async assertFree(name: string) {
@@ -137,7 +136,7 @@ export class DomainsService {
       object: 'list' as const,
       data: domains.map(domain => this.present(domain)),
       buying: { available: marginBps !== null && this.clients().vercel.configured(), tlds: [...tlds] },
-      max_domains: (await this.planAccess.limit(resellerId, 'domains_per_store')).value,
+      max_domains: (await this.planAccess.storeLimit(storeId, 'domains_per_store')).value,
     };
   }
 

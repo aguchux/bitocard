@@ -16707,6 +16707,602 @@
         ]
       }
     },
+    "/v1/subscriptions": {
+      "get": {
+        "description": "Each store’s plan and billing, and the account’s plan (the highest among your stores, which account-wide features follow).",
+        "operationId": "StoreSubscriptionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Every store’s plan, and the account’s plan (the highest among your stores).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Your stores’ plans.",
+                  "required": [
+                    "object",
+                    "account_plan",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "account_plan": {
+                      "type": "object",
+                      "description": "The account’s plan: account-wide features and limits follow it.",
+                      "required": [
+                        "code",
+                        "name"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Plan code."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Plan name."
+                        }
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreSubscription"
+                      },
+                      "description": "Your stores, oldest first."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "account_plan": {
+                    "code": "premium",
+                    "name": "Premium"
+                  },
+                  "data": [
+                    {
+                      "object": "store_subscription",
+                      "store": {
+                        "id": "6f1c2a8e-3b7d-4e19-9a42-0c5d8b7e1f30",
+                        "name": "Ada Gifts"
+                      },
+                      "plan": {
+                        "object": "plan",
+                        "code": "premium",
+                        "name": "Premium",
+                        "price": {
+                          "amount": 2500,
+                          "currency": "USD",
+                          "interval": "month"
+                        },
+                        "features": [
+                          "international_selling",
+                          "chargeback_protection",
+                          "priority_support"
+                        ],
+                        "description": "More protection, more reach and more tools, billed monthly from your wallet.",
+                        "feature_details": [
+                          {
+                            "code": "international_selling",
+                            "scope": "store",
+                            "group": "selling",
+                            "name": "International selling",
+                            "description": "Sell to customers outside your country."
+                          },
+                          {
+                            "code": "chargeback_protection",
+                            "scope": "store",
+                            "group": "support",
+                            "name": "Chargeback protection",
+                            "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
+                          },
+                          {
+                            "code": "priority_support",
+                            "scope": "account",
+                            "group": "support",
+                            "name": "Priority support",
+                            "description": "Faster answers from BitoCard, including live chat."
+                          }
+                        ],
+                        "limits": {
+                          "stores": 5,
+                          "domains_per_store": 5,
+                          "own_connections": null,
+                          "ai_replies": 2000,
+                          "team_members": null,
+                          "webhook_endpoints": 16
+                        },
+                        "local_price": {
+                          "amount": 3500000,
+                          "currency": "NGN",
+                          "fixed": true
+                        }
+                      },
+                      "renews_at": "2026-11-20T09:00:00.000Z",
+                      "cancel_at_period_end": false,
+                      "next_plan": null,
+                      "past_due_since": null
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your stores’ plans",
+        "tags": [
+          "Plans"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/stores/{store}/subscription": {
+      "get": {
+        "description": "The store’s plan with its price in your currency, when it renews, and any cancellation or downgrade waiting for the end of the month.",
+        "operationId": "StoreSubscriptionsController_get",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The store’s plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSubscription"
+                },
+                "example": {
+                  "object": "store_subscription",
+                  "store": {
+                    "id": "6f1c2a8e-3b7d-4e19-9a42-0c5d8b7e1f30",
+                    "name": "Ada Gifts"
+                  },
+                  "plan": {
+                    "object": "plan",
+                    "code": "premium",
+                    "name": "Premium",
+                    "price": {
+                      "amount": 2500,
+                      "currency": "USD",
+                      "interval": "month"
+                    },
+                    "features": [
+                      "international_selling",
+                      "chargeback_protection",
+                      "priority_support"
+                    ],
+                    "description": "More protection, more reach and more tools, billed monthly from your wallet.",
+                    "feature_details": [
+                      {
+                        "code": "international_selling",
+                        "scope": "store",
+                        "group": "selling",
+                        "name": "International selling",
+                        "description": "Sell to customers outside your country."
+                      },
+                      {
+                        "code": "chargeback_protection",
+                        "scope": "store",
+                        "group": "support",
+                        "name": "Chargeback protection",
+                        "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
+                      },
+                      {
+                        "code": "priority_support",
+                        "scope": "account",
+                        "group": "support",
+                        "name": "Priority support",
+                        "description": "Faster answers from BitoCard, including live chat."
+                      }
+                    ],
+                    "limits": {
+                      "stores": 5,
+                      "domains_per_store": 5,
+                      "own_connections": null,
+                      "ai_replies": 2000,
+                      "team_members": null,
+                      "webhook_endpoints": 16
+                    },
+                    "local_price": {
+                      "amount": 3500000,
+                      "currency": "NGN",
+                      "fixed": true
+                    }
+                  },
+                  "renews_at": "2026-11-20T09:00:00.000Z",
+                  "cancel_at_period_end": false,
+                  "next_plan": null,
+                  "past_due_since": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a store’s plan",
+        "tags": [
+          "Plans"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "post": {
+        "description": "Dashboard only, live only (`live_only` in the sandbox). Each store pays for its own plan from your live wallet, in your currency. Moving up charges now, less credit for the unused part of this month’s plan, and starts a new month; moving down to a cheaper paid plan, or to Startup, waits for the end of the paid month. Choosing the current plan takes back a waiting change.",
+        "operationId": "StoreSubscriptionsController_change",
+        "parameters": [
+          {
+            "name": "store",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The store’s plan after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreSubscription"
+                },
+                "example": {
+                  "object": "store_subscription",
+                  "store": {
+                    "id": "6f1c2a8e-3b7d-4e19-9a42-0c5d8b7e1f30",
+                    "name": "Ada Gifts"
+                  },
+                  "plan": {
+                    "object": "plan",
+                    "code": "premium",
+                    "name": "Premium",
+                    "price": {
+                      "amount": 2500,
+                      "currency": "USD",
+                      "interval": "month"
+                    },
+                    "features": [
+                      "international_selling",
+                      "chargeback_protection",
+                      "priority_support"
+                    ],
+                    "description": "More protection, more reach and more tools, billed monthly from your wallet.",
+                    "feature_details": [
+                      {
+                        "code": "international_selling",
+                        "scope": "store",
+                        "group": "selling",
+                        "name": "International selling",
+                        "description": "Sell to customers outside your country."
+                      },
+                      {
+                        "code": "chargeback_protection",
+                        "scope": "store",
+                        "group": "support",
+                        "name": "Chargeback protection",
+                        "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
+                      },
+                      {
+                        "code": "priority_support",
+                        "scope": "account",
+                        "group": "support",
+                        "name": "Priority support",
+                        "description": "Faster answers from BitoCard, including live chat."
+                      }
+                    ],
+                    "limits": {
+                      "stores": 5,
+                      "domains_per_store": 5,
+                      "own_connections": null,
+                      "ai_replies": 2000,
+                      "team_members": null,
+                      "webhook_endpoints": 16
+                    },
+                    "local_price": {
+                      "amount": 3500000,
+                      "currency": "NGN",
+                      "fixed": true
+                    }
+                  },
+                  "renews_at": "2026-11-20T09:00:00.000Z",
+                  "cancel_at_period_end": false,
+                  "next_plan": null,
+                  "past_due_since": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a store’s plan",
+        "tags": [
+          "Plans"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "finance"
+        ]
+      }
+    },
     "/v1/catalogue/products": {
       "get": {
         "description": "Products you can sell in your country, with your wholesale cost and your price for each denomination (fixed values, or the lowest and highest of a range). Prices are in your currency; a quote locks the exact price.",
@@ -45032,6 +45628,97 @@
           }
         }
       },
+      "StoreSubscription": {
+        "type": "object",
+        "title": "StoreSubscription",
+        "description": "A store’s plan and its billing. Each store pays for its own plan.",
+        "required": [
+          "object",
+          "store",
+          "plan",
+          "renews_at",
+          "cancel_at_period_end",
+          "next_plan",
+          "past_due_since"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `store_subscription`.",
+            "const": "store_subscription"
+          },
+          "store": {
+            "type": "object",
+            "description": "The store.",
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The store.",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "Its name."
+              }
+            }
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "renews_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the store’s plan is next charged; null when it is not billed (Startup, or a plan set by BitoCard).",
+            "format": "date-time"
+          },
+          "cancel_at_period_end": {
+            "type": "boolean",
+            "description": "True when the plan ends at `renews_at` and the store goes back to Startup."
+          },
+          "next_plan": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "A cheaper plan taking over at `renews_at`.",
+                "required": [
+                  "code",
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "Plan code."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Plan name."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "past_due_since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When a renewal failed for lack of funds; the plan stays on for 7 days.",
+            "format": "date-time"
+          }
+        }
+      },
       "Subscription": {
         "type": "object",
         "title": "Subscription",
@@ -50057,6 +50744,7 @@
               "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
+              "plan.stores_renewing",
               "plan.feature_changed",
               "webhook_endpoint.disabled",
               "verification.updated",
@@ -50259,6 +50947,7 @@
               "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
+              "plan.stores_renewing",
               "plan.feature_changed",
               "webhook_endpoint.disabled",
               "verification.updated",

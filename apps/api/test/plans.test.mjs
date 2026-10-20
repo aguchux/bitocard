@@ -132,7 +132,13 @@ describe('plans', () => {
     assert.equal(deleted.status, 200, JSON.stringify(deleted.json));
     assert.ok(!deleted.json.plans.some(plan => plan.code === 'trial_gold'));
     assert.equal((await finance.delete('/v1/admin/plans/standard')).json.error.code, 'plan_in_use');
-    assert.equal((await finance.delete('/v1/admin/plans/premium')).json.error.code, 'plan_in_use', "BitoCard's own store accounts are on Premium");
+    assert.equal((await finance.delete('/v1/admin/plans/enterprise')).json.error.code, 'plan_in_use', "BitoCard's own store accounts are on Enterprise");
+    // A plan only a store subscribes to is in use too.
+    await finance.post('/v1/admin/plans', { code: 'trial_store', name: 'Store Gold', price_cents: 900 });
+    await prismaOf().reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
+    const store = (await reseller.browser.post('/v1/stores', { name: 'Gold Store', subdomain: `gold${Date.now().toString(36)}` })).json;
+    await prismaOf().storeSubscription.create({ data: { storeId: store.id, resellerId: reseller.resellerId, planCode: 'trial_store' } });
+    assert.equal((await finance.delete('/v1/admin/plans/trial_store')).json.error.code, 'plan_in_use');
   });
 
   test('a feature the plan does not include is refused with plan_feature_required, and works once switched on', async () => {
@@ -153,7 +159,7 @@ describe('plans', () => {
       refusedWith(await browser.get(`/v1/stores/${store.id}/domains`), 'custom_domains');
       refusedWith(await browser.post('/v1/support/bitocard-chat/messages', { body: 'Hello' }), 'priority_support');
       const message = (await browser.get(`/v1/stores/${store.id}/traffic`)).json.error.message;
-      assert.match(message, /Store traffic is not part of your Startup plan/);
+      assert.match(message, /Store traffic is not part of this store’s Startup plan/);
     } finally {
       for (const feature of ['multiple_stores', 'store_traffic', 'team_members', 'custom_domains']) await finance.put(`/v1/admin/plans/standard/features/${feature}`, { enabled: true });
     }
