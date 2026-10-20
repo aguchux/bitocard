@@ -6,7 +6,12 @@ import type { Store } from '../generated/prisma/client.js';
  * from the reseller's own systems) their oldest published store. Null when they have none: callers fall back to the
  * reseller's name and BitoCard's neutral address.
  */
-export async function orderStore(prisma: PrismaService, order: { resellerId: string; customerId: string | null }): Promise<Store | null> {
+export async function orderStore(prisma: PrismaService, order: { resellerId: string; customerId: string | null; storeId?: string | null }): Promise<Store | null> {
+  // The store it was sold through (the API key's, or the customer's), when recorded.
+  if (order.storeId) {
+    const store = await prisma.store.findUnique({ where: { id: order.storeId } });
+    if (store && store.resellerId === order.resellerId) return store;
+  }
   if (order.customerId) {
     const customer = await prisma.customer.findUnique({ where: { id: order.customerId }, include: { store: true } });
     if (customer?.store && customer.store.resellerId === order.resellerId) return customer.store;

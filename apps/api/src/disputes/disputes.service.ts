@@ -1,3 +1,4 @@
+import { inStoreOrAccount } from '../stores/store-scope.js';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -245,8 +246,8 @@ export class DisputesService {
     return presentDispute(dispute, 'reseller');
   }
 
-  async listForReseller(resellerId: string, mode: LedgerMode, filter: { status?: DisputeStatus; kind?: DisputeKind; limit?: number; starting_after?: string }) {
-    return this.page({ resellerId, mode, status: filter.status, kind: filter.kind }, filter, 'reseller');
+  async listForReseller(resellerId: string, mode: LedgerMode, filter: { status?: DisputeStatus; kind?: DisputeKind; limit?: number; starting_after?: string }, storeId?: string) {
+    return this.page({ resellerId, mode, status: filter.status, kind: filter.kind, ...inStoreOrAccount(storeId) }, filter, 'reseller');
   }
 
   async getForReseller(resellerId: string, mode: LedgerMode, id: string) {
@@ -509,7 +510,7 @@ export class DisputesService {
   /** The reseller's event: the dispute as they see it in a list (never the messages). */
   private async recordEvent(tx: Tx, id: string, type: DisputeEvent) {
     const dispute = await tx.dispute.findUniqueOrThrow({ where: { id } });
-    await this.events.record(tx, { resellerId: dispute.resellerId, mode: dispute.mode, type, object: presentSummary(dispute, 'reseller') });
+    await this.events.record(tx, { resellerId: dispute.resellerId, storeId: dispute.storeId, mode: dispute.mode, type, object: presentSummary(dispute, 'reseller') });
   }
 
   private async page(where: Prisma.DisputeWhereInput, page: { limit?: number; starting_after?: string }, audience: Audience, orderBy: Prisma.DisputeOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'desc' }]) {

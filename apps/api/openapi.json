@@ -8909,6 +8909,10 @@
                     "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
                     "name": "Ada Digital"
                   },
+                  "store": {
+                    "id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
+                    "name": "Ada Digital"
+                  },
                   "expires_at": "2026-10-06T09:27:44.000Z"
                 }
               }
@@ -11463,7 +11467,7 @@
     },
     "/v1/api-keys": {
       "post": {
-        "description": "The secret is returned only in this response; store it safely.",
+        "description": "Each key belongs to one store (`store_id`). The secret is returned only in this response; store it safely.",
         "operationId": "ApiKeysController_create",
         "parameters": [],
         "requestBody": {
@@ -11488,6 +11492,7 @@
                   "object": "api_key",
                   "id": "6b1f2e3d-4c5a-4b6c-8d7e-9f0a1b2c3d4e",
                   "name": "Website backend",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "test",
                   "prefix": "bc_test_x7Kq2m",
                   "scopes": [
@@ -11602,7 +11607,18 @@
       "get": {
         "description": "Secrets are never shown again.",
         "operationId": "ApiKeysController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "store_id",
+            "required": false,
+            "in": "query",
+            "description": "Only this store’s keys.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Every key, newest first, including revoked and expired ones. Secrets are never shown.",
@@ -11636,6 +11652,7 @@
                       "object": "api_key",
                       "id": "6b1f2e3d-4c5a-4b6c-8d7e-9f0a1b2c3d4e",
                       "name": "Website backend",
+                      "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                       "mode": "test",
                       "prefix": "bc_test_x7Kq2m",
                       "scopes": [
@@ -11663,6 +11680,7 @@
                       "object": "api_key",
                       "id": "7c2a3f4e-5d6b-4c7d-9e8f-0a1b2c3d4e5f",
                       "name": "Old backend",
+                      "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                       "mode": "live",
                       "prefix": "bc_live_p3Rw9z",
                       "scopes": [
@@ -11677,6 +11695,25 @@
                       "revoked_at": "2026-10-01T08:00:00.000Z"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
                 }
               }
             }
@@ -11783,6 +11820,7 @@
                   "object": "api_key",
                   "id": "8d3b4a5f-6e7c-4d8e-8f9a-1b2c3d4e5f6a",
                   "name": "Website backend",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "test",
                   "prefix": "bc_test_Lm4Tq8",
                   "scopes": [
@@ -11938,6 +11976,7 @@
                   "object": "api_key",
                   "id": "6b1f2e3d-4c5a-4b6c-8d7e-9f0a1b2c3d4e",
                   "name": "Website backend",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "test",
                   "prefix": "bc_test_x7Kq2m",
                   "scopes": [
@@ -18910,6 +18949,7 @@
                 "example": {
                   "object": "webhook_endpoint",
                   "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "live",
                   "url": "https://example.com/webhooks/bitocard",
                   "description": "Order updates for the shop backend",
@@ -19031,6 +19071,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "store_id",
+            "required": false,
+            "in": "query",
+            "description": "Only this store’s endpoints (an API key sees only its store’s).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19065,6 +19115,7 @@
                     {
                       "object": "webhook_endpoint",
                       "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+                      "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                       "mode": "live",
                       "url": "https://example.com/webhooks/bitocard",
                       "description": "Order updates for the shop backend",
@@ -19082,6 +19133,7 @@
                     {
                       "object": "webhook_endpoint",
                       "id": "3d4e5f6a-7b8c-4d9e-8f0a-2b3c4d5e6f7a",
+                      "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                       "mode": "live",
                       "url": "https://example.com/webhooks/payments",
                       "description": null,
@@ -19095,6 +19147,25 @@
                       "created_at": "2026-10-01T09:00:00.000Z"
                     }
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
                 }
               }
             }
@@ -19202,6 +19273,7 @@
                 "example": {
                   "object": "webhook_endpoint",
                   "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "live",
                   "url": "https://example.com/webhooks/bitocard",
                   "description": "Order updates for the shop backend",
@@ -19368,6 +19440,7 @@
                 "example": {
                   "object": "webhook_endpoint",
                   "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "live",
                   "url": "https://example.com/webhooks/bitocard",
                   "description": "Order updates for the shop backend",
@@ -19710,6 +19783,7 @@
                 "example": {
                   "object": "webhook_endpoint",
                   "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
                   "mode": "live",
                   "url": "https://example.com/webhooks/bitocard",
                   "description": "Order updates for the shop backend",
@@ -37479,6 +37553,11 @@
             "type": "boolean",
             "description": "Only the reading scopes: nothing can be changed. Staff who cannot create API keys always get read-only tokens.",
             "default": false
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The store the token acts for (it sees only that store’s orders, events and webhooks). Defaults to your oldest published store, else your oldest.",
+            "format": "uuid"
           }
         },
         "required": [
@@ -37686,6 +37765,11 @@
                 "support:write"
               ]
             }
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The store the key belongs to: it sees only that store’s orders, events and webhooks, within the store’s plan. Defaults to your oldest published store, else your oldest; with no store, an unpublished one is made for your keys."
           }
         },
         "required": [
@@ -38052,6 +38136,11 @@
                 "support_ticket.message_received"
               ]
             }
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The store whose events it receives (with your account’s own). An API key’s endpoints are always its store’s; from the dashboard, defaults to your oldest published store, else your oldest."
           }
         },
         "required": [
@@ -45591,7 +45680,7 @@
                   "integer",
                   "null"
                 ],
-                "description": "Webhook endpoints: Webhook endpoints in each mode. Null: no limit."
+                "description": "Webhook endpoints: Webhook endpoints per store in each mode. Null: no limit."
               }
             }
           },
@@ -45770,6 +45859,7 @@
           "object",
           "id",
           "name",
+          "store_id",
           "mode",
           "prefix",
           "scopes",
@@ -45793,6 +45883,11 @@
           "name": {
             "type": "string",
             "description": "The name you gave the key, such as the system that uses it."
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The store the key belongs to: it sees only that store’s orders, events and webhooks, within the store’s plan.",
+            "format": "uuid"
           },
           "mode": {
             "type": "string",
@@ -45869,6 +45964,7 @@
           "object",
           "id",
           "name",
+          "store_id",
           "mode",
           "prefix",
           "scopes",
@@ -45893,6 +45989,11 @@
           "name": {
             "type": "string",
             "description": "The name you gave the key, such as the system that uses it."
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The store the key belongs to: it sees only that store’s orders, events and webhooks, within the store’s plan.",
+            "format": "uuid"
           },
           "mode": {
             "type": "string",
@@ -45973,6 +46074,7 @@
         "required": [
           "object",
           "id",
+          "store_id",
           "mode",
           "url",
           "description",
@@ -45993,6 +46095,11 @@
           "id": {
             "type": "string",
             "description": "Endpoint ID.",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The store whose events it receives, with your account’s own (wallet, payouts, checks).",
             "format": "uuid"
           },
           "mode": {
@@ -46100,6 +46207,7 @@
         "required": [
           "object",
           "id",
+          "store_id",
           "mode",
           "url",
           "description",
@@ -46121,6 +46229,11 @@
           "id": {
             "type": "string",
             "description": "Endpoint ID.",
+            "format": "uuid"
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The store whose events it receives, with your account’s own (wallet, payouts, checks).",
             "format": "uuid"
           },
           "mode": {
@@ -50552,6 +50665,7 @@
           "read_only",
           "scopes",
           "reseller",
+          "store",
           "expires_at"
         ],
         "additionalProperties": false,
@@ -50621,6 +50735,33 @@
                 "description": "Its business name."
               }
             }
+          },
+          "store": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "The store asked for, else your oldest published (else oldest) store.",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The store the token acts for: it sees only that store’s orders, events and webhooks.",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The store’s name."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "expires_at": {
             "type": "string",

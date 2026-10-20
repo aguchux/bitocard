@@ -1,8 +1,9 @@
+import { StoreScope } from '../stores/store-scope.js';
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
-import { type Caller, CurrentCaller, Public, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { type Caller, CurrentCaller, Public, resellerOf, Roles, Scopes, storeScopeOf } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
@@ -42,19 +43,20 @@ class SendMessageDto {
 @modeHeader
 @Controller('numbers')
 export class NumbersController {
-  constructor(private readonly numbers: NumbersService) {}
+  constructor(private readonly numbers: NumbersService, private readonly scope: StoreScope) {}
 
   @ApiOperation({ summary: 'List virtual numbers', description: 'The numbers your orders bought, newest first, with when each is paid up to.' })
   @Scopes('orders:read')
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: NumberFilterDto) {
-    return this.numbers.list(resellerOf(caller), mode, filter);
+    return this.numbers.list(resellerOf(caller), mode, filter, storeScopeOf(caller));
   }
 
   @ApiOperation({ summary: 'Get a virtual number' })
   @Scopes('orders:read')
   @Get(':id')
-  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'number', id);
     return this.numbers.get(resellerOf(caller), mode, id);
   }
 
@@ -62,14 +64,16 @@ export class NumbersController {
   @Roles('admin', 'developer')
   @Scopes('orders:write')
   @Patch(':id')
-  update(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateNumberDto) {
+  async update(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateNumberDto) {
+    await this.scope.check(caller, 'number', id);
     return this.numbers.update(resellerOf(caller), mode, id, body);
   }
 
   @ApiOperation({ summary: 'Get a number’s renewal price', description: 'What renewing for a month would take from your wallet now (at today’s exchange rate).' })
   @Scopes('orders:read')
   @Get(':id/renewal-price')
-  renewalPrice(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async renewalPrice(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'number', id);
     return this.numbers.renewalPrice(resellerOf(caller), mode, id);
   }
 
@@ -81,14 +85,16 @@ export class NumbersController {
   @Scopes('orders:write')
   @Post(':id/renew')
   @HttpCode(HttpStatus.OK)
-  renew(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async renew(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'number', id);
     return this.numbers.renewByReseller(resellerOf(caller), mode, id);
   }
 
   @ApiOperation({ summary: 'List a number’s messages', description: 'SMS received and sent, newest first, with their text. Messages are kept 90 days.' })
   @Scopes('orders:read')
   @Get(':id/messages')
-  messages(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Query() page: PageDto) {
+  async messages(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Query() page: PageDto) {
+    await this.scope.check(caller, 'number', id);
     return this.numbers.resellerMessages(resellerOf(caller), mode, id, page);
   }
 
@@ -100,7 +106,8 @@ export class NumbersController {
   @Roles('admin', 'developer', 'support')
   @Scopes('orders:write')
   @Post(':id/messages')
-  send(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: SendMessageDto) {
+  async send(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: SendMessageDto) {
+    await this.scope.check(caller, 'number', id);
     return this.numbers.resellerSend(resellerOf(caller), mode, id, body);
   }
 }

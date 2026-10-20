@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import { ArrayUnique, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { type Caller, CurrentCaller, Roles, SessionOnly } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
@@ -24,6 +24,18 @@ class CreateApiKeyDto {
   @ArrayUnique()
   @IsIn(apiKeyScopes, { each: true })
   scopes?: string[];
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'The store the key belongs to: it sees only that store’s orders, events and webhooks, within the store’s plan. Defaults to your oldest published store, else your oldest; with no store, an unpublished one is made for your keys.' })
+  @IsOptional()
+  @IsUUID()
+  store_id?: string;
+}
+
+class ListApiKeysQuery {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Only this store’s keys.' })
+  @IsOptional()
+  @IsUUID()
+  store_id?: string;
 }
 
 class RollApiKeyDto {
@@ -51,7 +63,7 @@ export class ApiKeysController {
   constructor(private readonly keys: ApiKeysService) {}
 
   /** Create a key. The secret is returned only in this response; store it safely. */
-  @ApiOperation({ summary: 'Create a key', description: 'The secret is returned only in this response; store it safely.' })
+  @ApiOperation({ summary: 'Create a key', description: 'Each key belongs to one store (`store_id`). The secret is returned only in this response; store it safely.' })
   @Post()
   @SkipIdempotency()
   create(@CurrentCaller() caller: Caller, @Body() body: CreateApiKeyDto) {
@@ -62,8 +74,8 @@ export class ApiKeysController {
   /** Every key, including revoked and expired ones. Secrets are never shown again. */
   @ApiOperation({ summary: 'Every key, including revoked and expired ones', description: 'Secrets are never shown again.' })
   @Get()
-  list(@CurrentCaller() caller: Caller) {
-    return this.keys.list(sessionReseller(caller).resellerId);
+  list(@CurrentCaller() caller: Caller, @Query() query: ListApiKeysQuery) {
+    return this.keys.list(sessionReseller(caller).resellerId, query.store_id);
   }
 
   /** Replace a key with a new secret. The old one keeps working for the overlap period. */

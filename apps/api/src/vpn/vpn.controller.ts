@@ -1,9 +1,10 @@
+import { StoreScope } from '../stores/store-scope.js';
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, StepUp } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, StepUp, storeScopeOf } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CheckoutService } from '../checkout/checkout.service.js';
@@ -31,19 +32,20 @@ class VpnFilterDto extends PageDto {
 @modeHeader
 @Controller('vpn-subscriptions')
 export class VpnController {
-  constructor(private readonly vpn: VpnService) {}
+  constructor(private readonly vpn: VpnService, private readonly scope: StoreScope) {}
 
   @ApiOperation({ summary: 'List VPN access', description: 'VPN access your orders bought, newest first, with its state and expiry. The username and password are only on `GET /v1/orders/{id}`.' })
   @Scopes('orders:read')
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: VpnFilterDto) {
-    return this.vpn.list(resellerOf(caller), mode, filter);
+    return this.vpn.list(resellerOf(caller), mode, filter, storeScopeOf(caller));
   }
 
   @ApiOperation({ summary: 'Get VPN access', description: 'Its state and expiry, read again from the supplier when older than ten minutes. Access never renews automatically.' })
   @Scopes('orders:read')
   @Get(':id')
-  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'vpn', id);
     return this.vpn.get(resellerOf(caller), mode, id);
   }
 
@@ -56,7 +58,8 @@ export class VpnController {
   @Scopes('orders:write')
   @Post(':id/password-reset')
   @HttpCode(HttpStatus.OK)
-  reset(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async reset(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'vpn', id);
     return this.vpn.resellerReset(resellerOf(caller), mode, id);
   }
 }

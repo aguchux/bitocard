@@ -270,6 +270,15 @@ const schemas = {
         },
         'The reseller account in use when it was issued.',
       ),
+      store: nullable(
+        shape(
+          {
+            id: uuid('The store the token acts for: it sees only that store’s orders, events and webhooks.'),
+            name: str('The store’s name.'),
+          },
+          'The store asked for, else your oldest published (else oldest) store.',
+        ),
+      ),
       expires_at: time('When it stops working: 15 minutes after issue, or earlier if the dashboard session ends.'),
     },
     'A short-lived "Try it" token for the API documentation. It works like an API key for one reseller account and one mode, and is tied to the dashboard session that issued it.',
@@ -533,6 +542,7 @@ export const dashboardDocs: DocsArea = {
         read_only: false,
         scopes: [...apiKeyScopes],
         reseller: { id: resellerId, name: 'Ada Digital' },
+        store: { id: '0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90', name: 'Ada Digital' },
         expires_at: '2026-10-06T09:27:44.000Z',
       },
     },

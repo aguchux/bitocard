@@ -2,9 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { BookOpen, Plus } from "lucide-react";
-import { Button, Card, DataTable, Dialog, errorMessage, Field, formatDateTime, formatRelative, Input, Notice, PageHeader, StatusBadge, Toggle } from "@bitocard/admin-ui";
+import { Button, Card, DataTable, Dialog, errorMessage, Field, formatDateTime, formatRelative, Input, Notice, PageHeader, Select, StatusBadge, Toggle } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
-import { type WebhookEventType, useCreateWebhookEndpointMutation, useUpdateWebhookEndpointMutation, useWebhookEndpointsQuery } from "@bitocard/api-client/reseller";
+import { type WebhookEventType, useCreateWebhookEndpointMutation, useStoresQuery, useUpdateWebhookEndpointMutation, useWebhookEndpointsQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { disabledReason, EventPicker, eventsSummary, ModeExplainer, SecretDialog } from "../developer-parts";
@@ -16,18 +16,21 @@ function CreateEndpointDialog({ open, onClose, onCreated, sandbox }: { open: boo
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [events, setEvents] = useState<Array<WebhookEventType | "*">>(["*"]);
+  const [storeId, setStoreId] = useState("");
+  const stores = useStoresQuery().data?.data ?? [];
   const [create, state] = useCreateWebhookEndpointMutation();
 
   const close = () => {
     setUrl("");
     setDescription("");
     setEvents(["*"]);
+    setStoreId("");
     state.reset();
     onClose();
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const created = await create({ url: url.trim(), description: description.trim() || undefined, events }).unwrap().catch(() => null);
+    const created = await create({ url: url.trim(), description: description.trim() || undefined, events, ...(stores.length > 1 ? { store_id: storeId || stores[0].id } : {}) }).unwrap().catch(() => null);
     if (!created) return;
     close();
     onCreated(created.secret);
@@ -55,6 +58,17 @@ function CreateEndpointDialog({ open, onClose, onCreated, sandbox }: { open: boo
         <Field label="Endpoint URL" htmlFor="endpoint-url" hint="An HTTPS address on the public internet.">
           <Input id="endpoint-url" type="url" inputMode="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://example.com/webhooks/bitocard" maxLength={2048} required autoFocus />
         </Field>
+        {stores.length > 1 ? (
+          <Field label="Store" htmlFor="endpoint-store" hint="It receives this store's events, and your account's own (wallet, payouts, checks).">
+            <Select id="endpoint-store" value={storeId || stores[0].id} onChange={event => setStoreId(event.target.value)}>
+              {stores.map(store => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
         <Field label="Description (optional)" htmlFor="endpoint-description">
           <Input id="endpoint-description" value={description} onChange={event => setDescription(event.target.value)} maxLength={200} placeholder="Order updates for our website" />
         </Field>

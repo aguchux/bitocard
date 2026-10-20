@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { passwordLength } from './passwords.service.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -216,4 +216,9 @@ export class DocsTokenDto {
   @IsOptional()
   @IsBoolean()
   read_only?: boolean;
+
+  @ApiPropertyOptional({ description: 'The store the token acts for (it sees only that store’s orders, events and webhooks). Defaults to your oldest published store, else your oldest.', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  store_id?: string;
 }

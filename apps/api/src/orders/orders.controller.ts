@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Length, Matches, ValidateNested } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, StepUp } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, StepUp, storeScopeOf } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { adminId } from '../countries/countries.controller.js';
 import type { LedgerMode, OrderStatus } from '../generated/prisma/client.js';
@@ -84,21 +84,21 @@ export class OrdersController {
   @Scopes('orders:write')
   @Post()
   create(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: CreateOrderDto) {
-    return this.orders.create(resellerOf(caller), mode, body);
+    return this.orders.create(resellerOf(caller), mode, body, undefined, storeScopeOf(caller));
   }
 
   @ApiOperation({ summary: 'List orders', description: 'Newest first. Codes and tokens are not included; get the order for them.' })
   @Scopes('orders:read')
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: OrderFilterDto) {
-    return this.orders.list(resellerOf(caller), mode, filter);
+    return this.orders.list(resellerOf(caller), mode, filter, storeScopeOf(caller));
   }
 
   @ApiOperation({ summary: 'Get an order', description: 'Includes what was delivered: gift card codes and PINs, electricity tokens.' })
   @Scopes('orders:read')
   @Get(':id')
   get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.orders.get(resellerOf(caller), mode, id);
+    return this.orders.get(resellerOf(caller), mode, id, storeScopeOf(caller));
   }
 
   @ApiOperation({
@@ -108,7 +108,7 @@ export class OrdersController {
   @Scopes('orders:read')
   @Get(':id/receipt')
   receipt(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.orders.receipt(resellerOf(caller), mode, id);
+    return this.orders.receipt(resellerOf(caller), mode, id, storeScopeOf(caller));
   }
 
   @ApiOperation({
@@ -121,7 +121,7 @@ export class OrdersController {
   @Post(':id/access/replace')
   @HttpCode(HttpStatus.OK)
   replaceAccess(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.access.replace(resellerOf(caller), mode, id);
+    return this.access.replace(resellerOf(caller), mode, id, storeScopeOf(caller));
   }
 
   @ApiOperation({ summary: 'Simulate the outcome of a processing order (test mode)' })
@@ -130,7 +130,7 @@ export class OrdersController {
   @Post(':id/simulate')
   @HttpCode(HttpStatus.OK)
   simulate(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: SimulateOrderDto) {
-    return this.orders.simulate(resellerOf(caller), mode, id, body.outcome);
+    return this.orders.simulate(resellerOf(caller), mode, id, body.outcome, storeScopeOf(caller));
   }
 }
 

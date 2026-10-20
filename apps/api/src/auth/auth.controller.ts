@@ -108,7 +108,7 @@ export class AuthController {
   @Post('docs-token')
   @HttpCode(HttpStatus.OK)
   docsToken(@CurrentCaller() caller: Caller, @Body() body: DocsTokenDto) {
-    return this.docsTokens.issue(caller, body.mode, body.read_only ?? false);
+    return this.docsTokens.issue(caller, body.mode, body.read_only ?? false, body.store_id);
   }
 
   /** Confirm your email address with the code that was sent to it. */

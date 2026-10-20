@@ -1,9 +1,10 @@
+import { StoreScope } from '../stores/store-scope.js';
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
-import { type Caller, CurrentCaller, Public, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { type Caller, CurrentCaller, Public, resellerOf, Roles, Scopes, storeScopeOf } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
@@ -34,33 +35,36 @@ class CustomerTopUpDto extends TopUpDto {
 @modeHeader
 @Controller('esims')
 export class EsimsController {
-  constructor(private readonly esims: EsimsService) {}
+  constructor(private readonly esims: EsimsService, private readonly scope: StoreScope) {}
 
   @ApiOperation({ summary: 'List eSIMs', description: 'The eSIMs your orders delivered, newest first, with their status, data use and expiry. Activation codes are only on `GET /v1/orders/{id}`.' })
   @Scopes('orders:read')
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: EsimFilterDto) {
-    return this.esims.list(resellerOf(caller), mode, filter);
+    return this.esims.list(resellerOf(caller), mode, filter, storeScopeOf(caller));
   }
 
   @ApiOperation({ summary: 'Get an eSIM', description: 'Its status, data use and expiry, read again from the supplier when older than ten minutes (suppliers update data use every few hours).' })
   @Scopes('orders:read')
   @Get(':id')
-  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'esim', id);
     return this.esims.get(resellerOf(caller), mode, id);
   }
 
   @ApiOperation({ summary: 'List top-up options', description: 'The top-ups this eSIM can take now, with what each costs you (BitoCard’s price, from your wallet). Empty when it takes none, or once it has expired.' })
   @Scopes('orders:read')
   @Get(':id/top-up-options')
-  options(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async options(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'esim', id);
     return this.esims.resellerOptions(resellerOf(caller), mode, id);
   }
 
   @ApiOperation({ summary: 'List top-ups', description: 'Top-ups added to this eSIM (by you or your customer), newest first.' })
   @Scopes('orders:read')
   @Get(':id/top-ups')
-  topUps(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async topUps(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'esim', id);
     return this.esims.resellerTopUps(resellerOf(caller), mode, id);
   }
 
@@ -72,7 +76,8 @@ export class EsimsController {
   @Roles('admin', 'support', 'finance')
   @Scopes('orders:write')
   @Post(':id/top-ups')
-  topUp(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: TopUpDto) {
+  async topUp(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: TopUpDto) {
+    await this.scope.check(caller, 'esim', id);
     return this.esims.resellerTopUp(resellerOf(caller), mode, id, body);
   }
 
@@ -85,7 +90,8 @@ export class EsimsController {
   @Scopes('orders:write')
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  cancel(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async cancel(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'esim', id);
     return this.esims.resellerCancel(resellerOf(caller), mode, id);
   }
 }

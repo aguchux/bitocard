@@ -84,10 +84,10 @@ export class VpnService {
 
   // -- Reading -------------------------------------------------------------------------------------------------------
 
-  async list(resellerId: string, mode: LedgerMode, filter: { order_id?: string; status?: string; limit?: number; starting_after?: string }) {
+  async list(resellerId: string, mode: LedgerMode, filter: { order_id?: string; status?: string; limit?: number; starting_after?: string }, storeId?: string) {
     const limit = filter.limit ?? 25;
     const rows = await this.prisma.vpnSubscription.findMany({
-      where: { resellerId, mode, ...(filter.order_id ? { orderId: filter.order_id } : {}), ...(filter.status ? { status: filter.status } : {}) },
+      where: { resellerId, mode, ...(filter.order_id ? { orderId: filter.order_id } : {}), ...(filter.status ? { status: filter.status } : {}), ...(storeId ? { order: { storeId } } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
@@ -221,7 +221,7 @@ export class VpnService {
     const changed = data.status !== undefined && data.status !== sub.status;
     const saved = await this.prisma.$transaction(async tx => {
       const updated = await tx.vpnSubscription.update({ where: { id: sub.id }, data });
-      if (changed) await this.events.record(tx, { resellerId: sub.resellerId, mode: sub.mode, type: 'vpn_subscription.updated', object: presentVpn(updated) });
+      if (changed) await this.events.record(tx, { resellerId: sub.resellerId, orderId: sub.orderId, mode: sub.mode, type: 'vpn_subscription.updated', object: presentVpn(updated) });
       return updated;
     });
     if (changed) this.events.committed();

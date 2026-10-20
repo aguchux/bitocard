@@ -18,6 +18,8 @@ export type DocsTokenClaims = {
   /** The dashboard session that issued it. */
   sid: string;
   rid: string;
+  /** The store it acts for (optional: the oldest store otherwise). */
+  st?: string;
   mode: ApiKeyMode;
   /** Read-only: only the `:read` scopes. */
   ro: boolean;
@@ -44,6 +46,7 @@ export function readDocsToken(key: string, token: string, now = Date.now()): Doc
     const valid =
       typeof claims.sid === 'string' &&
       typeof claims.rid === 'string' &&
+      (claims.st === undefined || typeof claims.st === 'string') &&
       (claims.mode === 'test' || claims.mode === 'live') &&
       typeof claims.ro === 'boolean' &&
       typeof claims.exp === 'number' &&

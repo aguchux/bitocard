@@ -6,6 +6,7 @@ import { sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { Realm, ResellerRole } from '../generated/prisma/client.js';
 import { type Caller, type CallerRequest, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, requireStepUp } from './caller.js';
+import { freePlanCode } from '../plans/features.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
 import { reservedSubdomains } from '../stores/reserved.js';
 import { SessionsService, sessionPolicy } from './sessions.service.js';
@@ -149,6 +150,9 @@ export class AuthGuard implements CanActivate {
     const member = await this.prisma.resellerMember.findFirst({ where: { userId: session.userId, resellerId: claims.rid }, include: { reseller: { include: { plan: true } } } });
     if (!member || member.reseller.status === 'suspended' || (claims.mode === 'live' && member.reseller.status !== 'active')) throw unauthenticated();
     const readOnly = claims.ro || !docsWriteRoles.includes(member.role);
+    // A docs token acts for one store: the one it was asked for, else the oldest published (else oldest) store.
+    const stores = await this.prisma.store.findMany({ where: { resellerId: claims.rid }, orderBy: { createdAt: 'asc' }, include: { subscription: { include: { plan: true } } } });
+    const store = (claims.st ? stores.find(item => item.id === claims.st) : undefined) ?? stores.find(item => item.status === 'published') ?? stores[0];
     return {
       kind: 'api_key',
       id: `docs:${claims.sid}:${claims.mode}`,
@@ -156,14 +160,20 @@ export class AuthGuard implements CanActivate {
       apiKeyId: null,
       docsTokenExpiresAt: new Date(claims.exp),
       resellerId: claims.rid,
+      storeId: store?.id ?? null,
       mode: claims.mode,
       scopes: docsTokenScopes(readOnly),
-      planRestrictions: member.reseller.plan.apiRestrictions,
+      planRestrictions: store?.subscription?.plan.apiRestrictions ?? (store ? await this.startupRestrictions() : member.reseller.plan.apiRestrictions),
     };
   }
 
+  /** The free plan's API restrictions: what a store without a plan of its own has. */
+  private async startupRestrictions() {
+    return (await this.prisma.plan.findUnique({ where: { code: freePlanCode } }))?.apiRestrictions ?? [];
+  }
+
   private async identifyApiKey(token: string): Promise<Caller> {
-    const key = await this.prisma.apiKey.findUnique({ where: { keyHash: sha256(token) }, include: { reseller: { include: { plan: true } } } });
+    const key = await this.prisma.apiKey.findUnique({ where: { keyHash: sha256(token) }, include: { reseller: true, store: { include: { subscription: { include: { plan: true } } } } } });
     const now = new Date();
     if (!key || key.revokedAt || (key.expiresAt && key.expiresAt <= now) || key.reseller.status === 'suspended') throw unauthenticated();
     if (!key.lastUsedAt || now.getTime() - key.lastUsedAt.getTime() > touchEveryMs) {
@@ -175,9 +185,11 @@ export class AuthGuard implements CanActivate {
       realm: 'reseller',
       apiKeyId: key.id,
       resellerId: key.resellerId,
+      storeId: key.storeId,
       mode: key.mode,
       scopes: key.scopes,
-      planRestrictions: key.reseller.plan.apiRestrictions,
+      // A key is limited by its store's plan (Startup when the store has none).
+      planRestrictions: key.store.subscription?.plan.apiRestrictions ?? (await this.startupRestrictions()),
     };
   }
 }

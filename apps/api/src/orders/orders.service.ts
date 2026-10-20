@@ -178,7 +178,7 @@ export class OrdersService {
   /** The order as the reseller sees it, without delivered codes: webhooks never carry secrets. */
   private async recordEvent(tx: Tx, type: 'order.completed' | 'order.failed' | 'order.refunded', id: string) {
     const order = await tx.order.findUniqueOrThrow({ where: { id }, include: { product: true } });
-    await this.events.record(tx, { resellerId: order.resellerId, mode: order.mode, type, object: this.present(order) });
+    await this.events.record(tx, { resellerId: order.resellerId, storeId: order.storeId, mode: order.mode, type, object: this.present(order) });
   }
 
   private load(id: string) {
@@ -198,8 +198,10 @@ export class OrdersService {
     mode: LedgerMode,
     input: { quote_id: string; simulate?: 'completed' | 'failed' | 'pending' },
     checkout?: { customerId: string; funding?: 'customer' | 'wallet' },
+    storeId?: string,
   ) {
     if (input.simulate && mode !== 'test') throw testModeOnly();
+    const store = await this.storeFor(resellerId, storeId, checkout?.customerId);
     const quote = await this.prisma.quote.findFirst({ where: { id: input.quote_id, resellerId, mode }, include: { product: true } });
     if (!quote) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such quote.', 'quote_id');
     if (quote.status === 'used') throw conflict('quote_used', 'This quote has already been used for an order. Create a new quote.');
@@ -248,6 +250,7 @@ export class OrdersService {
           data: {
             id,
             resellerId,
+            storeId: store,
             mode,
             quoteId: quote.id,
             productId: quote.productId,
@@ -287,10 +290,24 @@ export class OrdersService {
     return this.detail(order);
   }
 
-  async list(resellerId: string, mode: LedgerMode, filter: { status?: OrderStatus; customer_reference?: string; limit?: number; starting_after?: string }) {
+  /**
+   * The store an order is sold through: the API key's store, else the store its customer bought from, else (the
+   * dashboard) the oldest published store, else the oldest. Null for a reseller without one.
+   */
+  private async storeFor(resellerId: string, storeId: string | undefined, customerId: string | undefined) {
+    if (storeId) return storeId;
+    if (customerId) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { storeId: true, store: { select: { resellerId: true } } } });
+      if (customer?.store.resellerId === resellerId) return customer.storeId;
+    }
+    const stores = await this.prisma.store.findMany({ where: { resellerId }, orderBy: { createdAt: 'asc' }, select: { id: true, status: true } });
+    return (stores.find(item => item.status === 'published') ?? stores[0])?.id ?? null;
+  }
+
+  async list(resellerId: string, mode: LedgerMode, filter: { status?: OrderStatus; customer_reference?: string; limit?: number; starting_after?: string }, storeId?: string) {
     const limit = filter.limit ?? 25;
     const orders = await this.prisma.order.findMany({
-      where: { resellerId, mode, status: filter.status, customerReference: filter.customer_reference },
+      where: { resellerId, storeId, mode, status: filter.status, customerReference: filter.customer_reference },
       include: { product: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -299,15 +316,15 @@ export class OrdersService {
     return { object: 'list' as const, data: orders.slice(0, limit).map(order => this.present(order)), has_more: orders.length > limit };
   }
 
-  async get(resellerId: string, mode: LedgerMode, id: string) {
-    const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode }, include: { product: true, deliveries: true } });
+  async get(resellerId: string, mode: LedgerMode, id: string, storeId?: string) {
+    const order = await this.prisma.order.findFirst({ where: { id, resellerId, storeId, mode }, include: { product: true, deliveries: true } });
     if (!order) throw notFound();
     return this.detail(order);
   }
 
   /** The customer receipt: BitoCard (the regional Golojan entity) as seller of record, under the reseller's store brand. */
-  async receipt(resellerId: string, mode: LedgerMode, id: string) {
-    const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode }, include: { product: true, customer: { select: { storeId: true } }, reseller: { include: { stores: { orderBy: { createdAt: 'asc' } } } } } });
+  async receipt(resellerId: string, mode: LedgerMode, id: string, storeId?: string) {
+    const order = await this.prisma.order.findFirst({ where: { id, resellerId, storeId, mode }, include: { product: true, customer: { select: { storeId: true } }, reseller: { include: { stores: { orderBy: { createdAt: 'asc' } } } } } });
     if (!order) throw notFound();
     if (order.source === 'own') throw conflict('receipt_unavailable', 'You are the seller of orders through your own supplier, so BitoCard does not issue their receipts.');
     if (order.status !== 'completed' || order.receiptNumber === null) throw conflict('receipt_unavailable', 'Receipts are issued for completed orders.');
@@ -332,9 +349,9 @@ export class OrdersService {
     };
   }
 
-  async simulate(resellerId: string, mode: LedgerMode, id: string, outcome: 'completed' | 'failed') {
+  async simulate(resellerId: string, mode: LedgerMode, id: string, outcome: 'completed' | 'failed', storeId?: string) {
     if (mode !== 'test') throw testModeOnly();
-    const order = await this.prisma.order.findFirst({ where: { id, resellerId, mode: 'test' } });
+    const order = await this.prisma.order.findFirst({ where: { id, resellerId, storeId, mode: 'test' } });
     if (!order) throw notFound();
     if (order.status !== 'processing') return this.detail(await this.load(id));
     await this.prisma.order.update({ where: { id }, data: { simulate: outcome } });
@@ -575,7 +592,7 @@ export class OrdersService {
             nextSyncAt,
           },
         });
-        await this.events.record(tx, { resellerId: order.resellerId, mode: order.mode, type: 'vpn_subscription.updated', object: presentVpn(saved) });
+        await this.events.record(tx, { resellerId: order.resellerId, storeId: order.storeId, mode: order.mode, type: 'vpn_subscription.updated', object: presentVpn(saved) });
       }
       await this.recordEvent(tx, 'order.completed', order.id);
       return true;

@@ -123,10 +123,10 @@ export class NumbersService {
     return number as NumberWithOrder;
   }
 
-  async list(resellerId: string, mode: LedgerMode, filter: { status?: string; limit?: number; starting_after?: string }) {
+  async list(resellerId: string, mode: LedgerMode, filter: { status?: string; limit?: number; starting_after?: string }, storeId?: string) {
     const limit = filter.limit ?? 25;
     const rows = await this.prisma.virtualNumber.findMany({
-      where: { resellerId, mode, ...(filter.status ? { status: filter.status } : {}) },
+      where: { resellerId, mode, ...(filter.status ? { status: filter.status } : {}), ...(storeId ? { order: { storeId } } : {}) },
       include: this.includeOrder,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -248,7 +248,7 @@ export class NumbersService {
         },
         include: this.includeOrder,
       });
-      await this.events.record(tx, { resellerId: number.resellerId, mode: number.mode, type: 'number.renewed', object: this.present(updated as NumberWithOrder) });
+      await this.events.record(tx, { resellerId: number.resellerId, orderId: number.orderId, mode: number.mode, type: 'number.renewed', object: this.present(updated as NumberWithOrder) });
       return updated as NumberWithOrder;
     });
     this.events.committed();
@@ -315,7 +315,7 @@ export class NumbersService {
         const claimed = await tx.virtualNumber.updateMany({ where: { id: number.id, status: 'active', expiresAt: { lte: now } }, data: { status: 'expired', expiredAt: now } });
         if (claimed.count === 0) return false;
         const updated = (await tx.virtualNumber.findUniqueOrThrow({ where: { id: number.id }, include: this.includeOrder })) as NumberWithOrder;
-        await this.events.record(tx, { resellerId: number.resellerId, mode: number.mode, type: 'number.expired', object: this.present(updated) });
+        await this.events.record(tx, { resellerId: number.resellerId, orderId: number.orderId, mode: number.mode, type: 'number.expired', object: this.present(updated) });
         return true;
       });
       if (!paused) continue;
@@ -344,7 +344,7 @@ export class NumbersService {
         if (claimed.count === 0) return false;
         await tx.numberMessage.deleteMany({ where: { numberId: number.id } });
         const updated = (await tx.virtualNumber.findUniqueOrThrow({ where: { id: number.id }, include: this.includeOrder })) as NumberWithOrder;
-        await this.events.record(tx, { resellerId: number.resellerId, mode: number.mode, type: 'number.deleted', object: this.present(updated) });
+        await this.events.record(tx, { resellerId: number.resellerId, orderId: number.orderId, mode: number.mode, type: 'number.deleted', object: this.present(updated) });
         return true;
       });
       if (!deleted) continue;
@@ -549,7 +549,7 @@ export class NumbersService {
         const message = await tx.numberMessage.create({
           data: { numberId: number.id, direction: 'in', counterparty: input.from!.replace(/[^\d]/g, ''), textEncrypted: this.encryption().encrypt(text), status: 'received', supplierMessageId: input.id },
         });
-        await this.events.record(tx, { resellerId: number.resellerId, mode: number.mode, type: 'number.sms_received', object: this.presentMessage(message, number, null, false) });
+        await this.events.record(tx, { resellerId: number.resellerId, orderId: number.orderId, mode: number.mode, type: 'number.sms_received', object: this.presentMessage(message, number, null, false) });
       });
     } catch (error) {
       // Delivered again: stored once.

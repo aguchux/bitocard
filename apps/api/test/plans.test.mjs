@@ -238,8 +238,11 @@ describe('plan limits', () => {
     const second = await browser.post('/v1/team/invitations', { email: `other${Date.now()}@example.com`, role: 'support' });
     assert.deepEqual([second.status, second.json.error.code, second.json.error.param], [409, 'plan_limit_reached', 'email']);
 
-    // Webhook endpoints, per mode.
+    // Webhook endpoints, per store and mode: the store's own plan decides.
     await finance.put('/v1/admin/plans/limited/limits/webhook_endpoints', { value: 0 });
+    for (const { id } of (await browser.get('/v1/stores')).json.data) {
+      await prismaOf().storeSubscription.upsert({ where: { storeId: id }, create: { storeId: id, resellerId: reseller.resellerId, planCode: 'limited' }, update: { planCode: 'limited' } });
+    }
     const endpoint = await browser.post('/v1/webhook-endpoints', { url: 'https://hooks.example.com/bitocard' }, { 'bitocard-mode': 'test' });
     assert.deepEqual([endpoint.status, endpoint.json.error?.code], [400, 'endpoint_limit'], JSON.stringify(endpoint.json));
 

@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUrl, Length, Max, MaxLength, Min } from 'class-validator';
-import { type Caller, CurrentCaller, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Max, MaxLength, Min } from 'class-validator';
+import { type Caller, CurrentCaller, resellerOf, Roles, Scopes, storeScopeOf } from '../auth/caller.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import type { LedgerMode, WebhookDeliveryStatus } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
@@ -10,6 +10,9 @@ import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
 import { WebhookEndpointsService } from './endpoints.service.js';
 import { eventTypes } from './events.js';
 import { EventsService } from './events.service.js';
+
+/** The reseller, and for an API key only its store. */
+const ownerOf = (caller: Caller) => ({ resellerId: resellerOf(caller), storeId: storeScopeOf(caller) });
 
 const eventChoices = ['*', ...eventTypes];
 const urlRules = { require_protocol: true, require_tld: false, protocols: ['https', 'http'] };
@@ -26,6 +29,16 @@ class CreateEndpointDto {
   @ApiPropertyOptional({ type: [String], enum: eventChoices, default: ['*'], description: 'Event types to receive; `*` for all, including types added later.' })
   @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @IsIn(eventChoices, { each: true })
   events?: string[];
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'The store whose events it receives (with your account’s own). An API key’s endpoints are always its store’s; from the dashboard, defaults to your oldest published store, else your oldest.' })
+  @IsOptional() @IsUUID()
+  store_id?: string;
+}
+
+class ListEndpointsQuery {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Only this store’s endpoints (an API key sees only its store’s).' })
+  @IsOptional() @IsUUID()
+  store_id?: string;
 }
 
 class UpdateEndpointDto {
@@ -89,33 +102,33 @@ export class WebhookEndpointsController {
   @SkipIdempotency()
   @Post()
   create(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: CreateEndpointDto) {
-    return this.endpoints.create(resellerOf(caller), mode, body);
+    return this.endpoints.create(ownerOf(caller), mode, body);
   }
 
   @ApiOperation({ summary: 'List webhook endpoints' })
   @Get()
-  list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode) {
-    return this.endpoints.list(resellerOf(caller), mode);
+  list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: ListEndpointsQuery) {
+    return this.endpoints.list(ownerOf(caller), mode, query.store_id);
   }
 
   @ApiOperation({ summary: 'Get a webhook endpoint' })
   @Get(':id')
   get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.endpoints.get(resellerOf(caller), mode, id);
+    return this.endpoints.get(ownerOf(caller), mode, id);
   }
 
   @ApiOperation({ summary: 'Update a webhook endpoint', description: 'Change its URL, description or event types, or enable it again after it was disabled.' })
   @Roles('admin', 'developer')
   @Patch(':id')
   update(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateEndpointDto) {
-    return this.endpoints.update(resellerOf(caller), mode, id, body);
+    return this.endpoints.update(ownerOf(caller), mode, id, body);
   }
 
   @ApiOperation({ summary: 'Delete a webhook endpoint', description: 'Its delivery log is deleted too. Events stay available from `GET /v1/events`.' })
   @Roles('admin', 'developer')
   @Delete(':id')
   remove(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.endpoints.remove(resellerOf(caller), mode, id);
+    return this.endpoints.remove(ownerOf(caller), mode, id);
   }
 
   @ApiOperation({
@@ -127,7 +140,7 @@ export class WebhookEndpointsController {
   @Post(':id/rotate-secret')
   @HttpCode(HttpStatus.OK)
   rotate(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: RotateSecretDto) {
-    return this.endpoints.rotateSecret(resellerOf(caller), mode, id, body.expire_previous_in_hours ?? 24);
+    return this.endpoints.rotateSecret(ownerOf(caller), mode, id, body.expire_previous_in_hours ?? 24);
   }
 
   @ApiOperation({ summary: 'Send a test event', description: 'Sends a `ping` event to this endpoint now and returns the delivery with its result. Test events are not retried.' })
@@ -135,19 +148,19 @@ export class WebhookEndpointsController {
   @Post(':id/test')
   @HttpCode(HttpStatus.OK)
   test(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.endpoints.sendTest(resellerOf(caller), mode, id);
+    return this.endpoints.sendTest(ownerOf(caller), mode, id);
   }
 
   @ApiOperation({ summary: 'List deliveries to an endpoint', description: 'The delivery log, newest first.' })
   @Get(':id/deliveries')
   deliveries(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Query() filter: DeliveryFilterDto) {
-    return this.endpoints.listDeliveries(resellerOf(caller), mode, id, filter);
+    return this.endpoints.listDeliveries(ownerOf(caller), mode, id, filter);
   }
 
   @ApiOperation({ summary: 'Get a delivery', description: 'Includes each attempt: response status, the start of the response body, any error and the time taken.' })
   @Get(':id/deliveries/:deliveryId')
   delivery(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('deliveryId', ParseUUIDPipe) deliveryId: string) {
-    return this.endpoints.getDelivery(resellerOf(caller), mode, id, deliveryId);
+    return this.endpoints.getDelivery(ownerOf(caller), mode, id, deliveryId);
   }
 
   @ApiOperation({ summary: 'Resend a delivery', description: 'Sends the same event (same ID and body, newly signed) again now, whatever its status.' })
@@ -155,7 +168,7 @@ export class WebhookEndpointsController {
   @Post(':id/deliveries/:deliveryId/resend')
   @HttpCode(HttpStatus.OK)
   resend(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('deliveryId', ParseUUIDPipe) deliveryId: string) {
-    return this.endpoints.resend(resellerOf(caller), mode, id, deliveryId);
+    return this.endpoints.resend(ownerOf(caller), mode, id, deliveryId);
   }
 }
 
@@ -174,12 +187,12 @@ export class EventsController {
   })
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: EventFilterDto) {
-    return this.events.list(resellerOf(caller), mode, filter);
+    return this.events.list(ownerOf(caller), mode, filter);
   }
 
   @ApiOperation({ summary: 'Get an event' })
   @Get(':id')
   get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
-    return this.events.get(resellerOf(caller), mode, id);
+    return this.events.get(ownerOf(caller), mode, id);
   }
 }

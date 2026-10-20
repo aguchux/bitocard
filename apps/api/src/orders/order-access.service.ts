@@ -89,8 +89,8 @@ export class OrderAccessService {
   }
 
   /** A new link for the order; the old one, and every pass made with it, stop working at once. */
-  async replace(resellerId: string, mode: Order['mode'], orderId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, resellerId, mode }, select: { id: true, resellerId: true } });
+  async replace(resellerId: string, mode: Order['mode'], orderId: string, storeId?: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, resellerId, mode, storeId }, select: { id: true, resellerId: true } });
     if (!order) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such order.');
     await this.link(order);
     const token = `bca_${randomToken()}`;

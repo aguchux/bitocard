@@ -534,6 +534,8 @@ enum ApiKeyMode {
 model ApiKey {
   id          String     @id @default(uuid()) @db.Uuid
   resellerId  String     @map("reseller_id") @db.Uuid
+  /// The store the key belongs to: it sees only that store's orders, events and webhooks, within that store's plan.
+  storeId     String     @map("store_id") @db.Uuid
   name        String
   mode        ApiKeyMode
   /// First characters of the key (for example bc_live_a1b2c3), shown so people can tell keys apart.
@@ -546,9 +548,11 @@ model ApiKey {
   revokedAt   DateTime?  @map("revoked_at")
   createdAt   DateTime   @default(now()) @map("created_at")
   reseller    Reseller   @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  store       Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
   createdBy   User       @relation(fields: [createdById], references: [id])
 
   @@index([resellerId])
+  @@index([storeId])
   @@map("api_keys")
 }
 
@@ -758,6 +762,10 @@ model Store {
   reseller              Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   notifications         Notification[]
   devices               Device[]
+  apiKeys               ApiKey[]
+  webhookEndpoints      WebhookEndpoint[]
+  events                Event[]
+  orders                Order[]
   customers             Customer[]
   checkouts             Checkout[]
   domains               StoreDomain[]
@@ -1547,6 +1555,8 @@ enum OrderStatus {
 model Order {
   id                        String          @id @default(uuid()) @db.Uuid
   resellerId                String          @map("reseller_id") @db.Uuid
+  /// The store it was sold through: the API key's store, or the store its customer bought from.
+  storeId                   String?         @map("store_id") @db.Uuid
   mode                      LedgerMode
   quoteId                   String          @unique @map("quote_id") @db.Uuid
   productId                 String          @map("product_id") @db.Uuid
@@ -1597,6 +1607,7 @@ model Order {
   customerId                String?         @map("customer_id") @db.Uuid
   customer                  Customer?       @relation(fields: [customerId], references: [id])
   reseller                  Reseller        @relation(fields: [resellerId], references: [id])
+  store                     Store?          @relation(fields: [storeId], references: [id], onDelete: SetNull)
   product                   Product         @relation(fields: [productId], references: [id])
   deliveries                OrderDelivery[]
   access                    OrderAccess?
@@ -1605,6 +1616,7 @@ model Order {
   vpnSubscription           VpnSubscription?
   attempts                  OrderAttempt[]
 
+  @@index([storeId])
   @@index([resellerId, createdAt])
   @@index([status, nextCheckAt])
   @@index([productId, completedAt])
@@ -1850,6 +1862,8 @@ model Event {
   /// Commit-ordered position, for GET /v1/events?since=.
   seq          BigInt            @unique @default(autoincrement())
   resellerId   String            @map("reseller_id") @db.Uuid
+  /// The store the event is about; null for the account's own (wallet, payouts, checks), sent to every store.
+  storeId      String?           @map("store_id") @db.Uuid
   mode         LedgerMode
   type         String
   /// The exact JSON body sent to endpoints, so every retry carries the same bytes.
@@ -1860,6 +1874,7 @@ model Event {
   /// Set once the event has been fanned out to the endpoints that want it.
   dispatchedAt DateTime?         @map("dispatched_at")
   reseller     Reseller          @relation(fields: [resellerId], references: [id])
+  store        Store?            @relation(fields: [storeId], references: [id], onDelete: SetNull)
   deliveries   WebhookDelivery[]
 
   @@index([resellerId, mode, seq])
@@ -1871,6 +1886,8 @@ model Event {
 model WebhookEndpoint {
   id                      String                @id @default(uuid()) @db.Uuid
   resellerId              String                @map("reseller_id") @db.Uuid
+  /// The store whose events it receives (and the account's own).
+  storeId                 String                @map("store_id") @db.Uuid
   mode                    LedgerMode
   url                     String
   description             String?
@@ -1890,9 +1907,11 @@ model WebhookEndpoint {
   leaseUntil              DateTime?             @map("lease_until")
   createdAt               DateTime              @default(now()) @map("created_at")
   reseller                Reseller              @relation(fields: [resellerId], references: [id])
+  store                   Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
   deliveries              WebhookDelivery[]
 
   @@index([resellerId, mode])
+  @@index([storeId, mode])
   @@map("webhook_endpoints")
 }
 

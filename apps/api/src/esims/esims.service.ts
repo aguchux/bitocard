@@ -131,10 +131,10 @@ export class EsimsService implements OnModuleInit {
     return esim;
   }
 
-  async list(resellerId: string, mode: LedgerMode, filter: { order_id?: string; limit?: number; starting_after?: string }) {
+  async list(resellerId: string, mode: LedgerMode, filter: { order_id?: string; limit?: number; starting_after?: string }, storeId?: string) {
     const limit = filter.limit ?? 25;
     const rows = await this.prisma.esim.findMany({
-      where: { resellerId, mode, ...(filter.order_id ? { orderId: filter.order_id } : {}) },
+      where: { resellerId, mode, ...(filter.order_id ? { orderId: filter.order_id } : {}), ...(storeId ? { order: { storeId } } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(filter.starting_after ? { cursor: { id: filter.starting_after }, skip: 1 } : {}),
@@ -186,7 +186,7 @@ export class EsimsService implements OnModuleInit {
     if (!Object.keys(data).length) return esim;
     const saved = await this.prisma.$transaction(async tx => {
       const updated = await tx.esim.update({ where: { id: esim.id }, data });
-      if (shown) await this.events.record(tx, { resellerId: esim.resellerId, mode: esim.mode, type: 'esim.updated', object: presentEsim(updated) });
+      if (shown) await this.events.record(tx, { resellerId: esim.resellerId, orderId: esim.orderId, mode: esim.mode, type: 'esim.updated', object: presentEsim(updated) });
       return updated;
     });
     if (shown) this.events.committed();

@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
+import { storeForNew } from '../stores/store-scope.js';
 import type { ApiKey, ApiKeyMode } from '../generated/prisma/client.js';
 
 /** Every scope an API key can hold. New endpoints add their scope here and document it. */
@@ -33,6 +34,7 @@ export function presentApiKey(key: ApiKey) {
     object: 'api_key' as const,
     id: key.id,
     name: key.name,
+    store_id: key.storeId,
     mode: key.mode,
     prefix: key.prefix,
     scopes: key.scopes,
@@ -48,7 +50,7 @@ export function presentApiKey(key: ApiKey) {
 export class ApiKeysService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(resellerId: string, userId: string, input: { name: string; mode: ApiKeyMode; scopes?: string[] }) {
+  async create(resellerId: string, userId: string, input: { name: string; mode: ApiKeyMode; scopes?: string[]; store_id?: string }) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     if (input.mode === 'live' && reseller.status !== 'active') {
       throw new ApiError(
@@ -63,11 +65,12 @@ export class ApiKeysService {
     if (active >= maxActiveKeys) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'api_key_limit_reached', `You can have up to ${maxActiveKeys} active keys. Revoke one first.`);
     }
-    return this.issue(resellerId, userId, input.name, input.mode, input.scopes ?? [...apiKeyScopes]);
+    const storeId = await storeForNew(this.prisma, resellerId, input.store_id);
+    return this.issue(resellerId, storeId, userId, input.name, input.mode, input.scopes ?? [...apiKeyScopes]);
   }
 
-  async list(resellerId: string) {
-    const keys = await this.prisma.apiKey.findMany({ where: { resellerId }, orderBy: { createdAt: 'desc' } });
+  async list(resellerId: string, storeId?: string) {
+    const keys = await this.prisma.apiKey.findMany({ where: { resellerId, storeId }, orderBy: { createdAt: 'desc' } });
     return { object: 'list' as const, data: keys.map(presentApiKey) };
   }
 
@@ -75,7 +78,7 @@ export class ApiKeysService {
   async roll(resellerId: string, userId: string, id: string, overlapHours: number) {
     const old = await this.prisma.apiKey.findFirst({ where: { id, resellerId } });
     if (!old || old.revokedAt || (old.expiresAt && old.expiresAt <= new Date())) throw notFound();
-    const replacement = await this.issue(resellerId, userId, old.name, old.mode, old.scopes);
+    const replacement = await this.issue(resellerId, old.storeId, userId, old.name, old.mode, old.scopes);
     const expiresAt = new Date(Date.now() + overlapHours * hour);
     await this.prisma.apiKey.update({
       where: { id: old.id },
@@ -91,10 +94,10 @@ export class ApiKeysService {
     return presentApiKey(revoked);
   }
 
-  private async issue(resellerId: string, userId: string, name: string, mode: ApiKeyMode, scopes: string[]) {
+  private async issue(resellerId: string, storeId: string, userId: string, name: string, mode: ApiKeyMode, scopes: string[]) {
     const secret = `bc_${mode}_${randomToken()}`;
     const key = await this.prisma.apiKey.create({
-      data: { resellerId, name, mode, scopes, prefix: secret.slice(0, prefixLength), keyHash: sha256(secret), createdById: userId },
+      data: { resellerId, storeId, name, mode, scopes, prefix: secret.slice(0, prefixLength), keyHash: sha256(secret), createdById: userId },
     });
     return { ...presentApiKey(key), secret };
   }

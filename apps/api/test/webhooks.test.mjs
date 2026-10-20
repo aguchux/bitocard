@@ -575,8 +575,9 @@ describe('safe destinations', () => {
       const strictDelivery = strict.app.get((await import('../dist/webhooks/delivery.service.js')).WebhookDeliveryService);
       const { Encryption } = await import('../dist/common/encryption.js');
       const encryption = new Encryption(strict.app.get((await import('../dist/config/config.js')).APP_CONFIG).ENCRYPTION_KEY);
+      const store = await strictPrisma.store.create({ data: { resellerId, name: 'Hooks', subdomain: `hooks${Date.now().toString(36)}` } });
       for (const url of ['https://127.0.0.1:9/hook', 'https://localhost:9/hook']) {
-        await strictPrisma.webhookEndpoint.create({ data: { resellerId, mode: 'test', url, secretEncrypted: encryption.encrypt('whsec_x') } });
+        await strictPrisma.webhookEndpoint.create({ data: { resellerId, storeId: store.id, mode: 'test', url, secretEncrypted: encryption.encrypt('whsec_x') } });
       }
       await topUp(browser);
       await strictDelivery.idle();

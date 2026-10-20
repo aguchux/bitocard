@@ -19,7 +19,7 @@ import {
   PageHeader,
   Select,
 } from "@bitocard/admin-ui";
-import { type ApiKey, type ApiKeyScope, apiKeyScopes, type Mode, useApiKeysQuery, useCreateApiKeyMutation, useRevokeApiKeyMutation, useRollApiKeyMutation } from "@bitocard/api-client/reseller";
+import { type ApiKey, type ApiKeyScope, apiKeyScopes, type Mode, useApiKeysQuery, useCreateApiKeyMutation, useRevokeApiKeyMutation, useRollApiKeyMutation, useStoresQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { CopyButton, ModeBadge, SecretDialog } from "./developer-parts";
@@ -59,18 +59,21 @@ function CreateKeyDialog({ open, onClose, onCreated, verified }: { open: boolean
   const [name, setName] = useState("");
   const [mode, setMode] = useState<Mode>("test");
   const [scopes, setScopes] = useState<ApiKeyScope[]>([...apiKeyScopes]);
+  const [storeId, setStoreId] = useState("");
+  const stores = useStoresQuery().data?.data ?? [];
   const [create, state] = useCreateApiKeyMutation();
 
   const close = () => {
     setName("");
     setMode("test");
     setScopes([...apiKeyScopes]);
+    setStoreId("");
     state.reset();
     onClose();
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const created = await create({ name: name.trim(), mode, scopes }).unwrap().catch(() => null);
+    const created = await create({ name: name.trim(), mode, scopes, ...(stores.length > 1 ? { store_id: storeId || stores[0].id } : {}) }).unwrap().catch(() => null);
     if (!created) return;
     close();
     onCreated(created.secret);
@@ -98,6 +101,17 @@ function CreateKeyDialog({ open, onClose, onCreated, verified }: { open: boolean
         <Field label="Name" htmlFor="key-name" hint="To recognise the key by, such as the system that uses it.">
           <Input id="key-name" value={name} onChange={event => setName(event.target.value)} maxLength={60} placeholder="Website backend" required autoFocus />
         </Field>
+        {stores.length > 1 ? (
+          <Field label="Store" htmlFor="key-store" hint="The key sees only this store's orders, events and webhooks, and works within its plan.">
+            <Select id="key-store" value={storeId || stores[0].id} onChange={event => setStoreId(event.target.value)}>
+              {stores.map(store => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-ink">Mode</legend>
           {(
@@ -156,6 +170,8 @@ export default function ApiKeysPage() {
   const { membership } = useReseller();
   const allowed = can(membership, "admin", "developer");
   const keys = useApiKeysQuery(undefined, { skip: !allowed });
+  const stores = useStoresQuery(undefined, { skip: !allowed }).data?.data ?? [];
+  const storeName = (id: string) => stores.find(store => store.id === id)?.name ?? "—";
   const [roll] = useRollApiKeyMutation();
   const [revoke] = useRevokeApiKeyMutation();
   const [creating, setCreating] = useState(false);
@@ -230,6 +246,7 @@ export default function ApiKeysPage() {
                     </span>
                   ),
                 },
+                ...(stores.length > 1 ? [{ key: "store", header: "Store", cell: (key: ApiKey) => <span className="text-sm">{storeName(key.store_id)}</span> }] : []),
                 { key: "mode", header: "Mode", cell: key => <ModeBadge mode={key.mode} /> },
                 { key: "key", header: "Key", cell: key => <code className="break-all font-mono text-xs text-muted">{`${key.prefix}…`}</code> },
                 {

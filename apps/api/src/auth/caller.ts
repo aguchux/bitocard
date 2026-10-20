@@ -28,6 +28,9 @@ export type Caller =
       /** Set for a docs "Try it" token: when it expires. */
       docsTokenExpiresAt?: Date;
       resellerId: string;
+      /** The store the key belongs to (a docs token: the store it was asked for, else the oldest). It sees only that
+       * store's orders, events and webhooks. Null only for a docs token of a reseller with no store yet. */
+      storeId: string | null;
       mode: ApiKeyMode;
       scopes: string[];
       /** API features the reseller's plan switches off. */
@@ -96,6 +99,11 @@ export const SessionOnly = () => applyDecorators(SetMetadata(ROUTE_SESSION_ONLY,
 export function resellerOf(caller: Caller) {
   if (!caller.resellerId) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'Choose a reseller account first.');
   return caller.resellerId;
+}
+
+/** The store an API key (or docs token) is limited to; undefined for dashboard sessions, which see every store. */
+export function storeScopeOf(caller: Caller): string | undefined {
+  return caller.kind === 'api_key' && caller.storeId ? caller.storeId : undefined;
 }
 
 /** The signed-in person (never an API key) making the request. */

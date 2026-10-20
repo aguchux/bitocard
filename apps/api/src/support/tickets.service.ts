@@ -1,3 +1,4 @@
+import { inStoreOrAccount } from '../stores/store-scope.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { houseRootId, HouseService, houseStoreId } from '../checkout/house.service.js';
@@ -271,8 +272,8 @@ export class TicketsService {
     return presentTicket(ticket, 'reseller');
   }
 
-  async listForReseller(resellerId: string, mode: LedgerMode, filter: Page & { status?: TicketStatus; queue?: TicketQueue; requester?: 'customer' | 'reseller' }) {
-    return this.page({ resellerId, mode, status: filter.status, queue: filter.queue, requester: filter.requester }, filter, 'reseller');
+  async listForReseller(resellerId: string, mode: LedgerMode, filter: Page & { status?: TicketStatus; queue?: TicketQueue; requester?: 'customer' | 'reseller' }, storeId?: string) {
+    return this.page({ resellerId, mode, status: filter.status, queue: filter.queue, requester: filter.requester, ...inStoreOrAccount(storeId) }, filter, 'reseller');
   }
 
   async getForReseller(resellerId: string, mode: LedgerMode, id: string) {
@@ -554,7 +555,7 @@ export class TicketsService {
 
   private async recordEvent(tx: Tx, id: string, type: TicketEvent) {
     const ticket = await tx.supportTicket.findUniqueOrThrow({ where: { id } });
-    await this.events.record(tx, { resellerId: ticket.resellerId, mode: ticket.mode, type, object: presentTicketSummary(ticket, 'reseller') });
+    await this.events.record(tx, { resellerId: ticket.resellerId, storeId: ticket.storeId, mode: ticket.mode, type, object: presentTicketSummary(ticket, 'reseller') });
   }
 
   private async page(where: Prisma.SupportTicketWhereInput, page: Page, audience: Exclude<Audience, 'customer'>, orderBy: Prisma.SupportTicketOrderByWithRelationInput[] = [{ lastMessageAt: 'desc' }, { id: 'desc' }]) {

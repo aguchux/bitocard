@@ -1,7 +1,8 @@
+import { StoreScope } from '../stores/store-scope.js';
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, requireStepUp } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, requireStepUp, storeScopeOf } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -149,14 +150,13 @@ async function authorOf(prisma: PrismaService, caller: Caller, kind: 'reseller' 
 export class DisputesController {
   constructor(
     private readonly disputes: DisputesService,
-    private readonly prisma: PrismaService,
-  ) {}
+    private readonly prisma: PrismaService, private readonly scope: StoreScope) {}
 
   @ApiOperation({ summary: 'List disputes', description: 'Your customers’ disputes, your own disputes with BitoCard and chargebacks, newest first.' })
   @Scopes('disputes:read')
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: DisputeFilterDto) {
-    return this.disputes.listForReseller(resellerOf(caller), mode, filter);
+    return this.disputes.listForReseller(resellerOf(caller), mode, filter, storeScopeOf(caller));
   }
 
   @ApiOperation({
@@ -173,7 +173,8 @@ export class DisputesController {
   @ApiOperation({ summary: 'Get a dispute', description: 'With every message, staff notes included.' })
   @Scopes('disputes:read')
   @Get(':id')
-  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'dispute', id);
     return this.disputes.getForReseller(resellerOf(caller), mode, id);
   }
 
@@ -181,6 +182,7 @@ export class DisputesController {
   @Scopes('disputes:write')
   @Post(':id/messages')
   async reply(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: MessageDto) {
+    await this.scope.check(caller, 'dispute', id);
     return this.disputes.replyAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
   }
 
@@ -192,6 +194,7 @@ export class DisputesController {
   @Post(':id/escalate')
   @HttpCode(HttpStatus.OK)
   async escalate(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: EscalateDto) {
+    await this.scope.check(caller, 'dispute', id);
     return this.disputes.escalate(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
   }
 
@@ -203,6 +206,7 @@ export class DisputesController {
   @Post(':id/resolve')
   @HttpCode(HttpStatus.OK)
   async resolve(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveDto) {
+    await this.scope.check(caller, 'dispute', id);
     return this.disputes.resolveAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
   }
 }

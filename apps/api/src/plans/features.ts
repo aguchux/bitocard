@@ -54,7 +54,7 @@ export const planLimitCatalogue = {
   own_connections: { scope: 'account', group: 'independence', name: 'Own connections', unit: 'connections', description: 'Supplier and payment gateway accounts of their own connected at once, in each mode.', default: null, max: 1000 },
   ai_replies: { scope: 'store', group: 'support', name: 'AI replies a month', unit: 'replies', description: 'Replies each store’s assistant writes on BitoCard’s AI each month (their own AI key has no limit).', default: null, fallback: 'AI_MONTHLY_REPLIES', max: 10_000_000 },
   team_members: { scope: 'account', group: 'team', name: 'Team members', unit: 'people', description: 'People besides the owner on the team, invitations waiting included (with Team members on the plan).', default: null, max: 10_000 },
-  webhook_endpoints: { scope: 'account', group: 'independence', name: 'Webhook endpoints', unit: 'endpoints', description: 'Webhook endpoints in each mode.', default: 16, max: 1000 },
+  webhook_endpoints: { scope: 'store', group: 'independence', name: 'Webhook endpoints', unit: 'endpoints', description: 'Webhook endpoints per store in each mode.', default: 16, max: 1000 },
 } as const satisfies Record<string, { scope: EntitlementScope; group: PlanFeatureGroup; name: string; unit: string; description: string; default: number | null; fallback?: string; max: number }>;
 export type PlanLimit = keyof typeof planLimitCatalogue;
 export const planLimits = Object.keys(planLimitCatalogue) as PlanLimit[];

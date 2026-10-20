@@ -14,7 +14,7 @@ export class DocsTokensService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
-  async issue(caller: Caller, mode: ApiKeyMode, readOnlyRequested: boolean, now = Date.now()) {
+  async issue(caller: Caller, mode: ApiKeyMode, readOnlyRequested: boolean, storeId?: string, now = Date.now()) {
     if (caller.kind !== 'session') throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'session_required', 'Sign in to the dashboard to try the API.');
     if (!caller.resellerId || !caller.role) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_permitted', 'Choose a reseller account first.');
     const key = this.config.ENCRYPTION_KEY;
@@ -30,16 +30,21 @@ export class DocsTokensService {
         'mode',
       );
     }
+    // The token acts for one store, as an API key does.
+    const stores = await this.prisma.store.findMany({ where: { resellerId: reseller.id }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true, status: true } });
+    const store = storeId ? stores.find(item => item.id === storeId) : (stores.find(item => item.status === 'published') ?? stores[0]);
+    if (storeId && !store) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such store.', 'store_id');
     // Staff who cannot create API keys cannot make changes through the docs either.
     const readOnly = readOnlyRequested || !docsWriteRoles.includes(caller.role);
     const expires = now + docsTokenLifetimeMs;
     return {
       object: 'docs_token' as const,
-      token: issueDocsToken(key, { sid: caller.sessionId, rid: caller.resellerId, mode, ro: readOnly, exp: expires }),
+      token: issueDocsToken(key, { sid: caller.sessionId, rid: caller.resellerId, ...(store ? { st: store.id } : {}), mode, ro: readOnly, exp: expires }),
       mode,
       read_only: readOnly,
       scopes: docsTokenScopes(readOnly),
       reseller: { id: reseller.id, name: reseller.name },
+      store: store ? { id: store.id, name: store.name } : null,
       expires_at: new Date(expires).toISOString(),
     };
   }

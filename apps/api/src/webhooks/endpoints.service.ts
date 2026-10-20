@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PlanAccessService } from '../plans/plan-access.js';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
+import { storeForNew } from '../stores/store-scope.js';
 import { Encryption } from '../common/encryption.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -23,6 +24,7 @@ export function presentEndpoint(endpoint: WebhookEndpoint) {
   return {
     object: 'webhook_endpoint' as const,
     id: endpoint.id,
+    store_id: endpoint.storeId,
     mode: endpoint.mode,
     url: endpoint.url,
     description: endpoint.description,
@@ -63,6 +65,9 @@ export function presentDelivery(delivery: WebhookDelivery & { event: Event; log?
   };
 }
 
+/** Whose endpoints: the reseller's, and for an API key only its own store's. */
+export type EndpointOwner = { resellerId: string; storeId?: string };
+
 type EndpointInput = { url?: string; description?: string | null; events?: string[]; status?: 'enabled' | 'disabled' };
 
 /** Reseller webhook endpoints, their secrets, test events and the delivery log. */
@@ -80,8 +85,8 @@ export class WebhookEndpointsService {
     return new Encryption(this.config.ENCRYPTION_KEY);
   }
 
-  private async find(resellerId: string, mode: LedgerMode, id: string) {
-    const endpoint = await this.prisma.webhookEndpoint.findFirst({ where: { id, resellerId, mode } });
+  private async find(owner: EndpointOwner, mode: LedgerMode, id: string) {
+    const endpoint = await this.prisma.webhookEndpoint.findFirst({ where: { id, resellerId: owner.resellerId, storeId: owner.storeId, mode } });
     if (!endpoint) throw notFound();
     return endpoint;
   }
@@ -100,37 +105,48 @@ export class WebhookEndpointsService {
   }
 
   /** The signing secret is returned here and on rotation only. */
-  async create(resellerId: string, mode: LedgerMode, input: { url: string; description?: string; events?: string[] }) {
+  async create(owner: EndpointOwner, mode: LedgerMode, input: { url: string; description?: string; events?: string[]; store_id?: string }) {
+    const { resellerId } = owner;
     const events = this.eventList(input.events ?? ['*']);
-    const existing = await this.prisma.webhookEndpoint.findMany({ where: { resellerId, mode }, select: { url: true } });
+    const storeId = await this.storeFor(owner, input.store_id);
+    const existing = await this.prisma.webhookEndpoint.findMany({ where: { storeId, mode }, select: { url: true } });
     if (existing.some(endpoint => endpoint.url === input.url)) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'endpoint_exists', 'An endpoint with this URL already exists.', 'url');
     }
     // The plan's limit first: no address lookups for an endpoint that cannot be added anyway.
-    await this.planAccess.requireRoom(resellerId, 'webhook_endpoints', existing.length, { code: 'endpoint_limit', param: 'url', invalid: true });
+    await this.planAccess.requireStoreRoom(storeId, 'webhook_endpoints', existing.length, { code: 'endpoint_limit', param: 'url', invalid: true });
     await this.checkUrl(input.url);
     const secret = newWebhookSecret();
     const endpoint = await this.prisma.webhookEndpoint.create({
-      data: { resellerId, mode, url: input.url, description: input.description ?? null, events, secretEncrypted: this.encryption().encrypt(secret) },
+      data: { resellerId, storeId, mode, url: input.url, description: input.description ?? null, events, secretEncrypted: this.encryption().encrypt(secret) },
     });
     return { ...presentEndpoint(endpoint), secret };
   }
 
-  async list(resellerId: string, mode: LedgerMode) {
-    const endpoints = await this.prisma.webhookEndpoint.findMany({ where: { resellerId, mode }, orderBy: { createdAt: 'asc' } });
+  /** The store a new endpoint belongs to: an API key's own; else the one named, else the oldest published, else the oldest. */
+  private async storeFor(owner: EndpointOwner, storeId?: string) {
+    if (owner.storeId) {
+      if (storeId && storeId !== owner.storeId) throw notFound('store');
+      return owner.storeId;
+    }
+    return storeForNew(this.prisma, owner.resellerId, storeId);
+  }
+
+  async list(owner: EndpointOwner, mode: LedgerMode, storeId?: string) {
+    const endpoints = await this.prisma.webhookEndpoint.findMany({ where: { resellerId: owner.resellerId, storeId: owner.storeId ?? storeId, mode }, orderBy: { createdAt: 'asc' } });
     return { object: 'list' as const, data: endpoints.map(presentEndpoint) };
   }
 
-  async get(resellerId: string, mode: LedgerMode, id: string) {
-    return presentEndpoint(await this.find(resellerId, mode, id));
+  async get(owner: EndpointOwner, mode: LedgerMode, id: string) {
+    return presentEndpoint(await this.find(owner, mode, id));
   }
 
   /** Enabling again clears the failure history; deliveries resume for events from now on and any still pending. */
-  async update(resellerId: string, mode: LedgerMode, id: string, input: EndpointInput) {
-    const endpoint = await this.find(resellerId, mode, id);
+  async update(owner: EndpointOwner, mode: LedgerMode, id: string, input: EndpointInput) {
+    const endpoint = await this.find(owner, mode, id);
     if (input.url !== undefined && input.url !== endpoint.url) {
       await this.checkUrl(input.url);
-      if (await this.prisma.webhookEndpoint.findFirst({ where: { resellerId, mode, url: input.url, id: { not: id } } })) {
+      if (await this.prisma.webhookEndpoint.findFirst({ where: { storeId: endpoint.storeId, mode, url: input.url, id: { not: id } } })) {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'endpoint_exists', 'An endpoint with this URL already exists.', 'url');
       }
     }
@@ -154,15 +170,15 @@ export class WebhookEndpointsService {
   }
 
   /** Deletes the endpoint and its delivery log. Events stay available from GET /v1/events. */
-  async remove(resellerId: string, mode: LedgerMode, id: string) {
-    await this.find(resellerId, mode, id);
+  async remove(owner: EndpointOwner, mode: LedgerMode, id: string) {
+    await this.find(owner, mode, id);
     await this.prisma.webhookEndpoint.delete({ where: { id } });
     return { object: 'webhook_endpoint' as const, id, deleted: true };
   }
 
   /** A new secret; the old one keeps signing alongside it for the overlap (default 24 hours), then stops. */
-  async rotateSecret(resellerId: string, mode: LedgerMode, id: string, overlapHours = 24) {
-    const endpoint = await this.find(resellerId, mode, id);
+  async rotateSecret(owner: EndpointOwner, mode: LedgerMode, id: string, overlapHours = 24) {
+    const endpoint = await this.find(owner, mode, id);
     if (overlapHours < 0 || overlapHours > maxOverlapHours) throw invalid('parameter_invalid', `The overlap can be 0 to ${maxOverlapHours} hours.`, 'expire_previous_in_hours');
     const secret = newWebhookSecret();
     const updated = await this.prisma.webhookEndpoint.update({
@@ -177,15 +193,16 @@ export class WebhookEndpointsService {
   }
 
   /** Sends a `ping` event to this endpoint now and returns the delivery with its result. */
-  async sendTest(resellerId: string, mode: LedgerMode, id: string) {
-    const endpoint = await this.find(resellerId, mode, id);
+  async sendTest(owner: EndpointOwner, mode: LedgerMode, id: string) {
+    const endpoint = await this.find(owner, mode, id);
     const eventId = randomUUID();
     const createdAt = new Date();
     const delivery = await this.prisma.$transaction(async tx => {
       await tx.event.create({
         data: {
           id: eventId,
-          resellerId,
+          resellerId: owner.resellerId,
+          storeId: endpoint.storeId,
           mode,
           type: pingEvent,
           endpointId: endpoint.id,
@@ -199,11 +216,11 @@ export class WebhookEndpointsService {
     const result = await this.delivery.attempt(endpoint, delivery, true);
     // Test events are sent once, never retried.
     if (!result.success) await this.prisma.webhookDelivery.update({ where: { id: delivery.id }, data: { status: 'failed' } });
-    return this.getDelivery(resellerId, mode, id, delivery.id);
+    return this.getDelivery(owner, mode, id, delivery.id);
   }
 
-  async listDeliveries(resellerId: string, mode: LedgerMode, id: string, filter: { status?: WebhookDeliveryStatus; limit?: number; starting_after?: string }) {
-    await this.find(resellerId, mode, id);
+  async listDeliveries(owner: EndpointOwner, mode: LedgerMode, id: string, filter: { status?: WebhookDeliveryStatus; limit?: number; starting_after?: string }) {
+    await this.find(owner, mode, id);
     const limit = filter.limit ?? 25;
     const deliveries = await this.prisma.webhookDelivery.findMany({
       where: { endpointId: id, status: filter.status },
@@ -215,8 +232,8 @@ export class WebhookEndpointsService {
     return { object: 'list' as const, data: deliveries.slice(0, limit).map(delivery => presentDelivery(delivery)), has_more: deliveries.length > limit };
   }
 
-  async getDelivery(resellerId: string, mode: LedgerMode, id: string, deliveryId: string) {
-    await this.find(resellerId, mode, id);
+  async getDelivery(owner: EndpointOwner, mode: LedgerMode, id: string, deliveryId: string) {
+    await this.find(owner, mode, id);
     const delivery = await this.prisma.webhookDelivery.findFirst({
       where: { id: deliveryId, endpointId: id },
       include: { event: true, log: { orderBy: { createdAt: 'desc' }, take: 50 } },
@@ -226,11 +243,11 @@ export class WebhookEndpointsService {
   }
 
   /** Sends the same event again now, whatever its status; the result is added to the log. */
-  async resend(resellerId: string, mode: LedgerMode, id: string, deliveryId: string) {
-    const endpoint = await this.find(resellerId, mode, id);
+  async resend(owner: EndpointOwner, mode: LedgerMode, id: string, deliveryId: string) {
+    const endpoint = await this.find(owner, mode, id);
     const delivery = await this.prisma.webhookDelivery.findFirst({ where: { id: deliveryId, endpointId: id }, include: { event: true } });
     if (!delivery) throw notFound('delivery');
     await this.delivery.attempt(endpoint, delivery, true);
-    return this.getDelivery(resellerId, mode, id, deliveryId);
+    return this.getDelivery(owner, mode, id, deliveryId);
   }
 }

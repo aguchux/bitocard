@@ -1,7 +1,8 @@
+import { StoreScope } from '../stores/store-scope.js';
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUUID, Length, ValidateIf } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, resellerOf, Roles, Scopes, storeScopeOf } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -162,14 +163,13 @@ async function authorOf(prisma: PrismaService, caller: Caller, kind: 'reseller' 
 export class TicketsController {
   constructor(
     private readonly tickets: TicketsService,
-    private readonly prisma: PrismaService,
-  ) {}
+    private readonly prisma: PrismaService, private readonly scope: StoreScope) {}
 
   @ApiOperation({ summary: 'List support tickets', description: 'Your customers’ tickets and your own tickets to BitoCard, most recently active first.' })
   @Scopes('support:read')
   @Get()
   list(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() filter: TicketFilterDto) {
-    return this.tickets.listForReseller(resellerOf(caller), mode, filter);
+    return this.tickets.listForReseller(resellerOf(caller), mode, filter, storeScopeOf(caller));
   }
 
   @ApiOperation({
@@ -185,7 +185,8 @@ export class TicketsController {
   @ApiOperation({ summary: 'Get a support ticket', description: 'With its messages: on your customers’ tickets, staff notes included.' })
   @Scopes('support:read')
   @Get(':id')
-  get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+  async get(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    await this.scope.check(caller, 'ticket', id);
     return this.tickets.getForReseller(resellerOf(caller), mode, id);
   }
 
@@ -196,6 +197,7 @@ export class TicketsController {
   @Scopes('support:write')
   @Post(':id/messages')
   async reply(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: TicketMessageDto) {
+    await this.scope.check(caller, 'ticket', id);
     return this.tickets.replyAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
   }
 
@@ -204,6 +206,7 @@ export class TicketsController {
   @Post(':id/escalate')
   @HttpCode(HttpStatus.OK)
   async escalate(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: EscalateTicketDto) {
+    await this.scope.check(caller, 'ticket', id);
     return this.tickets.escalate(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
   }
 
@@ -212,6 +215,7 @@ export class TicketsController {
   @Post(':id/resolve')
   @HttpCode(HttpStatus.OK)
   async resolve(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: ResolveTicketDto) {
+    await this.scope.check(caller, 'ticket', id);
     return this.tickets.resolveAsReseller(resellerOf(caller), mode, id, await authorOf(this.prisma, caller, 'reseller'), body);
   }
 
@@ -220,6 +224,7 @@ export class TicketsController {
   @Post(':id/drafts/:draft/send')
   @HttpCode(HttpStatus.OK)
   async sendDraft(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string, @Body() body: SendDraftDto) {
+    await this.scope.check(caller, 'ticket', id);
     return presentTicket(await this.tickets.sendDraft({ resellerId: resellerOf(caller), mode }, id, draft, await authorOf(this.prisma, caller, 'reseller'), body.body), 'reseller');
   }
 
@@ -228,13 +233,15 @@ export class TicketsController {
   @Post(':id/drafts/:draft/discard')
   @HttpCode(HttpStatus.OK)
   async discardDraft(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Param('draft', ParseUUIDPipe) draft: string) {
+    await this.scope.check(caller, 'ticket', id);
     return presentTicket(await this.tickets.discardDraft({ resellerId: resellerOf(caller), mode }, id, draft), 'reseller');
   }
 
   @ApiOperation({ summary: 'Update a support ticket', description: 'Set the priority or the team member a customer’s ticket is assigned to.' })
   @Scopes('support:write')
   @Patch(':id')
-  update(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateTicketDto) {
+  async update(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateTicketDto) {
+    await this.scope.check(caller, 'ticket', id);
     return this.tickets.updateAsReseller(resellerOf(caller), mode, id, body);
   }
 }

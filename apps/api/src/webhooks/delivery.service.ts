@@ -118,18 +118,25 @@ export class WebhookDeliveryService implements OnModuleDestroy {
     const endpointIds = new Set<string>();
     for (;;) {
       const count = await this.prisma.$transaction(async tx => {
-        const events = await tx.$queryRaw<Array<{ id: string; reseller_id: string; mode: string; type: string }>>`
-          SELECT id, reseller_id, mode::text AS mode, type FROM events
+        const events = await tx.$queryRaw<Array<{ id: string; reseller_id: string; store_id: string | null; mode: string; type: string }>>`
+          SELECT id, reseller_id, store_id, mode::text AS mode, type FROM events
           WHERE dispatched_at IS NULL ORDER BY seq LIMIT 100 FOR UPDATE SKIP LOCKED`;
         if (!events.length) return 0;
         const endpoints = await tx.webhookEndpoint.findMany({
           where: { status: 'enabled', resellerId: { in: [...new Set(events.map(event => event.reseller_id))] } },
-          select: { id: true, resellerId: true, mode: true, events: true },
+          select: { id: true, resellerId: true, storeId: true, mode: true, events: true },
         });
         const now = new Date();
         const deliveries = events.flatMap(event =>
           endpoints
-            .filter(endpoint => endpoint.resellerId === event.reseller_id && endpoint.mode === event.mode && (!endpoint.events.length || endpoint.events.includes(event.type)))
+            // A store's events go to its own endpoints; the account's own (no store) to every store's.
+            .filter(
+              endpoint =>
+                endpoint.resellerId === event.reseller_id &&
+                (event.store_id === null || endpoint.storeId === event.store_id) &&
+                endpoint.mode === event.mode &&
+                (!endpoint.events.length || endpoint.events.includes(event.type)),
+            )
             .map(endpoint => ({ eventId: event.id, endpointId: endpoint.id, nextAttemptAt: now })),
         );
         if (deliveries.length) await tx.webhookDelivery.createMany({ data: deliveries, skipDuplicates: true });

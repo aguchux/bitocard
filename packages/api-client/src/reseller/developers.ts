@@ -11,6 +11,8 @@ export type ApiKey = {
   object: 'api_key';
   id: string;
   name: string;
+  /** The store the key belongs to: it sees only that store's orders, events and webhooks. */
+  store_id: string;
   mode: Mode;
   /** The first 14 characters of the secret, such as `bc_test_AbCdEf`. */
   prefix: string;
@@ -28,6 +30,8 @@ export type WebhookEventType = (typeof webhookEventTypes)[number];
 export type WebhookEndpoint = {
   object: 'webhook_endpoint';
   id: string;
+  /** The store whose events it receives, with the account's own. */
+  store_id: string;
   mode: Mode;
   url: string;
   description: string | null;
@@ -88,7 +92,7 @@ export type WebhookEvent = {
 export const resellerDevelopersApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     apiKeys: build.query<List<ApiKey>, void>({ query: () => '/v1/api-keys', providesTags: ['ApiKey'] }),
-    createApiKey: build.mutation<CreatedApiKey, { name: string; mode: Mode; scopes?: ApiKeyScope[] }>({
+    createApiKey: build.mutation<CreatedApiKey, { name: string; mode: Mode; scopes?: ApiKeyScope[]; store_id?: string }>({
       query: body => ({ url: '/v1/api-keys', method: 'POST', body }),
       invalidatesTags: ['ApiKey'],
     }),
@@ -104,7 +108,7 @@ export const resellerDevelopersApi = bitocardApi.injectEndpoints({
       providesTags: result => [{ type: 'WebhookEndpoint', id: 'LIST' }, ...(result?.data.map(item => ({ type: 'WebhookEndpoint' as const, id: item.id })) ?? [])],
     }),
     webhookEndpoint: build.query<WebhookEndpoint, string>({ query: id => `/v1/webhook-endpoints/${id}`, providesTags: (_result, _error, id) => [{ type: 'WebhookEndpoint', id }] }),
-    createWebhookEndpoint: build.mutation<CreatedWebhookEndpoint, { url: string; description?: string; events?: Array<WebhookEventType | '*'> }>({
+    createWebhookEndpoint: build.mutation<CreatedWebhookEndpoint, { url: string; description?: string; events?: Array<WebhookEventType | '*'>; store_id?: string }>({
       query: body => ({ url: '/v1/webhook-endpoints', method: 'POST', body }),
       invalidatesTags: [{ type: 'WebhookEndpoint', id: 'LIST' }],
     }),

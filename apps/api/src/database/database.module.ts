@@ -1,4 +1,5 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
+import { StoreScope } from '../stores/store-scope.js';
 import { PRISMA_ADAPTER, PrismaService, type DatabaseAdapter } from './prisma.service.js';
 
 @Global()
@@ -8,8 +9,8 @@ export class DatabaseModule {
   static register(adapter?: DatabaseAdapter): DynamicModule {
     return {
       module: DatabaseModule,
-      providers: [{ provide: PRISMA_ADAPTER, useValue: adapter ?? null }, PrismaService],
-      exports: [PrismaService],
+      providers: [{ provide: PRISMA_ADAPTER, useValue: adapter ?? null }, PrismaService, StoreScope],
+      exports: [PrismaService, StoreScope],
     };
   }
 }

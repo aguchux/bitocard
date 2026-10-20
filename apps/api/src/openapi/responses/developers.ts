@@ -13,6 +13,7 @@ const apiKeyProperties = {
   object: constant('api_key'),
   id: uuid('API key ID.'),
   name: str('The name you gave the key, such as the system that uses it.'),
+  store_id: uuid('The store the key belongs to: it sees only that store’s orders, events and webhooks, within the store’s plan.'),
   mode: str('`test` keys use the sandbox (simulated fulfilment, no real money); `live` keys move real money.', { enum: ['test', 'live'] }),
   prefix: str('The first characters of the secret (for example `bc_live_a1b2c3`), so you can tell keys apart. The full secret is never shown again.'),
   scopes,
@@ -25,6 +26,7 @@ const apiKeyProperties = {
 const endpointProperties = {
   object: constant('webhook_endpoint'),
   id: uuid('Endpoint ID.'),
+  store_id: uuid('The store whose events it receives, with your account’s own (wallet, payouts, checks).'),
   mode: str('`test` endpoints receive sandbox events, `live` endpoints live events.', { enum: ['test', 'live'] }),
   url: str('Where events are sent (HTTPS on the public internet).', { format: 'uri' }),
   description: nullableStr('Your description of the endpoint.'),
@@ -73,6 +75,7 @@ const exampleKey = {
   object: 'api_key',
   id: '6b1f2e3d-4c5a-4b6c-8d7e-9f0a1b2c3d4e',
   name: 'Website backend',
+  store_id: '0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90',
   mode: 'test',
   prefix: 'bc_test_x7Kq2m',
   scopes: [...apiKeyScopes],
@@ -85,6 +88,7 @@ const exampleKey = {
 const exampleEndpoint = {
   object: 'webhook_endpoint',
   id: '2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f',
+  store_id: '0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90',
   mode: 'live',
   url: 'https://example.com/webhooks/bitocard',
   description: 'Order updates for the shop backend',
