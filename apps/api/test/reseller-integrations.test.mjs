@@ -298,3 +298,21 @@ describe('isolation', () => {
     assert.equal((await other.browser.post('/v1/integrations/reloadly/connection/check')).status, 404);
   });
 });
+
+describe('the plan’s limit on own connections', () => {
+  test('a new connection past the limit is refused; changing one already connected is not', async () => {
+    await offer('reloadly', { global: true, countries: [], approval: 'automatic' });
+    await offer('didww', { global: true, countries: [], approval: 'automatic' });
+    const { browser } = await allowedReseller();
+    const finance = await adminClient(server, ['finance']);
+    assert.equal((await finance.put('/v1/admin/plans/premium/limits/own_connections', { value: 1 })).status, 200);
+    try {
+      assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-own' } }, testMode)).status, 200);
+      assert.equal((await browser.put('/v1/integrations/didww/connection', { values: { api_key: 'didww-new' } }, testMode)).status, 200, 'changing it is fine');
+      const refused = await browser.put('/v1/integrations/reloadly/connection', { values: reloadly }, testMode);
+      assert.deepEqual([refused.status, refused.json.error?.code, refused.json.error?.param], [409, 'plan_limit_reached', 'own_connections'], JSON.stringify(refused.json));
+    } finally {
+      await finance.put('/v1/admin/plans/premium/limits/own_connections', { reset: true });
+    }
+  });
+});

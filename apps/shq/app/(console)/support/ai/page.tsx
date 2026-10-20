@@ -65,7 +65,9 @@ function Overview({ ai }: { ai: SupportAi }) {
     <div className="space-y-4">
       {ai.premium ? (
         <Notice tone="green" title="Premium: BitoCard’s AI is included">
-          {`Each store gets ${ai.allowance.replies_per_store.toLocaleString("en-GB")} assistant replies a month on BitoCard’s AI. Past that, people answer until next month, or your own key takes over.`}
+          {ai.allowance.replies_per_store === null
+            ? "Your plan has no monthly limit on assistant replies on BitoCard’s AI."
+            : `Each store gets ${ai.allowance.replies_per_store.toLocaleString("en-GB")} assistant replies a month on BitoCard’s AI on your plan. Past that, people answer until next month, or your own key takes over.`}
         </Notice>
       ) : (
         <Notice tone="blue" title="Use your own AI key, or Premium">
@@ -79,7 +81,7 @@ function Overview({ ai }: { ai: SupportAi }) {
             {ai.allowance.stores.map(store => (
               <li key={store.store_id} className="flex justify-between gap-3">
                 <span>{store.store_name}</span>
-                <span className="text-muted">{`${store.bitocard_replies.toLocaleString("en-GB")} of ${ai.allowance.replies_per_store.toLocaleString("en-GB")} replies`}</span>
+                <span className="text-muted">{ai.allowance.replies_per_store === null ? `${store.bitocard_replies.toLocaleString("en-GB")} replies` : `${store.bitocard_replies.toLocaleString("en-GB")} of ${ai.allowance.replies_per_store.toLocaleString("en-GB")} replies`}</span>
               </li>
             ))}
           </ul>

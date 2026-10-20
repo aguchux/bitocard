@@ -681,6 +681,8 @@ model Plan {
   available       Boolean    @default(true)
   /// Where it is listed, lowest first.
   sortOrder       Int        @default(0) @map("sort_order")
+  /// How much the plan allows (`planLimitCatalogue`): a number, or null for unlimited; a limit not set has its default.
+  limits          Json       @default("{}")
   updatedAt       DateTime   @updatedAt @map("updated_at")
   resellers       Reseller[]
   localPrices     PlanPrice[]

@@ -229,7 +229,8 @@ export type AiProviderName = 'anthropic' | 'openai' | 'deepseek';
 export type SupportAi = {
   object: 'support_ai';
   premium: boolean;
-  allowance: { replies_per_store: number; month_start: string; stores: Array<{ store_id: string; store_name: string; bitocard_replies: number }> };
+  /** `replies_per_store`: on your plan; null: no limit. */
+  allowance: { replies_per_store: number | null; month_start: string; stores: Array<{ store_id: string; store_name: string; bitocard_replies: number }> };
   providers: Array<{
     provider: AiProviderName;
     label: string;

@@ -9,11 +9,12 @@ import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.
 import { reservedSubdomains } from './reserved.js';
 import { StoreHostsService } from './store-hosts.service.js';
 import { designFor, storeTemplates, templateFor, type StoreTemplate } from './templates.js';
-import { planFeatureRequired, planIncludes } from '../plans/plan-access.js';
+import { planFeatureRequired, planIncludes, PlanAccessService } from '../plans/plan-access.js';
 
 export { reservedSubdomains };
 
 /** Stores a reseller can run, each with its own template, address, branding and domains. */
+/** The default store limit; each plan sets its own (`stores` in `planLimitCatalogue`). */
 export const maxStoresPerReseller = 5;
 
 const subdomainFormat = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
@@ -105,6 +106,7 @@ export class StoresService {
     private readonly audit: AuditService,
     private readonly settings: SettingsService,
     private readonly hosts: StoreHostsService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   /** Business name, and the country if it is not yet set (Google sign-ups choose it during onboarding). */
@@ -142,9 +144,7 @@ export class StoresService {
     }
     // A second store needs a plan with several stores.
     if (reseller.stores.length >= 1 && !planIncludes(reseller, 'multiple_stores')) throw planFeatureRequired('multiple_stores', reseller.plan.name);
-    if (reseller.stores.length >= maxStoresPerReseller) {
-      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'store_limit_reached', `You can run up to ${maxStoresPerReseller} stores.`);
-    }
+    await this.planAccess.requireRoom(resellerId, 'stores', reseller.stores.length, { code: 'store_limit_reached', param: 'name' });
     const design = await this.chooseDesign(resellerId, { template: input.template ?? 'all_in_one', variant: input.variant, theme: input.theme, focus: input.focus ?? null });
     const subdomain = await this.assertSubdomain(input.subdomain);
     try {

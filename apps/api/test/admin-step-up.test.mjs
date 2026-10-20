@@ -43,6 +43,7 @@ const protectedRoutes = [
   ['put', '/v1/admin/tax-rates/NG', {}],
   ['patch', '/v1/admin/currencies/NGN', {}],
   ['put', '/v1/admin/exchange/markups', {}],
+  ['put', '/v1/admin/plans/premium/limits/stores', { value: 5 }],
   ['patch', '/v1/admin/plans/premium', {}],
   ['post', '/v1/admin/plans', {}],
   ['put', '/v1/admin/plans/premium/features/priority_support', { enabled: true }],

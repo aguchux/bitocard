@@ -104,6 +104,10 @@ export type PlanSettings = {
       api_restrictions: string[];
       /** Resellers on the plan now. */
       resellers: number;
+      /** How much the plan allows, per limit (null: unlimited). */
+      limits: Record<string, number | null>;
+      /** The limits the plan sets itself; the others have their default. */
+      limits_set: string[];
       local_prices: Array<{
         currency: string;
         /** The markets that use the currency. */
@@ -116,8 +120,10 @@ export type PlanSettings = {
     }
   >;
   groups: Array<{ code: string; name: string }>;
-  /** Every feature a plan can include; each plan's `features` say which it has. */
-  features: Array<{ code: string; group: string; name: string; description: string }>;
+  /** Every feature a plan can include; each plan's `features` say which it has. `scope`: per store or per account. */
+  features: Array<{ code: string; scope: 'store' | 'account'; group: string; name: string; description: string }>;
+  /** Every limit a plan sets, with its default (null: unlimited) and the most it can be. */
+  limits: Array<{ code: string; scope: 'store' | 'account'; group: string; name: string; unit: string; description: string; default: number | null; max: number }>;
 };
 export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; available?: boolean; sort_order?: number };
 export type CreatePlanInput = { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean };

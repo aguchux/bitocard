@@ -162,6 +162,79 @@ describe('plans', () => {
   });
 });
 
+describe('plan limits', () => {
+  test('every plan starts with today’s limits, shown to admins and resellers', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const overview = (await finance.get('/v1/admin/plans')).json;
+    const standard = overview.plans.find(plan => plan.code === 'standard');
+    assert.deepEqual(
+      [standard.limits.stores, standard.limits.domains_per_store, standard.limits.webhook_endpoints, standard.limits.team_members, standard.limits.own_connections],
+      [5, 5, 16, null, null],
+    );
+    assert.equal(standard.limits.ai_replies, overview.limits.find(item => item.code === 'ai_replies').default, 'AI replies default to the Support assistant setting');
+    assert.deepEqual(standard.limits_set, []);
+    assert.deepEqual(overview.limits.find(item => item.code === 'domains_per_store').scope, 'store');
+    assert.deepEqual(overview.features.find(item => item.code === 'team_members').scope, 'account');
+    const listed = (await client(server.base).get('/v1/plans')).json.data[0];
+    assert.equal(listed.limits.stores, 5);
+    assert.equal(listed.feature_details.find(item => item.code === 'team_members').scope, 'account');
+  });
+
+  test('a plan’s limits are enforced, unlimited means no limit, and lowering one removes nothing', async () => {
+    const finance = await adminClient(server, ['finance']);
+    await finance.post('/v1/admin/plans', { code: 'limited', name: 'Limited', price_cents: 1000, features: ['multiple_stores', 'team_members'] });
+    const reseller = await resellerClient(server);
+    const { browser } = reseller;
+    await prismaOf().reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG', planCode: 'limited' } });
+    const store = async name => browser.post('/v1/stores', { name, subdomain: `${name.toLowerCase()}${Date.now().toString(36)}` });
+    assert.equal((await store('One')).status, 201);
+
+    // Stores: one allowed, then refused with the plan named; unlimited lets more in.
+    const set = await finance.put('/v1/admin/plans/limited/limits/stores', { value: 1 });
+    assert.equal(set.status, 200, JSON.stringify(set.json));
+    assert.deepEqual(set.json.plans.find(plan => plan.code === 'limited').limits_set, ['stores']);
+    const refused = await store('Two');
+    assert.deepEqual([refused.status, refused.json.error.code], [409, 'store_limit_reached']);
+    assert.match(refused.json.error.message, /Your Limited plan allows 1 store/);
+    await finance.put('/v1/admin/plans/limited/limits/stores', { value: null });
+    assert.equal((await store('Two')).status, 201, 'unlimited');
+    // Lowered below what they have: both stores stay, a third is refused.
+    await finance.put('/v1/admin/plans/limited/limits/stores', { value: 1 });
+    assert.equal((await browser.get('/v1/stores')).json.data.length, 2);
+    assert.equal((await store('Three')).json.error.code, 'store_limit_reached');
+
+    // Team members: invitations waiting count; replacing one to the same address does not.
+    await finance.put('/v1/admin/plans/limited/limits/team_members', { value: 1 });
+    const mate = `mate${Date.now()}@example.com`;
+    assert.equal((await browser.post('/v1/team/invitations', { email: mate, role: 'support' })).status, 201);
+    assert.equal((await browser.post('/v1/team/invitations', { email: mate, role: 'finance' })).status, 201, 'the same person again replaces it');
+    const second = await browser.post('/v1/team/invitations', { email: `other${Date.now()}@example.com`, role: 'support' });
+    assert.deepEqual([second.status, second.json.error.code, second.json.error.param], [409, 'plan_limit_reached', 'email']);
+
+    // Webhook endpoints, per mode.
+    await finance.put('/v1/admin/plans/limited/limits/webhook_endpoints', { value: 0 });
+    const endpoint = await browser.post('/v1/webhook-endpoints', { url: 'https://hooks.example.com/bitocard' }, { 'bitocard-mode': 'test' });
+    assert.deepEqual([endpoint.status, endpoint.json.error?.code], [400, 'endpoint_limit'], JSON.stringify(endpoint.json));
+
+    // Reset goes back to the default, and every change is audited.
+    const reset = await finance.put('/v1/admin/plans/limited/limits/stores', { reset: true });
+    assert.equal(reset.json.plans.find(plan => plan.code === 'limited').limits.stores, 5);
+    assert.ok(await prismaOf().auditLog.findFirst({ where: { action: 'plan.limit_changed', targetId: 'limited' } }));
+    await prismaOf().reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'standard' } });
+  });
+
+  test('limits are checked: known, whole numbers within range, finance only', async () => {
+    const finance = await adminClient(server, ['finance']);
+    assert.equal((await finance.put('/v1/admin/plans/premium/limits/rockets', { value: 1 })).status, 404);
+    assert.equal((await finance.put('/v1/admin/plans/nowhere/limits/stores', { value: 1 })).status, 404);
+    assert.equal((await finance.put('/v1/admin/plans/premium/limits/stores', { value: -1 })).status, 400);
+    assert.equal((await finance.put('/v1/admin/plans/premium/limits/stores', { value: 1.5 })).status, 400);
+    assert.equal((await finance.put('/v1/admin/plans/premium/limits/stores', { value: 5000 })).json.error.param, 'value');
+    assert.equal((await finance.put('/v1/admin/plans/premium/limits/stores', {})).json.error.code, 'parameter_missing');
+    assert.equal((await (await adminClient(server, ['support'])).put('/v1/admin/plans/premium/limits/stores', { value: 3 })).status, 403);
+  });
+});
+
 describe('plan API restrictions', () => {
   test('every API feature is on by default; a plan restriction blocks it until lifted', async () => {
     const { browser } = await resellerClient(server);

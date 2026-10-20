@@ -2061,23 +2061,34 @@
                       "feature_details": [
                         {
                           "code": "multiple_stores",
+                          "scope": "account",
                           "group": "independence",
                           "name": "Several stores",
                           "description": "Run more than one store, each with its own address and design."
                         },
                         {
                           "code": "store_traffic",
+                          "scope": "store",
                           "group": "selling",
                           "name": "Store traffic",
                           "description": "See how many people visit your stores, day by day."
                         },
                         {
                           "code": "team_members",
+                          "scope": "account",
                           "group": "team",
                           "name": "Team members",
                           "description": "Invite colleagues to work in SHQ with their own sign-in."
                         }
                       ],
+                      "limits": {
+                        "stores": 5,
+                        "domains_per_store": 5,
+                        "own_connections": null,
+                        "ai_replies": 2000,
+                        "team_members": null,
+                        "webhook_endpoints": 16
+                      },
                       "local_price": {
                         "amount": 0,
                         "currency": "NGN",
@@ -2102,23 +2113,34 @@
                       "feature_details": [
                         {
                           "code": "international_selling",
+                          "scope": "store",
                           "group": "selling",
                           "name": "International selling",
                           "description": "Sell to customers outside your country."
                         },
                         {
                           "code": "chargeback_protection",
+                          "scope": "store",
                           "group": "support",
                           "name": "Chargeback protection",
                           "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
                         },
                         {
                           "code": "priority_support",
+                          "scope": "account",
                           "group": "support",
                           "name": "Priority support",
                           "description": "Faster answers from BitoCard, including live chat."
                         }
                       ],
+                      "limits": {
+                        "stores": 5,
+                        "domains_per_store": 5,
+                        "own_connections": null,
+                        "ai_replies": 2000,
+                        "team_members": null,
+                        "webhook_endpoints": 16
+                      },
                       "local_price": {
                         "amount": 3500000,
                         "currency": "NGN",
@@ -2237,8 +2259,11 @@
                       }
                     },
                     "max_domains": {
-                      "type": "integer",
-                      "description": "The most domains a store can have."
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The most domains a store can have on your plan; null when the plan has no limit."
                     }
                   }
                 },
@@ -16400,23 +16425,34 @@
                     "feature_details": [
                       {
                         "code": "international_selling",
+                        "scope": "store",
                         "group": "selling",
                         "name": "International selling",
                         "description": "Sell to customers outside your country."
                       },
                       {
                         "code": "chargeback_protection",
+                        "scope": "store",
                         "group": "support",
                         "name": "Chargeback protection",
                         "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
                       },
                       {
                         "code": "priority_support",
+                        "scope": "account",
                         "group": "support",
                         "name": "Priority support",
                         "description": "Faster answers from BitoCard, including live chat."
                       }
                     ],
+                    "limits": {
+                      "stores": 5,
+                      "domains_per_store": 5,
+                      "own_connections": null,
+                      "ai_replies": 2000,
+                      "team_members": null,
+                      "webhook_endpoints": 16
+                    },
                     "local_price": {
                       "amount": 3500000,
                       "currency": "NGN",
@@ -16541,23 +16577,34 @@
                     "feature_details": [
                       {
                         "code": "international_selling",
+                        "scope": "store",
                         "group": "selling",
                         "name": "International selling",
                         "description": "Sell to customers outside your country."
                       },
                       {
                         "code": "chargeback_protection",
+                        "scope": "store",
                         "group": "support",
                         "name": "Chargeback protection",
                         "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
                       },
                       {
                         "code": "priority_support",
+                        "scope": "account",
                         "group": "support",
                         "name": "Priority support",
                         "description": "Faster answers from BitoCard, including live chat."
                       }
                     ],
+                    "limits": {
+                      "stores": 5,
+                      "domains_per_store": 5,
+                      "own_connections": null,
+                      "ai_replies": 2000,
+                      "team_members": null,
+                      "webhook_endpoints": 16
+                    },
                     "local_price": {
                       "amount": 3500000,
                       "currency": "NGN",
@@ -44755,6 +44802,7 @@
           "features",
           "description",
           "feature_details",
+          "limits",
           "local_price"
         ],
         "additionalProperties": false,
@@ -44838,6 +44886,7 @@
               "description": "A feature the plan includes.",
               "required": [
                 "code",
+                "scope",
                 "group",
                 "name",
                 "description"
@@ -44862,6 +44911,14 @@
                     "team_members"
                   ]
                 },
+                "scope": {
+                  "type": "string",
+                  "description": "Where it applies: to each store (`store`) or to your whole account (`account`).",
+                  "enum": [
+                    "store",
+                    "account"
+                  ]
+                },
                 "group": {
                   "type": "string",
                   "description": "Where it is listed: running independently, selling, crypto, support and protection, or team.",
@@ -44884,6 +44941,63 @@
               }
             },
             "description": "The features in words, in the order they are shown."
+          },
+          "limits": {
+            "type": "object",
+            "description": "How much the plan allows. Adding one more past a limit is refused (409 `store_limit_reached`, `too_many_domains` or `plan_limit_reached` with `param` the limit; 400 `endpoint_limit`; 402 `ai_allowance_reached`); nothing is removed when a limit is lowered.",
+            "required": [
+              "stores",
+              "domains_per_store",
+              "own_connections",
+              "ai_replies",
+              "team_members",
+              "webhook_endpoints"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "stores": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Stores: Stores the reseller can run (with Several stores on the plan). Null: no limit."
+              },
+              "domains_per_store": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Domains per store: Domains each store can have (with Your own domains on the plan). Null: no limit."
+              },
+              "own_connections": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Own connections: Supplier and payment gateway accounts of their own connected at once, in each mode. Null: no limit."
+              },
+              "ai_replies": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "AI replies a month: Replies each store’s assistant writes on BitoCard’s AI each month (their own AI key has no limit). Null: no limit."
+              },
+              "team_members": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Team members: People besides the owner on the team, invitations waiting included (with Team members on the plan). Null: no limit."
+              },
+              "webhook_endpoints": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Webhook endpoints: Webhook endpoints in each mode. Null: no limit."
+              }
+            }
           },
           "local_price": {
             "anyOf": [

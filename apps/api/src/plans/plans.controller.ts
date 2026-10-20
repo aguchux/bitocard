@@ -44,6 +44,13 @@ class PlansQueryDto {
   @IsOptional() @Matches(/^[A-Za-z]{3}$/) currency?: string;
 }
 
+class PlanLimitDto {
+  /** A whole number, or null for unlimited. */
+  @IsOptional() @IsInt() @Min(0) value?: number | null;
+  /** Back to the default. */
+  @IsOptional() @IsBoolean() reset?: boolean;
+}
+
 class UpdateResellerDto {
   @IsOptional() @IsIn(statuses) status?: ResellerStatus;
   @IsOptional() @IsString() plan?: string;
@@ -108,6 +115,14 @@ export class AdminPlansController {
   @Put('plans/:code/features/:feature')
   setFeature(@CurrentCaller() caller: Caller, @Param('code') code: string, @Param('feature') feature: string, @Body() body: PlanFeatureDto) {
     return this.plans.setFeature(adminId(caller), code, feature, body.enabled);
+  }
+
+  /** How much of a limit one plan allows (a number, null for unlimited, or reset to the default). Audited. */
+  @AdminRoles('finance')
+  @StepUp()
+  @Put('plans/:code/limits/:limit')
+  setLimit(@CurrentCaller() caller: Caller, @Param('code') code: string, @Param('limit') limit: string, @Body() body: PlanLimitDto) {
+    return this.plans.setLimit(adminId(caller), code, limit, body);
   }
 
   /** Deletes a plan nobody is on (never Standard). Audited. */

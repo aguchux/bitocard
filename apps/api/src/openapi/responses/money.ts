@@ -1,3 +1,4 @@
+import { planLimitCatalogue, planLimits } from '../../plans/features.js';
 import { planFeatureCatalogue, planFeatureGroups, planFeatures } from '../../plans/plans.service.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, num, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
@@ -359,8 +360,12 @@ const Plan = objectSchema(
     features: array(oneOf('A plan feature.', planFeatures), 'What the plan includes, by code: `feature_details` names and describes each. An API call needing a feature the plan does not include is refused (403 `plan_feature_required`, `param` the feature).'),
     description: nullable(str('What the plan is for.')),
     feature_details: array(
-      shape({ code: oneOf('The feature.', planFeatures), group: oneOf('Where it is listed: running independently, selling, crypto, support and protection, or team.', Object.keys(planFeatureGroups)), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
+      shape({ code: oneOf('The feature.', planFeatures), scope: oneOf('Where it applies: to each store (`store`) or to your whole account (`account`).', ['store', 'account']), group: oneOf('Where it is listed: running independently, selling, crypto, support and protection, or team.', Object.keys(planFeatureGroups)), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
       'The features in words, in the order they are shown.',
+    ),
+    limits: shape(
+      Object.fromEntries(planLimits.map(limit => [limit, nullableInt(`${planLimitCatalogue[limit].name}: ${planLimitCatalogue[limit].description} Null: no limit.`)])),
+      'How much the plan allows. Adding one more past a limit is refused (409 `store_limit_reached`, `too_many_domains` or `plan_limit_reached` with `param` the limit; 400 `endpoint_limit`; 402 `ai_allowance_reached`); nothing is removed when a limit is lowered.',
     ),
     local_price: nullable(
       shape(
@@ -537,6 +542,7 @@ const standardPlan = {
   features: ['multiple_stores', 'store_traffic', 'team_members'],
   description: 'Everything you need to run your store and sell through the API.',
   feature_details: (['multiple_stores', 'store_traffic', 'team_members'] as const).map(code => ({ code, ...planFeatureCatalogue[code] })),
+  limits: { stores: 5, domains_per_store: 5, own_connections: null, ai_replies: 2000, team_members: null, webhook_endpoints: 16 },
   local_price: { amount: 0, currency: 'NGN', fixed: true },
 };
 const premiumPlan = {
@@ -547,6 +553,7 @@ const premiumPlan = {
   features: ['international_selling', 'chargeback_protection', 'priority_support'],
   description: 'More protection, more reach and more tools, billed monthly from your wallet.',
   feature_details: (['international_selling', 'chargeback_protection', 'priority_support'] as const).map(code => ({ code, ...planFeatureCatalogue[code] })),
+  limits: { stores: 5, domains_per_store: 5, own_connections: null, ai_replies: 2000, team_members: null, webhook_endpoints: 16 },
   local_price: { amount: 3_500_000, currency: 'NGN', fixed: true },
 };
 

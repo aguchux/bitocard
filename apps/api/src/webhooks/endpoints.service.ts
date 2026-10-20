@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { PlanAccessService } from '../plans/plan-access.js';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { Encryption } from '../common/encryption.js';
@@ -11,6 +12,7 @@ import { eventPayload, eventTypes, pingEvent } from './events.js';
 import { newWebhookSecret } from './signing.js';
 
 /** Endpoints per reseller in each mode. */
+/** The default endpoints per mode; each plan sets its own (`webhook_endpoints`). */
 export const maxEndpoints = 16;
 const maxOverlapHours = 168;
 
@@ -70,6 +72,7 @@ export class WebhookEndpointsService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly delivery: WebhookDeliveryService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   private encryption() {
@@ -99,12 +102,13 @@ export class WebhookEndpointsService {
   /** The signing secret is returned here and on rotation only. */
   async create(resellerId: string, mode: LedgerMode, input: { url: string; description?: string; events?: string[] }) {
     const events = this.eventList(input.events ?? ['*']);
-    await this.checkUrl(input.url);
     const existing = await this.prisma.webhookEndpoint.findMany({ where: { resellerId, mode }, select: { url: true } });
     if (existing.some(endpoint => endpoint.url === input.url)) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'endpoint_exists', 'An endpoint with this URL already exists.', 'url');
     }
-    if (existing.length >= maxEndpoints) throw invalid('endpoint_limit', `You can have up to ${maxEndpoints} webhook endpoints in each mode.`, 'url');
+    // The plan's limit first: no address lookups for an endpoint that cannot be added anyway.
+    await this.planAccess.requireRoom(resellerId, 'webhook_endpoints', existing.length, { code: 'endpoint_limit', param: 'url', invalid: true });
+    await this.checkUrl(input.url);
     const secret = newWebhookSecret();
     const endpoint = await this.prisma.webhookEndpoint.create({
       data: { resellerId, mode, url: input.url, description: input.description ?? null, events, secretEncrypted: this.encryption().encrypt(secret) },

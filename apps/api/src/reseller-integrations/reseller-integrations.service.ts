@@ -14,7 +14,7 @@ import { linksFor } from '../integrations/links.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { connectable, connectableIntegrations, type ConnectableIntegration, type ConnectableKind } from './connectable.js';
-import { planIncludes } from '../plans/plan-access.js';
+import { planIncludes, PlanAccessService } from '../plans/plan-access.js';
 
 /** Why a reseller cannot connect their own integrations yet (null: they can). */
 export type AccessReason = 'switch_off' | 'plan' | 'not_verified' | 'no_country' | null;
@@ -60,6 +60,7 @@ export class ResellerIntegrationsService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly inbox: InboxService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   /**
@@ -116,6 +117,12 @@ export class ResellerIntegrationsService {
     const existing = await this.prisma.resellerConnection.findUnique({ where: { resellerId_integrationId_mode: { resellerId, integrationId, mode } } });
     if (existing?.status === 'suspended') {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'connection_suspended', 'BitoCard suspended this connection. Contact support to have it reinstated.');
+    }
+    // A new connection (not a change to one already counted) needs room in the plan's limit.
+    const counted: ConnectionStatus[] = ['pending_review', 'active', 'suspended'];
+    if (!existing || !counted.includes(existing.status)) {
+      const used = await this.prisma.resellerConnection.count({ where: { resellerId, mode, status: { in: counted } } });
+      await this.planAccess.requireRoom(resellerId, 'own_connections', used);
     }
     const saved = existing?.credentialsEncrypted ? (JSON.parse(this.encryption().decrypt(existing.credentialsEncrypted)) as Record<string, string>) : {};
     const values = prepare(integration, submitted, saved);

@@ -101,7 +101,7 @@ function StoreDomainsView({ store, children }: { store: Store; children: (store:
 function useAdding(domains: StoreDomains) {
   const { membership } = useReseller();
   const manage = can(membership, "admin");
-  const full = counted(domains.data).length >= domains.max_domains;
+  const full = domains.max_domains !== null && counted(domains.data).length >= domains.max_domains;
   return { manage, full, allowed: manage && !full };
 }
 
@@ -160,7 +160,7 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
           value={traffic.data ? count(traffic.data.visitors) : "—"}
           icon={<Eye />}
           loading={traffic.isLoading}
-          footer={<span className="text-sm text-muted">{traffic.data ? `${count(traffic.data.views)} page views` : "Traffic not loaded"} · {list.length} of {domains.max_domains} domains</span>}
+          footer={<span className="text-sm text-muted">{traffic.data ? `${count(traffic.data.views)} page views` : "Traffic not loaded"} · {domains.max_domains === null ? `${list.length} domains` : `${list.length} of ${domains.max_domains} domains`}</span>}
         />
         <StatCard label="Live" value={live.length} icon={<CheckCircle2 />} tone="green" footer={<span className="block truncate text-sm text-muted">{main ? `Main address: ${main.name}` : `Your store is at ${store.url.replace(/^https:\/\//, "")}`}</span>} />
         <StatCard label="Need attention" value={attention.length} icon={<AlertTriangle />} tone="amber" footer={<span className="text-sm text-muted">{attention.length ? "Waiting for DNS, expired or renewal" : "Nothing to do"}</span>} />
@@ -207,7 +207,7 @@ export function DomainsOverview({ store, domains }: { store: Store; domains: Sto
             Buy a domain or connect one you own to use your own address.
           </EmptyState>
         )}
-        {manage && full ? <div className="px-5 pb-5 sm:px-6"><Notice tone="blue">Your store has {domains.max_domains} domains, the most it can have. Disconnect one to add another.</Notice></div> : null}
+        {manage && full ? <div className="px-5 pb-5 sm:px-6"><Notice tone="blue">Your store has {domains.max_domains} domains, the most your plan allows. Disconnect one, or change your plan in Settings &gt; Plan.</Notice></div> : null}
       </Card>
       {!manage ? <Notice tone="blue">The owner or an admin of {membership.reseller.name} manages the store’s domains.</Notice> : null}
     </div>
@@ -218,7 +218,7 @@ function AddingClosed({ store, domains }: { store: Store; domains: StoreDomains 
   const { manage, full } = useAdding(domains);
   return (
     <Notice tone="blue">
-      {!manage ? "The owner or an admin manages the store’s domains." : full ? `Your store has ${domains.max_domains} domains, the most it can have. Disconnect one to add another.` : null}{" "}
+      {!manage ? "The owner or an admin manages the store’s domains." : full ? `Your store has ${domains.max_domains} domains, the most your plan allows. Disconnect one, or change your plan in Settings > Plan.` : null}{" "}
       <AppLink href={storeHref("/store/domains", store)} className="font-semibold underline">Back to domains</AppLink>
     </Notice>
   );

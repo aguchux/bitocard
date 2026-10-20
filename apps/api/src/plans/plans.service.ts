@@ -7,7 +7,8 @@ import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
 import { FxService } from '../fx/fx.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures } from './features.js';
+import { freePlanCode, isPlanFeature, isPlanLimit, type PlanLimit, planFeatureCatalogue, planFeatureGroups, planFeatures, planLimitCatalogue, planLimits } from './features.js';
+import { PlanAccessService } from './plan-access.js';
 
 export { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures, type PlanFeature } from './features.js';
 
@@ -18,12 +19,19 @@ export function presentPlan(plan: Plan) {
 /** What a reseller pays for a plan a month in one currency: the admin's fixed price, else the dollar price converted. */
 export type LocalPrice = { amount: bigint; currency: string; fixed: boolean };
 
-/** The plan as resellers see it: its description, its features in words, and (when asked) its price in their currency. */
-export function presentPlanDetail(plan: Plan, local: LocalPrice | null) {
+/** Every limit's value for a plan (null: unlimited). */
+export type PlanLimitValues = Record<PlanLimit, number | null>;
+
+/**
+ * The plan as resellers see it: its description, its features in words, how much it allows (`limits`), and (when
+ * asked) its price in their currency.
+ */
+export function presentPlanDetail(plan: Plan, local: LocalPrice | null, limits: PlanLimitValues) {
   return {
     ...presentPlan(plan),
     description: plan.description,
     feature_details: planFeatures.filter(code => plan.features.includes(code)).map(code => ({ code, ...planFeatureCatalogue[code] })),
+    limits,
     local_price: local ? { amount: Number(local.amount), currency: local.currency, fixed: local.fixed } : null,
   };
 }
@@ -45,7 +53,13 @@ export class PlansService {
     private readonly settings: SettingsService,
     private readonly inbox: InboxService,
     private readonly fx: FxService,
+    private readonly access: PlanAccessService,
   ) {}
+
+  /** Every limit's value for a plan: what it sets, else the default. */
+  limitsOf(plan: { limits: unknown }): PlanLimitValues {
+    return Object.fromEntries(planLimits.map(limit => [limit, this.access.limitOf(plan, limit)])) as PlanLimitValues;
+  }
 
   list() {
     return this.prisma.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { priceCents: 'asc' }, { code: 'asc' }] });
@@ -58,7 +72,7 @@ export class PlansService {
   async publicList(currency?: string) {
     const plans = (await this.list()).filter(plan => plan.available);
     const code = currency?.trim().toUpperCase();
-    return Promise.all(plans.map(async plan => presentPlanDetail(plan, code ? await this.localPrice(plan, code) : null)));
+    return Promise.all(plans.map(async plan => presentPlanDetail(plan, code ? await this.localPrice(plan, code) : null, this.limitsOf(plan))));
   }
 
   /**
@@ -98,6 +112,10 @@ export class PlansService {
           available: plan.available,
           sort_order: plan.sortOrder,
           api_restrictions: plan.apiRestrictions,
+          /** Every limit's value (null: unlimited). */
+          limits: this.limitsOf(plan),
+          /** The limits this plan sets itself; the others have their default. */
+          limits_set: planLimits.filter(limit => Object.prototype.hasOwnProperty.call(plan.limits ?? {}, limit)),
           resellers: counts.find(row => row.planCode === plan.code)?._count._all ?? 0,
           local_prices: await Promise.all(
             currencies.map(async currency => {
@@ -117,7 +135,35 @@ export class PlansService {
       ),
       groups: Object.entries(planFeatureGroups).map(([code, name]) => ({ code, name })),
       features: planFeatures.map(code => ({ code, ...planFeatureCatalogue[code] })),
+      limits: planLimits.map(code => {
+        const { scope, group, name, unit, description, max } = planLimitCatalogue[code];
+        return { code, scope, group, name, unit, description, max, default: this.access.limitOf({ limits: {} }, code) };
+      }),
     };
+  }
+
+  /**
+   * Admin: how much of a limit a plan allows: a number, `null` for unlimited, or `reset` back to the default. Lowering it
+   * below what resellers already use only stops new additions; nothing is removed. Audited.
+   */
+  async setLimit(actorId: string | null, code: string, limit: string, input: { value?: number | null; reset?: boolean }) {
+    if (!isPlanLimit(limit)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan limit.');
+    const plan = await this.prisma.plan.findUnique({ where: { code } });
+    if (!plan) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
+    const { max, name } = planLimitCatalogue[limit];
+    if (!input.reset) {
+      if (input.value === undefined) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_missing', 'Send a value (null for unlimited), or reset.', 'value');
+      if (input.value !== null && (!Number.isSafeInteger(input.value) || input.value < 0 || input.value > max)) {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', `${name} must be a whole number from 0 to ${max}, or unlimited.`, 'value');
+      }
+    }
+    const before = { ...((plan.limits as Record<string, number | null> | null) ?? {}) };
+    const after: Record<string, number | null> = { ...before };
+    if (input.reset) delete after[limit];
+    else after[limit] = input.value ?? null;
+    await this.prisma.plan.update({ where: { code }, data: { limits: after } });
+    await this.audit.record({ actorId, action: 'plan.limit_changed', targetType: 'plan', targetId: code, before: { limit, value: before[limit] }, after: { limit, value: input.reset ? 'default' : after[limit] } });
+    return this.adminOverview();
   }
 
   /**

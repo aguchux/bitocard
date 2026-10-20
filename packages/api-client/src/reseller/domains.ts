@@ -30,7 +30,7 @@ export type StoreDomain = {
   last_error: string | null;
   created_at: string;
 };
-export type StoreDomains = List<StoreDomain> & { buying: { available: boolean; tlds: string[] }; max_domains: number };
+export type StoreDomains = List<StoreDomain> & { buying: { available: boolean; tlds: string[] }; /** The most domains a store can have on your plan; null: no limit. */ max_domains: number | null };
 export type DomainOffer = { object: 'domain_offer'; domain: string; available: boolean; price: { amount: number; currency: 'USD' } | null; renewal_price: { amount: number; currency: 'USD' } | null };
 export type DomainContact = { first_name: string; last_name: string; email: string; phone: string; address1: string; address2?: string; city: string; state: string; zip: string; country: string; company_name?: string };
 export type DnsRecordType = 'A' | 'AAAA' | 'CNAME' | 'MX' | 'TXT' | 'CAA';

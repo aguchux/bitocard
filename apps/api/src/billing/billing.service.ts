@@ -43,7 +43,7 @@ export class BillingService {
     return {
       object: 'subscription' as const,
       /** With `local_price`: what the plan costs a month in your currency. */
-      plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency)),
+      plan: presentPlanDetail(reseller.plan, await this.plans.localPrice(reseller.plan, currency), this.plans.limitsOf(reseller.plan)),
       /** Null when the plan is not billed (Standard, or set by BitoCard). */
       renews_at: reseller.planRenewsAt?.toISOString() ?? null,
       cancel_at_period_end: reseller.planCancelAtPeriodEnd,

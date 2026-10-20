@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { PlanAccessService } from '../../plans/plan-access.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { ApiError } from '../../common/errors/api-error.js';
 import { Encryption } from '../../common/encryption.js';
@@ -37,6 +38,7 @@ export class AiService {
     private readonly integrations: IntegrationsService,
     private readonly audit: AuditService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   private encryption() {
@@ -53,8 +55,14 @@ export class AiService {
     return parseModelList(this.integrations.config.AI_BITOCARD_MODELS as string | undefined).filter(item => Boolean(this.setting(keys[item.provider].key)?.trim()));
   }
 
-  allowance() {
+  /** The default replies a month per store, for plans that set none (the Support assistant setting). */
+  defaultAllowance() {
     return Number(this.integrations.config.AI_MONTHLY_REPLIES ?? 2000);
+  }
+
+  /** Replies a month per store on BitoCard's AI for the reseller's plan (null: unlimited). */
+  async allowance(resellerId: string) {
+    return (await this.planAccess.limit(resellerId, 'ai_replies')).value;
   }
 
   private bitocardProvider(provider: AiProviderName): AiProvider | null {
@@ -117,8 +125,10 @@ export class AiService {
     return this.prisma.aiUsage.count({ where: { storeId, funding: 'bitocard', kind: { in: ['chat', 'ticket'] }, createdAt: { gte: monthStart() } } });
   }
 
-  async allowanceLeft(storeId: string) {
-    return Math.max(0, this.allowance() - (await this.usedThisMonth(storeId)));
+  /** Replies left this month for a store (Infinity when its plan has no limit). */
+  async allowanceLeft(resellerId: string, storeId: string) {
+    const allowance = await this.allowance(resellerId);
+    return allowance === null ? Infinity : Math.max(0, allowance - (await this.usedThisMonth(storeId)));
   }
 
   /** Whether a reseller's plan includes bots on BitoCard's keys. */
@@ -137,7 +147,7 @@ export class AiService {
     if (call.funding === 'bitocard') {
       if (!(await this.premium(call.resellerId))) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'ai_plan_required', 'Assistants on BitoCard’s AI need the Premium plan. Use your own AI key instead, or change plan.');
       if (!this.bitocardModels().some(item => item.provider === call.provider && item.model === call.model)) throw invalid('ai_model_unavailable', 'This model is not offered on BitoCard’s AI. Choose another.', 'model');
-      if (call.storeId && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
+      if (call.storeId && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.resellerId, call.storeId)) <= 0) {
         throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'ai_allowance_reached', 'This store has used this month’s assistant replies on BitoCard’s AI. People answer until next month, or add your own AI key.');
       }
       client = this.bitocardProvider(call.provider);
@@ -183,7 +193,7 @@ export class AiService {
     return {
       object: 'support_ai' as const,
       premium,
-      allowance: { replies_per_store: this.allowance(), month_start: monthStart().toISOString(), stores: usage },
+      allowance: { replies_per_store: await this.allowance(resellerId), month_start: monthStart().toISOString(), stores: usage },
       providers: aiProviders.map(provider => ({ provider, label: aiProviderLabels[provider], bitocard_models: bitocard.filter(item => item.provider === provider).map(item => item.model), own_key: own.find(item => item.provider === provider) ?? null })),
     };
   }

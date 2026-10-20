@@ -151,6 +151,11 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ code, feature, enabled }) => ({ url: `/v1/admin/plans/${code}/features/${feature}`, method: 'PUT', body: { enabled } }),
       invalidatesTags: ['Plan', 'Reseller', 'Activity'],
     }),
+    /** Finance: how much of a limit a plan allows (a number, null for unlimited, or `reset` to the default). */
+    setPlanLimit: build.mutation<PlanSettings, { code: string; limit: string; value?: number | null; reset?: boolean }>({
+      query: ({ code, limit, ...body }) => ({ url: `/v1/admin/plans/${code}/limits/${limit}`, method: 'PUT', body }),
+      invalidatesTags: ['Plan', 'Reseller', 'Activity'],
+    }),
     /** Finance: deletes a plan nobody is on. */
     deletePlan: build.mutation<PlanSettings, { code: string }>({
       query: ({ code }) => ({ url: `/v1/admin/plans/${code}`, method: 'DELETE' }),
@@ -431,6 +436,7 @@ export const {
   useUpdatePlanMutation,
   useCreatePlanMutation,
   useSetPlanFeatureMutation,
+  useSetPlanLimitMutation,
   useDeletePlanMutation,
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,

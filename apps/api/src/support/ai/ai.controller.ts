@@ -61,7 +61,7 @@ export class AdminAiController {
   /** The models offered on BitoCard's AI, for BitoCard's own assistants. */
   @Get()
   overview() {
-    return { object: 'support_ai_admin' as const, bitocard_models: this.ai.bitocardModels(), replies_per_store: this.ai.allowance() };
+    return { object: 'support_ai_admin' as const, bitocard_models: this.ai.bitocardModels(), replies_per_store: this.ai.defaultAllowance() };
   }
 
   @Get('usage')

@@ -17,6 +17,7 @@ import { type Contact, VercelDomains } from './vercel.js';
 import { PlanAccessService } from '../plans/plan-access.js';
 
 /** At most this many domains per store (in use: not removed or failed). */
+/** The default domains per store; each plan sets its own (`domains_per_store`). */
 export const maxDomainsPerStore = 5;
 /** Purchased domains renew this long before they expire, from the wallet (Vercel's own auto-renew stays off). */
 export const renewBeforeMs = 14 * 24 * 3600_000;
@@ -108,8 +109,9 @@ export class DomainsService {
   }
 
   private async assertRoom(storeId: string) {
+    const store = await this.prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { resellerId: true } });
     const used = await this.prisma.storeDomain.count({ where: { storeId, status: { notIn: ['removed', 'failed'] } } });
-    if (used >= maxDomainsPerStore) throw conflict('too_many_domains', `A store can have up to ${maxDomainsPerStore} domains. Remove one first.`);
+    await this.planAccess.requireRoom(store.resellerId, 'domains_per_store', used, { code: 'too_many_domains', param: 'domain' });
   }
 
   private async assertFree(name: string) {
@@ -135,7 +137,7 @@ export class DomainsService {
       object: 'list' as const,
       data: domains.map(domain => this.present(domain)),
       buying: { available: marginBps !== null && this.clients().vercel.configured(), tlds: [...tlds] },
-      max_domains: maxDomainsPerStore,
+      max_domains: (await this.planAccess.limit(resellerId, 'domains_per_store')).value,
     };
   }
 
