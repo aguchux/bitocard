@@ -10,6 +10,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { PaymentProviders } from './payment-providers.js';
 import { inPaymentCurrency } from './payments.service.js';
+import { planIncludes } from '../plans/plan-access.js';
 
 export const chargebackOutcomes = ['won', 'lost'] as const;
 export type ChargebackOutcome = (typeof chargebackOutcomes)[number];
@@ -154,7 +155,7 @@ export class ChargebacksService {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'own_gateway_payment', 'This payment went to the reseller’s own gateway account: they handle its chargebacks with their gateway.', 'payment_id');
     }
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: payment.resellerId }, include: { plan: true } });
-    const isProtected = reseller.plan.features.includes('chargeback_protection');
+    const isProtected = planIncludes(reseller, 'chargeback_protection');
     let chargeback: Chargeback;
     try {
       chargeback = await this.prisma.chargeback.create({

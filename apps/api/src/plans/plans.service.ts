@@ -7,26 +7,9 @@ import type { Plan, ResellerStatus } from '../generated/prisma/client.js';
 import { FxService } from '../fx/fx.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures } from './features.js';
 
-/**
- * What plans can include, in the order they are shown, with the words resellers read. Admins place each on the free
- * plan (every plan has it) or on paid plans only (`setFeatureTier`); code checks a reseller's plan with
- * `plan.features.includes(code)`.
- */
-export const planFeatureCatalogue = {
-  chargeback_protection: { name: 'Chargeback protection', description: 'Chargebacks are handled by BitoCard, not taken from your wallet.' },
-  priority_support: { name: 'Priority support', description: 'Faster answers from BitoCard, including chat.' },
-  international_selling: { name: 'International selling', description: 'Sell to customers outside your country.' },
-  own_integrations: { name: 'Your own suppliers', description: 'Connect your own supplier accounts and sell from them.' },
-  own_payment_gateways: { name: 'Your own payment gateway', description: 'Your customers pay into your own gateway account.' },
-  onchain_crypto: { name: 'Coins on chain', description: 'Deposit and withdraw your own coins on chain.' },
-  ai_assistant: { name: 'AI support assistant', description: 'BitoCard’s AI answers your customers, within a monthly allowance.' },
-} as const;
-export type PlanFeature = keyof typeof planFeatureCatalogue;
-export const planFeatures = Object.keys(planFeatureCatalogue) as PlanFeature[];
-
-/** The free plan: every reseller starts on it, it is never charged, and a feature placed "free" is on it. */
-export const freePlanCode = 'standard';
+export { freePlanCode, isPlanFeature, planFeatureCatalogue, planFeatureGroups, planFeatures, type PlanFeature } from './features.js';
 
 export function presentPlan(plan: Plan) {
   return { object: 'plan' as const, code: plan.code, name: plan.name, price: { amount: plan.priceCents, currency: 'USD', interval: 'month' }, features: plan.features };
@@ -65,12 +48,15 @@ export class PlansService {
   ) {}
 
   list() {
-    return this.prisma.plan.findMany({ orderBy: { priceCents: 'asc' } });
+    return this.prisma.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { priceCents: 'asc' }, { code: 'asc' }] });
   }
 
-  /** The public plan list; with `currency`, each plan's monthly price in it (null where it cannot be priced). */
+  /**
+   * The public plan list: the plans resellers can choose (`available`); with `currency`, each plan's monthly price in it
+   * (null where it cannot be priced).
+   */
   async publicList(currency?: string) {
-    const plans = await this.list();
+    const plans = (await this.list()).filter(plan => plan.available);
     const code = currency?.trim().toUpperCase();
     return Promise.all(plans.map(async plan => presentPlanDetail(plan, code ? await this.localPrice(plan, code) : null)));
   }
@@ -94,14 +80,13 @@ export class PlansService {
   }
 
   /**
-   * Admin: every plan with its price in each market currency (fixed, or converted today) and how many resellers are on
-   * it, and every plan feature with where it sits (`free`: on every plan; `premium`: on paid plans only).
+   * Admin: every plan with its price in each market currency (fixed, or converted today), whether resellers can choose
+   * it and how many are on it; and every plan feature with its group (each plan's `features` say where it is on).
    */
   async adminOverview() {
-    const plans = await this.prisma.plan.findMany({ orderBy: { priceCents: 'asc' }, include: { localPrices: true } });
+    const plans = await this.prisma.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { priceCents: 'asc' }, { code: 'asc' }], include: { localPrices: true } });
     const markets = await this.prisma.country.findMany({ orderBy: { name: 'asc' }, select: { code: true, name: true, currency: true } });
     const currencies = [...new Set(markets.map(market => market.currency))].filter(currency => currency !== 'USD').sort();
-    const free = plans.find(plan => plan.code === freePlanCode);
     const counts = await this.prisma.reseller.groupBy({ by: ['planCode'], where: { house: false }, _count: { _all: true } });
     return {
       object: 'plan_settings' as const,
@@ -110,6 +95,8 @@ export class PlansService {
           ...presentPlan(plan),
           description: plan.description,
           free: plan.code === freePlanCode,
+          available: plan.available,
+          sort_order: plan.sortOrder,
           api_restrictions: plan.apiRestrictions,
           resellers: counts.find(row => row.planCode === plan.code)?._count._all ?? 0,
           local_prices: await Promise.all(
@@ -128,8 +115,38 @@ export class PlansService {
           ),
         })),
       ),
-      features: planFeatures.map(code => ({ code, ...planFeatureCatalogue[code], tier: free?.features.includes(code) ? ('free' as const) : ('premium' as const) })),
+      groups: Object.entries(planFeatureGroups).map(([code, name]) => ({ code, name })),
+      features: planFeatures.map(code => ({ code, ...planFeatureCatalogue[code] })),
     };
+  }
+
+  /**
+   * Admin: a new plan (paid: only the Standard plan is free) with the features it includes. Resellers can choose it at
+   * once unless it is created hidden (`available: false`). Audited.
+   */
+  async create(actorId: string | null, input: { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean; sort_order?: number }) {
+    const code = input.code.trim().toLowerCase();
+    const invalid = (message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', message, param);
+    if (!/^[a-z][a-z0-9_]{1,29}$/.test(code)) throw invalid('Use 2 to 30 lower-case letters, numbers and underscores, starting with a letter.', 'code');
+    if (!Number.isSafeInteger(input.price_cents) || input.price_cents <= 0) throw invalid('A new plan needs a price: only the Standard plan is free.', 'price_cents');
+    const unknown = input.features?.find(feature => !isPlanFeature(feature));
+    if (unknown) throw invalid(`Unknown feature ${unknown}.`, 'features');
+    if (await this.prisma.plan.findUnique({ where: { code } })) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_exists', `There is already a plan called ${code}.`, 'code');
+    const last = await this.prisma.plan.aggregate({ _max: { sortOrder: true } });
+    const plan = await this.prisma.plan.create({
+      data: {
+        code,
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        priceCents: input.price_cents,
+        features: planFeatures.filter(feature => input.features?.includes(feature)),
+        available: input.available ?? true,
+        sortOrder: input.sort_order ?? (last._max.sortOrder ?? 0) + 10,
+      },
+      include: { localPrices: true },
+    });
+    await this.audit.record({ actorId, action: 'plan.created', targetType: 'plan', targetId: code, before: null, after: auditable(plan) });
+    return this.adminOverview();
   }
 
   /**
@@ -140,18 +157,19 @@ export class PlansService {
   async update(
     actorId: string | null,
     code: string,
-    input: { name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; features?: string[]; api_restrictions?: string[] },
+    input: { name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; features?: string[]; api_restrictions?: string[]; available?: boolean; sort_order?: number },
   ) {
     const before = await this.prisma.plan.findUnique({ where: { code }, include: { localPrices: true } });
     if (!before) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
     const invalid = (message: string, param: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', message, param);
-    const unknownFeature = input.features?.find(feature => !(planFeatures as readonly string[]).includes(feature));
+    const unknownFeature = input.features?.find(feature => !isPlanFeature(feature));
     if (unknownFeature) throw invalid(`Unknown feature ${unknownFeature}.`, 'features');
     const unknownScope = input.api_restrictions?.find(scope => !(apiKeyScopes as readonly string[]).includes(scope));
     if (unknownScope) throw invalid(`Unknown API scope ${unknownScope}.`, 'api_restrictions');
     const free = code === freePlanCode;
     if (free && input.price_cents !== undefined && input.price_cents !== 0) throw invalid('The free plan is never charged.', 'price_cents');
     if (!free && input.price_cents === 0) throw invalid('A paid plan needs a price.', 'price_cents');
+    if (free && input.available === false) throw invalid('Every reseller starts on the free plan, so it cannot be hidden.', 'available');
     const local = Object.entries(input.local_prices ?? {}).map(([currency, amount]) => ({ currency: currency.toUpperCase(), amount }));
     if (local.length) {
       if (free) throw invalid('The free plan is never charged.', 'local_prices');
@@ -172,50 +190,68 @@ export class PlansService {
           name: input.name?.trim() || undefined,
           description: input.description === undefined ? undefined : input.description?.trim() || null,
           priceCents: input.price_cents,
-          features: input.features,
+          features: input.features ? planFeatures.filter(feature => input.features!.includes(feature)) : undefined,
           apiRestrictions: input.api_restrictions,
+          available: input.available,
+          sortOrder: input.sort_order,
         },
         include: { localPrices: true },
       });
     });
     await this.audit.record({ actorId, action: 'plan.updated', targetType: 'plan', targetId: code, before: auditable(before), after: auditable(after) });
-    return { ...presentPlan(after), description: after.description, api_restrictions: after.apiRestrictions, local_prices: auditable(after).local_prices };
+    await this.tellPlan(after.code, after.name, before.features.filter(feature => !after.features.includes(feature)));
+    return { ...presentPlan(after), description: after.description, available: after.available, sort_order: after.sortOrder, api_restrictions: after.apiRestrictions, local_prices: auditable(after).local_prices };
   }
 
   /**
-   * Admin: puts a feature on the free plan (every plan has it) or on paid plans only. Resellers on the free plan gain or
-   * lose it at once. Audited when anything changed.
+   * Admin: switches one feature on or off for one plan. Resellers on the plan gain or lose it at once (an API call
+   * using it is then refused, `plan_feature_required`), and are told when they lose it. Audited when anything changed.
    */
-  async setFeatureTier(actorId: string | null, feature: string, tier: 'free' | 'premium') {
-    if (!(planFeatures as readonly string[]).includes(feature)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan feature.');
-    const plans = await this.prisma.plan.findMany();
-    const changed: string[] = [];
-    for (const plan of plans) {
-      const wanted = tier === 'free' || plan.code !== freePlanCode;
-      if (wanted === plan.features.includes(feature)) continue;
-      const features = wanted ? [...plan.features, feature] : plan.features.filter(item => item !== feature);
+  async setFeature(actorId: string | null, code: string, feature: string, enabled: boolean) {
+    if (!isPlanFeature(feature)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan feature.');
+    const plan = await this.prisma.plan.findUnique({ where: { code } });
+    if (!plan) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
+    if (enabled !== plan.features.includes(feature)) {
+      const features = enabled ? [...plan.features, feature] : plan.features.filter(item => item !== feature);
       // Kept in the catalogue's order, so plan lists read the same everywhere.
-      await this.prisma.plan.update({ where: { code: plan.code }, data: { features: planFeatures.filter(code => features.includes(code)) } });
-      changed.push(plan.code);
-    }
-    if (changed.length) {
-      await this.audit.record({ actorId, action: 'plan.feature_tier_changed', targetType: 'plan_feature', targetId: feature, before: null, after: { feature, tier, plans: changed } });
-      if (tier === 'premium') await this.tellFreePlan(feature as PlanFeature);
+      await this.prisma.plan.update({ where: { code }, data: { features: planFeatures.filter(item => features.includes(item)) } });
+      await this.audit.record({ actorId, action: 'plan.feature_changed', targetType: 'plan', targetId: code, before: { feature, enabled: !enabled }, after: { feature, enabled } });
+      if (!enabled) await this.tellPlan(code, plan.name, [feature]);
     }
     return this.adminOverview();
   }
 
-  /** Tells every reseller on the free plan that a feature now needs Premium (the reseller terms promise it). */
-  private async tellFreePlan(feature: PlanFeature) {
-    const { name } = planFeatureCatalogue[feature];
+  /**
+   * Admin: deletes a plan nobody is on (resellers and BitoCard's own store accounts alike; `plan_in_use` otherwise), and
+   * never the free plan. Hide a plan instead (`available: false`) to stop new subscribers and keep those on it.
+   */
+  async remove(actorId: string | null, code: string) {
+    const plan = await this.prisma.plan.findUnique({ where: { code }, include: { localPrices: true } });
+    if (!plan) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
+    if (code === freePlanCode) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_in_use', 'The free plan cannot be deleted: every reseller starts on it.');
+    const using = await this.prisma.reseller.count({ where: { planCode: code } });
+    if (using) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_in_use', `${using} account${using === 1 ? ' is' : 's are'} on ${plan.name}. Hide it instead, or move them to another plan first.`);
+    }
+    await this.prisma.plan.delete({ where: { code } });
+    await this.audit.record({ actorId, action: 'plan.deleted', targetType: 'plan', targetId: code, before: auditable(plan), after: null });
+    return this.adminOverview();
+  }
+
+  /** Tells every reseller on a plan which features it no longer includes (the reseller terms promise it). */
+  private async tellPlan(code: string, planName: string, removed: string[]) {
+    const features = removed.filter(isPlanFeature);
+    if (!features.length) return;
     const at = new Date().toISOString();
+    const names = features.map(feature => planFeatureCatalogue[feature].name);
+    const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
     for (let after: string | undefined; ; ) {
-      const page = await this.prisma.reseller.findMany({ where: { planCode: freePlanCode, house: false }, select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(after ? { cursor: { id: after }, skip: 1 } : {}) });
+      const page = await this.prisma.reseller.findMany({ where: { planCode: code, house: false }, select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(after ? { cursor: { id: after }, skip: 1 } : {}) });
       for (const reseller of page) {
         await this.inbox.reseller(reseller.id, 'plan.feature_changed', {
-          subject: `${feature}:${at}`,
-          title: `${name} is now part of Premium`,
-          body: `${planFeatureCatalogue[feature].description} It is no longer on the Standard plan. Upgrade to Premium to keep it.`,
+          subject: `${code}:${features.join(',')}:${at}`,
+          title: `${list} ${names.length === 1 ? 'is' : 'are'} no longer part of ${planName}`,
+          body: `Your ${planName} plan no longer includes ${list}. See Settings > Plan for the plans that do.`,
           link: '/settings/plan',
         });
       }

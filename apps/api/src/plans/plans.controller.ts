@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp, requireStepUp } from '../auth/caller.js';
@@ -16,11 +16,27 @@ class UpdatePlanDto {
   @IsOptional() @IsObject() local_prices?: Record<string, number | null>;
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) features?: string[];
   @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) api_restrictions?: string[];
+  /** Resellers can choose it; false hides it from new subscribers (those on it keep it). */
+  @IsOptional() @IsBoolean() available?: boolean;
+  /** Its place in the list, lowest first. */
+  @IsOptional() @IsInt() @Min(0) @Max(10_000) sort_order?: number;
 }
 
-class FeatureTierDto {
-  /** `free`: on every plan; `premium`: on paid plans only. */
-  @IsIn(['free', 'premium']) tier: 'free' | 'premium';
+class CreatePlanDto {
+  /** Its code, for example `business` (lower-case letters, numbers and underscores). */
+  @IsString() @Length(2, 30) code: string;
+  @IsString() @Length(1, 40) name: string;
+  @IsOptional() @IsString() @Length(0, 300) description?: string | null;
+  /** The monthly price in US cents (above zero: only Standard is free). */
+  @IsInt() @Min(1) @Max(1_000_000) price_cents: number;
+  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) features?: string[];
+  @IsOptional() @IsBoolean() available?: boolean;
+  @IsOptional() @IsInt() @Min(0) @Max(10_000) sort_order?: number;
+}
+
+class PlanFeatureDto {
+  /** Whether the plan includes the feature. */
+  @IsBoolean() enabled: boolean;
 }
 
 class PlansQueryDto {
@@ -78,12 +94,28 @@ export class AdminPlansController {
     return this.plans.adminOverview();
   }
 
-  /** Puts a plan feature on every plan (`free`) or on paid plans only (`premium`). Audited. */
+  /** A new paid plan with its features. Audited. */
   @AdminRoles('finance')
   @StepUp()
-  @Put('plan-features/:feature')
-  setFeatureTier(@CurrentCaller() caller: Caller, @Param('feature') feature: string, @Body() body: FeatureTierDto) {
-    return this.plans.setFeatureTier(adminId(caller), feature, body.tier);
+  @Post('plans')
+  createPlan(@CurrentCaller() caller: Caller, @Body() body: CreatePlanDto) {
+    return this.plans.create(adminId(caller), body);
+  }
+
+  /** Switches one feature on or off for one plan; resellers on it gain or lose it at once. Audited. */
+  @AdminRoles('finance')
+  @StepUp()
+  @Put('plans/:code/features/:feature')
+  setFeature(@CurrentCaller() caller: Caller, @Param('code') code: string, @Param('feature') feature: string, @Body() body: PlanFeatureDto) {
+    return this.plans.setFeature(adminId(caller), code, feature, body.enabled);
+  }
+
+  /** Deletes a plan nobody is on (never Standard). Audited. */
+  @AdminRoles('finance')
+  @StepUp()
+  @Delete('plans/:code')
+  removePlan(@CurrentCaller() caller: Caller, @Param('code') code: string) {
+    return this.plans.remove(adminId(caller), code);
   }
 
   @AdminRoles('finance')

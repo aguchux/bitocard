@@ -1,4 +1,4 @@
-import { planFeatures } from '../../plans/plans.service.js';
+import { planFeatureCatalogue, planFeatureGroups, planFeatures } from '../../plans/plans.service.js';
 import { eventObjectSchemas } from '../../webhooks/openapi.js';
 import { array, bool, constant, int, list, listExample, mode, money, nullable, nullableInt, nullableStr, nullableTime, num, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
@@ -356,10 +356,10 @@ const Plan = objectSchema(
       },
       'The price.',
     ),
-    features: array(oneOf('A plan feature.', planFeatures), 'What the plan includes: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant). BitoCard decides which are on the free plan and which need Premium.'),
+    features: array(oneOf('A plan feature.', planFeatures), 'What the plan includes, by code: `feature_details` names and describes each. An API call needing a feature the plan does not include is refused (403 `plan_feature_required`, `param` the feature).'),
     description: nullable(str('What the plan is for.')),
     feature_details: array(
-      shape({ code: oneOf('The feature.', planFeatures), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
+      shape({ code: oneOf('The feature.', planFeatures), group: oneOf('Where it is listed: running independently, selling, crypto, support and protection, or team.', Object.keys(planFeatureGroups)), name: str('Its name.'), description: str('What it does.') }, 'A feature the plan includes.'),
       'The features in words, in the order they are shown.',
     ),
     local_price: nullable(
@@ -534,9 +534,9 @@ const standardPlan = {
   code: 'standard',
   name: 'Standard',
   price: { amount: 0, currency: 'USD', interval: 'month' },
-  features: [],
+  features: ['multiple_stores', 'store_traffic', 'team_members'],
   description: 'Everything you need to run your store and sell through the API.',
-  feature_details: [],
+  feature_details: (['multiple_stores', 'store_traffic', 'team_members'] as const).map(code => ({ code, ...planFeatureCatalogue[code] })),
   local_price: { amount: 0, currency: 'NGN', fixed: true },
 };
 const premiumPlan = {
@@ -544,13 +544,9 @@ const premiumPlan = {
   code: 'premium',
   name: 'Premium',
   price: { amount: 2_500, currency: 'USD', interval: 'month' },
-  features: ['chargeback_protection', 'priority_support', 'international_selling'],
+  features: ['international_selling', 'chargeback_protection', 'priority_support'],
   description: 'More protection, more reach and more tools, billed monthly from your wallet.',
-  feature_details: [
-    { code: 'chargeback_protection', name: 'Chargeback protection', description: 'Chargebacks are handled by BitoCard, not taken from your wallet.' },
-    { code: 'priority_support', name: 'Priority support', description: 'Faster answers from BitoCard, including chat.' },
-    { code: 'international_selling', name: 'International selling', description: 'Sell to customers outside your country.' },
-  ],
+  feature_details: (['international_selling', 'chargeback_protection', 'priority_support'] as const).map(code => ({ code, ...planFeatureCatalogue[code] })),
   local_price: { amount: 3_500_000, currency: 'NGN', fixed: true },
 };
 

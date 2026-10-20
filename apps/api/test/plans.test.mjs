@@ -5,10 +5,13 @@ import { FixturesModule, adminClient, client, resellerClient, startApp } from '.
 
 let server;
 let admin;
+const prismaOf = () => server.app.get(prismaService);
+let prismaService;
 
 before(async () => {
   server = await startApp({ extraModules: [FixturesModule] });
   admin = await adminClient(server);
+  prismaService = (await import('../dist/database/prisma.service.js')).PrismaService;
 });
 
 after(() => server?.close());
@@ -67,29 +70,95 @@ describe('plans', () => {
     assert.deepEqual(reset.json.local_prices, {});
   });
 
-  test('admins put each feature on the free plan or on Premium only, and resellers follow at once', async () => {
+  test('admins create plans with their features; hidden plans take no one new; bad plans are refused', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const created = await finance.post('/v1/admin/plans', { code: 'business', name: 'Business', description: 'For independent sellers.', price_cents: 4900, features: ['own_payment_gateways', 'own_integrations', 'custom_domains'] });
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    const business = created.json.plans.find(plan => plan.code === 'business');
+    assert.deepEqual([business.available, business.free, business.features], [true, false, ['own_integrations', 'own_payment_gateways', 'custom_domains']], 'features kept in the catalogue order');
+    assert.ok(created.json.features.every(feature => created.json.groups.some(group => group.code === feature.group)), 'every feature has a group');
+    const listed = (await client(server.base).get('/v1/plans')).json.data;
+    assert.deepEqual(listed.map(plan => plan.code), ['standard', 'premium', 'business']);
+    assert.deepEqual(listed[2].feature_details.map(item => item.name), ['Your own suppliers', 'Your own payment gateway', 'Your own domains']);
+    assert.ok(await prismaOf().auditLog.findFirst({ where: { action: 'plan.created', targetId: 'business' } }));
+
+    assert.equal((await finance.post('/v1/admin/plans', { code: 'business', name: 'Again', price_cents: 100 })).json.error.code, 'plan_exists');
+    assert.equal((await finance.post('/v1/admin/plans', { code: 'Not OK!', name: 'Bad', price_cents: 100 })).json.error.param, 'code');
+    assert.equal((await finance.post('/v1/admin/plans', { code: 'freebie', name: 'Free', price_cents: 0 })).status, 400, 'only Standard is free');
+    assert.equal((await finance.post('/v1/admin/plans', { code: 'flyer', name: 'Flyer', price_cents: 100, features: ['flying'] })).json.error.param, 'features');
+    assert.equal((await (await adminClient(server, ['support'])).post('/v1/admin/plans', { code: 'nope', name: 'Nope', price_cents: 100 })).status, 403);
+
+    // Hidden: off the public list, and nobody new can choose it (those on it keep it).
+    assert.equal((await finance.patch('/v1/admin/plans/business', { available: false })).json.available, false);
+    assert.deepEqual((await client(server.base).get('/v1/plans')).json.data.map(plan => plan.code), ['standard', 'premium']);
+    const { browser } = await resellerClient(server);
+    const hidden = await browser.post('/v1/subscription', { plan: 'business' });
+    assert.deepEqual([hidden.status, hidden.json.error?.code], [409, 'plan_unavailable']);
+    assert.equal((await finance.patch('/v1/admin/plans/standard', { available: false })).json.error.param, 'available', 'the free plan is never hidden');
+  });
+
+  test('admins switch each feature on or off per plan; resellers on it follow at once and are told what they lose', async () => {
     const finance = await adminClient(server, ['finance']);
     const { browser } = await resellerClient(server);
     assert.equal((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), false);
 
-    const free = await finance.put('/v1/admin/plan-features/international_selling', { tier: 'free' });
-    assert.equal(free.status, 200, JSON.stringify(free.json));
-    assert.equal(free.json.features.find(item => item.code === 'international_selling').tier, 'free');
+    const on = await finance.put('/v1/admin/plans/standard/features/international_selling', { enabled: true });
+    assert.equal(on.status, 200, JSON.stringify(on.json));
+    assert.ok(on.json.plans.find(plan => plan.code === 'standard').features.includes('international_selling'));
     assert.ok((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), 'Standard resellers have it now');
-    assert.ok(free.json.plans.find(plan => plan.code === 'premium').features.includes('international_selling'), 'and Premium keeps it');
-    const standard = (await client(server.base).get('/v1/plans')).json.data[0];
-    assert.deepEqual(standard.feature_details.map(item => item.name), ['International selling']);
 
-    const premium = await finance.put('/v1/admin/plan-features/international_selling', { tier: 'premium' });
-    assert.equal(premium.json.features.find(item => item.code === 'international_selling').tier, 'premium');
+    const off = await finance.put('/v1/admin/plans/standard/features/international_selling', { enabled: false });
+    assert.equal(off.json.plans.find(plan => plan.code === 'standard').features.includes('international_selling'), false);
+    assert.ok(off.json.plans.find(plan => plan.code === 'premium').features.includes('international_selling'), 'other plans keep it');
     assert.equal((await browser.get('/v1/account')).json.plan.features.includes('international_selling'), false);
     const notices = (await browser.get('/v1/notifications')).json.data;
-    assert.ok(notices.some(item => item.type === 'plan.feature_changed' && item.title === 'International selling is now part of Premium'), 'Standard resellers are told');
-    assert.ok(await server.app.get((await import('../dist/database/prisma.service.js')).PrismaService).auditLog.findFirst({ where: { action: 'plan.feature_tier_changed', targetId: 'international_selling' } }));
+    assert.ok(notices.some(item => item.type === 'plan.feature_changed' && item.title === 'International selling is no longer part of Standard'), 'resellers on the plan are told');
+    assert.ok(await prismaOf().auditLog.findFirst({ where: { action: 'plan.feature_changed', targetId: 'standard' } }));
 
-    assert.equal((await finance.put('/v1/admin/plan-features/flying', { tier: 'free' })).status, 404);
-    assert.equal((await finance.put('/v1/admin/plan-features/international_selling', { tier: 'gold' })).status, 400);
-    assert.equal((await (await adminClient(server, ['support'])).put('/v1/admin/plan-features/international_selling', { tier: 'free' })).status, 403);
+    assert.equal((await finance.put('/v1/admin/plans/standard/features/flying', { enabled: true })).status, 404);
+    assert.equal((await finance.put('/v1/admin/plans/nowhere/features/international_selling', { enabled: true })).status, 404);
+    assert.equal((await finance.put('/v1/admin/plans/standard/features/international_selling', { enabled: 'yes' })).status, 400);
+    assert.equal((await (await adminClient(server, ['support'])).put('/v1/admin/plans/standard/features/international_selling', { enabled: true })).status, 403);
+  });
+
+  test('a plan in use cannot be deleted; an empty one can; Standard never', async () => {
+    const finance = await adminClient(server, ['finance']);
+    await finance.post('/v1/admin/plans', { code: 'trial_gold', name: 'Gold', price_cents: 900 });
+    const reseller = await resellerClient(server);
+    await prismaOf().reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'trial_gold' } });
+    assert.equal((await finance.delete('/v1/admin/plans/trial_gold')).json.error.code, 'plan_in_use');
+    await prismaOf().reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'standard' } });
+    const deleted = await finance.delete('/v1/admin/plans/trial_gold');
+    assert.equal(deleted.status, 200, JSON.stringify(deleted.json));
+    assert.ok(!deleted.json.plans.some(plan => plan.code === 'trial_gold'));
+    assert.equal((await finance.delete('/v1/admin/plans/standard')).json.error.code, 'plan_in_use');
+    assert.equal((await finance.delete('/v1/admin/plans/premium')).json.error.code, 'plan_in_use', "BitoCard's own store accounts are on Premium");
+  });
+
+  test('a feature the plan does not include is refused with plan_feature_required, and works once switched on', async () => {
+    const finance = await adminClient(server, ['finance']);
+    const reseller = await resellerClient(server);
+    const { browser } = reseller;
+    await prismaOf().reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
+    const store = (await browser.post('/v1/stores', { name: 'First Store', subdomain: `first${Date.now().toString(36)}` })).json;
+    assert.ok(store.id, JSON.stringify(store));
+    const refusedWith = (res, feature) => assert.deepEqual([res.status, res.json.error?.code, res.json.error?.param], [403, 'plan_feature_required', feature], JSON.stringify(res.json));
+
+    for (const feature of ['multiple_stores', 'store_traffic', 'team_members', 'custom_domains']) await finance.put(`/v1/admin/plans/standard/features/${feature}`, { enabled: false });
+    try {
+      refusedWith(await browser.post('/v1/stores', { name: 'Second Store', subdomain: `second${Date.now().toString(36)}` }), 'multiple_stores');
+      refusedWith(await browser.get(`/v1/stores/${store.id}/traffic`), 'store_traffic');
+      refusedWith(await browser.post('/v1/team/invitations', { email: `mate${Date.now()}@example.com`, role: 'support' }), 'team_members');
+      await admin.put('/v1/admin/switches/custom_domains', { reseller_id: reseller.resellerId, enabled: true });
+      refusedWith(await browser.get(`/v1/stores/${store.id}/domains`), 'custom_domains');
+      refusedWith(await browser.post('/v1/support/bitocard-chat/messages', { body: 'Hello' }), 'priority_support');
+      const message = (await browser.get(`/v1/stores/${store.id}/traffic`)).json.error.message;
+      assert.match(message, /Store traffic is not part of your Standard plan/);
+    } finally {
+      for (const feature of ['multiple_stores', 'store_traffic', 'team_members', 'custom_domains']) await finance.put(`/v1/admin/plans/standard/features/${feature}`, { enabled: true });
+    }
+    assert.equal((await browser.get(`/v1/stores/${store.id}/traffic`)).status, 200, 'on again: allowed');
+    assert.equal((await browser.post('/v1/stores', { name: 'Second Store', subdomain: `second${Date.now().toString(36)}` })).status, 201);
   });
 });
 

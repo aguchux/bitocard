@@ -7,6 +7,7 @@ import { EmailService } from '../notifications/email.service.js';
 import { formatMoney, planEndedEmail, planRenewalFailedEmail } from '../notifications/templates.js';
 import { PlansService, presentPlanDetail } from '../plans/plans.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { freePlanCode } from '../plans/features.js';
 
 /** Days a Premium plan stays on after a failed renewal before it drops to Standard. */
 export const renewalGraceDays = 7;
@@ -52,17 +53,20 @@ export class BillingService {
 
   async change(resellerId: string, planCode: string) {
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
-    if (planCode === 'standard') {
-      if (reseller.planCode === 'standard') return this.subscription(resellerId);
+    if (planCode === freePlanCode) {
+      if (reseller.planCode === freePlanCode) return this.subscription(resellerId);
       // A billed plan runs to the end of the paid month; one set by BitoCard ends now.
       await this.prisma.reseller.update({
         where: { id: resellerId },
-        data: reseller.planRenewsAt ? { planCancelAtPeriodEnd: true } : { planCode: 'standard', planPastDueSince: null },
+        data: reseller.planRenewsAt ? { planCancelAtPeriodEnd: true } : { planCode: freePlanCode, planPastDueSince: null },
       });
       return this.subscription(resellerId);
     }
     const plan = await this.prisma.plan.findUnique({ where: { code: planCode } });
     if (!plan) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such plan.', 'plan');
+    if (reseller.planCode !== planCode && !plan.available) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_unavailable', `${plan.name} is no longer offered. Choose another plan.`, 'plan');
+    }
     if (reseller.planCode === planCode) {
       if (reseller.planCancelAtPeriodEnd) await this.prisma.reseller.update({ where: { id: resellerId }, data: { planCancelAtPeriodEnd: false } });
       return this.subscription(resellerId);
@@ -139,7 +143,7 @@ export class BillingService {
   private async end(resellerId: string, planName: string) {
     await this.prisma.reseller.update({
       where: { id: resellerId },
-      data: { planCode: 'standard', planRenewsAt: null, planCancelAtPeriodEnd: false, planPastDueSince: null },
+      data: { planCode: freePlanCode, planRenewsAt: null, planCancelAtPeriodEnd: false, planPastDueSince: null },
     });
     await this.notify(resellerId, to => planEndedEmail(to, planName));
     await this.inbox.reseller(resellerId, 'plan.ended', {

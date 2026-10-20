@@ -66,7 +66,7 @@ describe('a reseller’s own coins on chain', () => {
   test('deposits (Premium) credit the coin wallet; withdrawals need the asker’s emailed code and settle once', async () => {
     const { browser, email, resellerId } = await resellerClient(server);
     const standard = await browser.get('/v1/crypto/deposit-networks?asset=USDT', headers);
-    assert.deepEqual([standard.status, standard.json.error.code], [403, 'premium_required']);
+    assert.deepEqual([standard.status, standard.json.error.code], [403, 'plan_feature_required']);
     const plain = await browser.get('/v1/crypto', headers);
     check('GET /v1/crypto', 200, plain.json);
     assert.equal(plain.json.onchain, false);
@@ -165,7 +165,7 @@ describe('a reseller’s own coins on chain', () => {
     // Off Premium, no new deposits; the coins already held can still be withdrawn (never trapped).
     await prisma.reseller.update({ where: { id: resellerId }, data: { planCode: 'standard' } });
     const noDeposits = await browser.post('/v1/crypto/deposit-addresses', { asset: 'USDT', chain: 'ETHEREUM' }, headers);
-    assert.deepEqual([noDeposits.status, noDeposits.json.error.code], [403, 'premium_required']);
+    assert.deepEqual([noDeposits.status, noDeposits.json.error.code], [403, 'plan_feature_required']);
     assert.equal((await browser.get('/v1/crypto/withdrawal-networks?asset=USDT', headers)).status, 200);
     const afterPremium = await browser.post('/v1/crypto/withdrawals', { asset: 'USDT', chain: 'ETHEREUM', address_id: added.json.id, amount: '10' }, headers);
     assert.equal(afterPremium.status, 201, JSON.stringify(afterPremium.json));

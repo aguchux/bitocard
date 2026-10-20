@@ -133,6 +133,10 @@ describe('a customer chats with their store', () => {
 describe('BitoCard’s chats', () => {
   test('a reseller’s team chats with BitoCard; admins see it, take it, answer; the reseller ends it', async () => {
     const reseller = await resellerClient(server);
+    // Chat with BitoCard is priority support: refused on Standard, open on Premium.
+    const refused = await reseller.browser.post('/v1/support/bitocard-chat/messages', { body: 'Hello?' });
+    assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.param], [403, 'plan_feature_required', 'priority_support']);
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'premium' } });
     assert.equal((await reseller.browser.get('/v1/support/bitocard-chat')).json.chat, null);
     const chat = (await reseller.browser.post('/v1/support/bitocard-chat/messages', { body: 'How do I enable mobile money?' })).json;
     assert.deepEqual([chat.requester, chat.queue, chat.status], ['reseller', 'bitocard', 'waiting']);

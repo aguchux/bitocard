@@ -21,6 +21,7 @@ import { exactFeeNano, maxFeeMinor, pickFeeRule } from '../fees/platform-fees.se
 import { minor } from '../ledger/mode.js';
 import { stockSupplier } from '../suppliers/stock.adapter.js';
 import { SupplierAdapters } from '../suppliers/supplier-adapters.js';
+import { planIncludes } from '../plans/plan-access.js';
 
 const Decimal = Prisma.Decimal;
 type Decimal = Prisma.Decimal;
@@ -164,7 +165,7 @@ export class PricingService {
       mode,
       country: reseller.countryRef,
       currency: reseller.countryRef.currency,
-      international: reseller.plan.features.includes('international_selling'),
+      international: planIncludes(reseller, 'international_selling'),
       capBps: reseller.countryRef.markupCapPercent * 100,
       markups: await this.prisma.resellerMarkup.findMany({ where: { resellerId } }),
       rules: await this.prisma.pricingRule.findMany(),

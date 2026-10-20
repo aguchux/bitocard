@@ -89,15 +89,18 @@ export type AuditEntry = {
 export type ResellerStatus = 'pending' | 'active' | 'suspended';
 export type Plan = { object: 'plan'; code: string; name: string; price: { amount: number; currency: string; interval: string }; features: string[] };
 /** Where a plan feature sits: on every plan (`free`) or on paid plans only (`premium`). */
-export type PlanFeatureTier = 'free' | 'premium';
-/** Settings > Plans: every plan with its prices per market currency, and every plan feature with its tier. */
+/** Settings > Plans: every plan with its prices per market currency and features, and the feature catalogue. */
 export type PlanSettings = {
   object: 'plan_settings';
   plans: Array<
     Plan & {
       description: string | null;
-      /** The free plan: never charged; features placed "free" are on it. */
+      /** The free plan: every reseller starts on it; never charged, hidden or deleted. */
       free: boolean;
+      /** Resellers can choose it; a hidden plan keeps those on it but takes no one new. */
+      available: boolean;
+      /** Its place in the list, lowest first. */
+      sort_order: number;
       api_restrictions: string[];
       /** Resellers on the plan now. */
       resellers: number;
@@ -112,9 +115,12 @@ export type PlanSettings = {
       }>;
     }
   >;
-  features: Array<{ code: string; name: string; description: string; tier: PlanFeatureTier }>;
+  groups: Array<{ code: string; name: string }>;
+  /** Every feature a plan can include; each plan's `features` say which it has. */
+  features: Array<{ code: string; group: string; name: string; description: string }>;
 };
-export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null> };
+export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; available?: boolean; sort_order?: number };
+export type CreatePlanInput = { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean };
 export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; plan: string; created_at: string };
 export type ResellerDetail = {
   object: 'reseller';

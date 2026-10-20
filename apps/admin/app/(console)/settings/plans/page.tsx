@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Crown, Gift, Save } from "lucide-react";
-import { Badge, Button, Card, CardHeader, cn, currencyDigits, errorMessage, Field, formatMoney, Input, Notice, PageHeader, QueryView, Skeleton, Textarea } from "@bitocard/admin-ui";
+import { Fragment, useState } from "react";
+import { EyeOff, Plus, Save, Trash2 } from "lucide-react";
+import { ActionDialog, Badge, Button, Card, CardHeader, currencyDigits, Dialog, errorMessage, Field, formatMoney, Input, Notice, PageHeader, QueryView, Skeleton, Tabs, Textarea, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type PlanFeatureTier, type PlanSettings, usePlanSettingsQuery, useSetPlanFeatureTierMutation, useUpdatePlanMutation } from "@bitocard/api-client/admin";
+import { type PlanSettings, useCreatePlanMutation, useDeletePlanMutation, usePlanSettingsQuery, useSetPlanFeatureMutation, useUpdatePlanMutation } from "@bitocard/api-client/admin";
 
-type PaidPlan = PlanSettings["plans"][number];
+type SettingsPlan = PlanSettings["plans"][number];
 
 /** "35000" or "35,000.50" in a currency's major units, to minor units; null when it is not an amount. */
 function toMinor(value: string, currency: string) {
@@ -17,46 +17,151 @@ function toMinor(value: string, currency: string) {
 }
 const toMajor = (minor: number, currency: string) => String(minor / 10 ** currencyDigits(currency));
 
-/** The paid plan's name, description and US dollar price. */
-function PlanDetails({ plan, editable }: { plan: PaidPlan; editable: boolean }) {
+/** "Business" to "business"; what the code field suggests from the name. */
+const codeFrom = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/^[^a-z]+/, "")
+    .slice(0, 30);
+
+/**
+ * Every feature down the side, every plan across the top, a switch in each cell. A change applies to resellers on that
+ * plan at once; those losing a feature are told.
+ */
+function FeatureMatrix({ settings, editable }: { settings: PlanSettings; editable: boolean }) {
+  const [setFeature, state] = useSetPlanFeatureMutation();
+  const [pending, setPending] = useState<string | null>(null);
+  return (
+    <Card>
+      <CardHeader
+        title="Features by plan"
+        description="Switch each feature on or off for each plan. Resellers on the plan gain or lose it at once, and are told what they lose; anything a plan does not include is refused."
+      />
+      <div className="px-5 pb-5 sm:px-6">
+        {state.error ? <div className="mb-4"><Notice tone="red">{errorMessage(state.error)}</Notice></div> : null}
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <table className="w-full min-w-[36rem] text-sm">
+            <thead className="bg-canvas">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left font-semibold text-ink">Feature</th>
+                {settings.plans.map(plan => (
+                  <th key={plan.code} scope="col" className="w-28 px-2 py-3 text-center font-semibold text-ink">
+                    <span className="block truncate">{plan.name}</span>
+                    {!plan.available ? <span className="text-xs font-normal text-muted">Hidden</span> : null}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {settings.groups.map(group => {
+                const features = settings.features.filter(feature => feature.group === group.code);
+                if (!features.length) return null;
+                return (
+                  <Fragment key={group.code}>
+                    <tr className="border-t border-line bg-canvas/60">
+                      <th scope="colgroup" colSpan={settings.plans.length + 1} className="px-4 py-2 text-left text-xs font-semibold tracking-wide text-muted uppercase">
+                        {group.name}
+                      </th>
+                    </tr>
+                    {features.map(feature => (
+                      <tr key={feature.code} className="border-t border-line">
+                        <th scope="row" className="px-4 py-3 text-left font-normal">
+                          <span className="block font-semibold text-ink">{feature.name}</span>
+                          <span className="block text-xs text-muted">{feature.description}</span>
+                        </th>
+                        {settings.plans.map(plan => {
+                          const key = `${plan.code}:${feature.code}`;
+                          const on = plan.features.includes(feature.code);
+                          return (
+                            <td key={plan.code} className="px-2 py-3 text-center">
+                              <span className="inline-flex justify-center">
+                                <Toggle
+                                  checked={on}
+                                  label={`${feature.name} on ${plan.name}`}
+                                  disabled={!editable || pending === key}
+                                  onChange={async enabled => {
+                                    setPending(key);
+                                    await setFeature({ code: plan.code, feature: feature.code, enabled })
+                                      .unwrap()
+                                      .catch(() => undefined);
+                                    setPending(null);
+                                  }}
+                                />
+                              </span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/** The plan's name, description, US dollar price (paid plans), whether resellers can choose it, and its place. */
+function PlanDetails({ plan, editable }: { plan: SettingsPlan; editable: boolean }) {
   const [update, state] = useUpdatePlanMutation();
   const [name, setName] = useState(plan.name);
   const [description, setDescription] = useState(plan.description ?? "");
   const [price, setPrice] = useState(toMajor(plan.price.amount, "USD"));
+  const [order, setOrder] = useState(String(plan.sort_order));
   const [saved, setSaved] = useState(false);
-  const cents = toMinor(price, "USD");
-  const changed = name !== plan.name || description !== (plan.description ?? "") || cents !== plan.price.amount;
+  const cents = plan.free ? 0 : toMinor(price, "USD");
+  const sortOrder = /^\d{1,5}$/.test(order.trim()) ? Number(order) : null;
+  const badPrice = !plan.free && (cents === null || cents === 0);
+  const changed = name !== plan.name || description !== (plan.description ?? "") || (!plan.free && cents !== plan.price.amount) || sortOrder !== plan.sort_order;
   return (
     <Card>
-      <CardHeader title={`${plan.name} plan`} description={`${plan.resellers} reseller${plan.resellers === 1 ? "" : "s"} on it now. Charged monthly from their live wallet.`} actions={<Badge tone="pink">Paid</Badge>} />
+      <CardHeader
+        title={`${plan.name} plan`}
+        description={`${plan.resellers} reseller${plan.resellers === 1 ? "" : "s"} on it now.${plan.free ? " Every reseller starts here; it is never charged." : " Charged monthly from their live wallet."}`}
+        actions={<Badge tone={plan.free ? "grey" : "pink"}>{plan.free ? "Free" : "Paid"}</Badge>}
+      />
       <form
         className="grid gap-4 px-5 pb-5 sm:px-6 md:grid-cols-2"
         onSubmit={async event => {
           event.preventDefault();
-          if (cents === null || cents === 0) return;
+          if (badPrice || sortOrder === null) return;
           setSaved(false);
-          await update({ code: plan.code, name, description: description || null, price_cents: cents })
+          await update({ code: plan.code, name, description: description || null, ...(plan.free ? {} : { price_cents: cents ?? undefined }), sort_order: sortOrder })
             .unwrap()
             .then(() => setSaved(true))
             .catch(() => undefined);
         }}
       >
-        <Field label="Name" htmlFor="plan-name">
-          <Input id="plan-name" value={name} maxLength={40} disabled={!editable} onChange={event => setName(event.target.value)} />
+        <Field label="Name" htmlFor={`plan-name-${plan.code}`}>
+          <Input id={`plan-name-${plan.code}`} value={name} maxLength={40} disabled={!editable} onChange={event => setName(event.target.value)} />
         </Field>
-        <Field label="Price a month (US dollars)" htmlFor="plan-price" hint="Used where no local price is set below: converted at the day's rate when charged." error={price && (cents === null || cents === 0) ? "Enter a price above zero, like 25 or 24.99." : undefined}>
-          <Input id="plan-price" inputMode="decimal" value={price} disabled={!editable} onChange={event => setPrice(event.target.value)} />
-        </Field>
+        {plan.free ? (
+          <Field label="Price a month" htmlFor={`plan-price-${plan.code}`} hint="The free plan is never charged.">
+            <Input id={`plan-price-${plan.code}`} value="Free" disabled />
+          </Field>
+        ) : (
+          <Field label="Price a month (US dollars)" htmlFor={`plan-price-${plan.code}`} hint="Used where no local price is set: converted at the day's rate when charged." error={price && badPrice ? "Enter a price above zero, like 25 or 24.99." : undefined}>
+            <Input id={`plan-price-${plan.code}`} inputMode="decimal" value={price} disabled={!editable} onChange={event => setPrice(event.target.value)} />
+          </Field>
+        )}
         <div className="md:col-span-2">
-          <Field label="Description" htmlFor="plan-description" hint="Shown to resellers with the plan.">
-            <Textarea id="plan-description" rows={2} maxLength={300} value={description} disabled={!editable} onChange={event => setDescription(event.target.value)} />
+          <Field label="Description" htmlFor={`plan-description-${plan.code}`} hint="Shown to resellers with the plan.">
+            <Textarea id={`plan-description-${plan.code}`} rows={2} maxLength={300} value={description} disabled={!editable} onChange={event => setDescription(event.target.value)} />
           </Field>
         </div>
+        <Field label="Place in the list" htmlFor={`plan-order-${plan.code}`} hint="Lowest first." error={sortOrder === null ? "Enter a whole number." : undefined}>
+          <Input id={`plan-order-${plan.code}`} inputMode="numeric" value={order} disabled={!editable} onChange={event => setOrder(event.target.value)} />
+        </Field>
         {state.error ? <div className="md:col-span-2"><Notice tone="red">{errorMessage(state.error)}</Notice></div> : null}
-        {saved && !changed ? <div className="md:col-span-2"><Notice tone="green">Saved. Resellers see it at once; renewals charge the new price from their next renewal.</Notice></div> : null}
+        {saved && !changed ? <div className="md:col-span-2"><Notice tone="green">Saved. Resellers see it at once; a new price is charged from each reseller&apos;s next renewal.</Notice></div> : null}
         {editable ? (
           <div className="md:col-span-2">
-            <Button type="submit" icon={<Save className="size-4" aria-hidden />} loading={state.isLoading} disabled={!changed || cents === null || cents === 0}>
+            <Button type="submit" icon={<Save className="size-4" aria-hidden />} loading={state.isLoading} disabled={!changed || badPrice || sortOrder === null}>
               Save plan
             </Button>
           </div>
@@ -66,12 +171,57 @@ function PlanDetails({ plan, editable }: { plan: PaidPlan; editable: boolean }) 
   );
 }
 
+/** Whether resellers can choose the plan, and deleting it once nobody is on it. */
+function PlanAvailability({ plan, editable, onDeleted }: { plan: SettingsPlan; editable: boolean; onDeleted: () => void }) {
+  const [update, state] = useUpdatePlanMutation();
+  const [remove] = useDeletePlanMutation();
+  const [deleting, setDeleting] = useState(false);
+  if (plan.free) return null;
+  return (
+    <Card>
+      <CardHeader title="Offered to resellers" description="A hidden plan disappears from the list resellers choose from. Resellers already on it keep it and renew as before." />
+      <div className="space-y-4 px-5 pb-5 sm:px-6">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-line p-4">
+          <div>
+            <p className="font-semibold text-ink">{plan.available ? "Resellers can choose it" : "Hidden from resellers"}</p>
+            <p className="text-sm text-muted">{plan.available ? "Listed in SHQ's Settings > Plan." : "Nobody new can choose it."}</p>
+          </div>
+          <Toggle checked={plan.available} label={`Offer ${plan.name} to resellers`} disabled={!editable || state.isLoading} onChange={available => void update({ code: plan.code, available }).unwrap().catch(() => undefined)} />
+        </div>
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        {editable ? (
+          <div>
+            <Button variant="danger" icon={<Trash2 className="size-4" aria-hidden />} disabled={plan.resellers > 0} onClick={() => setDeleting(true)}>
+              Delete plan
+            </Button>
+            {plan.resellers > 0 ? <p className="mt-1 text-xs text-muted">Resellers are on this plan: hide it instead, or move them first.</p> : null}
+          </div>
+        ) : null}
+        <ActionDialog
+          open={deleting}
+          onClose={() => setDeleting(false)}
+          title={`Delete ${plan.name}?`}
+          confirmLabel="Delete plan"
+          requireReason={false}
+          onConfirm={async () => {
+            await remove({ code: plan.code }).unwrap();
+            onDeleted();
+          }}
+        >
+          <p className="text-sm text-muted">The plan and its local prices are removed for good. Nobody is on it.</p>
+        </ActionDialog>
+      </div>
+    </Card>
+  );
+}
+
 /** Fixed monthly prices in each market currency; blank means the US dollar price converted on the day. */
-function LocalPrices({ plan, editable }: { plan: PaidPlan; editable: boolean }) {
+function LocalPrices({ plan, editable }: { plan: SettingsPlan; editable: boolean }) {
   const [update, state] = useUpdatePlanMutation();
   const initial = Object.fromEntries(plan.local_prices.map(row => [row.currency, row.fixed === null ? "" : toMajor(row.fixed, row.currency)]));
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [saved, setSaved] = useState(false);
+  if (plan.free) return null;
   const problems = plan.local_prices.filter(row => values[row.currency]?.trim() && !toMinor(values[row.currency], row.currency));
   const changes = Object.fromEntries(
     plan.local_prices
@@ -91,7 +241,7 @@ function LocalPrices({ plan, editable }: { plan: PaidPlan; editable: boolean }) 
         ) : (
           <ul className="divide-y divide-line rounded-xl border border-line">
             {plan.local_prices.map(row => {
-              const id = `local-${row.currency}`;
+              const id = `local-${plan.code}-${row.currency}`;
               const invalid = problems.some(item => item.currency === row.currency);
               return (
                 <li key={row.currency} className="grid items-center gap-3 p-4 sm:grid-cols-[1fr_14rem]">
@@ -129,7 +279,7 @@ function LocalPrices({ plan, editable }: { plan: PaidPlan; editable: boolean }) 
           </ul>
         )}
         {state.error ? <div className="mt-4"><Notice tone="red">{errorMessage(state.error)}</Notice></div> : null}
-        {saved && count === 0 ? <div className="mt-4"><Notice tone="green">Saved. New upgrades and the next renewals use these prices.</Notice></div> : null}
+        {saved && count === 0 ? <div className="mt-4"><Notice tone="green">Saved. New subscriptions and the next renewals use these prices.</Notice></div> : null}
         {editable && plan.local_prices.length ? (
           <Button
             className="mt-4"
@@ -151,91 +301,173 @@ function LocalPrices({ plan, editable }: { plan: PaidPlan; editable: boolean }) 
   );
 }
 
-const tiers: Array<{ value: PlanFeatureTier; label: string; icon: typeof Gift }> = [
-  { value: "free", label: "Free", icon: Gift },
-  { value: "premium", label: "Premium", icon: Crown },
-];
-
-/** Each plan feature on every plan (Free) or on paid plans only (Premium). */
-function Features({ settings, editable }: { settings: PlanSettings; editable: boolean }) {
-  const [setTier, state] = useSetPlanFeatureTierMutation();
-  const [pending, setPending] = useState<string | null>(null);
-  const free = settings.plans.find(plan => plan.free);
+/** A new paid plan: name, code, price, description and its features, starting from another plan's if wanted. */
+function NewPlanDialog({ settings, open, onClose, onCreated }: { settings: PlanSettings; open: boolean; onClose: () => void; onCreated: (code: string) => void }) {
+  const [create, state] = useCreatePlanMutation();
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [codeTouched, setCodeTouched] = useState(false);
+  const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
+  const [features, setFeatures] = useState<string[]>([]);
+  const [available, setAvailable] = useState(true);
+  const cents = toMinor(price, "USD");
+  const finalCode = codeTouched ? code : codeFrom(name);
+  const codeOk = /^[a-z][a-z0-9_]{1,29}$/.test(finalCode);
+  const ready = name.trim().length > 0 && codeOk && cents !== null && cents > 0;
+  const close = () => {
+    state.reset();
+    onClose();
+  };
   return (
-    <Card>
-      <CardHeader
-        title="Features"
-        description={`Free features are on every plan; Premium ones only on paid plans. A change applies to resellers at once${free ? ` (${free.resellers} on ${free.name} now)` : ""}.`}
-      />
-      <div className="px-5 pb-5 sm:px-6">
-        {state.error ? <div className="mb-4"><Notice tone="red">{errorMessage(state.error)}</Notice></div> : null}
-        <ul className="divide-y divide-line rounded-xl border border-line">
-          {settings.features.map(feature => (
-            <li key={feature.code} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-semibold text-ink">{feature.name}</p>
-                <p className="text-sm text-muted">{feature.description}</p>
-              </div>
-              <div role="radiogroup" aria-label={`${feature.name}: which plans`} className="inline-flex shrink-0 rounded-xl bg-canvas p-1 ring-1 ring-line">
-                {tiers.map(tier => {
-                  const active = feature.tier === tier.value;
-                  return (
-                    <button
-                      key={tier.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      disabled={!editable || pending === feature.code}
-                      onClick={async () => {
-                        if (active) return;
-                        setPending(feature.code);
-                        await setTier({ feature: feature.code, tier: tier.value })
-                          .unwrap()
-                          .catch(() => undefined);
-                        setPending(null);
-                      }}
-                      className={cn(
-                        "inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed",
-                        active ? (tier.value === "premium" ? "bg-brand-500 text-white shadow-sm" : "bg-white text-ink shadow-sm") : "text-muted hover:text-ink",
-                      )}
-                    >
-                      <tier.icon className="size-4" aria-hidden />
-                      {tier.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </li>
-          ))}
-        </ul>
+    <Dialog
+      open={open}
+      onClose={close}
+      title="New plan"
+      description="A paid monthly plan. Choose what it includes; you can change its features and prices any time."
+      footer={
+        <>
+          <Button variant="ghost" onClick={close}>
+            Cancel
+          </Button>
+          <Button
+            loading={state.isLoading}
+            disabled={!ready}
+            onClick={async () => {
+              const created = await create({ code: finalCode, name: name.trim(), description: description.trim() || null, price_cents: cents ?? 0, features, available })
+                .unwrap()
+                .catch(() => null);
+              if (created) onCreated(finalCode);
+            }}
+          >
+            Create plan
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name" htmlFor="new-plan-name">
+            <Input id="new-plan-name" value={name} maxLength={40} onChange={event => setName(event.target.value)} placeholder="Business" />
+          </Field>
+          <Field label="Code" htmlFor="new-plan-code" hint="Lower-case letters, numbers and underscores. It cannot change." error={finalCode && !codeOk ? "Start with a letter; 2 to 30 characters." : undefined}>
+            <Input
+              id="new-plan-code"
+              value={finalCode}
+              maxLength={30}
+              onChange={event => {
+                setCodeTouched(true);
+                setCode(event.target.value.toLowerCase());
+              }}
+            />
+          </Field>
+          <Field label="Price a month (US dollars)" htmlFor="new-plan-price" error={price && (cents === null || cents === 0) ? "Enter a price above zero." : undefined}>
+            <Input id="new-plan-price" inputMode="decimal" value={price} onChange={event => setPrice(event.target.value)} placeholder="49" />
+          </Field>
+          <div className="flex items-end justify-between gap-3 rounded-xl border border-line p-3">
+            <span className="text-sm font-semibold text-ink">Offer to resellers now</span>
+            <Toggle checked={available} label="Offer to resellers now" onChange={setAvailable} />
+          </div>
+        </div>
+        <Field label="Description" htmlFor="new-plan-description" hint="Shown to resellers with the plan.">
+          <Textarea id="new-plan-description" rows={2} maxLength={300} value={description} onChange={event => setDescription(event.target.value)} />
+        </Field>
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-ink">Features</p>
+            <div className="flex flex-wrap gap-2">
+              {settings.plans.map(plan => (
+                <button key={plan.code} type="button" className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => setFeatures(plan.features)}>
+                  {`Copy ${plan.name}`}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ul className="divide-y divide-line rounded-xl border border-line">
+            {settings.features.map(feature => {
+              const on = features.includes(feature.code);
+              return (
+                <li key={feature.code} className="flex items-center justify-between gap-3 p-3">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-ink">{feature.name}</span>
+                    <span className="block text-xs text-muted">{feature.description}</span>
+                  </span>
+                  <Toggle checked={on} label={feature.name} onChange={next => setFeatures(current => (next ? [...current, feature.code] : current.filter(item => item !== feature.code)))} />
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
-    </Card>
+    </Dialog>
   );
 }
 
-/** Settings > Plans: the paid plan's details and local prices, and which features are free or Premium. */
+/** Settings > Plans: every plan and what it includes, each plan's details and prices, and new plans. */
 export default function PlansPage() {
   const admin = useAdmin();
   const editable = can(admin, "finance");
   const settings = usePlanSettingsQuery();
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   return (
     <AdminShell section="settings" current="/settings/plans" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plans" }]}>
-      <PageHeader title="Plans" description="Standard is free. Premium is billed monthly from the reseller's live wallet, in their own currency." />
+      <PageHeader
+        title="Plans"
+        description="Standard is free. Other plans are billed monthly from the reseller's live wallet, in their own currency, and include the features you switch on for them."
+        actions={
+          editable && settings.data ? (
+            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setCreating(true)}>
+              New plan
+            </Button>
+          ) : undefined
+        }
+      />
       {!editable ? <Notice tone="grey">Only finance admins can change plans.</Notice> : null}
       <QueryView query={settings} message={error => errorMessage(error, "Could not load the plans.")} loading={<Skeleton className="h-96 w-full" />}>
-        {data => (
-          <div className="space-y-5">
-            {data.plans
-              .filter(plan => !plan.free)
-              .map(plan => (
-                <div key={plan.code} className="space-y-5">
-                  <PlanDetails plan={plan} editable={editable} />
-                  <LocalPrices plan={plan} editable={editable} />
-                </div>
-              ))}
-            <Features settings={data} editable={editable} />
-          </div>
-        )}
+        {data => {
+          const plan = data.plans.find(item => item.code === chosen) ?? data.plans.find(item => !item.free) ?? data.plans[0];
+          return (
+            <div className="space-y-5">
+              <FeatureMatrix settings={data} editable={editable} />
+              {plan ? (
+                <section aria-label="Plan details" className="space-y-5">
+                  <Tabs
+                    label="Plan"
+                    variant="pills"
+                    value={plan.code}
+                    onChange={setChosen}
+                    items={data.plans.map(item => ({ value: item.code, label: item.available ? item.name : `${item.name} (hidden)`, count: item.resellers }))}
+                  />
+                  {!plan.available ? (
+                    <Notice tone="amber" title="Hidden">
+                      <span className="inline-flex items-center gap-1.5">
+                        <EyeOff className="size-4" aria-hidden /> {`${plan.name} is not offered to resellers. Those on it keep it.`}
+                      </span>
+                    </Notice>
+                  ) : null}
+                  {/* Keyed by plan, so each form starts from that plan's saved values. */}
+                  <div key={plan.code} className="space-y-5">
+                    <PlanDetails plan={plan} editable={editable} />
+                    <PlanAvailability plan={plan} editable={editable} onDeleted={() => setChosen(null)} />
+                    <LocalPrices plan={plan} editable={editable} />
+                  </div>
+                </section>
+              ) : null}
+              <NewPlanDialog
+                key={creating ? "open" : "closed"}
+                settings={data}
+                open={creating}
+                onClose={() => setCreating(false)}
+                onCreated={code => {
+                  setCreating(false);
+                  setChosen(code);
+                }}
+              />
+            </div>
+          );
+        }}
       </QueryView>
     </AdminShell>
   );

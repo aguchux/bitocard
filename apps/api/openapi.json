@@ -2052,9 +2052,32 @@
                         "currency": "USD",
                         "interval": "month"
                       },
-                      "features": [],
+                      "features": [
+                        "multiple_stores",
+                        "store_traffic",
+                        "team_members"
+                      ],
                       "description": "Everything you need to run your store and sell through the API.",
-                      "feature_details": [],
+                      "feature_details": [
+                        {
+                          "code": "multiple_stores",
+                          "group": "independence",
+                          "name": "Several stores",
+                          "description": "Run more than one store, each with its own address and design."
+                        },
+                        {
+                          "code": "store_traffic",
+                          "group": "selling",
+                          "name": "Store traffic",
+                          "description": "See how many people visit your stores, day by day."
+                        },
+                        {
+                          "code": "team_members",
+                          "group": "team",
+                          "name": "Team members",
+                          "description": "Invite colleagues to work in SHQ with their own sign-in."
+                        }
+                      ],
                       "local_price": {
                         "amount": 0,
                         "currency": "NGN",
@@ -2071,26 +2094,29 @@
                         "interval": "month"
                       },
                       "features": [
+                        "international_selling",
                         "chargeback_protection",
-                        "priority_support",
-                        "international_selling"
+                        "priority_support"
                       ],
                       "description": "More protection, more reach and more tools, billed monthly from your wallet.",
                       "feature_details": [
                         {
+                          "code": "international_selling",
+                          "group": "selling",
+                          "name": "International selling",
+                          "description": "Sell to customers outside your country."
+                        },
+                        {
                           "code": "chargeback_protection",
+                          "group": "support",
                           "name": "Chargeback protection",
                           "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
                         },
                         {
                           "code": "priority_support",
+                          "group": "support",
                           "name": "Priority support",
-                          "description": "Faster answers from BitoCard, including chat."
-                        },
-                        {
-                          "code": "international_selling",
-                          "name": "International selling",
-                          "description": "Sell to customers outside your country."
+                          "description": "Faster answers from BitoCard, including live chat."
                         }
                       ],
                       "local_price": {
@@ -7340,7 +7366,7 @@
     },
     "/v1/stores/{id}/traffic": {
       "get": {
-        "description": "Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies.",
+        "description": "Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies. Needs a plan with store traffic (`plan_feature_required` otherwise).",
         "operationId": "StoresController_traffic",
         "parameters": [
           {
@@ -16366,26 +16392,29 @@
                       "interval": "month"
                     },
                     "features": [
+                      "international_selling",
                       "chargeback_protection",
-                      "priority_support",
-                      "international_selling"
+                      "priority_support"
                     ],
                     "description": "More protection, more reach and more tools, billed monthly from your wallet.",
                     "feature_details": [
                       {
+                        "code": "international_selling",
+                        "group": "selling",
+                        "name": "International selling",
+                        "description": "Sell to customers outside your country."
+                      },
+                      {
                         "code": "chargeback_protection",
+                        "group": "support",
                         "name": "Chargeback protection",
                         "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
                       },
                       {
                         "code": "priority_support",
+                        "group": "support",
                         "name": "Priority support",
-                        "description": "Faster answers from BitoCard, including chat."
-                      },
-                      {
-                        "code": "international_selling",
-                        "name": "International selling",
-                        "description": "Sell to customers outside your country."
+                        "description": "Faster answers from BitoCard, including live chat."
                       }
                     ],
                     "local_price": {
@@ -16504,26 +16533,29 @@
                       "interval": "month"
                     },
                     "features": [
+                      "international_selling",
                       "chargeback_protection",
-                      "priority_support",
-                      "international_selling"
+                      "priority_support"
                     ],
                     "description": "More protection, more reach and more tools, billed monthly from your wallet.",
                     "feature_details": [
                       {
+                        "code": "international_selling",
+                        "group": "selling",
+                        "name": "International selling",
+                        "description": "Sell to customers outside your country."
+                      },
+                      {
                         "code": "chargeback_protection",
+                        "group": "support",
                         "name": "Chargeback protection",
                         "description": "Chargebacks are handled by BitoCard, not taken from your wallet."
                       },
                       {
                         "code": "priority_support",
+                        "group": "support",
                         "name": "Priority support",
-                        "description": "Faster answers from BitoCard, including chat."
-                      },
-                      {
-                        "code": "international_selling",
-                        "name": "International selling",
-                        "description": "Sell to customers outside your country."
+                        "description": "Faster answers from BitoCard, including live chat."
                       }
                     ],
                     "local_price": {
@@ -41082,13 +41114,18 @@
                   "type": "string",
                   "description": "A plan feature.",
                   "enum": [
-                    "chargeback_protection",
-                    "priority_support",
-                    "international_selling",
                     "own_integrations",
                     "own_payment_gateways",
+                    "multiple_stores",
+                    "custom_domains",
+                    "international_selling",
+                    "store_traffic",
                     "onchain_crypto",
-                    "ai_assistant"
+                    "reseller_desks",
+                    "chargeback_protection",
+                    "priority_support",
+                    "ai_assistant",
+                    "team_members"
                   ]
                 },
                 "description": "What the plan adds, for example `chargeback_protection`."
@@ -44767,16 +44804,21 @@
               "type": "string",
               "description": "A plan feature.",
               "enum": [
-                "chargeback_protection",
-                "priority_support",
-                "international_selling",
                 "own_integrations",
                 "own_payment_gateways",
+                "multiple_stores",
+                "custom_domains",
+                "international_selling",
+                "store_traffic",
                 "onchain_crypto",
-                "ai_assistant"
+                "reseller_desks",
+                "chargeback_protection",
+                "priority_support",
+                "ai_assistant",
+                "team_members"
               ]
             },
-            "description": "What the plan includes: `chargeback_protection`, `priority_support`, `international_selling`, `own_integrations` (your own suppliers), `own_payment_gateways` (your own payment gateway collecting your customers’ payments), `onchain_crypto` (depositing and withdrawing coins on chain), `ai_assistant` (BitoCard’s AI for your support assistant). BitoCard decides which are on the free plan and which need Premium."
+            "description": "What the plan includes, by code: `feature_details` names and describes each. An API call needing a feature the plan does not include is refused (403 `plan_feature_required`, `param` the feature)."
           },
           "description": {
             "anyOf": [
@@ -44796,6 +44838,7 @@
               "description": "A feature the plan includes.",
               "required": [
                 "code",
+                "group",
                 "name",
                 "description"
               ],
@@ -44805,13 +44848,29 @@
                   "type": "string",
                   "description": "The feature.",
                   "enum": [
-                    "chargeback_protection",
-                    "priority_support",
-                    "international_selling",
                     "own_integrations",
                     "own_payment_gateways",
+                    "multiple_stores",
+                    "custom_domains",
+                    "international_selling",
+                    "store_traffic",
                     "onchain_crypto",
-                    "ai_assistant"
+                    "reseller_desks",
+                    "chargeback_protection",
+                    "priority_support",
+                    "ai_assistant",
+                    "team_members"
+                  ]
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Where it is listed: running independently, selling, crypto, support and protection, or team.",
+                  "enum": [
+                    "independence",
+                    "selling",
+                    "crypto",
+                    "support",
+                    "team"
                   ]
                 },
                 "name": {
@@ -49884,6 +49943,7 @@
               "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
+              "plan.feature_changed",
               "webhook_endpoint.disabled",
               "verification.updated",
               "kyc.customer_submitted",
@@ -50085,6 +50145,7 @@
               "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
+              "plan.feature_changed",
               "webhook_endpoint.disabled",
               "verification.updated",
               "kyc.customer_submitted",

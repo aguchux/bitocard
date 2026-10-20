@@ -677,6 +677,10 @@ model Plan {
   apiRestrictions String[]   @default([]) @map("api_restrictions")
   /// What the plan is for, shown with it (admins edit it).
   description     String?
+  /// Resellers can choose it. A hidden plan keeps those already on it (they renew as before) but takes no one new.
+  available       Boolean    @default(true)
+  /// Where it is listed, lowest first.
+  sortOrder       Int        @default(0) @map("sort_order")
   updatedAt       DateTime   @updatedAt @map("updated_at")
   resellers       Reseller[]
   localPrices     PlanPrice[]

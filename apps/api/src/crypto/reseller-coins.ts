@@ -13,6 +13,7 @@ import { CodeDto, DepositAddressDto, DepositNetworksDto, WithdrawalAddressDto, W
 import { CryptoWalletsService } from './crypto-wallets.service.js';
 import { chainNames } from './chains/client.js';
 import { CryptoWithdrawalsService, type Holder, withdrawalChains } from './withdrawals.service.js';
+import { planFeatureRequired, planIncludes } from '../plans/plan-access.js';
 
 /** The plan feature that lets a reseller move its own coins on chain (Premium, by migration). */
 export const onchainFeature = 'onchain_crypto';
@@ -41,9 +42,9 @@ export class ResellerCoinsService {
   /** Checks the gates and says who is asking; `deposit` also needs the exchange switch. */
   async holder(caller: Caller, mode: LedgerMode, purpose: 'read' | 'deposit' | 'withdraw'): Promise<Holder> {
     const resellerId = resellerOf(caller);
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { name: true, status: true, house: true, plan: { select: { features: true } } } });
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { name: true, status: true, house: true, plan: { select: { name: true, features: true } } } });
     if (reseller.house) throw refused('onchain_unavailable', 'BitoCard’s own accounts hold coins in the exchange reserves.');
-    if (purpose === 'deposit' && !reseller.plan.features.includes(onchainFeature)) throw refused('premium_required', 'Depositing coins on chain is part of the Premium plan.');
+    if (purpose === 'deposit' && !planIncludes(reseller, onchainFeature)) throw planFeatureRequired(onchainFeature, reseller.plan.name);
     if (purpose !== 'read') {
       if (reseller.status === 'suspended') throw refused('reseller_suspended', 'Your account is suspended.');
       if (mode === 'live' && reseller.status !== 'active') throw refused('reseller_not_verified', 'Verify your business before moving coins on chain.');
@@ -60,7 +61,7 @@ export class ResellerCoinsService {
   /** The reseller's coin wallet per coin: what it can spend and what is on its way out. */
   async balances(caller: Caller, mode: LedgerMode) {
     const resellerId = resellerOf(caller);
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { plan: { select: { features: true } } } });
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { house: true, plan: { select: { features: true } } } });
     const [assets, accounts] = await Promise.all([
       this.wallets.assets(true),
       this.prisma.ledgerAccount.findMany({ where: { mode, resellerId, kind: { in: ['reseller_crypto', 'reseller_crypto_withdrawing'] } }, select: { kind: true, currency: true, balanceMinor: true } }),
@@ -70,7 +71,7 @@ export class ResellerCoinsService {
       object: 'reseller_coins' as const,
       mode,
       /** Whether the plan lets the reseller deposit coins on chain (Premium); withdrawing what it holds is always open. */
-      onchain: reseller.plan.features.includes(onchainFeature),
+      onchain: planIncludes(reseller, onchainFeature),
       withdrawal_chains: withdrawalChains.map(chain => ({ chain, name: chainNames[chain] })),
       assets: assets
         .filter(asset => asset.enabled || balance('reseller_crypto', asset.code) > 0n || balance('reseller_crypto_withdrawing', asset.code) > 0n)

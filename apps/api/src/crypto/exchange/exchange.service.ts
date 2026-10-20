@@ -18,6 +18,7 @@ import { type CryptoContext, CryptoWalletsService, notFound } from '../crypto-wa
 import type { UsdPrice } from '../price-feed.js';
 import { CryptoPricesService } from '../prices.js';
 import { available, deskPrice, type ExchangeSide, markupEarned, marketPriceMinor, maxMarkupBps, quoteLifetimeMs, tradeTerms } from './pricing.js';
+import { PlanAccessService } from '../../plans/plan-access.js';
 
 /** BitoCard's own desk: its fiat reserves on each market's house account, its coins on the root house account. */
 export const bitocardDesk = 'bitocard';
@@ -66,6 +67,7 @@ export class ExchangeService {
     private readonly prices: CryptoPricesService,
     private readonly fx: FxService,
     private readonly settings: SettingsService,
+    private readonly planAccess: PlanAccessService,
     private readonly audit: AuditService,
     private readonly inbox: InboxService,
   ) {}
@@ -92,7 +94,7 @@ export class ExchangeService {
     if (house) return { id: bitocardDesk, name: 'BitoCard', fiatOwner: context.seller.id, coinOwner: houseRootId, enabled: true, capBps: maxMarkupBps };
     const resellerId = context.seller.id;
     const [allowed, ownMarkup, choice] = await Promise.all([
-      this.settings.isOn('reseller_desks', resellerId),
+      this.desksAllowed(resellerId),
       asset ? this.prisma.exchangeMarkup.findUnique({ where: { desk_mode_asset_currency: { desk: resellerId, mode: context.mode, asset, currency } }, select: { enabled: true } }) : null,
       this.prisma.exchangeDesk.findUnique({ where: { resellerId } }),
     ]);
@@ -459,9 +461,15 @@ export class ExchangeService {
     return { object: 'exchange_reserves' as const, mode, desk: { id: resellerId, name: reseller.name }, coins, wallets: money };
   }
 
-  /** A reseller's own desk may be changed only while the `reseller_desks` switch is on, and live only once verified. */
+  /** Whether the reseller may run their own desk: the `reseller_desks` switch on and a plan with it. */
+  private async desksAllowed(resellerId: string) {
+    return (await this.settings.isOn('reseller_desks', resellerId)) && (await this.planAccess.has(resellerId, 'reseller_desks'));
+  }
+
+  /** A reseller's own desk may be changed only while the switch is on, with a plan that has it, and live only once verified. */
   private async requireOwnDesk(resellerId: string, mode: LedgerMode) {
-    if (!(await this.settings.isOn('reseller_desks', resellerId))) throw conflict('exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
+    if (await this.settings.isOn('reseller_desks', resellerId)) await this.planAccess.require(resellerId, 'reseller_desks');
+    if (!(await this.desksAllowed(resellerId))) throw conflict('exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
     if (mode === 'live') {
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { status: true } });
       if (reseller.status !== 'active') throw conflict('exchange_unavailable', 'Your business must be verified before running a live exchange desk.');
@@ -470,7 +478,7 @@ export class ExchangeService {
 
   async resellerDesk(resellerId: string) {
     const [enabled, choice, reseller] = await Promise.all([
-      this.settings.isOn('reseller_desks', resellerId),
+      this.desksAllowed(resellerId),
       this.prisma.exchangeDesk.findUnique({ where: { resellerId } }),
       this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, select: { country: true } }),
     ]);
@@ -479,7 +487,8 @@ export class ExchangeService {
   }
 
   async setResellerDesk(resellerId: string, fallbackToBitocard: boolean) {
-    if (!(await this.settings.isOn('reseller_desks', resellerId))) throw conflict('exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
+    if (await this.settings.isOn('reseller_desks', resellerId)) await this.planAccess.require(resellerId, 'reseller_desks');
+    if (!(await this.desksAllowed(resellerId))) throw conflict('exchange_not_enabled', 'Running your own exchange desk is not enabled for your business yet.');
     await this.prisma.exchangeDesk.upsert({ where: { resellerId }, create: { resellerId, fallbackToBitocard }, update: { fallbackToBitocard } });
     return this.resellerDesk(resellerId);
   }

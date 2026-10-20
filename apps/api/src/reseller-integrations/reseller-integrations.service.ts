@@ -14,6 +14,7 @@ import { linksFor } from '../integrations/links.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { connectable, connectableIntegrations, type ConnectableIntegration, type ConnectableKind } from './connectable.js';
+import { planIncludes } from '../plans/plan-access.js';
 
 /** Why a reseller cannot connect their own integrations yet (null: they can). */
 export type AccessReason = 'switch_off' | 'plan' | 'not_verified' | 'no_country' | null;
@@ -70,7 +71,7 @@ export class ResellerIntegrationsService {
     const gate = gates[kind];
     const reason: AccessReason = !(await this.settings.isOn(gate.switch, resellerId))
       ? 'switch_off'
-      : !reseller.plan.features.includes(gate.feature)
+      : !planIncludes(reseller, gate.feature)
         ? 'plan'
         : !reseller.country
           ? 'no_country'

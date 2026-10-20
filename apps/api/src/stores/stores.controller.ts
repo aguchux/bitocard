@@ -13,6 +13,7 @@ import { StoreHomeService } from './store-home.service.js';
 import { maxTrafficDays, StoreVisitsService } from './store-visits.service.js';
 import { templateKeys } from './templates.js';
 import { StoresService } from './stores.service.js';
+import { PlanAccessService } from '../plans/plan-access.js';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 const lower = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -136,6 +137,7 @@ export class StoresController {
     private readonly stores: StoresService,
     private readonly visits: StoreVisitsService,
     private readonly home: StoreHomeService,
+    private readonly planAccess: PlanAccessService,
   ) {}
 
   @ApiOperation({ summary: 'Get a store’s home page editor', description: 'The draft (else what is published, else the design’s starting page), what is published, and the sections the store’s template offers.' })
@@ -224,12 +226,13 @@ export class StoresController {
 
   @ApiOperation({
     summary: 'Store traffic',
-    description: 'Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies.',
+    description: 'Page views and visitors of the store per address (its bitocard.com address and its own domains) and per day, counted without cookies. Needs a plan with store traffic (`plan_feature_required` otherwise).',
   })
   @ApiQuery({ name: 'days', required: false, description: `How many days back, today included (1 to ${maxTrafficDays}; default 30).` })
   @Get(':id/traffic')
   async traffic(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Query('days') days?: string) {
     const store = await this.stores.get(resellerOf(caller), id);
+    await this.planAccess.require(resellerOf(caller), 'store_traffic');
     return this.visits.traffic(store.id, Number(days ?? 30));
   }
 

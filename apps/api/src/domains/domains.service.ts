@@ -14,6 +14,7 @@ import { domainName, isManaged, lookupPublicRecords, mailProviders, mailRecords,
 import { ResendDomains, type SendingRecord } from './resend-domains.js';
 import { domainSender } from './sender.js';
 import { type Contact, VercelDomains } from './vercel.js';
+import { PlanAccessService } from '../plans/plan-access.js';
 
 /** At most this many domains per store (in use: not removed or failed). */
 export const maxDomainsPerStore = 5;
@@ -59,6 +60,7 @@ export class DomainsService {
     private readonly audit: AuditService,
     private readonly inbox: InboxService,
     private readonly settings: SettingsService,
+    private readonly planAccess: PlanAccessService,
   ) {
     this.clients = integrations.derive(config => {
       const margin = config.DOMAIN_MARGIN_PERCENT?.trim();
@@ -87,13 +89,14 @@ export class DomainsService {
 
   // Access ---------------------------------------------------------------------------------------------------------------
 
-  /** The reseller's store, with the switch on. */
+  /** The reseller's store, with the switch on and a plan with custom domains. */
   private async storeOf(resellerId: string, storeId: string) {
     const store = await this.prisma.store.findFirst({ where: { id: storeId, resellerId } });
     if (!store) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such store.');
     if (!(await this.settings.isOn('custom_domains', resellerId))) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'domains_not_enabled', 'Custom domains are not open for your account yet.');
     }
+    await this.planAccess.require(resellerId, 'custom_domains');
     return store;
   }
 

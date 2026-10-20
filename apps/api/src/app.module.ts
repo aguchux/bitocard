@@ -51,6 +51,7 @@ import type { DatabaseAdapter } from './database/prisma.service.js';
 import { HealthModule } from './health/health.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { VpnApiModule, VpnModule } from './vpn/vpn.module.js';
+import { PlanAccessModule } from './plans/plan-access.js';
 
 export type AppOptions = {
   /** Database driver adapter to use instead of DATABASE_URL (tests use an in-process Postgres). */
@@ -73,6 +74,7 @@ export class AppModule {
         AuditModule,
         CountriesModule,
         SettingsModule,
+        PlanAccessModule,
         PlansModule,
         DomainsModule,
         StoresModule,

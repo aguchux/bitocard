@@ -24,7 +24,7 @@ import type {
   OrderStatus,
   Overview,
   Plan,
-  PlanFeatureTier,
+  CreatePlanInput,
   PlanSettings,
   PricingRule,
   PricingRuleInput,
@@ -128,18 +128,33 @@ export const adminApi = bitocardApi.injectEndpoints({
       query: ({ id, reason }) => ({ url: `/v1/admin/resellers/${id}/startup-allowance/revoke`, method: 'POST', body: { reason } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, 'Activity'],
     }),
-    plans: build.query<List<Plan>, void>({ query: () => '/v1/plans', providesTags: ['Plan'] }),
-    /** Settings > Plans: prices per market currency and where each feature sits. */
+    /** Every plan, hidden ones too (for choosing a reseller's plan and fee rules). */
+    plans: build.query<List<PlanSettings['plans'][number]>, void>({
+      query: () => '/v1/admin/plans',
+      transformResponse: (settings: PlanSettings) => ({ object: 'list', data: settings.plans, has_more: false }),
+      providesTags: ['Plan'],
+    }),
+    /** Settings > Plans: every plan with its prices per market currency and features, and the feature catalogue. */
     planSettings: build.query<PlanSettings, void>({ query: () => '/v1/admin/plans', providesTags: ['Plan'] }),
     /** Finance: name, description, US dollar price and fixed prices per currency (null goes back to converting). */
     updatePlan: build.mutation<Plan, UpdatePlanInput>({
       query: ({ code, ...body }) => ({ url: `/v1/admin/plans/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Plan', 'Reseller', 'Activity'],
     }),
-    /** Finance: a feature on every plan (`free`) or on paid plans only (`premium`). */
-    setPlanFeatureTier: build.mutation<PlanSettings, { feature: string; tier: PlanFeatureTier }>({
-      query: ({ feature, tier }) => ({ url: `/v1/admin/plan-features/${feature}`, method: 'PUT', body: { tier } }),
+    /** Finance: a new paid plan with its features. */
+    createPlan: build.mutation<PlanSettings, CreatePlanInput>({
+      query: body => ({ url: '/v1/admin/plans', method: 'POST', body }),
+      invalidatesTags: ['Plan', 'Activity'],
+    }),
+    /** Finance: one feature on or off for one plan; resellers on it follow at once. */
+    setPlanFeature: build.mutation<PlanSettings, { code: string; feature: string; enabled: boolean }>({
+      query: ({ code, feature, enabled }) => ({ url: `/v1/admin/plans/${code}/features/${feature}`, method: 'PUT', body: { enabled } }),
       invalidatesTags: ['Plan', 'Reseller', 'Activity'],
+    }),
+    /** Finance: deletes a plan nobody is on. */
+    deletePlan: build.mutation<PlanSettings, { code: string }>({
+      query: ({ code }) => ({ url: `/v1/admin/plans/${code}`, method: 'DELETE' }),
+      invalidatesTags: ['Plan', 'Activity'],
     }),
 
     verifications: build.infiniteQuery<List<Verification>, { status?: VerificationStatus; subject?: 'reseller' | 'customer'; reseller_id?: string }, string>({
@@ -414,7 +429,9 @@ export const {
   usePlansQuery,
   usePlanSettingsQuery,
   useUpdatePlanMutation,
-  useSetPlanFeatureTierMutation,
+  useCreatePlanMutation,
+  useSetPlanFeatureMutation,
+  useDeletePlanMutation,
   useVerificationsInfiniteQuery,
   useDecideVerificationMutation,
   useOrdersInfiniteQuery,

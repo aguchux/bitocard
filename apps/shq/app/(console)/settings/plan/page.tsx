@@ -88,7 +88,7 @@ export default function PlanPage() {
 
   return (
     <ShqShell section="settings" current="/settings/plan" crumbs={[{ label: "Settings", href: "/settings" }, { label: "Plan" }]}>
-      <PageHeader title="Plan" description="Standard is free. Premium is billed monthly from your wallet." />
+      <PageHeader title="Plan" description="Standard is free. Paid plans are billed monthly from your wallet and unlock the features listed with them." />
       {changed ? <Notice tone="green">{changed}</Notice> : null}
       {mode === "test" ? <Notice tone="amber">Plans are paid from your live wallet, so they cannot be changed in the sandbox. Switch to live to change your plan.</Notice> : null}
       {!can(membership, "finance") ? <Notice tone="grey">Only the owner and finance members can change the plan.</Notice> : null}
@@ -116,7 +116,7 @@ export default function PlanPage() {
           ) : sub.renews_at ? (
             <Notice tone="blue">{`${sub.plan.name} renews on ${formatDate(sub.renews_at)}, charged from your live wallet.`}</Notice>
           ) : null}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {plans.data.data.map(plan => (
               <PlanCard key={plan.code} plan={plan} subscription={sub} onChoose={setChoosing} canChange={canChange} />
             ))}

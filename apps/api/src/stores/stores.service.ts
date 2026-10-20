@@ -9,6 +9,7 @@ import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.
 import { reservedSubdomains } from './reserved.js';
 import { StoreHostsService } from './store-hosts.service.js';
 import { designFor, storeTemplates, templateFor, type StoreTemplate } from './templates.js';
+import { planFeatureRequired, planIncludes } from '../plans/plan-access.js';
 
 export { reservedSubdomains };
 
@@ -135,10 +136,12 @@ export class StoresService {
   }
 
   async create(resellerId: string, input: Required<Pick<StoreInput, 'name' | 'subdomain'>> & StoreInput) {
-    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { stores: true } });
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { stores: true, plan: true } });
     if (!reseller.country) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'country_required', 'Set your business country before creating a store.');
     }
+    // A second store needs a plan with several stores.
+    if (reseller.stores.length >= 1 && !planIncludes(reseller, 'multiple_stores')) throw planFeatureRequired('multiple_stores', reseller.plan.name);
     if (reseller.stores.length >= maxStoresPerReseller) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'store_limit_reached', `You can run up to ${maxStoresPerReseller} stores.`);
     }

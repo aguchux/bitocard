@@ -247,6 +247,12 @@ describe('reseller desks', () => {
 
     assert.equal((await admin.put(`/v1/admin/switches/reseller_desks`, { enabled: true })).status, 200);
     try {
+      // The switch on but a plan without the desk: refused for the plan.
+      assert.equal((await admin.put('/v1/admin/plans/standard/features/reseller_desks', { enabled: false })).status, 200);
+      const noPlan = await browser.put('/v1/exchange/desk', { fallback_to_bitocard: false }, headers);
+      assert.deepEqual([noPlan.status, noPlan.json.error.code, noPlan.json.error.param], [403, 'plan_feature_required', 'reseller_desks']);
+      assert.equal((await browser.get('/v1/exchange/desk', headers)).json.enabled, false);
+      assert.equal((await admin.put('/v1/admin/plans/standard/features/reseller_desks', { enabled: true })).status, 200);
       assert.equal((await admin.patch('/v1/admin/countries/NG', { exchange_markup_cap_bps: 300 })).json.exchange_markup_cap_bps, 300);
       assert.equal((await browser.get('/v1/exchange/desk', headers)).json.markup_cap_bps, 300);
       assert.equal((await browser.put('/v1/exchange/markups', offer, headers)).json.error.code, 'markup_above_cap');
@@ -258,6 +264,7 @@ describe('reseller desks', () => {
       assert.equal(btc.desk.id, resellerId);
       assert.equal(btc.buy.markup_bps, 200);
     } finally {
+      await admin.put('/v1/admin/plans/standard/features/reseller_desks', { enabled: true });
       await admin.patch('/v1/admin/countries/NG', { exchange_markup_cap_bps: 500 });
       assert.equal((await admin.put('/v1/admin/switches/reseller_desks', { enabled: null })).status, 200);
     }

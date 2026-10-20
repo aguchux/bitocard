@@ -218,6 +218,7 @@ describe('files in chat', () => {
     assert.equal((await consoleUpload(admin, `/v1/admin/support/chats/${started.chat.id}/attachments`, jpeg(), 'image/jpeg', 'help.jpg')).status, 201);
 
     const reseller = await resellerClient(server);
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { planCode: 'premium' } });
     const own = await consoleUpload(reseller.browser, '/v1/support/bitocard-chat/attachments', pdf(), 'application/pdf', 'statement.pdf');
     assert.deepEqual([own.status, own.json.requester, own.json.status], [201, 'reseller', 'waiting']);
 
