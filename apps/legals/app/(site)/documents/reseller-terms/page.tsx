@@ -5,7 +5,7 @@ import { pageMetadata } from "@/components/seo";
 
 const seo = {
   title: "Reseller terms",
-  description: "The terms for selling with BitoCard: your account and checks, your wallet and payouts, pricing, your stores and what you publish on them, domains, your customers, disputes and your own integrations.",
+  description: "The terms for selling with BitoCard: your account and checks, your wallet, invoices and payouts, plans per store, pricing, your stores and what you publish on them, domains, your customers, disputes and your own integrations.",
   path: "/documents/reseller-terms",
 };
 
@@ -54,15 +54,24 @@ export default function ResellerTerms() {
         <ul>
           <li><strong>Pre-funding.</strong> Your wallet pays our wholesale price for every order before it is fulfilled. An order your wallet cannot cover is refused. Your store can be published before your wallet is funded, but it cannot take paid orders until it is funded and your checks are complete.</li>
           <li><strong>Two wallets.</strong> You have a wallet in your country&apos;s currency and one in US dollars. You can move money between them at the rate we show before you confirm. Your country&apos;s wallet pays your orders; when it is short, we may use dollars you topped up to cover the difference, at our disclosed rate.</li>
-          <li><strong>Top-ups are not withdrawable.</strong> Money you top up (by card, bank transfer, mobile money or your own reserved bank account) can only be spent on orders, fees and your plan. It cannot be withdrawn or paid out. We credit a top-up only once the payment provider confirms it.</li>
+          <li><strong>Top-ups are not withdrawable.</strong> Money you top up (by card, bank transfer, mobile money or your own reserved bank account) can only be spent on orders, fees, your plans and what you owe on your invoices. It cannot be withdrawn or paid out. We credit a top-up only once the payment provider confirms it.</li>
           <li><strong>Holds.</strong> When an order is placed we hold its wholesale price. We take it when the order is delivered and give it back if the order fails.</li>
         </ul>
         <h3 id="wallet-earnings">Your profit and payouts</h3>
         <ul>
           <li><strong>Your profit is yours.</strong> On a sale we collect for you, the difference between your customer&apos;s price and our wholesale price (after tax) is your profit. It becomes withdrawable once the payout hold for your country has passed (15 days after the sale unless we tell you otherwise), so that refunds and chargebacks can still be put right.</li>
           <li><strong>Withdrawals.</strong> You can withdraw withdrawable profit to a bank account in your business&apos;s or verified owner&apos;s name, above the minimum we set for your country. A new bank account can be used 24 hours after it is added, and we may check the account name with the bank first. Only the account&apos;s owner can add a payout account.</li>
+          <li><strong>Withdrawals to mobile money.</strong> Where we offer it in your country, you can also withdraw to a mobile money wallet on one of your verified owner&apos;s own phone numbers that they have confirmed with us, on a network our mobile money partner pays out to in your currency. The same rules apply as for bank accounts (the 24-hour wait, the minimum, holds while a chargeback is open). The mobile money provider&apos;s fee comes out of the amount you withdraw: SHQ shows what will arrive before you confirm, and a payout the provider refuses comes back to your wallet. Check the number: money sent to the wallet you chose cannot be recalled by us.</li>
           <li><strong>Mistakes.</strong> If we credit your wallet by mistake, or a payment we credited is reversed, we may correct your balance. If it goes below what you owe us, you must pay the difference.</li>
           <li><strong>Your balance is not a bank account.</strong> We do not pay interest on it. It is a record of what you have paid in and earned with BitoCard.</li>
+        </ul>
+        <h3 id="wallet-invoices">Invoices and what you owe</h3>
+        <ul>
+          <li><strong>Monthly invoices.</strong> Each store has a monthly invoice, and your account has one for what is not tied to a store, listing every charge: plans, domains, our fees and usage (section 6). Each charge is taken from your wallet when it happens (topped-up money first, then your profit).</li>
+          <li><strong>What you owe.</strong> When your wallet cannot cover a usage charge, the rest is owed to us, up to your credit limit. Your next top-ups pay what you owe first, oldest charge first, and you can pay an invoice from SHQ at any time. An invoice is due 7 days after its month ends, or sooner if the store&apos;s plan renews first.</li>
+          <li><strong>Your credit limit.</strong> It is the most you can owe us, set in US dollars and applied in your currency at our exchange rate. It starts at US$10. Once you have paid a full month&apos;s invoice in full and owe nothing, you can raise it one step at a time in SHQ (US$25, US$50, then US$100, the most). We may lower it, or set it at any amount up to US$100. An invoice unpaid after its due date lowers it one step.</li>
+          <li><strong>At your limit.</strong> Usage we would have to charge for stops until you pay: our AI assistant (people answer instead), mobile money top-ups for your store&apos;s customers (other ways to pay stay open), orders and payments through your own integrations, and buying or renewing domains. Plan renewals follow their own 7-day grace instead (section 6). Usage that has already happened is still owed, even beyond the limit. We never stop paid customer orders already under way, your customers&apos; access to what they bought, or you withdrawing your money or coins.</li>
+          <li><strong>Paying us.</strong> What you owe is a debt to us. If it stays unpaid, usage that would add to it stays stopped, we take it from what we pay out if your account closes, and we may recover it as the law allows.</li>
         </ul>
       </Section>
 
@@ -77,7 +86,9 @@ export default function ResellerTerms() {
       <Section id="plans" title="6. Plans, fees and promotions">
         <ul>
           <li><strong>Plans.</strong> Each of your stores has its own plan. The Startup plan is free. Our paid plans (Premium, Enterprise and any others we offer) are monthly subscriptions for one store each, at the price shown in SHQ, paid from your wallet in your country&apos;s currency: a price we set for that currency, or else the US dollar price converted at our exchange rate on the day of each charge. The features and limits each plan includes are listed in SHQ, and only those are open to you: a store has what its own plan includes, and features for your whole account (such as your team and your own suppliers and gateways) follow the highest plan among your stores. Anything a plan does not include is refused until you change plan. Moving a store to a higher plan is charged at once, less a credit for the unused part of its current month; moving to a lower plan takes effect at the end of the paid month. We may add plans, stop offering one and move features between plans; we tell you in SHQ when a feature leaves your plan, and a plan we stop offering stays yours, renewing as before, until you change it. If your wallet cannot pay a store&apos;s renewal, we warn you and keep its plan for 7 days, then move that store to Startup. If you cancel, the plan lasts until the end of the month you paid for. If you were on a paid plan before plans became per store, every store keeps it at no extra charge until your next renewal; we tell you at least 14 days before which stores will renew, and you can choose others in SHQ.</li>
-          <li><strong>Fees.</strong> Where you use your own suppliers or payment gateways (section 13), our fees are taken from your wallet, at the rates shown in SHQ before you use them. We publish your rates, every fee charged and a monthly statement in SHQ.</li>
+          <li><strong>Fees.</strong> Where you use your own suppliers or payment gateways (section 13), our fees are taken from your wallet, at the rates for the store&apos;s plan shown in SHQ before you use them. We publish your rates, every fee charged and a monthly statement in SHQ. We charge no commission on the products we supply: you buy at our price and keep your margin.</li>
+          <li><strong>Usage charges.</strong> Some things cost us money each time they are used, and are charged to the store that used them at our cost plus the margin for its plan shown in SHQ, in your currency at our exchange rate: replies from our AI assistant beyond the store&apos;s monthly allowance, if you choose for that store to carry on rather than hand over to people (you can switch it back to stopping at any time), and our mobile money partner&apos;s fee when your store&apos;s customers top up their store wallet by mobile money. Each charge is on the store&apos;s invoice (section 4).</li>
+          <li><strong>Limits.</strong> Plans also set how much you can have, such as the number of stores, domains per store, team members, connections to your own suppliers and gateways, webhook endpoints and AI replies a month. When you reach a limit, adding more is refused until you change plan. If we lower a limit, or you move to a plan with lower limits, nothing you already have is removed, but you cannot add more until you are back within it.</li>
           <li><strong>Startup allowance.</strong> Where we offer it, a verified new reseller may receive a one-time promotional allowance that pays our wholesale price on customer-paid orders until it is used up. It is not money: it cannot be spent directly, withdrawn, transferred or paid out, and we may stop the programme or remove what is left of it at any time.</li>
           <li><strong>Customer welcome bonus.</strong> Where we switch it on for your store, we fund a small discount on an eligible customer&apos;s first purchase, once per customer, under the conditions shown in SHQ. We may end it at any time.</li>
         </ul>
@@ -85,7 +96,7 @@ export default function ResellerTerms() {
 
       <Section id="stores" title="7. Your stores">
         <ul>
-          <li><strong>Several stores.</strong> You can run up to five stores, each with its own name, address, design and template. Each store is part of your one reseller account: these terms apply to all of them, and your wallet pays for all of them.</li>
+          <li><strong>Several stores.</strong> You can run as many stores as your plan allows, each with its own name, address, design, template and plan. Each store is part of your one reseller account: these terms apply to all of them, and your wallets pay for all of them.</li>
           <li><strong>Addresses.</strong> Each store gets an address on bitocard.com (for example yourstore.bitocard.com). We may refuse or change an address that is misleading, offensive, infringes someone&apos;s rights or is reserved by us. You do not own a bitocard.com address, and it ends when the store is closed.</li>
           <li><strong>Templates and designs.</strong> A store&apos;s template decides what it sells (for example top-ups only, or gift cards only) and its design decides how it looks. You may change them; changing a template starts its home page again. The crypto desk template is offered only where we have switched crypto trading on for you, and its customers also agree to our crypto terms.</li>
           <li><strong>Publishing.</strong> You decide when a store is published. You can take it offline at any time. Customers of a closed store can still sign in and see what they bought.</li>
@@ -152,7 +163,7 @@ export default function ResellerTerms() {
         <ul>
           <li><strong>What it says is yours.</strong> Your store&apos;s AI assistant answers from the information you give it (and what BitoCard generates from your store, which you review before applying). You are responsible for that information being true and for checking its answers; BitoCard&apos;s fixed rules (never asking for codes or secrets, never promising refunds, handing over to a person) always apply and cannot be switched off.</li>
           <li><strong>It says it is an AI.</strong> Customers are always told they are talking to an AI assistant and can ask for a person. Keep a person available to answer what it hands over.</li>
-          <li><strong>Your own AI key</strong> is yours: you pay the provider and follow its terms, and its provider receives your customers&apos; messages as our privacy notice says. On a plan that includes it, BitoCard&apos;s AI is included within a monthly allowance of replies per store, which we set and may change; past it, people answer until the month resets.</li>
+          <li><strong>Your own AI key</strong> is yours: you pay the provider and follow its terms, and its provider receives your customers&apos; messages as our privacy notice says. On a plan that includes it, BitoCard&apos;s AI is included within a monthly allowance of replies per store, which we set and may change; past it, people answer until the month resets, unless you choose for that store to carry on and pay for each further reply as a usage charge (section 6).</li>
           <li><strong>We may suspend an assistant</strong> that breaks these terms or the law, or says what it must not, and tell you why.</li>
         </ul>
       </Section>
@@ -170,6 +181,7 @@ export default function ResellerTerms() {
 
       <Section id="api" title="14. Using our API">
         <ul>
+          <li><strong>Keys belong to a store.</strong> Each API key and webhook endpoint belongs to one of your stores. A key can sell what that store&apos;s plan allows, and sees only that store&apos;s orders and records and your account&apos;s own (such as top-ups and payouts). Your wallets are shared by all your stores, so an order through any key is paid from them.</li>
           <li>Keep your API keys and webhook secrets secret, use only the permissions you need, and rotate a key you think has leaked.</li>
           <li>Verify our webhooks&apos; signatures, and treat our API, not a webhook, as the record of an order.</li>
           <li>Stay within our rate limits, and do not test our security, scrape our catalogue for others or resell API access.</li>
@@ -192,7 +204,7 @@ export default function ResellerTerms() {
           <li>You can close your account at any time once your orders, disputes and chargebacks are settled.</li>
           <li>We may suspend your account or a store at once if you break these terms, if the law or a regulator requires it, or to protect customers, suppliers or BitoCard. We tell you why unless the law prevents us, and lift it when the reason has gone.</li>
           <li>We may end these terms by giving you 30 days&apos; notice, or at once for a serious breach.</li>
-          <li>When your account closes, your stores go offline. We pay out your withdrawable profit after the payout hold, less what you owe us. Money you topped up is spent only on what you owe, and anything left is returned to where it came from where the payment provider allows. Domains you bought stay yours to transfer.</li>
+          <li>When your account closes, your stores go offline. We pay out your withdrawable profit after the payout hold, less what you owe us, including unpaid invoices. Money you topped up is spent only on what you owe, and anything left is returned to where it came from where the payment provider allows. Domains you bought stay yours to transfer.</li>
         </ul>
       </Section>
 
