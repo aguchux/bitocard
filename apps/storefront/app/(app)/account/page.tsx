@@ -6,12 +6,10 @@ import { SpinDialog } from "@/components/app/spin-dialog";
 import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
-import { QuickBuyForm } from "@/components/store/quick-buy";
 import { storeApi } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
-import { homeQuickBuyTabs } from "@/lib/home-quick-buy";
 import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
@@ -35,14 +33,13 @@ function spent(summary: StoreCustomerSummary | null) {
 /** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
 export default async function AccountHome({ searchParams }: { searchParams: Promise<{ spin?: string }> }) {
   const { spin } = await searchParams;
-  const [navigation, summary, popular, recent, wallet, spins, quickBuyTabs] = await Promise.all([
+  const [navigation, summary, popular, recent, wallet, spins] = await Promise.all([
     storeNavigation(),
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
     inMarket("/v1/store/products?sort=popular&limit=8").then(path => storeApi<StoreList<StoreProduct>>(path)),
     customerApi<StoreList<StoreCheckout>>("GET", "/v1/store/checkouts?limit=3"),
     walletFor(),
     customerApi<StoreSpinRewards>("GET", "/v1/store/spins"),
-    homeQuickBuyTabs(),
   ]);
   const rewards = spins.ok ? spins.data : null;
   const figures = summary.ok ? summary.data : null;
@@ -80,15 +77,6 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
           </li>
         </StatsSlider>
       </section>
-
-      {quickBuyTabs.length ? (
-        <section aria-labelledby="quick-buy">
-          <SectionTitle id="quick-buy" title="Quick top-up" />
-          <div className="rounded-3xl bg-white p-4 ring-1 ring-slate-200/70 sm:p-5">
-            <QuickBuyForm id="home" tabs={quickBuyTabs} tone="light" />
-          </div>
-        </section>
-      ) : null}
 
       {showSpin(rewards) ? (
         <section aria-label="Spin and win">

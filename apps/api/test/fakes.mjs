@@ -283,6 +283,12 @@ export async function fakeReloadly() {
     }
     const operators = /^\/topups\/operators\/countries\/([A-Z]{2})$/.exec(path);
     if (method === 'GET' && operators) return { body: state.operators[operators[1]] ?? [] };
+    const autoDetect = /^\/topups\/operators\/auto-detect\/phone\/([^/]+)\/countries\/([A-Z]{2})$/.exec(path);
+    if (method === 'GET' && autoDetect) {
+      const [, phone, country] = autoDetect;
+      const match = state.autoDetect?.[`${country}:${phone}`];
+      return match ? { body: match } : { status: 404, body: { message: 'No matching operator found' } };
+    }
     return { status: 404, body: { message: `Fake Reloadly has no ${method} ${path}` } };
   });
   return {

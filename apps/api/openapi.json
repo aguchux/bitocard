@@ -7793,6 +7793,7 @@
                   "country": "NG",
                   "currency": "NGN",
                   "checkout_mode": "live",
+                  "white_label": true,
                   "app": {
                     "desktop_nav": "rail"
                   },
@@ -26087,6 +26088,196 @@
         "x-bitocard-auth": "public"
       }
     },
+    "/v1/store/network-detect": {
+      "get": {
+        "description": "For the quick top-up form: which network a mobile number belongs to (the routed supplier’s own lookup, else a prefix guess), and the matching airtime or data product on sale, if any. `detected: false` asks the customer to choose a network themselves.",
+        "operationId": "StorefrontController_detectNetwork",
+        "parameters": [
+          {
+            "name": "phone",
+            "required": true,
+            "in": "query",
+            "description": "The mobile number to top up, in national or international format.",
+            "schema": {
+              "example": "0803 123 4567",
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "required": true,
+            "in": "query",
+            "description": "The number’s country (2-letter code).",
+            "schema": {
+              "example": "NG",
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "airtime",
+              "type": "string",
+              "enum": [
+                "airtime",
+                "data"
+              ]
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "The signed-in customer’s currency (ISO 4217): the matched product then has `price`.",
+            "schema": {
+              "example": "NGN",
+              "type": "string"
+            }
+          },
+          {
+            "name": "store",
+            "required": false,
+            "in": "query",
+            "description": "A reseller’s hosted store (its subdomain): only a network it sells.",
+            "schema": {
+              "example": "adadigital",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Which network a mobile number belongs to, and the matching airtime or data product, for the quick top-up form.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Network detection",
+                  "description": "The mobile network a number belongs to, and the matching airtime or data product on sale, if any.",
+                  "required": [
+                    "object",
+                    "detected",
+                    "brand",
+                    "product"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `network_detection`.",
+                      "const": "network_detection"
+                    },
+                    "detected": {
+                      "type": "boolean",
+                      "description": "Whether a network was matched. False asks the customer to choose a network themselves."
+                    },
+                    "brand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The network’s brand slug (for example `mtn`), when detected."
+                    },
+                    "product": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/StoreProduct"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "object": "network_detection",
+                  "detected": true,
+                  "brand": "mtn",
+                  "product": {
+                    "object": "store_product",
+                    "id": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                    "key": "airtime:NG:mtn:topup",
+                    "name": "MTN Nigeria airtime",
+                    "category": "airtime",
+                    "category_label": "Airtime",
+                    "country": "NG",
+                    "country_name": "Nigeria",
+                    "global": false,
+                    "face_currency": "NGN",
+                    "denomination_type": "range",
+                    "from": 5000,
+                    "to": 5000000,
+                    "price": null,
+                    "description": "Top up any MTN Nigeria prepaid line.",
+                    "logo_url": null,
+                    "features": [],
+                    "brand": {
+                      "object": "store_brand",
+                      "slug": "mtn",
+                      "name": "MTN",
+                      "company": "MTN Group",
+                      "description": null,
+                      "logo_url": "https://bitocard.com/brand-icons/mtn.svg",
+                      "image_url": null,
+                      "color": "#FFCB05",
+                      "initials": "MTN",
+                      "tags": [
+                        "mobile"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Detect a mobile number’s network",
+        "tags": [
+          "Storefront"
+        ],
+        "x-bitocard-auth": "public"
+      }
+    },
     "/v1/store/search": {
       "get": {
         "description": "Products, brands and the companies behind them, categories and countries, best matches first.",
@@ -42777,6 +42968,7 @@
                     "multiple_stores",
                     "custom_domains",
                     "international_selling",
+                    "white_label",
                     "store_traffic",
                     "onchain_crypto",
                     "reseller_desks",
@@ -46496,6 +46688,7 @@
                 "multiple_stores",
                 "custom_domains",
                 "international_selling",
+                "white_label",
                 "store_traffic",
                 "onchain_crypto",
                 "reseller_desks",
@@ -46541,6 +46734,7 @@
                     "multiple_stores",
                     "custom_domains",
                     "international_selling",
+                    "white_label",
                     "store_traffic",
                     "onchain_crypto",
                     "reseller_desks",
@@ -48310,6 +48504,7 @@
           "country",
           "currency",
           "checkout_mode",
+          "white_label",
           "app",
           "domain"
         ],
@@ -48388,6 +48583,10 @@
               "test",
               "live"
             ]
+          },
+          "white_label": {
+            "type": "boolean",
+            "description": "The store’s plan has Your brand only: its pages leave BitoCard’s name out (the terms of sale still name the seller)."
           },
           "app": {
             "type": "object",

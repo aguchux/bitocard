@@ -180,6 +180,8 @@ export interface SupplierAdapter {
   readonly defaultFeatureRules?: FeatureRules;
   /** Pay-TV and bills: confirm a smartcard or meter number before a quote. */
   validateRecipient?(meta: Record<string, unknown>, accountNumber: string): Promise<RecipientCheck>;
+  /** Airtime and data: the mobile network a phone number belongs to, by the supplier's own lookup. Null if it cannot tell. */
+  detectOperator?(phone: string, country: string): Promise<{ brand: string; name: string } | null>;
   /**
    * Places an order. Throws ProviderError with `definite` only when the supplier clearly refused it before
    * accepting; anything unclear must come back as `pending` (or an unclear error) so it is checked, not retried.

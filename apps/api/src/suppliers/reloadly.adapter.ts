@@ -221,6 +221,22 @@ export class ReloadlyAdapter implements SupplierAdapter {
     );
     return operators.flatMap(operator => operatorItems(operator, country));
   }
+
+  /** The mobile network a phone number belongs to, from Reloadly's own lookup. Null when it cannot tell (never thrown). */
+  async detectOperator(phone: string, country: string): Promise<{ brand: string; name: string } | null> {
+    if (!this.configured()) return null;
+    try {
+      const operator = await this.get<Operator>(
+        this.urls.topups,
+        `/operators/auto-detect/phone/${encodeURIComponent(phone)}/countries/${encodeURIComponent(country)}`,
+        'application/com.reloadly.topups-v1+json',
+      );
+      if (!operator?.name) return null;
+      return { brand: slug(operator.name, [operator.country?.name ?? '', 'data', 'bundles', 'bundle']), name: operator.name };
+    } catch {
+      return null;
+    }
+  }
 }
 
 /** Top-ups deliver nothing to hand over; the confirmation carries no supplier details. */

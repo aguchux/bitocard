@@ -6,6 +6,16 @@ import type { DocsArea } from './index.js';
 
 const groupKeys = navigationGroups.map(group => group.key);
 const color = (description: string) => str(description, { pattern: '^#[0-9a-f]{6}$' });
+const networkDetection = objectSchema(
+  'Network detection',
+  {
+    object: constant('network_detection'),
+    detected: bool('Whether a network was matched. False asks the customer to choose a network themselves.'),
+    brand: nullableStr('The network’s brand slug (for example `mtn`), when detected.'),
+    product: nullable(ref('StoreProduct')),
+  },
+  'The mobile network a number belongs to, and the matching airtime or data product on sale, if any.',
+);
 
 // -- Reseller stores --------------------------------------------------------------------------------------------
 
@@ -208,6 +218,7 @@ const storefront = objectSchema(
     country: nullableStr('ISO 3166-1 alpha-2 country of the reseller’s business.'),
     currency: nullableStr('ISO 4217 currency the store sells in.'),
     checkout_mode: oneOf('`live`, or `test` while the store’s checkout is the sandbox (show shoppers that orders are not real).', ['test', 'live']),
+    white_label: bool('The store’s plan has Your brand only: its pages leave BitoCard’s name out (the terms of sale still name the seller).'),
     app: shape({ desktop_nav: oneOf('The customer account app’s menu on desktop: the store’s choice, else BitoCard’s default.', ['rail', 'bottom']) }, 'How the customer account app looks.'),
     domain: nullableStr('The store’s own main domain while it works (for example `adadigital.com`), else null.'),
   },
@@ -742,6 +753,7 @@ export const storesDocs: DocsArea = {
         country: 'NG',
         currency: 'NGN',
         checkout_mode: 'live',
+        white_label: true,
         app: { desktop_nav: 'rail' },
         domain: 'adadigital.com',
       },
@@ -758,6 +770,12 @@ export const storesDocs: DocsArea = {
       description: 'The product page.',
       schema: 'StoreProductDetail',
       example: { ...dstvProduct, denominations: [440_000], range: null, recipient_type: 'smartcard', redeem_instructions: null, other_countries: [], related: [] },
+    },
+    'GET /v1/store/network-detect': {
+      status: 200,
+      description: 'Which network a mobile number belongs to, and the matching airtime or data product, for the quick top-up form.',
+      schema: networkDetection,
+      example: { object: 'network_detection', detected: true, brand: 'mtn', product: mtnProduct },
     },
     'GET /v1/store/search': {
       status: 200,

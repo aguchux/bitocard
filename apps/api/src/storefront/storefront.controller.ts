@@ -5,6 +5,7 @@ import { ArrayMaxSize, IsArray, IsBoolean, IsHexColor, IsIn, IsInt, IsOptional, 
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly } from '../auth/caller.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import { productFeatureKeys } from '../catalogue/features.js';
+import { NetworkDetectionService } from '../catalogue/network-detection.service.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
 import { categoryLabels, navigationGroups } from './layout.js';
 import { StorefrontAdminService } from './storefront-admin.service.js';
@@ -148,6 +149,33 @@ class StoreProductsQueryDto {
   offset?: number;
 }
 
+class NetworkDetectDto {
+  @ApiProperty({ description: 'The mobile number to top up, in national or international format.', example: '0803 123 4567' })
+  @IsString()
+  @Length(5, 20)
+  phone: string;
+
+  @ApiProperty({ description: 'The number’s country (2-letter code).', example: 'NG' })
+  @Transform(lower)
+  @Matches(/^[a-z]{2}$/, { message: 'country must be a 2-letter code' })
+  country: string;
+
+  @ApiPropertyOptional({ enum: ['airtime', 'data'], default: 'airtime' })
+  @IsOptional()
+  @IsIn(['airtime', 'data'])
+  category?: 'airtime' | 'data';
+
+  @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): the matched product then has `price`.', example: 'NGN' })
+  @IsOptional()
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be a 3-letter code' })
+  currency?: string;
+
+  @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain): only a network it sells.', example: 'adadigital' })
+  @IsOptional()
+  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  store?: string;
+}
+
 class SearchQueryDto {
   @ApiPropertyOptional({ description: 'The shopper’s market (a 2-letter country code), or global: leaves out other countries’ local products (airtime, data, bills, pay-TV, mobile money); products usable anywhere stay.', example: 'NG' })
   @IsOptional()
@@ -222,7 +250,10 @@ const storeOf = (query: { store?: string }) => (query.store && query.store !== '
 @Public()
 @Controller('store')
 export class StorefrontController {
-  constructor(private readonly storefront: StorefrontService) {}
+  constructor(
+    private readonly storefront: StorefrontService,
+    private readonly networkDetection: NetworkDetectionService,
+  ) {}
 
   @ApiOperation({ summary: 'Get the home page', description: 'The published layout with every section filled in, the menu and the countries on sale. Not found until published.' })
   @Get('home')
@@ -243,6 +274,25 @@ export class StorefrontController {
   @Header('Cache-Control', 'public, max-age=60')
   product(@Param('key') key: string, @Query() query: StoreQueryDto) {
     return this.storefront.inStore(storeOf(query), undefined, () => this.storefront.product(key), query.currency);
+  }
+
+  @ApiOperation({
+    summary: 'Detect a mobile number’s network',
+    description:
+      'For the quick top-up form: which network a mobile number belongs to (the routed supplier’s own lookup, else a prefix guess), and the matching airtime or data product on sale, if any. `detected: false` asks the customer to choose a network themselves.',
+  })
+  @Get('network-detect')
+  async detectNetwork(@Query() query: NetworkDetectDto) {
+    const category = query.category ?? 'airtime';
+    const guess = await this.networkDetection.detect(query.phone, query.country);
+    if (!guess) return { object: 'network_detection' as const, detected: false as const, product: null };
+    const matches = await this.storefront.inStore(
+      storeOf(query),
+      query.country,
+      () => this.storefront.products({ category, country: query.country, brand: guess.brand, limit: 1 }),
+      query.currency,
+    );
+    return { object: 'network_detection' as const, detected: true as const, brand: guess.brand, product: matches.data[0] ?? null };
   }
 
   @ApiOperation({ summary: 'Search everything', description: 'Products, brands and the companies behind them, categories and countries, best matches first.' })

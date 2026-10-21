@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { ArrowRight, X, Zap } from "lucide-react";
 import type { StoreBrand, StoreList, StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
 import { appProductBase, Carousel, CarouselItem, SectionTitle } from "@/components/app/blocks";
@@ -84,6 +84,19 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           </Chip>
         ))}
       </nav>
+
+      {group === "mobile" ? (
+        <Link href="/account/topup" className="flex items-center gap-3 rounded-2xl bg-navy-900 p-4 text-white transition hover:bg-navy-800">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10">
+            <Zap className="size-6" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">Quick top-up</span>
+            <span className="block text-sm text-white/70">Phone number and amount. We find the network.</span>
+          </span>
+          <ArrowRight className="size-5 shrink-0" aria-hidden="true" />
+        </Link>
+      ) : null}
 
       {filtered ? (
         <section aria-labelledby="results">

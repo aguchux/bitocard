@@ -96,6 +96,28 @@ describe('the public catalogue', () => {
     await prisma.product.update({ where: { key }, data: { active: true } });
   });
 
+  test('network-detect finds a number’s network from the routed supplier and matches it to a product on sale', async () => {
+    reloadly.state.autoDetect = { 'NG:+2348031234567': { operatorId: 341, name: 'MTN Nigeria', country: { isoName: 'NG', name: 'Nigeria' } } };
+    const detected = await visitor.get('/v1/store/network-detect?phone=%2B2348031234567&country=NG');
+    assert.equal(detected.status, 200, JSON.stringify(detected.json));
+    assert.equal(detected.json.detected, true);
+    assert.equal(detected.json.brand, 'mtn');
+    assert.ok(detected.json.product && detected.json.product.category === 'airtime' && detected.json.product.brand.slug === 'mtn');
+    noSuppliers(detected.json);
+
+    // Reloadly has no match: falls back to the prefix table (0802 is Airtel Nigeria).
+    reloadly.state.autoDetect = {};
+    const prefixGuess = await visitor.get('/v1/store/network-detect?phone=08021234567&country=NG');
+    assert.equal(prefixGuess.json.detected, true);
+    assert.equal(prefixGuess.json.brand, 'airtel');
+
+    // Neither can tell: the customer chooses themselves.
+    const noMatch = await visitor.get('/v1/store/network-detect?phone=%2B19175550123&country=US');
+    assert.deepEqual([noMatch.json.detected, noMatch.json.product], [false, null]);
+
+    assert.equal((await visitor.get('/v1/store/network-detect?phone=08021234567&country=nigeria')).status, 400);
+  });
+
   test('categories and brands list only what is on sale; the menu lists every group; countries every market', async () => {
     const categories = (await visitor.get('/v1/store/categories')).json.data;
     assert.ok(categories.some(item => item.category === 'airtime' && item.label === 'Airtime' && item.group === 'mobile' && item.products >= 2));
