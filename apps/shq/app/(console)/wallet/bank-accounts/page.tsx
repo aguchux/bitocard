@@ -1,9 +1,10 @@
 "use client";
 
 import { useId, useMemo, useState, type FormEvent } from "react";
-import { Building, Plus, Trash2 } from "lucide-react";
+import { Building, Plus, Smartphone, Trash2 } from "lucide-react";
 import { ActionDialog, Badge, Button, Card, CardHeader, DataTable, Dialog, errorMessage, Field, formatDateTime, Input, Notice, PageHeader, Select } from "@bitocard/admin-ui";
-import { type BankAccount, useAddBankAccountMutation, useBankAccountsQuery, useBanksQuery, useRemoveBankAccountMutation } from "@bitocard/api-client/reseller";
+import { type BankAccount, useAddBankAccountMutation, useAddMobileMoneyAccountMutation, useBankAccountsQuery, useBanksQuery, usePhonesQuery, useRemoveBankAccountMutation } from "@bitocard/api-client/reseller";
+import { AppLink } from "@bitocard/admin-ui/shell";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -99,6 +100,82 @@ function AddBankAccount({ open, onClose, sandbox }: { open: boolean; onClose: ()
   );
 }
 
+/** A mobile money wallet: one of the owner's own confirmed phone numbers. pawaPay finds its network. */
+function AddMobileMoney({ open, onClose, sandbox }: { open: boolean; onClose: () => void; sandbox: boolean }) {
+  const id = useId();
+  const phones = usePhonesQuery(undefined, { skip: !open });
+  const [add, state] = useAddMobileMoneyAccountMutation();
+  const [phone, setPhone] = useState("");
+  const [added, setAdded] = useState<BankAccount | null>(null);
+  const confirmed = (phones.data?.data ?? []).filter(item => item.verified);
+  const close = () => {
+    setPhone("");
+    setAdded(null);
+    state.reset();
+    onClose();
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!phone) return;
+    const account = await add({ phone })
+      .unwrap()
+      .catch(() => null);
+    if (account) setAdded(account);
+  };
+  return (
+    <Dialog
+      open={open}
+      onClose={close}
+      title="Add a mobile money wallet"
+      description="Withdrawals go only to one of your own confirmed phone numbers."
+      footer={
+        added ? (
+          <Button onClick={close}>Done</Button>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+            <Button type="submit" form={`${id}-form`} loading={state.isLoading} disabled={!phone}>
+              Add wallet
+            </Button>
+          </>
+        )
+      }
+    >
+      {added ? (
+        <Notice tone="green" title="Wallet added">
+          {`${added.bank_name} ····${added.account_number_last4}. `}
+          {sandbox ? "You can withdraw to it straight away." : `Withdrawals to it can start ${formatDateTime(added.payouts_available_from)}.`}
+        </Notice>
+      ) : (
+        <form id={`${id}-form`} onSubmit={submit} className="space-y-4" noValidate>
+          {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
+          {phones.data && !confirmed.length ? (
+            <Notice tone="amber">
+              You have no confirmed phone number yet. <AppLink href="/settings/profile">Add one in your profile</AppLink>, then come back.
+            </Notice>
+          ) : null}
+          <Field label="Phone number" htmlFor={`${id}-phone`} hint={phones.isLoading ? "Loading your numbers…" : undefined}>
+            <Select id={`${id}-phone`} value={phone} onChange={event => setPhone(event.target.value)} disabled={!confirmed.length}>
+              <option value="">Choose a number</option>
+              {confirmed.map(item => (
+                <option key={item.phone} value={item.phone}>
+                  {item.phone}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <p className="text-xs text-muted">
+            The mobile money fee comes out of each withdrawal, so a little less arrives than you withdraw.
+            {sandbox ? "" : " For your security, withdrawals to a new wallet start 24 hours after it is added, and the owner is emailed."}
+          </p>
+        </form>
+      )}
+    </Dialog>
+  );
+}
+
 export default function BankAccountsPage() {
   const { membership, mode } = useReseller();
   const allowed = can(membership, "finance");
@@ -108,6 +185,7 @@ export default function BankAccountsPage() {
   const accounts = useBankAccountsQuery(undefined, { skip: !allowed });
   const [remove] = useRemoveBankAccountMutation();
   const [adding, setAdding] = useState(false);
+  const [addingMobile, setAddingMobile] = useState(false);
   const [removing, setRemoving] = useState<BankAccount | null>(null);
   const list = accounts.data?.data;
   const full = (list?.length ?? 0) >= maxAccounts;
@@ -122,12 +200,17 @@ export default function BankAccountsPage() {
     >
       <PageHeader
         title="Payout bank accounts"
-        description={`Where your withdrawn earnings are paid. Up to ${maxAccounts} accounts.`}
+        description={`Where your withdrawn earnings are paid: bank accounts and mobile money wallets. Up to ${maxAccounts} in all.`}
         actions={
           canAdd ? (
-            <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setAdding(true)} disabled={!list || full}>
-              Add account
-            </Button>
+            <>
+              <Button variant="secondary" icon={<Smartphone className="size-4" aria-hidden />} onClick={() => setAddingMobile(true)} disabled={!list || full}>
+                Add mobile money
+              </Button>
+              <Button icon={<Plus className="size-4" aria-hidden />} onClick={() => setAdding(true)} disabled={!list || full}>
+                Add bank account
+              </Button>
+            </>
           ) : null
         }
       />
@@ -164,7 +247,7 @@ export default function BankAccountsPage() {
                   header: "Account",
                   cell: row => (
                     <span className="inline-flex min-w-0 items-center gap-2">
-                      <Building className="size-4 shrink-0 text-muted" aria-hidden />
+                      {row.kind === "mobile_money" ? <Smartphone className="size-4 shrink-0 text-muted" aria-hidden /> : <Building className="size-4 shrink-0 text-muted" aria-hidden />}
                       <span className="truncate">{`${row.bank_name} ····${row.account_number_last4}`}</span>
                     </span>
                   ),
@@ -197,6 +280,7 @@ export default function BankAccountsPage() {
         </>
       )}
       <AddBankAccount open={adding} onClose={() => setAdding(false)} sandbox={sandbox} />
+      <AddMobileMoney open={addingMobile} onClose={() => setAddingMobile(false)} sandbox={sandbox} />
       <ActionDialog
         open={removing !== null}
         onClose={() => setRemoving(null)}

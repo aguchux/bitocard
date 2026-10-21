@@ -17,6 +17,12 @@ class AddBankAccountDto {
   account_number: string;
 }
 
+class AddMobileMoneyAccountDto {
+  @ApiProperty({ example: '+233241234567', description: 'One of your own confirmed phone numbers (E.164), on a mobile money network.' })
+  @Matches(/^\+[1-9]\d{6,14}$/, { message: 'phone must be an E.164 number such as +233241234567' })
+  phone: string;
+}
+
 class CreatePayoutDto {
   @ApiProperty({ description: 'Minor units; at least the country minimum withdrawal.' })
   @IsInt() @Min(1) @Max(100_000_000_00)
@@ -68,6 +74,18 @@ export class PayoutsController {
   @Post('bank-accounts')
   addBankAccount(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: AddBankAccountDto) {
     return this.payouts.addBankAccount(resellerOf(caller), mode, personOf(caller), body);
+  }
+
+  @ApiOperation({
+    summary: 'Add a mobile money payout account',
+    description:
+      'Dashboard only, and only the account owner. The number must be one of your own confirmed phone numbers, on a mobile money network payouts are open to in your currency. Listed with your bank accounts (`kind: mobile_money`). The mobile money fee comes out of each withdrawal. Live payouts to it start 24 hours after it is added.',
+  })
+  @SessionOnly()
+  @Roles()
+  @Post('mobile-money-accounts')
+  addMobileMoneyAccount(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: AddMobileMoneyAccountDto) {
+    return this.payouts.addMobileMoneyAccount(resellerOf(caller), mode, personOf(caller), body);
   }
 
   @ApiOperation({ summary: 'Remove a payout bank account', description: 'Dashboard only.' })

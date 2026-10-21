@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ApiError } from '../common/errors/api-error.js';
 import { Encryption } from '../common/encryption.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
@@ -18,6 +19,8 @@ import { EventsService } from '../webhooks/events.service.js';
 import { accountNameMatches } from '../identity/providers.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { CustomerPayoutsService } from './customer-payouts.service.js';
+import { mobileMoneySplit } from './mobile-money.js';
+import { SupplierWebhooksService } from '../orders/supplier-webhooks.js';
 
 /** Payouts to a newly added live bank account start after this, so a taken-over account cannot be emptied at once. */
 export const bankAccountCoolingOffMs = 24 * 60 * 60 * 1000;
@@ -38,6 +41,7 @@ export function presentBankAccount(account: BankAccount) {
     object: 'bank_account' as const,
     id: account.id,
     mode: account.mode,
+    kind: account.kind,
     country: account.country,
     currency: account.currency,
     bank_code: account.bankCode,
@@ -60,10 +64,12 @@ export function presentPayout(payout: Payout & { bankAccount?: BankAccount | nul
     mode: payout.mode,
     status: payout.status,
     amount: minor(payout.amountMinor),
+    fee: minor(payout.feeMinor),
+    sent: minor(payout.amountMinor - payout.feeMinor),
     currency: payout.currency,
     bank_account_id: payout.bankAccountId,
     ...(payout.bankAccount
-      ? { bank_account: { bank_name: payout.bankAccount.bankName, account_number_last4: payout.bankAccount.accountNumberLast4, removed: payout.bankAccount.removedAt !== null } }
+      ? { bank_account: { kind: payout.bankAccount.kind, bank_name: payout.bankAccount.bankName, account_number_last4: payout.bankAccount.accountNumberLast4, removed: payout.bankAccount.removedAt !== null } }
       : {}),
     failure_reason: payout.failureReason,
     created_at: payout.createdAt.toISOString(),
@@ -76,7 +82,7 @@ export function presentPayout(payout: Payout & { bankAccount?: BankAccount | nul
  * "payouts in progress" before the bank transfer starts, and back to earnings only if the transfer definitely failed.
  */
 @Injectable()
-export class PayoutsService {
+export class PayoutsService implements OnModuleInit {
   private readonly logger = new Logger('Payouts');
   private readonly bankLists = new Map<string, { at: number; banks: Array<{ code: string; name: string }> }>();
 
@@ -90,7 +96,17 @@ export class PayoutsService {
     private readonly events: EventsService,
     private readonly inbox: InboxService,
     private readonly customerPayouts: CustomerPayoutsService,
+    private readonly modules: ModuleRef,
   ) {}
+
+  /** pawaPay's callbacks about withdrawals arrive at the supplier webhook address; it hands them here. */
+  onModuleInit() {
+    try {
+      this.modules.get(SupplierWebhooksService, { strict: false }).onPayoutNotice(reference => this.refreshMobileMoney(reference));
+    } catch {
+      // Not loaded (the webhook queue consumer): the payments job checks withdrawals instead.
+    }
+  }
 
   private encryption() {
     if (!this.config.ENCRYPTION_KEY) throw new Error('ENCRYPTION_KEY is not configured');
@@ -185,6 +201,70 @@ export class PayoutsService {
     return presentBankAccount(account);
   }
 
+  /**
+   * Adds a mobile money wallet for withdrawals: one of the owner's own confirmed phone numbers, on a network pawaPay
+   * pays out to in the reseller's country and currency. pawaPay gives no holder's name, so the number being the
+   * verified owner's own confirmed phone stands in for the bank's name check. The same 24-hour wait applies.
+   */
+  async addMobileMoneyAccount(resellerId: string, mode: LedgerMode, userId: string, input: { phone: string }) {
+    const { reseller, country, currency } = await this.wallets.currencyOf(resellerId);
+    if (mode === 'live' && !reseller.verifiedAt) throw resellerNotVerified();
+    const phone = await this.prisma.userPhone.findFirst({ where: { userId, realm: 'reseller', phone: input.phone } });
+    if (!phone) {
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'invalid_request_error',
+        'phone_not_confirmed',
+        'Withdrawals go only to one of your own confirmed phone numbers. Add and confirm it in Settings > Profile first.',
+        'phone',
+      );
+    }
+    const accounts = await this.prisma.bankAccount.findMany({ where: { resellerId, mode, removedAt: null } });
+    if (accounts.length >= maxBankAccounts) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'bank_account_limit_reached', `You can have up to ${maxBankAccounts} payout accounts. Remove one first.`);
+    }
+    if (accounts.some(item => item.kind === 'mobile_money' && this.encryption().decrypt(item.accountNumberEncrypted) === phone.phone)) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'bank_account_exists', 'This number is already a payout account.', 'phone');
+    }
+    const payouts = this.providers.mobileMoney(mode);
+    let network;
+    try {
+      network = await payouts.network(phone.phone, country.code, currency);
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Could not find the mobile money network');
+      throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The mobile money service could not be reached. Try again shortly.');
+    }
+    if (!network) {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'mobile_money_unavailable', `Withdrawals to this number's mobile money network are not available in ${currency}.`, 'phone');
+    }
+    const last4 = phone.phone.slice(-4);
+    const account = await this.prisma.bankAccount.create({
+      data: {
+        resellerId,
+        mode,
+        kind: 'mobile_money',
+        country: country.code,
+        currency,
+        bankCode: network.code,
+        bankName: network.name,
+        accountNumberEncrypted: this.encryption().encrypt(phone.phone),
+        accountNumberLast4: last4,
+        accountName: reseller.verifiedName ?? reseller.name,
+        createdById: userId,
+      },
+    });
+    const name = network.name;
+    if (mode === 'live') this.notify(resellerId, to => bankAccountAddedEmail(to, name, last4));
+    await this.inbox.reseller(resellerId, 'bank_account.added', {
+      subject: account.id,
+      title: 'Mobile money payout account added',
+      body: `${name} number ending ${last4} can receive withdrawals after the 24-hour wait. If you did not add it, remove it and contact support.`,
+      link: '/wallet/bank-accounts',
+      mode,
+    });
+    return presentBankAccount(account);
+  }
+
   async removeBankAccount(resellerId: string, mode: LedgerMode, id: string) {
     const account = await this.prisma.bankAccount.findFirst({ where: { id, resellerId, mode, removedAt: null } });
     if (!account) throw notFound('bank account');
@@ -231,7 +311,24 @@ export class PayoutsService {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'amount_too_small', `The smallest withdrawal is ${formatMoney(country.minWithdrawalMinor, currency)}.`, 'amount');
     }
 
-    const provider = this.providers.transfers(mode, country.code);
+    // Mobile money: pawaPay's fee comes out of the amount withdrawn, so what is sent is less (`fee`, `sent`).
+    const mobile = account.kind === 'mobile_money';
+    const momo = mobile ? this.providers.mobileMoney(mode) : null;
+    let fee = 0n;
+    if (momo) {
+      const percent = mode === 'test' ? (this.providers.mobileMoneyFeePercent() ?? '0') : this.providers.mobileMoneyFeePercent();
+      if (percent === null) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'Mobile money withdrawals are not available right now.');
+      const network = await momo.network(this.encryption().decrypt(account.accountNumberEncrypted), country.code, currency).catch(() => {
+        throw new ApiError(HttpStatus.BAD_GATEWAY, 'api_error', 'provider_error', 'The mobile money service could not be reached. Try again shortly.');
+      });
+      if (!network || network.code !== account.bankCode) {
+        throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'mobile_money_unavailable', `Withdrawals to ${account.bankName} are not available right now.`, 'bank_account_id');
+      }
+      const split = mobileMoneySplit(amount, percent, network.wholeUnits);
+      if (!split) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'amount_too_small', 'This amount is too small to send after the mobile money fee.', 'amount');
+      fee = split.fee;
+    }
+    const provider = momo ?? this.providers.transfers(mode, country.code);
     const id = randomUUID();
     const entry = await this.ledger.prepare({
       mode,
@@ -239,7 +336,7 @@ export class PayoutsService {
       reference: `payout:${id}`,
       resellerId,
       description: `Withdrawal to ${account.bankName} ••••${account.accountNumberLast4}`,
-      metadata: { payout_id: id },
+      metadata: { payout_id: id, ...(fee > 0n ? { fee: fee.toString() } : {}) },
       lines: [
         { account: { kind: 'reseller_earnings', currency, resellerId }, debit: amount },
         { account: { kind: 'reseller_payouts_pending', currency, resellerId }, credit: amount },
@@ -247,25 +344,27 @@ export class PayoutsService {
     });
     const payout = await this.prisma.$transaction(async tx => {
       const created = await tx.payout.create({
-        data: { id, resellerId, mode, bankAccountId: account.id, amountMinor: amount, currency, reference: `bc_po_${id.replaceAll('-', '')}`, provider: provider.name, requestedById: userId },
+        data: { id, resellerId, mode, bankAccountId: account.id, amountMinor: amount, feeMinor: fee, currency, reference: `bc_po_${id.replaceAll('-', '')}`, provider: provider.name, requestedById: userId },
       });
       await this.ledger.write(tx, entry);
       return created;
     });
 
     try {
-      const result = await provider.transfer({
-        reference: payout.reference,
-        bankCode: account.bankCode,
-        accountNumber: this.encryption().decrypt(account.accountNumberEncrypted),
-        amount,
-        currency,
-        narration: `${reseller.name} BitoCard earnings`,
-      });
+      const result = momo
+        ? await momo.send({ reference: payout.reference, phone: this.encryption().decrypt(account.accountNumberEncrypted), network: account.bankCode, amount: amount - fee, currency })
+        : await this.providers.transfers(mode, country.code).transfer({
+            reference: payout.reference,
+            bankCode: account.bankCode,
+            accountNumber: this.encryption().decrypt(account.accountNumberEncrypted),
+            amount,
+            currency,
+            narration: `${reseller.name} BitoCard earnings`,
+          });
       return presentPayout({ ...(await this.apply(payout, result)), bankAccount: account });
     } catch (error) {
       if (error instanceof ProviderError && error.definite) {
-        return presentPayout({ ...(await this.apply(payout, { status: 'failed', providerTransferId: '', fee: 0n, failureReason: 'The bank transfer was refused.' })), bankAccount: account });
+        return presentPayout({ ...(await this.apply(payout, { status: 'failed', providerTransferId: '', fee: 0n, failureReason: mobile ? 'The mobile money payout was refused.' : 'The bank transfer was refused.' })), bankAccount: account });
       }
       // Unclear: the transfer may still happen. The payout stays pending for the exception queue; money stays set aside.
       this.logger.error({ err: error, payoutId: payout.id }, 'Payout transfer outcome unclear; needs review');
@@ -338,7 +437,7 @@ export class PayoutsService {
         title: paid ? `${amount} withdrawal paid` : `${amount} withdrawal failed`,
         body: paid
           ? `Your withdrawal was paid to the account ending ${updated.bankAccount.accountNumberLast4}.`
-          : `Your withdrawal to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'the bank refused it').replace(/\.+$/, '')}. The money is back in your earnings.`,
+          : `Your withdrawal to the account ending ${updated.bankAccount.accountNumberLast4} failed: ${(updated.failureReason ?? 'it was refused').replace(/\.+$/, '')}. The money is back in your earnings.`,
         link: '/wallet/payouts',
         mode: updated.mode,
       });
@@ -378,6 +477,14 @@ export class PayoutsService {
     return { handled: true, status: (await this.apply(payout, result)).status };
   }
 
+  /** A pawaPay payout callback naming one of our withdrawals: re-read from pawaPay, then applied. */
+  async refreshMobileMoney(reference: string) {
+    const payout = await this.prisma.payout.findUnique({ where: { reference } });
+    const momo = payout ? this.providers.mobileMoneyByName(payout.provider) : null;
+    if (!payout || !momo) return { handled: false };
+    return { handled: true, status: (await this.apply(payout, await momo.status(reference))).status };
+  }
+
   /** Checks live payouts still in progress. Run on a schedule. */
   async refreshProcessing() {
     const payouts = await this.prisma.payout.findMany({
@@ -386,10 +493,12 @@ export class PayoutsService {
     });
     let completed = 0;
     for (const payout of payouts) {
-      const provider = this.providers.transfersByName(payout.provider);
-      if (!provider || !payout.providerTransferId) continue;
+      const momo = this.providers.mobileMoneyByName(payout.provider);
+      const provider = momo ? null : this.providers.transfersByName(payout.provider);
+      if ((!momo && !provider) || !payout.providerTransferId) continue;
       try {
-        if ((await this.apply(payout, await provider.transferStatus(payout.providerTransferId))).status !== 'processing') completed += 1;
+        const result = momo ? await momo.status(payout.reference) : await provider!.transferStatus(payout.providerTransferId);
+        if ((await this.apply(payout, result)).status !== 'processing') completed += 1;
       } catch (error) {
         this.logger.warn({ err: error, payoutId: payout.id }, 'Payout status check failed; will retry');
       }

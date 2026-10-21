@@ -15322,6 +15322,7 @@
                       "object": "bank_account",
                       "id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                       "mode": "live",
+                      "kind": "bank",
                       "country": "NG",
                       "currency": "NGN",
                       "bank_code": "044",
@@ -15444,6 +15445,7 @@
                   "object": "bank_account",
                   "id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                   "mode": "live",
+                  "kind": "bank",
                   "country": "NG",
                   "currency": "NGN",
                   "bank_code": "044",
@@ -15546,6 +15548,146 @@
         ]
       }
     },
+    "/v1/mobile-money-accounts": {
+      "post": {
+        "description": "Dashboard only, and only the account owner. The number must be one of your own confirmed phone numbers, on a mobile money network payouts are open to in your currency. Listed with your bank accounts (`kind: mobile_money`). The mobile money fee comes out of each withdrawal. Live payouts to it start 24 hours after it is added.",
+        "operationId": "PayoutsController_addMobileMoneyAccount",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMobileMoneyAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The added mobile money wallet, listed with your bank accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccount"
+                },
+                "example": {
+                  "object": "bank_account",
+                  "id": "5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d",
+                  "mode": "live",
+                  "kind": "mobile_money",
+                  "country": "GH",
+                  "currency": "GHS",
+                  "bank_code": "MTN_MOMO_GHA",
+                  "bank_name": "MTN",
+                  "account_number_last4": "4567",
+                  "account_name": "Ama Mensah",
+                  "payouts_available_from": "2026-10-04T11:20:00.000Z",
+                  "created_at": "2026-10-03T11:20:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a mobile money payout account",
+        "tags": [
+          "Payouts"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ]
+      }
+    },
     "/v1/bank-accounts/{id}": {
       "delete": {
         "description": "Dashboard only.",
@@ -15582,6 +15724,7 @@
                     "object",
                     "id",
                     "mode",
+                    "kind",
                     "country",
                     "currency",
                     "bank_code",
@@ -15610,6 +15753,14 @@
                       "enum": [
                         "test",
                         "live"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "`bank`, or `mobile_money`: one of the owner’s confirmed phone numbers (`bank_code` is the mobile money network, `account_number_last4` the phone’s last four digits).",
+                      "enum": [
+                        "bank",
+                        "mobile_money"
                       ]
                     },
                     "country": {
@@ -15657,6 +15808,7 @@
                   "object": "bank_account",
                   "id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                   "mode": "live",
+                  "kind": "bank",
                   "country": "NG",
                   "currency": "NGN",
                   "bank_code": "044",
@@ -15854,9 +16006,12 @@
                       "mode": "live",
                       "status": "paid",
                       "amount": 2500000,
+                      "fee": 0,
+                      "sent": 2500000,
                       "currency": "NGN",
                       "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                       "bank_account": {
+                        "kind": "bank",
                         "bank_name": "Access Bank",
                         "account_number_last4": "4821",
                         "removed": false
@@ -16000,9 +16155,12 @@
                   "mode": "live",
                   "status": "processing",
                   "amount": 2500000,
+                  "fee": 0,
+                  "sent": 2500000,
                   "currency": "NGN",
                   "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                   "bank_account": {
+                    "kind": "bank",
                     "bank_name": "Access Bank",
                     "account_number_last4": "4821",
                     "removed": false
@@ -16142,9 +16300,12 @@
                   "mode": "live",
                   "status": "paid",
                   "amount": 2500000,
+                  "fee": 0,
+                  "sent": 2500000,
                   "currency": "NGN",
                   "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                   "bank_account": {
+                    "kind": "bank",
                     "bank_name": "Access Bank",
                     "account_number_last4": "4821",
                     "removed": false
@@ -16312,9 +16473,12 @@
                   "mode": "test",
                   "status": "failed",
                   "amount": 2500000,
+                  "fee": 0,
+                  "sent": 2500000,
                   "currency": "NGN",
                   "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                   "bank_account": {
+                    "kind": "bank",
                     "bank_name": "Access Bank",
                     "account_number_last4": "4821",
                     "removed": false
@@ -38699,6 +38863,19 @@
           "account_number"
         ]
       },
+      "AddMobileMoneyAccountDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+233241234567",
+            "description": "One of your own confirmed phone numbers (E.164), on a mobile money network."
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
       "CreatePayoutDto": {
         "type": "object",
         "properties": {
@@ -39954,6 +40131,8 @@
           "mode",
           "status",
           "amount",
+          "fee",
+          "sent",
           "currency",
           "bank_account_id",
           "failure_reason",
@@ -39993,13 +40172,21 @@
             "type": "integer",
             "description": "Amount withdrawn, in minor units of `currency` (for example kobo)."
           },
+          "fee": {
+            "type": "integer",
+            "description": "Taken out of the amount withdrawn: the mobile money fee; 0 for bank transfers, in minor units of `currency` (for example kobo)."
+          },
+          "sent": {
+            "type": "integer",
+            "description": "What was sent to the account: the amount less the fee, in minor units of `currency` (for example kobo)."
+          },
           "currency": {
             "type": "string",
             "description": "ISO 4217 currency."
           },
           "bank_account_id": {
             "type": "string",
-            "description": "The bank account paid.",
+            "description": "The bank account or mobile money wallet paid.",
             "format": "uuid"
           },
           "failure_reason": {
@@ -46043,6 +46230,7 @@
           "object",
           "id",
           "mode",
+          "kind",
           "country",
           "currency",
           "bank_code",
@@ -46070,6 +46258,14 @@
             "enum": [
               "test",
               "live"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "`bank`, or `mobile_money`: one of the owner’s confirmed phone numbers (`bank_code` is the mobile money network, `account_number_last4` the phone’s last four digits).",
+            "enum": [
+              "bank",
+              "mobile_money"
             ]
           },
           "country": {
@@ -46118,6 +46314,8 @@
           "mode",
           "status",
           "amount",
+          "fee",
+          "sent",
           "currency",
           "bank_account_id",
           "failure_reason",
@@ -46159,13 +46357,21 @@
             "type": "integer",
             "description": "Amount withdrawn, in minor units of `currency` (for example kobo)."
           },
+          "fee": {
+            "type": "integer",
+            "description": "Taken out of the amount withdrawn: the mobile money fee; 0 for bank transfers, in minor units of `currency` (for example kobo)."
+          },
+          "sent": {
+            "type": "integer",
+            "description": "What was sent to the account: the amount less the fee, in minor units of `currency` (for example kobo)."
+          },
           "currency": {
             "type": "string",
             "description": "ISO 4217 currency."
           },
           "bank_account_id": {
             "type": "string",
-            "description": "The bank account paid.",
+            "description": "The bank account or mobile money wallet paid.",
             "format": "uuid"
           },
           "failure_reason": {
@@ -46192,19 +46398,28 @@
             "type": "object",
             "description": "The account paid. Webhook payloads leave this out.",
             "required": [
+              "kind",
               "bank_name",
               "account_number_last4",
               "removed"
             ],
             "additionalProperties": false,
             "properties": {
+              "kind": {
+                "type": "string",
+                "description": "`bank` or `mobile_money`.",
+                "enum": [
+                  "bank",
+                  "mobile_money"
+                ]
+              },
               "bank_name": {
                 "type": "string",
-                "description": "Bank name."
+                "description": "Bank or mobile money network name."
               },
               "account_number_last4": {
                 "type": "string",
-                "description": "Last four digits of the account number."
+                "description": "Last four digits of the account or phone number."
               },
               "removed": {
                 "type": "boolean",
@@ -55701,6 +55916,8 @@
                     "mode": "live",
                     "status": "paid",
                     "amount": 2500000,
+                    "fee": 0,
+                    "sent": 2500000,
                     "currency": "NGN",
                     "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                     "failure_reason": null,
@@ -55790,6 +56007,8 @@
                     "mode": "live",
                     "status": "failed",
                     "amount": 2500000,
+                    "fee": 0,
+                    "sent": 2500000,
                     "currency": "NGN",
                     "bank_account_id": "7e6d5c4b-3a2f-4e1d-9c0b-8a7f6e5d4c3b",
                     "failure_reason": "The bank transfer was refused.",

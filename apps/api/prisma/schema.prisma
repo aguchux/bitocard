@@ -1203,6 +1203,8 @@ model BankAccount {
   accountNumberEncrypted String     @map("account_number_encrypted")
   accountNumberLast4     String     @map("account_number_last4")
   accountName            String     @map("account_name")
+  /// `mobile_money`: bank_code is pawaPay's network (for example MTN_MOMO_GHA) and the number is the owner's confirmed phone.
+  kind                   PayoutAccountKind @default(bank)
   createdById            String     @map("created_by_id") @db.Uuid
   createdAt              DateTime   @default(now()) @map("created_at")
   removedAt              DateTime?  @map("removed_at")
@@ -1213,6 +1215,11 @@ model BankAccount {
 
   @@index([resellerId])
   @@map("bank_accounts")
+}
+
+enum PayoutAccountKind {
+  bank
+  mobile_money
 }
 
 enum PayoutStatus {
@@ -1229,6 +1236,8 @@ model Payout {
   mode               LedgerMode
   bankAccountId      String       @map("bank_account_id") @db.Uuid
   amountMinor        BigInt       @map("amount_minor")
+  /// Taken out of the amount withdrawn (mobile money: pawaPay's fee); what is sent is amount less fee.
+  feeMinor           BigInt       @default(0) @map("fee_minor")
   currency           String       @db.Char(3)
   status             PayoutStatus @default(pending)
   reference          String       @unique

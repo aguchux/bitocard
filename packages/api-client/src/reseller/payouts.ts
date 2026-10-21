@@ -12,6 +12,8 @@ export type BankAccount = {
   object: 'bank_account';
   id: string;
   mode: Mode;
+  /** `mobile_money`: one of the owner's confirmed phones; `bank_code` is the network, the last four the phone's. */
+  kind: 'bank' | 'mobile_money';
   country: string;
   currency: string;
   bank_code: string;
@@ -32,10 +34,14 @@ export type Payout = {
   mode: Mode;
   status: PayoutStatus;
   amount: number;
+  /** Taken out of the amount withdrawn (the mobile money fee; 0 for banks). */
+  fee: number;
+  /** What was sent: amount less fee. */
+  sent: number;
   currency: string;
   bank_account_id: string;
   /** The account paid into; still named after the account is removed. Not in webhook payloads. */
-  bank_account?: { bank_name: string; account_number_last4: string; removed: boolean };
+  bank_account?: { kind: 'bank' | 'mobile_money'; bank_name: string; account_number_last4: string; removed: boolean };
   failure_reason: string | null;
   created_at: string;
   completed_at: string | null;
@@ -69,6 +75,11 @@ export const resellerPayoutsApi = bitocardApi.injectEndpoints({
     /** The bank confirms the account and supplies its name. */
     addBankAccount: build.mutation<BankAccount, { bank_code: string; account_number: string }>({
       query: body => ({ url: '/v1/bank-accounts', method: 'POST', body }),
+      invalidatesTags: ['BankAccount'],
+    }),
+    /** One of the owner's own confirmed phone numbers, on a network payouts are open to. */
+    addMobileMoneyAccount: build.mutation<BankAccount, { phone: string }>({
+      query: body => ({ url: '/v1/mobile-money-accounts', method: 'POST', body }),
       invalidatesTags: ['BankAccount'],
     }),
     removeBankAccount: build.mutation<BankAccount & { removed: true }, string>({
@@ -118,6 +129,7 @@ export const {
   useBanksQuery,
   useBankAccountsQuery,
   useAddBankAccountMutation,
+  useAddMobileMoneyAccountMutation,
   useRemoveBankAccountMutation,
   usePayoutsInfiniteQuery,
   usePayoutQuery,

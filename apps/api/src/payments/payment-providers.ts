@@ -8,6 +8,7 @@ import { MonnifyProvider } from './monnify.provider.js';
 import { PawapayPaymentsProvider } from './pawapay.provider.js';
 import type { CheckoutProvider, ReservedAccountProvider, TransferProvider } from './providers.js';
 import { SandboxProvider } from './sandbox.provider.js';
+import { type MobileMoneyPayouts, PawapayPayouts, SandboxMobileMoney } from '../payouts/mobile-money.js';
 import { StripeProvider } from './stripe.provider.js';
 
 /** The payment gateways an admin can offer per market, for wallet top-ups and customer checkout, as payers see them. */
@@ -131,6 +132,33 @@ export class PaymentProviders {
     if (!this.flutterwave?.supportsTransfers(country)) throw providerUnavailable('Bank payouts');
     return this.flutterwave;
   }
+
+  /** Withdrawals to mobile money: pawaPay live (set up, Sandbox off), the sandbox in test mode. */
+  mobileMoney(mode: LedgerMode): MobileMoneyPayouts {
+    if (mode === 'test') return this.sandboxMobileMoney;
+    const settings = this.integrations.config;
+    if (!settings.PAWAPAY_API_TOKEN || inSandbox(settings, 'pawapay')) throw providerUnavailable('Mobile money withdrawals');
+    return new PawapayPayouts(settings.PAWAPAY_API_TOKEN, urlsFor(settings, 'live').PAWAPAY_API_URL);
+  }
+
+  /** pawaPay's payout fee agreed with BitoCard (a percentage), or null while it is not set. */
+  mobileMoneyFeePercent() {
+    const fee = this.integrations.config.PAWAPAY_PAYOUT_FEE_PERCENT?.trim();
+    return fee && /^\d{1,2}(\.\d{1,4})?$/.test(fee) ? fee : null;
+  }
+
+  /** The mobile money provider that handled an existing payout, or null. */
+  mobileMoneyByName(name: string): MobileMoneyPayouts | null {
+    if (name === 'sandbox') return this.sandboxMobileMoney;
+    if (name !== 'pawapay') return null;
+    try {
+      return this.mobileMoney('live');
+    } catch {
+      return null;
+    }
+  }
+
+  private readonly sandboxMobileMoney = new SandboxMobileMoney();
 
   /** The transfer provider that handled an existing payout. */
   transfersByName(name: string): TransferProvider | null {

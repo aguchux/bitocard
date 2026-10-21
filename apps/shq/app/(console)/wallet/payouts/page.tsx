@@ -147,7 +147,9 @@ function Withdraw({ accounts, sandbox }: { accounts: BankAccount[]; sandbox: boo
       >
         {confirm ? (
           <p className="text-sm text-muted">
-            {`The money goes to ${confirm.account.account_name}. A withdrawal cannot be cancelled once it starts; if the bank refuses it, the amount returns to your earnings.`}
+            {confirm.account.kind === "mobile_money"
+              ? `The money goes to your ${confirm.account.bank_name} wallet. The mobile money fee comes out of this amount, so a little less arrives. A withdrawal cannot be cancelled once it starts; if it is refused, the amount returns to your earnings.`
+              : `The money goes to ${confirm.account.account_name}. A withdrawal cannot be cancelled once it starts; if the bank refuses it, the amount returns to your earnings.`}
           </p>
         ) : null}
       </ActionDialog>
@@ -214,7 +216,16 @@ export default function PayoutsPage() {
               rowKey={row => row.id}
               empty="No withdrawals yet."
               columns={[
-                { key: "amount", header: "Amount", cell: row => <span className="tabular-nums">{formatMoney(row.amount, row.currency)}</span> },
+                {
+                  key: "amount",
+                  header: "Amount",
+                  cell: row => (
+                    <span className="tabular-nums">
+                      {formatMoney(row.amount, row.currency)}
+                      {row.fee > 0 ? <span className="block text-xs text-muted">{`${formatMoney(row.sent, row.currency)} sent after ${formatMoney(row.fee, row.currency)} fee`}</span> : null}
+                    </span>
+                  ),
+                },
                 {
                   key: "status",
                   header: "Status",

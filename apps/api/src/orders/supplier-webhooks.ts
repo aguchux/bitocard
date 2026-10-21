@@ -80,7 +80,18 @@ export class SupplierWebhooksService {
     return this.store('zendit', rawBody, zenditNotice(payload));
   }
 
-  /** pawaPay payout callbacks: authenticated by the token in the callback address; the body only names the payout. */
+  /** Who handles pawaPay callbacks about resellers' withdrawals (`bc_po_` references): `PayoutsService`, registered when it starts. */
+  private payoutListener?: (reference: string) => Promise<unknown>;
+
+  onPayoutNotice(listener: (reference: string) => Promise<unknown>) {
+    this.payoutListener = listener;
+  }
+
+  /**
+   * pawaPay payout callbacks: authenticated by the token in the callback address; the body only names the payout. A
+   * reseller's withdrawal is re-read from pawaPay at once (the `payments` job checks it again if this fails); anything
+   * else names a mobile money order and is stored.
+   */
   async receivePawapay(rawBody: Buffer | undefined, token: string | undefined) {
     if (!rawBody || !pawapayCallbackValid(this.integrations.config.PAWAPAY_CALLBACK_TOKEN, token)) throw untrusted();
     let payload: unknown = null;
@@ -89,7 +100,12 @@ export class SupplierWebhooksService {
     } catch {
       // Stored all the same.
     }
-    return this.store('pawapay', rawBody, pawapayNotice(payload));
+    const notice = pawapayNotice(payload);
+    if (notice.reference?.startsWith('bc_po_') && this.payoutListener) {
+      await this.payoutListener(notice.reference).catch(error => this.logger.error({ err: error }, 'Withdrawal notification not applied'));
+      return { received: true };
+    }
+    return this.store('pawapay', rawBody, notice);
   }
 
   /**

@@ -644,6 +644,12 @@ export async function fakePawapay() {
       if (type === 'DEPOSIT') return { body: { companyName: 'BitoCard', countries: state.countries.filter(country => !state.noDeposits.has(country.country)) } };
       return { status: 400, body: {} };
     }
+    if (method === 'POST' && path === '/v2/predict-provider') {
+      // By dialling code; `state.predict` maps a phone (no +) to another provider.
+      const country = state.countries.find(item => body.phoneNumber.startsWith(item.prefix));
+      if (!country) return { status: 400, body: { failureReason: { failureCode: 'INVALID_PHONE_NUMBER', failureMessage: 'Unknown number' } } };
+      return { body: { country: country.country, provider: state.predict?.[body.phoneNumber] ?? country.providers[0].provider, phoneNumber: body.phoneNumber } };
+    }
     if (method === 'POST' && path === '/v2/payouts') {
       if (state.payouts[body.payoutId]) return { body: { payoutId: body.payoutId, status: 'DUPLICATE_IGNORED' } };
       if (state.reply === 'REJECTED') return { body: { payoutId: body.payoutId, status: 'REJECTED', failureReason: { failureCode: 'INVALID_PHONE_NUMBER', failureMessage: 'Not a valid MSISDN' } } };
