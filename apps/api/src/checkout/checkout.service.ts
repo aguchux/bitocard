@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { emailedCategories, QuotesService } from '../catalogue/quotes.service.js';
@@ -85,6 +86,7 @@ export class CheckoutService implements OnModuleInit {
   private readonly sandboxOrders = new Map<string, 'completed' | 'failed'>();
 
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
     private readonly stores: StoreSellers,
     private readonly quotes: QuotesService,
@@ -450,6 +452,8 @@ export class CheckoutService implements OnModuleInit {
   private async holdGatewayFee(resellerId: string, mode: Checkout['mode'], quote: { id: string; priceMinor: bigint; wholesaleMinor: bigint; taxMinor: bigint; source: string; feeMaxMinor: bigint | null }, paymentId: string, name: string) {
     let fee: { id: string } | null = null;
     try {
+      // At the credit limit, own-gateway payments wait until what is owed is paid.
+      if (mode === 'live') await this.invoices.requireCredit(resellerId);
       fee = await this.fees.hold({ resellerId, mode, kind: 'gateway_payment', baseMinor: quote.priceMinor, source: { type: 'payment', id: paymentId }, description: `Store payment: ${name}` });
       const cost = quote.source === 'own' ? (quote.feeMaxMinor ?? 0n) : quote.wholesaleMinor + quote.taxMinor;
       const wallet = await this.wallets.wallet(resellerId, mode);

@@ -124,7 +124,7 @@ export const operations: Operation[] = Object.entries(document.paths).flatMap(([
 export const sections: Array<{ title: string; kind: "api" | "dashboard" | "public"; tags: string[] }> = [
   { title: "Core API", kind: "api", tags: ["Account", "Catalogue", "Quotes", "Orders", "Numbers", "eSIMs", "VPN", "Wallet", "Exchange", "Crypto", "Payouts", "Customers", "Disputes", "Support"] },
   { title: "Webhooks and events", kind: "api", tags: ["Webhooks", "Events"] },
-  { title: "Stores and markets", kind: "api", tags: ["Stores", "Countries", "Exchange rates", "Plans", "Settings"] },
+  { title: "Stores and markets", kind: "api", tags: ["Stores", "Countries", "Exchange rates", "Plans", "Invoices", "Settings"] },
   { title: "Dashboard (SHQ)", kind: "dashboard", tags: ["Authentication", "API keys", "Team", "Notifications", "Integrations"] },
   { title: "BitoCard store", kind: "public", tags: ["Storefront"] },
 ];
@@ -164,7 +164,8 @@ export const tagIntros: Record<string, string> = {
   Stores: "Your BitoCard-hosted storefront: subdomain, branding and publishing.",
   Countries: "Markets BitoCard serves, with the money rules resellers there work under. Public.",
   "Exchange rates": "BitoCard's conversion rates for each currency against the US dollar. Public.",
-  Plans: "The Standard and Premium plans, and your subscription.",
+  Plans: "Startup, Premium and Enterprise, and each store’s plan.",
+  Invoices: "Monthly invoices per store, what you owe, and your credit limit.",
   Settings: "Options BitoCard enables per country, and your choices among them.",
   Authentication: "Sign-in for SHQ, the reseller dashboard. Uses the dashboard's session cookie; API keys cannot call these.",
   "API keys": "Create, roll and revoke API keys. Dashboard only: a key can never manage keys.",

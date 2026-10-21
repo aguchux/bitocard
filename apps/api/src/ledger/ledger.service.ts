@@ -27,7 +27,7 @@ export type EntryInput = {
 export type PreparedEntry = Omit<EntryInput, 'lines'> & { postings: Array<{ accountId: string; kind: AccountKind; amount: bigint }> };
 
 /** Assets and expenses grow with debits; every other account (what BitoCard owes, revenue, tax) grows with credits. */
-const debitNormal = new Set<AccountKind>(['provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales', 'promotions', 'crypto_custody', 'crypto_promotions']);
+const debitNormal = new Set<AccountKind>(['reseller_owed', 'provider_balance', 'processing_fees', 'supplier_float', 'cost_of_sales', 'promotions', 'crypto_custody', 'crypto_promotions']);
 const resellerKinds = new Set<AccountKind>([
   'reseller_funding',
   'reseller_earnings',
@@ -35,6 +35,7 @@ const resellerKinds = new Set<AccountKind>([
   'reseller_reserved',
   'reseller_payouts_pending',
   'reseller_allowance',
+  'reseller_owed',
   'customer_payments',
   // Exchange desks' reserves (BitoCard's sit on its house accounts).
   'reserve_fiat',

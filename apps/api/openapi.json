@@ -17342,6 +17342,724 @@
         ]
       }
     },
+    "/v1/invoices": {
+      "get": {
+        "description": "Monthly invoices per store, and one for your account’s own usage, in live mode, newest first. Every line was taken from your wallet when it happened; what your wallet could not cover is owed, and your next top-ups pay it, oldest first.",
+        "operationId": "InvoicesController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "starting_after",
+            "required": false,
+            "in": "query",
+            "description": "ID of the last item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "store_id",
+            "required": false,
+            "in": "query",
+            "description": "Only this store’s invoices (an API key sees its store’s and the account’s own).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "`open`: the month is running; `closed`: something is owed; `paid`: closed with nothing owed.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "paid"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your invoices, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Invoice"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more items after these; pass the last ID as `starting_after` to get them."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "invoice",
+                      "id": "4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d",
+                      "number": "INV-000042",
+                      "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
+                      "currency": "NGN",
+                      "period_start": "2026-10-01T00:00:00.000Z",
+                      "period_end": "2026-11-01T00:00:00.000Z",
+                      "status": "open",
+                      "total": 3806250,
+                      "paid": 3806250,
+                      "owed": 0,
+                      "closed_at": null,
+                      "due_at": null,
+                      "paid_at": null,
+                      "overdue": false
+                    }
+                  ],
+                  "has_more": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List invoices",
+        "tags": [
+          "Invoices"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/invoices/{id}": {
+      "get": {
+        "description": "The invoice with every line: what each was, what it cost, what was paid and what is still owed.",
+        "operationId": "InvoicesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice with its lines.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetail"
+                },
+                "example": {
+                  "object": "invoice",
+                  "id": "4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d",
+                  "number": "INV-000042",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
+                  "currency": "NGN",
+                  "period_start": "2026-10-01T00:00:00.000Z",
+                  "period_end": "2026-11-01T00:00:00.000Z",
+                  "status": "open",
+                  "total": 3806250,
+                  "paid": 3806250,
+                  "owed": 0,
+                  "closed_at": null,
+                  "due_at": null,
+                  "paid_at": null,
+                  "overdue": false,
+                  "lines": [
+                    {
+                      "object": "invoice_line",
+                      "id": "5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e",
+                      "kind": "subscription",
+                      "description": "Premium plan for Ada Digital: ₦38,062.50",
+                      "amount": 3806250,
+                      "paid": 3806250,
+                      "owed": 0,
+                      "created_at": "2026-10-01T06:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an invoice",
+        "tags": [
+          "Invoices"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/invoices/{id}/pay": {
+      "post": {
+        "description": "Dashboard only. Pays what the invoice still owes from your live wallet now: topped-up funds first, then earnings.",
+        "operationId": "InvoicesController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice after paying what it owed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceDetail"
+                },
+                "example": {
+                  "object": "invoice",
+                  "id": "4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d",
+                  "number": "INV-000042",
+                  "store_id": "0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90",
+                  "currency": "NGN",
+                  "period_start": "2026-10-01T00:00:00.000Z",
+                  "period_end": "2026-11-01T00:00:00.000Z",
+                  "status": "paid",
+                  "total": 3806250,
+                  "paid": 3806250,
+                  "owed": 0,
+                  "closed_at": null,
+                  "due_at": null,
+                  "paid_at": "2026-11-03T10:00:00.000Z",
+                  "overdue": false,
+                  "lines": [
+                    {
+                      "object": "invoice_line",
+                      "id": "5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e",
+                      "kind": "subscription",
+                      "description": "Premium plan for Ada Digital: ₦38,062.50",
+                      "amount": 3806250,
+                      "paid": 3806250,
+                      "owed": 0,
+                      "created_at": "2026-10-01T06:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pay an invoice",
+        "tags": [
+          "Invoices"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "finance"
+        ]
+      }
+    },
+    "/v1/billing/credit": {
+      "get": {
+        "description": "What your account may owe BitoCard (US$10 at first, then 25, 50 and 100), what you owe in each currency, and whether you can raise the limit: after a full month’s invoice is paid in full, with nothing owed. At the limit, billable usage stops until what is owed is paid.",
+        "operationId": "InvoicesController_credit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Your credit limit and what you owe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credit"
+                },
+                "example": {
+                  "object": "credit",
+                  "limit_usd_cents": 1000,
+                  "steps": [
+                    1000,
+                    2500,
+                    5000,
+                    10000
+                  ],
+                  "owed": [],
+                  "next_limit_usd_cents": 2500,
+                  "can_raise": false,
+                  "raise_blocked_by": "no_paid_month"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your credit limit",
+        "tags": [
+          "Invoices"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/billing/credit/raise": {
+      "post": {
+        "description": "Dashboard only. One step up (10, 25, 50, 100 US dollars), after a full month’s invoice is paid in full with nothing owed (`credit_raise_unavailable` otherwise).",
+        "operationId": "InvoicesController_raise",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Your credit limit, one step higher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credit"
+                },
+                "example": {
+                  "object": "credit",
+                  "limit_usd_cents": 2500,
+                  "steps": [
+                    1000,
+                    2500,
+                    5000,
+                    10000
+                  ],
+                  "owed": [],
+                  "next_limit_usd_cents": 5000,
+                  "can_raise": false,
+                  "raise_blocked_by": "no_paid_month"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Raise your credit limit",
+        "tags": [
+          "Invoices"
+        ],
+        "x-bitocard-auth": "session",
+        "x-bitocard-roles": [
+          "finance"
+        ]
+      }
+    },
     "/v1/catalogue/products": {
       "get": {
         "description": "Products you can sell in your country, with your wholesale cost and your price for each denomination (fixed values, or the lowest and highest of a range). Prices are in your currency; a quote locks the exact price.",
@@ -45851,6 +46569,378 @@
           }
         }
       },
+      "Invoice": {
+        "type": "object",
+        "title": "Invoice",
+        "description": "A month’s invoice for a store (or your account’s own usage), in one currency.",
+        "required": [
+          "object",
+          "id",
+          "number",
+          "store_id",
+          "currency",
+          "period_start",
+          "period_end",
+          "status",
+          "total",
+          "paid",
+          "owed",
+          "closed_at",
+          "due_at",
+          "paid_at",
+          "overdue"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `invoice`.",
+            "const": "invoice"
+          },
+          "id": {
+            "type": "string",
+            "description": "The invoice.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Its number, such as INV-000123."
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The store it bills; null for your account’s own usage."
+          },
+          "currency": {
+            "type": "string",
+            "description": "The currency it is in."
+          },
+          "period_start": {
+            "type": "string",
+            "description": "The start of the calendar month (UTC) it covers.",
+            "format": "date-time"
+          },
+          "period_end": {
+            "type": "string",
+            "description": "The end of that month.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` while the month runs; `closed` once it ends with something owed; `paid` once nothing is owed.",
+            "enum": [
+              "open",
+              "closed",
+              "paid"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "description": "Everything charged on it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "paid": {
+            "type": "integer",
+            "description": "What your wallet has paid of it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "owed": {
+            "type": "integer",
+            "description": "What is still owed: your next top-ups pay it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "closed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the month closed.",
+            "format": "date-time"
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it is due: 7 days after it closes, or sooner when the store’s subscription renews first.",
+            "format": "date-time"
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When nothing was owed any more.",
+            "format": "date-time"
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether it went past its due date unpaid (your credit limit then dropped a step)."
+          }
+        }
+      },
+      "InvoiceDetail": {
+        "type": "object",
+        "title": "InvoiceDetail",
+        "description": "An invoice with its lines.",
+        "required": [
+          "object",
+          "id",
+          "number",
+          "store_id",
+          "currency",
+          "period_start",
+          "period_end",
+          "status",
+          "total",
+          "paid",
+          "owed",
+          "closed_at",
+          "due_at",
+          "paid_at",
+          "overdue",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `invoice`.",
+            "const": "invoice"
+          },
+          "id": {
+            "type": "string",
+            "description": "The invoice.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "Its number, such as INV-000123."
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The store it bills; null for your account’s own usage."
+          },
+          "currency": {
+            "type": "string",
+            "description": "The currency it is in."
+          },
+          "period_start": {
+            "type": "string",
+            "description": "The start of the calendar month (UTC) it covers.",
+            "format": "date-time"
+          },
+          "period_end": {
+            "type": "string",
+            "description": "The end of that month.",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` while the month runs; `closed` once it ends with something owed; `paid` once nothing is owed.",
+            "enum": [
+              "open",
+              "closed",
+              "paid"
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "description": "Everything charged on it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "paid": {
+            "type": "integer",
+            "description": "What your wallet has paid of it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "owed": {
+            "type": "integer",
+            "description": "What is still owed: your next top-ups pay it, in minor units of `currency` (for example kobo or cents)."
+          },
+          "closed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the month closed.",
+            "format": "date-time"
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When it is due: 7 days after it closes, or sooner when the store’s subscription renews first.",
+            "format": "date-time"
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When nothing was owed any more.",
+            "format": "date-time"
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether it went past its due date unpaid (your credit limit then dropped a step)."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceLine"
+            },
+            "description": "Every charge, oldest first."
+          }
+        }
+      },
+      "InvoiceLine": {
+        "type": "object",
+        "title": "InvoiceLine",
+        "description": "One charge on an invoice.",
+        "required": [
+          "object",
+          "id",
+          "kind",
+          "description",
+          "amount",
+          "paid",
+          "owed",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `invoice_line`.",
+            "const": "invoice_line"
+          },
+          "id": {
+            "type": "string",
+            "description": "The line.",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "What it was for.",
+            "enum": [
+              "subscription",
+              "domain",
+              "platform_fee",
+              "usage"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "description": "What was charged."
+          },
+          "amount": {
+            "type": "integer",
+            "description": "What it cost, in minor units of `currency` (for example kobo or cents)."
+          },
+          "paid": {
+            "type": "integer",
+            "description": "What your wallet paid when it happened, or since, in minor units of `currency` (for example kobo or cents)."
+          },
+          "owed": {
+            "type": "integer",
+            "description": "What is still owed, in minor units of `currency` (for example kobo or cents)."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was charged.",
+            "format": "date-time"
+          }
+        }
+      },
+      "Credit": {
+        "type": "object",
+        "title": "Credit",
+        "description": "Your credit limit and what you owe.",
+        "required": [
+          "object",
+          "limit_usd_cents",
+          "steps",
+          "owed",
+          "next_limit_usd_cents",
+          "can_raise",
+          "raise_blocked_by"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `credit`.",
+            "const": "credit"
+          },
+          "limit_usd_cents": {
+            "type": "integer",
+            "description": "What your account may owe BitoCard, in US cents."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "description": "A step, in US cents."
+            },
+            "description": "The steps the limit rises through, one at a time."
+          },
+          "owed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "currency",
+                "amount",
+                "limit"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "description": "The currency."
+                },
+                "amount": {
+                  "type": "integer",
+                  "description": "What you owe, in minor units of `currency` (for example kobo or cents)."
+                },
+                "limit": {
+                  "type": "integer",
+                  "description": "Your credit limit in that currency, at today’s rate, in minor units of `currency` (for example kobo or cents)."
+                }
+              }
+            },
+            "description": "What you owe, per currency (empty when nothing)."
+          },
+          "next_limit_usd_cents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The next step up; null at the maximum."
+          },
+          "can_raise": {
+            "type": "boolean",
+            "description": "Whether you can raise the limit now."
+          },
+          "raise_blocked_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "maximum",
+              "owing",
+              "no_paid_month",
+              null
+            ],
+            "description": "Why not: at the maximum, something is owed, or no full month’s invoice has been paid in full since the last raise."
+          }
+        }
+      },
       "ApiKey": {
         "type": "object",
         "title": "API key",
@@ -50885,6 +51975,8 @@
               "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
+              "invoice.closed",
+              "invoice.overdue",
               "plan.stores_renewing",
               "plan.feature_changed",
               "webhook_endpoint.disabled",
@@ -51088,6 +52180,8 @@
               "chargeback.closed",
               "plan.renewal_failed",
               "plan.ended",
+              "invoice.closed",
+              "invoice.overdue",
               "plan.stores_renewing",
               "plan.feature_changed",
               "webhook_endpoint.disabled",

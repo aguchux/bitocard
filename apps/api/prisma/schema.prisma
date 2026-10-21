@@ -456,6 +456,10 @@ model Reseller {
   planCancelAtPeriodEnd Boolean                @default(false) @map("plan_cancel_at_period_end")
   /// Set when a renewal charge failed; the plan drops to Standard after the grace period.
   planPastDueSince      DateTime?              @map("plan_past_due_since")
+  /// What the account may owe BitoCard, in US cents: US$10 at first, raised a step at a time (25, 50, 100) after a full
+  /// month's invoice is paid in full; admins may set any value up to US$100. An invoice unpaid past its due date drops it a step.
+  creditLimitCents      Int                    @default(1000) @map("credit_limit_cents")
+  creditLimitRaisedAt   DateTime?              @map("credit_limit_raised_at")
   ledgerAccounts        LedgerAccount[]
   holds                 Hold[]
   earningsLots          EarningsLot[]
@@ -485,6 +489,7 @@ model Reseller {
   cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
 
   @@map("resellers")
+  invoices              Invoice[]
 }
 
 enum ResellerRole {
@@ -841,6 +846,9 @@ enum LedgerMode {
 enum AccountKind {
   /// Topped-up money: pays wholesale cost, never withdrawn.
   reseller_funding
+  /// What a reseller owes BitoCard for usage their wallet could not pay when it happened (debit-normal: an asset of
+  /// BitoCard's). Paid off by their next top-ups, oldest invoice first. Never below zero.
+  reseller_owed
   /// Profit past its payout hold: pays wholesale cost and can be withdrawn.
   reseller_earnings
   /// Profit still inside the payout hold.
@@ -3942,4 +3950,57 @@ model SupportBotKnowledge {
 
   @@unique([botId, version])
   @@map("support_bot_knowledge")
+}
+
+/// A month's bill: per store (and one for the account's own usage), per currency, live only. Each line was taken from
+/// the wallet when it happened; what the wallet could not pay is owed until a top-up (or Pay invoice) pays it.
+model Invoice {
+  id         String        @id @default(uuid()) @db.Uuid
+  /// Shown as INV-000123.
+  number     Int           @unique @default(autoincrement())
+  resellerId String        @map("reseller_id") @db.Uuid
+  /// Null: the account's own usage.
+  storeId    String?       @map("store_id") @db.Uuid
+  /// The store's id, or `account`: one invoice per scope, currency and month.
+  scopeKey   String        @map("scope_key")
+  currency   String        @db.Char(3)
+  /// The calendar month (UTC) it covers.
+  periodStart DateTime     @map("period_start")
+  periodEnd  DateTime      @map("period_end")
+  /// `open` (the month is running), `closed` (owing), `paid` (closed and nothing owed).
+  status     String        @default("open")
+  totalMinor BigInt        @default(0) @map("total_minor")
+  paidMinor  BigInt        @default(0) @map("paid_minor")
+  closedAt   DateTime?     @map("closed_at")
+  /// 7 days after it closes, or sooner when one of the store's subscriptions renews first.
+  dueAt      DateTime?     @map("due_at")
+  paidAt     DateTime?     @map("paid_at")
+  /// Set once when it went past its due date unpaid (the credit limit dropped a step).
+  overdueAt  DateTime?     @map("overdue_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  reseller   Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  lines      InvoiceLine[]
+
+  @@unique([resellerId, scopeKey, currency, periodStart])
+  @@index([status, dueAt])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  /// subscription, domain, platform_fee, usage
+  kind        String
+  description String
+  amountMinor BigInt   @map("amount_minor")
+  /// Taken from the wallet so far; the rest is owed.
+  paidMinor   BigInt   @map("paid_minor")
+  /// The ledger reference of what it charged: each charge is one line.
+  reference   String   @unique
+  createdAt   DateTime @default(now()) @map("created_at")
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, createdAt])
+  @@map("invoice_lines")
 }

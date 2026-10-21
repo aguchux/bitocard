@@ -90,6 +90,8 @@ export const notificationTypes = {
   'chargeback.closed': { realm: 'reseller', roles: ['finance'], severity: 'warning', label: 'Chargeback decided' },
   'plan.renewal_failed': { realm: 'reseller', roles: ['finance'], severity: 'critical', label: 'Plan renewal failed' },
   'plan.ended': { realm: 'reseller', roles: ['finance'], severity: 'warning', label: 'Plan ended' },
+  'invoice.closed': { realm: 'reseller', roles: ['finance'], severity: 'warning', label: 'Invoice to pay' },
+  'invoice.overdue': { realm: 'reseller', roles: ['finance'], severity: 'critical', label: 'Invoice overdue' },
   'plan.stores_renewing': { realm: 'reseller', roles: ['finance'], severity: 'warning', label: 'Store plans renewing' },
   'plan.feature_changed': { realm: 'reseller', roles: ['admin', 'finance'], severity: 'warning', label: 'Plan features changed' },
   'webhook_endpoint.disabled': { realm: 'reseller', roles: ['admin', 'developer'], severity: 'critical', label: 'Webhook endpoint disabled' },

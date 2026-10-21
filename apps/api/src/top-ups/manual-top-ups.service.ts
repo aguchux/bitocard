@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { type ConfirmMethod, confirmMethods } from '../auth/confirm-methods.js';
 import { AdminAuthService } from '../auth/admin-auth.service.js';
 import { randomUUID } from 'node:crypto';
@@ -52,6 +53,7 @@ export class ManualTopUpsService {
   private readonly logger = new Logger('ManualTopUps');
 
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
     private readonly adminAuth: AdminAuthService,
     private readonly ledger: LedgerService,
@@ -239,6 +241,7 @@ export class ManualTopUpsService {
         mode: row.mode,
       });
     } else if (row.resellerId) {
+      if (row.mode === 'live') await this.invoices.payFromTopUps(row.resellerId);
       await this.inbox.reseller(row.resellerId, 'top_up.credited', {
         subject: `manual_top_up:${row.id}`,
         title: `${amount} added to your wallet`,

@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { orderStore, pickOrderStore } from '../stores/order-store.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
@@ -81,6 +82,7 @@ export class OrdersService {
   private checkoutListener: CheckoutOrderListener | null = null;
 
   constructor(
+    private readonly invoices: InvoicesService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
@@ -219,6 +221,8 @@ export class OrdersService {
     let hold: { id: string } | null = null;
     let fee: { id: string; heldMinor: bigint } | null = null;
     if (own) {
+      // At the credit limit, own-integration orders wait until what is owed is paid.
+      if (mode === 'live') await this.invoices.requireCredit(resellerId);
       // The reseller's own supplier: BitoCard holds only its fee, at the rate the quote locked.
       const connection = quote.connectionId ? await this.prisma.resellerConnection.findUnique({ where: { id: quote.connectionId } }) : null;
       if (connection?.status !== 'active') throw conflict('integration_unavailable', 'Your supplier account is no longer connected. Create a new quote.');

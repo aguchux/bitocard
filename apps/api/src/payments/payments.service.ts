@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { Encryption } from '../common/encryption.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { randomUUID } from 'node:crypto';
@@ -118,6 +119,7 @@ export class PaymentsService {
   }
 
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly integrations: IntegrationsService,
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
@@ -151,7 +153,9 @@ export class PaymentsService {
   }
 
   /** Tells the owner and finance that money reached the wallet. */
-  private toppedUp(payment: { id: string; resellerId: string; mode: LedgerMode; amountMinor: bigint; currency: string }, how: string) {
+  private async toppedUp(payment: { id: string; resellerId: string; mode: LedgerMode; amountMinor: bigint; currency: string }, how: string) {
+    // A live top-up pays what the reseller owes first.
+    if (payment.mode === 'live') await this.invoices.payFromTopUps(payment.resellerId);
     return this.inbox.reseller(payment.resellerId, 'top_up.credited', {
       subject: payment.id,
       title: `${formatMoney(payment.amountMinor, payment.currency)} added to your wallet`,

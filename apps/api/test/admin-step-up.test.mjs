@@ -45,6 +45,7 @@ const protectedRoutes = [
   ['put', '/v1/admin/exchange/markups', {}],
   ['put', '/v1/admin/plans/premium/limits/stores', { value: 5 }],
   ['put', `/v1/admin/stores/${randomId}/subscription`, { plan: 'premium' }],
+  ['put', `/v1/admin/resellers/${randomId}/credit-limit`, { cents: 2500, reason: 'x' }],
   ['patch', '/v1/admin/plans/premium', {}],
   ['post', '/v1/admin/plans', {}],
   ['put', '/v1/admin/plans/premium/features/priority_support', { enabled: true }],

@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -83,6 +84,7 @@ export type FeeSource = { type: 'order' | 'payment'; id: string };
 @Injectable()
 export class PlatformFeesService {
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly wallets: WalletService,
@@ -165,7 +167,7 @@ export class PlatformFeesService {
     // The carry row must exist before it can be locked. Insert-or-skip, so settlements at the same moment do not collide.
     await this.prisma.feeCarry.createMany({ data: [{ resellerId: charge.resellerId, mode: charge.mode, currency: charge.currency }], skipDuplicates: true });
 
-    return this.prisma.$transaction(async tx => {
+    const settled = await this.prisma.$transaction(async tx => {
       // Only one of settle and release wins, even at the same moment.
       const claimed = await tx.feeCharge.updateMany({ where: { id: charge.id, status: 'held' }, data: { status: 'charged', settledAt: new Date() } });
       if (claimed.count === 0) return tx.feeCharge.findUniqueOrThrow({ where: { id: charge.id } });
@@ -224,6 +226,12 @@ export class PlatformFeesService {
         data: { chargedMinor: charged, carryBeforeNano: carryBefore, carryAfterNano: carryAfter, extraNano: extra },
       });
     });
+    // A live fee is a line on the month's invoice: the order's store's, else the account's.
+    if (settled.mode === 'live' && settled.status === 'charged' && settled.chargedMinor && settled.chargedMinor > 0n) {
+      const order = settled.sourceType === 'order' && /^[0-9a-f-]{36}$/i.test(settled.sourceId) ? await this.prisma.order.findUnique({ where: { id: settled.sourceId }, select: { storeId: true } }) : null;
+      await this.invoices.recordPaid({ resellerId: settled.resellerId, storeId: order?.storeId ?? null, currency: settled.currency, kind: 'platform_fee', description: 'BitoCard fee', amount: settled.chargedMinor, reference: settled.reference });
+    }
+    return settled;
   }
 
   /** The transaction failed: returns the whole hold and charges nothing; the carry is untouched. Repeating does nothing. */

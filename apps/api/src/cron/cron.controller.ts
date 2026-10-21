@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { DomainsService } from '../domains/domains.service.js';
 import { StoreHostsService } from '../stores/store-hosts.service.js';
 import { StoreVisitsService } from '../stores/store-visits.service.js';
@@ -78,6 +79,7 @@ export class CronController {
     replies: RepliesService,
     chats: ChatsService,
     tickets: TicketsService,
+    invoices: InvoicesService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -90,6 +92,8 @@ export class CronController {
       earnings: () => wallets.releaseDueEarnings(),
       /** Daily. */
       plans: () => billing.renewDue(),
+      /** Hourly: close last month's invoices, drop the credit limit for overdue ones, pay what is owed from top-ups. */
+      invoices: () => invoices.run(),
       /** Hourly: virtual number renewals, reminders, pausing at expiry, deletion 15 days later, and old messages. */
       numbers: () => numbers.job(),
       esims: () => esims.job(),

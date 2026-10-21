@@ -95,6 +95,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Bank transfer accounts", href: "/wallet/reserved-accounts", icon: Landmark },
       { label: "Withdrawals", href: "/wallet/payouts", icon: Banknote },
       { label: "Payout bank accounts", href: "/wallet/bank-accounts", icon: Building },
+      { label: "Invoices", href: "/wallet/invoices", icon: ReceiptText },
       { label: "BitoCard fees", href: "/wallet/fees", icon: Percent },
     ],
   },

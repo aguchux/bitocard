@@ -585,8 +585,75 @@ const subscription = { object: 'subscription', plan: premiumPlan, renews_at: '20
 
 const noMore = (item: Schema) => list(item, {}, false);
 
+
+const invoiceFields = {
+  object: constant('invoice'),
+  id: uuid('The invoice.'),
+  number: str('Its number, such as INV-000123.'),
+  store_id: { type: ['string', 'null'], format: 'uuid', description: 'The store it bills; null for your account’s own usage.' } as Schema,
+  currency: str('The currency it is in.'),
+  period_start: time('The start of the calendar month (UTC) it covers.'),
+  period_end: time('The end of that month.'),
+  status: oneOf('`open` while the month runs; `closed` once it ends with something owed; `paid` once nothing is owed.', ['open', 'closed', 'paid']),
+  total: money('Everything charged on it'),
+  paid: money('What your wallet has paid of it'),
+  owed: money('What is still owed: your next top-ups pay it'),
+  closed_at: nullableTime('When the month closed.'),
+  due_at: nullableTime('When it is due: 7 days after it closes, or sooner when the store’s subscription renews first.'),
+  paid_at: nullableTime('When nothing was owed any more.'),
+  overdue: bool('Whether it went past its due date unpaid (your credit limit then dropped a step).'),
+};
+const InvoiceLine = objectSchema(
+  'InvoiceLine',
+  {
+    object: constant('invoice_line'),
+    id: uuid('The line.'),
+    kind: oneOf('What it was for.', ['subscription', 'domain', 'platform_fee', 'usage']),
+    description: str('What was charged.'),
+    amount: money('What it cost'),
+    paid: money('What your wallet paid when it happened, or since'),
+    owed: money('What is still owed'),
+    created_at: time('When it was charged.'),
+  },
+  'One charge on an invoice.',
+);
+const Invoice = objectSchema('Invoice', invoiceFields, 'A month’s invoice for a store (or your account’s own usage), in one currency.');
+const InvoiceDetail = objectSchema('InvoiceDetail', { ...invoiceFields, lines: array(ref('InvoiceLine'), 'Every charge, oldest first.') }, 'An invoice with its lines.');
+const Credit = objectSchema(
+  'Credit',
+  {
+    object: constant('credit'),
+    limit_usd_cents: int('What your account may owe BitoCard, in US cents.'),
+    steps: array(int('A step, in US cents.'), 'The steps the limit rises through, one at a time.'),
+    owed: array(shape({ currency: str('The currency.'), amount: money('What you owe'), limit: money('Your credit limit in that currency, at today’s rate') }), 'What you owe, per currency (empty when nothing).'),
+    next_limit_usd_cents: nullableInt('The next step up; null at the maximum.'),
+    can_raise: bool('Whether you can raise the limit now.'),
+    raise_blocked_by: { type: ['string', 'null'], enum: ['maximum', 'owing', 'no_paid_month', null], description: 'Why not: at the maximum, something is owed, or no full month’s invoice has been paid in full since the last raise.' } as Schema,
+  },
+  'Your credit limit and what you owe.',
+);
+const invoiceLineExample = { object: 'invoice_line', id: '5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e', kind: 'subscription', description: 'Premium plan for Ada Digital: ₦38,062.50', amount: 3806250, paid: 3806250, owed: 0, created_at: '2026-10-01T06:00:00.000Z' };
+const invoiceExample = {
+  object: 'invoice',
+  id: '4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d',
+  number: 'INV-000042',
+  store_id: '0e3a2c74-5b1f-4d8e-9a6c-2f7b8d1e4c90',
+  currency: 'NGN',
+  period_start: '2026-10-01T00:00:00.000Z',
+  period_end: '2026-11-01T00:00:00.000Z',
+  status: 'open',
+  total: 3806250,
+  paid: 3806250,
+  owed: 0,
+  closed_at: null,
+  due_at: null,
+  paid_at: null,
+  overdue: false,
+};
+const creditExample = { object: 'credit', limit_usd_cents: 1000, steps: [1000, 2500, 5000, 10000], owed: [], next_limit_usd_cents: 2500, can_raise: false, raise_blocked_by: 'no_paid_month' };
+
 export const moneyDocs: DocsArea = {
-  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, StoreSubscription, Subscription },
+  schemas: { Wallet, WalletConversion, WalletTransaction, PaymentMethod, ReservedAccount, SimulatedDeposit, Chargeback, FeeCharge, FeeStatement, FeeRate, ExchangeRate, Bank, BankAccount, PayoutDetail, Plan, StoreSubscription, Subscription, Invoice, InvoiceDetail, InvoiceLine, Credit },
   responses: {
     'GET /v1/wallet': { status: 200, description: 'Your wallet in the mode of the key or session.', schema: 'Wallet', example: wallet },
     'GET /v1/wallet/transactions': { status: 200, description: 'Wallet transactions, newest first.', schema: list(ref('WalletTransaction')), example: listExample(transactions, true) },
@@ -740,5 +807,10 @@ export const moneyDocs: DocsArea = {
     },
     'GET /v1/stores/{store}/subscription': { status: 200, description: 'The store’s plan.', schema: 'StoreSubscription', example: storeSubscription },
     'POST /v1/stores/{store}/subscription': { status: 200, description: 'The store’s plan after the change.', schema: 'StoreSubscription', example: storeSubscription },
+    'GET /v1/invoices': { status: 200, description: 'Your invoices, newest first.', schema: list(ref('Invoice')), example: listExample([invoiceExample]) },
+    'GET /v1/invoices/{id}': { status: 200, description: 'The invoice with its lines.', schema: 'InvoiceDetail', example: { ...invoiceExample, lines: [invoiceLineExample] } },
+    'POST /v1/invoices/{id}/pay': { status: 200, description: 'The invoice after paying what it owed.', schema: 'InvoiceDetail', example: { ...invoiceExample, status: 'paid', paid_at: '2026-11-03T10:00:00.000Z', lines: [invoiceLineExample] } },
+    'GET /v1/billing/credit': { status: 200, description: 'Your credit limit and what you owe.', schema: 'Credit', example: creditExample },
+    'POST /v1/billing/credit/raise': { status: 200, description: 'Your credit limit, one step higher.', schema: 'Credit', example: { ...creditExample, limit_usd_cents: 2500, next_limit_usd_cents: 5000, raise_blocked_by: 'no_paid_month' } },
   },
 };

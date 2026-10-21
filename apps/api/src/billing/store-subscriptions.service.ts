@@ -3,6 +3,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Plan, StoreSubscription } from '../generated/prisma/client.js';
+import { InvoicesService } from './invoices.service.js';
 import { WalletService } from '../ledger/wallet.service.js';
 import { EmailService } from '../notifications/email.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
@@ -43,6 +44,7 @@ export class StoreSubscriptionsService {
     private readonly email: EmailService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly invoices: InvoicesService,
   ) {}
 
   private freePlan() {
@@ -114,10 +116,12 @@ export class StoreSubscriptionsService {
   }
 
   /** Takes an amount from the live wallet (topped-up funds first, then earnings) as BitoCard revenue. */
-  private async charge(resellerId: string, amount: bigint, reference: string, description: string) {
+  private async charge(resellerId: string, amount: bigint, reference: string, description: string, line: { storeId: string; currency: string }) {
     if (amount <= 0n) return;
     const hold = await this.wallets.hold({ resellerId, mode: 'live', amount, reference, description });
     await this.wallets.captureHold(hold.id, description);
+    // The store's invoice for the month records it (paid).
+    await this.invoices.recordPaid({ resellerId, storeId: line.storeId, currency: line.currency, kind: 'subscription', description, amount, reference });
   }
 
   /**
@@ -163,7 +167,7 @@ export class StoreSubscriptionsService {
     }
     const due = price.amount > credit ? price.amount - credit : 0n;
     const how = credit > 0n ? ` less ${formatMoney(credit, price.currency)} unused from ${current!.plan.name}` : '';
-    await this.charge(resellerId, due, `plan:store:${storeId}:${planCode}:${now.toISOString()}`, `${plan.name} plan for ${store.name}: ${formatMoney(due, price.currency)} (${formatMoney(price.amount, price.currency)} a month${how})`);
+    await this.charge(resellerId, due, `plan:store:${storeId}:${planCode}:${now.toISOString()}`, `${plan.name} plan for ${store.name}: ${formatMoney(due, price.currency)} (${formatMoney(price.amount, price.currency)} a month${how})`, { storeId, currency: price.currency });
     const data = { planCode, renewsAt: addMonth(now), periodStartedAt: now, paidMinor: price.amount, paidCurrency: price.currency, cancelAtPeriodEnd: false, nextPlanCode: null, pastDueSince: null, migrated: false };
     await this.prisma.storeSubscription.upsert({ where: { storeId }, create: { storeId, resellerId, ...data }, update: data });
     await this.syncAccountPlan(resellerId);
@@ -204,7 +208,7 @@ export class StoreSubscriptionsService {
       const plan = subscription.nextPlanCode ? ((await this.prisma.plan.findUnique({ where: { code: subscription.nextPlanCode } })) ?? subscription.plan) : subscription.plan;
       try {
         const price = await this.priceFor(resellerId, plan);
-        await this.charge(resellerId, price.amount, `plan:store:${storeId}:${plan.code}:${subscription.renewsAt!.toISOString()}`, `${plan.name} plan for ${subscription.store.name}: ${formatMoney(price.amount, price.currency)}`);
+        await this.charge(resellerId, price.amount, `plan:store:${storeId}:${plan.code}:${subscription.renewsAt!.toISOString()}`, `${plan.name} plan for ${subscription.store.name}: ${formatMoney(price.amount, price.currency)}`, { storeId, currency: price.currency });
         await this.prisma.storeSubscription.update({
           where: { storeId },
           data: { planCode: plan.code, renewsAt: addMonth(subscription.renewsAt!), periodStartedAt: subscription.renewsAt, paidMinor: price.amount, paidCurrency: price.currency, nextPlanCode: null, pastDueSince: null, migrated: false },

@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { ResellerIntegrationsService } from '../reseller-integrations/reseller-integrations.service.js';
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
@@ -75,6 +76,7 @@ type WalletContext = { store: Store; mode: LedgerMode; seller: Reseller; country
 @Injectable()
 export class CustomerWalletsService {
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
     private readonly stores: StoreSellers,
     private readonly settings: SettingsService,
@@ -182,6 +184,14 @@ export class CustomerWalletsService {
       gateway = 'sandbox';
     } else {
       throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'provider_unavailable', 'Top-ups are not available in your country yet.');
+    }
+    // Mobile money top-ups are billable for the store's reseller: at their credit limit, other methods stay open.
+    if (gateway === 'pawapay' && context.mode === 'live' && !context.seller.house) {
+      try {
+        await this.invoices.requireCredit(context.seller.id);
+      } catch {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'payment_method_unavailable', 'This payment method is not available here right now. Choose another.', 'method');
+      }
     }
     const id = randomUUID();
     const returnUrl = new URL(input.return_url);

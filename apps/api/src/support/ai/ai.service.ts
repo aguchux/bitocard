@@ -1,3 +1,4 @@
+import { InvoicesService } from '../../billing/invoices.service.js';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { PlanAccessService } from '../../plans/plan-access.js';
 import { AuditService } from '../../audit/audit.service.js';
@@ -34,6 +35,7 @@ export const monthStart = (at = new Date()) => new Date(Date.UTC(at.getUTCFullYe
 @Injectable()
 export class AiService {
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
     private readonly audit: AuditService,
@@ -154,6 +156,8 @@ export class AiService {
       if (call.storeId && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
         throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'ai_allowance_reached', 'This store has used this month’s assistant replies on BitoCard’s AI. People answer until next month, or add your own AI key.');
       }
+      // At the credit limit BitoCard's AI stops (people answer) until what is owed is paid.
+      await this.invoices.requireCredit(call.resellerId);
       client = this.bitocardProvider(call.provider);
       if (!client) throw unavailable(`${aiProviderLabels[call.provider]} is not set up on BitoCard’s AI.`);
     } else {

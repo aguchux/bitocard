@@ -1,3 +1,4 @@
+import { InvoicesService } from '../billing/invoices.service.js';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -53,6 +54,7 @@ export class DomainsService {
   private readonly clients: () => { vercel: VercelDomains; resend: ResendDomains | null; marginBps: number | null; tlds: Set<string>; lookupUrl: string };
 
   constructor(
+    private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
     private readonly wallets: WalletService,
@@ -218,6 +220,8 @@ export class DomainsService {
     const store = await this.storeOf(resellerId, storeId);
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } });
     if (reseller.status !== 'active') throw conflict('reseller_not_verified', 'Finish verifying your business before buying a domain.');
+    // At the credit limit, buying and renewing domains waits until what is owed is paid.
+    await this.invoices.requireCredit(resellerId);
     const name = this.parse(input.domain);
     const { tlds } = this.clients();
     if (!tlds.has(tldOf(name))) throw invalid('tld_not_offered', `Only ${[...tlds].map(tld => `.${tld}`).join(', ')} can be bought here for now.`, 'domain');
@@ -294,6 +298,7 @@ export class DomainsService {
     if (domain.holdId) {
       const hold = await this.prisma.hold.findUniqueOrThrow({ where: { id: domain.holdId } });
       await this.wallets.captureHold(hold.id, `Domain bought: ${domain.name}`, [{ kind: 'domain_revenue', amount: hold.amountMinor }]);
+      await this.invoices.recordPaid({ resellerId: domain.resellerId, storeId: domain.storeId, currency: hold.currency, kind: 'domain', description: `Domain bought: ${domain.name}`, amount: hold.amountMinor, reference: hold.reference });
     }
     await this.postCost(domain, 'register', domain.costCents ?? 0);
     await this.attach(domain.name, true);
@@ -610,6 +615,7 @@ export class DomainsService {
   private async renewDomain(domain: StoreDomain) {
     if (domain.source !== 'purchased' || !domain.expiresAt || !['active', 'pending', 'expired'].includes(domain.status)) throw conflict('not_renewable', 'Only domains bought here are renewed through BitoCard.');
     if (domain.renewalError === 'renewal_pending') throw conflict('renewal_pending', 'A renewal is being confirmed. Nothing more will be taken for it.');
+    await this.invoices.requireCredit(domain.resellerId);
     const period = domain.expiresAt.toISOString();
     const claimed = await this.prisma.storeDomain.updateMany({
       where: { id: domain.id, OR: [{ renewalAttemptAt: null }, { renewalAttemptAt: { lt: new Date(Date.now() - 5 * 60_000) } }] },
@@ -650,7 +656,9 @@ export class DomainsService {
   }
 
   private async finishRenewal(domain: StoreDomain, holdId: string, costCents: number, period: string) {
-    await this.wallets.captureHold(holdId, `Domain renewed: ${domain.name}`, [{ kind: 'domain_revenue', amount: (await this.prisma.hold.findUniqueOrThrow({ where: { id: holdId } })).amountMinor }]);
+    const hold = await this.prisma.hold.findUniqueOrThrow({ where: { id: holdId } });
+    await this.wallets.captureHold(holdId, `Domain renewed: ${domain.name}`, [{ kind: 'domain_revenue', amount: hold.amountMinor }]);
+    await this.invoices.recordPaid({ resellerId: domain.resellerId, storeId: domain.storeId, currency: hold.currency, kind: 'domain', description: `Domain renewed: ${domain.name}`, amount: hold.amountMinor, reference: hold.reference });
     await this.postCost(domain, `renew:${period}`, costCents);
     const info = await this.vercel.info(domain.name).catch(() => null);
     const expiresAt = info?.expiresAt ? new Date(info.expiresAt) : new Date(domain.expiresAt!.getTime() + 365 * day);
