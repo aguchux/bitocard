@@ -44,5 +44,8 @@
   },
   "dependencies": {
     "libphonenumber-js": "^1.13.14"
-  }
+  },
+  "sideEffects": [
+    "**/*.css"
+  ]
 }

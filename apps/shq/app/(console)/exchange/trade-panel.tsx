@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, Select } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, Select, Skeleton } from "@bitocard/admin-ui";
 import { type ResellerExchangeQuote, useQuoteResellerExchangeMutation, useResellerExchangeOverviewQuery, useResellerExchangeTradesQuery, useTradeResellerExchangeMutation } from "@bitocard/api-client/reseller";
 
 const coinInput = /^\d{1,12}(?:\.\d{1,8})?$/;
@@ -73,7 +73,12 @@ export function TradePanel({ currencies, canTrade }: { currencies: string[]; can
         </div> : null}
         {trading.error ? <div className="mt-3"><Notice tone="red">{errorMessage(trading.error)}</Notice></div> : null}
         {done ? <p className="mt-4 text-sm font-semibold text-mint-700" role="status">{done}</p> : null}
-      </> : null}
+      </> : overview.error ? null : (
+        <div className="mt-5 space-y-4" aria-busy="true" aria-label="Loading prices">
+          <div className="grid gap-4 sm:grid-cols-3">{[0, 1, 2].map(item => <Skeleton key={item} className="h-16 w-full" />)}</div>
+          <Skeleton className="h-11 w-40" />
+        </div>
+      )}
     </Card>
     <Card><CardHeader title="Recent trades with BitoCard" description="Your latest wallet and coin exchanges." actions={<Link href="/exchange/trades" className="text-sm font-semibold text-brand-600 hover:underline">All trades</Link>} />
       {history.error ? <div className="px-5 pb-5"><Notice tone="red">{errorMessage(history.error)}</Notice></div> : null}

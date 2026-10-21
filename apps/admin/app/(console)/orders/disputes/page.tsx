@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, DataTable, disputeActionLabels, disputeKindLabels, disputeTopicLabels, errorMessage, formatRelative, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
 import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { type AdminDisputeSummary, type DisputeStatus, useAdminDisputesQuery } from "@bitocard/api-client/admin";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 const filters = [
   { value: "escalated", label: "Needs a decision" },
@@ -20,6 +21,8 @@ type Filter = (typeof filters)[number]["value"];
  */
 export default function DisputesPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("adminDispute");
   const [filter, setFilter] = useState<Filter>("escalated");
   const query = useAdminDisputesQuery({ status: filter as DisputeStatus });
 
@@ -39,6 +42,7 @@ export default function DisputesPage() {
           onRetry={query.refetch}
           rowKey={row => row.id}
           onRowClick={row => router.push(`/orders/disputes/${row.id}`)}
+          onRowIntent={row => { router.prefetch(`/orders/disputes/${row.id}`); prefetchDetail(row.id); }}
           empty={filter === "escalated" ? "Nothing waiting for a decision." : "No disputes."}
           columns={[
             {

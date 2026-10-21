@@ -6,7 +6,13 @@ import { Layers } from "lucide-react";
 import { ActionDialog, Button, Card, CardHeader, Dialog, EmptyState, errorMessage, Notice, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { appUrl } from "@bitocard/ui/site";
-import { type EditorSources, HomeEditor } from "@bitocard/admin-ui/storefront";
+import type { EditorSources } from "@bitocard/admin-ui/storefront";
+import dynamic from "next/dynamic";
+
+/** The home page editor (with drag and drop) loads on its own, so the rest of the page draws first. */
+const HomeEditor = dynamic(() => import("@bitocard/admin-ui/storefront").then(module => module.HomeEditor), {
+  loading: () => <Skeleton className="h-[32rem] w-full" />,
+});
 import {
   type Store,
   type StoreHomeEditor,

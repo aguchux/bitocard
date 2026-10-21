@@ -26,6 +26,9 @@ export function createNextConfig({ indexable = true, ...config } = {}) {
     turbopack: { root: repoRoot },
     outputFileTracingRoot: repoRoot,
     ...config,
+    // Load only the modules a page imports from BitoCard's own barrels (with "sideEffects" in their package.json),
+    // so a page using two buttons does not ship the KYC viewer, chat panel and editor too.
+    experimental: { ...config.experimental, optimizePackageImports: [...(config.experimental?.optimizePackageImports ?? []), "@bitocard/admin-ui", "@bitocard/ui"] },
     async headers() {
       const extra = config.headers ? await config.headers() : [];
       return [{ source: "/:path*", headers }, ...extra];

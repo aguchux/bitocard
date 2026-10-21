@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Card, DataTable, errorMessage, Input, PageHeader, useDebouncedValue, type Column } from "@bitocard/admin-ui";
 import { AdminShell } from "@bitocard/admin-ui/shell";
 import { type CryptoCustomer, useCryptoCustomersQuery } from "@bitocard/api-client/admin";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 const columns: Array<Column<CryptoCustomer>> = [
   {
@@ -29,6 +30,8 @@ const columns: Array<Column<CryptoCustomer>> = [
  */
 export default function CryptoCustomersPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("cryptoCustomer");
   const [search, setSearch] = useState("");
   const q = useDebouncedValue(search.trim());
   const customers = useCryptoCustomersQuery(q ? { q } : {});
@@ -51,6 +54,7 @@ export default function CryptoCustomersPage() {
           onRetry={customers.refetch}
           empty={q ? "No customer matches." : "No customer holds crypto yet."}
           onRowClick={customer => router.push(`/crypto/customers/${customer.id}`)}
+          onRowIntent={customer => { router.prefetch(`/crypto/customers/${customer.id}`); prefetchDetail(customer.id); }}
         />
       </Card>
     </AdminShell>

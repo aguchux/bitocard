@@ -6,11 +6,14 @@ import { Card, DataTable, errorMessage, formatDate, LoadMore, PageHeader, Status
 import { type NumberStatus, useResellerNumbersInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { useReseller } from "@/components/reseller";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 type Filter = "all" | NumberStatus;
 
 export default function NumbersPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("resellerNumber");
   const { mode } = useReseller();
   const [status, setStatus] = useState<Filter>("all");
   const query = useResellerNumbersInfiniteQuery({ status: status === "all" ? undefined : status });
@@ -46,6 +49,7 @@ export default function NumbersPage() {
           onRetry={query.refetch}
           rowKey={number => number.id}
           onRowClick={number => router.push(`/numbers/${number.id}`)}
+          onRowIntent={number => { router.prefetch(`/numbers/${number.id}`); prefetchDetail(number.id); }}
           empty={status === "all" ? "No numbers yet. A number appears here once a virtual number order completes." : "No numbers match this filter."}
           columns={[
             { key: "number", header: "Number", cell: number => <span className="break-all font-mono">{number.number}</span> },

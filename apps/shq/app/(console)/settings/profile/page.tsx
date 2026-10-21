@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { KeyRound, LogOut, Mail, Pencil, Plus, Smartphone, Star, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   useAddAdditionalPhoneMutation,
@@ -74,7 +74,13 @@ function MobileNumber() {
       />
       <div className="space-y-4 p-5 sm:p-6">
         {done ? <Notice tone="green">Your mobile number is confirmed.</Notice> : null}
-        <ul className="divide-y divide-line rounded-xl border border-line">
+        {!phones.data && !phones.error ? (
+          <div className="space-y-2" aria-busy="true" aria-label="Loading phone numbers">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : null}
+        <ul className="divide-y divide-line rounded-xl border border-line empty:hidden">
           {(phones.data?.data ?? []).map(item => <li key={item.phone} className="space-y-2 px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="flex items-center gap-2"><Smartphone className="size-4 text-subtle" aria-hidden />{item.phone}{item.primary ? <Badge tone="blue">Primary</Badge> : null}<Badge tone={item.verified ? "green" : "amber"}>{item.verified ? "Confirmed" : "Not confirmed"}</Badge></span>

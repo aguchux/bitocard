@@ -8,11 +8,14 @@ import { Card, categoryName, DataTable, errorMessage, formatDateTime, formatMone
 import { type OrderStatus, useResellerOrdersInfiniteQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 type Filter = "all" | OrderStatus;
 
 export default function OrdersPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("resellerOrder");
   const { membership, mode } = useReseller();
   const [status, setStatus] = useState<Filter>("all");
   const [reference, setReference] = useState("");
@@ -75,6 +78,7 @@ export default function OrdersPage() {
           onRetry={query.refetch}
           rowKey={order => order.id}
           onRowClick={order => router.push(`/orders/${order.id}`)}
+          onRowIntent={order => { router.prefetch(`/orders/${order.id}`); prefetchDetail(order.id); }}
           empty={status === "all" && !customerReference ? "No orders yet." : "No orders match these filters."}
           columns={[
             {

@@ -3,10 +3,13 @@
 import { useRouter } from "next/navigation";
 import { Card, categoryName, DataTable, errorMessage, formatDateTime, formatMoney, LoadMore, StatusBadge } from "@bitocard/admin-ui";
 import { type OrderStatus, useOrdersInfiniteQuery } from "@bitocard/api-client/admin";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 /** Orders, newest first, with cursor paging. The filters come from the page (queue, status, reseller). */
 export function OrderList({ status, needsReview, resellerId, empty }: { status?: OrderStatus; needsReview?: boolean; resellerId?: string; empty: string }) {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("order");
   const query = useOrdersInfiniteQuery({ status, needs_review: needsReview, reseller_id: resellerId });
   const rows = query.data?.pages.flatMap(page => page.data);
 
@@ -20,6 +23,7 @@ export function OrderList({ status, needsReview, resellerId, empty }: { status?:
         onRetry={query.refetch}
         rowKey={order => order.id}
         onRowClick={order => router.push(`/orders/${order.id}`)}
+          onRowIntent={order => { router.prefetch(`/orders/${order.id}`); prefetchDetail(order.id); }}
         empty={empty}
         columns={[
           {

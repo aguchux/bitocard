@@ -9,6 +9,7 @@ import { type TicketSummary, useTicketsQuery } from "@bitocard/api-client/resell
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { needsAnswer, shqTicketStatus, ticketTone } from "@/components/support";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 const filters = [
   { value: "answer", label: "Needs an answer" },
@@ -36,6 +37,8 @@ const shows: Record<Filter, (row: TicketSummary) => boolean> = {
  */
 export default function SupportPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("ticket");
   const { membership, mode } = useReseller();
   const allowed = can(membership, "admin", "support");
   const [filter, setFilter] = useState<Filter>("answer");
@@ -77,6 +80,7 @@ export default function SupportPage() {
               onRetry={query.refetch}
               rowKey={row => row.id}
               onRowClick={row => router.push(`/support/${row.id}`)}
+          onRowIntent={row => { router.prefetch(`/support/${row.id}`); prefetchDetail(row.id); }}
               empty={filter === "answer" ? "No customer is waiting for you." : "No tickets."}
               columns={[
                 {

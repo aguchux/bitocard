@@ -6,12 +6,15 @@ import { Card, chatStatusLabels, DataTable, errorMessage, formatRelative, Notice
 import { type ChatSummary, useChatsQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 const tone = (status: string) => (status === "waiting" ? "open" : status === "closed" ? "resolved" : "pending");
 
 /** The store's live chats with its customers, newest activity first. Polled while the page is open. */
 export default function ChatsPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("chat");
   const { membership, mode } = useReseller();
   const allowed = can(membership, "admin", "support");
   const query = useChatsQuery(undefined, { skip: !allowed, pollingInterval: 10_000, skipPollingIfUnfocused: true });
@@ -37,6 +40,7 @@ export default function ChatsPage() {
               onRetry={query.refetch}
               rowKey={row => row.id}
               onRowClick={row => router.push(`/support/chats/${row.id}`)}
+          onRowIntent={row => { router.prefetch(`/support/chats/${row.id}`); prefetchDetail(row.id); }}
               empty="No one is chatting right now."
               columns={[
                 {

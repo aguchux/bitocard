@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardHeader, errorMessage, humanise, Notice, Toggle } from "@bitocard/admin-ui";
+import { Card, CardHeader, errorMessage, humanise, Notice, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useSetSwitchMutation, useSwitchesQuery } from "@bitocard/api-client/admin";
 
@@ -51,6 +51,13 @@ export function ResellerSwitchesCard({ resellerId, features }: { resellerId: str
           );
         })}
         {!definitions.length && !switches.isLoading ? <li className="py-4 text-sm text-muted">No switches can be set per reseller.</li> : null}
+        {!switches.data && switches.isLoading
+          ? [0, 1, 2, 3].map(item => (
+              <li key={item} className="py-2" aria-hidden>
+                <Skeleton className="h-10 w-full" />
+              </li>
+            ))
+          : null}
       </ul>
     </Card>
   );

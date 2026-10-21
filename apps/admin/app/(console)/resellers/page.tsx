@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { Card, DataTable, errorMessage, FilterSelect, formatDate, humanise, PageHeader, StatusBadge, Tabs } from "@bitocard/admin-ui";
 import { AdminShell } from "@bitocard/admin-ui/shell";
 import { type ResellerStatus, useCountriesQuery, useResellersQuery } from "@bitocard/api-client/admin";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 type Filter = "all" | ResellerStatus;
 
 export default function ResellersPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("reseller");
   const [status, setStatus] = useState<Filter>("all");
   const [country, setCountry] = useState("");
   const countries = useCountriesQuery();
@@ -47,6 +50,7 @@ export default function ResellersPage() {
           onRetry={refetch}
           rowKey={reseller => reseller.id}
           onRowClick={reseller => router.push(`/resellers/${reseller.id}`)}
+          onRowIntent={reseller => { router.prefetch(`/resellers/${reseller.id}`); prefetchDetail(reseller.id); }}
           empty="No resellers match these filters."
           columns={[
             { key: "name", header: "Business", cell: reseller => <span className="font-semibold">{reseller.name}</span> },

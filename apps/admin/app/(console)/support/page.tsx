@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, DataTable, errorMessage, formatRelative, PageHeader, StatusBadge, Tabs, ticketCategoryLabels, ticketPriorityLabels, ticketStatusLabel } from "@bitocard/admin-ui";
 import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { type AdminTicketSummary, type TicketQueue, type TicketStatus, useAdminTicketsQuery } from "@bitocard/api-client/admin";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 const filters = [
   { value: "open", label: "Needs an answer", status: "open", queue: "bitocard" },
@@ -22,6 +23,8 @@ const requesterLabel = (row: AdminTicketSummary) => (row.requester === "reseller
  */
 export default function SupportTicketsPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("adminTicket");
   const [filter, setFilter] = useState<Filter>("open");
   const chosen = filters.find(item => item.value === filter)!;
   const query = useAdminTicketsQuery({ queue: chosen.queue as TicketQueue, ...(chosen.status ? { status: chosen.status as TicketStatus } : {}) });
@@ -39,6 +42,7 @@ export default function SupportTicketsPage() {
           onRetry={query.refetch}
           rowKey={row => row.id}
           onRowClick={row => router.push(`/support/${row.id}`)}
+          onRowIntent={row => { router.prefetch(`/support/${row.id}`); prefetchDetail(row.id); }}
           empty={filter === "open" ? "Nobody is waiting for an answer." : "No tickets."}
           columns={[
             {

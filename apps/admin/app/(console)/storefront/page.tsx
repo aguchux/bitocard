@@ -2,7 +2,13 @@
 
 import { QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { bitocardSectionTypes, type EditorSources, HomeEditor } from "@bitocard/admin-ui/storefront";
+import { bitocardSectionTypes, type EditorSources } from "@bitocard/admin-ui/storefront";
+import dynamic from "next/dynamic";
+
+/** The home page editor (with drag and drop) loads on its own, so the rest of the page draws first. */
+const HomeEditor = dynamic(() => import("@bitocard/admin-ui/storefront").then(module => module.HomeEditor), {
+  loading: () => <Skeleton className="h-[32rem] w-full" />,
+});
 import {
   type StorefrontPage,
   useProductsInfiniteQuery,

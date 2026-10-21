@@ -8,6 +8,7 @@ import { Card, DataTable, disputeKindLabels, disputeTopicLabels, errorMessage, f
 import { type DisputeSummary, useDisputesQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
+import { usePrefetchQuery } from "@bitocard/api-client";
 
 const filters = [
   { value: "mine", label: "With you" },
@@ -33,6 +34,8 @@ const statusLabel = (status: string) => ({ open: "With you", escalated: "With Bi
  */
 export default function DisputesPage() {
   const router = useRouter();
+  // Opening a row draws at once: its page's code and data are fetched as the pointer reaches it.
+  const prefetchDetail = usePrefetchQuery("dispute");
   const { membership, mode } = useReseller();
   const allowed = can(membership, "admin", "support", "finance");
   const [filter, setFilter] = useState<Filter>("mine");
@@ -76,6 +79,7 @@ export default function DisputesPage() {
               onRetry={query.refetch}
               rowKey={row => row.id}
               onRowClick={row => router.push(`/disputes/${row.id}`)}
+          onRowIntent={row => { router.prefetch(`/disputes/${row.id}`); prefetchDetail(row.id); }}
               empty={filter === "mine" ? "Nothing waiting for you." : "No disputes."}
               columns={[
                 {

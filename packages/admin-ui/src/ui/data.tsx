@@ -53,6 +53,7 @@ export function DataTable<T>({
   onRetry,
   empty = 'Nothing here yet.',
   onRowClick,
+  onRowIntent,
   caption,
 }: {
   columns: Array<Column<T>>;
@@ -63,8 +64,21 @@ export function DataTable<T>({
   onRetry?: () => void;
   empty?: string;
   onRowClick?: (row: T) => void;
+  /**
+   * The person is about to open a row (the pointer reached it, or it took focus): prefetch what its page needs.
+   * Called once per row each time the table mounts.
+   */
+  onRowIntent?: (row: T) => void;
   caption?: string;
 }) {
+  const intended = useRef(new Set<string>());
+  const intent = (row: T) => {
+    if (!onRowIntent) return;
+    const key = rowKey(row);
+    if (intended.current.has(key)) return;
+    intended.current.add(key);
+    onRowIntent(row);
+  };
   // Rows already shown win over a failed refresh: the error panel is only for when there are none to show.
   if (error && !rows?.length) return <ErrorState message={error} onRetry={onRetry} />;
   if (loading && !rows) {
@@ -77,9 +91,11 @@ export function DataTable<T>({
     );
   }
   if (!rows?.length) return <EmptyState title={empty} />;
-  type RowProps = { onClick?: () => void; onKeyDown?: (event: React.KeyboardEvent) => void; tabIndex?: number; role?: 'link'; className?: string };
+  type RowProps = { onClick?: () => void; onKeyDown?: (event: React.KeyboardEvent) => void; onPointerEnter?: () => void; onFocus?: () => void; tabIndex?: number; role?: 'link'; className?: string };
   const clickable = onRowClick
     ? (row: T): RowProps => ({
+        onPointerEnter: () => intent(row),
+        onFocus: () => intent(row),
         onClick: () => onRowClick(row),
         onKeyDown: (event: React.KeyboardEvent) => {
           if (event.key === 'Enter' || event.key === ' ') {

@@ -62,6 +62,18 @@ describe('DataTable', () => {
     expect(open).toHaveBeenCalledWith({ id: 'a1', name: 'Ada' });
   });
 
+  test('pointing at or focusing a row says it is about to open, once per row, so its page can be prefetched', () => {
+    const intent = vi.fn();
+    render(<DataTable columns={columns} rows={[{ id: 'a1', name: 'Ada' }, { id: 'b2', name: 'Bo' }]} rowKey={row => row.id} onRowClick={vi.fn()} onRowIntent={intent} caption="People" />);
+    const table = screen.getByRole('table');
+    const ada = within(table).getByText('Ada').closest('tr')!;
+    fireEvent.pointerEnter(ada);
+    fireEvent.pointerEnter(ada);
+    fireEvent.focus(ada);
+    fireEvent.focus(within(table).getByText('Bo').closest('tr')!);
+    expect(intent.mock.calls.map(call => call[0].id)).toEqual(['a1', 'b2']);
+  });
+
   test('loading, empty and error states', () => {
     const retry = vi.fn();
     const { rerender } = render(<DataTable columns={columns} rows={undefined} loading rowKey={row => row.id} />);
