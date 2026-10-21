@@ -11,7 +11,7 @@ import { storeApi } from "@/lib/api";
 import { customerApi } from "@/lib/customer";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
-import { homeQuickBuyTabs } from "@/lib/quick-buy";
+import { homeQuickBuyTabs } from "@/lib/home-quick-buy";
 import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
