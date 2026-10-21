@@ -117,4 +117,17 @@ describe("SMS helpers", () => {
   test("outgoing statuses read in plain words", () => {
     expect(["queued", "sent", "delivered", "failed"].map(status => sentStatus[status])).toEqual(["Sending", "Sent", "Delivered", "Failed"]);
   });
+  test("sends an Idempotency-Key on writes (the form's nonce when given), never on reads", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    await accessApi(token, "/number");
+    await accessApi(token, "/messages", { to: "+447700900123", text: "Hi" });
+    await accessApi(token, "/messages", { to: "+447700900123", text: "Hi" }, { idempotencyKey: "attempt-12345678" });
+    await accessApi(token, "/messages", { to: "+447700900123", text: "Hi" }, { idempotencyKey: "bad key!" });
+    const keys = fetch.mock.calls.map(call => ((call as unknown as [string, RequestInit])[1].headers as Record<string, string>)["idempotency-key"]);
+    expect(keys[0]).toBeUndefined();
+    expect(keys[1]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(keys[2]).toBe("attempt-12345678");
+    expect(keys[3]).toMatch(/^[0-9a-f-]{36}$/);
+  });
 });

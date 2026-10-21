@@ -5,7 +5,6 @@ import type { Request } from 'express';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 import { type Caller, CurrentCaller, Public, resellerOf, Roles, Scopes, storeScopeOf } from '../auth/caller.js';
-import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { Mode } from '../ledger/mode.js';
 import { modeHeader, PageDto } from '../ledger/wallet.controller.js';
@@ -123,7 +122,6 @@ export class EsimAccessController {
   }
 
   @Post(':token/esims/:id/top-ups')
-  @SkipIdempotency()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   async topUp(@Param('token') token: string, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request, @Body() body: CustomerTopUpDto) {
@@ -132,7 +130,6 @@ export class EsimAccessController {
   }
 
   @Post(':token/esims/:id/cancel')
-  @SkipIdempotency()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   async cancel(@Param('token') token: string, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {

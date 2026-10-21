@@ -403,9 +403,19 @@ describe('eSIMs on a signed-in customer’s order', () => {
     assert.deepEqual([options.json.available, options.json.data.length, options.json.wallets.map(item => item.currency)], [true, 2, ['NGN', 'USD']]);
     assert.deepEqual(options.json.data[0].prices.map(price => [price.currency, price.amount > 0]), [['NGN', true], ['USD', true]], 'its price from each wallet');
     const balance = (await call('GET', '/v1/store/wallet')).json.balance;
-    const paid = await call('POST', `/v1/store/checkouts/${bought.json.id}/esims/${esimId}/top-ups`, { option_id: options.json.data[0].id });
+    // The same attempt sent twice (a double submit, a retry): one top-up, paid once.
+    const attempt = `attempt-${Date.now()}`;
+    const once = () =>
+      fetch(`${server.base}/v1/store/checkouts/${bought.json.id}/esims/${esimId}/top-ups`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'bitocard-customer-session': token, 'idempotency-key': attempt },
+        body: JSON.stringify({ option_id: options.json.data[0].id }),
+      }).then(async res => ({ status: res.status, json: await res.json() }));
+    const paid = await once();
     assert.deepEqual([paid.status, paid.json.status, paid.json.amount], [200, 'completed', options.json.data[0].amount]);
-    assert.equal((await call('GET', '/v1/store/wallet')).json.balance, balance - options.json.data[0].amount);
+    const repeat = await once();
+    assert.equal(repeat.json.id, paid.json.id, 'the repeat answers the first');
+    assert.equal((await call('GET', '/v1/store/wallet')).json.balance, balance - options.json.data[0].amount, 'charged once');
 
     const cancelled = await call('POST', `/v1/store/checkouts/${bought.json.id}/esims/${esimId}/cancel`);
     assert.equal(cancelled.status, 200, JSON.stringify(cancelled.json));

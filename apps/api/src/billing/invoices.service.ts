@@ -15,6 +15,7 @@ export const creditSteps = [1000, 2500, 5000, 10000] as const;
 export const maxCreditCents = 10000;
 /** Days after an invoice closes that it is due (sooner when one of the store's subscriptions renews first). */
 export const invoiceDueDays = 7;
+const isUniqueViolation = (error: unknown) => (error as { code?: string } | null)?.code === 'P2002';
 const day = 24 * 60 * 60 * 1000;
 
 export type InvoiceLineKind = 'subscription' | 'domain' | 'platform_fee' | 'usage';
@@ -104,6 +105,18 @@ export class InvoicesService {
     });
   }
 
+  /**
+   * Makes the month's invoice before a transaction uses it: two charges at once both upserting it inside their own
+   * transactions could collide on its unique key and fail one of them (Postgres aborts the transaction).
+   */
+  private async ensureInvoice(resellerId: string, storeId: string | null, currency: string, at: Date) {
+    try {
+      await this.prisma.$transaction(tx => this.invoiceFor(tx, resellerId, storeId, currency, at));
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+    }
+  }
+
   private async addLine(tx: Tx, input: { resellerId: string; storeId: string | null; currency: string; kind: InvoiceLineKind; description: string; amount: bigint; paid: bigint; reference: string; at: Date }) {
     if (await tx.invoiceLine.findUnique({ where: { reference: input.reference }, select: { id: true } })) return;
     const invoice = await this.invoiceFor(tx, input.resellerId, input.storeId, input.currency, input.at);
@@ -118,6 +131,7 @@ export class InvoicesService {
   async recordPaid(input: { resellerId: string; storeId?: string | null; currency: string; kind: InvoiceLineKind; description: string; amount: bigint; reference: string; at?: Date }) {
     if (input.amount <= 0n) return;
     try {
+      await this.ensureInvoice(input.resellerId, input.storeId ?? null, input.currency, input.at ?? new Date());
       await this.prisma.$transaction(tx => this.addLine(tx, { ...input, storeId: input.storeId ?? null, paid: input.amount, at: input.at ?? new Date() }));
     } catch (error) {
       this.logger.error({ err: error, reference: input.reference }, 'Could not add a paid charge to its invoice');
@@ -153,6 +167,30 @@ export class InvoicesService {
     const limit = await this.limitIn(reseller.creditLimitCents, input.currency);
     const [funding, earnings, owed] = await this.accounts(input.resellerId, input.currency);
     const revenue = await this.ledger.accountId('live', { kind: input.revenue, currency: input.currency });
+    const at = new Date();
+    await this.ensureInvoice(input.resellerId, input.storeId ?? null, input.currency, at);
+    // Once per reference: a repeat (a retried job, a second notice) answers what the first charge did.
+    const already = async () => {
+      const line = await this.prisma.invoiceLine.findUnique({ where: { reference: input.reference } });
+      return line ? { paid: line.paidMinor, owed: line.amountMinor - line.paidMinor } : null;
+    };
+    const earlier = await already();
+    if (earlier) return earlier;
+    try {
+      return await this.chargeOnce(input, { funding, earnings, owed, revenue, limit, at });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const done = await already();
+      if (done) return done;
+      throw error;
+    }
+  }
+
+  private chargeOnce(
+    input: { resellerId: string; storeId?: string | null; currency: string; kind: InvoiceLineKind; description: string; amount: bigint; reference: string; revenue: AccountKind; force?: boolean },
+    ids: { funding: string; earnings: string; owed: string; revenue: string; limit: bigint; at: Date },
+  ) {
+    const { funding, earnings, owed, revenue, limit } = ids;
     return this.prisma.$transaction(async tx => {
       const balances = await this.ledger.lockBalances(tx, [funding, earnings, owed]);
       let left = input.amount;
@@ -177,8 +215,7 @@ export class InvoicesService {
         ],
       };
       await this.ledger.write(tx, entry);
-      if (await tx.invoiceLine.findUnique({ where: { reference: input.reference }, select: { id: true } })) throw new Error(`Usage ${input.reference} was already charged`);
-      await this.addLine(tx, { ...input, storeId: input.storeId ?? null, paid: input.amount - left, at: new Date() });
+      await this.addLine(tx, { ...input, storeId: input.storeId ?? null, paid: input.amount - left, at: ids.at });
       return { paid: input.amount - left, owed: left };
     });
   }
@@ -317,7 +354,11 @@ export class InvoicesService {
     const late = await this.prisma.invoice.findMany({ where: { status: 'closed', overdueAt: null, dueAt: { lt: now } }, take: 500 });
     let overdue = 0;
     for (const invoice of late) {
-      if (invoice.paidMinor >= invoice.totalMinor) continue;
+      if (invoice.paidMinor >= invoice.totalMinor) {
+        // Paid while it was being closed: it is paid, not overdue.
+        await this.prisma.invoice.updateMany({ where: { id: invoice.id, status: 'closed' }, data: { status: 'paid', paidAt: invoice.paidAt ?? now } });
+        continue;
+      }
       const claimed = await this.prisma.invoice.updateMany({ where: { id: invoice.id, overdueAt: null }, data: { overdueAt: now } });
       if (claimed.count === 0) continue;
       overdue += 1;
@@ -413,7 +454,9 @@ export class InvoicesService {
       }[check.reason];
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'credit_raise_unavailable', message);
     }
-    await this.prisma.reseller.update({ where: { id: resellerId }, data: { creditLimitCents: check.next!, creditLimitRaisedAt: new Date() } });
+    // Claimed on the limit it was raised from, so two raises at once go up one step, not two.
+    const raised = await this.prisma.reseller.updateMany({ where: { id: resellerId, creditLimitCents: check.reseller.creditLimitCents }, data: { creditLimitCents: check.next!, creditLimitRaisedAt: new Date() } });
+    if (raised.count === 0) return this.credit(resellerId);
     await this.audit.record({ actorId, action: 'reseller.credit_limit_raised', targetType: 'reseller', targetId: resellerId, before: { cents: check.reseller.creditLimitCents }, after: { cents: check.next } });
     return this.credit(resellerId);
   }

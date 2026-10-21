@@ -54,6 +54,43 @@ describe('invoices', () => {
     assert.match(detail.json.number, /^INV-\d{6}$/);
   });
 
+  test('races and repeats: parallel upgrades charge once; a usage charge repeated answers the first; parallel charges on a new month both land', async () => {
+    const { browser, resellerId, store } = await reseller(100_000_000);
+    const tries = await Promise.all([1, 2, 3].map(() => browser.post(`/v1/stores/${store.id}/subscription`, { plan: 'premium' })));
+    assert.ok(tries.some(res => res.status === 200), JSON.stringify(tries.map(res => res.json)));
+    assert.ok(tries.every(res => res.status === 200 || res.json.error?.code === 'plan_change_in_progress'), JSON.stringify(tries.map(res => res.json)));
+    const charged = await prisma.journalEntry.count({ where: { resellerId, type: 'hold_capture', description: { startsWith: 'Premium plan' } } });
+    const lines = await prisma.invoiceLine.findMany({ where: { invoice: { resellerId }, kind: 'subscription' } });
+    assert.equal(lines.length, 1, 'one subscription line: charged once');
+    assert.ok(charged <= 1);
+    assert.equal((await prisma.store.findUniqueOrThrow({ where: { id: store.id } })).planChangingAt, null, 'the claim is given back');
+
+    const first = await usage(resellerId, store.id, 1_000, 'repeat-me');
+    const again = await usage(resellerId, store.id, 1_000, 'repeat-me');
+    assert.deepEqual([again.paid, again.owed], [first.paid, first.owed]);
+    assert.equal(await prisma.invoiceLine.count({ where: { reference: 'usage:repeat-me' } }), 1);
+    const parallel = await Promise.all([1, 2].map(() => usage(resellerId, store.id, 2_000, 'twice-at-once')));
+    assert.deepEqual(parallel.map(item => item.paid), [2_000n, 2_000n], 'both answer the one charge');
+    assert.equal(await prisma.journalEntry.count({ where: { reference: 'usage:twice-at-once' } }), 1);
+
+    // A fresh reseller, two charges at once: the month's invoice is made once and both lines land on it.
+    const fresh = await reseller(1_000_000);
+    await Promise.all([usage(fresh.resellerId, fresh.store.id, 100), usage(fresh.resellerId, fresh.store.id, 200)]);
+    const invoice = await prisma.invoice.findFirstOrThrow({ where: { resellerId: fresh.resellerId }, include: { lines: true } });
+    assert.deepEqual([invoice.lines.length, invoice.totalMinor], [2, 300n]);
+    await ledgerOk();
+  });
+
+  test('raising the credit limit twice at once goes up one step', async () => {
+    const { browser, resellerId } = await reseller(10_000_000);
+    await prisma.reseller.update({ where: { id: resellerId }, data: { createdAt: new Date(Date.now() - 90 * day) } });
+    const start = new Date(Date.now() - 60 * day);
+    await prisma.invoice.create({ data: { resellerId, scopeKey: 'account', currency: 'NGN', periodStart: start, periodEnd: new Date(start.getTime() + 30 * day), status: 'paid', totalMinor: 100n, paidMinor: 100n, paidAt: new Date(), closedAt: new Date() } });
+    const results = await Promise.all([1, 2].map(() => browser.post('/v1/billing/credit/raise', {})));
+    assert.ok(results.every(res => res.status === 200 || res.json.error?.code === 'credit_raise_unavailable'), JSON.stringify(results.map(res => res.json)));
+    assert.equal((await prisma.reseller.findUniqueOrThrow({ where: { id: resellerId } })).creditLimitCents, 2500, 'US$10 to US$25, not US$50');
+  });
+
   test('usage the wallet cannot cover is owed up to the credit limit, then refused; at the limit billable usage stops', async () => {
     const { browser, resellerId, store } = await reseller(500_000);
     // US$10 at NGN 1,500 (and BitoCard's margin) is a little over NGN 15,000.

@@ -15,6 +15,9 @@ export const storeRenewalGraceDays = 7;
 /** Resellers whose plans moved to their stores are told this long before the first renewal. */
 export const transitionNoticeDays = 14;
 const day = 24 * 60 * 60 * 1000;
+/** How long a plan change holds its store (longer than charging the wallet takes). */
+const planChangeClaimMs = 2 * 60 * 1000;
+const busy = Symbol('busy');
 
 function addMonth(date: Date) {
   const next = new Date(date);
@@ -131,6 +134,33 @@ export class StoreSubscriptionsService {
    * paid month.
    */
   async change(resellerId: string, storeId: string, planCode: string, actorId: string | null) {
+    await this.storeOf(resellerId, storeId);
+    const result = await this.claimed(storeId, () => this.changeClaimed(resellerId, storeId, planCode, actorId));
+    if (result === busy) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'plan_change_in_progress', 'This store’s plan is being changed already. Refresh in a moment.');
+    return result;
+  }
+
+  /**
+   * Runs `work` holding the store's plan claim (2 minutes, longer than a charge), so a change, a second change (a double
+   * click with fresh idempotency keys) and a renewal never charge at once or use the same unused days as credit.
+   * `busy` when another holds it.
+   */
+  private async claimed<T>(storeId: string, work: () => Promise<T>): Promise<T | typeof busy> {
+    const claimedAt = new Date();
+    const claim = await this.prisma.store.updateMany({
+      where: { id: storeId, OR: [{ planChangingAt: null }, { planChangingAt: { lt: new Date(claimedAt.getTime() - planChangeClaimMs) } }] },
+      data: { planChangingAt: claimedAt },
+    });
+    if (claim.count === 0) return busy;
+    try {
+      return await work();
+    } finally {
+      await this.prisma.store.updateMany({ where: { id: storeId, planChangingAt: claimedAt }, data: { planChangingAt: null } });
+    }
+  }
+
+  private async changeClaimed(resellerId: string, storeId: string, planCode: string, actorId: string | null) {
+    // Read under the claim, so the credit is worked out from the plan as it is now.
     const store = await this.storeOf(resellerId, storeId);
     const current = store.subscription;
     const now = new Date();
@@ -198,12 +228,24 @@ export class StoreSubscriptionsService {
   async renewDue(now = new Date()) {
     const outcome = { renewed: 0, ended: 0, past_due: 0, notices: await this.transitionNotices(now) };
     const due = await this.prisma.storeSubscription.findMany({ where: { renewsAt: { lte: now } }, include: { plan: true, store: true }, take: 200 });
-    for (const subscription of due) {
+    for (const listed of due) {
+      // Under the store's claim, read again: a change made meanwhile wins, and the next run renews what is still due.
+      const step = await this.claimed(listed.storeId, async () => {
+        const subscription = await this.prisma.storeSubscription.findFirst({ where: { storeId: listed.storeId, renewsAt: { lte: now } }, include: { plan: true, store: true } });
+        if (subscription) await this.renewOne(subscription, now, outcome);
+      });
+      if (step === busy) continue;
+    }
+    return outcome;
+  }
+
+  private async renewOne(subscription: StoreSubscription & { plan: Plan; store: { name: string } }, now: Date, outcome: { renewed: number; ended: number; past_due: number }) {
+    {
       const { storeId, resellerId } = subscription;
       if (subscription.cancelAtPeriodEnd) {
         await this.end(subscription, 'cancelled');
         outcome.ended += 1;
-        continue;
+        return;
       }
       const plan = subscription.nextPlanCode ? ((await this.prisma.plan.findUnique({ where: { code: subscription.nextPlanCode } })) ?? subscription.plan) : subscription.plan;
       try {
@@ -220,7 +262,7 @@ export class StoreSubscriptionsService {
         if (subscription.pastDueSince && now.getTime() - subscription.pastDueSince.getTime() >= storeRenewalGraceDays * day) {
           await this.end(subscription, 'unpaid');
           outcome.ended += 1;
-          continue;
+          return;
         }
         if (!subscription.pastDueSince) {
           await this.prisma.storeSubscription.update({ where: { storeId }, data: { pastDueSince: now } });
@@ -239,7 +281,6 @@ export class StoreSubscriptionsService {
         outcome.past_due += 1;
       }
     }
-    return outcome;
   }
 
   /** The store goes back to Startup: cancelled at the end of its month, or unpaid after the grace period. */

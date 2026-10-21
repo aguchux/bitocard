@@ -26,6 +26,8 @@ function TopUp({ source, esim, store }: { source: EsimSource; esim: StoreEsim; s
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
+  // One key per top-up attempt: a double click or a retry after an error pays once; a new one after it is answered.
+  const [attempt, setAttempt] = useState(() => crypto.randomUUID());
   const [wallet, setWallet] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -118,8 +120,9 @@ function TopUp({ source, esim, store }: { source: EsimSource; esim: StoreEsim; s
                 onClick={() =>
                   start(async () => {
                     setError(null);
-                    const result = await topUpEsim(source, esim.id, selected!.id, payFrom?.currency ?? "");
+                    const result = await topUpEsim(source, esim.id, selected!.id, payFrom?.currency ?? "", attempt);
                     if (!result.ok) return setError(result.error);
+                    setAttempt(crypto.randomUUID());
                     setNotice(
                       result.data.status === "completed"
                         ? `${result.data.name} added.`

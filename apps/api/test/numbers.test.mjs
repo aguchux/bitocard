@@ -313,6 +313,14 @@ describe('the number on its order’s page', () => {
     assert.equal(sent.status, 200, JSON.stringify(sent.json));
     assert.equal(sent.json.message.status, 'queued');
     assert.equal(await prisma.numberMessage.count({ where: { numberId: number.id, direction: 'out', sentBy: 'customer' } }), 1);
+
+    // Order page writes need an Idempotency-Key, scoped to the link: the same key twice sends one message.
+    const raw = key => fetch(`${server.base}/v1/store/access/${token}/messages`, { method: 'POST', headers: { 'content-type': 'application/json', ...proof, ...(key ? { 'idempotency-key': key } : {}) }, body: JSON.stringify({ to: '+447700900123', text: 'Again' }) });
+    assert.equal((await raw(null)).status, 400, 'no key, refused');
+    const key = `page-${Date.now()}`;
+    assert.equal((await raw(key)).status, 200);
+    assert.equal((await raw(key)).status, 200);
+    assert.equal(await prisma.numberMessage.count({ where: { numberId: number.id, direction: 'out', sentBy: 'customer' } }), 2, 'one more, not two');
   });
 
   test('the customer renews and switches auto-renew; the reseller’s wallet pays, and a short wallet renews nothing', async () => {

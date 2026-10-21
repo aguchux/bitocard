@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { apiUrl } from "./api";
 import { customerCookie, shopperHeader } from "./customer";
@@ -98,7 +99,7 @@ type AccessAction =
 const reads = new Set<string>(["", "/number", "/esims", "/vpn"]);
 
 /** Calls an order-page endpoint with the customer's proof (their store session, and the pass for this page). Never cached; never throws. */
-export async function accessApi<T>(token: string, action: AccessAction = "", body?: unknown): Promise<AccessResult<T>> {
+export async function accessApi<T>(token: string, action: AccessAction = "", body?: unknown, options: { idempotencyKey?: string } = {}): Promise<AccessResult<T>> {
   if (!accessToken.test(token)) return { ok: false, status: 404, code: "resource_missing", message: "This link is not valid." };
   const jar = await cookies();
   const session = jar.get(customerCookie)?.value;
@@ -113,6 +114,8 @@ export async function accessApi<T>(token: string, action: AccessAction = "", bod
         ...(body !== undefined ? { "content-type": "application/json" } : {}),
         ...(session ? { "bitocard-customer-session": session } : {}),
         ...(pass ? { "bitocard-access-pass": pass } : {}),
+        // Writes carry an Idempotency-Key (the form's nonce when it names one), so a repeat acts once.
+        ...(read ? {} : { "idempotency-key": options.idempotencyKey && /^[A-Za-z0-9_-]{8,128}$/.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() }),
         ...(await shopperHeader()),
       },
       body: body !== undefined ? JSON.stringify(body) : read ? undefined : "{}",

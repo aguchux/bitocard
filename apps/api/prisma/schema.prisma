@@ -768,6 +768,8 @@ model Store {
   hostError             String?        @map("host_error")
   hostSyncedAt          DateTime?      @map("host_synced_at")
   createdAt             DateTime       @default(now()) @map("created_at")
+  /// A plan change in progress (a 2-minute claim), so two at once never both charge.
+  planChangingAt        DateTime?      @map("plan_changing_at")
   updatedAt             DateTime       @updatedAt @map("updated_at")
   reseller              Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   notifications         Notification[]

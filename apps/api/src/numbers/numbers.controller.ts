@@ -173,7 +173,6 @@ export class NumberAccessController {
   }
 
   @Post(':token/number/renew')
-  @SkipIdempotency()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   async renew(@Param('token') token: string, @Req() req: Request) {
@@ -191,7 +190,6 @@ export class NumberAccessController {
   }
 
   @Post(':token/messages')
-  @SkipIdempotency()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   async send(@Param('token') token: string, @Req() req: Request, @Body() body: PageSendDto) {
