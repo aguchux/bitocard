@@ -8,6 +8,7 @@ import type { AccountKind, Invoice, InvoiceLine, Prisma } from '../generated/pri
 import { LedgerService, type PreparedEntry, type Tx } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { formatMoney } from '../notifications/templates.js';
+import { freePlanCode } from '../plans/features.js';
 
 /** The credit limit's steps, in US cents: raised one at a time, each after a full month's invoice is paid in full. */
 export const creditSteps = [1000, 2500, 5000, 10000] as const;
@@ -146,7 +147,7 @@ export class InvoicesService {
    * Billable usage: takes `amount` from the live wallet (topped-up funds, then earnings) and owes the rest, as long as
    * what is owed stays within the credit limit (`credit_limit_reached` otherwise, nothing taken). One line per reference.
    */
-  async charge(input: { resellerId: string; storeId?: string | null; currency: string; kind: InvoiceLineKind; description: string; amount: bigint; reference: string; revenue: AccountKind }) {
+  async charge(input: { resellerId: string; storeId?: string | null; currency: string; kind: InvoiceLineKind; description: string; amount: bigint; reference: string; revenue: AccountKind; force?: boolean }) {
     if (input.amount <= 0n) return { paid: 0n, owed: 0n };
     const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: input.resellerId }, select: { creditLimitCents: true } });
     const limit = await this.limitIn(reseller.creditLimitCents, input.currency);
@@ -159,7 +160,8 @@ export class InvoicesService {
       left -= fromFunding;
       const fromEarnings = (balances.get(earnings) ?? 0n) < left ? (balances.get(earnings) ?? 0n) : left;
       left -= fromEarnings;
-      if (left > 0n && (balances.get(owed) ?? 0n) + left > limit) throw creditLimitReached(input.currency);
+      // `force`: usage already consumed (checked against the limit before it started) is owed even past the limit.
+      if (left > 0n && !input.force && (balances.get(owed) ?? 0n) + left > limit) throw creditLimitReached(input.currency);
       const entry: PreparedEntry = {
         mode: 'live',
         type: 'usage_charge',
@@ -175,9 +177,42 @@ export class InvoicesService {
         ],
       };
       await this.ledger.write(tx, entry);
+      if (await tx.invoiceLine.findUnique({ where: { reference: input.reference }, select: { id: true } })) throw new Error(`Usage ${input.reference} was already charged`);
       await this.addLine(tx, { ...input, storeId: input.storeId ?? null, paid: input.amount - left, at: new Date() });
       return { paid: input.amount - left, owed: left };
     });
+  }
+
+  /** BitoCard's margin on usage for a store (its plan's; Startup's without one) or the account (its plan's). */
+  async usageMarginBps(resellerId: string, storeId?: string | null) {
+    if (storeId) {
+      const subscription = await this.prisma.storeSubscription.findUnique({ where: { storeId }, include: { plan: true } });
+      if (subscription) return subscription.plan.usageMarginBps;
+      return (await this.prisma.plan.findUnique({ where: { code: freePlanCode } }))?.usageMarginBps ?? 0;
+    }
+    return (await this.prisma.reseller.findUniqueOrThrow({ where: { id: resellerId }, include: { plan: true } })).plan.usageMarginBps;
+  }
+
+  /** A cost plus BitoCard's usage margin, rounded up to a whole minor unit. */
+  async withMargin(amount: bigint, resellerId: string, storeId?: string | null) {
+    const bps = BigInt(await this.usageMarginBps(resellerId, storeId));
+    return (amount * (10_000n + bps) + 9_999n) / 10_000n;
+  }
+
+  /**
+   * Usage BitoCard paid for in US dollars (millionths of one), billed in the reseller's currency at BitoCard's `pay`
+   * rate plus the usage margin, rounded up; owed past the credit limit if need be (it has happened). Once per reference;
+   * nothing for a cost of zero.
+   */
+  async chargeUsdUsage(input: { resellerId: string; storeId?: string | null; micros: bigint; description: string; reference: string }) {
+    if (input.micros <= 0n) return null;
+    const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: input.resellerId }, select: { house: true, country: true } });
+    if (reseller.house) return null;
+    const currency = (reseller.country ? (await this.prisma.country.findUnique({ where: { code: reseller.country }, select: { currency: true } }))?.currency : null) ?? 'USD';
+    const marked = await this.withMargin(input.micros, input.resellerId, input.storeId);
+    // One US cent is 10,000 millionths of a dollar; `pay` is the currency's minor units per US cent.
+    const amount = currency === 'USD' ? (marked + 9_999n) / 10_000n : BigInt((await this.fx.rate(currency)).pay.mul(marked.toString()).div(10_000).toDecimalPlaces(0, 0).toFixed(0));
+    return this.charge({ resellerId: input.resellerId, storeId: input.storeId, currency, kind: 'usage', description: input.description, amount, reference: input.reference, revenue: 'platform_revenue', force: true });
   }
 
   /** What the reseller owes in each currency, from the ledger. */

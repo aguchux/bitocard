@@ -62,6 +62,7 @@ export function presentStore(store: Store) {
     checkout_mode: store.checkoutMode,
     /** The account app's menu on desktop: `rail`, `bottom`, or null to follow BitoCard's default. */
     desktop_nav: store.desktopNav,
+    ai_overage: store.aiOverage,
     /** Customers are asked for the identity check where BitoCard's market rules require it (true), or never. */
     customer_verification: store.customerVerification,
     published_at: store.publishedAt?.toISOString() ?? null,
@@ -77,6 +78,7 @@ export type StoreInput = {
   accent_color?: string;
   checkout_mode?: LedgerMode;
   desktop_nav?: 'rail' | 'bottom' | null;
+  ai_overage?: 'stop' | 'pay';
   customer_verification?: boolean;
   template?: string;
   variant?: string;
@@ -229,6 +231,7 @@ export class StoresService {
           ...(templateChanged ? { homeDraft: Prisma.DbNull, homePublished: Prisma.DbNull } : {}),
           checkoutMode: input.checkout_mode,
           desktopNav: input.desktop_nav,
+          aiOverage: input.ai_overage,
           customerVerification: input.customer_verification,
           ...(subdomain ? { hostStatus: 'pending' } : {}),
         },

@@ -20,6 +20,8 @@ class UpdatePlanDto {
   @IsOptional() @IsBoolean() available?: boolean;
   /** Its place in the list, lowest first. */
   @IsOptional() @IsInt() @Min(0) @Max(10_000) sort_order?: number;
+  /** BitoCard's margin on usage billed as it goes (AI replies beyond the allowance, mobile money deposit fees), in basis points over cost. */
+  @IsOptional() @IsInt() @Min(0) @Max(20_000) usage_margin_bps?: number;
 }
 
 class CreatePlanDto {

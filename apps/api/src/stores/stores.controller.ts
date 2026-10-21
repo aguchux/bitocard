@@ -58,6 +58,10 @@ class StoreFieldsDto {
   @IsOptional() @ValidateIf((_dto, value) => value !== null) @IsIn(['rail', 'bottom'])
   desktop_nav?: 'rail' | 'bottom' | null;
 
+  @ApiPropertyOptional({ enum: ['stop', 'pay'], description: 'When the store has used its month’s AI replies on BitoCard’s AI: `stop` (people answer until next month, the default) or `pay` (each further reply billed as it goes, at cost plus BitoCard’s margin, on the store’s invoice).' })
+  @IsOptional() @IsIn(['stop', 'pay'])
+  ai_overage?: 'stop' | 'pay';
+
   @ApiPropertyOptional({ description: 'Ask your store’s customers for the identity check where BitoCard’s market rules require one (`true`, the default), or never (`false`: you take responsibility for knowing your customers). You can also turn it off for one customer in SHQ.' })
   @IsOptional() @IsBoolean()
   customer_verification?: boolean;

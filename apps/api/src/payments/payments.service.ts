@@ -439,6 +439,34 @@ export class PaymentsService {
   }
 
   /** Tells the customer their wallet was topped up (in their store's app). */
+  /**
+   * A store customer's live mobile money top-up: pawaPay's deposit fee, which BitoCard pays, is a usage line for the
+   * store's reseller at cost plus their plan's usage margin (owed past the credit limit if need be: the money is in).
+   * BitoCard's own store bears it itself.
+   */
+  private async billDepositFee(payment: Payment, fee: bigint) {
+    if (payment.provider !== 'pawapay' || payment.mode !== 'live' || fee <= 0n || !payment.customerId) return;
+    const seller = await this.prisma.reseller.findUnique({ where: { id: payment.resellerId }, select: { house: true } });
+    if (!seller || seller.house) return;
+    const customer = await this.prisma.customer.findUnique({ where: { id: payment.customerId }, select: { storeId: true } });
+    try {
+      const amount = await this.invoices.withMargin(fee, payment.resellerId, customer?.storeId);
+      await this.invoices.charge({
+        resellerId: payment.resellerId,
+        storeId: customer?.storeId ?? null,
+        currency: payment.currency,
+        kind: 'usage',
+        description: `Mobile money deposit fee: a customer top-up of ${formatMoney(payment.amountMinor, payment.currency)}`,
+        amount,
+        reference: `usage:deposit_fee:${payment.id}`,
+        revenue: 'platform_revenue',
+        force: true,
+      });
+    } catch (error) {
+      this.logger.error({ err: error, paymentId: payment.id }, 'Could not bill a mobile money deposit fee');
+    }
+  }
+
   private async customerToppedUp(payment: { id: string; customerId: string | null; mode: LedgerMode; amountMinor: bigint; currency: string }, how: string) {
     if (!payment.customerId) return;
     const customer = await this.prisma.customer.findUnique({ where: { id: payment.customerId }, select: { id: true, storeId: true } });
@@ -490,7 +518,10 @@ export class PaymentsService {
         return claimed.count === 1;
       });
       if (credited && checkout) await this.tellCheckout('paid', payment.id);
-      if (credited && customerTopUp) await this.customerToppedUp(payment, 'top-up');
+      if (credited && customerTopUp) {
+        await this.customerToppedUp(payment, 'top-up');
+        await this.billDepositFee(payment, result.fee);
+      }
       if (credited && payment.purpose === 'wallet_top_up') {
         this.events.committed();
         await this.toppedUp(payment, 'top-up');

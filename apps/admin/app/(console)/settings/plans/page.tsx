@@ -196,11 +196,14 @@ function PlanDetails({ plan, editable }: { plan: SettingsPlan; editable: boolean
   const [description, setDescription] = useState(plan.description ?? "");
   const [price, setPrice] = useState(toMajor(plan.price.amount, "USD"));
   const [order, setOrder] = useState(String(plan.sort_order));
+  const [margin, setMargin] = useState(String(plan.usage_margin_bps / 100));
   const [saved, setSaved] = useState(false);
   const cents = plan.free ? 0 : toMinor(price, "USD");
   const sortOrder = /^\d{1,5}$/.test(order.trim()) ? Number(order) : null;
+  // The usage margin is entered as a percentage (up to 200, two decimals) and saved in basis points.
+  const marginBps = /^\d{1,3}(\.\d{1,2})?$/.test(margin.trim()) && Number(margin) <= 200 ? Math.round(Number(margin) * 100) : null;
   const badPrice = !plan.free && (cents === null || cents === 0);
-  const changed = name !== plan.name || description !== (plan.description ?? "") || (!plan.free && cents !== plan.price.amount) || sortOrder !== plan.sort_order;
+  const changed = name !== plan.name || description !== (plan.description ?? "") || (!plan.free && cents !== plan.price.amount) || sortOrder !== plan.sort_order || marginBps !== plan.usage_margin_bps;
   return (
     <Card>
       <CardHeader
@@ -212,9 +215,9 @@ function PlanDetails({ plan, editable }: { plan: SettingsPlan; editable: boolean
         className="grid gap-4 px-5 pb-5 sm:px-6 md:grid-cols-2"
         onSubmit={async event => {
           event.preventDefault();
-          if (badPrice || sortOrder === null) return;
+          if (badPrice || sortOrder === null || marginBps === null) return;
           setSaved(false);
-          await update({ code: plan.code, name, description: description || null, ...(plan.free ? {} : { price_cents: cents ?? undefined }), sort_order: sortOrder })
+          await update({ code: plan.code, name, description: description || null, ...(plan.free ? {} : { price_cents: cents ?? undefined }), sort_order: sortOrder, usage_margin_bps: marginBps })
             .unwrap()
             .then(() => setSaved(true))
             .catch(() => undefined);
@@ -240,11 +243,19 @@ function PlanDetails({ plan, editable }: { plan: SettingsPlan; editable: boolean
         <Field label="Place in the list" htmlFor={`plan-order-${plan.code}`} hint="Lowest first." error={sortOrder === null ? "Enter a whole number." : undefined}>
           <Input id={`plan-order-${plan.code}`} inputMode="numeric" value={order} disabled={!editable} onChange={event => setOrder(event.target.value)} />
         </Field>
+        <Field
+          label="Usage margin (%)"
+          htmlFor={`plan-margin-${plan.code}`}
+          hint="Added to BitoCard's cost on usage billed as it goes: AI replies beyond the allowance, mobile money deposit fees."
+          error={marginBps === null ? "Enter a percentage from 0 to 200." : undefined}
+        >
+          <Input id={`plan-margin-${plan.code}`} inputMode="decimal" value={margin} disabled={!editable} onChange={event => setMargin(event.target.value)} />
+        </Field>
         {state.error ? <div className="md:col-span-2"><Notice tone="red">{errorMessage(state.error)}</Notice></div> : null}
         {saved && !changed ? <div className="md:col-span-2"><Notice tone="green">Saved. Resellers see it at once; a new price is charged from each reseller&apos;s next renewal.</Notice></div> : null}
         {editable ? (
           <div className="md:col-span-2">
-            <Button type="submit" icon={<Save className="size-4" aria-hidden />} loading={state.isLoading} disabled={!changed || badPrice || sortOrder === null}>
+            <Button type="submit" icon={<Save className="size-4" aria-hidden />} loading={state.isLoading} disabled={!changed || badPrice || sortOrder === null || marginBps === null}>
               Save plan
             </Button>
           </div>

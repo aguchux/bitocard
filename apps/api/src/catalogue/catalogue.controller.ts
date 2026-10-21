@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiExcludeController, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes, StepUp } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, Scopes, StepUp, storeScopeOf } from '../auth/caller.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -272,7 +272,7 @@ export class QuotesController {
   @Scopes('quotes:write')
   @Post()
   create(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Body() body: CreateQuoteDto) {
-    return this.quotes.create(resellerOf(caller), mode, body);
+    return this.quotes.create(resellerOf(caller), mode, body, { storeId: storeScopeOf(caller) });
   }
 
   @ApiOperation({ summary: 'Get a quote' })

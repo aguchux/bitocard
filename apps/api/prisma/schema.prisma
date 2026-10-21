@@ -689,6 +689,9 @@ model Plan {
   description     String?
   /// Resellers can choose it. A hidden plan keeps those already on it (they renew as before) but takes no one new.
   available       Boolean    @default(true)
+  /// BitoCard's margin on usage billed as it happens (AI replies beyond the allowance, mobile money deposit fees), in
+  /// basis points over its cost.
+  usageMarginBps  Int        @default(2000) @map("usage_margin_bps")
   /// Where it is listed, lowest first.
   sortOrder       Int        @default(0) @map("sort_order")
   /// How much the plan allows (`planLimitCatalogue`): a number, or null for unlimited; a limit not set has its default.
@@ -748,6 +751,8 @@ model Store {
   theme                 String         @default("navy_pink")
   /// Single product stores: the product key they sell.
   focus                 String?
+  /// Beyond the month's AI replies on BitoCard's AI: `stop` (people answer) or `pay` (each reply billed as it goes).
+  aiOverage             String         @default("stop") @map("ai_overage")
   /// The home page being edited in SHQ, and the one shoppers see (null: the variant's starting page).
   homeDraft             Json?          @map("home_draft")
   homePublished         Json?          @map("home_published")

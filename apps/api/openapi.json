@@ -6823,6 +6823,7 @@
                   },
                   "checkout_mode": "test",
                   "desktop_nav": null,
+                  "ai_overage": "stop",
                   "customer_verification": true,
                   "published_at": null,
                   "created_at": "2026-10-01T10:05:12.000Z"
@@ -6975,6 +6976,7 @@
                       },
                       "checkout_mode": "live",
                       "desktop_nav": null,
+                      "ai_overage": "stop",
                       "customer_verification": true,
                       "published_at": "2026-10-02T14:20:00.000Z",
                       "created_at": "2026-10-01T10:05:12.000Z"
@@ -7111,6 +7113,7 @@
                   },
                   "checkout_mode": "live",
                   "desktop_nav": null,
+                  "ai_overage": "stop",
                   "customer_verification": true,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
@@ -7272,6 +7275,7 @@
                   },
                   "checkout_mode": "live",
                   "desktop_nav": null,
+                  "ai_overage": "stop",
                   "customer_verification": true,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
@@ -7613,6 +7617,7 @@
                   },
                   "checkout_mode": "live",
                   "desktop_nav": null,
+                  "ai_overage": "stop",
                   "customer_verification": true,
                   "published_at": "2026-10-02T14:20:00.000Z",
                   "created_at": "2026-10-01T10:05:12.000Z"
@@ -38010,6 +38015,14 @@
             "nullable": true,
             "description": "Your customers’ account app menu on desktop: a side `rail` or the `bottom` bar; null follows BitoCard’s default. Phones and tablets always use the bottom bar."
           },
+          "ai_overage": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "pay"
+            ],
+            "description": "When the store has used its month’s AI replies on BitoCard’s AI: `stop` (people answer until next month, the default) or `pay` (each further reply billed as it goes, at cost plus BitoCard’s margin, on the store’s invoice)."
+          },
           "customer_verification": {
             "type": "boolean",
             "description": "Ask your store’s customers for the identity check where BitoCard’s market rules require one (`true`, the default), or never (`false`: you take responsibility for knowing your customers). You can also turn it off for one customer in SHQ."
@@ -38087,6 +38100,14 @@
             ],
             "nullable": true,
             "description": "Your customers’ account app menu on desktop: a side `rail` or the `bottom` bar; null follows BitoCard’s default. Phones and tablets always use the bottom bar."
+          },
+          "ai_overage": {
+            "type": "string",
+            "enum": [
+              "stop",
+              "pay"
+            ],
+            "description": "When the store has used its month’s AI replies on BitoCard’s AI: `stop` (people answer until next month, the default) or `pay` (each further reply billed as it goes, at cost plus BitoCard’s margin, on the store’s invoice)."
           },
           "customer_verification": {
             "type": "boolean",
@@ -47857,6 +47878,7 @@
           "focus",
           "home",
           "checkout_mode",
+          "ai_overage",
           "desktop_nav",
           "customer_verification",
           "published_at",
@@ -47985,6 +48007,14 @@
             "enum": [
               "test",
               "live"
+            ]
+          },
+          "ai_overage": {
+            "type": "string",
+            "description": "Beyond the month’s AI replies on BitoCard’s AI: `stop` (people answer) or `pay` (each reply billed as it goes).",
+            "enum": [
+              "stop",
+              "pay"
             ]
           },
           "desktop_nav": {

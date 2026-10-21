@@ -101,6 +101,8 @@ export type PlanSettings = {
       available: boolean;
       /** Its place in the list, lowest first. */
       sort_order: number;
+      /** BitoCard's margin on usage billed as it goes (AI replies beyond the allowance, mobile money deposit fees), in basis points. */
+      usage_margin_bps: number;
       api_restrictions: string[];
       /** Resellers on the plan now. */
       resellers: number;
@@ -125,7 +127,7 @@ export type PlanSettings = {
   /** Every limit a plan sets, with its default (null: unlimited) and the most it can be. */
   limits: Array<{ code: string; scope: 'store' | 'account'; group: string; name: string; unit: string; description: string; default: number | null; max: number }>;
 };
-export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; available?: boolean; sort_order?: number };
+export type UpdatePlanInput = { code: string; name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; available?: boolean; sort_order?: number; usage_margin_bps?: number };
 export type CreatePlanInput = { code: string; name: string; description?: string | null; price_cents: number; features?: string[]; available?: boolean };
 export type ResellerSummary = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus; verified_at: string | null; plan: string; created_at: string };
 export type ResellerDetail = {

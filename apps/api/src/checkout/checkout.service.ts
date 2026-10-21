@@ -251,7 +251,7 @@ export class CheckoutService implements OnModuleInit {
         mode,
         { product_id: product.id, face_value: input.face_value, quantity: input.quantity, recipient, customer_reference: customer.id },
         // Products from the reseller's own supplier can only be paid into their own gateway.
-        { ownSources: Boolean(option.own) },
+        { ownSources: Boolean(option.own), storeId: store.id },
       );
       quote = await this.prisma.quote.findUniqueOrThrow({ where: { id: presented.id } });
     }
@@ -279,7 +279,7 @@ export class CheckoutService implements OnModuleInit {
     if (fromWallet) return this.payFromWallet({ id, store, customer, seller, mode, quote, productName: product.name, walletCurrency });
     const paymentId = randomUUID();
     let feeChargeId: string | null = null;
-    if (option.own) feeChargeId = await this.holdGatewayFee(seller.id, mode, quote, paymentId, product.name);
+    if (option.own) feeChargeId = await this.holdGatewayFee(seller.id, mode, quote, paymentId, product.name, store.id);
 
     await this.prisma.checkout.create({
       data: {
@@ -449,12 +449,12 @@ export class CheckoutService implements OnModuleInit {
    * and the wallet must also cover the order's cost (BitoCard-sourced products) so the customer is never charged for
    * an order that cannot be placed. Customers are told only that the store cannot take the order; the reseller is told why.
    */
-  private async holdGatewayFee(resellerId: string, mode: Checkout['mode'], quote: { id: string; priceMinor: bigint; wholesaleMinor: bigint; taxMinor: bigint; source: string; feeMaxMinor: bigint | null }, paymentId: string, name: string) {
+  private async holdGatewayFee(resellerId: string, mode: Checkout['mode'], quote: { id: string; priceMinor: bigint; wholesaleMinor: bigint; taxMinor: bigint; source: string; feeMaxMinor: bigint | null }, paymentId: string, name: string, storeId: string) {
     let fee: { id: string } | null = null;
     try {
       // At the credit limit, own-gateway payments wait until what is owed is paid.
       if (mode === 'live') await this.invoices.requireCredit(resellerId);
-      fee = await this.fees.hold({ resellerId, mode, kind: 'gateway_payment', baseMinor: quote.priceMinor, source: { type: 'payment', id: paymentId }, description: `Store payment: ${name}` });
+      fee = await this.fees.hold({ resellerId, storeId, mode, kind: 'gateway_payment', baseMinor: quote.priceMinor, source: { type: 'payment', id: paymentId }, description: `Store payment: ${name}` });
       const cost = quote.source === 'own' ? (quote.feeMaxMinor ?? 0n) : quote.wholesaleMinor + quote.taxMinor;
       const wallet = await this.wallets.wallet(resellerId, mode);
       if (BigInt(wallet.available) < cost) throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'insufficient_funds', 'The wallet balance is too low for this.');

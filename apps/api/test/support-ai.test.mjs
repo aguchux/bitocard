@@ -125,6 +125,31 @@ describe('keys, plans, allowance and usage', () => {
     assert.ok(adminUsage.data.some(row => row.reseller_id === reseller.resellerId && row.cost_usd > 0));
   });
 
+  test('a store that pays as it goes keeps answering past its allowance, each reply a usage line at cost plus margin', async () => {
+    for (const source of ['open_exchange_rates', 'flutterwave']) {
+      await prisma.exchangeRate.create({ data: { currency: 'NGN', source, unitsPerUsd: 1500, fetchedAt: new Date(Date.now() + 3600_000) } });
+    }
+    const reseller = await resellerClient(server);
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { country: 'NG' } });
+    const store = (await reseller.browser.post('/v1/stores', { name: 'Paying Store', subdomain: `paying${Date.now().toString(36)}` })).json;
+    await prisma.storeSubscription.create({ data: { storeId: store.id, resellerId: reseller.resellerId, planCode: 'premium' } });
+    const call = { funding: 'bitocard', provider: 'anthropic', model: 'claude-haiku-5-5', resellerId: reseller.resellerId, storeId: store.id, botId: null, mode: 'live', kind: 'chat' };
+    const asks = { system: 'Be helpful.', messages: [{ role: 'user', content: 'Hi' }], maxTokens: 100 };
+    await service.reply(call, asks);
+    await service.reply(call, asks);
+    await assert.rejects(service.reply(call, asks), error => error.code === 'ai_allowance_reached');
+    assert.equal(await prisma.invoiceLine.count({ where: { invoice: { resellerId: reseller.resellerId } } }), 0, 'replies inside the allowance are not billed');
+
+    const chosen = await reseller.browser.patch(`/v1/stores/${store.id}`, { ai_overage: 'pay' });
+    assert.deepEqual([chosen.status, chosen.json.ai_overage], [200, 'pay']);
+    await service.reply(call, asks);
+    const [line] = await prisma.invoiceLine.findMany({ where: { invoice: { resellerId: reseller.resellerId, storeId: store.id } } });
+    assert.equal(line.kind, 'usage');
+    // 290 millionths of a dollar plus Premium's 20% is 348; in naira at BitoCard's rate, rounded up, owed (the wallet is empty).
+    assert.ok(line.amountMinor > 0n && line.paidMinor === 0n, `${line.amountMinor} ${line.paidMinor}`);
+    assert.equal((await reseller.browser.get('/v1/billing/credit')).json.owed[0].amount, Number(line.amountMinor));
+  });
+
   test('an own key the provider later refuses stops being used until replaced', async () => {
     const reseller = await resellerClient(server);
     await reseller.browser.put('/v1/support/ai/keys/anthropic', { api_key: 'good-reseller-anthropic-99' });

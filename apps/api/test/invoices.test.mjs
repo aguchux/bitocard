@@ -120,6 +120,39 @@ describe('invoices', () => {
     assert.equal((await browser.post('/v1/billing/credit/raise', {})).json.error.code, 'credit_raise_unavailable', 'one step per paid month');
   });
 
+  test('a customer’s mobile money top-up bills its store’s reseller pawaPay’s deposit fee plus the plan’s usage margin', async () => {
+    const { resellerId, store } = await reseller();
+    const customer = await prisma.customer.create({ data: { storeId: store.id, email: `buyer${Date.now()}@example.com`, name: 'Buyer', passwordHash: 'x' } });
+    const payment = { id: crypto.randomUUID(), provider: 'pawapay', mode: 'live', customerId: customer.id, resellerId, amountMinor: 1_000_000n, currency: 'NGN' };
+    const payments = server.app.get((await import('../dist/payments/payments.service.js')).PaymentsService);
+    // Startup's usage margin is 20%: a ₦150 fee is billed ₦180, owed while the wallet is empty, on the store's invoice.
+    await payments.billDepositFee(payment, 15_000n);
+    await payments.billDepositFee(payment, 15_000n);
+    const lines = await prisma.invoiceLine.findMany({ where: { invoice: { resellerId, storeId: store.id } } });
+    assert.deepEqual(lines.map(line => [line.kind, line.amountMinor, line.paidMinor]), [['usage', 18_000n, 0n]], 'once per payment');
+    // Other gateways and the sandbox are not billed.
+    await payments.billDepositFee({ ...payment, id: crypto.randomUUID(), provider: 'stripe' }, 15_000n);
+    await payments.billDepositFee({ ...payment, id: crypto.randomUUID(), mode: 'test' }, 15_000n);
+    assert.equal(await prisma.invoiceLine.count({ where: { invoice: { resellerId } } }), 1);
+    await ledgerOk();
+  });
+
+  test('fee rules follow the store’s plan', async () => {
+    const { resellerId, store } = await reseller();
+    const fees = server.app.get((await import('../dist/fees/platform-fees.service.js')).PlatformFeesService);
+    await prisma.feeRule.createMany({
+      data: [
+        { kind: 'gateway_payment', scopeKey: `gateway_payment:*:*:premium:${Date.now()}`, planCode: 'premium', ratePpb: 10_000_000 },
+        { kind: 'gateway_payment', scopeKey: `gateway_payment:*:*:standard:${Date.now()}`, planCode: 'standard', ratePpb: 30_000_000 },
+      ],
+    });
+    const rate = async () => (await fees.quote({ resellerId, storeId: store.id, kind: 'gateway_payment', baseMinor: 100_000n })).ratePpb;
+    assert.equal(await rate(), 30_000_000, 'a store without a plan of its own is on Startup');
+    await prisma.storeSubscription.create({ data: { storeId: store.id, resellerId, planCode: 'premium' } });
+    assert.equal(await rate(), 10_000_000);
+    await prisma.feeRule.deleteMany({ where: { kind: 'gateway_payment', countryCode: null, category: null } });
+  });
+
   test('an invoice with nothing owed closes as paid; admins set the limit up to US$100', async () => {
     const { resellerId, store } = await reseller(1_000_000);
     await usage(resellerId, store.id, 100_000);

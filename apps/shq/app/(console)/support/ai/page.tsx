@@ -2,8 +2,8 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { KeyRound, Trash2 } from "lucide-react";
-import { Button, Card, CardHeader, DataTable, errorMessage, ExternalLinks, Field, formatRelative, Input, Notice, PageHeader, QueryView, Skeleton, StatusBadge } from "@bitocard/admin-ui";
-import { type AiProviderName, type AiUsageRow, type SupportAi, useAiUsageQuery, useDeleteAiKeyMutation, useSaveAiKeyMutation, useSupportAiQuery } from "@bitocard/api-client/reseller";
+import { Button, Card, CardHeader, DataTable, errorMessage, ExternalLinks, Field, formatRelative, Input, Notice, PageHeader, QueryView, Select, Skeleton, StatusBadge } from "@bitocard/admin-ui";
+import { type AiProviderName, type AiUsageRow, type SupportAi, useAiUsageQuery, useDeleteAiKeyMutation, useSaveAiKeyMutation, useStoresQuery, useSupportAiQuery, useUpdateStoreMutation } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
@@ -58,6 +58,29 @@ function ProviderCard({ provider }: { provider: SupportAi["providers"][number] }
   );
 }
 
+/** Past the month's allowance: people answer (stop), or each reply is billed as it goes on the store's invoice (pay). */
+function OverageChoice({ storeId }: { storeId: string }) {
+  const { membership } = useReseller();
+  const store = useStoresQuery().data?.data.find(item => item.id === storeId);
+  const [update, state] = useUpdateStoreMutation();
+  if (!store) return null;
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <Select
+        aria-label={`${store.name}: after the allowance`}
+        value={store.ai_overage}
+        disabled={!can(membership, "admin") || state.isLoading}
+        onChange={event => void update({ id: store.id, ai_overage: event.target.value as "stop" | "pay" })}
+        className="w-auto text-xs"
+      >
+        <option value="stop">Then people answer</option>
+        <option value="pay">Then pay as it goes</option>
+      </Select>
+      {state.error ? <span className="text-xs text-red-600">{errorMessage(state.error)}</span> : null}
+    </span>
+  );
+}
+
 function Overview({ ai }: { ai: SupportAi }) {
   const usage = useAiUsageQuery();
   const stores = new Map(ai.allowance.stores.map(store => [store.store_id, store.store_name]));
@@ -67,7 +90,7 @@ function Overview({ ai }: { ai: SupportAi }) {
         <Notice tone="green" title="Premium: BitoCard’s AI is included">
           {ai.allowance.replies_per_store === null
             ? "Your plan has no monthly limit on assistant replies on BitoCard’s AI."
-            : `Each store gets ${ai.allowance.replies_per_store.toLocaleString("en-GB")} assistant replies a month on BitoCard’s AI on your plan. Past that, people answer until next month, or your own key takes over.`}
+            : `Each store gets ${ai.allowance.replies_per_store.toLocaleString("en-GB")} assistant replies a month on BitoCard’s AI on your plan. Past that, people answer until next month, or your own key takes over, unless you choose for a store to pay as it goes: each further reply at BitoCard’s cost plus your plan’s usage margin, on the store’s invoice.`}
         </Notice>
       ) : (
         <Notice tone="blue" title="Use your own AI key, or Premium">
@@ -79,8 +102,9 @@ function Overview({ ai }: { ai: SupportAi }) {
           <CardHeader title="This month on BitoCard’s AI" className="px-0 pt-0 pb-3" />
           <ul className="space-y-1 text-sm">
             {ai.allowance.stores.map(store => (
-              <li key={store.store_id} className="flex justify-between gap-3">
+              <li key={store.store_id} className="flex flex-wrap items-center justify-between gap-3">
                 <span>{store.store_name}</span>
+                {ai.allowance.replies_per_store === null ? null : <OverageChoice storeId={store.store_id} />}
                 <span className="text-muted">{ai.allowance.replies_per_store === null ? `${store.bitocard_replies.toLocaleString("en-GB")} replies` : `${store.bitocard_replies.toLocaleString("en-GB")} of ${ai.allowance.replies_per_store.toLocaleString("en-GB")} replies`}</span>
               </li>
             ))}

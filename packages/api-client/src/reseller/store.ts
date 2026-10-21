@@ -27,6 +27,8 @@ export type Store = {
   checkout_mode: 'test' | 'live';
   /** The customer account app's menu on desktop; null follows BitoCard's default. */
   desktop_nav: 'rail' | 'bottom' | null;
+  /** Beyond the month's AI replies: `stop` (people answer) or `pay` (billed as it goes). */
+  ai_overage: 'stop' | 'pay';
   /** Customers are asked for the identity check where BitoCard's market rules require one (true), or never. */
   customer_verification: boolean;
   published_at: string | null;
@@ -42,6 +44,7 @@ export type StoreInput = {
   accent_color?: string;
   checkout_mode?: 'test' | 'live';
   desktop_nav?: 'rail' | 'bottom' | null;
+  ai_overage?: 'stop' | 'pay';
   customer_verification?: boolean;
   template?: StoreTemplateKey;
   variant?: string;

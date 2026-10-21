@@ -1,5 +1,5 @@
 import { InvoicesService } from '../../billing/invoices.service.js';
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { PlanAccessService } from '../../plans/plan-access.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { ApiError } from '../../common/errors/api-error.js';
@@ -34,6 +34,8 @@ export const monthStart = (at = new Date()) => new Date(Date.UTC(at.getUTCFullYe
  */
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger('AiService');
+
   constructor(
     private readonly invoices: InvoicesService,
     private readonly prisma: PrismaService,
@@ -150,10 +152,15 @@ export class AiService {
    */
   async reply(call: AiCall, request: Omit<AiRequest, 'model'>): Promise<AiReply> {
     let client: AiProvider | null;
+    // Beyond the month's allowance a store may pay as it goes (`stores.ai_overage`): each reply billed at cost plus margin.
+    let overage = false;
     if (call.funding === 'bitocard') {
       if (!(await this.premium(call.resellerId, call.storeId))) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'ai_plan_required', 'Assistants on BitoCard’s AI need the Premium plan. Use your own AI key instead, or change plan.');
       if (!this.bitocardModels().some(item => item.provider === call.provider && item.model === call.model)) throw invalid('ai_model_unavailable', 'This model is not offered on BitoCard’s AI. Choose another.', 'model');
       if (call.storeId && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
+        overage = (await this.prisma.store.findUnique({ where: { id: call.storeId }, select: { aiOverage: true } }))?.aiOverage === 'pay';
+      }
+      if (call.storeId && !overage && (call.kind === 'chat' || call.kind === 'ticket') && (await this.allowanceLeft(call.storeId)) <= 0) {
         throw new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'ai_allowance_reached', 'This store has used this month’s assistant replies on BitoCard’s AI. People answer until next month, or add your own AI key.');
       }
       // At the credit limit BitoCard's AI stops (people answer) until what is owed is paid.
@@ -174,7 +181,8 @@ export class AiService {
       throw error;
     }
     const price = parseAiPrices(this.setting(keys[call.provider].prices)).get(call.model);
-    await this.prisma.aiUsage.create({
+    const costMicros = call.funding === 'bitocard' ? aiCostMicros(reply.usage, price) : 0n;
+    const usage = await this.prisma.aiUsage.create({
       data: {
         resellerId: call.resellerId,
         storeId: call.storeId,
@@ -187,9 +195,15 @@ export class AiService {
         inputTokens: reply.usage.input,
         cachedTokens: reply.usage.cached,
         outputTokens: reply.usage.output,
-        costMicros: call.funding === 'bitocard' ? aiCostMicros(reply.usage, price) : 0n,
+        costMicros,
       },
     });
+    // A reply beyond the allowance is a usage line on the store's invoice (live stores only).
+    if (overage && call.mode === 'live') {
+      await this.invoices
+        .chargeUsdUsage({ resellerId: call.resellerId, storeId: call.storeId, micros: costMicros, description: `AI reply beyond this month’s allowance (${call.model})`, reference: `usage:ai:${usage.id}` })
+        .catch(error => this.logger.error({ err: error, usageId: usage.id }, 'Could not bill an AI reply'));
+    }
     return reply;
   }
 

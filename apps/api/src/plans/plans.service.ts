@@ -111,6 +111,7 @@ export class PlansService {
           free: plan.code === freePlanCode,
           available: plan.available,
           sort_order: plan.sortOrder,
+          usage_margin_bps: plan.usageMarginBps,
           api_restrictions: plan.apiRestrictions,
           /** Every limit's value (null: unlimited). */
           limits: this.limitsOf(plan),
@@ -203,7 +204,7 @@ export class PlansService {
   async update(
     actorId: string | null,
     code: string,
-    input: { name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; features?: string[]; api_restrictions?: string[]; available?: boolean; sort_order?: number },
+    input: { name?: string; description?: string | null; price_cents?: number; local_prices?: Record<string, number | null>; features?: string[]; api_restrictions?: string[]; available?: boolean; sort_order?: number; usage_margin_bps?: number },
   ) {
     const before = await this.prisma.plan.findUnique({ where: { code }, include: { localPrices: true } });
     if (!before) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such plan.');
@@ -240,13 +241,14 @@ export class PlansService {
           apiRestrictions: input.api_restrictions,
           available: input.available,
           sortOrder: input.sort_order,
+          usageMarginBps: input.usage_margin_bps,
         },
         include: { localPrices: true },
       });
     });
     await this.audit.record({ actorId, action: 'plan.updated', targetType: 'plan', targetId: code, before: auditable(before), after: auditable(after) });
     await this.tellPlan(after.code, after.name, before.features.filter(feature => !after.features.includes(feature)));
-    return { ...presentPlan(after), description: after.description, available: after.available, sort_order: after.sortOrder, api_restrictions: after.apiRestrictions, local_prices: auditable(after).local_prices };
+    return { ...presentPlan(after), description: after.description, available: after.available, sort_order: after.sortOrder, usage_margin_bps: after.usageMarginBps, api_restrictions: after.apiRestrictions, local_prices: auditable(after).local_prices };
   }
 
   /**

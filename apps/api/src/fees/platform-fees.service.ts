@@ -1,3 +1,4 @@
+import { freePlanCode } from '../plans/features.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
@@ -98,12 +99,15 @@ export class PlatformFeesService {
   }
 
   /** What a fee would be, without holding anything. */
-  async quote(input: { resellerId: string; kind: FeeKind; category?: ProductCategory | null; baseMinor: bigint; locked?: LockedFee }) {
+  async quote(input: { resellerId: string; storeId?: string | null; kind: FeeKind; category?: ProductCategory | null; baseMinor: bigint; locked?: LockedFee }) {
     if (input.baseMinor < 0n) throw new Error('Fee base cannot be negative');
-    const { reseller, currency } = await this.wallets.currencyOf(input.resellerId);
+    const { reseller: account, currency } = await this.wallets.currencyOf(input.resellerId);
+    // Fee rules follow the plan of the store the transaction is for (Startup without one), else the account's.
+    const planCode = input.storeId ? ((await this.prisma.storeSubscription.findUnique({ where: { storeId: input.storeId }, select: { planCode: true } }))?.planCode ?? freePlanCode) : account.planCode;
+    const reseller = { ...account, planCode };
     const rule = input.locked
       ? { id: input.locked.ruleId, ratePpb: input.locked.ratePpb, minFeeMinor: input.locked.minFeeMinor }
-      : await this.ruleFor({ kind: input.kind, countryCode: reseller.country, category: input.category ?? null, planCode: reseller.planCode });
+      : await this.ruleFor({ kind: input.kind, countryCode: reseller.country, category: input.category ?? null, planCode });
     const ratePpb = rule?.ratePpb ?? 0;
     const exactNano = exactFeeNano(input.baseMinor, ratePpb);
     const minFee = rule?.minFeeMinor ?? null;
@@ -114,7 +118,7 @@ export class PlatformFeesService {
    * Holds the most the fee can be for a transaction, before it is placed. Throws insufficient_funds if the wallet cannot
    * cover it. One fee per source: repeating returns the same fee.
    */
-  async hold(input: { resellerId: string; mode: LedgerMode; kind: FeeKind; category?: ProductCategory | null; baseMinor: bigint; source: FeeSource; description: string; locked?: LockedFee }) {
+  async hold(input: { resellerId: string; storeId?: string | null; mode: LedgerMode; kind: FeeKind; category?: ProductCategory | null; baseMinor: bigint; source: FeeSource; description: string; locked?: LockedFee }) {
     const reference = `fee:${input.source.type}:${input.source.id}`;
     const existing = await this.prisma.feeCharge.findUnique({ where: { reference } });
     if (existing) return existing;
