@@ -22,7 +22,7 @@ export default async function SpinPage() {
     return (
       <div className="mx-auto max-w-xl py-16 text-center">
         <h1 className="font-display text-4xl font-black text-navy-900">Spin and win</h1>
-        <p className="mt-3 text-slate-600">Choose a country where Customer Catcher is open, then come back to spin.</p>
+        <p className="mt-3 text-slate-600">Choose a country where free spins are open, then come back to spin.</p>
         <Link href="/?market=1" className="mt-6 inline-flex min-h-12 items-center rounded-xl bg-brand-500 px-5 font-bold text-white hover:bg-brand-600">Choose my country</Link>
       </div>
     );

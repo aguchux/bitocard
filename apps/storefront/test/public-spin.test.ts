@@ -1,4 +1,4 @@
-// Customer Catcher: signed-out visitors spin at /spin. The storefront server keeps only the API's opaque claim
+// Free public spins: signed-out visitors spin at /spin. The storefront server keeps only the API's opaque claim
 // token, in an HttpOnly cookie; the dialog that offers a saved claim on first sign-in reads and clears it the same
 // way. These tests check the server actions' plumbing (cookies, headers, market), not the API's own rules.
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
