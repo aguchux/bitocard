@@ -39,7 +39,7 @@ function Shell({ store, children }: { store: AccessStore | null; children: React
         {children}
       </main>
       <footer className="px-4 pb-8 text-center text-xs text-slate-500">
-        {name} · {brand.credit}
+        {store ? name : `${name} · ${brand.credit}`}
       </footer>
     </div>
   );

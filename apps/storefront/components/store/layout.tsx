@@ -1,15 +1,16 @@
 import Link from "next/link";
-import { Search, Store } from "lucide-react";
+import { LifeBuoy, Search, Store } from "lucide-react";
 import type { StoreCountry, StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { Brand } from "@bitocard/ui/brand";
 import { legalDocuments } from "@bitocard/ui/legal";
 import { appUrl, brand } from "@bitocard/ui/site";
-import type { HostedStore } from "@/lib/store";
+import { type HostedStore, storeCredit } from "@/lib/store";
 import { CountryPicker } from "./country-picker";
 import { CurrencyMenu } from "./currency-menu";
 import { MarketChooser } from "./market-chooser";
 import { quickLinksFor } from "@/lib/quick-links";
 import { DesktopNav, MobileMenu } from "./header-menus";
+import { FooterCategories } from "./footer-categories";
 
 /** A reseller's store name, with its logo when it has one. */
 export function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "lg" | "md" }) {
@@ -116,67 +117,72 @@ export function SearchForm({ countries, q = "", country = "", size = "lg" }: { c
   );
 }
 
+const footerLink = "inline-flex min-h-10 items-center hover:text-navy-900";
+
+/**
+ * The footer, the same on every page: the store's name, one All categories button (a full-screen grid, so categories
+ * are never listed twice), help, the legal documents on one line, and the credit. bitocard.com adds its business
+ * links; resellers' stores show nothing of BitoCard's own business, and white-label stores leave its name out.
+ */
 export function StoreFooter({ groups, store = null }: { groups: StoreNavigationGroup[]; store?: HostedStore | null }) {
+  // A reseller's store lists only what it sells; bitocard.com every group, "Soon" where none is open yet.
+  const shown = store ? groups.filter(group => group.on_sale) : groups;
+  // Reseller terms are for resellers: bitocard.com shows them with its business links, never on a store.
+  const legal = legalDocuments.filter(doc => doc.href !== "/documents/reseller-terms");
+  const credit = storeCredit(store, brand.credit);
   return (
     <footer className="mt-12 border-t border-slate-100 bg-white pb-[env(safe-area-inset-bottom)] sm:mt-16">
-      {/* Phones: the brand across the top, then the link lists two to a row. */}
-      <div className={`mx-auto grid max-w-[1400px] grid-cols-2 gap-x-6 gap-y-8 px-4 py-10 sm:px-6 lg:px-8 ${store ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
-        <div className="col-span-2 md:col-span-1">
-          {store ? (
-            <Link href="/" aria-label={`${store.name} home`} className="inline-flex min-w-0 items-center no-underline">
-              <StoreName store={store} size="md" />
-            </Link>
-          ) : (
-            <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 no-underline">
-              <Brand />
-            </Link>
-          )}
-          <p className="mt-3 max-w-xs text-sm text-slate-500">Gift cards, mobile top-ups, bills and digital essentials, delivered digitally.</p>
-        </div>
-        <nav aria-label="Shop" className="text-sm">
-          <p className="font-semibold text-navy-900">Shop</p>
-          <ul className="mt-2">
-            {groups.map(group => (
-              <li key={group.key}>
-                <Link href={`/catalogs/${group.categories.length === 1 ? group.categories[0].category : group.key}`} className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
-                  {group.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        {store ? null : (
-        <nav aria-label="Business" className="text-sm">
-          <p className="font-semibold text-navy-900">Business</p>
-          <ul className="mt-2">
-            <li>
-              <Link href="/resellers" className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
-                Open a reseller store
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            {store ? (
+              <Link href="/" aria-label={`${store.name} home`} className="inline-flex min-w-0 items-center no-underline">
+                <StoreName store={store} size="md" />
               </Link>
-            </li>
-            <li>
-              <a href={appUrl("shq", "/signin")} className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
-                Reseller sign in
-              </a>
-            </li>
-          </ul>
-        </nav>
+            ) : (
+              <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 no-underline">
+                <Brand />
+              </Link>
+            )}
+            <p className="mt-1 max-w-sm text-sm text-slate-500">Gift cards, top-ups, bills and digital essentials, delivered digitally.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <FooterCategories groups={shown} />
+            <Link href="/account/support" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-navy-900 hover:border-slate-300 hover:bg-slate-50">
+              <LifeBuoy className="size-4" aria-hidden="true" /> Help
+            </Link>
+          </div>
+        </div>
+        {store ? null : (
+          <nav aria-label="Business" className="mt-6 flex flex-wrap items-center gap-x-5 text-sm text-slate-600">
+            <span className="font-semibold text-navy-900">For business</span>
+            <Link href="/resellers" className={footerLink}>
+              Open a reseller store
+            </Link>
+            <a href={appUrl("shq", "/signin")} className={footerLink}>
+              Reseller sign in
+            </a>
+            <a href={appUrl("legals", "/documents/reseller-terms")} className={footerLink}>
+              Reseller terms
+            </a>
+          </nav>
         )}
-        <nav aria-label="Legal" className="text-sm">
-          <p className="font-semibold text-navy-900">Legal</p>
-          <ul className="mt-2">
-            {legalDocuments.map(doc => (
-              <li key={doc.href}>
-                <a href={appUrl("legals", doc.href)} className="inline-flex min-h-10 items-center text-slate-600 hover:text-navy-900">
-                  {doc.short}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
       </div>
-      {/* BitoCard sells every order on a reseller's store (the terms of sale are BitoCard's), so it is named there too. */}
-      <p className="border-t border-slate-100 py-5 text-center text-xs text-slate-500">{store ? `${store.name} · Sold and delivered by BitoCard` : brand.credit}</p>
+      <div className="border-t border-slate-100">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-2 px-4 py-4 text-xs text-slate-500 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-4">
+            {legal.map(doc => (
+              <a key={doc.href} href={appUrl("legals", doc.href)} className="inline-flex min-h-9 items-center hover:text-navy-900">
+                {doc.short}
+              </a>
+            ))}
+          </nav>
+          <p>
+            © {new Date().getFullYear()} {store ? store.name : brand.name}
+            {credit ? ` · ${credit}` : ""}
+          </p>
+        </div>
+      </div>
     </footer>
   );
 }

@@ -62,6 +62,15 @@ describe('a plan per store', () => {
     assert.equal((await browser.post(`/v1/stores/${second.id}/subscription`, { plan: 'premium' }, { 'bitocard-mode': 'test' })).json.error.code, 'live_only');
   });
 
+  test('white label: a store on Premium leaves BitoCard’s name out; one on Startup does not', async () => {
+    const { browser, first, second } = await reseller();
+    await prisma.store.updateMany({ where: { id: { in: [first.id, second.id] } }, data: { status: 'published' } });
+    const lookup = async store => (await fetch(`${server.base}/v1/storefronts/${store.subdomain}`).then(res => res.json())).white_label;
+    assert.equal(await lookup(first), false);
+    assert.equal((await plan(browser, first.id, 'premium')).status, 200);
+    assert.deepEqual([await lookup(first), await lookup(second)], [true, false], 'per store');
+  });
+
   test('per-store features follow the store’s own plan', async () => {
     const { browser, first, second } = await reseller();
     await finance.put('/v1/admin/plans/standard/features/store_traffic', { enabled: false });

@@ -26,6 +26,7 @@ export const planFeatureCatalogue = {
   multiple_stores: { scope: 'account', group: 'independence', name: 'Several stores', description: 'Run more than one store, each with its own address and design.' },
   custom_domains: { scope: 'store', group: 'independence', name: 'Your own domains', description: 'Buy or connect your own domain for your store.' },
   international_selling: { scope: 'store', group: 'selling', name: 'International selling', description: 'Sell to customers outside your country.' },
+  white_label: { scope: 'store', group: 'selling', name: 'Your brand only', description: 'BitoCard’s name is left out of the store’s footer and pages (the terms of sale still name the seller).' },
   store_traffic: { scope: 'store', group: 'selling', name: 'Store traffic', description: 'See how many people visit your stores, day by day.' },
   onchain_crypto: { scope: 'account', group: 'crypto', name: 'Coins on chain', description: 'Deposit and withdraw your own coins on chain.' },
   reseller_desks: { scope: 'store', group: 'crypto', name: 'Your own exchange desk', description: 'Your customers buy and sell crypto at your desk, from your reserves.' },
