@@ -42,7 +42,7 @@ export function StoreHeader({
   groups: StoreNavigationGroup[];
   countries: StoreCountry[];
   market: string | null;
-  /** The signed-in customer's own country: shown, not chosen. */
+  /** On a market's own country store, or a reseller's: shown, not chosen. */
   marketLocked?: boolean;
   signedIn: boolean;
   store?: HostedStore | null;
@@ -66,14 +66,22 @@ export function StoreHeader({
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
           </Link>
-          {store ? null : (
+          {!store ? (
             <>
               <MarketChooser countries={countries} market={market} locked={marketLocked} />
               <div className="hidden lg:block">
                 <CurrencyMenu />
               </div>
             </>
-          )}
+          ) : store.house ? (
+            <a
+              href={appUrl("storefront", "/go-global")}
+              className="hidden min-h-11 items-center gap-1.5 rounded-xl px-2 text-[15px] font-semibold text-navy-900 hover:bg-slate-50 sm:inline-flex sm:px-3"
+              title="Shop every market on bitocard.com, priced in US dollars"
+            >
+              Shop globally
+            </a>
+          ) : null}
           <Link
             href={signedIn ? "/account" : "/signin"}
             className="hidden min-h-11 items-center rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-semibold whitespace-nowrap text-navy-900 hover:border-slate-300 lg:inline-flex"

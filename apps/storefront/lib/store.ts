@@ -5,10 +5,13 @@ import type { StoreDesign } from "@bitocard/api-client/storefront";
 import { apiUrl } from "./api";
 
 /**
- * Resellers' hosted stores are this same app on `<subdomain>.bitocard.com` (and `<subdomain>.localhost` in development,
- * which browsers send to this machine). bitocard.com itself, and `www`, are BitoCard's own store.
+ * Resellers' hosted stores, and BitoCard's own market country stores (`ng.bitocard.com`…, a bare 2-letter country
+ * code: shorter than any reseller may choose, `stores.service.ts`'s own `subdomainFormat` keeps new reseller
+ * subdomains to 3 characters or more, but this pattern parses *every* incoming host and must accept both), are this
+ * same app on `<subdomain>.bitocard.com` (and `<subdomain>.localhost` in development, which browsers send to this
+ * machine). bitocard.com itself, and `www`, are BitoCard's own store.
  */
-const storeHostPattern = /^([a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9]))\.(?:bitocard\.com|localhost)(?::\d+)?$/;
+const storeHostPattern = /^([a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?)\.(?:bitocard\.com|localhost)(?::\d+)?$/;
 const ownHosts = new Set(["www", "bitocard"]);
 
 export type HostedStore = {

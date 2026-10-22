@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ChatWidget } from "@/components/app/chat-widget";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
 import { currentCustomer } from "@/lib/customer";
-import { countryStoreFor, currentMarket } from "@/lib/market";
+import { countryStoreFor, currentMarket, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
 import { storeShell } from "@/lib/store-theme";
@@ -43,10 +43,12 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       </div>
     );
   }
-  const [{ groups, countries }, market, customer] = await Promise.all([storeNavigation(), currentMarket(), currentCustomer()]);
+  const [{ groups, countries }, market, customer, global] = await Promise.all([storeNavigation(), currentMarket(), currentCustomer(), marketIsGlobal()]);
   // On root (no store context at all), a signed-in customer whose fixed country now has its own live country store
-  // belongs there: send them, rather than serving their market from root (docs/BITOCARD_COUNTRY_STORES_PLAN.md).
-  if (!store) {
+  // belongs there: send them, rather than serving their market from root (docs/BITOCARD_COUNTRY_STORES_PLAN.md) —
+  // unless they explicitly chose to stay global (the market dialog's "Stay global"), which is a standing choice,
+  // not just for one visit.
+  if (!store && !global) {
     const subdomain = countryStoreFor(countries, customer?.country);
     if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
   }
@@ -61,7 +63,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           Test store: orders are simulated and no money is taken.
         </p>
       ) : null}
-      <StoreHeader groups={groups} countries={countries} market={market} marketLocked={Boolean(customer?.country && !store)} signedIn={Boolean(customer)} store={store} />
+      <StoreHeader groups={groups} countries={countries} market={market} signedIn={Boolean(customer)} store={store} />
       <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 sm:px-6 lg:px-8">
         {children}
       </main>

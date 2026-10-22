@@ -13,7 +13,7 @@ import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
-import { countryStoreFor } from "@/lib/market";
+import { countryStoreFor, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
 import { storeShell } from "@/lib/store-theme";
@@ -61,8 +61,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     pendingPublicSpinClaim(),
   ]);
   // On root, a customer whose fixed country now has its own live country store belongs there, same as the store pages
-  // (docs/BITOCARD_COUNTRY_STORES_PLAN.md); their account is the same account, just served from its own address.
-  if (!store) {
+  // (docs/BITOCARD_COUNTRY_STORES_PLAN.md); their account is the same account, just served from its own address —
+  // unless they explicitly chose to stay global, a standing choice that carries over into their account too.
+  if (!store && !(await marketIsGlobal())) {
     const subdomain = countryStoreFor(navigation.countries, customer.country);
     if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
   }
