@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftRight, CreditCard, Gift, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeftRight, CreditCard, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
 import { Card, categoryName, PanelNav, SettingsPanel, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
@@ -10,7 +10,6 @@ import { ExchangeLimits } from "./exchange-limits";
 import { IdentityProvider } from "./identity-provider";
 import { SmsProvider } from "./sms-provider";
 import { PaymentMethods } from "./payment-methods";
-import { SpinLimit } from "./spin-limit";
 import { TaxRateCard } from "./tax-rate";
 
 
@@ -28,7 +27,6 @@ const panels = [
   { id: "payments", label: "Payment methods", icon: CreditCard },
   { id: "tax", label: "Tax", icon: Receipt },
   { id: "exchange", label: "Exchange", icon: ArrowLeftRight },
-  { id: "spin", label: "Spin and win", icon: Gift },
 ];
 
 /** Markets: what each country sells and where customers must verify their identity. */
@@ -201,9 +199,6 @@ function Markets() {
                 alertMinor={country.exchange_reserve_alert_minor}
                 editable={editable}
               />
-            </SettingsPanel>
-            <SettingsPanel id="spin" icon={Gift} title="Spin and win" description="How many spins each customer gets a day.">
-              <SpinLimit code={country.code} country={country.name} limit={country.spin_daily_limit} editable={editable} />
             </SettingsPanel>
           </div>
         </div>

@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/app/app-header";
 import { AppNav, AppRail } from "@/components/app/app-nav";
 import { ChatWidget } from "@/components/app/chat-widget";
 import { SubRail } from "@/components/app/sub-rail";
+import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
@@ -17,6 +18,7 @@ import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
 import { storeShell } from "@/lib/store-theme";
 import { currentStore, storeCredit, storeSubdomain } from "@/lib/store";
+import { pendingPublicSpinClaim } from "@/lib/spin-actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const subdomain = await storeSubdomain();
@@ -53,9 +55,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!customer.email_verified) redirect(`/account/verify?next=${next}`);
 
   // The store's choice (else BitoCard's default); the side rail if the API cannot be reached.
-  const [app, navigation] = await Promise.all([
+  const [app, navigation, publicSpinClaim] = await Promise.all([
     store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
     storeNavigation(),
+    pendingPublicSpinClaim(),
   ]);
   // On root, a customer whose fixed country now has its own live country store belongs there, same as the store pages
   // (docs/BITOCARD_COUNTRY_STORES_PLAN.md); their account is the same account, just served from its own address.
@@ -112,6 +115,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense fallback={null}>
         <ChatWidget store={name} aboveNav />
       </Suspense>
+      <PublicSpinClaimDialog initial={publicSpinClaim} />
     </div>
   );
 }

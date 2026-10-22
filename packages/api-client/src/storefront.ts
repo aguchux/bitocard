@@ -757,3 +757,26 @@ export type StoreSpinExchangePreview = { object: 'spin_exchange_preview'; usd: s
 
 /** `POST /v1/store/spins/exchange`: the rewards moved into the store wallet (`amount` in its minor units). */
 export type StoreSpinExchange = { object: 'spin_exchange'; id: string; usd: string; currency: string; amount: number; rate: string; created_at: string };
+
+/** Signed-out Customer Catcher state. The opaque claim token is kept by the storefront server, never in this shape. */
+export type StorePublicSpinRewards = Omit<StoreSpinRewards, 'object' | 'mode' | 'reason'> & {
+  object: 'public_spin_rewards';
+  reason: string | null;
+  claim_expires_at: string;
+};
+
+export type StorePublicSpinResult = { spin: StoreSpin; status: StorePublicSpinRewards };
+
+/** A saved visitor win shown once after sign-up/sign-in, or the reason it was invalidated. */
+export type StorePublicSpinClaim = {
+  object: 'public_spin_claim';
+  status: 'active' | 'claimed' | 'invalidated' | 'expired';
+  reason: string | null;
+  message?: string | null;
+  usd?: string;
+  spins?: number;
+  currencies?: Array<{ currency: string; amount: number }>;
+  id?: string;
+  currency?: string;
+  amount?: number;
+};

@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
@@ -11,6 +11,7 @@ import { type CryptoContext, CryptoWalletsService } from './crypto-wallets.servi
 import { FxService } from '../fx/fx.service.js';
 import { walletCurrencies } from '../ledger/wallet.service.js';
 import { CryptoPricesService, unitsForCents } from './prices.js';
+import { StoreSellers } from '../checkout/store-sellers.js';
 
 /** What every customer can win in all, in US cents. */
 export const spinTotalCents = 100;
@@ -77,6 +78,8 @@ const conflict = (code: string, message: string) => new ApiError(HttpStatus.CONF
 const usd = (cents: number) => (cents / 100).toFixed(2);
 const startOfDay = (now = new Date()) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 const nextDay = (now = new Date()) => new Date(startOfDay(now).getTime() + 24 * 60 * 60_000);
+const publicClaimDays = 30;
+const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 /** The gates whose refusal the status page explains instead of failing. */
 const gateCodes = ['crypto_not_enabled', 'email_not_verified', 'customer_verification_required', 'crypto_account_frozen', 'store_unavailable', 'country_required'];
 
@@ -98,7 +101,197 @@ export class SpinsService {
     private readonly settings: SettingsService,
     private readonly prices: CryptoPricesService,
     private readonly fx: FxService,
+    private readonly stores: StoreSellers,
   ) {}
+
+  /** The public Customer Catcher is BitoCard-only and separately enabled per market in Admin > Spin rewards. */
+  private async publicContext(storeKey: string | null, askedCountry?: string) {
+    const store = await this.stores.resolve(storeKey);
+    if (!this.stores.isHouse(store)) throw conflict('public_spins_not_enabled', 'The public wheel is not available on this store.');
+    const countryCode = this.stores.isRoot(store) ? askedCountry?.toUpperCase() : store.reseller.country ?? undefined;
+    if (!countryCode) throw conflict('country_required', 'Choose your country before you spin.');
+    const country = await this.prisma.country.findUnique({ where: { code: countryCode } });
+    if (!country || !country.publicSpinsEnabled) throw conflict('public_spins_not_enabled', 'The public wheel is not open in this country yet.');
+    const seller = await this.stores.seller(store, country.code);
+    if (!(await this.settings.isOn('spin_rewards', seller.id))) throw conflict('spins_not_enabled', 'Spin and win is not available in this country yet.');
+    return { store, country, mode: this.stores.mode(store) };
+  }
+
+  private publicWins(row: { wins: Prisma.JsonValue }) {
+    return (Array.isArray(row.wins) ? row.wins : []) as Array<{ id: string; number: number; asset: string; amount: string; usd: string; segment: number; created_at: string }>;
+  }
+
+  private presentPublic(row: { status: string; limit: number; spinsUsed: number; wonCents: number; wins: Prisma.JsonValue; expiresAt: Date; invalidatedReason: string | null }) {
+    const active = row.status === 'active' && row.expiresAt > new Date();
+    return {
+      object: 'public_spin_rewards' as const,
+      enabled: active && row.spinsUsed < row.limit,
+      reason: active ? null : row.status === 'invalidated' ? row.invalidatedReason : row.status,
+      segments: spinSegments.map((item, index) => ({ index, asset: item.asset, usd: usd(item.cents) })),
+      daily_limit: row.limit,
+      allowance: {
+        won_usd: usd(row.wonCents),
+        spins_used: row.spinsUsed,
+        today_left: Math.max(0, row.limit - row.spinsUsed),
+        daily_limit: row.limit,
+        next_spin_at: null,
+        finished: row.spinsUsed >= row.limit,
+      },
+      recent: this.publicWins(row).toReversed(),
+      rewards: { coins: [], usd: usd(row.wonCents), exchange_currencies: [] },
+      claim_expires_at: row.expiresAt.toISOString(),
+    };
+  }
+
+  /** Reads the visitor claim named by the opaque storefront cookie, or an empty six-spin wheel. */
+  async publicStatus(storeKey: string | null, country: string | undefined, token?: string) {
+    const context = await this.publicContext(storeKey, country);
+    const row = token ? await this.prisma.publicSpinClaim.findUnique({ where: { tokenHash: tokenHash(token) } }) : null;
+    if (row && row.storeId === context.store.id && row.countryCode === context.country.code && row.mode === context.mode) {
+      if (row.status === 'active' && row.expiresAt <= new Date()) {
+        const expired = await this.prisma.publicSpinClaim.update({ where: { id: row.id }, data: { status: 'expired' } });
+        return this.presentPublic(expired);
+      }
+      return this.presentPublic(row);
+    }
+    const limit = context.country.publicSpinLimit;
+    return this.presentPublic({ status: 'active', limit, spinsUsed: 0, wonCents: 0, wins: [], expiresAt: new Date(Date.now() + publicClaimDays * 86_400_000), invalidatedReason: null });
+  }
+
+  /** One of the visitor's fixed spins. The returned token is kept only in an HttpOnly storefront cookie. */
+  async publicSpin(storeKey: string | null, country: string | undefined, token?: string) {
+    const context = await this.publicContext(storeKey, country);
+    let raw = token;
+    let claim = raw ? await this.prisma.publicSpinClaim.findUnique({ where: { tokenHash: tokenHash(raw) } }) : null;
+    if (!claim) {
+      raw = randomBytes(32).toString('base64url');
+      const limit = context.country.publicSpinLimit;
+      const count = randomInt(Math.max(spinCount.min, limit), spinCount.max + 1);
+      claim = await this.prisma.publicSpinClaim.create({
+        data: {
+          tokenHash: tokenHash(raw),
+          storeId: context.store.id,
+          countryCode: context.country.code,
+          mode: context.mode,
+          limit,
+          // The visitor uses the first `limit`; after claiming, the same schedule becomes their authenticated
+          // allowance, so visitor and later account spins still add up to exactly the promotion's $1 in all.
+          schedule: spinSchedule(count),
+          expiresAt: new Date(Date.now() + publicClaimDays * 86_400_000),
+        },
+      });
+    }
+    if (claim.storeId !== context.store.id || claim.countryCode !== context.country.code || claim.mode !== context.mode) throw conflict('claim_invalid', 'This spin claim belongs to another store or country.');
+    if (claim.status !== 'active' || claim.expiresAt <= new Date()) throw conflict('claim_expired', 'This spin claim is no longer available.');
+    if (claim.spinsUsed >= claim.limit) throw conflict('public_spins_finished', 'Create an account to claim your wins and keep spinning.');
+    const cents = claim.schedule[claim.spinsUsed];
+    const assets = await this.assets();
+    const payout = await this.payout(cents, assets);
+    const outcome = {
+      id: randomUUID(),
+      number: claim.spinsUsed + 1,
+      asset: payout.asset.code,
+      amount: fromUnits(payout.amount, payout.asset.decimals),
+      usd: usd(cents),
+      segment: payout.segment,
+      created_at: new Date().toISOString(),
+    };
+    const updated = await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM public_spin_claims WHERE id = ${claim!.id}::uuid FOR UPDATE`;
+      const fresh = await tx.publicSpinClaim.findUniqueOrThrow({ where: { id: claim!.id } });
+      if (fresh.status !== 'active' || fresh.spinsUsed !== outcome.number - 1) throw conflict('spin_in_progress', 'Your last spin is still being counted. Try again.');
+      return tx.publicSpinClaim.update({
+        where: { id: fresh.id },
+        data: { spinsUsed: { increment: 1 }, wonCents: { increment: cents }, wins: [...this.publicWins(fresh), outcome] as Prisma.InputJsonValue },
+      });
+    });
+    return { token: raw!, spin: { object: 'spin' as const, ...outcome, allowance: this.presentPublic(updated).allowance }, status: this.presentPublic(updated) };
+  }
+
+  private async invalidatePublicClaim(id: string, reason: string) {
+    return this.prisma.publicSpinClaim.update({ where: { id }, data: { status: 'invalidated', invalidatedReason: reason } });
+  }
+
+  /** What a signed-in customer may claim on first login; also invalidates an ineligible or already-used claim. */
+  async publicClaimStatus(customer: CustomerWithStore, token?: string) {
+    if (!token) return null;
+    const claim = await this.prisma.publicSpinClaim.findUnique({ where: { tokenHash: tokenHash(token) } });
+    if (!claim || claim.storeId !== customer.storeId) return null;
+    if (claim.status !== 'active') return { object: 'public_spin_claim', status: claim.status, reason: claim.invalidatedReason, message: claim.invalidatedReason === 'daily_limit' ? 'Your saved visitor spins expired because you already used today\u2019s registered spins.' : null };
+    if (claim.expiresAt <= new Date()) {
+      await this.prisma.publicSpinClaim.update({ where: { id: claim.id }, data: { status: 'expired' } });
+      return { object: 'public_spin_claim', status: 'expired', reason: 'expired', message: 'Your saved visitor spins have expired.' };
+    }
+    const context = await this.wallets.context(customer);
+    if (context.mode !== claim.mode || context.country !== claim.countryCode) {
+      await this.invalidatePublicClaim(claim.id, 'market_changed');
+      return { object: 'public_spin_claim', status: 'invalidated', reason: 'market_changed', message: 'Those visitor spins were for another market and cannot be claimed here.' };
+    }
+    const earlier = await this.prisma.publicSpinClaim.findFirst({ where: { id: { not: claim.id }, mode: context.mode, status: 'claimed', customer: { email: customer.email.toLowerCase() } }, select: { id: true } });
+    if (earlier) {
+      await this.invalidatePublicClaim(claim.id, 'already_claimed');
+      return { object: 'public_spin_claim', status: 'invalidated', reason: 'already_claimed', message: 'This account has already claimed a Customer Catcher win.' };
+    }
+    const allowance = await this.prisma.spinAllowance.findFirst({ where: { customerId: customer.id, mode: context.mode } });
+    if (allowance) {
+      const limit = await this.dailyLimit(context.country);
+      const reason = (await this.spinsToday(allowance.id)) >= limit ? 'daily_limit' : 'already_started';
+      await this.invalidatePublicClaim(claim.id, reason);
+      return {
+        object: 'public_spin_claim', status: 'invalidated', reason,
+        message: reason === 'daily_limit' ? 'Your saved visitor spins were removed because you already used today\u2019s registered spins.' : 'This account has already started Spin and win, so the visitor claim cannot be added.',
+      };
+    }
+    const currencies = walletCurrencies(context.currency);
+    const amounts = (await Promise.all(currencies.map(async currency => ({ currency, amount: Number((await this.fx.exchange(BigInt(claim.wonCents), 'USD', currency)).amount) })))).filter(item => item.amount > 0);
+    return { object: 'public_spin_claim', status: 'active', reason: null, usd: usd(claim.wonCents), spins: claim.spinsUsed, currencies: amounts };
+  }
+
+  /** Credits the whole visitor total once to the customer's local or USD store wallet. */
+  async claimPublic(customer: CustomerWithStore, token: string | undefined, currencyAsked: string) {
+    if (!customer.emailVerifiedAt) throw conflict('email_not_verified', 'Confirm your email before claiming your wins.');
+    const status = await this.publicClaimStatus(customer, token);
+    if (!status || status.status !== 'active' || !token) throw conflict('claim_invalid', status?.message ?? 'There is no visitor win to claim.');
+    const claim = await this.prisma.publicSpinClaim.findUniqueOrThrow({ where: { tokenHash: tokenHash(token) } });
+    if (claim.spinsUsed < 1) throw conflict('nothing_to_exchange', 'Spin first, then claim your win.');
+    const selected = status.currencies?.find(item => item.currency === currencyAsked.toUpperCase());
+    if (!selected) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'currency_unsupported', 'Choose your local or US dollar wallet.', 'currency');
+    const amount = BigInt(selected.amount);
+    const id = randomUUID();
+    const entry = await this.ledger.prepare({
+      mode: claim.mode,
+      type: 'public_spin_claim',
+      reference: `public_spin_claim:${claim.id}`,
+      description: 'Customer Catcher spin wins',
+      metadata: { public_spin_claim_id: claim.id, usd: usd(claim.wonCents), spins: claim.spinsUsed },
+      lines: [
+        { account: { kind: 'promotions', currency: selected.currency }, debit: amount },
+        { account: { kind: 'customer_wallet', currency: selected.currency, customerId: customer.id }, credit: amount },
+      ],
+    });
+    await this.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM public_spin_claims WHERE id = ${claim.id}::uuid FOR UPDATE`;
+      const fresh = await tx.publicSpinClaim.findUniqueOrThrow({ where: { id: claim.id } });
+      if (fresh.status !== 'active') throw conflict('claim_invalid', 'This visitor win has already been handled.');
+      await tx.spinAllowance.create({
+        data: {
+          customerId: customer.id,
+          mode: claim.mode,
+          emailKey: customer.email.toLowerCase(),
+          schedule: claim.schedule,
+          totalCents: spinTotalCents,
+          spinsUsed: claim.spinsUsed,
+          wonCents: claim.wonCents,
+        },
+      }).catch((error: unknown) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw conflict('claimed_elsewhere', 'This account has already started or claimed Spin and win.');
+        throw error;
+      });
+      await this.ledger.write(tx, entry);
+      await tx.publicSpinClaim.update({ where: { id: claim.id }, data: { status: 'claimed', customerId: customer.id, claimCurrency: selected.currency, claimAmountMinor: amount, claimedAt: new Date() } });
+    });
+    return { object: 'public_spin_claim', id, status: 'claimed', usd: usd(claim.wonCents), currency: selected.currency, amount: Number(amount) };
+  }
 
   /** The customer's crypto context once every gate passes; throws the gate's refusal otherwise. */
   private async gate(customer: CustomerWithStore): Promise<CryptoContext> {

@@ -55,26 +55,26 @@ enum UserStatus {
 }
 
 model User {
-  id              String     @id @default(uuid()) @db.Uuid
+  id              String      @id @default(uuid()) @db.Uuid
   realm           Realm
   /// Stored lower-case.
   email           String
-  emailVerifiedAt DateTime?  @map("email_verified_at")
+  emailVerifiedAt DateTime?   @map("email_verified_at")
   /// E.164, for example +2348012345678. Only resellers use phone sign-in.
   phone           String?
-  phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  phoneVerifiedAt DateTime?   @map("phone_verified_at")
   phones          UserPhone[]
   /// Argon2id. Null for Google-only accounts.
-  passwordHash    String?    @map("password_hash")
+  passwordHash    String?     @map("password_hash")
   name            String
-  status          UserStatus @default(active)
+  status          UserStatus  @default(active)
   /// Admin roles (super_admin, operations, finance, support). Reseller staff roles live on ResellerMember.
-  adminRoles      String[]   @default([]) @map("admin_roles")
-  failedSignIns   Int        @default(0) @map("failed_sign_ins")
-  lockedUntil     DateTime?  @map("locked_until")
-  lastSignInAt    DateTime?  @map("last_sign_in_at")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
+  adminRoles      String[]    @default([]) @map("admin_roles")
+  failedSignIns   Int         @default(0) @map("failed_sign_ins")
+  lockedUntil     DateTime?   @map("locked_until")
+  lastSignInAt    DateTime?   @map("last_sign_in_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
   oauthAccounts           OAuthAccount[]
   sessions                Session[]
@@ -124,21 +124,21 @@ model OAuthState {
 }
 
 model Session {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  realm      Realm
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  realm       Realm
   /// SHA-256 of the session token; the token itself only ever lives in the cookie.
-  tokenHash  String    @unique @map("token_hash") @db.Char(64)
-  ip         String?
-  userAgent  String?   @map("user_agent")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
-  expiresAt  DateTime  @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
+  tokenHash   String    @unique @map("token_hash") @db.Char(64)
+  ip          String?
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
   /// Admin sessions: sensitive and money actions are allowed until then (5 minutes after the admin entered their
   /// authenticator code). Fixed, never extended by use, and gone with the session.
   stepUpUntil DateTime? @map("step_up_until")
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("sessions")
@@ -408,86 +408,85 @@ enum ResellerStatus {
 
 /// A reseller business. Stores, wallets and countries attach to it in later milestones.
 model Reseller {
-  id                    String                 @id @default(uuid()) @db.Uuid
+  id                        String                    @id @default(uuid()) @db.Uuid
   /// Who collects their hosted stores' customer payments: `own` (their own payment gateway, where they may use and have
   /// one; Premium and switched on for their market) or `bitocard` (BitoCard's gateways, the money reaching their wallet).
-  paymentCollector      String                 @default("own") @map("payment_collector")
-  name                  String
+  paymentCollector          String                    @default("own") @map("payment_collector")
+  name                      String
   /// ISO 3166-1 alpha-2 (NG, GH, KE during the pilot). Set at sign-up or during onboarding.
-  country               String?                @db.Char(2)
-  status                ResellerStatus         @default(pending)
+  country                   String?                   @db.Char(2)
+  status                    ResellerStatus            @default(pending)
   /// When the business owner passed the identity check (Didit); required before going live.
-  verifiedAt            DateTime?              @map("verified_at")
+  verifiedAt                DateTime?                 @map("verified_at")
   /// The owner's name as verified, for matching payout bank accounts.
-  verifiedName          String?                @map("verified_name")
+  verifiedName              String?                   @map("verified_name")
   /// An admin let this reseller go live without the owner's identity check (audited). Payouts and the startup
   /// allowance still need the check itself.
-  identityWaivedAt      DateTime?              @map("identity_waived_at")
-  identityWaivedBy      String?                @map("identity_waived_by") @db.Uuid
-  identityWaiverReason  String?                @map("identity_waiver_reason")
+  identityWaivedAt          DateTime?                 @map("identity_waived_at")
+  identityWaivedBy          String?                   @map("identity_waived_by") @db.Uuid
+  identityWaiverReason      String?                   @map("identity_waiver_reason")
   /// The owner's BVN was checked with Flutterwave and its name matched the verified owner (Nigeria; reserved accounts).
-  bvnVerifiedAt         DateTime?              @map("bvn_verified_at")
+  bvnVerifiedAt             DateTime?                 @map("bvn_verified_at")
   /// KYB (BitoCard Verify): unregistered (a person trading) or a registered business; null until the owner chooses.
-  businessType          ResellerBusinessType?  @map("business_type")
+  businessType              ResellerBusinessType?     @map("business_type")
   /// The registered business's details, set when its KYB is approved (registered businesses only).
-  registeredName        String?                @map("registered_name")
-  registrationNumber    String?                @map("registration_number")
-  businessAddress       String?                @map("business_address")
+  registeredName            String?                   @map("registered_name")
+  registrationNumber        String?                   @map("registration_number")
+  businessAddress           String?                   @map("business_address")
   /// When BitoCard approved the business's KYB (registered businesses: documents checked). Registered, KYB-verified,
   /// active resellers review their own customers' identity checks.
-  kybVerifiedAt         DateTime?              @map("kyb_verified_at")
+  kybVerifiedAt             DateTime?                 @map("kyb_verified_at")
   /// The account's plan: the highest plan among its stores' subscriptions (Startup without one), kept by
   /// `StoreSubscriptionsService.syncAccountPlan`. Account-wide features and limits read it.
-  planCode              String                 @default("standard") @map("plan_code")
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
-  members               ResellerMember[]
-  invitations           Invitation[]
-  apiKeys               ApiKey[]
-  countryRef            Country?               @relation(fields: [country], references: [code])
-  plan                  Plan                   @relation(fields: [planCode], references: [code])
-  stores                Store[]
-  domains               StoreDomain[]
-  options               ResellerOption[]
-  switches              FeatureSwitch[]
+  planCode                  String                    @default("standard") @map("plan_code")
+  createdAt                 DateTime                  @default(now()) @map("created_at")
+  updatedAt                 DateTime                  @updatedAt @map("updated_at")
+  members                   ResellerMember[]
+  invitations               Invitation[]
+  apiKeys                   ApiKey[]
+  countryRef                Country?                  @relation(fields: [country], references: [code])
+  plan                      Plan                      @relation(fields: [planCode], references: [code])
+  stores                    Store[]
+  domains                   StoreDomain[]
+  options                   ResellerOption[]
+  switches                  FeatureSwitch[]
   /// Premium billing (M4): when the next monthly charge is due. Null means not billed (Standard, or a plan set by an admin).
-  planRenewsAt          DateTime?              @map("plan_renews_at")
+  planRenewsAt              DateTime?                 @map("plan_renews_at")
   /// Switch to Standard at the next renewal instead of charging.
-  planCancelAtPeriodEnd Boolean                @default(false) @map("plan_cancel_at_period_end")
+  planCancelAtPeriodEnd     Boolean                   @default(false) @map("plan_cancel_at_period_end")
   /// Set when a renewal charge failed; the plan drops to Standard after the grace period.
-  planPastDueSince      DateTime?              @map("plan_past_due_since")
+  planPastDueSince          DateTime?                 @map("plan_past_due_since")
   /// What the account may owe BitoCard, in US cents: US$10 at first, raised a step at a time (25, 50, 100) after a full
   /// month's invoice is paid in full; admins may set any value up to US$100. An invoice unpaid past its due date drops it a step.
-  creditLimitCents      Int                    @default(1000) @map("credit_limit_cents")
-  creditLimitRaisedAt   DateTime?              @map("credit_limit_raised_at")
-  ledgerAccounts        LedgerAccount[]
-  holds                 Hold[]
-  earningsLots          EarningsLot[]
-  payments              Payment[]
-  reservedAccounts      ReservedAccount[]
-  bankAccounts          BankAccount[]
-  payouts               Payout[]
-  markups               ResellerMarkup[]
-  quotes                Quote[]
-  orders                Order[]
-  events                Event[]
-  connections           ResellerConnection[]
-  feeCharges            FeeCharge[]
-  webhookEndpoints      WebhookEndpoint[]
-  verifications         IdentityVerification[]
-  kycCases              KycCase[]
-  mediaAssets           MediaAsset[]
-  listings              ResellerListing[]
+  creditLimitCents          Int                       @default(1000) @map("credit_limit_cents")
+  creditLimitRaisedAt       DateTime?                 @map("credit_limit_raised_at")
+  ledgerAccounts            LedgerAccount[]
+  holds                     Hold[]
+  earningsLots              EarningsLot[]
+  payments                  Payment[]
+  reservedAccounts          ReservedAccount[]
+  bankAccounts              BankAccount[]
+  payouts                   Payout[]
+  markups                   ResellerMarkup[]
+  quotes                    Quote[]
+  orders                    Order[]
+  events                    Event[]
+  connections               ResellerConnection[]
+  feeCharges                FeeCharge[]
+  webhookEndpoints          WebhookEndpoint[]
+  verifications             IdentityVerification[]
+  kycCases                  KycCase[]
+  mediaAssets               MediaAsset[]
+  listings                  ResellerListing[]
   /// BitoCard's own store (bitocard.com): one house account per market sells to its retail customers, and one with no
   /// country owns the store itself. Never a real reseller.
-  house                 Boolean                @default(false)
-  checkouts             Checkout[]
-  manualTopUps          ManualTopUp[]
-  cryptoAddresses       CryptoAddress[]
-  cryptoDeposits        CryptoDeposit[]
-  cryptoWithdrawals     CryptoWithdrawal[]
+  house                     Boolean                   @default(false)
+  checkouts                 Checkout[]
+  manualTopUps              ManualTopUp[]
+  cryptoAddresses           CryptoAddress[]
+  cryptoDeposits            CryptoDeposit[]
+  cryptoWithdrawals         CryptoWithdrawal[]
   cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
-
   @@map("resellers")
   invoices              Invoice[]
 }
@@ -568,37 +567,42 @@ model ApiKey {
 /// A market BitoCard operates in. BitoCard decides what is available in each country.
 model Country {
   /// ISO 3166-1 alpha-2.
-  code               String            @id @db.Char(2)
-  name               String
+  code                      String            @id @db.Char(2)
+  name                      String
   /// ISO 4217, for example NGN. Resellers in this country trade in this currency.
-  currency           String            @db.Char(3)
+  currency                  String            @db.Char(3)
   /// Resellers based here can sign up.
-  resellerSignup     Boolean           @default(false) @map("reseller_signup")
+  resellerSignup            Boolean           @default(false) @map("reseller_signup")
   /// Reserved (dedicated) bank accounts for wallet funding; customer wallets exist only where this is on.
-  reservedAccounts   Boolean           @default(false) @map("reserved_accounts")
+  reservedAccounts          Boolean           @default(false) @map("reserved_accounts")
   /// Markup Protection Scheme: highest markup over BitoCard's wholesale price, in percent.
-  markupCapPercent   Int               @default(100) @map("markup_cap_percent")
+  markupCapPercent          Int               @default(100) @map("markup_cap_percent")
   /// Days before a sale's profit can be withdrawn.
-  payoutHoldDays     Int               @default(15) @map("payout_hold_days")
+  payoutHoldDays            Int               @default(15) @map("payout_hold_days")
   /// Smallest withdrawal, in the currency's minor units (for example kobo).
-  minWithdrawalMinor BigInt            @map("min_withdrawal_minor")
+  minWithdrawalMinor        BigInt            @map("min_withdrawal_minor")
   /// Who checks identities here: `bitocard` (BitoCard Verify, every African country) or `didit` (elsewhere).
-  identityProvider   String            @default("didit") @map("identity_provider")
+  identityProvider          String            @default("didit") @map("identity_provider")
   /// Null disables profile phone verification in this market.
-  smsProvider        String?           @map("sms_provider")
+  smsProvider               String?           @map("sms_provider")
   /// Spin and win: spins each customer may take per day (UTC) in this market, 1 to 10.
-  spinDailyLimit     Int      @default(2) @map("spin_daily_limit")
+  spinDailyLimit            Int               @default(2) @map("spin_daily_limit")
+  /// Customer Catcher: signed-out visitors may use the public Spin and win page in this market.
+  publicSpinsEnabled        Boolean           @default(false) @map("public_spins_enabled")
+  /// Spins kept in a visitor claim before sign-up (1 to 10; six by default).
+  publicSpinLimit           Int               @default(6) @map("public_spin_limit")
   /// The most a reseller's own exchange desk may mark up (basis points, 0 to 2,000) in this market.
-  exchangeMarkupCapBps Int    @default(500) @map("exchange_markup_cap_bps")
+  exchangeMarkupCapBps      Int               @default(500) @map("exchange_markup_cap_bps")
   /// Admins are told when BitoCard's fiat exchange reserve in this market falls below this (minor units); null: never.
-  exchangeReserveAlertMinor BigInt? @map("exchange_reserve_alert_minor")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
-  categories         CountryCategory[]
-  options            CountryOption[]
-  paymentMethods     PaymentMethod[]
-  resellers          Reseller[]
-  customers          Customer[]
+  exchangeReserveAlertMinor BigInt?           @map("exchange_reserve_alert_minor")
+  createdAt                 DateTime          @default(now()) @map("created_at")
+  updatedAt                 DateTime          @updatedAt @map("updated_at")
+  categories                CountryCategory[]
+  options                   CountryOption[]
+  paymentMethods            PaymentMethod[]
+  resellers                 Reseller[]
+  customers                 Customer[]
+  publicSpinClaims          PublicSpinClaim[]
 
   @@map("countries")
 }
@@ -677,28 +681,28 @@ model FeatureSwitch {
 
 /// Reseller plans: Standard (free) and Premium. The admin sets Premium's price.
 model Plan {
-  code            String     @id
-  name            String
+  code               String              @id
+  name               String
   /// Monthly price in US cents; converted to the reseller's currency when billed.
-  priceCents      Int        @map("price_cents")
+  priceCents         Int                 @map("price_cents")
   /// Plan features, for example chargeback_protection or international_selling.
-  features        String[]
+  features           String[]
   /// API features switched off for this plan. Empty means every API feature is on (the default).
-  apiRestrictions String[]   @default([]) @map("api_restrictions")
+  apiRestrictions    String[]            @default([]) @map("api_restrictions")
   /// What the plan is for, shown with it (admins edit it).
-  description     String?
+  description        String?
   /// Resellers can choose it. A hidden plan keeps those already on it (they renew as before) but takes no one new.
-  available       Boolean    @default(true)
+  available          Boolean             @default(true)
   /// BitoCard's margin on usage billed as it happens (AI replies beyond the allowance, mobile money deposit fees), in
   /// basis points over its cost.
-  usageMarginBps  Int        @default(2000) @map("usage_margin_bps")
+  usageMarginBps     Int                 @default(2000) @map("usage_margin_bps")
   /// Where it is listed, lowest first.
-  sortOrder       Int        @default(0) @map("sort_order")
+  sortOrder          Int                 @default(0) @map("sort_order")
   /// How much the plan allows (`planLimitCatalogue`): a number, or null for unlimited; a limit not set has its default.
-  limits          Json       @default("{}")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
-  resellers       Reseller[]
-  localPrices     PlanPrice[]
+  limits             Json                @default("{}")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  resellers          Reseller[]
+  localPrices        PlanPrice[]
   storeSubscriptions StoreSubscription[]
 
   @@map("plans")
@@ -724,54 +728,54 @@ enum StoreStatus {
 
 /// A reseller's hosted storefront on <subdomain>.bitocard.com.
 model Store {
-  id                    String         @id @default(uuid()) @db.Uuid
-  resellerId            String         @map("reseller_id") @db.Uuid
+  id                    String             @id @default(uuid()) @db.Uuid
+  resellerId            String             @map("reseller_id") @db.Uuid
   name                  String
   /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.
-  subdomain             String         @unique
-  status                StoreStatus    @default(draft)
+  subdomain             String             @unique
+  status                StoreStatus        @default(draft)
   /// Customer checkout on the store: `test` (sandbox: simulated payments and orders) until the reseller switches it live.
-  checkoutMode          LedgerMode     @default(test) @map("checkout_mode")
+  checkoutMode          LedgerMode         @default(test) @map("checkout_mode")
   /// The customer account app's menu on desktop: `rail` or `bottom`; null follows BitoCard (the
   /// `customer_app_bottom_bar_desktop` switch). Phones and tablets always use the bottom bar.
-  desktopNav            String?        @map("desktop_nav")
+  desktopNav            String?            @map("desktop_nav")
   /// The store's customers are asked for the identity check where the market requires it (true) or never (false).
   /// The reseller's choice for their store; BitoCard's for bitocard.com.
-  customerVerification  Boolean        @default(true) @map("customer_verification")
+  customerVerification  Boolean            @default(true) @map("customer_verification")
   /// bitocard.com only: customers are asked only once this many days have passed since their first paid purchase.
-  verificationGraceDays Int?           @map("verification_grace_days")
-  logoUrl               String?        @map("logo_url")
-  primaryColor          String         @default("#070f4c") @map("primary_color")
-  accentColor           String         @default("#ff2382") @map("accent_color")
-  publishedAt           DateTime?      @map("published_at")
+  verificationGraceDays Int?               @map("verification_grace_days")
+  logoUrl               String?            @map("logo_url")
+  primaryColor          String             @default("#070f4c") @map("primary_color")
+  accentColor           String             @default("#ff2382") @map("accent_color")
+  publishedAt           DateTime?          @map("published_at")
   /// The store's template (`src/stores/templates.ts`): what it sells and the sections its editor offers.
-  template              String         @default("all_in_one")
+  template              String             @default("all_in_one")
   /// The template's design variant and its colour theme.
-  variant               String         @default("classic")
-  theme                 String         @default("navy_pink")
+  variant               String             @default("classic")
+  theme                 String             @default("navy_pink")
   /// Single product stores: the product key they sell.
   focus                 String?
   /// Beyond the month's AI replies on BitoCard's AI: `stop` (people answer) or `pay` (each reply billed as it goes).
-  aiOverage             String         @default("stop") @map("ai_overage")
+  aiOverage             String             @default("stop") @map("ai_overage")
   /// The home page being edited in SHQ, and the one shoppers see (null: the variant's starting page).
-  homeDraft             Json?          @map("home_draft")
-  homePublished         Json?          @map("home_published")
-  homeVersion           Int            @default(0) @map("home_version")
-  homePublishedAt       DateTime?      @map("home_published_at")
+  homeDraft             Json?              @map("home_draft")
+  homePublished         Json?              @map("home_published")
+  homeVersion           Int                @default(0) @map("home_version")
+  homePublishedAt       DateTime?          @map("home_published_at")
   /// The store's address on bitocard.com (its Cloudflare record and the storefront's Vercel domain): `pending` until set
   /// up (the `domains` job retries), `ready`, or `failed` (`hostError` says why).
-  hostStatus            String         @default("pending") @map("host_status")
+  hostStatus            String             @default("pending") @map("host_status")
   /// The subdomain whose address is set up now (differs from `subdomain` until a rename is applied).
-  hostName              String?        @map("host_name")
+  hostName              String?            @map("host_name")
   /// Cloudflare's ID of the store's CNAME record.
-  hostRecordId          String?        @map("host_record_id")
-  hostError             String?        @map("host_error")
-  hostSyncedAt          DateTime?      @map("host_synced_at")
-  createdAt             DateTime       @default(now()) @map("created_at")
+  hostRecordId          String?            @map("host_record_id")
+  hostError             String?            @map("host_error")
+  hostSyncedAt          DateTime?          @map("host_synced_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
   /// A plan change in progress (a 2-minute claim), so two at once never both charge.
-  planChangingAt        DateTime?      @map("plan_changing_at")
-  updatedAt             DateTime       @updatedAt @map("updated_at")
-  reseller              Reseller       @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  planChangingAt        DateTime?          @map("plan_changing_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  reseller              Reseller           @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   notifications         Notification[]
   devices               Device[]
   apiKeys               ApiKey[]
@@ -784,6 +788,7 @@ model Store {
   visitDays             StoreVisitDay[]
   homeVersions          StoreHomeVersion[]
   subscription          StoreSubscription?
+  publicSpinClaims      PublicSpinClaim[]
 
   @@index([resellerId])
   @@index([hostStatus])
@@ -1195,24 +1200,24 @@ model ReservedAccount {
 
 /// Where a reseller's withdrawals go. The account name comes from the bank, never from the reseller.
 model BankAccount {
-  id                     String     @id @default(uuid()) @db.Uuid
-  resellerId             String     @map("reseller_id") @db.Uuid
+  id                     String            @id @default(uuid()) @db.Uuid
+  resellerId             String            @map("reseller_id") @db.Uuid
   mode                   LedgerMode
-  country                String     @db.Char(2)
-  currency               String     @db.Char(3)
-  bankCode               String     @map("bank_code")
-  bankName               String     @map("bank_name")
-  accountNumberEncrypted String     @map("account_number_encrypted")
-  accountNumberLast4     String     @map("account_number_last4")
-  accountName            String     @map("account_name")
+  country                String            @db.Char(2)
+  currency               String            @db.Char(3)
+  bankCode               String            @map("bank_code")
+  bankName               String            @map("bank_name")
+  accountNumberEncrypted String            @map("account_number_encrypted")
+  accountNumberLast4     String            @map("account_number_last4")
+  accountName            String            @map("account_name")
   /// `mobile_money`: bank_code is pawaPay's network (for example MTN_MOMO_GHA) and the number is the owner's confirmed phone.
   kind                   PayoutAccountKind @default(bank)
-  createdById            String     @map("created_by_id") @db.Uuid
-  createdAt              DateTime   @default(now()) @map("created_at")
-  removedAt              DateTime?  @map("removed_at")
+  createdById            String            @map("created_by_id") @db.Uuid
+  createdAt              DateTime          @default(now()) @map("created_at")
+  removedAt              DateTime?         @map("removed_at")
   /// Set when the business is renamed after verification: live payouts wait until then (a fresh 24 hours).
-  payoutsFrom            DateTime?  @map("payouts_from")
-  reseller               Reseller   @relation(fields: [resellerId], references: [id])
+  payoutsFrom            DateTime?         @map("payouts_from")
+  reseller               Reseller          @relation(fields: [resellerId], references: [id])
   payouts                Payout[]
 
   @@index([resellerId])
@@ -1577,62 +1582,62 @@ enum OrderStatus {
 
 /// A purchase from a quote. The wholesale cost and tax are held from the wallet until the supplier confirms the outcome.
 model Order {
-  id                        String          @id @default(uuid()) @db.Uuid
-  resellerId                String          @map("reseller_id") @db.Uuid
+  id                        String           @id @default(uuid()) @db.Uuid
+  resellerId                String           @map("reseller_id") @db.Uuid
   /// The store it was sold through: the API key's store, or the store its customer bought from.
-  storeId                   String?         @map("store_id") @db.Uuid
+  storeId                   String?          @map("store_id") @db.Uuid
   mode                      LedgerMode
-  quoteId                   String          @unique @map("quote_id") @db.Uuid
-  productId                 String          @map("product_id") @db.Uuid
+  quoteId                   String           @unique @map("quote_id") @db.Uuid
+  productId                 String           @map("product_id") @db.Uuid
   quantity                  Int
-  faceValueMinor            BigInt          @map("face_value_minor")
-  faceCurrency              String          @map("face_currency") @db.Char(3)
-  currency                  String          @db.Char(3)
-  wholesaleMinor            BigInt          @map("wholesale_minor")
-  taxMinor                  BigInt          @map("tax_minor")
-  priceMinor                BigInt          @map("price_minor")
-  resellerProfitMinor       BigInt          @map("reseller_profit_minor")
+  faceValueMinor            BigInt           @map("face_value_minor")
+  faceCurrency              String           @map("face_currency") @db.Char(3)
+  currency                  String           @db.Char(3)
+  wholesaleMinor            BigInt           @map("wholesale_minor")
+  taxMinor                  BigInt           @map("tax_minor")
+  priceMinor                BigInt           @map("price_minor")
+  resellerProfitMinor       BigInt           @map("reseller_profit_minor")
   recipient                 Json?
-  customerReference         String?         @map("customer_reference")
-  status                    OrderStatus     @default(processing)
+  customerReference         String?          @map("customer_reference")
+  status                    OrderStatus      @default(processing)
   /// In the admin exception queue: the supplier has not confirmed the outcome after repeated checks.
-  needsReview               Boolean         @default(false) @map("needs_review")
-  holdId                    String?         @map("hold_id") @db.Uuid
+  needsReview               Boolean          @default(false) @map("needs_review")
+  holdId                    String?          @map("hold_id") @db.Uuid
   /// The supplier handling the current attempt (internal).
-  supplierCode              String          @map("supplier_code")
-  supplierProductId         String          @map("supplier_product_id") @db.Uuid
-  supplierCostMinor         BigInt          @map("supplier_cost_minor")
+  supplierCode              String           @map("supplier_code")
+  supplierProductId         String           @map("supplier_product_id") @db.Uuid
+  supplierCostMinor         BigInt           @map("supplier_cost_minor")
   /// What the supplier said it charged (Reloadly `balanceInfo.cost`, VTpass `total_amount`), and whether that differs from the expected cost.
-  supplierReportedCostMinor BigInt?         @map("supplier_reported_cost_minor")
-  costMismatch              Boolean         @default(false) @map("cost_mismatch")
-  supplierCurrency          String          @map("supplier_currency") @db.Char(3)
+  supplierReportedCostMinor BigInt?          @map("supplier_reported_cost_minor")
+  costMismatch              Boolean          @default(false) @map("cost_mismatch")
+  supplierCurrency          String           @map("supplier_currency") @db.Char(3)
   /// Our reference for the current attempt, sent to the supplier so a status check can find it.
-  supplierReference         String          @unique @map("supplier_reference")
-  supplierTransactionId     String?         @map("supplier_transaction_id")
+  supplierReference         String           @unique @map("supplier_reference")
+  supplierTransactionId     String?          @map("supplier_transaction_id")
   /// `bitocard`, or `own`: fulfilled through the reseller's own supplier account (BitoCard charges only its fee).
-  source                    String          @default("bitocard")
-  connectionId              String?         @map("connection_id") @db.Uuid
-  feeChargeId               String?         @map("fee_charge_id") @db.Uuid
+  source                    String           @default("bitocard")
+  connectionId              String?          @map("connection_id") @db.Uuid
+  feeChargeId               String?          @map("fee_charge_id") @db.Uuid
   /// Own supplier: BitoCard's fee taken from the wallet: the most it can be while processing, then what was charged.
-  feeMinor                  BigInt?         @map("fee_minor")
+  feeMinor                  BigInt?          @map("fee_minor")
   /// Sandbox only: the outcome to simulate.
   simulate                  String?
-  checks                    Int             @default(0)
-  nextCheckAt               DateTime?       @map("next_check_at")
-  failureReason             String?         @map("failure_reason")
+  checks                    Int              @default(0)
+  nextCheckAt               DateTime?        @map("next_check_at")
+  failureReason             String?          @map("failure_reason")
   /// Sequential receipt number, given when the order completes.
-  receiptNumber             Int?            @unique @map("receipt_number")
-  createdAt                 DateTime        @default(now()) @map("created_at")
-  updatedAt                 DateTime        @updatedAt @map("updated_at")
-  completedAt               DateTime?       @map("completed_at")
+  receiptNumber             Int?             @unique @map("receipt_number")
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  updatedAt                 DateTime         @updatedAt @map("updated_at")
+  completedAt               DateTime?        @map("completed_at")
   /// When the codes or licence keys were emailed to the customer (`recipient.email`); retried until sent.
-  deliveryEmailedAt         DateTime?       @map("delivery_emailed_at")
+  deliveryEmailedAt         DateTime?        @map("delivery_emailed_at")
   /// A storefront customer's order (checkout); they see it in their account.
-  customerId                String?         @map("customer_id") @db.Uuid
-  customer                  Customer?       @relation(fields: [customerId], references: [id])
-  reseller                  Reseller        @relation(fields: [resellerId], references: [id])
-  store                     Store?          @relation(fields: [storeId], references: [id], onDelete: SetNull)
-  product                   Product         @relation(fields: [productId], references: [id])
+  customerId                String?          @map("customer_id") @db.Uuid
+  customer                  Customer?        @relation(fields: [customerId], references: [id])
+  reseller                  Reseller         @relation(fields: [resellerId], references: [id])
+  store                     Store?           @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  product                   Product          @relation(fields: [productId], references: [id])
   deliveries                OrderDelivery[]
   access                    OrderAccess?
   virtualNumber             VirtualNumber?
@@ -1650,16 +1655,16 @@ model Order {
 /// What the customer receives: gift card codes, licence keys, electricity tokens, eSIM activation strings, VPN
 /// credentials and confirmations. Every code, PIN and password is encrypted.
 model OrderDelivery {
-  id            String   @id @default(uuid()) @db.Uuid
-  orderId       String   @map("order_id") @db.Uuid
+  id              String           @id @default(uuid()) @db.Uuid
+  orderId         String           @map("order_id") @db.Uuid
   /// gift_card, licence_key, token, confirmation, virtual_number, esim or vpn_account.
-  kind          String
-  codeEncrypted String?  @map("code_encrypted")
-  pinEncrypted  String?  @map("pin_encrypted")
-  serial        String?
-  details       Json?
-  createdAt     DateTime @default(now()) @map("created_at")
-  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind            String
+  codeEncrypted   String?          @map("code_encrypted")
+  pinEncrypted    String?          @map("pin_encrypted")
+  serial          String?
+  details         Json?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
   vpnSubscription VpnSubscription?
 
   @@index([orderId])
@@ -1669,37 +1674,37 @@ model OrderDelivery {
 /// A fixed-term VPN account issued for one order. The password is never stored here: it is encrypted on the related
 /// `vpn_account` order delivery, which can be created before the supplier call so an uncertain retry uses the same value.
 model VpnSubscription {
-  id                String        @id @default(uuid()) @db.Uuid
-  orderId           String        @unique @map("order_id") @db.Uuid
-  deliveryId        String        @unique @map("delivery_id") @db.Uuid
-  resellerId        String        @map("reseller_id") @db.Uuid
-  mode              LedgerMode
-  productId         String        @map("product_id") @db.Uuid
-  supplierCode      String        @map("supplier_code")
+  id                       String        @id @default(uuid()) @db.Uuid
+  orderId                  String        @unique @map("order_id") @db.Uuid
+  deliveryId               String        @unique @map("delivery_id") @db.Uuid
+  resellerId               String        @map("reseller_id") @db.Uuid
+  mode                     LedgerMode
+  productId                String        @map("product_id") @db.Uuid
+  supplierCode             String        @map("supplier_code")
   /// Null while credentials are prepared but the supplier has not confirmed account creation.
-  supplierAccountId String?       @map("supplier_account_id")
+  supplierAccountId        String?       @map("supplier_account_id")
   /// provisioning, active, expired (disabled at the end of its term), revoked (disabled after a refund), suspended
   /// (disabled by an admin), failed (never provisioned) or needs_review (the supplier disagrees and an admin must look).
-  status            String        @default("provisioning")
-  supplierStatus    String?       @map("supplier_status")
-  startsAt          DateTime?     @map("starts_at")
-  expiresAt         DateTime?     @map("expires_at")
-  disabledAt        DateTime?     @map("disabled_at")
-  lastSyncedAt      DateTime?     @map("last_synced_at")
-  nextSyncAt        DateTime?     @map("next_sync_at")
-  credentialVersion Int           @default(1) @map("credential_version")
+  status                   String        @default("provisioning")
+  supplierStatus           String?       @map("supplier_status")
+  startsAt                 DateTime?     @map("starts_at")
+  expiresAt                DateTime?     @map("expires_at")
+  disabledAt               DateTime?     @map("disabled_at")
+  lastSyncedAt             DateTime?     @map("last_synced_at")
+  nextSyncAt               DateTime?     @map("next_sync_at")
+  credentialVersion        Int           @default(1) @map("credential_version")
   /// A new password sent to the supplier but not yet confirmed (encrypted): the same one is sent again until it is.
-  pendingPasswordEncrypted String? @map("pending_password_encrypted")
-  passwordChangedAt DateTime?     @map("password_changed_at")
+  pendingPasswordEncrypted String?       @map("pending_password_encrypted")
+  passwordChangedAt        DateTime?     @map("password_changed_at")
   /// Consecutive failed supplier checks, and the last one's reason (internal).
-  syncFailures      Int           @default(0) @map("sync_failures")
-  lastError         String?       @map("last_error")
+  syncFailures             Int           @default(0) @map("sync_failures")
+  lastError                String?       @map("last_error")
   /// When admins were last told about this account (needs review, drift), so they are told once per problem.
-  alertedAt         DateTime?     @map("alerted_at")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  delivery          OrderDelivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
+  alertedAt                DateTime?     @map("alerted_at")
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @updatedAt @map("updated_at")
+  order                    Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  delivery                 OrderDelivery @relation(fields: [deliveryId], references: [id], onDelete: Restrict)
 
   @@unique([supplierCode, supplierAccountId])
   @@index([status, nextSyncAt])
@@ -2440,59 +2445,60 @@ model PaymentMethod {
 
 /// A storefront customer: an account at one store only (the same email can be a customer at any other store).
 model Customer {
-  id               String                   @id @default(uuid()) @db.Uuid
-  storeId          String                   @map("store_id") @db.Uuid
+  id                        String                    @id @default(uuid()) @db.Uuid
+  storeId                   String                    @map("store_id") @db.Uuid
   /// Stored lower-case.
-  email            String
-  name             String
+  email                     String
+  name                      String
   /// Argon2id.
-  passwordHash     String                   @map("password_hash")
-  emailVerifiedAt  DateTime?                @map("email_verified_at")
-  phone            String?
-  phoneVerifiedAt  DateTime?                @map("phone_verified_at")
-  status           UserStatus               @default(active)
-  failedSignIns    Int                      @default(0) @map("failed_sign_ins")
-  lockedUntil      DateTime?                @map("locked_until")
-  lastSignInAt     DateTime?                @map("last_sign_in_at")
+  passwordHash              String                    @map("password_hash")
+  emailVerifiedAt           DateTime?                 @map("email_verified_at")
+  phone                     String?
+  phoneVerifiedAt           DateTime?                 @map("phone_verified_at")
+  status                    UserStatus                @default(active)
+  failedSignIns             Int                       @default(0) @map("failed_sign_ins")
+  lockedUntil               DateTime?                 @map("locked_until")
+  lastSignInAt              DateTime?                 @map("last_sign_in_at")
   /// Asked for the identity check where it applies (true) or not: set by the store's owner. Never means checked.
-  identityCheck    Boolean                  @default(true) @map("identity_check")
+  identityCheck             Boolean                   @default(true) @map("identity_check")
   /// The customer's country, chosen at sign-up (a reseller's store: the reseller's) and then fixed: their wallet,
   /// checkouts and prices are in its currency. Null only for accounts from before it was asked, until they choose.
-  country          String?                  @db.Char(2)
-  createdAt        DateTime                 @default(now()) @map("created_at")
-  updatedAt        DateTime                 @updatedAt @map("updated_at")
-  store            Store                    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  market           Country?                 @relation(fields: [country], references: [code], onDelete: Restrict)
-  sessions         CustomerSession[]
-  codes            CustomerCode[]
-  checkouts        Checkout[]
-  orders           Order[]
-  notifications    Notification[]
-  devices          Device[]
-  preferences      NotificationPreference[]
-  ledgerAccounts   LedgerAccount[]
-  payments         Payment[]
-  reservedAccounts ReservedAccount[]
+  country                   String?                   @db.Char(2)
+  createdAt                 DateTime                  @default(now()) @map("created_at")
+  updatedAt                 DateTime                  @updatedAt @map("updated_at")
+  store                     Store                     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  market                    Country?                  @relation(fields: [country], references: [code], onDelete: Restrict)
+  sessions                  CustomerSession[]
+  codes                     CustomerCode[]
+  checkouts                 Checkout[]
+  orders                    Order[]
+  notifications             Notification[]
+  devices                   Device[]
+  preferences               NotificationPreference[]
+  ledgerAccounts            LedgerAccount[]
+  payments                  Payment[]
+  reservedAccounts          ReservedAccount[]
   /// An admin froze the customer's crypto account: no ads, trades or withdrawals until unfrozen.
-  cryptoFrozenAt     DateTime?                @map("crypto_frozen_at")
-  cryptoFrozenReason String?                  @map("crypto_frozen_reason")
-  p2pProfile         P2pProfile?
-  cryptoFreezes      CryptoFreeze[]
-  p2pAds             P2pAd[]
-  p2pBuys            P2pTrade[]               @relation("p2p_buyer")
-  p2pSales           P2pTrade[]               @relation("p2p_seller")
-  cryptoAddresses    CryptoAddress[]
-  cryptoDeposits     CryptoDeposit[]
+  cryptoFrozenAt            DateTime?                 @map("crypto_frozen_at")
+  cryptoFrozenReason        String?                   @map("crypto_frozen_reason")
+  p2pProfile                P2pProfile?
+  cryptoFreezes             CryptoFreeze[]
+  p2pAds                    P2pAd[]
+  p2pBuys                   P2pTrade[]                @relation("p2p_buyer")
+  p2pSales                  P2pTrade[]                @relation("p2p_seller")
+  cryptoAddresses           CryptoAddress[]
+  cryptoDeposits            CryptoDeposit[]
   cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
-  cryptoWithdrawals  CryptoWithdrawal[]
-  bankAccounts       CustomerBankAccount[]
-  payouts            CustomerPayout[]
-  spinAllowances     SpinAllowance[]
-  spins              Spin[]
-  spinExchanges      SpinExchange[]
-  manualTopUps       ManualTopUp[]
-  exchangeQuotes     ExchangeQuote[]
-  exchangeTrades     ExchangeTrade[]
+  cryptoWithdrawals         CryptoWithdrawal[]
+  bankAccounts              CustomerBankAccount[]
+  payouts                   CustomerPayout[]
+  spinAllowances            SpinAllowance[]
+  spins                     Spin[]
+  spinExchanges             SpinExchange[]
+  publicSpinClaim           PublicSpinClaim?
+  manualTopUps              ManualTopUp[]
+  exchangeQuotes            ExchangeQuote[]
+  exchangeTrades            ExchangeTrade[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -2742,23 +2748,23 @@ model EsimTopUp {
 /// A crypto asset BitoCard's wallets hold. Balances are kept in the ledger in base units of `decimals` places
 /// (6 for the stablecoins, 8 for BTC, ETH and BNB: ETH's 18 would overflow a bigint).
 model CryptoAsset {
-  code      String   @id @db.VarChar(10)
-  name      String
-  decimals  Int
+  code                 String   @id @db.VarChar(10)
+  name                 String
+  decimals             Int
   /// Customers can hold and trade it.
-  enabled   Boolean  @default(false)
+  enabled              Boolean  @default(false)
   /// BitoCard's P2P fee in basis points, taken in the asset from what the buyer receives.
-  p2pFeeBps Int      @default(20) @map("p2p_fee_bps")
-  sortOrder Int      @default(0) @map("sort_order")
+  p2pFeeBps            Int      @default(20) @map("p2p_fee_bps")
+  sortOrder            Int      @default(0) @map("sort_order")
   /// The most one customer can withdraw on chain in 24 hours (asset units, decimal string).
-  withdrawalDailyLimit String @default("0") @map("withdrawal_daily_limit")
+  withdrawalDailyLimit String   @default("0") @map("withdrawal_daily_limit")
   /// Withdrawals from this amount (asset units, decimal string) wait for an admin's approval.
-  withdrawalReviewFrom String @default("0") @map("withdrawal_review_from")
+  withdrawalReviewFrom String   @default("0") @map("withdrawal_review_from")
   /// The most one taker may exchange of this coin in 24 hours (coin units, as text); null: no daily limit.
-  exchangeDailyLimit String? @map("exchange_daily_limit")
+  exchangeDailyLimit   String?  @map("exchange_daily_limit")
   /// Admins are told when BitoCard's coin reserve falls below this (coin units, as text); null: never.
-  exchangeReserveAlert String? @map("exchange_reserve_alert")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  exchangeReserveAlert String?  @map("exchange_reserve_alert")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("crypto_assets")
 }
@@ -2801,34 +2807,34 @@ model P2pProfile {
 /// An ad on the P2P market (one order book per mode, country and asset). A sell ad locks its crypto when posted; a
 /// buy ad locks the fiat it needs. Partial fills take from `remaining`.
 model P2pAd {
-  id                 String     @id @default(uuid()) @db.Uuid
-  mode               LedgerMode
-  customerId         String     @map("customer_id") @db.Uuid
-  country            String     @db.Char(2)
+  id               String     @id @default(uuid()) @db.Uuid
+  mode             LedgerMode
+  customerId       String     @map("customer_id") @db.Uuid
+  country          String     @db.Char(2)
   /// The market's fiat currency.
-  currency           String     @db.Char(3)
-  asset              String     @db.VarChar(10)
+  currency         String     @db.Char(3)
+  asset            String     @db.VarChar(10)
   /// sell (the owner sells crypto) or buy.
-  side               String
+  side             String
   /// Fiat minor units per whole unit of the asset (NGN 1,650.00 per USDT = 165000).
-  priceMinor         BigInt     @map("price_minor")
+  priceMinor       BigInt     @map("price_minor")
   /// Crypto base units.
-  totalAmount        BigInt     @map("total_amount")
-  remainingAmount    BigInt     @map("remaining_amount")
-  filledAmount       BigInt     @default(0) @map("filled_amount")
+  totalAmount      BigInt     @map("total_amount")
+  remainingAmount  BigInt     @map("remaining_amount")
+  filledAmount     BigInt     @default(0) @map("filled_amount")
   /// Fiat limits per order.
-  minFiatMinor       BigInt     @map("min_fiat_minor")
-  maxFiatMinor       BigInt     @map("max_fiat_minor")
+  minFiatMinor     BigInt     @map("min_fiat_minor")
+  maxFiatMinor     BigInt     @map("max_fiat_minor")
   /// Buy ads: fiat still locked, and how much of it came from P2P proceeds (spent first) rather than the wallet.
-  fiatLockedMinor    BigInt     @default(0) @map("fiat_locked_minor")
-  fiatFromProceeds   BigInt     @default(0) @map("fiat_from_proceeds")
-  terms              String?
+  fiatLockedMinor  BigInt     @default(0) @map("fiat_locked_minor")
+  fiatFromProceeds BigInt     @default(0) @map("fiat_from_proceeds")
+  terms            String?
   /// active, paused, completed or cancelled.
-  status             String     @default("active")
-  createdAt          DateTime   @default(now()) @map("created_at")
-  updatedAt          DateTime   @updatedAt @map("updated_at")
-  customer           Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  trades             P2pTrade[]
+  status           String     @default("active")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  customer         Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  trades           P2pTrade[]
 
   @@index([mode, country, asset, side, status, priceMinor])
   @@index([customerId, status])
@@ -2837,34 +2843,34 @@ model P2pAd {
 
 /// One trade against an ad. Instant trades settle both legs in the transaction that creates them.
 model P2pTrade {
-  id                   String     @id @default(uuid()) @db.Uuid
+  id               String     @id @default(uuid()) @db.Uuid
   /// Shown as P2P-000123.
-  number               Int        @unique @default(autoincrement())
-  mode                 LedgerMode
-  adId                 String     @map("ad_id") @db.Uuid
-  buyerId              String     @map("buyer_id") @db.Uuid
-  sellerId             String     @map("seller_id") @db.Uuid
+  number           Int        @unique @default(autoincrement())
+  mode             LedgerMode
+  adId             String     @map("ad_id") @db.Uuid
+  buyerId          String     @map("buyer_id") @db.Uuid
+  sellerId         String     @map("seller_id") @db.Uuid
   /// The customer who took the ad (the other is the ad's owner).
-  takerId              String     @map("taker_id") @db.Uuid
-  country              String     @db.Char(2)
-  currency             String     @db.Char(3)
-  asset                String     @db.VarChar(10)
-  priceMinor           BigInt     @map("price_minor")
+  takerId          String     @map("taker_id") @db.Uuid
+  country          String     @db.Char(2)
+  currency         String     @db.Char(3)
+  asset            String     @db.VarChar(10)
+  priceMinor       BigInt     @map("price_minor")
   /// Crypto the seller gave, the fee BitoCard took from it and what the buyer received.
-  amount               BigInt
-  feeAmount            BigInt     @map("fee_amount")
-  fiatMinor            BigInt     @map("fiat_minor")
+  amount           BigInt
+  feeAmount        BigInt     @map("fee_amount")
+  fiatMinor        BigInt     @map("fiat_minor")
   /// Where the buyer's fiat came from: P2P proceeds first, then the wallet (top-ups).
-  fiatFromProceeds     BigInt     @default(0) @map("fiat_from_proceeds")
-  fiatFromWallet       BigInt     @default(0) @map("fiat_from_wallet")
+  fiatFromProceeds BigInt     @default(0) @map("fiat_from_proceeds")
+  fiatFromWallet   BigInt     @default(0) @map("fiat_from_wallet")
   /// instant (BitoCard wallet) for now; classic (paid off platform) later.
-  settlement           String     @default("instant")
-  status               String     @default("completed")
-  createdAt            DateTime   @default(now()) @map("created_at")
-  completedAt          DateTime?  @map("completed_at")
-  ad                   P2pAd      @relation(fields: [adId], references: [id], onDelete: Restrict)
-  buyer                Customer   @relation("p2p_buyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  seller               Customer   @relation("p2p_seller", fields: [sellerId], references: [id], onDelete: Restrict)
+  settlement       String     @default("instant")
+  status           String     @default("completed")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  completedAt      DateTime?  @map("completed_at")
+  ad               P2pAd      @relation(fields: [adId], references: [id], onDelete: Restrict)
+  buyer            Customer   @relation("p2p_buyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller           Customer   @relation("p2p_seller", fields: [sellerId], references: [id], onDelete: Restrict)
 
   @@index([buyerId, createdAt])
   @@index([sellerId, createdAt])
@@ -2875,26 +2881,26 @@ model P2pTrade {
 /// Where an asset moves on chain: USDT on TRON, BNB on BNB Chain. `decimals` is the token's own (USDT on BNB Chain has
 /// 18); amounts are cut down to the asset's ledger places when credited. Contracts are matched exactly, never by symbol.
 model CryptoNetwork {
-  id             String   @id @default(uuid()) @db.Uuid
-  asset          String   @db.VarChar(10)
+  id                 String   @id @default(uuid()) @db.Uuid
+  asset              String   @db.VarChar(10)
   /// ETHEREUM, BSC, TRON, SOLANA or BITCOIN.
-  chain          String
+  chain              String
   /// The token contract (mainnet), or null for the chain's own coin.
-  contract       String?
+  contract           String?
   /// The same token on the chain's testnet (sandbox stores), or null.
-  testContract   String?  @map("test_contract")
-  decimals       Int
+  testContract       String?  @map("test_contract")
+  decimals           Int
   /// Blocks after the one holding a deposit before it is credited.
-  confirmations  Int
-  depositsEnabled Boolean @default(false) @map("deposits_enabled")
+  confirmations      Int
+  depositsEnabled    Boolean  @default(false) @map("deposits_enabled")
   /// Deposits at or above this (asset units, decimal string) are confirmed by two different providers first.
-  doubleCheckFrom String  @default("1000") @map("double_check_from")
-  withdrawalsEnabled Boolean @default(false) @map("withdrawals_enabled")
+  doubleCheckFrom    String   @default("1000") @map("double_check_from")
+  withdrawalsEnabled Boolean  @default(false) @map("withdrawals_enabled")
   /// BitoCard's network fee per withdrawal (asset units, decimal string), taken on top of the amount sent.
-  withdrawalFee  String   @default("0") @map("withdrawal_fee")
+  withdrawalFee      String   @default("0") @map("withdrawal_fee")
   /// The smallest amount a customer can send (asset units, decimal string).
-  minWithdrawal  String   @default("0") @map("min_withdrawal")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  minWithdrawal      String   @default("0") @map("min_withdrawal")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@unique([asset, chain])
   @@map("crypto_networks")
@@ -2902,23 +2908,23 @@ model CryptoNetwork {
 
 /// An address a customer saved to withdraw crypto to: usable 24 hours after it is added, screened against sanctions lists.
 model CryptoWithdrawalAddress {
-  id          String     @id @default(uuid()) @db.Uuid
+  id          String             @id @default(uuid()) @db.Uuid
   /// A store customer's or a reseller's saved address (exactly one).
-  customerId  String?    @map("customer_id") @db.Uuid
-  resellerId  String?    @map("reseller_id") @db.Uuid
+  customerId  String?            @map("customer_id") @db.Uuid
+  resellerId  String?            @map("reseller_id") @db.Uuid
   mode        LedgerMode
   chain       String
   address     String
   label       String
   /// Withdrawals to it can start from then (24 hours after it was added).
-  usableFrom  DateTime   @map("usable_from")
+  usableFrom  DateTime           @map("usable_from")
   /// clear, flagged or unscreened (no screening provider answered), with who answered and when.
-  screening   String     @default("unscreened")
-  screenedBy  String?    @map("screened_by")
-  screenedAt  DateTime?  @map("screened_at")
-  createdAt   DateTime   @default(now()) @map("created_at")
-  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  reseller    Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  screening   String             @default("unscreened")
+  screenedBy  String?            @map("screened_by")
+  screenedAt  DateTime?          @map("screened_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  customer    Customer?          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  reseller    Reseller?          @relation(fields: [resellerId], references: [id], onDelete: Cascade)
   withdrawals CryptoWithdrawal[]
 
   @@unique([customerId, mode, chain, address])
@@ -2929,19 +2935,19 @@ model CryptoWithdrawalAddress {
 /// One asset's daily custody check: what the ledger says BitoCard holds for customers (`crypto_custody`, less withdrawals
 /// sent but not yet settled, plus deposits seen but not yet credited) against what the signer's wallets hold on chain.
 model CryptoReconciliation {
-  id          String     @id @default(uuid()) @db.Uuid
-  mode        LedgerMode
-  asset       String     @db.VarChar(10)
+  id         String     @id @default(uuid()) @db.Uuid
+  mode       LedgerMode
+  asset      String     @db.VarChar(10)
   /// Ledger units: what the ledger expects on chain, and what the signer reported.
-  expected    BigInt
-  held        BigInt
+  expected   BigInt
+  held       BigInt
   /// held - expected: below zero is a shortfall (admins are told); above, a surplus (fees not yet swept, for example).
-  difference  BigInt
+  difference BigInt
   /// matched, surplus, shortfall or unavailable (the signer could not be asked).
-  status      String
+  status     String
   /// The parts behind `expected` and `held` (per chain), and any error.
-  detail      Json
-  createdAt   DateTime   @default(now()) @map("created_at")
+  detail     Json
+  createdAt  DateTime   @default(now()) @map("created_at")
 
   @@index([mode, asset, createdAt])
   @@map("crypto_reconciliations")
@@ -3093,28 +3099,28 @@ model ExchangeQuote {
 
 /// An instant trade with an exchange desk, settled in one ledger entry (`exchange_trade:<id>`). Shown as EX-000123.
 model ExchangeTrade {
-  id             String     @id @default(uuid()) @db.Uuid
-  number         Int        @unique @default(autoincrement())
-  quoteId        String     @unique @map("quote_id") @db.Uuid
-  desk           String     @default("bitocard")
-  mode           LedgerMode
-  customerId     String     @map("customer_id") @db.Uuid
-  side           String
-  asset          String     @db.VarChar(10)
-  currency       String     @db.Char(3)
-  amount         BigInt
-  fiatMinor      BigInt     @map("fiat_minor")
-  priceMinor     BigInt     @map("price_minor")
-  marketUsdE8    BigInt     @map("market_usd_e8")
-  fxMid          Decimal    @map("fx_mid") @db.Decimal(24, 10)
-  markupBps      Int        @map("markup_bps")
+  id           String     @id @default(uuid()) @db.Uuid
+  number       Int        @unique @default(autoincrement())
+  quoteId      String     @unique @map("quote_id") @db.Uuid
+  desk         String     @default("bitocard")
+  mode         LedgerMode
+  customerId   String     @map("customer_id") @db.Uuid
+  side         String
+  asset        String     @db.VarChar(10)
+  currency     String     @db.Char(3)
+  amount       BigInt
+  fiatMinor    BigInt     @map("fiat_minor")
+  priceMinor   BigInt     @map("price_minor")
+  marketUsdE8  BigInt     @map("market_usd_e8")
+  fxMid        Decimal    @map("fx_mid") @db.Decimal(24, 10)
+  markupBps    Int        @map("markup_bps")
   /// The desk's margin in fiat minor units: what the trade made over the market price (never negative).
-  markupMinor    BigInt     @map("markup_minor")
+  markupMinor  BigInt     @map("markup_minor")
   /// Buying: how much came from P2P money and from the store wallet.
-  fromProceeds   BigInt     @default(0) @map("from_proceeds")
-  fromWallet     BigInt     @default(0) @map("from_wallet")
-  createdAt      DateTime   @default(now()) @map("created_at")
-  customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  fromProceeds BigInt     @default(0) @map("from_proceeds")
+  fromWallet   BigInt     @default(0) @map("from_wallet")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  customer     Customer   @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   @@index([customerId, createdAt])
   @@index([mode, createdAt])
@@ -3123,10 +3129,10 @@ model ExchangeTrade {
 
 /// A reseller's held price to trade its own fiat and coin reserve directly with BitoCard.
 model ExchangeDesk {
-  resellerId          String   @id @map("reseller_id") @db.Uuid
-  fallbackToBitocard   Boolean  @default(true) @map("fallback_to_bitocard")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  resellerId         String   @id @map("reseller_id") @db.Uuid
+  fallbackToBitocard Boolean  @default(true) @map("fallback_to_bitocard")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("exchange_desks")
 }
@@ -3213,50 +3219,50 @@ model ReserveMovement {
 }
 
 model CryptoWithdrawal {
-  id               String     @id @default(uuid()) @db.Uuid
+  id              String                   @id @default(uuid()) @db.Uuid
   /// Shown as CW-000123.
-  number           Int        @unique @default(autoincrement())
+  number          Int                      @unique @default(autoincrement())
   /// Whose coins: a store customer or a reseller (exactly one).
-  customerId       String?    @map("customer_id") @db.Uuid
-  resellerId       String?    @map("reseller_id") @db.Uuid
+  customerId      String?                  @map("customer_id") @db.Uuid
+  resellerId      String?                  @map("reseller_id") @db.Uuid
   /// For a reseller's withdrawal, the team member who asked: only they can confirm it with the emailed code.
-  requestedBy      String?    @map("requested_by") @db.Uuid
-  mode             LedgerMode
-  asset            String     @db.VarChar(10)
-  chain            String
-  addressId        String?    @map("address_id") @db.Uuid
-  address          String
+  requestedBy     String?                  @map("requested_by") @db.Uuid
+  mode            LedgerMode
+  asset           String                   @db.VarChar(10)
+  chain           String
+  addressId       String?                  @map("address_id") @db.Uuid
+  address         String
   /// Ledger units sent to the address, and BitoCard's fee on top.
-  amount           BigInt
-  fee              BigInt
+  amount          BigInt
+  fee             BigInt
   /// What the signer sends, in on-chain units (text: 18-decimal tokens exceed a bigint).
-  rawAmount        String     @map("raw_amount")
+  rawAmount       String                   @map("raw_amount")
   /// awaiting_code, review, queued, submitting, broadcast, completed, failed, rejected or cancelled.
-  status           String     @default("awaiting_code")
-  codeHash         String?    @map("code_hash")
-  codeExpiresAt    DateTime?  @map("code_expires_at")
-  codeAttempts     Int        @default(0) @map("code_attempts")
-  codeSentAt       DateTime?  @map("code_sent_at")
+  status          String                   @default("awaiting_code")
+  codeHash        String?                  @map("code_hash")
+  codeExpiresAt   DateTime?                @map("code_expires_at")
+  codeAttempts    Int                      @default(0) @map("code_attempts")
+  codeSentAt      DateTime?                @map("code_sent_at")
   /// Why it waits for an admin (amount, screening), and the admin's decision.
-  reviewReason     String?    @map("review_reason")
-  reviewedBy       String?    @map("reviewed_by") @db.Uuid
-  reviewNote       String?    @map("review_note")
-  reviewedAt       DateTime?  @map("reviewed_at")
+  reviewReason    String?                  @map("review_reason")
+  reviewedBy      String?                  @map("reviewed_by") @db.Uuid
+  reviewNote      String?                  @map("review_note")
+  reviewedAt      DateTime?                @map("reviewed_at")
   /// The same on every request to the signer, so a repeat never sends twice.
-  signerReference  String     @unique @map("signer_reference")
-  txHash           String?    @map("tx_hash")
-  confirmations    Int        @default(0)
-  attempts         Int        @default(0)
-  nextCheckAt      DateTime?  @map("next_check_at")
+  signerReference String                   @unique @map("signer_reference")
+  txHash          String?                  @map("tx_hash")
+  confirmations   Int                      @default(0)
+  attempts        Int                      @default(0)
+  nextCheckAt     DateTime?                @map("next_check_at")
   /// Set once it has waited too long for the signer or the chain (admins were told).
-  needsReviewAt    DateTime?  @map("needs_review_at")
-  error            String?
-  createdAt        DateTime   @default(now()) @map("created_at")
-  updatedAt        DateTime   @updatedAt @map("updated_at")
-  completedAt      DateTime?  @map("completed_at")
-  customer         Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reseller         Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
-  savedAddress     CryptoWithdrawalAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  needsReviewAt   DateTime?                @map("needs_review_at")
+  error           String?
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
+  completedAt     DateTime?                @map("completed_at")
+  customer        Customer?                @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reseller        Reseller?                @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  savedAddress    CryptoWithdrawalAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   @@index([status, nextCheckAt])
   @@index([resellerId, createdAt])
@@ -3296,36 +3302,36 @@ model CryptoAddress {
 /// A transfer to a customer's address, seen on chain: pending until it has its confirmations (and, when large, a second
 /// provider agrees), then credited once (`crypto_deposit:<chain>:<tx>:<index>`).
 model CryptoDeposit {
-  id            String     @id @default(uuid()) @db.Uuid
+  id              String     @id @default(uuid()) @db.Uuid
   /// The address's owner: a store customer or a reseller (exactly one).
-  customerId    String?    @map("customer_id") @db.Uuid
-  resellerId    String?    @map("reseller_id") @db.Uuid
-  mode          LedgerMode
-  chain         String
-  asset         String     @db.VarChar(10)
-  address       String
-  txHash        String     @map("tx_hash")
+  customerId      String?    @map("customer_id") @db.Uuid
+  resellerId      String?    @map("reseller_id") @db.Uuid
+  mode            LedgerMode
+  chain           String
+  asset           String     @db.VarChar(10)
+  address         String
+  txHash          String     @map("tx_hash")
   /// The log index (tokens) or output index (Bitcoin); 0 for a plain coin transfer.
-  outputIndex   Int        @map("output_index")
+  outputIndex     Int        @map("output_index")
   /// On-chain units, as text (may exceed a bigint for 18-decimal tokens).
-  rawAmount     String     @map("raw_amount")
+  rawAmount       String     @map("raw_amount")
   /// Ledger units credited (the asset's places).
-  amount        BigInt
-  blockNumber   BigInt?    @map("block_number")
-  confirmations Int        @default(0)
+  amount          BigInt
+  blockNumber     BigInt?    @map("block_number")
+  confirmations   Int        @default(0)
   /// pending, credited, ignored (too small or too large to credit) or failed (no longer on chain).
-  status        String     @default("pending")
+  status          String     @default("pending")
   /// Providers that have confirmed it.
-  confirmedBy   String[]   @default([]) @map("confirmed_by")
-  checkedAt     DateTime?  @map("checked_at")
+  confirmedBy     String[]   @default([]) @map("confirmed_by")
+  checkedAt       DateTime?  @map("checked_at")
   /// When the chain stopped showing it (cleared when it is seen again); it fails 6 hours after this.
-  missingSince  DateTime?  @map("missing_since")
-  creditedAt    DateTime?  @map("credited_at")
+  missingSince    DateTime?  @map("missing_since")
+  creditedAt      DateTime?  @map("credited_at")
   /// When the signer was told about the deposit's address (so it sweeps it and counts it in its balances).
-  signerTrackedAt DateTime? @map("signer_tracked_at")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  customer      Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  reseller      Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  signerTrackedAt DateTime?  @map("signer_tracked_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  customer        Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  reseller        Reseller?  @relation(fields: [resellerId], references: [id], onDelete: Restrict)
 
   @@unique([chain, txHash, outputIndex])
   @@index([resellerId, createdAt])
@@ -3337,14 +3343,14 @@ model CryptoDeposit {
 
 /// The order BitoCard asks chain providers for each chain (lower first), and how each last answered.
 model ChainRoute {
-  chain       String
-  provider    String
-  priority    Int       @default(100)
-  enabled     Boolean   @default(true)
-  lastBlock   BigInt?   @map("last_block")
-  lastError   String?   @map("last_error")
-  checkedAt   DateTime? @map("checked_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  chain     String
+  provider  String
+  priority  Int       @default(100)
+  enabled   Boolean   @default(true)
+  lastBlock BigInt?   @map("last_block")
+  lastError String?   @map("last_error")
+  checkedAt DateTime? @map("checked_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@id([chain, provider])
   @@map("chain_routes")
@@ -3352,17 +3358,17 @@ model ChainRoute {
 
 /// A chain provider's notification, kept once per body: only the transactions it names, which are re-read before anything is credited.
 model ChainNotice {
-  id          String    @id @default(uuid()) @db.Uuid
+  id          String      @id @default(uuid()) @db.Uuid
   provider    String
   chain       String
-  bodyHash    String    @unique @map("body_hash")
+  bodyHash    String      @unique @map("body_hash")
   /// The mode to record in; null for providers' webhooks (their Sandbox switch decides). Set for transactions a scan
   /// found but no provider could read yet (provider `scan`), kept here to be retried.
   mode        LedgerMode?
   hashes      String[]
-  processedAt DateTime? @map("processed_at")
-  attempts    Int       @default(0)
-  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime?   @map("processed_at")
+  attempts    Int         @default(0)
+  createdAt   DateTime    @default(now()) @map("created_at")
 
   @@index([processedAt])
   @@map("chain_notices")
@@ -3428,6 +3434,45 @@ model Spin {
   @@map("spins")
 }
 
+enum PublicSpinClaimStatus {
+  active
+  claimed
+  invalidated
+  expired
+}
+
+/// Customer Catcher: the server-owned six-spin claim behind an opaque, HttpOnly storefront cookie. Prize values are
+/// fixed on creation and never trusted from the browser. A claim is credited at most once after account creation.
+model PublicSpinClaim {
+  id                String                @id @default(uuid()) @db.Uuid
+  tokenHash         String                @unique @map("token_hash") @db.Char(64)
+  storeId           String                @map("store_id") @db.Uuid
+  countryCode       String                @map("country_code") @db.Char(2)
+  mode              LedgerMode
+  status            PublicSpinClaimStatus @default(active)
+  limit             Int                   @default(6)
+  /// The full $1 allowance schedule; the visitor uses its first `limit` entries before sign-up.
+  schedule          Int[]
+  /// Presented outcomes, stored as objects with number, cents, asset, amount, segment and created_at.
+  wins              Json                  @default("[]")
+  spinsUsed         Int                   @default(0) @map("spins_used")
+  wonCents          Int                   @default(0) @map("won_cents")
+  customerId        String?               @unique @map("customer_id") @db.Uuid
+  claimCurrency     String?               @map("claim_currency") @db.VarChar(3)
+  claimAmountMinor  BigInt?               @map("claim_amount_minor")
+  invalidatedReason String?               @map("invalidated_reason")
+  expiresAt         DateTime              @map("expires_at")
+  claimedAt         DateTime?             @map("claimed_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  store             Store                 @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  country           Country               @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  customer          Customer?             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([storeId, status, expiresAt])
+  @@map("public_spin_claims")
+}
+
 enum ResellerBusinessType {
   unregistered
   registered
@@ -3449,52 +3494,52 @@ enum KycCaseStatus {
 /// Documents are stored encrypted in a private bucket (`kyc_documents`); typed ID numbers are encrypted, with an HMAC
 /// fingerprint to find the same ID on other cases.
 model KycCase {
-  id                 String               @id @default(uuid()) @db.Uuid
-  verificationId     String               @unique @map("verification_id") @db.Uuid
+  id                 String                @id @default(uuid()) @db.Uuid
+  verificationId     String                @unique @map("verification_id") @db.Uuid
   subject            VerificationSubject
   /// kyc (a person) or kyb (a reseller's business: unregistered, or registered with its documents).
   kind               String
   mode               LedgerMode
-  country            String               @db.Char(2)
+  country            String                @db.Char(2)
   /// The reseller verified (KYB), or the customer's seller (customer checks).
-  resellerId         String               @map("reseller_id") @db.Uuid
+  resellerId         String                @map("reseller_id") @db.Uuid
   /// The reseller's own reference for the customer (customer checks; a store customer's id on hosted stores).
-  customerReference  String?              @map("customer_reference")
-  storeId            String?              @map("store_id") @db.Uuid
-  status             KycCaseStatus        @default(draft)
-  consentAt          DateTime?            @map("consent_at")
+  customerReference  String?               @map("customer_reference")
+  storeId            String?               @map("store_id") @db.Uuid
+  status             KycCaseStatus         @default(draft)
+  consentAt          DateTime?             @map("consent_at")
   businessType       ResellerBusinessType? @map("business_type")
-  registeredName     String?              @map("registered_name")
-  registrationNumber String?              @map("registration_number")
-  businessAddress    String?              @map("business_address")
-  idType             String?              @map("id_type")
+  registeredName     String?               @map("registered_name")
+  registrationNumber String?               @map("registration_number")
+  businessAddress    String?               @map("business_address")
+  idType             String?               @map("id_type")
   /// Encrypted with ENCRYPTION_KEY; shown in full only to reviewers.
-  idNumberEncrypted  String?              @map("id_number_encrypted")
+  idNumberEncrypted  String?               @map("id_number_encrypted")
   /// HMAC of country, ID type and number: the same ID on other cases.
-  idFingerprint      String?              @map("id_fingerprint")
-  fullName           String?              @map("full_name")
-  dateOfBirth        String?              @map("date_of_birth")
+  idFingerprint      String?               @map("id_fingerprint")
+  fullName           String?               @map("full_name")
+  dateOfBirth        String?               @map("date_of_birth")
   /// The liveness steps issued (codes), in order.
-  livenessSteps      String[]             @map("liveness_steps")
+  livenessSteps      String[]              @map("liveness_steps")
   /// Who reviews it, fixed at submission: admin, or the customer's seller (registered and KYB-verified).
   reviewer           String?
-  resubmitItems      String[]             @map("resubmit_items")
+  resubmitItems      String[]              @map("resubmit_items")
   reason             String?
   note               String?
-  verifiedName       String?              @map("verified_name")
-  decidedById        String?              @map("decided_by_id") @db.Uuid
+  verifiedName       String?               @map("verified_name")
+  decidedById        String?               @map("decided_by_id") @db.Uuid
   /// admin or reseller.
-  decidedRealm       String?              @map("decided_realm")
-  returnUrl          String?              @map("return_url")
-  submittedAt        DateTime?            @map("submitted_at")
-  decidedAt          DateTime?            @map("decided_at")
+  decidedRealm       String?               @map("decided_realm")
+  returnUrl          String?               @map("return_url")
+  submittedAt        DateTime?             @map("submitted_at")
+  decidedAt          DateTime?             @map("decided_at")
   /// When the documents are deleted (retention), null while it is open.
-  purgeAfter         DateTime?            @map("purge_after")
-  purgedAt           DateTime?            @map("purged_at")
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
-  verification       IdentityVerification @relation(fields: [verificationId], references: [id], onDelete: Restrict)
-  reseller           Reseller             @relation(fields: [resellerId], references: [id], onDelete: Restrict)
+  purgeAfter         DateTime?             @map("purge_after")
+  purgedAt           DateTime?             @map("purged_at")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+  verification       IdentityVerification  @relation(fields: [verificationId], references: [id], onDelete: Restrict)
+  reseller           Reseller              @relation(fields: [resellerId], references: [id], onDelete: Restrict)
   documents          KycDocument[]
   sessions           KycSession[]
 
@@ -3507,16 +3552,16 @@ model KycCase {
 
 /// One uploaded file of a case (ID sides, selfie, liveness frames, business documents), encrypted in the private bucket.
 model KycDocument {
-  id          String    @id @default(uuid()) @db.Uuid
-  caseId      String    @map("case_id") @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  caseId      String   @map("case_id") @db.Uuid
   /// id_front, id_back, selfie, liveness_<step>_<frame>, business_registration, business_address, business_directors.
   kind        String
-  objectKey   String    @map("object_key")
-  contentType String    @map("content_type")
+  objectKey   String   @map("object_key")
+  contentType String   @map("content_type")
   size        Int
   sha256      String
-  createdAt   DateTime  @default(now()) @map("created_at")
-  case        KycCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+  case        KycCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@unique([caseId, kind])
   @@map("kyc_documents")
@@ -3524,15 +3569,15 @@ model KycDocument {
 
 /// Links into verify.bitocard.com (single use, 30 minutes) and the app sessions they become (2 hours idle), by hash.
 model KycSession {
-  id          String    @id @default(uuid()) @db.Uuid
-  caseId      String    @map("case_id") @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  caseId    String    @map("case_id") @db.Uuid
   /// handoff (the link) or session (what the link was exchanged for).
-  kind        String
-  tokenHash   String    @unique @map("token_hash")
-  expiresAt   DateTime  @map("expires_at")
-  usedAt      DateTime? @map("used_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  case        KycCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  kind      String
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  case      KycCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([caseId])
   @@map("kyc_sessions")
@@ -3582,44 +3627,44 @@ enum DomainStatus {
 
 /// A reseller store's own domain, served by the storefront through Vercel (the storefront project's domains).
 model StoreDomain {
-  id                 String        @id @default(uuid()) @db.Uuid
-  resellerId         String        @map("reseller_id") @db.Uuid
-  storeId            String        @map("store_id") @db.Uuid
+  id               String       @id @default(uuid()) @db.Uuid
+  resellerId       String       @map("reseller_id") @db.Uuid
+  storeId          String       @map("store_id") @db.Uuid
   /// Lower case, without www (the apex the reseller chose, or a subdomain of a domain they own).
-  name               String
-  source             DomainSource
-  status             DomainStatus  @default(pending)
+  name             String
+  source           DomainSource
+  status           DomainStatus @default(pending)
   /// Where its DNS is: `vercel` (Vercel's nameservers, editable in SHQ) or `external` (the reseller's own DNS host).
-  dnsMode            String        @default("external") @map("dns_mode")
+  dnsMode          String       @default("external") @map("dns_mode")
   /// The store's main address: links, payment returns and emails use it.
-  primary            Boolean       @default(false)
-  verified           Boolean       @default(false)
-  misconfigured      Boolean       @default(true)
+  primary          Boolean      @default(false)
+  verified         Boolean      @default(false)
+  misconfigured    Boolean      @default(true)
   /// Vercel's ownership challenges while not verified ([{ type, domain, value, reason }]).
-  verification       Json?
-  lastCheckedAt      DateTime?     @map("last_checked_at")
-  lastError          String?       @map("last_error")
+  verification     Json?
+  lastCheckedAt    DateTime?    @map("last_checked_at")
+  lastError        String?      @map("last_error")
   // Buying and renewing (purchased domains only).
-  orderId            String?       @map("order_id")
+  orderId          String?      @map("order_id")
   /// Vercel's price for the registration being paid for, in US cents.
-  costCents          Int?          @map("cost_cents")
+  costCents        Int?         @map("cost_cents")
   /// What the reseller pays for it (Vercel's price plus BitoCard's margin), in US cents.
-  priceCents         Int?          @map("price_cents")
-  holdId             String?       @map("hold_id") @db.Uuid
-  expiresAt          DateTime?     @map("expires_at")
-  autoRenew          Boolean       @default(true) @map("auto_renew")
-  renewalAttemptAt   DateTime?     @map("renewal_attempt_at")
-  renewalError       String?       @map("renewal_error")
-  remindedAt         Json?         @map("reminded_at")
+  priceCents       Int?         @map("price_cents")
+  holdId           String?      @map("hold_id") @db.Uuid
+  expiresAt        DateTime?    @map("expires_at")
+  autoRenew        Boolean      @default(true) @map("auto_renew")
+  renewalAttemptAt DateTime?    @map("renewal_attempt_at")
+  renewalError     String?      @map("renewal_error")
+  remindedAt       Json?        @map("reminded_at")
   // Email from the store's domain (Resend) and the mailbox provider chosen.
-  emailDomainId      String?       @map("email_domain_id")
-  emailStatus        String?       @map("email_status")
-  emailRecords       Json?         @map("email_records")
-  mailProvider       String?       @map("mail_provider")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
-  reseller           Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
-  store              Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  emailDomainId    String?      @map("email_domain_id")
+  emailStatus      String?      @map("email_status")
+  emailRecords     Json?        @map("email_records")
+  mailProvider     String?      @map("mail_provider")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  reseller         Reseller     @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  store            Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([resellerId])
   @@index([storeId])
@@ -3734,22 +3779,22 @@ model SupportTicket {
 
 /// One message on a support ticket.
 model SupportTicketMessage {
-  id         String        @id @default(uuid()) @db.Uuid
-  ticketId   String        @map("ticket_id") @db.Uuid
+  id              String        @id @default(uuid()) @db.Uuid
+  ticketId        String        @map("ticket_id") @db.Uuid
   /// customer, reseller, bitocard, bot or system.
-  author     String
-  authorId   String?       @map("author_id") @db.Uuid
-  authorName String?       @map("author_name")
+  author          String
+  authorId        String?       @map("author_id") @db.Uuid
+  authorName      String?       @map("author_name")
   /// The assistant's picture when it wrote (bot messages), so each answer shows its face.
-  authorAvatarUrl String?   @map("author_avatar_url")
+  authorAvatarUrl String?       @map("author_avatar_url")
   /// all: the requester sees it too; staff: those answering only (the reseller and BitoCard on a customer's ticket,
   /// BitoCard only on a reseller's own).
-  visibility String        @default("all")
-  body       String
+  visibility      String        @default("all")
+  body            String
   /// An assistant's suggested reply waiting for staff to send, edit or discard (never shown to the requester).
-  draft      Boolean       @default(false)
-  createdAt  DateTime      @default(now()) @map("created_at")
-  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  draft           Boolean       @default(false)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([ticketId, createdAt])
   @@map("support_ticket_messages")
@@ -3758,41 +3803,41 @@ model SupportTicketMessage {
 /// A live chat: a store customer with their store (BitoCard at bitocard.com), or a reseller's team with BitoCard. One
 /// open conversation per customer (or reseller) at a time; staff take it over, close it, or turn it into a ticket.
 model SupportConversation {
-  id             String               @id @default(uuid()) @db.Uuid
-  resellerId     String               @map("reseller_id") @db.Uuid
-  mode           LedgerMode
+  id                 String                  @id @default(uuid()) @db.Uuid
+  resellerId         String                  @map("reseller_id") @db.Uuid
+  mode               LedgerMode
   /// customer (a store customer) or reseller (a reseller's team chatting with BitoCard).
-  requester      String
+  requester          String
   /// Who answers: reseller (the store) or bitocard.
-  queue          String
+  queue              String
   /// bot (an assistant is answering), waiting (for a person), with_staff (a person is answering) or closed.
-  status         String               @default("waiting")
-  storeId        String?              @map("store_id") @db.Uuid
-  customerId     String?              @map("customer_id") @db.Uuid
+  status             String                  @default("waiting")
+  storeId            String?                 @map("store_id") @db.Uuid
+  customerId         String?                 @map("customer_id") @db.Uuid
   /// The reseller team member who started it (reseller chats).
-  userId         String?              @map("user_id") @db.Uuid
+  userId             String?                 @map("user_id") @db.Uuid
   /// The staff member answering (a reseller team member, or an admin on BitoCard's queue).
-  assigneeId     String?              @map("assignee_id") @db.Uuid
+  assigneeId         String?                 @map("assignee_id") @db.Uuid
   /// The ticket it became, if staff turned it into one.
-  ticketId       String?              @map("ticket_id") @db.Uuid
-  lastMessageAt  DateTime             @default(now()) @map("last_message_at")
+  ticketId           String?                 @map("ticket_id") @db.Uuid
+  lastMessageAt      DateTime                @default(now()) @map("last_message_at")
   /// When the requester last wrote: a conversation waits for staff from here.
-  lastAskedAt    DateTime             @default(now()) @map("last_asked_at")
+  lastAskedAt        DateTime                @default(now()) @map("last_asked_at")
   /// When staff were last told it is waiting (at most every 10 minutes per conversation).
-  alertedAt      DateTime?            @map("alerted_at")
+  alertedAt          DateTime?               @map("alerted_at")
   /// The assistant answering it (status `bot`), and when one run claimed the next answer (so two runs never answer at once).
-  botId          String?              @map("bot_id") @db.Uuid
-  botClaimedAt   DateTime?            @map("bot_claimed_at")
-  closedAt       DateTime?            @map("closed_at")
+  botId              String?                 @map("bot_id") @db.Uuid
+  botClaimedAt       DateTime?               @map("bot_claimed_at")
+  closedAt           DateTime?               @map("closed_at")
   /// A signed-out visitor who gave their name and email (store chats without an account).
-  visitorId      String?              @map("visitor_id") @db.Uuid
-  visitor        SupportVisitor?      @relation(fields: [visitorId], references: [id])
+  visitorId          String?                 @map("visitor_id") @db.Uuid
+  visitor            SupportVisitor?         @relation(fields: [visitorId], references: [id])
   /// When a visitor was last emailed that staff replied (at most every 10 minutes per conversation).
-  requesterAlertedAt DateTime?        @map("requester_alerted_at")
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
-  messages       SupportChatMessage[]
-  attachments    SupportChatAttachment[]
+  requesterAlertedAt DateTime?               @map("requester_alerted_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+  messages           SupportChatMessage[]
+  attachments        SupportChatAttachment[]
 
   @@index([queue, status, lastMessageAt])
   @@index([resellerId, mode, status])
@@ -3803,18 +3848,18 @@ model SupportConversation {
 
 /// One message in a live chat.
 model SupportChatMessage {
-  id             String              @id @default(uuid()) @db.Uuid
-  conversationId String              @map("conversation_id") @db.Uuid
+  id              String                  @id @default(uuid()) @db.Uuid
+  conversationId  String                  @map("conversation_id") @db.Uuid
   /// customer, reseller, bitocard, bot or system.
-  author         String
-  authorId       String?             @map("author_id") @db.Uuid
-  authorName     String?             @map("author_name")
+  author          String
+  authorId        String?                 @map("author_id") @db.Uuid
+  authorName      String?                 @map("author_name")
   /// The assistant's picture when it wrote (bot messages), so each answer shows its face.
-  authorAvatarUrl String?            @map("author_avatar_url")
-  body           String
-  createdAt      DateTime            @default(now()) @map("created_at")
-  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  attachments    SupportChatAttachment[]
+  authorAvatarUrl String?                 @map("author_avatar_url")
+  body            String
+  createdAt       DateTime                @default(now()) @map("created_at")
+  conversation    SupportConversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments     SupportChatAttachment[]
 
   @@index([conversationId, createdAt])
   @@map("support_chat_messages")
@@ -3907,37 +3952,37 @@ model AiUsage {
 /// A support bot (assistant): one per store (or BitoCard's one for resellers in SHQ, `scope: platform`). It answers
 /// chats and/or tickets with an AI agent (BitoCard's keys on Premium, or the reseller's own), from its knowledge.
 model SupportBot {
-  id               String    @id @default(uuid()) @db.Uuid
-  resellerId       String    @map("reseller_id") @db.Uuid
+  id               String                @id @default(uuid()) @db.Uuid
+  resellerId       String                @map("reseller_id") @db.Uuid
   /// store (a store's customers) or platform (BitoCard's assistant for resellers in SHQ).
-  scope            String    @default("store")
-  storeId          String?   @unique @map("store_id") @db.Uuid
+  scope            String                @default("store")
+  storeId          String?               @unique @map("store_id") @db.Uuid
   /// chat and/or tickets.
-  roles            String[]  @default([])
+  roles            String[]              @default([])
   /// auto (sends ticket replies) or draft (staff send them).
-  ticketReplyMode  String    @default("draft") @map("ticket_reply_mode")
+  ticketReplyMode  String                @default("draft") @map("ticket_reply_mode")
   /// anthropic, openai or deepseek.
   provider         String
   model            String
   /// bitocard (its keys, Premium) or own (the reseller's key).
   funding          String
   name             String
-  avatarUrl        String?   @map("avatar_url")
+  avatarUrl        String?               @map("avatar_url")
   greeting         String?
   /// friendly, formal or brief.
-  tone             String    @default("friendly")
+  tone             String                @default("friendly")
   instructions     String?
   /// draft, active, paused (by its owner) or suspended (by BitoCard).
-  status           String    @default("draft")
-  suspendedReason  String?   @map("suspended_reason")
-  knowledgeId      String?   @map("knowledge_id") @db.Uuid
+  status           String                @default("draft")
+  suspendedReason  String?               @map("suspended_reason")
+  knowledgeId      String?               @map("knowledge_id") @db.Uuid
   /// Applies BitoCard's sections by itself when the store's data changes (never the owner's).
-  autoRefresh      Boolean   @default(false) @map("auto_refresh")
+  autoRefresh      Boolean               @default(false) @map("auto_refresh")
   /// When the store's data first differed from the knowledge in use.
-  knowledgeStaleAt DateTime? @map("knowledge_stale_at")
-  createdById      String?   @map("created_by_id") @db.Uuid
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  knowledgeStaleAt DateTime?             @map("knowledge_stale_at")
+  createdById      String?               @map("created_by_id") @db.Uuid
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
   knowledge        SupportBotKnowledge[]
 
   @@index([resellerId])
@@ -3947,22 +3992,22 @@ model SupportBot {
 
 /// A version of a bot's knowledge document (Markdown). Never edited in place: a change is a new version.
 model SupportBotKnowledge {
-  id               String     @id @default(uuid()) @db.Uuid
-  botId            String     @map("bot_id") @db.Uuid
-  version          Int
+  id              String     @id @default(uuid()) @db.Uuid
+  botId           String     @map("bot_id") @db.Uuid
+  version         Int
   /// upload, generated (by BitoCard from the store), edited or refreshed (BitoCard's sections updated).
-  source           String
+  source          String
   /// md, or csv (FAQs, turned into Markdown when uploaded).
-  format           String     @default("md")
-  content          String
-  chars            Int
+  format          String     @default("md")
+  content         String
+  chars           Int
   /// A fingerprint of the store data BitoCard's sections were made from (null for a document with none).
-  dataHash         String?    @map("data_hash")
+  dataHash        String?    @map("data_hash")
   /// Each BitoCard section's hash as BitoCard wrote it, to tell when the owner edited one.
-  managedSections  Json       @default("{}") @map("managed_sections")
-  createdById      String?    @map("created_by_id") @db.Uuid
-  createdAt        DateTime   @default(now()) @map("created_at")
-  bot              SupportBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+  managedSections Json       @default("{}") @map("managed_sections")
+  createdById     String?    @map("created_by_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at")
+  bot             SupportBot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, version])
   @@map("support_bot_knowledge")
@@ -3971,32 +4016,32 @@ model SupportBotKnowledge {
 /// A month's bill: per store (and one for the account's own usage), per currency, live only. Each line was taken from
 /// the wallet when it happened; what the wallet could not pay is owed until a top-up (or Pay invoice) pays it.
 model Invoice {
-  id         String        @id @default(uuid()) @db.Uuid
+  id          String        @id @default(uuid()) @db.Uuid
   /// Shown as INV-000123.
-  number     Int           @unique @default(autoincrement())
-  resellerId String        @map("reseller_id") @db.Uuid
+  number      Int           @unique @default(autoincrement())
+  resellerId  String        @map("reseller_id") @db.Uuid
   /// Null: the account's own usage.
-  storeId    String?       @map("store_id") @db.Uuid
+  storeId     String?       @map("store_id") @db.Uuid
   /// The store's id, or `account`: one invoice per scope, currency and month.
-  scopeKey   String        @map("scope_key")
-  currency   String        @db.Char(3)
+  scopeKey    String        @map("scope_key")
+  currency    String        @db.Char(3)
   /// The calendar month (UTC) it covers.
-  periodStart DateTime     @map("period_start")
-  periodEnd  DateTime      @map("period_end")
+  periodStart DateTime      @map("period_start")
+  periodEnd   DateTime      @map("period_end")
   /// `open` (the month is running), `closed` (owing), `paid` (closed and nothing owed).
-  status     String        @default("open")
-  totalMinor BigInt        @default(0) @map("total_minor")
-  paidMinor  BigInt        @default(0) @map("paid_minor")
-  closedAt   DateTime?     @map("closed_at")
+  status      String        @default("open")
+  totalMinor  BigInt        @default(0) @map("total_minor")
+  paidMinor   BigInt        @default(0) @map("paid_minor")
+  closedAt    DateTime?     @map("closed_at")
   /// 7 days after it closes, or sooner when one of the store's subscriptions renews first.
-  dueAt      DateTime?     @map("due_at")
-  paidAt     DateTime?     @map("paid_at")
+  dueAt       DateTime?     @map("due_at")
+  paidAt      DateTime?     @map("paid_at")
   /// Set once when it went past its due date unpaid (the credit limit dropped a step).
-  overdueAt  DateTime?     @map("overdue_at")
-  createdAt  DateTime      @default(now()) @map("created_at")
-  updatedAt  DateTime      @updatedAt @map("updated_at")
-  reseller   Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
-  lines      InvoiceLine[]
+  overdueAt   DateTime?     @map("overdue_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  reseller    Reseller      @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  lines       InvoiceLine[]
 
   @@unique([resellerId, scopeKey, currency, periodStart])
   @@index([status, dueAt])

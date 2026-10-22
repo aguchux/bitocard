@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Lock, Sparkles } from "lucide-react";
-import type { StoreSpin, StoreSpinAllowance, StoreSpinRewardBalance, StoreSpinRewards, StoreSpinWin } from "@bitocard/api-client/storefront";
+import type { StorePublicSpinRewards, StoreSpin, StoreSpinAllowance, StoreSpinRewardBalance, StoreSpinRewards, StoreSpinWin } from "@bitocard/api-client/storefront";
 import { CoinBurst, Confetti, WinPlaque } from "@/components/app/spin/celebration";
 import { RewardsPanel } from "@/components/app/spin/rewards-panel";
 import { WinsPanel } from "@/components/app/spin/wins-panel";
 import styles from "@/components/app/spin/spin.module.css";
 import type { SpinSound } from "@/components/app/spin/use-spin-sound";
 import { Pointer, WheelDisc, WheelFrame } from "@/components/app/spin/wheel";
-import { spinRewards, spinWheel } from "@/lib/spin-actions";
+import { spinPublicWheel, spinRewards, spinWheel } from "@/lib/spin-actions";
 import { landingAngle, restingAngle, segmentAt, spinBlocks, todayLights, usd } from "@/lib/spin";
 
 /** Long, smooth slow-down after a fast start, as a casino wheel. */
@@ -43,7 +43,7 @@ function TodayLights({ lit, total }: { lit: number; total: number }) {
  * prize count up. The angle only ever grows, so the wheel never snaps back between spins. `sound` clicks at each peg
  * and plays the landing (when the customer has turned it on).
  */
-export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewards; onChange?: () => void; sound?: Pick<SpinSound, "tick" | "win"> }) {
+export function SpinWheel({ initial, onChange, sound, visitor = false }: { initial: StoreSpinRewards | StorePublicSpinRewards; onChange?: () => void; sound?: Pick<SpinSound, "tick" | "win">; visitor?: boolean }) {
   const segments = [...initial.segments].sort((a, b) => a.index - b.index);
   const count = segments.length;
   const [allowance, setAllowance] = useState<StoreSpinAllowance | null>(initial.allowance);
@@ -81,6 +81,7 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
     window.cancelAnimationFrame(done.frame);
     const { spin } = done;
     setAllowance(spin.allowance);
+    if (visitor) setRewards(current => ({ ...current, usd: spin.allowance.won_usd }));
     setRecent(list => [{ id: spin.id, number: spin.number, asset: spin.asset, amount: spin.amount, usd: spin.usd, segment: spin.segment, created_at: new Date().toISOString() }, ...list.filter(item => item.id !== spin.id)]);
     setWin(spin);
     setPhase("idle");
@@ -90,6 +91,10 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
 
   /** The rewards as the server holds them now (after a win or an exchange). */
   async function refreshRewards() {
+    if (visitor) {
+      onChange?.();
+      return;
+    }
     const now = await spinRewards().catch(() => null);
     if (now) setRewards(now.rewards);
     onChange?.();
@@ -120,7 +125,7 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
     setWin(null);
     let result;
     try {
-      result = await spinWheel(crypto.randomUUID());
+      result = visitor ? await spinPublicWheel() : await spinWheel(crypto.randomUUID());
     } catch {
       result = { ok: false as const, code: null, message: "We could not reach the store. Try again shortly." };
     }
@@ -213,7 +218,7 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
           ) : ready ? (
             <p className={`${styles.status} text-white/85`}>Tap Spin to play.</p>
           ) : allowance?.finished ? (
-            <p className={`${styles.status} font-semibold`}>You have had all your spins. Thank you for playing.</p>
+            <p className={`${styles.status} font-semibold`}>{visitor ? "Your six visitor spins are saved. Create an account to claim them and spin more." : "You have had all your spins. Thank you for playing."}</p>
           ) : enabled && allowance && allowance.today_left === 0 ? (
             <p className={`${styles.status} font-semibold`}>
               That is today&apos;s spins done.
@@ -262,7 +267,23 @@ export function SpinWheel({ initial, onChange, sound }: { initial: StoreSpinRewa
           </div>
         ) : null}
 
-        <RewardsPanel rewards={rewards} onExchanged={refreshRewards} />
+        {visitor ? (
+          <section className={`${styles.goldPanel} p-5 sm:p-6`} aria-labelledby="visitor-rewards">
+            <h2 id="visitor-rewards" className="text-lg font-bold">Your saved wins</h2>
+            <p className={`mt-2 font-display text-4xl font-black tabular-nums ${styles.goldText}`}>{usd(rewards.usd)}</p>
+            <p className="mt-2 text-sm text-white/70">Create your free account to add the total to your local or US dollar wallet. This browser keeps the claim for 30 days.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/signup?next=%2Fspin" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-brand-500 px-5 font-bold text-white hover:bg-brand-600">
+                {allowance?.finished ? "Sign up to spin more" : "Claim my wins"}
+              </Link>
+              <Link href="/signin?next=%2Fspin" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white/10 px-5 font-semibold text-white ring-1 ring-white/20 hover:bg-white/15">
+                I already have an account
+              </Link>
+            </div>
+          </section>
+        ) : (
+          <RewardsPanel rewards={rewards} onExchanged={refreshRewards} />
+        )}
 
         <WinsPanel wins={recent} />
       </div>

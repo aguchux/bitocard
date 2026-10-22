@@ -49,7 +49,7 @@ export async function customerApi<T>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
-  options: { idempotencyKey?: string } = {},
+  options: { idempotencyKey?: string; headers?: Record<string, string> } = {},
 ): Promise<CustomerResult<T>> {
   const token = (await cookies()).get(customerCookie)?.value;
   const store = await storeSubdomain();
@@ -64,6 +64,7 @@ export async function customerApi<T>(
         ...(store ? { [storeHeader]: store } : {}),
         ...(await shopperHeader()),
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
+        ...options.headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });

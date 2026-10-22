@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: origin.href, changeFrequency: "daily", priority: 1 },
     { url: url("/resellers"), changeFrequency: "weekly", priority: 0.8 },
     { url: url("/catalogs"), changeFrequency: "daily", priority: 0.8 },
+    { url: url("/spin"), changeFrequency: "weekly", priority: 0.8 },
   ];
   // The store's categories and products, when the API is reachable (a build without it still gets the pages above).
   const categories = await storeApi<StoreList<StoreCategory>>("/v1/store/categories");

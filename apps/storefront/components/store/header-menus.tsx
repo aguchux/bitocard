@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, Coins, LayoutGrid, Menu, MonitorSmartphone, Phone, ShieldCheck, Store, X, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Coins, LayoutGrid, Menu, MonitorSmartphone, Phone, ShieldCheck, Sparkles, Store, X, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 
@@ -15,6 +15,7 @@ export const quickLinks: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/catalogs/rdp", label: "RDP", icon: MonitorSmartphone },
   { href: "/catalogs/vpn", label: "VPN", icon: ShieldCheck },
   { href: "/account/crypto", label: "Crypto", icon: Coins },
+  { href: "/spin", label: "Spin & win", icon: Sparkles },
 ];
 
 /** Closes on Escape or a click outside. */

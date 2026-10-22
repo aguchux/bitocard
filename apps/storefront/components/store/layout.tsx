@@ -47,6 +47,8 @@ export function StoreHeader({
   signedIn: boolean;
   store?: HostedStore | null;
 }) {
+  const baseLinks = quickLinksFor(groups, store?.design?.template);
+  const links = !store || store.house ? [...baseLinks, "/spin"] : baseLinks;
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
@@ -59,7 +61,7 @@ export function StoreHeader({
             <Brand />
           </Link>
         )}
-        <DesktopNav groups={groups} links={quickLinksFor(groups, store?.design?.template)} />
+        <DesktopNav groups={groups} links={links} />
         <div className="-mr-2 ml-auto flex items-center gap-1 sm:mr-0 sm:gap-3">
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
@@ -87,7 +89,7 @@ export function StoreHeader({
               Start Reselling
             </Link>
           )}
-          <MobileMenu groups={groups} signedIn={signedIn} reseller={!store} links={quickLinksFor(groups, store?.design?.template)} />
+          <MobileMenu groups={groups} signedIn={signedIn} reseller={!store} links={links} />
         </div>
       </div>
     </header>

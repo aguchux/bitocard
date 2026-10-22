@@ -27,7 +27,7 @@ import { ResellerDeskService } from './exchange/reseller-desk.service.js';
 import { ReservesService } from './exchange/reserves.service.js';
 import { P2pService } from './p2p.service.js';
 import { CryptoPricesService } from './prices.js';
-import { AdminSpinsController, CustomerSpinsController } from './spins.controller.js';
+import { AdminSpinsController, CustomerSpinsController, PublicSpinsController } from './spins.controller.js';
 import { SpinsService } from './spins.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
 import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.js';
@@ -44,6 +44,7 @@ import { ResellerCoinsController, ResellerCoinsService } from './reseller-coins.
     CustomerCashController,
     CustomerP2pController,
     CustomerSpinsController,
+    PublicSpinsController,
     CustomerExchangeController,
     ResellerExchangeController,
     ResellerCoinsController,

@@ -423,6 +423,9 @@ export type Country = {
   sms_provider?: 'termii' | 'africas_talking' | null;
   /** Spin and win: spins per customer per day here (1 to 10). Missing on older API versions. */
   spin_daily_limit?: number;
+  /** Customer Catcher public page: signed-out spins enabled here, and its first-visit allowance. */
+  public_spins_enabled?: boolean;
+  public_spin_limit?: number;
   /** The most a reseller's exchange desk may mark up here, in basis points (0 to 2000). Missing on older API versions. */
   exchange_markup_cap_bps?: number;
   /** Admins are told when BitoCard's money exchange reserve here falls below this (minor units); null: never. */

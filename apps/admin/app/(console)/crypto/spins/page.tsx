@@ -3,9 +3,9 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ArrowRightLeft, Coins, DollarSign, Gift, Users } from "lucide-react";
-import { Card, DataTable, errorMessage, FilterSelect, formatDateTime, formatMoney, PageHeader, StatCard, type Column } from "@bitocard/admin-ui";
-import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
-import { type Mode, type SpinReward, useSpinRewardsQuery } from "@bitocard/api-client/admin";
+import { Card, CardHeader, DataTable, errorMessage, FilterSelect, formatDateTime, formatMoney, Notice, PageHeader, Select, StatCard, Toggle, type Column } from "@bitocard/admin-ui";
+import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
+import { type Mode, type SpinReward, useCountriesQuery, useSetSwitchMutation, useSpinRewardsQuery, useSwitchesQuery, useUpdateCountryMutation } from "@bitocard/api-client/admin";
 
 const dollars = (value: string) => `$${Number(value).toFixed(2)}`;
 
@@ -49,9 +49,17 @@ export default function SpinRewardsPage() {
 }
 
 function SpinRewards() {
+  const admin = useAdmin();
   const customer = useSearchParams().get("customer") ?? undefined;
   const [mode, setMode] = useState<Mode>("live");
   const spins = useSpinRewardsQuery({ mode, ...(customer ? { customer_id: customer } : {}) });
+  const countries = useCountriesQuery();
+  const switches = useSwitchesQuery();
+  const [setSwitch, switchState] = useSetSwitchMutation();
+  const [updateCountry, countryState] = useUpdateCountryMutation();
+  const editable = can(admin, "operations");
+  const switchValue = (country?: string) => switches.data?.data.find(row => row.key === "spin_rewards" && (country ? row.country_code === country : row.scope === "global"))?.enabled;
+  const spinDefault = switches.data?.definitions.spin_rewards?.default ?? false;
   const totals = (spins.data?.totals ?? []).filter(total => total.mode === mode);
   const usdTotal = totals.reduce((sum, total) => sum + Number(total.usd), 0);
   const spinCount = totals.reduce((sum, total) => sum + total.spins, 0);
@@ -59,8 +67,35 @@ function SpinRewards() {
     <AdminShell section="crypto" current="/crypto/spins" crumbs={[{ label: "Crypto", href: "/crypto" }, { label: "Spin rewards" }]}>
       <PageHeader
         title="Spin rewards"
-        description="The Spin and win promotion: $1 per person, once, won in crypto over 50 to 100 spins (up to 2 a day; customers are not shown the total). Each spin is decided by the API and credited to the customer's spin rewards, never withdrawn or traded: customers exchange them into their store wallet to buy products."
+        description="Run Spin and win and Customer Catcher from one place: availability, visitor spins, registered daily limits, claims and promotion spend."
       />
+      <Card className="mt-6">
+        <CardHeader title="Customer Catcher settings" description="The public /spin page is BitoCard-only. Each visitor gets a server-owned claim in an HttpOnly cookie; account eligibility is checked again before wallet credit." />
+        {(switchState.error || countryState.error) ? <div className="px-5 pb-3 sm:px-6"><Notice tone="red">{errorMessage(switchState.error ?? countryState.error)}</Notice></div> : null}
+        <div className="border-t border-line px-5 py-4 sm:px-6">
+          <div className="flex min-h-12 items-center justify-between gap-4">
+            <div><p className="font-semibold text-ink">Spin and win globally</p><p className="text-xs text-muted">Country overrides below still win.</p></div>
+            <Toggle label="Spin and win globally" checked={switchValue() ?? spinDefault} disabled={!editable} onChange={enabled => setSwitch({ key: "spin_rewards", enabled })} />
+          </div>
+        </div>
+        <ul className="divide-y divide-line border-t border-line">
+          {countries.data?.data.map(country => {
+            const countrySwitch = switchValue(country.code);
+            const enabled = countrySwitch ?? switchValue() ?? spinDefault;
+            return (
+              <li key={country.code} className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(10rem,1fr)_auto_auto_auto] sm:items-end sm:px-6">
+                <div><p className="font-semibold text-ink">{country.name}</p><p className="text-xs text-muted">{countrySwitch === undefined ? "Uses global promotion switch" : "Country override set"}</p></div>
+                <label className="text-xs font-semibold text-muted">Registered / day<Select className="mt-1 w-24" value={country.spin_daily_limit ?? 2} disabled={!editable} onChange={event => updateCountry({ code: country.code, spin_daily_limit: Number(event.target.value) })}>{Array.from({ length: 10 }, (_, i) => i + 1).map(value => <option key={value}>{value}</option>)}</Select></label>
+                <label className="text-xs font-semibold text-muted">Visitor spins<Select className="mt-1 w-24" value={country.public_spin_limit ?? 6} disabled={!editable} onChange={event => updateCountry({ code: country.code, public_spin_limit: Number(event.target.value) })}>{Array.from({ length: 10 }, (_, i) => i + 1).map(value => <option key={value}>{value}</option>)}</Select></label>
+                <div className="flex items-center gap-5 pb-2">
+                  <Toggle label={`Promotion in ${country.name}`} checked={enabled} disabled={!editable} onChange={value => setSwitch({ key: "spin_rewards", country_code: country.code, enabled: value })} />
+                  <Toggle label={`Public page in ${country.name}`} checked={country.public_spins_enabled ?? false} disabled={!editable} onChange={value => updateCountry({ code: country.code, public_spins_enabled: value })} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
       <div className="mt-6 flex flex-wrap gap-3">
         <FilterSelect id="spins-mode" label="Mode" value={mode} onChange={value => setMode(value as Mode)} options={[{ value: "live", label: "Live" }, { value: "test", label: "Test" }]} />
         {customer ? (
