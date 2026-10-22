@@ -1,6 +1,6 @@
 # Country-localised bitocard.com stores: implementation plan
 
-**Status:** planning complete, sign-off received (22 October 2026) on root-redirect and shared-customer-pool decisions below. No code shipped yet. Stage 1 not started.
+**Status:** Stage 1 shipped 22 October 2026 (`HouseService.storeFor`, lifted `StoreHostsService` skip, `country_stores` switch; behind the switch, off everywhere, no customer-visible change). Stages 2–5 not started.
 
 This is the implementation source for giving bitocard.com country-localised subdomains (`ng.bitocard.com`, `gh.bitocard.com`, `ke.bitocard.com`, …), one per pilot market, each a fully local storefront (its own catalogue scope, currency, seller of record) hosted the same way a reseller's own store is hosted today. Where this plan differs from `AGENTS.md`, this plan is provisional until merged back into it; `AGENTS.md` wins on everything it already states unless this document explicitly supersedes a line of it (noted inline below).
 
@@ -20,13 +20,13 @@ A UK (GB) customer bought Nigerian MTN airtime on bitocard.com (a legitimate cas
 
 ## Stages
 
-### 1. Per-market house store + lifted hosting skip — not started
+### 1. Per-market house store + lifted hosting skip — complete (22 October 2026)
 
-- [ ] Add `HouseService.storeFor(countryCode)`: resolves (or creates) one `Store` row per house reseller, `subdomain = countryCode.toLowerCase()`, `template: 'all_in_one'`, owned by that market's house `Reseller`. Backfill NG, GH, KE via migration; new markets get theirs the moment `HouseService.resellerFor(countryCode)` first creates their house reseller (mirrors how a reseller's first store is provisioned today — no separate admin action required for this to work, though an explicit "activate now" admin action is still useful, see Stage 4).
-- [ ] Lift the house-account skip in `StoreHostsService.sync()` (`if (!store || store.reseller.house) return null;`) and its retry job (`where: { reseller: { house: false } }`) **but keep the single root `bitocard` store excluded by store ID**, not by `reseller.house`, so root's own address provisioning is never touched by this change.
-- [ ] Provision NG's `ng.bitocard.com` (Cloudflare CNAME + Vercel project domain) through the existing, unmodified `StoreHostsService` mechanism. Confirm `ready` status and TLS before Stage 2.
-- [ ] New feature switch `country_stores` (off by default; global or per-country scope, consistent with `switchDefinitions`): gates whether any country-store behaviour is reachable at all. Ship Stage 1 entirely dark (switch off everywhere) — infrastructure only, no customer-visible change.
-- [ ] Tests: extend `store-hosts.test.mjs` for a house-reseller-owned store; a new test asserting root's store is never touched by the lifted skip.
+- [x] Added `HouseService.storeFor(countryCode)`: resolves (or creates) one `Store` row per house reseller, `subdomain = countryCode.toLowerCase()`, `template: 'all_in_one'`, owned by that market's house `Reseller`. No migration backfill yet — NG/GH/KE's country stores are created lazily, the first time `storeFor` is called (Stage 3+ wires that call); nothing calls it yet, so no country stores exist in production until a later stage does.
+- [x] Lifted the house-account skip in `StoreHostsService.sync()` and its retry job; the single root `bitocard` store is now excluded by store ID (`houseStoreId`, imported from `checkout/house.service.ts`), not by `reseller.house`, so root's own address provisioning is unaffected.
+- [x] New feature switch `country_stores` (off by default; global or per-country scope). Nothing yet reads it — Stages 2–4 are what make it do something. Ships entirely dark.
+- [x] Tests: `store-hosts.test.mjs` now asserts the root store is never hosted while a market's `storeFor` store is, and that calling `storeFor` twice returns the same store. `settings.test.mjs` and the `GET /v1/settings` OpenAPI example updated for the new switch key. Full regression: checkout (41/41), stores (22/22), store-templates (10/10), store-hosts (6/6), openapi-docs (4/4).
+- [ ] Not done in Stage 1, left for Stage 3+: nothing calls `storeFor` yet, so it is inert in production. A migration backfill was considered and deliberately skipped in favour of lazy creation on first real use, to avoid provisioning NG/GH/KE's subdomains before Stage 3's routing fix and Stage 4's redirect are ready — provisioning the DNS/TLS ahead of the code that uses it would just be dead infrastructure with no traffic.
 
 ### 2. Replace the single `houseStoreId` sentinel — not started
 
