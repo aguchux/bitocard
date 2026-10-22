@@ -3,6 +3,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
+import { StoreHostsService } from '../stores/store-hosts.service.js';
 
 /** BitoCard's own store, bitocard.com (seeded by migration): its customers belong to it. */
 export const houseStoreId = '00000000-0000-4000-8000-0000000000b2';
@@ -20,6 +21,7 @@ export class HouseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
+    private readonly hosts: StoreHostsService,
   ) {}
 
   store() {
@@ -43,6 +45,31 @@ export class HouseService {
     } catch (error) {
       // Another request created it at the same moment.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.reseller.findFirstOrThrow({ where: { house: true, country: code } });
+      throw error;
+    }
+  }
+
+  /**
+   * The market's own store, `<country>.bitocard.com` (country-localised stores, `docs/BITOCARD_COUNTRY_STORES_PLAN.md`),
+   * created the first time it is needed, owned by that market's house account. Unlike a reseller's stores, this skips
+   * every plan-limit and verification check: house accounts always pass. Its address (Cloudflare and Vercel) is set up
+   * at once; a failure there is left for the `domains` job, exactly as a reseller's own store.
+   */
+  async storeFor(countryCode: string) {
+    const code = countryCode.toUpperCase();
+    const subdomain = code.toLowerCase();
+    const existing = await this.prisma.store.findUnique({ where: { subdomain } });
+    if (existing) return existing;
+    const reseller = await this.resellerFor(code);
+    try {
+      const store = await this.prisma.store.create({
+        data: { resellerId: reseller.id, name: `BitoCard ${code}`, subdomain, status: 'published', publishedAt: new Date(), template: 'all_in_one', variant: 'classic', theme: 'navy_pink' },
+      });
+      await this.hosts.sync(store.id);
+      return store;
+    } catch (error) {
+      // Another request created it at the same moment.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.store.findUniqueOrThrow({ where: { subdomain } });
       throw error;
     }
   }

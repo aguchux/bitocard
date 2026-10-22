@@ -1713,7 +1713,8 @@
                     "store_template_single_product": true,
                     "store_template_vpn_shop": true,
                     "store_template_rdp_shop": true,
-                    "manual_reseller_approval": false
+                    "manual_reseller_approval": false,
+                    "country_stores": false
                   }
                 }
               }
@@ -43532,7 +43533,8 @@
               "store_template_single_product",
               "store_template_vpn_shop",
               "store_template_rdp_shop",
-              "manual_reseller_approval"
+              "manual_reseller_approval",
+              "country_stores"
             ],
             "additionalProperties": false,
             "properties": {
@@ -43623,6 +43625,10 @@
               "manual_reseller_approval": {
                 "type": "boolean",
                 "description": "Resellers who pass the identity check wait for an admin to activate them, instead of going live at once."
+              },
+              "country_stores": {
+                "type": "boolean",
+                "description": "bitocard.com serves this market through its own country store (`<country>.bitocard.com`, for example ng.bitocard.com), with that market’s house account as seller of record for every purchase there, instead of the buyer’s own country. Root bitocard.com redirects into it once set up. Off: root bitocard.com serves the market as today."
               }
             }
           }

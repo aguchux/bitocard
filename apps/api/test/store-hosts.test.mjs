@@ -126,11 +126,22 @@ describe('store addresses', () => {
     assert.equal((await row(store.id)).hostRecordId, saved.hostRecordId);
   });
 
-  test('BitoCard’s own stores are served on bitocard.com and never get a record', async () => {
+  test('the single root bitocard.com store is never hosted; a market’s own country store is hosted exactly like a reseller’s', async () => {
     await cron();
-    const house = await prisma.store.findMany({ where: { reseller: { house: true } } });
-    assert.ok(house.length);
-    for (const store of house) assert.equal(zone.records.some(record => record.name === `${store.subdomain}.bitocard.com`), false);
+    // The root house store (seeded by migration, the only house store that exists before any country store is created).
+    const root = await prisma.store.findFirst({ where: { reseller: { house: true } } });
+    assert.ok(root);
+    assert.equal(zone.records.some(record => record.name === `${root.subdomain}.bitocard.com`), false);
+
+    const house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
+    const ng = await house.storeFor('NG');
+    assert.equal(ng.subdomain, 'ng');
+    assert.equal(ng.status, 'published');
+    const host = `ng.bitocard.com`;
+    assert.ok(zone.records.some(record => record.name === host), 'a country store gets its own Cloudflare record');
+    assert.equal((await row(ng.id)).hostStatus, 'ready');
+    // Asking again returns the same store, not a second one.
+    assert.equal((await house.storeFor('ng')).id, ng.id);
   });
 
   test('Test connection reads the zone and the storefront project, and refuses another zone', async () => {

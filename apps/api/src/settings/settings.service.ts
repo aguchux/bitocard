@@ -106,6 +106,11 @@ export const switchDefinitions = {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',
   },
+  country_stores: {
+    scopes: ['global', 'country'],
+    description:
+      'bitocard.com serves this market through its own country store (`<country>.bitocard.com`, for example ng.bitocard.com), with that market’s house account as seller of record for every purchase there, instead of the buyer’s own country. Root bitocard.com redirects into it once set up. Off: root bitocard.com serves the market as today.',
+  },
 } as const;
 
 export type OptionKey = keyof typeof optionDefinitions;

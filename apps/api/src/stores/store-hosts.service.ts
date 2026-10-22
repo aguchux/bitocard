@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { houseStoreId as rootStoreId } from '../checkout/house.service.js';
 import type { AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CloudflareDns } from '../domains/cloudflare.js';
@@ -39,10 +40,11 @@ export async function checkStoreHosts(config: HostConfig) {
 class HostConflict extends Error {}
 
 /**
- * Each reseller store's address, `<subdomain>.bitocard.com`: a DNS-only CNAME in bitocard.com's Cloudflare zone pointing to
+ * Each store's address, `<subdomain>.bitocard.com`: a DNS-only CNAME in bitocard.com's Cloudflare zone pointing to
  * Vercel, and the address on the storefront's Vercel project (which issues its certificate). Set up when the store is
- * created or renamed; the `domains` job retries anything pending or failed. BitoCard's own stores (house accounts) are
- * served on bitocard.com and are skipped.
+ * created or renamed; the `domains` job retries anything pending or failed. Reseller stores and BitoCard's own
+ * country stores (`ng`, `gh`, `ke`…) are both hosted this way; only the single root `bitocard` store is skipped (it
+ * already is bitocard.com, with no address of its own to set up).
  */
 @Injectable()
 export class StoreHostsService {
@@ -64,8 +66,8 @@ export class StoreHostsService {
 
   /** Sets the store's address up (or moves it after a rename). Never throws: a failure is kept on the store for the job. */
   async sync(storeId: string) {
-    const store = await this.prisma.store.findUnique({ where: { id: storeId }, include: { reseller: { select: { house: true } } } });
-    if (!store || store.reseller.house) return null;
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    if (!store || store.id === rootStoreId) return null;
     if (!this.configured()) return 'pending' as const;
     const { vercel, cloudflare, target } = this.clients();
     const name = `${store.subdomain}.${storeHostDomain}`;
@@ -107,7 +109,7 @@ export class StoreHostsService {
   async job() {
     if (!this.configured()) return { set_up: 0, failed: 0, skipped: 'store addresses not configured' };
     const due = await this.prisma.store.findMany({
-      where: { hostStatus: { in: ['pending', 'failed'] }, reseller: { house: false } },
+      where: { hostStatus: { in: ['pending', 'failed'] }, id: { not: rootStoreId } },
       orderBy: [{ hostSyncedAt: { sort: 'asc', nulls: 'first' } }],
       select: { id: true },
       take: 50,
