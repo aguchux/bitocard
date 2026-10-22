@@ -4,13 +4,15 @@ import { createNextConfig } from "@bitocard/next-config";
 const legals = process.env.LEGALS_URL ?? (process.env.VERCEL ? "https://legals.bitocard.com" : "http://localhost:3005");
 
 /**
- * Pilot markets' own country stores (docs/BITOCARD_COUNTRY_STORES_PLAN.md): bitocard.com, just localised, so the
- * /resellers redirect below must not treat them as a reseller's store. This redirect runs on the host header alone,
- * before any page or API call, so it cannot ask the API which stores are house-owned; this list is kept to the same
- * three pilot markets the plan enumerates everywhere else, and grows only when a new market's country store ships.
+ * A market's own country store (docs/BITOCARD_COUNTRY_STORES_PLAN.md) is bitocard.com itself, just localised, so the
+ * /resellers redirect below must not treat one as a reseller's store. This redirect runs on the host header alone,
+ * before any page or API call, so it cannot ask the API which subdomains are house-owned — but it does not need to:
+ * a country store's subdomain is always exactly its ISO 3166-1 alpha-2 code (two letters, `HouseService.storeFor`),
+ * and the stores.service.ts subdomain-format rule requires at least three characters for anything else, so no
+ * reseller can ever hold a two-letter subdomain. Excluding exactly two letters covers every market in the list, not
+ * a maintained set of pilot codes.
  */
-const countryStoreSubdomains = ["ng", "gh", "ke"];
-const notCountryStore = countryStoreSubdomains.map(code => `(?!${code}\\.)`).join("");
+const notCountryStoreSubdomain = "(?![a-z]{2}\\.)";
 
 export default createNextConfig({
   async redirects() {
@@ -23,7 +25,7 @@ export default createNextConfig({
       // only. A market's own country store is bitocard.com itself, just localised, so it keeps this page too.
       {
         source: "/resellers",
-        has: [{ type: "host", value: `(?!www\\.)${notCountryStore}[a-z0-9-]+\\.bitocard\\.com` }],
+        has: [{ type: "host", value: `(?!www\\.)${notCountryStoreSubdomain}[a-z0-9-]+\\.bitocard\\.com` }],
         destination: "https://bitocard.com/resellers",
         permanent: false,
       },

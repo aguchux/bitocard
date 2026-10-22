@@ -20,6 +20,7 @@ import { isPaymentGateway } from '../payments/payment-providers.js';
 import { paymentRef, PaymentsService } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { CustomerWalletsService, walletMethod } from './customer-wallets.js';
+import { HouseService } from './house.service.js';
 import { type HouseAwareStore, type PaymentOption, StoreSellers } from './store-sellers.js';
 import { templateSells } from '../stores/templates.js';
 
@@ -99,6 +100,7 @@ export class CheckoutService implements OnModuleInit {
     private readonly inbox: InboxService,
     private readonly customerWallets: CustomerWalletsService,
     private readonly fx: FxService,
+    private readonly house: HouseService,
   ) {}
 
   onModuleInit() {
@@ -218,6 +220,11 @@ export class CheckoutService implements OnModuleInit {
     const mode = this.stores.mode(store);
     // The customer's own country (fixed at sign-up), whatever country was sent.
     const seller = await this.stores.sellerFor(customer, input.country);
+    // The first checkout anywhere through root for this market provisions that market's own country store
+    // (docs/BITOCARD_COUNTRY_STORES_PLAN.md, Stage 5): every market in the list, not only the original three pilots.
+    // Once a country store exists, customers routed through it reach this branch only via isRoot being false, so a
+    // settled market never repeats the (idempotent, but needless) check.
+    if (this.stores.isRoot(store) && seller.country) await this.house.storeFor(seller.country);
     const product = await this.prisma.product.findUnique({ where: { id: input.product_id } });
     const listed = product && (this.stores.isHouse(store) ? product.listed : await this.prisma.resellerListing.findUnique({ where: { resellerId_productId: { resellerId: seller.id, productId: product.id } } }));
     if (!product || !listed) throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'resource_missing', 'No such product.', 'product_id');

@@ -47,7 +47,7 @@ export class StoreSellers {
   }
 
   /** The single root bitocard.com store (no fixed country) — the only house store whose seller depends on the buyer. */
-  private isRoot(store: Pick<Store, 'id'>) {
+  isRoot(store: Pick<Store, 'id'>) {
     return store.id === houseStoreId;
   }
 

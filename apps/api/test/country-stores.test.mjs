@@ -221,3 +221,59 @@ describe('country stores: storefront routing and the root redirect (Stage 4)', (
     assert.ok(navigation.countries.every(country => country.store_subdomain !== 'bitocard'));
   });
 });
+
+describe('country stores: general rollout, not just the pilots (Stage 5)', () => {
+  test('any market’s first checkout through root provisions its own country store, not only NG/GH/KE', async () => {
+    // South Africa: never touched by an earlier test, never one of the three original pilots, no store yet.
+    await prisma.country.upsert({
+      where: { code: 'ZA' },
+      create: { code: 'ZA', name: 'South Africa', currency: 'USD', minWithdrawalMinor: 1000n },
+      update: {},
+    });
+    assert.equal(await prisma.store.findUnique({ where: { subdomain: 'za' } }), null, 'no store exists yet');
+    await prisma.countryCategory.upsert({
+      where: { countryCode_category: { countryCode: 'ZA', category: 'gift_cards' } },
+      create: { countryCode: 'ZA', category: 'gift_cards', enabled: true },
+      update: { enabled: true, customerVerification: false },
+    });
+    assert.equal((await admin.put('/v1/admin/countries/ZA/payment-methods', { purpose: 'checkout', enabled: ['stripe'] })).status, 200);
+
+    const product = await admin.post('/v1/admin/stock', {
+      category: 'gift_cards',
+      country: 'ZA',
+      brand: 'amazon',
+      title: 'Amazon South Africa Card',
+      description: 'An Amazon gift card.',
+      redeem_instructions: 'Redeem at amazon.com/redeem.',
+      currency: 'USD',
+      face_value: 2500,
+      cost: 2000,
+      listed: true,
+      codes: [{ code: `ZA-CARD-${(counter += 1)}` }],
+    });
+    assert.equal(product.status, 201, JSON.stringify(product.json));
+
+    const shopper = await customer(null, 'ZA');
+    const started = await shopper.post('/v1/store/checkouts', { product_id: product.json.product.id, face_value: 2500, return_url: 'https://shop.example/checkout/return' });
+    assert.equal(started.status, 201, JSON.stringify(started.json));
+    await payOnStripe(shopper, started.json.id);
+
+    const za = await prisma.store.findUnique({ where: { subdomain: 'za' }, include: { reseller: true } });
+    assert.ok(za, 'the checkout provisioned the store, with no admin step and no special-casing to ZA');
+    assert.equal(za.reseller.house, true);
+    assert.equal(za.reseller.country, 'ZA');
+  });
+
+  test('an admin brings a country store up ahead of its first sale, idempotently, audited', async () => {
+    // Kenya: seeded, never bought from through root in this file, so no store yet — proving the admin action needs
+    // no prior checkout either, for any market in the list.
+    assert.equal(await prisma.store.findUnique({ where: { subdomain: 'ke' } }), null);
+    const created = await admin.post('/v1/admin/countries/KE/store');
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    assert.equal(created.json.subdomain, 'ke');
+    const again = await admin.post('/v1/admin/countries/KE/store');
+    assert.equal(again.json.id, created.json.id, 'asking again returns the same store, not a second one');
+    const audited = await prisma.auditLog.findFirst({ where: { action: 'country_store.provisioned', targetId: created.json.id } });
+    assert.ok(audited);
+  });
+});
