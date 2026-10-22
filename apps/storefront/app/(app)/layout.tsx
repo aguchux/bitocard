@@ -12,10 +12,11 @@ import { SubRail } from "@/components/app/sub-rail";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
 import { currentCustomer, safeNext } from "@/lib/customer";
+import { countryStoreFor } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
 import { storeShell } from "@/lib/store-theme";
-import { currentStore, storeSubdomain } from "@/lib/store";
+import { currentStore, storeCredit, storeSubdomain } from "@/lib/store";
 
 export async function generateMetadata(): Promise<Metadata> {
   const subdomain = await storeSubdomain();
@@ -56,6 +57,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
     storeNavigation(),
   ]);
+  // On root, a customer whose fixed country now has its own live country store belongs there, same as the store pages
+  // (docs/BITOCARD_COUNTRY_STORES_PLAN.md); their account is the same account, just served from its own address.
+  if (!store) {
+    const subdomain = countryStoreFor(navigation.countries, customer.country);
+    if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
+  }
   // What the desktop sub rails list: the catalogue's groups on sale (as the Catalog page's chips) and the customer's wallets.
   const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency };
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";
@@ -96,7 +103,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {children}
           </main>
           <footer className="px-4 pb-6 text-center text-xs text-slate-500">
-            © {new Date().getFullYear()} {name} · {brand.credit}
+            © {new Date().getFullYear()} {name}
+            {storeCredit(store, brand.credit) ? ` · ${storeCredit(store, brand.credit)}` : ""}
           </footer>
         </div>
       </div>

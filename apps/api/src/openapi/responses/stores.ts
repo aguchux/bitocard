@@ -218,6 +218,7 @@ const storefront = objectSchema(
     country: nullableStr('ISO 3166-1 alpha-2 country of the reseller’s business.'),
     currency: nullableStr('ISO 4217 currency the store sells in.'),
     checkout_mode: oneOf('`live`, or `test` while the store’s checkout is the sandbox (show shoppers that orders are not real).', ['test', 'live']),
+    house: bool('bitocard.com’s own retail arm in this market (a country store, `<country>.bitocard.com`), never a reseller’s.'),
     white_label: bool('The store’s plan has Your brand only: its pages leave BitoCard’s name out (the terms of sale still name the seller).'),
     app: shape({ desktop_nav: oneOf('The customer account app’s menu on desktop: the store’s choice, else BitoCard’s default.', ['rail', 'bottom']) }, 'How the customer account app looks.'),
     domain: nullableStr('The store’s own main domain while it works (for example `adadigital.com`), else null.'),
@@ -317,6 +318,7 @@ const storeCountry = objectSchema('Store country', {
   code: str('ISO 3166-1 alpha-2 country code.'),
   name: str('Country name.'),
   products: int('Products on sale there (zero is possible for a market not stocked yet).'),
+  store_subdomain: nullableStr('This market’s own live store (`<store_subdomain>.bitocard.com`), or null while bitocard.com still serves it directly.'),
 });
 const navigationGroup = objectSchema('Store menu group', {
   key: oneOf('Group key; filter products with `group`.', groupKeys),
@@ -539,10 +541,10 @@ const payTv = category_('pay_tv', 'bills', 12);
 const bills = category_('bills', 'bills', 4);
 
 const countries = [
-  { code: 'GH', name: 'Ghana', products: 9 },
-  { code: 'KE', name: 'Kenya', products: 0 },
-  { code: 'NG', name: 'Nigeria', products: 40 },
-  { code: 'US', name: 'United States', products: 12 },
+  { code: 'GH', name: 'Ghana', products: 9, store_subdomain: null },
+  { code: 'KE', name: 'Kenya', products: 0, store_subdomain: null },
+  { code: 'NG', name: 'Nigeria', products: 40, store_subdomain: 'ng' },
+  { code: 'US', name: 'United States', products: 12, store_subdomain: null },
 ];
 
 const navigation = [
@@ -753,6 +755,7 @@ export const storesDocs: DocsArea = {
         country: 'NG',
         currency: 'NGN',
         checkout_mode: 'live',
+        house: false,
         white_label: true,
         app: { desktop_nav: 'rail' },
         domain: 'adadigital.com',

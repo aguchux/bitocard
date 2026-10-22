@@ -25,9 +25,9 @@ export function MarketChooser({ countries, market, locked = false }: { countries
     if (market === null && !dialog.current?.open) dialog.current?.showModal();
   }, [market]);
 
-  const choose = (value: string) =>
+  const choose = (value: string, storeSubdomain?: string | null) =>
     startTransition(async () => {
-      await chooseMarket(value);
+      await chooseMarket(value, storeSubdomain);
       dialog.current?.close();
     });
 
@@ -91,7 +91,7 @@ export function MarketChooser({ countries, market, locked = false }: { countries
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => choose(country.code)}
+                  onClick={() => choose(country.code, country.store_subdomain)}
                   aria-pressed={market === country.code}
                   className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-slate-50 disabled:opacity-60"
                 >

@@ -20,6 +20,10 @@ export type HostedStore = {
   currency: string | null;
   /** `test` while the store's checkout is the sandbox: orders are simulated and nothing is charged. */
   checkout_mode: "test" | "live";
+  /** bitocard.com's own retail arm in this market (a country store, `docs/BITOCARD_COUNTRY_STORES_PLAN.md`), never a reseller's. */
+  house?: boolean;
+  /** The store's plan has Your brand only: its pages leave BitoCard's name out (the terms of sale still name the seller). */
+  white_label?: boolean;
   /** The customer account app: its menu on desktop (the store's choice, else BitoCard's default). */
   app?: { desktop_nav: "rail" | "bottom" };
   /** The store's own main domain while it works, else null. */
@@ -82,7 +86,21 @@ export const currentStore = cache(async (): Promise<{ store: HostedStore | null;
   }
 });
 
-/** True on a reseller's store (BitoCard's own pages, such as the reseller landing page, are not shown there). */
+/**
+ * True on a reseller's store (BitoCard's own pages, such as the reseller landing page, are not shown there). Never
+ * true on a market's own country store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`): it is bitocard.com's own, just
+ * localised, so it shows the same business pages root does. Reads the API's `house` flag, never the subdomain string.
+ */
 export async function onResellerStore() {
-  return Boolean(await storeSubdomain());
+  const { store } = await currentStore();
+  return Boolean(store) && !store!.house;
+}
+
+/**
+ * The credit line under a page: BitoCard's own ("A Golojan Ltd venture") on bitocard.com; on a reseller's store, that
+ * BitoCard sells and delivers (it is the seller of record), unless the store's plan has Your brand only.
+ */
+export function storeCredit(store: Pick<HostedStore, "white_label"> | null, credit: string) {
+  if (!store) return credit;
+  return store.white_label ? null : "Sold and delivered by BitoCard";
 }

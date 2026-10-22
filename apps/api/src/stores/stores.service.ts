@@ -282,6 +282,10 @@ export class StoresService {
       country: store.reseller.country,
       currency: store.reseller.countryRef?.currency ?? null,
       checkout_mode: store.checkoutMode,
+      /** bitocard.com's own retail arm in this market (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`), never a reseller's. */
+      house: store.reseller.house,
+      /** The store's plan has Your brand only: its pages leave BitoCard's name out. */
+      white_label: await this.planAccess.storeHas(store.id, 'white_label'),
       app: { desktop_nav: await desktopNavFor(this.settings, store) },
       domain: (await this.prisma.storeDomain.findFirst({ where: { storeId: store.id, status: 'active', primary: true }, select: { name: true } }))?.name ?? null,
     };

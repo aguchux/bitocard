@@ -198,6 +198,13 @@ export class SettingsService {
     );
   }
 
+  /** Whether a switch is on for a market as a whole: its country, else the global one, else its default. No reseller in mind. */
+  async isOnForCountry(key: SwitchKey, countryCode: string) {
+    const rows = await this.prisma.featureSwitch.findMany({ where: { key } });
+    const pick = (match: (row: (typeof rows)[number]) => boolean) => rows.find(match)?.enabled;
+    return pick(row => row.countryCode === countryCode) ?? pick(row => row.countryCode === null && row.resellerId === null) ?? switchDefault(key);
+  }
+
   async switchesFor(resellerId: string) {
     const keys = Object.keys(switchDefinitions) as SwitchKey[];
     return Object.fromEntries(await Promise.all(keys.map(async key => [key, await this.isOn(key, resellerId)] as const)));

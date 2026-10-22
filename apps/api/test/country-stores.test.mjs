@@ -174,3 +174,50 @@ describe('country stores: pricing and seller routing (Stage 3)', () => {
     assert.equal(done.order.status, 'completed');
   });
 });
+
+describe('country stores: storefront routing and the root redirect (Stage 4)', () => {
+  test('ng.bitocard.com resolves as a real store (never the old blanket “every house store is 404” gate) and is marked house', async () => {
+    const ng = await house.storeFor('NG');
+    await prisma.store.update({ where: { id: ng.id }, data: { hostStatus: 'ready' } });
+
+    const storefront = await (await fetch(`${server.base}/v1/storefronts/ng`)).json();
+    assert.equal(storefront.house, true);
+    assert.equal(storefront.checkout_mode, 'live');
+
+    // Was a 404 before Stage 4 (StorefrontService.inStore rejected every house store outright).
+    const navigation = await (await fetch(`${server.base}/v1/store/navigation`, { headers: { 'bitocard-store': 'ng' } })).json();
+    assert.equal(navigation.object, 'store_navigation');
+  });
+
+  test('a country store’s catalogue is the global admin-listed set, like root, never a reseller’s own `reseller_listings` (nobody can ever populate those for a house account)', async () => {
+    const product = await nairaGiftCard('Amazon Country Store Catalogue Card');
+    const home = await (await fetch(`${server.base}/v1/store/home`, { headers: { 'bitocard-store': 'ng' } })).json();
+    const listed = await (await fetch(`${server.base}/v1/store/products?limit=60`, { headers: { 'bitocard-store': 'ng' } })).json();
+    assert.ok(listed.data.some(item => item.key === product.key), 'the admin-listed product shows on the country store');
+    assert.ok(home.countries.length > 0);
+  });
+
+  test('root offers a market’s live, ready country store; a market with no switch or no ready store stays null', async () => {
+    const gh = await house.storeFor('GH');
+    // GH's store exists (as NG's did before its switch and ready host were set) but is not yet switched on or ready.
+    const beforeSwitch = await (await fetch(`${server.base}/v1/store/navigation`)).json();
+    const ngRow = beforeSwitch.countries.find(country => country.code === 'NG');
+    const ghRow = beforeSwitch.countries.find(country => country.code === 'GH');
+    assert.equal(ngRow.store_subdomain, 'ng', 'NG: switched on and ready (set up in earlier tests)');
+    assert.equal(ghRow.store_subdomain, null, 'GH: a store row exists, but the switch is still off');
+
+    assert.equal((await admin.put('/v1/admin/switches/country_stores', { country_code: 'GH', enabled: true })).status, 200);
+    const stillNotReady = await (await fetch(`${server.base}/v1/store/navigation`)).json();
+    assert.equal(stillNotReady.countries.find(country => country.code === 'GH').store_subdomain, null, 'switched on, but its host is not ready yet');
+
+    await prisma.store.update({ where: { id: gh.id }, data: { hostStatus: 'ready' } });
+    const ready = await (await fetch(`${server.base}/v1/store/navigation`)).json();
+    assert.equal(ready.countries.find(country => country.code === 'GH').store_subdomain, 'gh');
+  });
+
+  test('the single root bitocard.com store is never offered as a market’s own country store', async () => {
+    const navigation = await (await fetch(`${server.base}/v1/store/navigation`)).json();
+    // Root sells no particular country, so it can never appear as a "KE" (or any other) row's store_subdomain.
+    assert.ok(navigation.countries.every(country => country.store_subdomain !== 'bitocard'));
+  });
+});

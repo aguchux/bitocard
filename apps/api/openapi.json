@@ -7794,6 +7794,7 @@
                   "country": "NG",
                   "currency": "NGN",
                   "checkout_mode": "live",
+                  "house": false,
                   "white_label": true,
                   "app": {
                     "desktop_nav": "rail"
@@ -25555,22 +25556,26 @@
                     {
                       "code": "GH",
                       "name": "Ghana",
-                      "products": 9
+                      "products": 9,
+                      "store_subdomain": null
                     },
                     {
                       "code": "KE",
                       "name": "Kenya",
-                      "products": 0
+                      "products": 0,
+                      "store_subdomain": null
                     },
                     {
                       "code": "NG",
                       "name": "Nigeria",
-                      "products": 40
+                      "products": 40,
+                      "store_subdomain": "ng"
                     },
                     {
                       "code": "US",
                       "name": "United States",
-                      "products": 12
+                      "products": 12,
+                      "store_subdomain": null
                     }
                   ]
                 }
@@ -27123,22 +27128,26 @@
                     {
                       "code": "GH",
                       "name": "Ghana",
-                      "products": 9
+                      "products": 9,
+                      "store_subdomain": null
                     },
                     {
                       "code": "KE",
                       "name": "Kenya",
-                      "products": 0
+                      "products": 0,
+                      "store_subdomain": null
                     },
                     {
                       "code": "NG",
                       "name": "Nigeria",
-                      "products": 40
+                      "products": 40,
+                      "store_subdomain": "ng"
                     },
                     {
                       "code": "US",
                       "name": "United States",
-                      "products": 12
+                      "products": 12,
+                      "store_subdomain": null
                     }
                   ]
                 }
@@ -48510,6 +48519,7 @@
           "country",
           "currency",
           "checkout_mode",
+          "house",
           "white_label",
           "app",
           "domain"
@@ -48589,6 +48599,10 @@
               "test",
               "live"
             ]
+          },
+          "house": {
+            "type": "boolean",
+            "description": "bitocard.com’s own retail arm in this market (a country store, `<country>.bitocard.com`), never a reseller’s."
           },
           "white_label": {
             "type": "boolean",
@@ -49444,7 +49458,8 @@
         "required": [
           "code",
           "name",
-          "products"
+          "products",
+          "store_subdomain"
         ],
         "additionalProperties": false,
         "properties": {
@@ -49459,6 +49474,13 @@
           "products": {
             "type": "integer",
             "description": "Products on sale there (zero is possible for a market not stocked yet)."
+          },
+          "store_subdomain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "This market’s own live store (`<store_subdomain>.bitocard.com`), or null while bitocard.com still serves it directly."
           }
         }
       },

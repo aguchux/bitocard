@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ChatWidget } from "@/components/app/chat-widget";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
 import { currentCustomer } from "@/lib/customer";
-import { currentMarket } from "@/lib/market";
+import { countryStoreFor, currentMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
 import { storeShell } from "@/lib/store-theme";
@@ -43,6 +44,12 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     );
   }
   const [{ groups, countries }, market, customer] = await Promise.all([storeNavigation(), currentMarket(), currentCustomer()]);
+  // On root (no store context at all), a signed-in customer whose fixed country now has its own live country store
+  // belongs there: send them, rather than serving their market from root (docs/BITOCARD_COUNTRY_STORES_PLAN.md).
+  if (!store) {
+    const subdomain = countryStoreFor(countries, customer?.country);
+    if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
+  }
   // A reseller's store wears its template's variant and colour theme.
   return (
     <div className={shell} {...storeShell(store?.design)}>

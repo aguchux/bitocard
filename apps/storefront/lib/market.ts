@@ -25,6 +25,15 @@ export async function marketLocked() {
   return !(await storeSubdomain()) && Boolean((await currentCustomer())?.country);
 }
 
+/**
+ * The live country store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`) for a market in a `countries` list, if any —
+ * for root to redirect a signed-in customer (fixed country) or a chosen market into it, instead of staying on root.
+ */
+export function countryStoreFor(countries: ReadonlyArray<{ code: string; store_subdomain: string | null }>, code: string | null | undefined) {
+  if (!code) return null;
+  return countries.find(country => country.code === code)?.store_subdomain ?? null;
+}
+
 const add = (path: string, name: string, value: string) => `${path}${path.includes("?") ? "&" : "?"}${name}=${encodeURIComponent(value)}`;
 
 /** Store reads that list products: these take the customer's currency for local prices. */

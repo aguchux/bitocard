@@ -2,12 +2,14 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { worldwideCategories, worldwideCountry } from '../catalogue/pricing.service.js';
+import { houseStoreId } from '../checkout/house-ids.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { FxService } from '../fx/fx.service.js';
 import { type Brand, type LedgerMode, Prisma, type Product, type ProductCategory } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { minor } from '../ledger/mode.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { brandInitials, registryAssetUrl, registryBrand, registryCardArtUrl, registryIconUrl, registrySlugsMatching } from './brand-registry.js';
 import { storeLayout, verifyStorePreview } from '../stores/store-home.service.js';
 import { templateFor } from '../stores/templates.js';
@@ -67,6 +69,9 @@ type StoreScope = {
   resellerId: string;
   country: string;
   mode: LedgerMode;
+  /** A market's own country store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`): BitoCard's own retail arm there, so it
+   * sells the global admin-`listed` catalogue, like root, never a reseller's own `reseller_listings`/supplier offers. */
+  house: boolean;
   /** The store's template decides what it sells: its categories (null: all), or its one `focus` product. */
   template: string;
   variant: string;
@@ -92,7 +97,18 @@ export class StorefrontService {
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
     private readonly fx: FxService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** Whether the single root bitocard.com store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`). A market's own country store is not. */
+  private isRoot(store: { id: string }) {
+    return store.id === houseStoreId;
+  }
+
+  /** A house store's checkout is live or the sandbox by BitoCard's single Customer-checkout Sandbox switch, never a column. */
+  private houseMode(): LedgerMode {
+    return this.integrations.config.CHECKOUT_SANDBOX ? 'test' : 'live';
+  }
 
   /**
    * The rates for showing prices in `currency` (the signed-in customer's): BitoCard's `pay` rate for every currency
@@ -139,22 +155,24 @@ export class StorefrontService {
   }
 
   /**
-   * Runs `work` for a reseller's hosted store (`<subdomain>.bitocard.com`, named by the `store` query): only the
-   * products the reseller listed for their store (SHQ Catalogue), available from BitoCard's suppliers or their own, in
-   * their country plus products usable anywhere. No store (or `bitocard`) is bitocard.com. A store that is not
-   * published is a 404.
+   * Runs `work` for a hosted store (`<subdomain>.bitocard.com`, named by the `store` query): a reseller's own store
+   * (only the products they listed for it, SHQ Catalogue, available from BitoCard's suppliers or their own) or a
+   * market's own country store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`; BitoCard's own retail arm there, so it sells
+   * the same global `listed` catalogue as root). No store (or `bitocard`, the single root store) is bitocard.com. A
+   * store that is not published, or the root store reached by name, is a 404.
    */
   async inStore<T>(subdomain: string | null, market: string | undefined, work: () => Promise<T>, currency?: string) {
     if (!subdomain) return this.inMarket(market, work, currency);
     const store = await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: true } });
-    if (!store || store.status !== 'published' || store.reseller.status === 'suspended' || store.reseller.house || !store.reseller.country) {
+    if (!store || store.status !== 'published' || store.reseller.status === 'suspended' || this.isRoot(store) || !store.reseller.country) {
       throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
     }
     const scope: StoreScope = {
       id: store.id,
       resellerId: store.resellerId,
       country: store.reseller.country,
-      mode: store.checkoutMode,
+      mode: store.reseller.house ? this.houseMode() : store.checkoutMode,
+      house: store.reseller.house,
       template: store.template,
       variant: store.variant,
       focus: store.focus,
@@ -167,9 +185,10 @@ export class StorefrontService {
     return this.scope.run({ market: scope.country, store: scope, prices }, work);
   }
 
-  /** Whether the request is for a reseller's hosted store. */
+  /** Whether the request is for a reseller's hosted store (never true for a market's own country store). */
   private get onResellerStore() {
-    return Boolean(this.scope.getStore()?.store);
+    const store = this.scope.getStore()?.store;
+    return Boolean(store) && !store!.house;
   }
 
   // -- What is on sale -------------------------------------------------------------------------------------------
@@ -192,17 +211,21 @@ export class StorefrontService {
     const categories = new Set(enabled.map(row => row.category).filter(category => !allowed || allowed.has(category)));
     const worldwide = [...categories].filter(category => worldwideCategories.has(category));
     const fromBitocard: Prisma.ProductWhereInput = { supplierProducts: { some: { available: true, supplier: { enabled: true } } } };
+    // A market's own country store is BitoCard's own retail arm (never a reseller's), so it shares root's catalogue:
+    // only BitoCard's suppliers and the global admin-listed set, never a reseller's own offers or `reseller_listings`
+    // (nobody can ever populate those for a house account — there is no SHQ dashboard behind one).
+    const ownStore = store && !store.house ? store : null;
     return {
       categories,
       where: {
         AND: [
           ...(market ? [{ OR: [{ country: market }, { country: worldwideCountry }, { category: { in: [...worldwideCategories] } }] }] : []),
           // On sale from BitoCard's suppliers, or on a reseller's store from their own supplier account too.
-          store ? { OR: [fromBitocard, { resellerOffers: { some: { resellerId: store.resellerId, mode: store.mode, available: true, connection: { status: 'active', routing: { not: 'off' } } } } }] } : fromBitocard,
+          ownStore ? { OR: [fromBitocard, { resellerOffers: { some: { resellerId: ownStore.resellerId, mode: ownStore.mode, available: true, connection: { status: 'active', routing: { not: 'off' } } } } }] } : fromBitocard,
         ],
         active: true,
-        // bitocard.com: only products an admin listed (Catalog > Products > List); a reseller's store: what they listed.
-        ...(store ? { listings: { some: { resellerId: store.resellerId } } } : { listed: true }),
+        // bitocard.com (and a market's own country store): only products an admin listed; a reseller's store: theirs.
+        ...(ownStore ? { listings: { some: { resellerId: ownStore.resellerId } } } : { listed: true }),
         brand: { notIn: hidden.map(row => row.slug) },
         ...(template?.single ? { key: store?.focus ?? '' } : {}),
         // An empty OR would match everything (Prisma), so a store with none of its categories on sale (an RDP shop
@@ -476,20 +499,36 @@ export class StorefrontService {
     });
   }
 
-  /** Countries with products on sale, for the country picker. */
+  /**
+   * The markets with a live country store (`docs/BITOCARD_COUNTRY_STORES_PLAN.md`, Stage 4): the `country_stores`
+   * switch on for that market, and its store published with its address ready (so root never sends a shopper to a
+   * subdomain that is not actually serving traffic yet).
+   */
+  private async readyCountryStores() {
+    const rows = await this.prisma.store.findMany({
+      where: { status: 'published', hostStatus: 'ready', reseller: { house: true, countryRef: { isNot: null } } },
+      select: { subdomain: true, reseller: { select: { country: true } } },
+    });
+    const byCountry = new Map(rows.filter(row => row.reseller.country).map(row => [row.reseller.country!, row.subdomain]));
+    const on = await Promise.all([...byCountry.keys()].map(async code => [code, await this.settings.isOnForCountry('country_stores', code)] as const));
+    for (const [code, enabled] of on) if (!enabled) byCountry.delete(code);
+    return byCountry;
+  }
+
   /**
    * The countries for the country picker: every market BitoCard has set up (Settings > Markets), with the products on
-   * sale there (none yet is fine), plus any other country with products on sale.
+   * sale there (none yet is fine), plus any other country with products on sale. `store_subdomain` names a market's
+   * own live country store, so root can offer to take the shopper there instead of staying global.
    */
   async countries() {
-    // A reseller's store sells in its own country only.
+    // A reseller's store, or a market's own country store, sells in its own country only.
     const store = this.scope.getStore()?.store;
     if (store) {
       const market = await this.prisma.country.findUnique({ where: { code: store.country }, select: { name: true } });
-      return [{ code: store.country, name: market?.name ?? countryName(store.country), products: await this.prisma.product.count({ where: (await this.availability()).where }) }];
+      return [{ code: store.country, name: market?.name ?? countryName(store.country), products: await this.prisma.product.count({ where: (await this.availability()).where }), store_subdomain: null }];
     }
     // Always the whole store's countries, so a shopper can pick another market.
-    const { where } = await this.scope.run({ market: null }, () => this.availability());
+    const [{ where }, countryStores] = await Promise.all([this.scope.run({ market: null }, () => this.availability()), this.readyCountryStores()]);
     const [grouped, markets] = await Promise.all([
       this.prisma.product.groupBy({ by: ['country'], where, _count: { _all: true } }),
       this.prisma.country.findMany({ select: { code: true, name: true } }),
@@ -499,7 +538,7 @@ export class StorefrontService {
     return [...codes]
       // Products usable anywhere (`WW`) are not a country to pick: they show in every country.
       .filter(code => /^[A-Z]{2}$/.test(code) && code !== worldwideCountry)
-      .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0 }))
+      .map(code => ({ code, name: markets.find(row => row.code === code)?.name ?? countryName(code), products: counts.get(code) ?? 0, store_subdomain: countryStores.get(code) ?? null }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 

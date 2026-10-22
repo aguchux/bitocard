@@ -94,7 +94,7 @@ export type StoreProductDetail = StoreProduct & {
 /** `on_sale` is false for a category not open yet (listed only in the menu, with `products: 0`). */
 export type StoreCategory = { object: 'store_category'; category: ProductCategory; label: string; group: string | null; icon_url: string | null; image_url: string | null; products: number; on_sale: boolean };
 /** A market BitoCard has set up, or another country with products on sale; `products` may be 0. */
-export type StoreCountry = { code: string; name: string; products: number };
+export type StoreCountry = { code: string; name: string; products: number; store_subdomain: string | null };
 /** Every menu group is always listed; `on_sale` is false until one of its categories has products on sale. */
 export type StoreNavigationGroup = { key: string; label: string; on_sale: boolean; categories: StoreCategory[]; brands: StoreBrand[] };
 export type StoreList<T> = { object: 'list'; data: T[]; has_more?: boolean; total?: number };
