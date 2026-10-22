@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
-import { houseRootId, houseStoreId } from '../checkout/house.service.js';
+import { houseRootId } from '../checkout/house.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, SupportBot, SupportBotKnowledge } from '../generated/prisma/client.js';
@@ -106,9 +106,10 @@ export class BotsService {
     const bot = await this.prisma.supportBot.findUnique({ where: { id } });
     if (!bot) throw notFound();
     if (owner.kind === 'reseller' && bot.resellerId !== owner.resellerId) throw notFound();
-    if (owner.kind === 'admin' && bot.scope !== 'platform' && bot.storeId !== houseStoreId && bot.resellerId !== houseRootId) {
-      // Admins see every bot (to suspend one) but edit only BitoCard's own.
-      throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_bitocard_assistant', 'This assistant belongs to a reseller: admins can only suspend it.');
+    if (owner.kind === 'admin' && bot.scope !== 'platform' && bot.resellerId !== houseRootId) {
+      // Admins see every bot (to suspend one) but edit only BitoCard's own (any house store's, or the platform one).
+      const store = bot.storeId ? await this.prisma.store.findUnique({ where: { id: bot.storeId }, select: { reseller: { select: { house: true } } } }) : null;
+      if (!store?.reseller.house) throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'not_bitocard_assistant', 'This assistant belongs to a reseller: admins can only suspend it.');
     }
     return bot;
   }
@@ -126,8 +127,8 @@ export class BotsService {
 
   /** Validates a store the owner may give a bot. */
   private async checkStore(owner: BotOwner, storeId: string) {
-    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
-    const allowed = store && (owner.kind === 'reseller' ? store.resellerId === owner.resellerId : store.id === houseStoreId);
+    const store = await this.prisma.store.findUnique({ where: { id: storeId }, include: { reseller: { select: { house: true } } } });
+    const allowed = store && (owner.kind === 'reseller' ? store.resellerId === owner.resellerId : store.reseller.house);
     if (!allowed) throw invalid('parameter_invalid', 'Choose one of your stores.', 'store_id');
     return store;
   }

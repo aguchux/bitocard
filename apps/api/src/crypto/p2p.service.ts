@@ -196,7 +196,7 @@ export class P2pService {
       known.set(
         customerId,
         (async () => {
-          const owner = await this.prisma.customer.findUnique({ where: { id: customerId }, include: { store: true, market: true } });
+          const owner = await this.prisma.customer.findUnique({ where: { id: customerId }, include: { store: { include: { reseller: { select: { house: true } } } }, market: true } });
           if (!owner || owner.status !== 'active') return false;
           try {
             await this.requireTrader(owner);

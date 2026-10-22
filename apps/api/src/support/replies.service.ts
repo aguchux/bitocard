@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { waitUntil } from '@vercel/functions';
-import { houseStoreId } from '../checkout/house.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { SupportBot, SupportConversation, SupportTicket } from '../generated/prisma/client.js';
 import { formatMoney } from '../notifications/templates.js';
@@ -60,8 +59,11 @@ export class RepliesService {
   private async ticketAssistant(ticket: SupportTicket) {
     if (ticket.requester === 'reseller') return this.prisma.supportBot.findFirst({ where: { scope: 'platform', status: 'active', roles: { has: 'tickets' } } });
     if (!ticket.storeId) return null;
-    // A store's assistant answers its own queue; a ticket passed to BitoCard is BitoCard's (bitocard.com's is its store).
-    if (ticket.queue === 'bitocard' && ticket.storeId !== houseStoreId) return null;
+    // A store's assistant answers its own queue; a ticket passed to BitoCard is BitoCard's (any house store's is its own store's).
+    if (ticket.queue === 'bitocard') {
+      const store = await this.prisma.store.findUnique({ where: { id: ticket.storeId }, select: { reseller: { select: { house: true } } } });
+      if (!store?.reseller.house) return null;
+    }
     return this.prisma.supportBot.findFirst({ where: { storeId: ticket.storeId, status: 'active', roles: { has: 'tickets' } } });
   }
 
@@ -166,8 +168,8 @@ export class RepliesService {
     if (call.name === 'handoff') return { result: 'Handed over.', handover: String(args.reason ?? 'The assistant asked for a person.').slice(0, 300) };
     if (call.name === 'search_products' && scope.storeId) {
       const query = String(args.query ?? '').trim().slice(0, 80);
-      const house = scope.storeId === houseStoreId;
-      const store = await this.prisma.store.findUnique({ where: { id: scope.storeId }, select: { resellerId: true } });
+      const store = await this.prisma.store.findUnique({ where: { id: scope.storeId }, select: { resellerId: true, reseller: { select: { house: true } } } });
+      const house = store?.reseller.house ?? false;
       const products = await this.prisma.product.findMany({
         where: { active: true, name: { contains: query, mode: 'insensitive' }, ...(house ? { listed: true } : { listings: { some: { resellerId: store?.resellerId ?? '' } } }) },
         take: 8,

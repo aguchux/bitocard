@@ -4,7 +4,6 @@ import { AdminAuthService } from '../auth/admin-auth.service.js';
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
-import { houseStoreId } from '../checkout/house.service.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
 import { numericCode, sameDigest, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -77,7 +76,7 @@ export class ManualTopUpsService {
   async requestForCustomer(adminId: string, customerId: string, input: TopUpInput) {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, include: { store: { include: { reseller: true } } } });
     if (!customer) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such customer.');
-    const countryCode = customer.store.id === houseStoreId ? customer.country : customer.store.reseller.country;
+    const countryCode = customer.store.reseller.house ? customer.country : customer.store.reseller.country;
     if (!countryCode) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'The customer has not chosen their country yet, so they have no wallet to top up.');
     const country = await this.prisma.country.findUniqueOrThrow({ where: { code: countryCode } });
     const currency = (input.currency ?? country.currency).toUpperCase();

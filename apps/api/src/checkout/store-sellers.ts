@@ -40,7 +40,7 @@ export class StoreSellers {
   }
 
   /** The store named (null: bitocard.com). A reseller's store must be published and its reseller not suspended. */
-  async resolve(key: string | null): Promise<Store> {
+  async resolve(key: string | null): Promise<Store & { reseller: Reseller }> {
     if (!key) return this.house.store();
     const store = await this.prisma.store.findUnique({ where: { subdomain: key }, include: { reseller: true } });
     if (!store || store.status !== 'published' || store.reseller.status === 'suspended' || store.reseller.house) throw storeMissing();

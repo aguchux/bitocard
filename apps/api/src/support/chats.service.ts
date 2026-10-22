@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { houseRootId, HouseService, houseStoreId } from '../checkout/house.service.js';
+import { houseRootId, HouseService } from '../checkout/house.service.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
@@ -25,7 +25,7 @@ export type ChatAuthor = { kind: 'customer' | 'reseller' | 'bitocard' | 'bot' | 
 export type ChatUpload = { buffer: Buffer; mimetype: string; size: number; originalname?: string };
 type CheckedUpload = { file: ChatUpload; checked: CheckedFile };
 /** Who asks on a store: a signed-in customer, or a visitor who gave their name and email. */
-export type StoreRequester = { kind: 'customer'; customer: CustomerWithStore } | { kind: 'visitor'; visitor: SupportVisitor; store: Store };
+export type StoreRequester = { kind: 'customer'; customer: CustomerWithStore } | { kind: 'visitor'; visitor: SupportVisitor; store: Store & { reseller: { house: boolean } } };
 
 /** The longest chat message. */
 export const maxChatMessage = 2000;
@@ -206,7 +206,7 @@ export class ChatsService {
   /** The requester's open chat, or a new one with the store (BitoCard at bitocard.com). */
   private async storeChat(requester: StoreRequester) {
     const store = ChatsService.storeOf(requester);
-    const house = store.id === houseStoreId;
+    const house = store.reseller.house;
     const country = requester.kind === 'customer' ? requester.customer.country : null;
     return this.openOrCreate({ ...ChatsService.whereFor(requester), status: { not: 'closed' } }, async () => ({
       resellerId: house ? (country ? (await this.house.resellerFor(country)).id : houseRootId) : store.resellerId,
@@ -279,7 +279,7 @@ export class ChatsService {
     const known = await this.visitor(input.token, storeKey);
     let token: string | null = null;
     let visitor: SupportVisitor;
-    let store: Store;
+    let store: Store & { reseller: { house: boolean } };
     if (known?.kind === 'visitor') {
       visitor = await this.prisma.supportVisitor.update({ where: { id: known.visitor.id }, data: { name, email, lastSeenAt: new Date() } });
       store = known.store;

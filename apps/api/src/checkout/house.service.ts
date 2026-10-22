@@ -4,11 +4,9 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { StoreHostsService } from '../stores/store-hosts.service.js';
+import { houseRootId, houseStoreId } from './house-ids.js';
 
-/** BitoCard's own store, bitocard.com (seeded by migration): its customers belong to it. */
-export const houseStoreId = '00000000-0000-4000-8000-0000000000b2';
-/** The house account with no country, which owns the store. */
-export const houseRootId = '00000000-0000-4000-8000-0000000000b1';
+export { houseRootId, houseStoreId };
 
 /**
  * BitoCard selling to retail customers on bitocard.com, through the same quotes, orders and ledger as any reseller.
@@ -25,7 +23,7 @@ export class HouseService {
   ) {}
 
   store() {
-    return this.prisma.store.findUniqueOrThrow({ where: { id: houseStoreId } });
+    return this.prisma.store.findUniqueOrThrow({ where: { id: houseStoreId }, include: { reseller: true } });
   }
 
   /** bitocard.com's checkout is live unless an admin switched it to the sandbox (Settings > Integrations > Customer checkout). */

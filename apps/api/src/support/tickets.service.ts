@@ -1,7 +1,7 @@
 import { inStoreOrAccount } from '../stores/store-scope.js';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
-import { houseRootId, HouseService, houseStoreId } from '../checkout/house.service.js';
+import { houseRootId, HouseService } from '../checkout/house.service.js';
 import { StoreSellers } from '../checkout/store-sellers.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
@@ -166,7 +166,7 @@ export class TicketsService {
     if (input.checkout_id && (!checkout || checkout.customerId !== customer.id)) throw invalid('parameter_invalid', 'Choose one of your orders.', 'checkout_id');
     const open = await this.prisma.supportTicket.count({ where: { customerId: customer.id, status: { not: 'resolved' } } });
     if (open >= maxOpenCustomerTickets) throw conflict('too_many_tickets', `You have ${open} tickets still open. Reply on one of them, or wait for an answer, before opening another.`);
-    const house = customer.storeId === houseStoreId;
+    const house = customer.store.reseller.house;
     const resellerId = checkout?.resellerId ?? (house ? (customer.country ? (await this.house.resellerFor(customer.country)).id : houseRootId) : customer.store.resellerId);
     const ticket = await this.create(
       {
@@ -378,7 +378,8 @@ export class TicketsService {
   async returnToReseller(actorId: string | null, id: string, author: TicketAuthor, note: string) {
     const before = await this.load({ id });
     if (!before) throw notFound();
-    if (before.requester !== 'customer' || before.queue !== 'bitocard' || before.storeId === houseStoreId) throw conflict('ticket_not_returnable', 'Only a customer’s ticket a store passed to BitoCard can be sent back.');
+    const seller = await this.prisma.reseller.findUnique({ where: { id: before.resellerId }, select: { house: true } });
+    if (before.requester !== 'customer' || before.queue !== 'bitocard' || seller?.house) throw conflict('ticket_not_returnable', 'Only a customer’s ticket a store passed to BitoCard can be sent back.');
     const claimed = await this.transition(id, { queue: 'bitocard' }, { queue: 'reseller', status: 'open', assigneeId: null }, ['support_ticket.updated'], { author, body: note, visibility: 'staff' });
     if (!claimed) throw conflict('ticket_not_returnable', 'This ticket is no longer with BitoCard.');
     const after = (await this.load({ id }))!;

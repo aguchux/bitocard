@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { houseStoreId as rootStoreId } from '../checkout/house.service.js';
+import { houseStoreId as rootStoreId } from '../checkout/house-ids.js';
 import type { AppConfig } from '../config/config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { CloudflareDns } from '../domains/cloudflare.js';

@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { houseStoreId } from '../checkout/house.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { formatMoney } from '../notifications/templates.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -192,7 +191,7 @@ export class StoreKnowledgeService {
   /** The store data the document is made from (and its fingerprint). */
   async gather(storeId: string) {
     const store = await this.prisma.store.findUniqueOrThrow({ where: { id: storeId }, include: { reseller: true } });
-    const house = store.id === houseStoreId;
+    const house = store.reseller.house;
     const countryCode = store.reseller.country;
     const country = countryCode ? await this.prisma.country.findUnique({ where: { code: countryCode }, include: { categories: true } }) : null;
     const products = await this.prisma.product.findMany({

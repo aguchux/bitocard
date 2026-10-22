@@ -4,7 +4,6 @@ import { normalisePhone } from '../auth/auth.service.js';
 import { numericCode, randomToken, sameDigest, sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
-import { houseStoreId } from '../checkout/house.service.js';
 import { type Country, type Customer, type CustomerCodePurpose, Prisma, type Store } from '../generated/prisma/client.js';
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
@@ -23,7 +22,7 @@ const lockMs = 15 * minute;
 /** The header a store's server sends the customer's session token in. */
 export const customerSessionHeader = 'bitocard-customer-session';
 
-export type CustomerWithStore = Customer & { store: Store; market?: Country | null };
+export type CustomerWithStore = Customer & { store: Store & { reseller: { house: boolean } }; market?: Country | null };
 
 const countryLocked = () => new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_locked', 'Your country is set for good: your wallet and payments are in its currency.', 'country');
 
@@ -69,7 +68,7 @@ export class CustomersService {
 
   /** The customer signed in with this token, or null (ended, expired or suspended). */
   async resolve(token: string): Promise<{ customer: CustomerWithStore; sessionId: string } | null> {
-    const session = await this.prisma.customerSession.findUnique({ where: { tokenHash: sha256(token) }, include: { customer: { include: { store: true, market: true } } } });
+    const session = await this.prisma.customerSession.findUnique({ where: { tokenHash: sha256(token) }, include: { customer: { include: { store: { include: { reseller: { select: { house: true } } } }, market: true } } } });
     if (!session || session.revokedAt || session.expiresAt <= new Date() || session.customer.status !== 'active') return null;
     if (Date.now() - session.lastSeenAt.getTime() > touchEveryMs) await this.prisma.customerSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
     return { customer: session.customer, sessionId: session.id };
@@ -92,8 +91,8 @@ export class CustomersService {
    * The country a new customer is fixed to: on bitocard.com the one they chose (a BitoCard market), on a reseller's
    * store the reseller's (whatever was sent).
    */
-  private async signupCountry(store: Store, asked: string | undefined) {
-    if (store.id !== houseStoreId) {
+  private async signupCountry(store: Store & { reseller: { house: boolean } }, asked: string | undefined) {
+    if (!store.reseller.house) {
       const reseller = await this.prisma.reseller.findUniqueOrThrow({ where: { id: store.resellerId }, select: { country: true } });
       return reseller.country;
     }
@@ -108,7 +107,7 @@ export class CustomersService {
     return country.code;
   }
 
-  async signup(store: Store, input: { email: string; name: string; password: string; country?: string }) {
+  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
@@ -166,7 +165,7 @@ export class CustomersService {
     if (input.country !== undefined) {
       const code = await this.marketCode(input.country);
       if (customer.country !== code) {
-        if (customer.country || customer.storeId !== houseStoreId) throw countryLocked();
+        if (customer.country || !customer.store.reseller.house) throw countryLocked();
         const set = await this.prisma.customer.updateMany({ where: { id: customer.id, country: null }, data: { country: code } });
         if (set.count === 0) throw countryLocked();
       }
