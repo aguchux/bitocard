@@ -66,7 +66,19 @@ export class HouseService {
     const reseller = await this.resellerFor(code);
     try {
       const store = await this.prisma.store.create({
-        data: { resellerId: reseller.id, name: `BitoCard ${code}`, subdomain, status: 'published', publishedAt: new Date(), template: 'all_in_one', variant: 'classic', theme: 'navy_pink' },
+        // checkoutMode is never read for a house store's own checkout (StoreSellers.mode() always asks house.mode()
+        // instead), but it is still read raw for display (stores.service.ts's presenters); keep it truthful.
+        data: {
+          resellerId: reseller.id,
+          name: `BitoCard ${code}`,
+          subdomain,
+          status: 'published',
+          publishedAt: new Date(),
+          template: 'all_in_one',
+          variant: 'classic',
+          theme: 'navy_pink',
+          checkoutMode: 'live',
+        },
       });
       await this.hosts.sync(store.id);
       return store;

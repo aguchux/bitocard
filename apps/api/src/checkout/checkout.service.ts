@@ -20,7 +20,7 @@ import { isPaymentGateway } from '../payments/payment-providers.js';
 import { paymentRef, PaymentsService } from '../payments/payments.service.js';
 import { ProviderError } from '../payments/provider-error.js';
 import { CustomerWalletsService, walletMethod } from './customer-wallets.js';
-import { type PaymentOption, StoreSellers } from './store-sellers.js';
+import { type HouseAwareStore, type PaymentOption, StoreSellers } from './store-sellers.js';
 import { templateSells } from '../stores/templates.js';
 
 const minute = 60 * 1000;
@@ -179,7 +179,7 @@ export class CheckoutService implements OnModuleInit {
    * How customers can pay on a store, best first (bitocard.com: in the country given; a reseller's store: theirs). With
    * wallets on (`wallet_required`), only the wallet: customers top it up (the wallet's own methods) and buy from it.
    */
-  async methodsFor(store: Store, countryCode: string) {
+  async methodsFor(store: HouseAwareStore, countryCode: string) {
     const mode = this.stores.mode(store);
     const seller = await this.sellerOrNull(store, countryCode);
     if (seller && (await this.customerWallets.enabled(seller, mode))) return { object: 'list' as const, mode, wallet_required: true, data: [walletMethod] };
@@ -189,7 +189,7 @@ export class CheckoutService implements OnModuleInit {
     return { object: 'list' as const, mode, wallet_required: false, data: country ? await Promise.all(shown.map(option => this.stores.describe(option, country))) : [] };
   }
 
-  private async sellerOrNull(store: Store, countryCode: string) {
+  private async sellerOrNull(store: HouseAwareStore, countryCode: string) {
     try {
       return await this.stores.seller(store, countryCode);
     } catch (error) {
