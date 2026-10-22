@@ -57,6 +57,29 @@ describe("the visitor wheel", () => {
     expect(init.headers["bitocard-spin-claim"]).toBeUndefined();
   });
 
+  test("every POST carries an Idempotency-Key, as every API POST requires: the button's nonce, or a fresh one without a usable nonce", async () => {
+    const reward = { object: "spin", id: "s3", number: 1, segment: 0, asset: "USDT", amount: "0.0100", usd: "0.01", allowance: { won_usd: "0.01", spins_used: 1, today_left: 5, daily_limit: 6, next_spin_at: null, finished: false } };
+    const nonce = "0d1c2b3a-4f5e-4d6c-8b7a-9f8e7d6c5b4a";
+    const fetch = vi.fn(async () => reply({ spin: reward, status: { object: "public_spin_rewards" }, token: "claim-token-3" }));
+    vi.stubGlobal("fetch", fetch);
+
+    await spinPublicWheel(nonce);
+    await spinPublicWheel();
+    await spinPublicWheel("bad key!");
+
+    const [withNonce, withoutNonce, badNonce] = calls(fetch).map(call => call[1].headers["idempotency-key"]);
+    expect(withNonce).toBe(nonce);
+    expect(withoutNonce).toMatch(/^[0-9a-f-]{36}$/);
+    expect(badNonce).toMatch(/^[0-9a-f-]{36}$/);
+    expect(withoutNonce).not.toBe(badNonce);
+
+    // A GET (reading the wheel's status) never needs one: the API only requires it on POST.
+    const statusFetch = vi.fn(async () => reply({ object: "public_spin_rewards", enabled: true, reason: null, segments: [], daily_limit: 6, allowance: null, recent: [], rewards: { coins: [], usd: "0.00", exchange_currencies: [] }, claim_expires_at: "2027-01-01T00:00:00.000Z" }));
+    vi.stubGlobal("fetch", statusFetch);
+    await publicSpinRewards();
+    expect(calls(statusFetch)[0][1].headers["idempotency-key"]).toBeUndefined();
+  });
+
   test("a later spin sends the saved claim token back as a header, never in the body", async () => {
     setRequest({ host: "bitocard.com" }, { bc_market: "NG", bc_public_spin: "claim-token-2" });
     const fetch = vi.fn(async () => reply({ spin: { object: "spin", id: "s2", number: 2, segment: 1, asset: "USDC", amount: "0.0200", usd: "0.02", allowance: { won_usd: "0.03", spins_used: 2, today_left: 4, daily_limit: 6, next_spin_at: null, finished: false } }, status: { object: "public_spin_rewards" } }));

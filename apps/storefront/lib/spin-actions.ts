@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -8,6 +9,9 @@ import { apiUrl } from "@/lib/api";
 import { customerApi, shopperHeader } from "@/lib/customer";
 import { currentMarket } from "@/lib/market";
 import { storeSubdomain } from "@/lib/store";
+
+/** An Idempotency-Key a form may name (its nonce): letters, digits, hyphens and underscores, 8 to 128 characters. */
+const idempotencyKeyPattern = /^[A-Za-z0-9_-]{8,128}$/;
 
 /**
  * A spin's outcome for the wheel, never thrown: the win (the wheel lands on `spin.segment`), or the API's message and
@@ -23,7 +27,11 @@ const publicClaimHeader = "bitocard-spin-claim";
 const thirtyDays = 60 * 60 * 24 * 30;
 const publicCookieOptions = { path: "/", sameSite: "lax" as const, httpOnly: true, secure: process.env.NODE_ENV === "production", ...(process.env.NODE_ENV === "production" ? { domain: ".bitocard.com" } : {}) };
 
-async function publicSpinApi<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<{ ok: true; data: T } | { ok: false; code: string | null; message: string }> {
+/**
+ * `nonce` (made when the button was pressed) is the Idempotency-Key for a POST, so a repeated request spins once;
+ * without a usable one a fresh key is made here, as `customerApi` does for signed-in requests.
+ */
+async function publicSpinApi<T>(method: "GET" | "POST", path: string, body?: unknown, nonce?: string): Promise<{ ok: true; data: T } | { ok: false; code: string | null; message: string }> {
   const jar = await cookies();
   const token = jar.get(publicSpinCookie)?.value;
   const store = await storeSubdomain();
@@ -37,6 +45,7 @@ async function publicSpinApi<T>(method: "GET" | "POST", path: string, body?: unk
         ...(token ? { [publicClaimHeader]: token } : {}),
         ...(store ? { "bitocard-store": store } : {}),
         ...(await shopperHeader()),
+        ...(method === "POST" ? { "idempotency-key": nonce && idempotencyKeyPattern.test(nonce) ? nonce : randomUUID() } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -56,11 +65,14 @@ export async function publicSpinRewards(): Promise<StorePublicSpinRewards | null
   return result.ok ? result.data : null;
 }
 
-/** Spins once as a visitor and stores only the API's opaque claim token in an HttpOnly cookie. */
-export async function spinPublicWheel(): Promise<SpinResult> {
+/**
+ * Spins once as a visitor and stores only the API's opaque claim token in an HttpOnly cookie. `nonce` is the
+ * Idempotency-Key (made when the button was pressed), so a repeated request spins once.
+ */
+export async function spinPublicWheel(nonce?: string): Promise<SpinResult> {
   const [country, store] = await Promise.all([currentMarket(), storeSubdomain()]);
   if ((!country || country === "global") && !store) return { ok: false, code: "country_required", message: "Choose your country before you spin." };
-  const result = await publicSpinApi<StorePublicSpinResult & { token?: string }>("POST", "/v1/store/spins/public", country && country !== "global" ? { country } : {});
+  const result = await publicSpinApi<StorePublicSpinResult & { token?: string }>("POST", "/v1/store/spins/public", country && country !== "global" ? { country } : {}, nonce);
   if (!result.ok) return result;
   if (result.data.token) (await cookies()).set(publicSpinCookie, result.data.token, { ...publicCookieOptions, maxAge: thirtyDays });
   return { ok: true, spin: result.data.spin };

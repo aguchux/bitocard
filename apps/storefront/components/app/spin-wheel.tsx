@@ -125,7 +125,7 @@ export function SpinWheel({ initial, onChange, sound, visitor = false }: { initi
     setWin(null);
     let result;
     try {
-      result = visitor ? await spinPublicWheel() : await spinWheel(crypto.randomUUID());
+      result = visitor ? await spinPublicWheel(crypto.randomUUID()) : await spinWheel(crypto.randomUUID());
     } catch {
       result = { ok: false as const, code: null, message: "We could not reach the store. Try again shortly." };
     }
