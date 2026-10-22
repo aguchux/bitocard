@@ -56,8 +56,13 @@ export class HouseService {
   async storeFor(countryCode: string) {
     const code = countryCode.toUpperCase();
     const subdomain = code.toLowerCase();
-    const existing = await this.prisma.store.findUnique({ where: { subdomain } });
-    if (existing) return existing;
+    const existing = await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: { select: { house: true } } } });
+    // The subdomain format (minimum 3 characters) already keeps a reseller from taking a 2-letter country code, but
+    // never trust that alone: if something else ever holds this name, it is not BitoCard's country store.
+    if (existing) {
+      if (!existing.reseller.house) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'subdomain_taken', `${subdomain}.bitocard.com is not a BitoCard store.`);
+      return existing;
+    }
     const reseller = await this.resellerFor(code);
     try {
       const store = await this.prisma.store.create({
@@ -67,7 +72,11 @@ export class HouseService {
       return store;
     } catch (error) {
       // Another request created it at the same moment.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return this.prisma.store.findUniqueOrThrow({ where: { subdomain } });
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const store = await this.prisma.store.findUniqueOrThrow({ where: { subdomain }, include: { reseller: { select: { house: true } } } });
+        if (!store.reseller.house) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'subdomain_taken', `${subdomain}.bitocard.com is not a BitoCard store.`);
+        return store;
+      }
       throw error;
     }
   }

@@ -144,6 +144,21 @@ describe('store addresses', () => {
     assert.equal((await house.storeFor('ng')).id, ng.id);
   });
 
+  test('storeFor refuses to adopt a name that is not a house store, even if something already holds it', async () => {
+    const house = server.app.get((await import('../dist/checkout/house.service.js')).HouseService);
+    await prisma.country.upsert({
+      where: { code: 'ZZ' },
+      create: { code: 'ZZ', name: 'Zedland', currency: 'ZZZ', minWithdrawalMinor: 1000n },
+      update: {},
+    });
+    const squatter = await prisma.reseller.create({ data: { name: 'Squatter', country: 'ZZ', status: 'active', planCode: 'standard' } });
+    await prisma.store.create({ data: { resellerId: squatter.id, name: 'Squatter store', subdomain: 'zz', status: 'draft' } });
+    await assert.rejects(house.storeFor('ZZ'), error => {
+      assert.equal(error.code, 'subdomain_taken');
+      return true;
+    });
+  });
+
   test('Test connection reads the zone and the storefront project, and refuses another zone', async () => {
     const cards = (await admin.get('/v1/admin/integrations')).json.data;
     assert.deepEqual(['store_hosts', 'domains'].map(id => cards.find(card => card.id === id).testable), [true, true], 'the cards show Test connection');
