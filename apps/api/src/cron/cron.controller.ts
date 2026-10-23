@@ -84,8 +84,16 @@ export class CronController {
     this.jobs = {
       /** Hourly. */
       'exchange-rates': () => fx.refresh(),
-      /** Every 10 minutes: settle top-ups, checkout payments and payouts the providers have not notified us about. */
-      payments: async () => ({ top_ups: await payments.requeryPending(), payouts: await payouts.refreshProcessing(), customer_payouts: await customerPayouts.job() }),
+      /**
+       * Every 10 minutes: settle top-ups, checkout payments and payouts the providers have not notified us about, and
+       * credit transfers into reserved accounts whose notification never came.
+       */
+      payments: async () => ({
+        top_ups: await payments.requeryPending(),
+        reserved_deposits: await payments.sweepReservedDeposits(),
+        payouts: await payouts.refreshProcessing(),
+        customer_payouts: await customerPayouts.job(),
+      }),
       /** Every 5 minutes: place orders for paid checkouts the request did not finish, send and check customer refunds. */
       checkout: () => checkout.job(),
       /** Hourly. */

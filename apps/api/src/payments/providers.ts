@@ -80,7 +80,8 @@ export function uuidFor(kind: string, reference: string) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-export type ReservedAccountDetails = { bankName: string; accountNumber: string; accountName: string };
+/** `providerAccountId` is the provider's own ID for the account (Flutterwave's `order_ref`), when it gives one. */
+export type ReservedAccountDetails = { bankName: string; accountNumber: string; accountName: string; providerAccountId?: string };
 
 /** Dedicated bank account numbers; transfers into them top up the wallet. */
 export interface ReservedAccountProvider {

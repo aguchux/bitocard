@@ -130,6 +130,7 @@ export const notificationTypes = {
   'admin.payment.gateway_refused': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'A payment gateway refused to open a payment' },
   'admin.payment.unmatched': { realm: 'admin', roles: ['finance'], severity: 'warning', label: 'Payment that could not be credited' },
   'admin.payment.unmatched_refund_stuck': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Refund of an uncredited payment refused' },
+  'admin.reserved_account.unmatched_deposit': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Bank transfer to an account number not credited' },
   'admin.tax.rate_unconfirmed': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Sale refused: tax rate not confirmed' },
   'admin.fx.paused': { realm: 'admin', roles: ['finance'], severity: 'critical', label: 'Conversions paused' },
   'admin.vpn.attention': { realm: 'admin', roles: ['operations', 'support'], severity: 'warning', label: 'VPN account needs attention' },

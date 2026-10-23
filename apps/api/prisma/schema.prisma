@@ -938,6 +938,33 @@ enum AccountKind {
   reseller_crypto_withdrawing
 }
 
+/// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
+/// is lost after the bank opened the account still has its owner on record, and transfers into it are credited.
+model ReservedAccountRequest {
+  id         String     @id @default(uuid()) @db.Uuid
+  provider   String
+  /// The reference sent (Flutterwave's `tx_ref`, Monnify's `accountReference`): every deposit carries it.
+  reference  String
+  mode       LedgerMode
+  /// The wallet's owner: the reseller, or with `customerId` the store's seller in that market.
+  resellerId String     @map("reseller_id") @db.Uuid
+  customerId String?    @map("customer_id") @db.Uuid
+  currency   String     @db.Char(3)
+  /// pending (asked, no clear answer yet), active (accounts saved) or refused (the provider clearly said no).
+  status     String     @default("pending")
+  attempts   Int        @default(0)
+  /// The provider's last refusal or error, for admins only.
+  lastError  String?    @map("last_error")
+  /// One call at a time: claimed for a minute while the provider is asked.
+  claimedAt  DateTime?  @map("claimed_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@unique([provider, reference])
+  @@index([status, updatedAt])
+  @@map("reserved_account_requests")
+}
+
 /// A card payment into BitoCard's own gateway disputed by the cardholder with their bank (a chargeback): one per gateway dispute.
 model Chargeback {
   id                String     @id @default(uuid()) @db.Uuid
@@ -1186,6 +1213,8 @@ model ReservedAccount {
   accountName       String     @map("account_name")
   /// Our reference for the reservation at the provider; deposits carry it.
   providerReference String     @map("provider_reference")
+  /// The provider's own ID for the account (Flutterwave's `order_ref`), to look it up there.
+  providerAccountId String?    @map("provider_account_id")
   createdAt         DateTime   @default(now()) @map("created_at")
   reseller          Reseller   @relation(fields: [resellerId], references: [id])
   customer          Customer?  @relation(fields: [customerId], references: [id])

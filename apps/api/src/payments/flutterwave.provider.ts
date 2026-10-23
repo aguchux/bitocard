@@ -19,6 +19,30 @@ type FlwResponse<T> = { status: string; message?: string; data: T };
 type FlwCharge = { id: number; tx_ref: string; status: string; amount: number; currency: string; app_fee?: number; processor_response?: string };
 type FlwRefund = { id: number; status: string; comments?: string; tx_id?: number | string };
 type FlwTransfer = { id: number; status: string; fee?: number; complete_message?: string; reference?: string };
+type FlwVirtualAccount = { account_number?: string; bank_name?: string; order_ref?: string; flw_ref?: string; note?: string; account_status?: string };
+type FlwListedCharge = { id: number; tx_ref?: string; status?: string; payment_type?: string; currency?: string };
+type FlwPage<T> = FlwResponse<T> & { meta?: { page_info?: { total?: number; current_page?: number; total_pages?: number } } };
+
+/** Our references for reserved accounts: resellers' (`bc_ra_`) and store customers' (`bc_rc_`). */
+export const reservedReference = /^bc_r[ac]_/;
+
+/**
+ * The narration Flutterwave shows as the account's name: letters, digits, spaces and a little punctuation, at most 35
+ * characters (its limit), never empty.
+ */
+export function accountNarration(name: string) {
+  const clean = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 .&'-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return (clean || 'BitoCard wallet').slice(0, 35).trim();
+}
+
+/**
+ * The name the payer's bank shows for the account, from Flutterwave's note ("Please make a bank transfer to Ada
+ * Digital FLW"), else the narration sent. Payers check it before they send, so it must be what the bank shows.
+ */
+export function shownAccountName(note: string | undefined, narration: string) {
+  const match = /transfer to (.+?)\.?\s*$/i.exec(note ?? '');
+  return match?.[1]?.trim() || narration;
+}
 
 /** Countries Flutterwave's payment page takes payments from (cards everywhere; bank and mobile money where local). */
 const checkoutCountries = new Set(['NG', 'GH', 'KE', 'UG', 'TZ', 'RW', 'ZA', 'ZM', 'MW', 'CM', 'CI', 'SN', 'SL', 'EG', 'US', 'GB']);
@@ -161,18 +185,43 @@ export class FlutterwaveProvider implements CheckoutProvider, ReservedAccountPro
   }
 
   /**
-   * A permanent account number. Nigeria (NGN) sends the BVN. Ghana (GHS) takes no BVN but needs the holder's first and
-   * last name and phone number, and is enabled only for Ghanaian merchants unless Flutterwave switches it on
-   * (hi@flutterwavego.com). The narration (shown as the account's name) is at most 35 characters.
+   * A static (permanent) account number (`POST /v3/virtual-account-numbers`, `is_permanent: true`). Every transfer into
+   * it carries `tx_ref`, our reference, which is how deposits find their wallet. Nigeria (NGN) needs the BVN. Ghana
+   * (GHS) takes no BVN but needs the holder's first and last name and phone number, and is enabled only for Ghanaian
+   * merchants unless Flutterwave switches it on (hi@flutterwavego.com). The narration is the account's name (at most 35
+   * characters). A reply without an account number is unclear, never a refusal: the account may exist.
    */
   async createReservedAccount(input: { reference: string; email: string; name: string; currency: string; bvn?: string; firstName?: string; lastName?: string; phone?: string }): Promise<ReservedAccountDetails[]> {
-    const narration = input.name.slice(0, 35);
+    const narration = accountNarration(input.name);
+    const holder = {
+      ...(input.firstName ? { firstname: input.firstName } : {}),
+      ...(input.lastName ? { lastname: input.lastName } : {}),
+      ...(input.phone ? { phonenumber: input.phone } : {}),
+    };
     const body =
       input.currency === 'GHS'
-        ? { currency: 'GHS', is_permanent: true, email: input.email, firstname: input.firstName, lastname: input.lastName, phonenumber: input.phone, tx_ref: input.reference, narration }
-        : { email: input.email, is_permanent: true, bvn: input.bvn, tx_ref: input.reference, narration, currency: input.currency };
-    const res = await this.call<{ account_number: string; bank_name: string }>('/virtual-account-numbers', { method: 'POST', body });
-    return [{ bankName: res.data.bank_name, accountNumber: res.data.account_number, accountName: input.name }];
+        ? { currency: 'GHS', is_permanent: true, email: input.email, tx_ref: input.reference, narration, ...holder }
+        : { currency: input.currency, is_permanent: true, email: input.email, bvn: input.bvn, tx_ref: input.reference, narration, ...holder };
+    const res = await this.call<FlwVirtualAccount>('/virtual-account-numbers', { method: 'POST', body });
+    const account = res.data;
+    if (res.status !== 'success' || !account?.account_number || !account.bank_name) {
+      throw new ProviderError(this.name, `virtual account reply without an account number (${res.message ?? res.status})`, false);
+    }
+    return [{ bankName: account.bank_name, accountNumber: account.account_number, accountName: shownAccountName(account.note, narration), providerAccountId: account.order_ref }];
+  }
+
+  /**
+   * Successful bank transfers into our reserved accounts between two days (inclusive), one page at a time
+   * (`GET /v3/transactions`): the IDs to re-read, so a deposit whose notification never came is still credited.
+   */
+  async reservedDeposits(input: { from: string; to: string; page: number }) {
+    const query = new URLSearchParams({ from: input.from, to: input.to, page: String(input.page), status: 'successful' });
+    const res = (await this.call<FlwListedCharge[]>(`/transactions?${query.toString()}`)) as FlwPage<FlwListedCharge[]>;
+    const rows = Array.isArray(res.data) ? res.data : [];
+    return {
+      ids: rows.filter(row => reservedReference.test(row.tx_ref ?? '') && String(row.status).toLowerCase() === 'successful').map(row => String(row.id)),
+      lastPage: (res.meta?.page_info?.total_pages ?? 1) <= input.page || rows.length === 0,
+    };
   }
 
   supportsTransfers(country: string) {

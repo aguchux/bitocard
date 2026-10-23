@@ -10,12 +10,13 @@ import { AdminPaymentMethodsController } from './payment-methods.controller.js';
 import { PaymentMethodsService } from './payment-methods.service.js';
 import { AdminPawapayCoverageController, PawapayCoverageService } from './pawapay-coverage.js';
 import { PaymentsService } from './payments.service.js';
+import { AdminReservedAccountsController, ReservedAccountsAdminService } from './reserved-accounts.admin.js';
 import { ProviderWebhooksController } from './webhooks.controller.js';
 
 @Module({
   imports: [PayoutsModule, IdentityModule, SettingsModule, FxModule],
-  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController, AdminPawapayCoverageController],
-  providers: [PaymentsService, PaymentMethodsService, ChargebacksService, PawapayCoverageService],
+  controllers: [PaymentsController, ProviderWebhooksController, AdminPaymentMethodsController, AdminChargebacksController, AdminPawapayCoverageController, AdminReservedAccountsController],
+  providers: [PaymentsService, PaymentMethodsService, ChargebacksService, PawapayCoverageService, ReservedAccountsAdminService],
   exports: [PaymentsService, PaymentMethodsService, ChargebacksService],
 })
 export class PaymentsModule {}

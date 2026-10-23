@@ -8,12 +8,14 @@ const flwError = (status, message) => ({ status, body: { status: 'error', messag
 /**
  * Flutterwave v3. `state.charges` maps tx_ref to a charge ({ id, status, amount, currency, app_fee });
  * `state.transfers` maps transfer ID to a transfer; `state.rates` maps currency to units per USD.
- * Set `state.fail` to make a path fail: { '/virtual-account-numbers': 500 }.
+ * Set `state.fail` to make a path fail: { '/virtual-account-numbers': 500 }. `state.virtualAccounts` keeps every
+ * account opened (by account number); `state.loseReply` opens the next one but answers 502, as a reply lost on the
+ * way back. `GET /transactions` lists `state.charges` (successful ones, by `status`), `state.pageSize` a page.
  */
 export async function fakeFlutterwave() {
   // `bvns` maps a BVN to the name on its record; `bvnChecks` maps a consent reference to { bvn, status }.
   // `refunds` maps refund ID to a refund ({ id, tx_id, status }); new ones take `refundStatus`.
-  const state = { charges: {}, transfers: {}, refunds: {}, refundStatus: 'completed', rates: {}, fail: {}, nextId: 1000, accounts: { '0123456789': 'ADA OBI DIGITAL', '0987654321': 'JOHN STRANGER' }, bvns: {}, bvnChecks: {} };
+  const state = { charges: {}, virtualAccounts: {}, loseReply: false, pageSize: 50, transfers: {}, refunds: {}, refundStatus: 'completed', rates: {}, fail: {}, nextId: 1000, accounts: { '0123456789': 'ADA OBI DIGITAL', '0987654321': 'JOHN STRANGER' }, bvns: {}, bvnChecks: {} };
   const service = await fakeService(({ method, url, body }) => {
     const path = url.split('?')[0];
     const query = new URLSearchParams(url.split('?')[1] ?? '');
@@ -31,8 +33,38 @@ export async function fakeFlutterwave() {
       return entry ? flwOk({ tx_ref: entry[0], ...entry[1] }) : flwError(404, 'Not found');
     }
     if (method === 'POST' && path === '/virtual-account-numbers') {
-      if (body.currency === 'NGN' && !body.bvn) return flwError(400, 'BVN is required');
-      return flwOk({ account_number: `78${String((state.nextId += 1)).padStart(8, '0')}`, bank_name: 'Wema Bank' });
+      if ((body.currency ?? 'NGN') === 'NGN' && !body.bvn) return flwError(400, 'BVN is required');
+      if (body.currency === 'GHS' && !(body.firstname && body.lastname && body.phonenumber)) return flwError(400, 'firstname, lastname and phonenumber are required');
+      const id = (state.nextId += 1);
+      const account = {
+        response_code: '02',
+        response_message: 'Transaction in progress',
+        flw_ref: `FLW-${id}`,
+        order_ref: `URF_${id}`,
+        account_number: `78${String(id).padStart(8, '0')}`,
+        account_status: 'active',
+        frequency: 'N/A',
+        bank_name: body.currency === 'GHS' ? 'First Bank Ghana' : 'Wema Bank',
+        created_at: new Date().toISOString(),
+        expiry_date: 'N/A',
+        note: `Please make a bank transfer to ${body.narration} FLW`,
+        amount: '0.00',
+        tx_ref: body.tx_ref,
+      };
+      state.virtualAccounts[account.account_number] = account;
+      if (state.loseReply) {
+        state.loseReply = false;
+        return { status: 502, body: { status: 'error', message: 'Bad gateway' } };
+      }
+      return { body: { status: 'success', message: 'Virtual account created', data: account } };
+    }
+    if (method === 'GET' && path === '/transactions') {
+      const page = Number(query.get('page') ?? 1);
+      const rows = Object.entries(state.charges)
+        .filter(([, charge]) => !query.get('status') || charge.status === query.get('status'))
+        .map(([tx_ref, charge]) => ({ tx_ref, payment_type: 'bank_transfer', ...charge }));
+      const pages = Math.max(1, Math.ceil(rows.length / state.pageSize));
+      return { body: { status: 'success', message: 'Transactions fetched', meta: { page_info: { total: rows.length, current_page: page, total_pages: pages } }, data: rows.slice((page - 1) * state.pageSize, page * state.pageSize) } };
     }
     if (method === 'GET' && path === '/transfers/rates') {
       const rate = state.rates[query.get('source_currency')];
