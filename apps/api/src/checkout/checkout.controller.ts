@@ -32,6 +32,10 @@ class SignUpDto {
   @Transform(lowerTrim) @IsEmail() @Length(3, 254)
   email: string;
 
+  /** Optional at sign-up: kept unverified until the customer confirms it later (as `POST /phone` does). */
+  @IsOptional() @IsString() @Length(6, 25)
+  phone?: string;
+
   @IsString() @Length(passwordLength.min, passwordLength.max)
   password: string;
 }

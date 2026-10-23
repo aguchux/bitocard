@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { CheckCircle2, Eye, EyeOff } from "lucide-react";
-import { Button, Field, Input, Notice } from "@bitocard/admin-ui";
+import { CheckCircle2 } from "lucide-react";
+import { Button, Field, Input, Notice, PasswordInput } from "@bitocard/admin-ui";
 import { useAdminCompletePasswordLinkMutation, useAdminPasswordLinkMutation, type AdminPasswordSet } from "@bitocard/api-client/admin";
 import type { ApiError } from "@bitocard/api-client";
 
@@ -25,7 +25,6 @@ export function SetPassword() {
   const [name, setName] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [show, setShow] = useState(false);
   const [resetAuthenticator, setResetAuthenticator] = useState(false);
   const [mismatch, setMismatch] = useState(false);
   const [done, setDone] = useState<AdminPasswordSet | null>(null);
@@ -111,31 +110,10 @@ export function SetPassword() {
         </Field>
       ) : null}
       <Field label="New password" htmlFor="password" hint="10 to 128 characters. Passwords found in public data breaches are refused.">
-        <div className="relative">
-          <Input
-            id="password"
-            type={show ? "text" : "password"}
-            autoComplete="new-password"
-            required
-            minLength={10}
-            maxLength={128}
-            value={password}
-            onChange={event => setPassword(event.target.value)}
-            className="pr-12"
-          />
-          <button
-            type="button"
-            onClick={() => setShow(value => !value)}
-            aria-label={show ? "Hide password" : "Show password"}
-            aria-pressed={show}
-            className="absolute top-1/2 right-1 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-ink"
-          >
-            {show ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
-          </button>
-        </div>
+        <PasswordInput id="password" autoComplete="new-password" required minLength={10} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />
       </Field>
       <Field label="Confirm password" htmlFor="confirm">
-        <Input id="confirm" type={show ? "text" : "password"} autoComplete="new-password" required value={confirm} onChange={event => setConfirm(event.target.value)} />
+        <PasswordInput id="confirm" autoComplete="new-password" required value={confirm} onChange={event => setConfirm(event.target.value)} />
       </Field>
       {link.authenticator_set_up ? (
         <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-4">

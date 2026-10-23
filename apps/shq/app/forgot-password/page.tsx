@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { useForgotPasswordMutation, useResetPasswordMutation } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
-import { Button, CodeInput, errorMessage, Notice } from "@bitocard/admin-ui";
+import { Button, CodeInput, errorMessage, Notice, PasswordToggleButton } from "@bitocard/admin-ui";
 import { AuthLayout } from "@/components/auth-layout";
 import { IconInput } from "../signin/sign-in";
 
@@ -18,6 +18,7 @@ function ForgotPassword() {
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [forgot, forgotState] = useForgotPasswordMutation();
   const [reset, resetState] = useResetPasswordMutation();
 
@@ -64,7 +65,18 @@ function ForgotPassword() {
                 <label htmlFor="new-password" className="mb-1.5 block text-sm font-semibold text-ink">
                   New password
                 </label>
-                <IconInput id="new-password" icon={Lock} type="password" autoComplete="new-password" required minLength={10} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} />
+                <IconInput
+                  id="new-password"
+                  icon={Lock}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  minLength={10}
+                  maxLength={128}
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  end={<PasswordToggleButton show={showPassword} onToggle={() => setShowPassword(value => !value)} className="text-subtle hover:text-ink" />}
+                />
                 <p className="mt-1.5 text-xs text-muted">At least 10 characters. Passwords found in data breaches are refused.</p>
               </div>
               <Button type="submit" className="min-h-12 w-full text-base" loading={resetState.isLoading} disabled={code.length !== 6}>

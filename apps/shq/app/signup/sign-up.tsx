@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Building2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import { ArrowLeft, Building2, Lock, Mail, User } from "lucide-react";
 import {
   type SignUpInput,
   usePublicCountriesQuery,
@@ -12,7 +12,7 @@ import {
   useVerifySignupEmailMutation,
 } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
-import { Button, CodeInput, cn, errorMessage, Notice, Select, Skeleton, Wordmark } from "@bitocard/admin-ui";
+import { Button, CodeInput, cn, errorMessage, Notice, PasswordToggleButton, Select, Skeleton, Wordmark } from "@bitocard/admin-ui";
 import { continueWithGoogle, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
 type Step = "details" | "verify" | "business" | "password";
@@ -345,16 +345,7 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
                 value={password}
                 onChange={event => setPassword(event.target.value)}
                 aria-invalid={failure(error)?.param === "password" || undefined}
-                end={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(value => !value)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="grid size-10 place-items-center rounded-lg text-subtle hover:text-ink"
-                  >
-                    {showPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
-                  </button>
-                }
+                end={<PasswordToggleButton show={showPassword} onToggle={() => setShowPassword(value => !value)} className="text-subtle hover:text-ink" />}
               />
               <p className="mt-1.5 text-xs text-muted">At least 10 characters. Passwords found in data breaches are refused.</p>
             </div>

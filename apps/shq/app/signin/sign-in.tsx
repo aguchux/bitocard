@@ -2,11 +2,11 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 import { apiBaseUrl } from "@bitocard/api-client";
 import { useSessionQuery, useSignInMutation } from "@bitocard/api-client/reseller";
 import { AppLink, goNext, safeNext } from "@bitocard/admin-ui/shell";
-import { Button, cn, errorMessage, Input, Notice, Wordmark } from "@bitocard/admin-ui";
+import { Button, cn, errorMessage, Input, Notice, PasswordToggleButton, Wordmark } from "@bitocard/admin-ui";
 
 export { goNext, safeNext } from "@bitocard/admin-ui/shell";
 
@@ -135,16 +135,7 @@ export function SignIn() {
               required
               value={password}
               onChange={event => setPassword(event.target.value)}
-              end={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(value => !value)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="grid size-10 place-items-center rounded-lg text-subtle hover:text-ink"
-                >
-                  {showPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
-                </button>
-              }
+              end={<PasswordToggleButton show={showPassword} onToggle={() => setShowPassword(value => !value)} className="text-subtle hover:text-ink" />}
             />
           </div>
           <Button type="submit" className="min-h-12 w-full text-base" loading={signInState.isLoading}>

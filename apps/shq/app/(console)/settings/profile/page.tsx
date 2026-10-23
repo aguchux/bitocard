@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { KeyRound, LogOut, Mail, Pencil, Plus, Smartphone, Star, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader, Skeleton } from "@bitocard/admin-ui";
+import { Badge, Button, Card, CardHeader, CodeInput, errorMessage, Field, formatDate, humanise, Input, KeyValue, Notice, PageHeader, PasswordInput, Skeleton } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import {
   useAddAdditionalPhoneMutation,
@@ -88,7 +88,7 @@ function MobileNumber() {
             </div>
             {promoting === item.phone ? <form className="space-y-2" onSubmit={async event => { event.preventDefault(); if (await makePrimary({ phone: item.phone, password: user.has_password ? password : undefined }).unwrap().catch(() => null)) { setPromoting(null); setPassword(""); } }}>
               {primaryState.error ? <Notice tone="red">{errorMessage(primaryState.error)}</Notice> : null}
-              {user.has_password ? <Field label="Current password" htmlFor="phone-primary-password"><Input id="phone-primary-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></Field> : null}
+              {user.has_password ? <Field label="Current password" htmlFor="phone-primary-password"><PasswordInput id="phone-primary-password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></Field> : null}
               <div className="flex gap-2"><Button type="submit" loading={primaryState.isLoading}>Confirm</Button><Button type="button" variant="ghost" onClick={() => setPromoting(null)}>Cancel</Button></div>
             </form> : null}
           </li>)}
@@ -300,7 +300,7 @@ function EmailAddresses() {
                 >
                   {primaryState.error ? <Notice tone="red">{errorMessage(primaryState.error)}</Notice> : null}
                   <Field label="Current password" htmlFor="primary-email-password" hint={`To confirm it is you. You will sign in with ${item.email} from now on.`}>
-                    <Input id="primary-email-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required autoFocus />
+                    <PasswordInput id="primary-email-password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required autoFocus />
                   </Field>
                   <div className="flex flex-wrap gap-2">
                     <Button type="submit" size="sm" loading={primaryState.isLoading} disabled={!password}>
@@ -405,10 +405,10 @@ function PasswordCard() {
           >
             {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
             <Field label="Current password" htmlFor="password-current">
-              <Input id="password-current" type="password" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} required />
+              <PasswordInput id="password-current" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} required />
             </Field>
             <Field label="New password" htmlFor="password-new" hint="At least 10 characters. Passwords found in data breaches are refused.">
-              <Input id="password-new" type="password" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} minLength={10} maxLength={128} required />
+              <PasswordInput id="password-new" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} minLength={10} maxLength={128} required />
             </Field>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" loading={state.isLoading} disabled={!current || next.length < 10}>

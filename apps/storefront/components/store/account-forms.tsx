@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useId, useState, type ReactNode } from "react";
-import { AlertCircle, CheckCircle2, LoaderCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import {
   changePassword,
   type FormState,
@@ -17,6 +17,7 @@ import {
   verifyEmail,
 } from "@/lib/account-actions";
 import type { Market } from "@/lib/countries";
+import { PhoneInput } from "@bitocard/ui/phone-input";
 
 const empty: FormState = {};
 const inputClass = "min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-900 focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400";
@@ -41,22 +42,46 @@ export function FormMessage({ state }: { state: FormState }) {
   return null;
 }
 
-/** A labelled input; outlined when the API named it in its error. */
+/** A labelled input; outlined when the API named it in its error. A password field gets its own show/hide toggle. */
 export function TextField({
   label,
   name,
   state,
   hint,
+  type,
   ...props
 }: { label: string; name: string; state?: FormState; hint?: ReactNode } & React.InputHTMLAttributes<HTMLInputElement>) {
   const id = useId();
   const wrong = state?.field === name;
+  const [show, setShow] = useState(false);
+  const isPassword = type === "password";
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className="block text-sm font-semibold text-navy-900">
         {label}
       </label>
-      <input id={id} name={name} className={inputClass} aria-invalid={wrong || undefined} aria-describedby={hint ? `${id}-hint` : undefined} {...props} />
+      <div className={isPassword ? "relative" : undefined}>
+        <input
+          id={id}
+          name={name}
+          type={isPassword ? (show ? "text" : "password") : type}
+          className={`${inputClass} ${isPassword ? "pr-12" : ""}`}
+          aria-invalid={wrong || undefined}
+          aria-describedby={hint ? `${id}-hint` : undefined}
+          {...props}
+        />
+        {isPassword ? (
+          <button
+            type="button"
+            onClick={() => setShow(value => !value)}
+            aria-label={show ? "Hide password" : "Show password"}
+            aria-pressed={show}
+            className="absolute top-1/2 right-1 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-navy-900"
+          >
+            {show ? <EyeOff className="size-5" aria-hidden="true" /> : <Eye className="size-5" aria-hidden="true" />}
+          </button>
+        ) : null}
+      </div>
       {hint ? (
         <p id={`${id}-hint`} className="text-xs text-slate-500">
           {hint}
@@ -103,7 +128,7 @@ export function SignInForm({ next }: { next: string }) {
  * The customer's country (bitocard.com): fixed once chosen, so the hint says so. Their wallet, payments and prices are
  * in its currency.
  */
-export function CountryField({ markets, defaultValue, state }: { markets: Market[]; defaultValue?: string | null; state?: FormState }) {
+export function CountryField({ markets, defaultValue, state, onChange }: { markets: Market[]; defaultValue?: string | null; state?: FormState; onChange?: (code: string) => void }) {
   const id = useId();
   return (
     <div className="space-y-1.5">
@@ -115,6 +140,7 @@ export function CountryField({ markets, defaultValue, state }: { markets: Market
         name="country"
         required
         defaultValue={defaultValue && markets.some(market => market.code === defaultValue) ? defaultValue : ""}
+        onChange={onChange ? event => onChange(event.target.value) : undefined}
         aria-invalid={state?.field === "country" || undefined}
         aria-describedby={`${id}-hint`}
         className={inputClass}
@@ -135,16 +161,34 @@ export function CountryField({ markets, defaultValue, state }: { markets: Market
   );
 }
 
-/** Sign-up: on bitocard.com with the customer's country (`markets`); a reseller's store is the reseller's country. */
+/**
+ * Sign-up: on bitocard.com with the customer's country (`markets`); a reseller's store (or a market's own country
+ * store) is fixed to its own, sent as `market`. The phone number is optional and locked to that country once known;
+ * it is kept unverified until the customer confirms it later from their account.
+ */
 export function SignUpForm({ next, markets = [], market = null }: { next: string; markets?: Market[]; market?: string | null }) {
   const [state, action, pending] = useActionState(signUp, empty);
+  const [country, setCountry] = useState<string | null>(market && /^[A-Z]{2}$/.test(market) ? market : null);
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
       <FormMessage state={state} />
       <TextField label="Your name" name="name" autoComplete="name" required minLength={2} maxLength={100} state={state} />
       <TextField label="Email" name="email" type="email" autoComplete="email" required state={state} hint="We send your codes and receipts here." />
-      {markets.length ? <CountryField markets={markets} defaultValue={market} state={state} /> : null}
+      {markets.length ? <CountryField markets={markets} defaultValue={market} state={state} onChange={setCountry} /> : null}
+      {country ? (
+        <PhoneInput
+          country={country}
+          name="phone"
+          label="Mobile number"
+          className="space-y-1.5"
+          inputClassName="min-h-12 border border-slate-200 bg-white px-3.5 text-[15px] text-navy-900 focus:border-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/15 aria-[invalid=true]:border-red-400"
+          errorClassName="text-red-600"
+        />
+      ) : null}
+      {country ? (
+        <p className="text-xs text-slate-500">Optional. We don&apos;t verify it now — confirm it later from your account if you add it.</p>
+      ) : null}
       <TextField label="Password" name="password" type="password" autoComplete="new-password" required minLength={10} maxLength={128} state={state} hint={passwordHint} />
       <Submit pending={pending} className="w-full sm:w-auto">
         Create account

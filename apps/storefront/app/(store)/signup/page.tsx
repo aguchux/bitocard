@@ -18,8 +18,11 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   const next = safeNext((await searchParams).next);
   if (await currentCustomer()) redirect(next);
   // bitocard.com asks for the customer's country (the shopper's market first); a reseller's store is theirs.
-  const [{ store }, market] = await Promise.all([currentStore(), currentMarket()]);
+  const [{ store }, shopperMarket] = await Promise.all([currentStore(), currentMarket()]);
   const countries = store ? [] : await markets();
+  // On any store (a reseller's, or BitoCard's own country store), the country is fixed to the store's own: `currentMarket()`
+  // answers "global" there (it already scopes the catalogue), so the phone field locks to the store's real country instead.
+  const market = store ? store.country : shopperMarket;
   return (
     <div className="mx-auto grid max-w-xl gap-5 py-6 sm:py-12">
       <div>

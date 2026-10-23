@@ -25,6 +25,8 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
     email: text(form, "email"),
     password: String(form.get("password") ?? ""),
     country: text(form, "country") || undefined,
+    // Optional: the PhoneInput writes it in E.164 only once it is a valid number for the shown country.
+    phone: text(form, "phone") || undefined,
   });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);

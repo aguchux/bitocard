@@ -44,6 +44,20 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
   };
 }
 
+/**
+ * The column names a P2002 unique-constraint violation names, from whichever shape Prisma's Postgres driver adapter
+ * reports it in: `meta.target` (an array, or the constraint name as one string) or, with the driver adapter,
+ * `meta.driverAdapterError.cause.constraint.fields`.
+ */
+function violatedFields(error: Prisma.PrismaClientKnownRequestError): string[] {
+  const meta = error.meta as { target?: unknown; driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } } } | undefined;
+  const fromDriver = meta?.driverAdapterError?.cause?.constraint?.fields;
+  if (Array.isArray(fromDriver)) return fromDriver.filter((field): field is string => typeof field === 'string');
+  const target = meta?.target;
+  if (Array.isArray(target)) return target.filter((field): field is string => typeof field === 'string');
+  return typeof target === 'string' ? [target] : [];
+}
+
 const digest = (customerId: string, purpose: CustomerCodePurpose, code: string) => sha256(`customer:${purpose}:${customerId}:${code}`);
 const signInFailed = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'invalid_credentials', 'The email or password is wrong.');
 const codeInvalid = () => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'code_invalid', 'That code is not valid. Check it or ask for a new one.', 'code');
@@ -107,15 +121,24 @@ export class CustomersService {
     return country.code;
   }
 
-  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string }) {
+  /**
+   * `phone`, when sent, is validated and normalised exactly as `addPhone` does (a mobile number from the account's own
+   * country, in E.164), but stored unverified: no code is sent at sign-up, so the customer confirms it later from
+   * their account, as any other number they add.
+   */
+  async signup(store: Store & { reseller: { house: boolean } }, input: { email: string; name: string; password: string; country?: string; phone?: string }) {
     const email = input.email.trim().toLowerCase();
     const country = await this.signupCountry(store, input.country);
     await this.passwords.assertAcceptable(input.password);
+    const phone = input.phone ? normalisePhone(input.phone, country) : null;
     let customer: Customer;
     try {
-      customer = await this.prisma.customer.create({ data: { storeId: store.id, email, name: input.name.trim(), country, passwordHash: await this.passwords.hash(input.password) } });
+      customer = await this.prisma.customer.create({ data: { storeId: store.id, email, name: input.name.trim(), country, phone, passwordHash: await this.passwords.hash(input.password) } });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        if (violatedFields(error).some(field => field.includes('phone'))) {
+          throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_in_use', 'Another account already uses this number.', 'phone');
+        }
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_taken', 'An account with this email already exists. Sign in instead.', 'email');
       }
       throw error;

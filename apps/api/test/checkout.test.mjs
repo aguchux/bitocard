@@ -388,6 +388,26 @@ describe('store customer accounts', () => {
     assert.equal((await shopper.get('/v1/store/account')).status, 401, 'signed out on the server');
   });
 
+  test('an optional phone at sign-up is validated per country and stored unverified; no code is sent for it', async () => {
+    const email = `phone-signup-${Date.now()}@example.com`;
+    const wrongCountry = await store().post('/v1/store/account/signup', { name: 'Tari', email, password: 'correct horse battery', country: 'NG', phone: '+233241234567' });
+    assert.deepEqual([wrongCountry.status, wrongCountry.json.error.code, wrongCountry.json.error.param], [400, 'phone_wrong_country', 'phone']);
+
+    const shopper = store();
+    const signup = await shopper.post('/v1/store/account/signup', { name: 'Tari', email, password: 'correct horse battery', country: 'NG', phone: '08031234589' });
+    assert.equal(signup.status, 201, JSON.stringify(signup.json));
+    // A national number is read in the customer's own country, and kept unverified: no SMS code is sent at sign-up.
+    assert.deepEqual([signup.json.customer.phone, signup.json.customer.phone_verified], ['+2348031234589', false]);
+    const codesSent = await prisma.customerCode.count({ where: { customerId: signup.json.customer.id, purpose: 'phone_verification' } });
+    assert.equal(codesSent, 0);
+
+    const taken = await store().post('/v1/store/account/signup', { name: 'Chi', email: `phone-signup-2-${Date.now()}@example.com`, password: 'correct horse battery', country: 'NG', phone: '+2348031234589' });
+    assert.deepEqual([taken.status, taken.json.error.code], [409, 'phone_in_use']);
+
+    const noPhone = await store().post('/v1/store/account/signup', { name: 'Ngozi', email: `no-phone-${Date.now()}@example.com`, password: 'correct horse battery', country: 'NG' });
+    assert.deepEqual([noPhone.status, noPhone.json.customer.phone], [201, null]);
+  });
+
   test('five wrong passwords lock the account; a reset code sets a new password and ends other sessions', async () => {
     const shopper = await customer();
     const old = shopper.token;

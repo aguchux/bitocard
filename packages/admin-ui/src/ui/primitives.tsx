@@ -1,7 +1,7 @@
 'use client';
 
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { forwardRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import { cn } from '../format';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -89,6 +89,32 @@ export function Field({ label, hint, error, children, htmlFor }: { label: string
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
   return <input ref={ref} className={cn(fieldBase, 'min-h-11', className)} {...props} />;
+});
+
+/** The eye/eye-off button alone, for composing with `IconInput`'s `end` slot. */
+export function PasswordToggleButton({ show, onToggle, className }: { show: boolean; onToggle: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={show ? 'Hide password' : 'Show password'}
+      aria-pressed={show}
+      className={cn('grid size-10 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-ink', className)}
+    >
+      {show ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
+    </button>
+  );
+}
+
+/** An `Input` with its own show/hide toggle, so a person can confirm what they typed before submitting. */
+export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function PasswordInput({ className, ...props }, ref) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <Input ref={ref} type={show ? 'text' : 'password'} className={cn('pr-12', className)} {...props} />
+      <PasswordToggleButton show={show} onToggle={() => setShow(value => !value)} className="absolute top-1/2 right-1 -translate-y-1/2" />
+    </div>
+  );
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...props }, ref) {

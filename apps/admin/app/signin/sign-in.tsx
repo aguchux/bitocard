@@ -3,8 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
-import { ArrowLeft, Eye, EyeOff, Lock, Mail, MailCheck, ShieldCheck } from "lucide-react";
-import { Button, cn, CodeInput, Field, Input, Notice, Wordmark } from "@bitocard/admin-ui";
+import { ArrowLeft, Lock, Mail, MailCheck, ShieldCheck } from "lucide-react";
+import { Button, cn, CodeInput, Field, Input, Notice, PasswordToggleButton, Wordmark } from "@bitocard/admin-ui";
 import {
   useAdminForgotPasswordMutation,
   useAdminMfaSetupMutation,
@@ -199,17 +199,7 @@ export function SignIn() {
               autoFocus
               value={password}
               onChange={event => setPassword(event.target.value)}
-              end={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(value => !value)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  aria-pressed={showPassword}
-                  className="grid size-10 place-items-center rounded-lg text-muted hover:bg-canvas hover:text-ink"
-                >
-                  {showPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
-                </button>
-              }
+              end={<PasswordToggleButton show={showPassword} onToggle={() => setShowPassword(value => !value)} />}
             />
           </Field>
           <Button type="submit" className="min-h-14 w-full text-lg" loading={signInState.isLoading || setupState.isLoading}>
