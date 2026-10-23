@@ -29,7 +29,9 @@ export function StoreName({ store, size = "lg" }: { store: HostedStore; size?: "
 
 /**
  * The store header: wordmark, the category menus, then the shopper's country, currency, sign in and the reseller call
- * to action. On a reseller's store: their name and logo, and no market, currency or reseller call to action.
+ * to action. A market's own country store (`ng.bitocard.com`…) wears bitocard.com's own wordmark and every business
+ * link, exactly as root does: it is BitoCard's own retail arm there, localised, never rebranded. Only a reseller's
+ * store shows its own name and logo, and drops the market, currency and reseller call to action.
  */
 export function StoreHeader({
   groups,
@@ -47,14 +49,15 @@ export function StoreHeader({
   signedIn: boolean;
   store?: HostedStore | null;
 }) {
+  const reseller = Boolean(store) && !store!.house;
   const baseLinks = quickLinksFor(groups, store?.design?.template);
-  const links = !store || store.house ? [...baseLinks, "/spin"] : baseLinks;
+  const links = !reseller ? [...baseLinks, "/spin"] : baseLinks;
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-4 sm:h-[72px] sm:px-6 lg:px-8">
-        {store ? (
-          <Link href="/" aria-label={`${store.name} home`} className="mr-2 inline-flex min-h-11 min-w-0 items-center no-underline">
-            <StoreName store={store} />
+        {reseller ? (
+          <Link href="/" aria-label={`${store!.name} home`} className="mr-2 inline-flex min-h-11 min-w-0 items-center no-underline">
+            <StoreName store={store!} />
           </Link>
         ) : (
           <Link href="/" aria-label="Bitocard home" className="wordmark mr-2 inline-flex min-h-11 items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 no-underline sm:text-[32px]">
@@ -88,7 +91,7 @@ export function StoreHeader({
           >
             {signedIn ? "Account" : "Sign in"}
           </Link>
-          {store ? null : (
+          {!reseller ? (
             <Link
               href="/resellers"
               className="hidden min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-4 text-[15px] font-semibold whitespace-nowrap text-white shadow-sm hover:bg-brand-600 sm:inline-flex"
@@ -96,8 +99,8 @@ export function StoreHeader({
               <Store className="size-5" aria-hidden="true" />
               Start Reselling
             </Link>
-          )}
-          <MobileMenu groups={groups} signedIn={signedIn} reseller={!store} links={links} />
+          ) : null}
+          <MobileMenu groups={groups} signedIn={signedIn} reseller={reseller} links={links} />
         </div>
       </div>
     </header>
@@ -131,11 +134,13 @@ const footerLink = "inline-flex min-h-10 items-center hover:text-navy-900";
 
 /**
  * The footer, the same on every page: the store's name, one All categories button (a full-screen grid, so categories
- * are never listed twice), help, the legal documents on one line, and the credit. bitocard.com adds its business
- * links; resellers' stores show nothing of BitoCard's own business, and white-label stores leave its name out.
+ * are never listed twice), help, the legal documents on one line, and the credit. bitocard.com, and a market's own
+ * country store, add its business links and show BitoCard's own wordmark and credit; a reseller's store shows
+ * nothing of BitoCard's own business, its own name instead, and white-label stores leave BitoCard's name out.
  */
 export function StoreFooter({ groups, store = null }: { groups: StoreNavigationGroup[]; store?: HostedStore | null }) {
-  // A reseller's store lists only what it sells; bitocard.com every group, "Soon" where none is open yet.
+  const reseller = Boolean(store) && !store!.house;
+  // Any store (house or reseller) lists only what it sells; bitocard.com every group, "Soon" where none is open yet.
   const shown = store ? groups.filter(group => group.on_sale) : groups;
   // Reseller terms are for resellers: bitocard.com shows them with its business links, never on a store.
   const legal = legalDocuments.filter(doc => doc.href !== "/documents/reseller-terms");
@@ -145,9 +150,9 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
       <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            {store ? (
-              <Link href="/" aria-label={`${store.name} home`} className="inline-flex min-w-0 items-center no-underline">
-                <StoreName store={store} size="md" />
+            {reseller ? (
+              <Link href="/" aria-label={`${store!.name} home`} className="inline-flex min-w-0 items-center no-underline">
+                <StoreName store={store!} size="md" />
               </Link>
             ) : (
               <Link href="/" aria-label="Bitocard home" className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 no-underline">
@@ -163,7 +168,7 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
             </Link>
           </div>
         </div>
-        {store ? null : (
+        {reseller ? null : (
           <nav aria-label="Business" className="mt-6 flex flex-wrap items-center gap-x-5 text-sm text-slate-600">
             <span className="font-semibold text-navy-900">For business</span>
             <Link href="/resellers" className={footerLink}>
@@ -188,7 +193,7 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
             ))}
           </nav>
           <p>
-            © {new Date().getFullYear()} {store ? store.name : brand.name}
+            © {new Date().getFullYear()} {reseller ? store!.name : brand.name}
             {credit ? ` · ${credit}` : ""}
           </p>
         </div>

@@ -11,8 +11,8 @@ import { type HostedStore, storeCredit } from "@/lib/store";
 const group = (key: string, label: string, onSale: boolean) =>
   ({ key, label, on_sale: onSale, brands: [], categories: [{ object: "store_category", category: key, label, group: key, icon_url: null, image_url: null, products: onSale ? 3 : 0, on_sale: onSale }] }) as unknown as StoreNavigationGroup;
 const groups = [group("gift_cards", "Gift cards", true), group("rdp", "RDP", false)];
-const store = (whiteLabel: boolean) =>
-  ({ object: "storefront", name: "Ada Digital", subdomain: "ada", branding: { logo_url: null, primary_color: "#070f4c", accent_color: "#ff2382" }, country: "NG", currency: "NGN", checkout_mode: "live", white_label: whiteLabel }) as HostedStore;
+const store = (whiteLabel: boolean, house = false) =>
+  ({ object: "storefront", name: house ? "BitoCard NG" : "Ada Digital", subdomain: house ? "ng" : "ada", branding: { logo_url: null, primary_color: "#070f4c", accent_color: "#ff2382" }, country: "NG", currency: "NGN", checkout_mode: "live", white_label: whiteLabel, house }) as HostedStore;
 const render = (hosted: HostedStore | null) => renderToStaticMarkup(createElement(StoreFooter, { groups, store: hosted }));
 const outsideDialog = (html: string) => html.replace(/<dialog[\s\S]*<\/dialog>/, "");
 
@@ -42,5 +42,15 @@ describe("store footer", () => {
     expect(html).not.toMatch(/BitoCard|Bitocard/);
     expect(storeCredit(store(true), "x")).toBeNull();
     expect(storeCredit(null, "A Golojan Ltd venture")).toBe("A Golojan Ltd venture");
+  });
+
+  test("a market's own country store is BitoCard's own, just localised: BitoCard's business links and credit, never a distinct name", () => {
+    const html = render(store(false, true));
+    expect(html).not.toContain("BitoCard NG");
+    for (const text of ["Open a reseller store", "Reseller sign in", "Reseller terms", "A Golojan Ltd venture"]) expect(html).toContain(text);
+    expect(html).not.toContain("Sold and delivered by BitoCard");
+    expect(storeCredit(store(false, true), "A Golojan Ltd venture")).toBe("A Golojan Ltd venture");
+    // Only sells what the market has on sale, like a reseller's store, unlike root which shows every group with "Soon".
+    expect(html).not.toContain("/catalogs/rdp");
   });
 });

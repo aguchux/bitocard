@@ -68,9 +68,12 @@ export class HouseService {
       const store = await this.prisma.store.create({
         // checkoutMode is never read for a house store's own checkout (StoreSellers.mode() always asks house.mode()
         // instead), but it is still read raw for display (stores.service.ts's presenters); keep it truthful.
+        // name is plain "BitoCard", never "BitoCard NG": a market's own country store is BitoCard's own retail arm
+        // there, localised, never a distinct brand (the storefront never shows it anyway, but delivery emails and
+        // other transactional copy read it directly, so it must never carry the country code).
         data: {
           resellerId: reseller.id,
-          name: `BitoCard ${code}`,
+          name: 'BitoCard',
           subdomain,
           status: 'published',
           publishedAt: new Date(),

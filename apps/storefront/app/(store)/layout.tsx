@@ -9,12 +9,17 @@ import { storeNavigation } from "@/lib/navigation";
 import { currentStore, storeSubdomain } from "@/lib/store";
 import { storeShell } from "@/lib/store-theme";
 
-/** On a reseller's store: its name in every title, and its own address as the canonical one. */
+/**
+ * On a reseller's store: its name in every title, and its own address as the canonical one. A market's own country
+ * store is BitoCard's own, just localised: its own address as the canonical one, but the default BitoCard title,
+ * name and description stand (set in the root layout), never a distinct "BitoCard NG" brand.
+ */
 export async function generateMetadata(): Promise<Metadata> {
   const subdomain = await storeSubdomain();
   if (!subdomain) return {};
   const { store } = await currentStore();
-  const name = store?.name ?? "Store";
+  if (!store || store.house) return { metadataBase: new URL(`https://${subdomain}.bitocard.com`) };
+  const name = store.name;
   return {
     metadataBase: new URL(`https://${subdomain}.bitocard.com`),
     title: { absolute: name, template: `%s | ${name}` },
@@ -28,7 +33,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * The store's pages: header with the category menus, the page, and the footer. On a reseller's store
  * (`<subdomain>.bitocard.com`) the store's own name and logo replace BitoCard's, and its products are the ones the
- * reseller listed.
+ * reseller listed. A market's own country store (`ng.bitocard.com`…) is BitoCard's own retail arm there: it wears
+ * BitoCard's own name, logo and theme throughout, never rebranded, with only its market restricted.
  */
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   const { store, missing } = await currentStore();
@@ -52,9 +58,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
     const subdomain = countryStoreFor(countries, customer?.country);
     if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
   }
-  // A reseller's store wears its template's variant and colour theme.
+  // A reseller's store wears its template's variant and colour theme; a market's own country store wears BitoCard's own.
   return (
-    <div className={shell} {...storeShell(store?.design)}>
+    <div className={shell} {...storeShell(store && !store.house ? store.design : undefined)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>
@@ -70,7 +76,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       <StoreFooter groups={groups} store={store} />
       {/* Chat with the store: signed-in customers as themselves, visitors after giving their name and email (?chat=1 opens it). */}
       <Suspense fallback={null}>
-        <ChatWidget store={store?.name ?? "BitoCard"} />
+        <ChatWidget store={store && !store.house ? store.name : "BitoCard"} />
       </Suspense>
     </div>
   );

@@ -100,10 +100,11 @@ export async function onResellerStore() {
 }
 
 /**
- * The credit line under a page: BitoCard's own ("A Golojan Ltd venture") on bitocard.com; on a reseller's store, that
- * BitoCard sells and delivers (it is the seller of record), unless the store's plan has Your brand only.
+ * The credit line under a page: BitoCard's own ("A Golojan Ltd venture") on bitocard.com and on a market's own
+ * country store (it is bitocard.com's own retail arm there, not a reseller); on a reseller's store, that BitoCard
+ * sells and delivers (it is the seller of record), unless the store's plan has Your brand only.
  */
-export function storeCredit(store: Pick<HostedStore, "white_label"> | null, credit: string) {
-  if (!store) return credit;
+export function storeCredit(store: Pick<HostedStore, "white_label" | "house"> | null, credit: string) {
+  if (!store || store.house) return credit;
   return store.white_label ? null : "Sold and delivered by BitoCard";
 }

@@ -23,7 +23,7 @@ import { pendingPublicSpinClaim } from "@/lib/spin-actions";
 export async function generateMetadata(): Promise<Metadata> {
   const subdomain = await storeSubdomain();
   const { store } = await currentStore();
-  const name = store?.name ?? brand.name;
+  const name = store && !store.house ? store.name : brand.name;
   return {
     ...(subdomain ? { metadataBase: new URL(`https://${subdomain}.bitocard.com`) } : {}),
     title: { absolute: `Your account | ${name}`, template: `%s | ${name}` },
@@ -71,10 +71,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency };
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";
   const rail = desktopNav === "rail";
-  const name = store?.name ?? brand.name;
-  // A reseller's store wears its template's colour theme in the account app too.
+  // A market's own country store is BitoCard's own, just localised: it wears BitoCard's own brand, like root. Only a
+  // reseller's store wears its own name, logo and template colour theme.
+  const reseller = Boolean(store) && !store!.house;
+  const name = reseller ? store!.name : brand.name;
   return (
-    <div className={shell} {...storeShell(store?.design)}>
+    <div className={shell} {...storeShell(reseller ? store!.design : undefined)}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">
         Skip to content
       </a>
@@ -86,8 +88,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <AppHeader
         storeName={name}
         brand={
-          store ? (
-            <StoreName store={store} />
+          reseller ? (
+            <StoreName store={store!} />
           ) : (
             <span className="wordmark inline-flex items-center gap-2 text-[26px] font-extrabold tracking-tight text-navy-900 sm:text-[30px]">
               <Brand />

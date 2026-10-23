@@ -125,6 +125,29 @@ describe('country stores: pricing and seller routing (Stage 3)', () => {
     assert.equal(await prisma.reseller.findFirst({ where: { house: true, country: 'GB' } }), null, 'no GB house account was ever needed');
   });
 
+  test('a delivery email from a country store names plain "BitoCard", never "BitoCard NG"', async () => {
+    const { EmailService } = await import('../dist/notifications/email.service.js');
+    const outbox = server.app.get(EmailService).outbox;
+    const sent = outbox.length;
+    const product = await nairaGiftCard('Amazon Country Store Delivery Card');
+    const shopper = await customer('ng', 'GB');
+    const started = await shopper.post('/v1/store/checkouts', {
+      product_id: product.id,
+      face_value: 2_000_000,
+      return_url: 'https://shop.example/checkout/return',
+      recipient: { email: 'recipient@example.com' },
+    });
+    assert.equal(started.status, 201, JSON.stringify(started.json));
+    const done = await payOnStripe(shopper, started.json.id);
+    assert.equal(done.status, 'completed', JSON.stringify(done));
+
+    const [message] = outbox.slice(sent).filter(item => item.to === 'recipient@example.com');
+    assert.ok(message, 'the delivery email was sent');
+    assert.match(message.subject, /from BitoCard$/);
+    assert.doesNotMatch(message.subject, /BitoCard NG/);
+    assert.ok(message.text.includes('Thank you for your order from BitoCard.'));
+  });
+
   test('root bitocard.com keeps today’s behaviour: the same GB customer buying the same NGN product there still prices it in GBP', async () => {
     // GB can take payment and lists gift cards, so the purchase reaches pricing (not an earlier, unrelated refusal)
     // and is forced to convert NGN to GBP there — exactly the bug this plan exists to route around with a country
@@ -183,6 +206,10 @@ describe('country stores: storefront routing and the root redirect (Stage 4)', (
     const storefront = await (await fetch(`${server.base}/v1/storefronts/ng`)).json();
     assert.equal(storefront.house, true);
     assert.equal(storefront.checkout_mode, 'live');
+    // Plain "BitoCard", never "BitoCard NG": a market's own country store is BitoCard's own retail arm there,
+    // localised, never a distinct brand. The storefront app never shows the name for a house store anyway, but
+    // transactional copy (delivery emails) reads it directly, so it must never carry the country code.
+    assert.equal(storefront.name, 'BitoCard');
 
     // Was a 404 before Stage 4 (StorefrontService.inStore rejected every house store outright).
     const navigation = await (await fetch(`${server.base}/v1/store/navigation`, { headers: { 'bitocard-store': 'ng' } })).json();
