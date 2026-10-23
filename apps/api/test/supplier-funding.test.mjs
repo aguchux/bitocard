@@ -98,11 +98,36 @@ describe('supplier funding', () => {
     assert.equal((await colleague.post(`/v1/admin/suppliers/funding/${asked.id}/cancel`)).json.error.code, 'movement_not_awaiting_code');
   });
 
-  test('float tracking shows what was funded and what orders have drawn down, per supplier and currency', async () => {
-    const float = await finance.get('/v1/admin/suppliers/float?mode=live&from=2020-01-01&to=2030-01-01');
-    assert.equal(float.status, 200, JSON.stringify(float.json));
-    const row = float.json.data.find(item => item.supplier_code === 'reloadly' && item.currency === 'USD');
+  test('float tracking shows what was funded and what orders drew down over the period, and what remains', async () => {
+    // An order's supplier cost, posted exactly as OrdersService does: cost of sales against the supplier's float.
+    const ledger = server.app.get((await import('../dist/ledger/ledger.service.js')).LedgerService);
+    await ledger.post({
+      mode: 'live',
+      type: 'order_cost',
+      reference: 'supplier_funding_test:cost',
+      description: 'Test order cost',
+      lines: [
+        { account: { kind: 'cost_of_sales', currency: 'USD', provider: 'reloadly' }, debit: 1234n },
+        { account: { kind: 'supplier_float', currency: 'USD', provider: 'reloadly' }, credit: 1234n },
+      ],
+    });
+    const funded = await prisma.supplierFundingMovement.aggregate({ where: { mode: 'live', supplierCode: 'reloadly', currency: 'USD', status: 'completed' }, _sum: { amount: true } });
+    const float = await prisma.ledgerAccount.findFirstOrThrow({ where: { kind: 'supplier_float', mode: 'live', currency: 'USD', ownerKey: 'provider:reloadly' } });
+
+    // The admin app's date picker sends plain dates: "to today" includes today.
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await finance.get(`/v1/admin/suppliers/float?mode=live&from=${today}&to=${today}`);
+    assert.equal(result.status, 200, JSON.stringify(result.json));
+    const row = result.json.data.find(item => item.supplier_code === 'reloadly' && item.currency === 'USD');
     assert.ok(row, 'reloadly has a float row after being funded');
-    assert.ok(row.remaining >= 500000, 'at least what was funded above remains (nothing has drawn it down yet)');
+    assert.deepEqual([row.funded, row.consumed, row.remaining], [Number(funded._sum.amount), 1234, Number(float.balanceMinor)]);
+
+    const earlier = await finance.get('/v1/admin/suppliers/float?mode=live&from=2020-01-01&to=2020-01-31');
+    const quiet = earlier.json.data.find(item => item.supplier_code === 'reloadly' && item.currency === 'USD');
+    assert.deepEqual([quiet.funded, quiet.consumed, quiet.remaining], [0, 0, Number(float.balanceMinor)], 'the period scopes funded and drawn down, never what remains');
+
+    const told = await prisma.notification.findFirst({ where: { type: 'admin.supplier.funded' } });
+    assert.equal(told.link, '/reports/suppliers', 'the notice opens the supplier funding page');
+    await ledgerOk();
   });
 });

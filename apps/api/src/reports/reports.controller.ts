@@ -5,8 +5,12 @@ import type { Response } from 'express';
 import { AdminRoles, RealmOnly } from '../auth/caller.js';
 import { toCsv } from '../common/csv.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
+import { maxDailyRangeDays, reportRange } from './range.js';
 import { type ReportMetric, ReportsService } from './reports.service.js';
-import { statementPdf } from './statement-pdf.js';
+import { pnlTotals, statementPdf } from './statement-pdf.js';
+
+/** A PDF of more lines than this is refused (download the CSV, or choose a shorter period). */
+const pdfMaxRows = 5_000;
 
 class RangeDto {
   @IsIn(['test', 'live'])
@@ -50,22 +54,22 @@ export class AdminReportsController {
 
   @Get('pnl')
   pnl(@Query() query: RangeDto) {
-    return this.reports.pnl({ mode: query.mode, from: new Date(query.from), to: new Date(query.to), currency: query.currency });
+    return this.reports.pnl({ mode: query.mode, ...reportRange(query.from, query.to), currency: query.currency });
   }
 
   @Get('growth')
   growth(@Query() query: GrowthDto) {
-    return this.reports.growth({ mode: query.mode, from: new Date(query.from), to: new Date(query.to), metric: query.metric });
+    return this.reports.growth({ mode: query.mode, ...reportRange(query.from, query.to, maxDailyRangeDays), metric: query.metric });
   }
 
   @Get('statement')
   statement(@Query() query: RangeDto) {
-    return this.reports.statement({ mode: query.mode, from: new Date(query.from), to: new Date(query.to), currency: query.currency });
+    return this.reports.statement({ mode: query.mode, ...reportRange(query.from, query.to), currency: query.currency });
   }
 
   @Get('statement.csv')
   async statementCsv(@Query() query: RangeDto, @Res() res: Response) {
-    const { data } = await this.reports.statement({ mode: query.mode, from: new Date(query.from), to: new Date(query.to), currency: query.currency });
+    const { data } = await this.reports.statement({ mode: query.mode, ...reportRange(query.from, query.to), currency: query.currency });
     const csv = toCsv(
       [
         { key: 'date', header: 'Date' },
@@ -83,13 +87,12 @@ export class AdminReportsController {
 
   @Get('statement.pdf')
   async statementPdf(@Query() query: RangeDto, @Res() res: Response) {
-    const from = new Date(query.from);
-    const to = new Date(query.to);
+    const { from, to } = reportRange(query.from, query.to);
     const [statement, pnl] = await Promise.all([
-      this.reports.statement({ mode: query.mode, from, to, currency: query.currency }),
+      this.reports.statement({ mode: query.mode, from, to, currency: query.currency, maxRows: pdfMaxRows }),
       this.reports.pnl({ mode: query.mode, from, to, currency: query.currency }),
     ]);
-    const pdf = await statementPdf({ title: 'Statement', from: statement.from, to: statement.to, currency: pnl.currency, rows: statement.data, totals: pnl });
+    const pdf = await statementPdf({ title: 'Statement', from: statement.from, to: statement.to, currency: pnl.currency, rows: statement.data, totals: pnlTotals(pnl) });
     sendFile(res, 'application/pdf', fileName('statement', query.from, query.to, 'pdf'), pdf);
   }
 }

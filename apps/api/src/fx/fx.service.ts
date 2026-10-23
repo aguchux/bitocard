@@ -30,7 +30,14 @@ export const conversionUnavailable = (currency: string) =>
   new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'conversion_unavailable', `Conversions to and from ${currency} are paused. Try again later.`);
 
 /** Minor-unit digits of a currency (2 for NGN, GHS, KES and USD; 0 for JPY). */
-const digitsOf = (currency: string) => new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+const digitsOf = (currency: string) => {
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+  } catch {
+    // Not an ISO 4217 code (a crypto asset such as USDT): never let one bad code fail a whole report.
+    return 2;
+  }
+};
 
 /**
  * Exchange rates. Open Exchange Rates is the reference, checked against the rates Flutterwave offers. Conversions

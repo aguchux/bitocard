@@ -29,7 +29,8 @@ export type SupplierFundingMovement = {
 export type SupplierFundingInput = { mode: Mode; supplier_code: string; currency?: string; amount: number; reason: string };
 
 /** Funded, drawn down (`cost_of_sales` over the asked period) and remaining, per supplier and currency. */
-export type SupplierFloat = { object: 'supplier_float'; supplier_code: string; supplier_name: string; currency: string; remaining: number; consumed: number };
+/** `funded` and `consumed` are over the asked period; `remaining` is the float's balance over all time. */
+export type SupplierFloat = { object: 'supplier_float'; supplier_code: string; supplier_name: string; currency: string; funded: number; consumed: number; remaining: number };
 
 /** Finance: recording money sent to a supplier (its float), and tracking what has been funded against what orders have drawn down. */
 export const adminSupplierFundingApi = bitocardApi.injectEndpoints({

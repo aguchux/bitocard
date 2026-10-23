@@ -8,6 +8,7 @@ import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js
 import { productCategories } from '../countries/countries.service.js';
 import type { LedgerMode, ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
 import { PageDto } from '../ledger/wallet.controller.js';
+import { reportRange } from '../reports/range.js';
 import { SupplierFundingService } from './supplier-funding.service.js';
 import { SuppliersService } from './suppliers.service.js';
 
@@ -149,7 +150,7 @@ export class AdminSuppliersController {
   @AdminRoles('finance', 'operations')
   @Get('suppliers/float')
   float(@Query() query: FloatTrackingDto) {
-    return this.funding.floatTracking({ mode: query.mode, from: new Date(query.from), to: new Date(query.to) });
+    return this.funding.floatTracking({ mode: query.mode, ...reportRange(query.from, query.to) });
   }
 
   @AdminRoles('finance', 'operations')

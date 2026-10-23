@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileText } from "lucide-react";
 import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, type Column, type DateRange } from "@bitocard/admin-ui";
-import { resellerReportExportUrl, type ResellerStatementRow, useResellerStatementQuery } from "@bitocard/api-client/reseller";
+import { type ResellerStatementRow, useResellerStatementQuery } from "@bitocard/api-client/reseller";
+import { ReportDownloads } from "@/components/report-downloads";
 import { ShqShell } from "@/components/shq-shell";
 
 const typeLabels: Record<string, string> = {
@@ -14,11 +14,15 @@ const typeLabels: Record<string, string> = {
   usage_charge: "Usage charge",
   adjustment: "Adjustment",
   subscription: "Plan subscription",
+  domain: "Domain bought or renewed",
   chargeback: "Chargeback",
 };
 
 const money = (minor: number, currency: string) => `${minor < 0 ? "-" : ""}${(Math.abs(minor) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 const shortDate = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/** The most rows drawn on the page; the CSV and PDF downloads hold every one. */
+const shown = 500;
 
 const columns: Array<Column<ResellerStatementRow>> = [
   { key: "date", header: "Date", cell: row => shortDate(row.date) },
@@ -31,31 +35,24 @@ export default function ResellerStatementsPage() {
   const [range, setRange] = useState<DateRange>(defaultDateRange());
   const query = { from: range.from, to: range.to };
   const statement = useResellerStatementQuery(query);
+  const rows = statement.data?.data ?? [];
+  const described = rows.length > shown ? `The first ${shown} of ${rows.length} entries in this range: download the CSV for every one.` : `${rows.length} entries in this range.`;
 
   return (
     <ShqShell section="reports" current="/reports/statements" crumbs={[{ label: "Reports", href: "/reports" }, { label: "Statements" }]}>
       <PageHeader
         title="Statements"
-        description="Every earning, fee, subscription charge and chargeback for a date range, as a downloadable statement."
+        description="Every earning, fee, subscription charge, domain and chargeback for a date range, as a downloadable statement."
         actions={
-          statement.data ? (
-            <div className="flex flex-wrap gap-2">
-              <a href={resellerReportExportUrl("csv", query)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-canvas">
-                <Download className="size-4" aria-hidden /> CSV
-              </a>
-              <a href={resellerReportExportUrl("pdf", query)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-canvas">
-                <FileText className="size-4" aria-hidden /> PDF
-              </a>
-            </div>
-          ) : null
+          <ReportDownloads range={query} />
         }
       />
 
       <DateRangePicker value={range} onChange={setRange} />
 
       <Card>
-        <CardHeader title="Rows" description={`${statement.data?.data.length ?? 0} entries in this range.`} />
-        <DataTable columns={columns} rows={statement.data?.data} rowKey={row => `${row.date}:${row.type}`} loading={statement.isLoading} error={statement.error ? errorMessage(statement.error) : null} onRetry={statement.refetch} empty="No activity in this range." />
+        <CardHeader title="Rows" description={described} />
+        <DataTable columns={columns} rows={statement.data ? rows.slice(0, shown) : undefined} rowKey={row => `${row.reference}:${row.type}`} loading={statement.isLoading} error={statement.error ? errorMessage(statement.error) : null} onRetry={statement.refetch} empty="No activity in this range." />
       </Card>
     </ShqShell>
   );

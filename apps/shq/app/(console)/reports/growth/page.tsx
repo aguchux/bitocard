@@ -6,9 +6,12 @@ import { Card, CardHeader, DateRangePicker, defaultDateRange, errorMessage, Line
 import { type ResellerReportMetric, useResellerGrowthQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 
+// Earnings and sales come in minor units of the wallet's currency.
+const money = (value: number) => (value / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 const metrics: Array<{ value: ResellerReportMetric; label: string; format: (value: number) => string }> = [
-  { value: "earnings", label: "Earnings", format: value => `${(value / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-  { value: "gross_sales", label: "Gross sales", format: value => value.toLocaleString("en-GB") },
+  { value: "earnings", label: "Earnings", format: money },
+  { value: "gross_sales", label: "Gross sales", format: money },
   { value: "orders", label: "Orders", format: value => value.toLocaleString("en-GB") },
 ];
 

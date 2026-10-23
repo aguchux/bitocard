@@ -16,6 +16,12 @@ const typeLabels: Record<string, string> = {
   adjustment: 'Adjustment',
 };
 
+/** What a captured hold paid for, from the hold's own reference; null for an order's wholesale (never shown here). */
+type CaptureKind = 'subscription' | 'domain' | 'chargeback';
+const captureKind = (reference: string): CaptureKind | null =>
+  reference.startsWith('plan:') ? 'subscription' : reference.startsWith('domain:') ? 'domain' : reference.startsWith('chargeback:') ? 'chargeback' : null;
+const captureLabels: Record<CaptureKind, string> = { subscription: 'Plan subscription charge', domain: 'Domain bought or renewed', chargeback: 'Chargeback' };
+
 /**
  * A reseller's own earnings and growth, built only from their own ledger postings (never BitoCard's supplier costs,
  * wholesale prices or another reseller's data — a reseller's `reseller_earnings`/`reseller_earnings_held` balance is
@@ -30,8 +36,8 @@ export class ResellerReportsService {
   ) {}
 
   /**
-   * Earnings (profit from delivered sales, less refunded sales) less platform fees, subscription charges and
-   * chargebacks borne, plus any admin adjustment, is net profit. In the reseller's own wallet currency (their
+   * Earnings (profit from delivered sales, less refunded sales) less platform fees, subscription charges, domains
+   * bought or renewed, usage charges and chargebacks borne, plus any admin adjustment, is net profit. In the reseller's own wallet currency (their
    * country's, or US dollars) — never converted, since a reseller holds at most these two.
    */
   async pnl(input: { resellerId: string; mode: LedgerMode; from: Date; to: Date; currency?: string }) {
@@ -52,9 +58,9 @@ export class ResellerReportsService {
     const usageCharges = minor(await sumOf(['usage_charge'], ['reseller_funding', 'reseller_earnings']));
     // Admin adjustments can go either way; shown as a signed line, positive meaning credited to the reseller.
     const adjustments = minor(-(await sumOf(['adjustment'], ['reseller_funding', 'reseller_earnings'])));
-    const { subscription, chargebacks } = await this.holdCaptures({ resellerId: input.resellerId, mode: input.mode, from: input.from, to: input.to, currency });
+    const { subscription, chargebacks, domains } = await this.holdCaptures({ resellerId: input.resellerId, mode: input.mode, from: input.from, to: input.to, currency });
 
-    const expenses = platformFees + subscription + chargebacks + usageCharges;
+    const expenses = platformFees + subscription + domains + chargebacks + usageCharges;
     const netProfit = revenue - expenses + adjustments;
 
     return {
@@ -70,6 +76,7 @@ export class ResellerReportsService {
         { kind: 'earnings', label: 'Earnings from sales', group: 'revenue' as const, amount: revenue },
         { kind: 'platform_fee', label: 'BitoCard fees', group: 'expense' as const, amount: platformFees },
         { kind: 'subscription', label: 'Plan subscription', group: 'expense' as const, amount: subscription },
+        { kind: 'domain', label: 'Domains', group: 'expense' as const, amount: domains },
         { kind: 'chargeback', label: 'Chargebacks', group: 'expense' as const, amount: chargebacks },
         { kind: 'usage_charge', label: 'Usage charges', group: 'expense' as const, amount: usageCharges },
         ...(adjustments !== 0 ? [{ kind: 'adjustment', label: 'Adjustments', group: 'adjustment' as const, amount: adjustments }] : []),
@@ -77,10 +84,28 @@ export class ResellerReportsService {
     };
   }
 
-  /** Subscription charges and chargebacks borne: both are `hold_capture`s, told apart by the hold's own reference. */
+  /**
+   * Subscription charges, domains and chargebacks borne: all `hold_capture`s, told apart by the hold's own reference
+   * (`plan:`, `domain:`, `chargeback:`). An order's wholesale is a capture too, and stays out: it is the cost of what
+   * was sold, never a reseller's expense here.
+   */
   private async holdCaptures(input: { resellerId: string; mode: LedgerMode; from: Date; to: Date; currency: string }) {
-    const rows = await this.prisma.$queryRaw<Array<{ reference: string; amount: bigint }>>`
-      SELECT h.reference, p.amount_minor AS amount
+    const rows = await this.captureRows(input);
+    let subscription = 0;
+    let chargebacks = 0;
+    let domains = 0;
+    for (const row of rows) {
+      const kind = captureKind(row.reference);
+      if (kind === 'subscription') subscription += minor(row.amount);
+      else if (kind === 'chargeback') chargebacks += minor(row.amount);
+      else if (kind === 'domain') domains += minor(row.amount);
+    }
+    return { subscription, chargebacks, domains };
+  }
+
+  private captureRows(input: { resellerId: string; mode: LedgerMode; from: Date; to: Date; currency: string }) {
+    return this.prisma.$queryRaw<Array<{ date: Date; entry_reference: string; reference: string; amount: bigint }>>`
+      SELECT e.created_at AS date, e.reference AS entry_reference, h.reference, p.amount_minor AS amount
       FROM ledger_postings p
       JOIN ledger_accounts a ON a.id = p.account_id
       JOIN journal_entries e ON e.id = p.entry_id
@@ -88,16 +113,9 @@ export class ResellerReportsService {
       WHERE e.reseller_id = ${input.resellerId}::uuid AND e.mode = ${input.mode}::"LedgerMode" AND e.type = 'hold_capture'
         AND a.kind = 'reseller_reserved' AND a.currency = ${input.currency}
         AND e.created_at >= ${input.from} AND e.created_at < ${input.to}`;
-    let subscription = 0;
-    let chargebacks = 0;
-    for (const row of rows) {
-      if (row.reference.startsWith('plan:')) subscription += minor(row.amount);
-      else if (row.reference.startsWith('chargeback:')) chargebacks += minor(row.amount);
-    }
-    return { subscription, chargebacks };
   }
 
-  /** Daily earnings or sales, with a simple trend projection and the change against the preceding equal range. */
+  /** Daily earnings or sales (minor units of the wallet's currency) or orders, with a simple trend projection and the change against the preceding equal range. */
   async growth(input: { resellerId: string; mode: LedgerMode; from: Date; to: Date; metric: ResellerReportMetric; currency?: string }) {
     const { currency } = await this.wallets.walletCurrency(input.resellerId, input.currency);
     const span = input.to.getTime() - input.from.getTime();
@@ -107,7 +125,7 @@ export class ResellerReportsService {
     return { object: 'reseller_growth_report' as const, mode: input.mode, metric: input.metric, from: input.from.toISOString(), to: input.to.toISOString(), currency, current, previous, change_percent: changePercent, points };
   }
 
-  private async dailyValues(input: { resellerId: string; mode: LedgerMode; metric: ResellerReportMetric }, from: Date, currency: string): Promise<Map<string, number>> {
+  private async dailyValues(input: { resellerId: string; mode: LedgerMode; to: Date; metric: ResellerReportMetric }, from: Date, currency: string): Promise<Map<string, number>> {
     if (input.metric === 'earnings') {
       const rows = await this.prisma.$queryRaw<Array<{ day: Date; net: bigint }>>`
         SELECT date_trunc('day', e.created_at) AS day, SUM(p.amount_minor) AS net
@@ -116,19 +134,20 @@ export class ResellerReportsService {
         JOIN journal_entries e ON e.id = p.entry_id
         WHERE e.reseller_id = ${input.resellerId}::uuid AND e.mode = ${input.mode}::"LedgerMode" AND e.type IN ('earnings', 'order_refund')
           AND a.kind IN ('reseller_earnings', 'reseller_earnings_held') AND a.currency = ${currency}
+          AND e.created_at >= ${from} AND e.created_at < ${input.to}
         GROUP BY 1`;
       const byDay = new Map<string, number>();
       for (const row of rows) byDay.set(dateKey(row.day), minor(-row.net));
       return byDay;
     }
     const orders = await this.prisma.order.findMany({
-      where: { resellerId: input.resellerId, mode: input.mode, status: { in: ['completed', 'refunded'] }, currency, completedAt: { gte: from } },
+      where: { resellerId: input.resellerId, mode: input.mode, status: { in: ['completed', 'refunded'] }, currency, completedAt: { gte: from, lt: input.to } },
       select: { completedAt: true, priceMinor: true, resellerProfitMinor: true },
     });
     const byDay = new Map<string, number>();
     for (const order of orders) {
       const key = dateKey(order.completedAt!);
-      const value = input.metric === 'orders' ? 1 : minor(order.priceMinor) / 100;
+      const value = input.metric === 'orders' ? 1 : minor(order.priceMinor);
       byDay.set(key, (byDay.get(key) ?? 0) + value);
     }
     return byDay;
@@ -137,18 +156,18 @@ export class ResellerReportsService {
   /**
    * The dated rows behind the P&L above, in the same categories: positive means money credited to the reseller
    * (earnings, a fee refunded, a positive adjustment), negative means money taken from them (a fee, a subscription
-   * charge, a chargeback, a refund reversing a sale). The row source for the CSV and PDF exports.
+   * charge, a domain, a chargeback, a refund reversing a sale). The row source for the CSV and PDF exports.
    */
   async statement(input: { resellerId: string; mode: LedgerMode; from: Date; to: Date; currency?: string }) {
     const { currency } = await this.wallets.walletCurrency(input.resellerId, input.currency);
     const base = { resellerId: input.resellerId, mode: input.mode, createdAt: { gte: input.from, lt: input.to } };
-    const rows: Array<{ date: Date; type: string; description: string; amount: number }> = [];
+    const rows: Array<{ date: Date; reference: string; type: string; description: string; amount: number }> = [];
 
-    const sign = (entries: Array<{ createdAt: Date; type: string; description: string; postings: Array<{ amountMinor: bigint; account: { kind: AccountKind; currency: string } }> }>, kinds: AccountKind[], credited: boolean) => {
+    const sign = (entries: Array<{ createdAt: Date; reference: string; type: string; description: string; postings: Array<{ amountMinor: bigint; account: { kind: AccountKind; currency: string } }> }>, kinds: AccountKind[], credited: boolean) => {
       for (const entry of entries) {
         const net = entry.postings.filter(p => kinds.includes(p.account.kind) && p.account.currency === currency).reduce((sum, p) => sum + p.amountMinor, 0n);
         if (net === 0n) continue;
-        rows.push({ date: entry.createdAt, type: entry.type, description: typeLabels[entry.type] ?? entry.description, amount: minor(credited ? -net : net) });
+        rows.push({ date: entry.createdAt, reference: entry.reference, type: entry.type, description: typeLabels[entry.type] ?? entry.description, amount: minor(credited ? -net : net) });
       }
     };
 
@@ -159,28 +178,24 @@ export class ResellerReportsService {
     sign(await entriesOf(['usage_charge']), ['reseller_funding', 'reseller_earnings'], false);
     sign(await entriesOf(['adjustment']), ['reseller_funding', 'reseller_earnings'], true);
 
-    const holdRows = await this.prisma.$queryRaw<Array<{ date: Date; reference: string; amount: bigint }>>`
-      SELECT e.created_at AS date, h.reference, p.amount_minor AS amount
-      FROM ledger_postings p
-      JOIN ledger_accounts a ON a.id = p.account_id
-      JOIN journal_entries e ON e.id = p.entry_id
-      JOIN holds h ON h.id = (e.metadata->>'hold_id')::uuid
-      WHERE e.reseller_id = ${input.resellerId}::uuid AND e.mode = ${input.mode}::"LedgerMode" AND e.type = 'hold_capture'
-        AND a.kind = 'reseller_reserved' AND a.currency = ${currency}
-        AND e.created_at >= ${input.from} AND e.created_at < ${input.to}`;
-    for (const row of holdRows) {
-      if (row.reference.startsWith('plan:')) rows.push({ date: row.date, type: 'subscription', description: 'Plan subscription charge', amount: -minor(row.amount) });
-      else if (row.reference.startsWith('chargeback:')) rows.push({ date: row.date, type: 'chargeback', description: 'Chargeback', amount: -minor(row.amount) });
+    for (const row of await this.captureRows({ resellerId: input.resellerId, mode: input.mode, from: input.from, to: input.to, currency })) {
+      const kind = captureKind(row.reference);
+      if (kind) rows.push({ date: row.date, reference: row.entry_reference, type: kind, description: captureLabels[kind], amount: -minor(row.amount) });
     }
 
-    rows.sort((a, b) => a.date.getTime() - b.date.getTime());
+    rows.sort((a, b) => a.date.getTime() - b.date.getTime() || a.reference.localeCompare(b.reference));
     return {
       object: 'reseller_statement' as const,
       mode: input.mode,
       from: input.from.toISOString(),
       to: input.to.toISOString(),
       currency,
-      data: rows.map(row => ({ date: row.date.toISOString(), type: row.type, description: row.description, currency, amount: row.amount })),
+      data: rows.map(row => ({ date: row.date.toISOString(), reference: row.reference, type: row.type, description: row.description, currency, amount: row.amount })),
     };
+  }
+
+  /** The business name a statement is prepared for. */
+  async accountName(resellerId: string) {
+    return (await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { name: true } }))?.name ?? undefined;
   }
 }

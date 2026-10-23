@@ -141,7 +141,7 @@ export class SupplierFundingService {
       subject: done.id,
       title: `${formatMoney(done.amount, done.currency)} sent to ${supplier}`,
       body: `${this.number(done)}: ${done.reason}`,
-      link: `/catalog/suppliers/${done.supplierCode}`,
+      link: '/reports/suppliers',
       mode: done.mode,
     });
     return this.present(done, supplier, await this.names([done]));
@@ -181,12 +181,12 @@ export class SupplierFundingService {
   }
 
   /**
-   * Per supplier and currency: what has been funded, what orders have drawn down (`cost_of_sales` against the same
-   * float), and what remains. The ledger's `supplier_float` balance is funded minus consumed over all time, so
-   * "remaining" always matches it; `consumed` here is scoped to the asked period for the admin's own tracking.
+   * Per supplier and currency: what admins recorded as sent to it (`funded`) and what orders drew down
+   * (`consumed`: `cost_of_sales` against the same float, less what suppliers refunded) over the asked period, and
+   * what remains over all time (the ledger's `supplier_float` balance, so it always matches the books).
    */
   async floatTracking(input: { mode: LedgerMode; from: Date; to: Date }) {
-    const [balances, consumed] = await Promise.all([
+    const [balances, consumed, funded] = await Promise.all([
       this.prisma.ledgerAccount.groupBy({ by: ['ownerKey', 'currency'], where: { mode: input.mode, kind: 'supplier_float' }, _sum: { balanceMinor: true } }),
       this.prisma.$queryRaw<Array<{ provider: string; currency: string; consumed: bigint }>>`
         SELECT a.owner_key AS provider, a.currency, SUM(p.amount_minor) AS consumed
@@ -196,23 +196,32 @@ export class SupplierFundingService {
         WHERE a.kind = 'cost_of_sales' AND a.mode = ${input.mode}::"LedgerMode"
           AND e.created_at >= ${input.from} AND e.created_at < ${input.to}
         GROUP BY a.owner_key, a.currency`,
+      this.prisma.supplierFundingMovement.groupBy({
+        by: ['supplierCode', 'currency'],
+        where: { mode: input.mode, status: 'completed', completedAt: { gte: input.from, lt: input.to } },
+        _sum: { amount: true },
+      }),
     ]);
-    const consumedByKey = new Map(consumed.map(row => [`${row.provider}:${row.currency}`, row.consumed]));
-    const codes = [...new Set(balances.map(row => row.ownerKey.replace(/^provider:/, '')))];
+    // Both are keyed by the supplier's own code: ledger owner keys are `provider:<code>`.
+    const supplierOf = (ownerKey: string) => ownerKey.replace(/^provider:/, '');
+    const consumedByKey = new Map(consumed.map(row => [`${supplierOf(row.provider)}:${row.currency}`, row.consumed]));
+    const fundedByKey = new Map(funded.map(row => [`${row.supplierCode}:${row.currency}`, row._sum.amount ?? 0n]));
+    const codes = [...new Set(balances.map(row => supplierOf(row.ownerKey)))];
     const names = codes.length ? await this.prisma.supplier.findMany({ where: { code: { in: codes } }, select: { code: true, name: true } }) : [];
     const byCode = new Map(names.map(s => [s.code, s.name]));
     return {
       object: 'list' as const,
       data: balances
         .map(row => {
-          const code = row.ownerKey.replace(/^provider:/, '');
+          const code = supplierOf(row.ownerKey);
           return {
             object: 'supplier_float' as const,
             supplier_code: code,
             supplier_name: byCode.get(code) ?? code,
             currency: row.currency,
-            remaining: minor(row._sum.balanceMinor ?? 0n),
+            funded: minor(fundedByKey.get(`${code}:${row.currency}`) ?? 0n),
             consumed: minor(consumedByKey.get(`${code}:${row.currency}`) ?? 0n),
+            remaining: minor(row._sum.balanceMinor ?? 0n),
           };
         })
         .sort((a, b) => a.supplier_name.localeCompare(b.supplier_name)),

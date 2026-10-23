@@ -9,7 +9,7 @@ import { type Mode, type ReportMetric, useGrowthReportQuery } from "@bitocard/ap
 const metrics: Array<{ value: ReportMetric; label: string; format: (value: number) => string }> = [
   { value: "gross_sales", label: "Gross sales", format: value => `$${value.toLocaleString("en-GB")}` },
   { value: "orders", label: "Orders", format: value => value.toLocaleString("en-GB") },
-  { value: "platform_revenue", label: "Platform revenue", format: value => `$${value.toLocaleString("en-GB")}` },
+  { value: "platform_revenue", label: "Revenue", format: value => `$${value.toLocaleString("en-GB")}` },
   { value: "new_resellers", label: "New resellers", format: value => value.toLocaleString("en-GB") },
 ];
 

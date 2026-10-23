@@ -3,39 +3,58 @@ import { PrismaService } from '../database/prisma.service.js';
 import { FxService } from '../fx/fx.service.js';
 import { type AccountKind, type LedgerMode, Prisma } from '../generated/prisma/client.js';
 import { minor } from '../ledger/mode.js';
+import { statementTooLarge } from './range.js';
 import { buildTrend, dateKey } from './trend.js';
 
-/** A fixed, compile-time list of account kinds as an `IN (...)` clause: never user input, so each is its own bound parameter. */
-const kindList = (kinds: AccountKind[]) => Prisma.join(kinds);
+/** A fixed, compile-time list as an `IN (...)` clause: never user input, so each is its own bound parameter. */
+const kindList = (kinds: string[]) => Prisma.join(kinds);
+
+/**
+ * BitoCard's retail margin: what its own stores (bitocard.com and each market's country store) keep on a sale. Those
+ * stores sell through house accounts, so the margin is posted as the house account's earnings, not as platform
+ * revenue (which already holds the wholesale they paid).
+ */
+const retailMargin = 'retail_margin';
+type ReportLine = AccountKind | typeof retailMargin;
 
 /** Revenue BitoCard keeps for itself, in money (never the crypto-denominated kinds: no fiat price feed behind them here). */
-const revenueKinds: AccountKind[] = ['platform_revenue', 'platform_fees', 'domain_revenue'];
+const revenueLines: ReportLine[] = ['platform_revenue', retailMargin, 'platform_fees', 'domain_revenue'];
 /** What suppliers charge BitoCard for fulfilled orders. */
-const costOfSalesKinds: AccountKind[] = ['cost_of_sales'];
-/** Everything else BitoCard spends to run the business. */
-const expenseKinds: AccountKind[] = ['processing_fees', 'chargebacks', 'promotions'];
-const pnlKinds = [...revenueKinds, ...costOfSalesKinds, ...expenseKinds];
+const costOfSalesLines: ReportLine[] = ['cost_of_sales'];
+/** Everything else BitoCard spends to run the business; `adjustments` is what finance credited (or took back) by hand. */
+const expenseLines: ReportLine[] = ['processing_fees', 'chargebacks', 'promotions', 'adjustments'];
+const ledgerKinds = [...revenueLines, ...costOfSalesLines, ...expenseLines].filter((line): line is AccountKind => line !== retailMargin);
+const allLines = [...revenueLines, ...costOfSalesLines, ...expenseLines];
 
-/** `kind`'s natural side for a P&L figure: revenue is recognised on its credits, an expense on its debits. */
-const creditSided = new Set<AccountKind>(revenueKinds);
+/** The house accounts' earnings, posted by a sale and reversed by its refund. */
+const houseEarningKinds = ['reseller_earnings_held', 'reseller_earnings'];
+const houseEarningTypes = ['earnings', 'order_refund'];
 
-const labels: Record<AccountKind, string> = {
+const labels: Record<ReportLine, string> = {
   platform_revenue: 'Platform revenue',
+  retail_margin: "Retail margin on BitoCard's own stores",
   platform_fees: "Fees on resellers' own suppliers",
   domain_revenue: 'Domain sales',
   cost_of_sales: 'Cost of sales',
   processing_fees: 'Payment processing fees',
   chargebacks: 'Chargebacks',
   promotions: 'Promotions',
-} as Record<AccountKind, string>;
+  adjustments: 'Adjustments and goodwill',
+} as Record<ReportLine, string>;
 
+/** Revenue is recognised on its credits, an expense on its debits. */
+const isRevenue = (line: ReportLine) => revenueLines.includes(line);
+
+/** The most lines one statement holds: past it, a shorter period is asked for. */
+export const statementMaxRows = 50_000;
 
 export type ReportMetric = 'gross_sales' | 'orders' | 'platform_revenue' | 'new_resellers';
 
 /**
  * Platform-wide financial reporting: a P&L for a date range (every currency rolled into one via `FxService`'s
  * reference rates, or one market's own currency), growth with a simple linear-trend projection, and the flat,
- * dated ledger rows behind a P&L (the "statement"), for the CSV and PDF exports.
+ * dated ledger rows behind a P&L (the "statement"), for the CSV and PDF exports. Money only: postings in a crypto
+ * asset's units (a seized coin goes to `adjustments`) are left out.
  */
 @Injectable()
 export class ReportsService {
@@ -45,31 +64,29 @@ export class ReportsService {
   ) {}
 
   /**
-   * Revenue (`platform_revenue`, `platform_fees`, `domain_revenue`) less cost of sales (`cost_of_sales`) is gross
-   * profit; less operating expenses (`processing_fees`, `chargebacks`, `promotions`) is net profit. `currency`
-   * picks one market's own currency (no conversion, and only that currency's postings count, in its own minor
-   * units); omitted, every currency involved is converted to USD cents at the reference rate.
+   * Revenue (platform revenue, the retail margin of BitoCard's own stores, own-supplier fees, domains) less cost of
+   * sales is gross profit; less operating expenses (processing fees, chargebacks, promotions, adjustments) is net
+   * profit. `currency` picks one market's own currency (no conversion, and only that currency's postings count, in
+   * its own minor units); omitted, every currency involved is converted to USD cents at the reference rate.
    */
   async pnl(input: { mode: LedgerMode; from: Date; to: Date; currency?: string }) {
-    const rows = await this.byKindAndCurrency(input.mode, input.from, input.to, pnlKinds);
+    const rows = await this.byLineAndCurrency(input.mode, input.from, input.to);
     const scoped = input.currency ? rows.filter(row => row.currency === input.currency) : rows;
     const currencies = [...new Set(scoped.map(row => row.currency))];
     const reporting = input.currency ? null : await this.fx.reportingRates(currencies);
     const toUsdCents = reporting?.toUsdCents ?? null;
-    const ratesAsOf = reporting?.ratesAsOf ?? null;
-    const unconverted = reporting?.unconverted ?? [];
 
-    const byKind = new Map<AccountKind, number>();
+    const byLine = new Map<ReportLine, number>();
     for (const row of scoped) {
-      // The kind's natural value: revenue is its net credit, an expense its net debit.
-      const net = creditSided.has(row.kind) ? -row.net : row.net;
+      // The line's natural value: revenue is its net credit, an expense its net debit.
+      const net = isRevenue(row.line) ? -row.net : row.net;
       const value = toUsdCents ? toUsdCents(net, row.currency) : minor(net);
-      byKind.set(row.kind, (byKind.get(row.kind) ?? 0) + value);
+      byLine.set(row.line, (byLine.get(row.line) ?? 0) + value);
     }
-    const sum = (kinds: AccountKind[]) => kinds.reduce((total, kind) => total + (byKind.get(kind) ?? 0), 0);
-    const revenue = sum(revenueKinds);
-    const costOfSales = sum(costOfSalesKinds);
-    const expenses = sum(expenseKinds);
+    const sum = (lines: ReportLine[]) => lines.reduce((total, line) => total + (byLine.get(line) ?? 0), 0);
+    const revenue = sum(revenueLines);
+    const costOfSales = sum(costOfSalesLines);
+    const expenses = sum(expenseLines);
     const grossProfit = revenue - costOfSales;
     const netProfit = grossProfit - expenses;
 
@@ -84,23 +101,23 @@ export class ReportsService {
       gross_profit: grossProfit,
       operating_expenses: expenses,
       net_profit: netProfit,
-      breakdown: pnlKinds
-        .filter(kind => byKind.has(kind))
-        .map(kind => ({
-          kind,
-          label: labels[kind],
-          group: revenueKinds.includes(kind) ? ('revenue' as const) : costOfSalesKinds.includes(kind) ? ('cost_of_sales' as const) : ('expense' as const),
-          amount: byKind.get(kind)!,
+      breakdown: allLines
+        .filter(line => byLine.has(line))
+        .map(line => ({
+          kind: line,
+          label: labels[line],
+          group: isRevenue(line) ? ('revenue' as const) : costOfSalesLines.includes(line) ? ('cost_of_sales' as const) : ('expense' as const),
+          amount: byLine.get(line)!,
         })),
-      rates_as_of: ratesAsOf?.toISOString() ?? null,
-      unconverted,
+      rates_as_of: reporting?.ratesAsOf?.toISOString() ?? null,
+      unconverted: reporting?.unconverted ?? [],
     };
   }
 
   /**
    * Daily buckets of `metric` over the range, with the final buckets continued by a simple linear-trend
    * projection (flagged `projected: true`), plus the whole range's change against the immediately preceding range
-   * of the same length.
+   * of the same length. Money metrics are in US dollars; `platform_revenue` is the P&L's revenue.
    */
   async growth(input: { mode: LedgerMode; from: Date; to: Date; metric: ReportMetric; projectDays?: number }) {
     const span = input.to.getTime() - input.from.getTime();
@@ -121,23 +138,31 @@ export class ReportsService {
     };
   }
 
-  /** The dated ledger rows behind a P&L for the range: the source data for the CSV and PDF statement exports. */
-  async statement(input: { mode: LedgerMode; from: Date; to: Date; currency?: string }) {
-    const rows = await this.prisma.$queryRaw<Array<{ date: Date; reference: string; type: string; description: string; kind: AccountKind; currency: string; amount: bigint }>>`
-      SELECT e.created_at AS date, e.reference, e.type, e.description, a.kind, a.currency, p.amount_minor AS amount
+  /**
+   * The dated ledger rows behind a P&L for the range: the source data for the CSV and PDF statement exports. More
+   * than `maxRows` lines is refused (`statement_too_large`) rather than cut short.
+   */
+  async statement(input: { mode: LedgerMode; from: Date; to: Date; currency?: string; maxRows?: number }) {
+    const maxRows = input.maxRows ?? statementMaxRows;
+    const currency = input.currency ? Prisma.sql`AND a.currency = ${input.currency}` : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<Array<{ date: Date; reference: string; type: string; description: string; line: ReportLine; currency: string; amount: bigint }>>`
+      SELECT e.created_at AS date, e.reference, e.type, e.description,
+        CASE WHEN r.house THEN ${retailMargin} ELSE a.kind::text END AS line, a.currency, p.amount_minor AS amount
       FROM ledger_postings p
       JOIN ledger_accounts a ON a.id = p.account_id
       JOIN journal_entries e ON e.id = p.entry_id
-      WHERE a.mode = ${input.mode}::"LedgerMode" AND a.kind IN (${kindList(pnlKinds)})
+      LEFT JOIN resellers r ON r.id = a.reseller_id
+      WHERE a.mode = ${input.mode}::"LedgerMode" AND ${this.reportedPostings()} ${currency}
         AND e.created_at >= ${input.from} AND e.created_at < ${input.to}
-      ORDER BY e.created_at ASC`;
-    const filtered = input.currency ? rows.filter(row => row.currency === input.currency) : rows;
+      ORDER BY e.created_at ASC, e.reference ASC
+      LIMIT ${maxRows + 1}`;
+    if (rows.length > maxRows) throw statementTooLarge(maxRows);
     return {
       object: 'statement' as const,
       mode: input.mode,
       from: input.from.toISOString(),
       to: input.to.toISOString(),
-      data: filtered.map(row => {
+      data: rows.map(row => {
         // The literal posting: a positive amount_minor is a debit, negative is a credit (as it is stored).
         const isDebit = row.amount > 0n;
         const amount = minor(isDebit ? row.amount : -row.amount);
@@ -146,8 +171,8 @@ export class ReportsService {
           reference: row.reference,
           type: row.type,
           description: row.description,
-          kind: row.kind,
-          label: labels[row.kind],
+          kind: row.line,
+          label: labels[row.line],
           currency: row.currency,
           debit: isDebit ? amount : null,
           credit: isDebit ? null : amount,
@@ -156,15 +181,28 @@ export class ReportsService {
     };
   }
 
-  private async byKindAndCurrency(mode: LedgerMode, from: Date, to: Date, kinds: AccountKind[]) {
-    return this.prisma.$queryRaw<Array<{ kind: AccountKind; currency: string; net: bigint }>>`
-      SELECT a.kind, a.currency, SUM(p.amount_minor) AS net
+  /**
+   * The postings a P&L counts: BitoCard's own revenue and expense accounts, and the house accounts' earnings (the
+   * retail margin), in money only.
+   */
+  private reportedPostings() {
+    return Prisma.sql`(
+        (a.kind::text IN (${kindList(ledgerKinds)}))
+        OR (r.house AND a.kind::text IN (${kindList(houseEarningKinds)}) AND e.type IN (${kindList(houseEarningTypes)}))
+      )
+      AND a.currency NOT IN (SELECT code FROM crypto_assets)`;
+  }
+
+  private async byLineAndCurrency(mode: LedgerMode, from: Date, to: Date) {
+    return this.prisma.$queryRaw<Array<{ line: ReportLine; currency: string; net: bigint }>>`
+      SELECT CASE WHEN r.house THEN ${retailMargin} ELSE a.kind::text END AS line, a.currency, SUM(p.amount_minor) AS net
       FROM ledger_postings p
       JOIN ledger_accounts a ON a.id = p.account_id
       JOIN journal_entries e ON e.id = p.entry_id
-      WHERE a.mode = ${mode}::"LedgerMode" AND a.kind IN (${kindList(kinds)})
+      LEFT JOIN resellers r ON r.id = a.reseller_id
+      WHERE a.mode = ${mode}::"LedgerMode" AND ${this.reportedPostings()}
         AND e.created_at >= ${from} AND e.created_at < ${to}
-      GROUP BY a.kind, a.currency`;
+      GROUP BY 1, 2`;
   }
 
   private async dailyValues(mode: LedgerMode, from: Date, to: Date, metric: ReportMetric): Promise<Map<string, number>> {
@@ -183,13 +221,16 @@ export class ReportsService {
         FROM ledger_postings p
         JOIN ledger_accounts a ON a.id = p.account_id
         JOIN journal_entries e ON e.id = p.entry_id
-        WHERE a.mode = ${mode}::"LedgerMode" AND a.kind = 'platform_revenue' AND e.created_at >= ${from} AND e.created_at < ${to}
+        LEFT JOIN resellers r ON r.id = a.reseller_id
+        WHERE a.mode = ${mode}::"LedgerMode" AND ${this.reportedPostings()}
+          AND (a.kind::text IN (${kindList(revenueLines.filter(line => line !== retailMargin))}) OR r.house)
+          AND e.created_at >= ${from} AND e.created_at < ${to}
         GROUP BY 1, 2`;
       const { toUsdCents } = await this.fx.reportingRates([...new Set(rows.map(row => row.currency))]);
       const byDay = new Map<string, number>();
       for (const row of rows) {
         const key = dateKey(row.day);
-        // platform_revenue is credit-sided: its net credit (the revenue) is -SUM(amount_minor).
+        // Revenue is credit-sided: its net credit (the revenue) is -SUM(amount_minor).
         byDay.set(key, (byDay.get(key) ?? 0) + toUsdCents(-row.net, row.currency) / 100);
       }
       return byDay;

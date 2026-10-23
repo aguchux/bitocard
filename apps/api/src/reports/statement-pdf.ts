@@ -4,18 +4,35 @@ export type StatementRow = { date: string; reference: string; type: string; desc
 
 const amount = (minor: number | null, currency: string) => (minor === null ? '' : `${(minor / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`);
 const shortDate = (iso: string) => iso.slice(0, 10);
+/** The last day a period covers: its end is exclusive, so a period ending at midnight ends the day before. */
+const lastDay = (iso: string) => new Date(new Date(iso).getTime() - 1).toISOString().slice(0, 10);
+
+/** One line of the totals under the rows, in the statement's currency (`bold` for a subtotal). */
+export type StatementTotal = { label: string; value: number; bold?: boolean };
+
+/** The admin P&L's totals, as statement lines: costs shown as negatives. */
+export const pnlTotals = (pnl: { revenue: number; cost_of_sales: number; gross_profit: number; operating_expenses: number; net_profit: number }): StatementTotal[] => [
+  { label: 'Revenue', value: pnl.revenue },
+  { label: 'Cost of sales', value: -pnl.cost_of_sales },
+  { label: 'Gross profit', value: pnl.gross_profit, bold: true },
+  { label: 'Operating expenses', value: -pnl.operating_expenses },
+  { label: 'Net profit', value: pnl.net_profit, bold: true },
+];
 
 /**
- * A simple, dated statement: BitoCard's header, the period, every row with its debit or credit, and the P&L
- * totals. Returns the finished PDF as a buffer. One page of rows at a time; a new page repeats the column headings.
+ * A simple, dated statement: BitoCard's header, the period (and who it is for), every row with its debit or credit,
+ * and the totals. Returns the finished PDF as a buffer. One page of rows at a time; a new page repeats the column
+ * headings.
  */
 export function statementPdf(input: {
   title: string;
+  /** Who the statement is for (a reseller's business name), under the title. */
+  preparedFor?: string;
   from: string;
   to: string;
   currency: string;
   rows: StatementRow[];
-  totals: { revenue: number; cost_of_sales: number; gross_profit: number; operating_expenses: number; net_profit: number };
+  totals: StatementTotal[];
 }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
@@ -38,7 +55,8 @@ export function statementPdf(input: {
       doc.font('Helvetica').fontSize(9).fillColor('#5b6488').text('A Golojan Ltd venture');
       doc.moveDown(0.6);
       doc.font('Helvetica-Bold').fontSize(13).fillColor('#070f4c').text(input.title);
-      doc.font('Helvetica').fontSize(10).fillColor('#333').text(`${shortDate(input.from)} to ${shortDate(input.to)} · ${input.currency}`);
+      if (input.preparedFor) doc.font('Helvetica').fontSize(10).fillColor('#333').text(`For ${input.preparedFor}`);
+      doc.font('Helvetica').fontSize(10).fillColor('#333').text(`${shortDate(input.from)} to ${lastDay(input.to)} · ${input.currency}`);
       doc.moveDown(0.8);
     };
 
@@ -82,11 +100,7 @@ export function statementPdf(input: {
       doc.text(label, left, doc.y, { width: 300, continued: true });
       doc.text(`${(value / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${input.currency}`, { width: 200, align: 'right' });
     };
-    line('Revenue', input.totals.revenue);
-    line('Cost of sales', -input.totals.cost_of_sales);
-    line('Gross profit', input.totals.gross_profit, true);
-    line('Operating expenses', -input.totals.operating_expenses);
-    line('Net profit', input.totals.net_profit, true);
+    for (const total of input.totals) line(total.label, total.value, total.bold);
 
     doc.end();
   });

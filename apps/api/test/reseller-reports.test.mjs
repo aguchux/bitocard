@@ -192,3 +192,34 @@ describe('reseller statement', () => {
     assert.equal(buffer.subarray(0, 5).toString('ascii'), '%PDF-');
   });
 });
+
+describe('reseller reports: domains and periods', () => {
+  test('a domain bought from the wallet is an expense; an order\'s wholesale never is', async () => {
+    const { browser, resellerId } = await resellerClient(server, { country: 'NG' });
+    await fund(resellerId, 100_000_00);
+    await sell(resellerId, 9000, 'test-sale-domain');
+    // A domain bought as DomainsService does: held, then captured into domain revenue.
+    const domainHold = await wallets.hold({ resellerId, mode: 'live', amount: 2500n, reference: 'domain:test-domain:register', description: 'Domain: ada.com' });
+    await wallets.captureHold(domainHold.id, 'Domain bought: ada.com', [{ kind: 'domain_revenue', amount: 2500n }]);
+    // An order's wholesale: the cost of what was sold, not shown as an expense.
+    const orderHold = await wallets.hold({ resellerId, mode: 'live', amount: 4000n, reference: 'order:test-order-domain', description: 'Order' });
+    await wallets.captureHold(orderHold.id);
+    // Midday on the 2nd: the period "from the 2nd to the 2nd", as the date picker sends it, must include it.
+    const day2 = new Date('2025-07-02T12:00:00.000Z');
+    for (const reference of ['earnings:test-sale-domain', `hold_capture:${domainHold.id}`, `hold_capture:${orderHold.id}`]) await moveEntryDate(reference, day2);
+
+    const result = await browser.get('/v1/reports/pnl?from=2025-07-02&to=2025-07-02');
+    assert.equal(result.status, 200, JSON.stringify(result.json));
+    const byKind = Object.fromEntries(result.json.breakdown.map(row => [row.kind, row.amount]));
+    assert.deepEqual([result.json.revenue, byKind.domain, result.json.operating_expenses, result.json.net_profit], [9000, 2500, 2500, 6500]);
+
+    const statement = await browser.get('/v1/reports/statement?from=2025-07-02&to=2025-07-02');
+    const domain = statement.json.data.find(row => row.type === 'domain');
+    assert.deepEqual([domain.amount, domain.reference], [-2500, `hold_capture:${domainHold.id}`]);
+    assert.ok(statement.json.data.every(row => row.reference), 'every row names its entry');
+    assert.equal(statement.json.data.length, 2, 'the sale and the domain; never the order\'s wholesale');
+
+    const backwards = await browser.get('/v1/reports/pnl?from=2025-07-03&to=2025-07-01');
+    assert.deepEqual([backwards.status, backwards.json.error.code], [400, 'parameter_invalid']);
+  });
+});

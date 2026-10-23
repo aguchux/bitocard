@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileText, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, StatCard, type Column, type DateRange } from "@bitocard/admin-ui";
-import { resellerReportExportUrl, type ResellerPnlReport, useResellerPnlQuery } from "@bitocard/api-client/reseller";
+import { type ResellerPnlReport, useResellerPnlQuery } from "@bitocard/api-client/reseller";
+import { ReportDownloads } from "@/components/report-downloads";
 import { ShqShell } from "@/components/shq-shell";
 
 type Row = ResellerPnlReport["breakdown"][number];
@@ -18,7 +19,7 @@ const columnsFor = (currency: string): Array<Column<Row>> => [
 ];
 
 /**
- * Reports > P&L: your earnings from sales, less BitoCard's fees, your plan subscription and any chargebacks borne,
+ * Reports > P&L: your earnings from sales, less BitoCard's fees, your plan subscription, domains and any chargebacks borne,
  * for a date range. Never shows BitoCard's supplier costs, which stay internal.
  */
 export default function ResellerPnlPage() {
@@ -31,18 +32,9 @@ export default function ResellerPnlPage() {
     <ShqShell section="reports" current="/reports" crumbs={[{ label: "Reports", href: "/reports" }, { label: "P&L" }]}>
       <PageHeader
         title="Profit and loss"
-        description="What you earned from sales, less BitoCard's fees, your plan and any chargebacks you bore, for this range."
+        description="What you earned from sales, less BitoCard's fees, your plan, domains and any chargebacks you bore, for this range."
         actions={
-          data ? (
-            <div className="flex flex-wrap gap-2">
-              <a href={resellerReportExportUrl("csv", query)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-canvas">
-                <Download className="size-4" aria-hidden /> CSV
-              </a>
-              <a href={resellerReportExportUrl("pdf", query)} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-ink hover:bg-canvas">
-                <FileText className="size-4" aria-hidden /> PDF
-              </a>
-            </div>
-          ) : null
+          <ReportDownloads range={query} />
         }
       />
 

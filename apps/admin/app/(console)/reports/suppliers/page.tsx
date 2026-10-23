@@ -17,6 +17,7 @@ import { SupplierFundingDialog } from "@/components/supplier-funding";
 const floatColumns: Array<Column<SupplierFloat>> = [
   { key: "supplier", header: "Supplier", cell: row => <span className="font-semibold text-ink">{row.supplier_name}</span> },
   { key: "currency", header: "Currency", cell: row => row.currency },
+  { key: "funded", header: "Funded (this range)", align: "right", hideOnMobile: true, cell: row => formatMoney(row.funded, row.currency) },
   { key: "consumed", header: "Drawn down (this range)", align: "right", hideOnMobile: true, cell: row => formatMoney(row.consumed, row.currency) },
   { key: "remaining", header: "Remaining", align: "right", cell: row => <span className="font-semibold tabular-nums">{formatMoney(row.remaining, row.currency)}</span> },
 ];

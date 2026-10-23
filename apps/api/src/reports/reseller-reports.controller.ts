@@ -6,8 +6,12 @@ import { type Caller, CurrentCaller, resellerOf, Roles, SessionOnly } from '../a
 import { toCsv } from '../common/csv.js';
 import { Mode } from '../ledger/mode.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
+import { maxDailyRangeDays, reportRange, statementTooLarge } from './range.js';
 import { type ResellerReportMetric, ResellerReportsService } from './reseller-reports.service.js';
 import { statementPdf } from './statement-pdf.js';
+
+/** A PDF of more lines than this is refused (download the CSV, or choose a shorter period). */
+const pdfMaxRows = 5_000;
 
 class RangeDto {
   @IsDateString()
@@ -52,30 +56,31 @@ export class ResellerReportsController {
 
   @Get('pnl')
   pnl(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: RangeDto) {
-    return this.reports.pnl({ resellerId: resellerOf(caller), mode, from: new Date(query.from), to: new Date(query.to), currency: query.currency });
+    return this.reports.pnl({ resellerId: resellerOf(caller), mode, ...reportRange(query.from, query.to), currency: query.currency });
   }
 
   @Get('growth')
   growth(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: GrowthDto) {
-    return this.reports.growth({ resellerId: resellerOf(caller), mode, from: new Date(query.from), to: new Date(query.to), metric: query.metric, currency: query.currency });
+    return this.reports.growth({ resellerId: resellerOf(caller), mode, ...reportRange(query.from, query.to, maxDailyRangeDays), metric: query.metric, currency: query.currency });
   }
 
   @Get('statement')
   statement(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: RangeDto) {
-    return this.reports.statement({ resellerId: resellerOf(caller), mode, from: new Date(query.from), to: new Date(query.to), currency: query.currency });
+    return this.reports.statement({ resellerId: resellerOf(caller), mode, ...reportRange(query.from, query.to), currency: query.currency });
   }
 
   @Get('statement.csv')
   async statementCsv(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: RangeDto, @Res() res: Response) {
-    const { data, currency } = await this.reports.statement({ resellerId: resellerOf(caller), mode, from: new Date(query.from), to: new Date(query.to), currency: query.currency });
+    const { data, currency } = await this.reports.statement({ resellerId: resellerOf(caller), mode, ...reportRange(query.from, query.to), currency: query.currency });
     const csv = toCsv(
       [
         { key: 'date', header: 'Date' },
+        { key: 'reference', header: 'Reference' },
         { key: 'type', header: 'Type' },
         { key: 'description', header: 'Description' },
         { key: 'amount', header: `Amount (${currency})` },
       ],
-      data.map(row => ({ date: row.date, type: row.type, description: row.description, amount: (row.amount / 100).toFixed(2) })),
+      data.map(row => ({ date: row.date, reference: row.reference, type: row.type, description: row.description, amount: (row.amount / 100).toFixed(2) })),
     );
     sendFile(res, 'text/csv; charset=utf-8', fileName('statement', query.from, query.to, 'csv'), csv);
   }
@@ -83,15 +88,16 @@ export class ResellerReportsController {
   @Get('statement.pdf')
   async statementPdf(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: RangeDto, @Res() res: Response) {
     const resellerId = resellerOf(caller);
-    const from = new Date(query.from);
-    const to = new Date(query.to);
-    const [statement, pnl] = await Promise.all([
+    const { from, to } = reportRange(query.from, query.to);
+    const [statement, pnl, account] = await Promise.all([
       this.reports.statement({ resellerId, mode, from, to, currency: query.currency }),
       this.reports.pnl({ resellerId, mode, from, to, currency: query.currency }),
+      this.reports.accountName(resellerId),
     ]);
+    if (statement.data.length > pdfMaxRows) throw statementTooLarge(pdfMaxRows);
     const rows = statement.data.map(row => ({
       date: row.date,
-      reference: row.type,
+      reference: row.reference,
       type: row.type,
       description: row.description,
       label: row.description,
@@ -100,12 +106,19 @@ export class ResellerReportsController {
       credit: row.amount >= 0 ? row.amount : null,
     }));
     const pdf = await statementPdf({
-      title: 'Statement',
+      title: mode === 'test' ? 'Statement (sandbox)' : 'Statement',
+      preparedFor: account,
       from: statement.from,
       to: statement.to,
       currency: pnl.currency,
       rows,
-      totals: { revenue: pnl.revenue, cost_of_sales: 0, gross_profit: pnl.revenue, operating_expenses: pnl.operating_expenses, net_profit: pnl.net_profit },
+      // A reseller's own lines: what they earned, what it cost them, and what is left. Never BitoCard's cost of sales.
+      totals: [
+        { label: 'Earnings from sales', value: pnl.revenue },
+        { label: 'Expenses', value: -pnl.operating_expenses },
+        ...pnl.breakdown.filter(line => line.group === 'adjustment').map(line => ({ label: line.label, value: line.amount })),
+        { label: 'Net profit', value: pnl.net_profit, bold: true },
+      ],
     });
     sendFile(res, 'application/pdf', fileName('statement', query.from, query.to, 'pdf'), pdf);
   }

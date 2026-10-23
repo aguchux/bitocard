@@ -3,7 +3,7 @@
 // rows behind the P&L.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, startApp } from './helpers.mjs';
+import { adminClient, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
@@ -165,5 +165,110 @@ describe('statement', () => {
     assert.match(res.headers.get('content-type') ?? '', /application\/pdf/);
     const buffer = Buffer.from(await res.arrayBuffer());
     assert.equal(buffer.subarray(0, 5).toString('ascii'), '%PDF-');
+  });
+});
+
+describe('periods', () => {
+  test('a plain date for the end means the whole of that day, as the admin app\'s date picker sends it', async () => {
+    // Day 2 (2025-06-02) holds USD 200.00 of revenue at midday; "from the 2nd to the 2nd" must include it.
+    const result = await admin.get('/v1/admin/reports/pnl?mode=live&from=2025-06-02&to=2025-06-02&currency=USD');
+    assert.equal(result.status, 200, JSON.stringify(result.json));
+    assert.equal(result.json.revenue, 20000);
+    assert.equal(result.json.to, '2025-06-03T00:00:00.000Z');
+  });
+
+  test('an end before its start is refused, and daily growth over a year asks for a shorter period', async () => {
+    const backwards = await admin.get('/v1/admin/reports/pnl?mode=live&from=2025-06-03&to=2025-06-01');
+    assert.deepEqual([backwards.status, backwards.json.error.code, backwards.json.error.param], [400, 'parameter_invalid', 'to']);
+    const long = await admin.get('/v1/admin/reports/growth?mode=live&from=2024-01-01&to=2025-06-01&metric=orders');
+    assert.deepEqual([long.status, long.json.error.code], [400, 'range_too_long']);
+  });
+
+  test('a statement longer than its limit is refused, never cut short', async () => {
+    const { ReportsService } = await import('../dist/reports/reports.service.js');
+    await assert.rejects(
+      server.app.get(ReportsService).statement({ mode: 'live', from: new Date(from), to: new Date(to), currency: 'USD', maxRows: 1 }),
+      error => error.code === 'statement_too_large',
+    );
+  });
+});
+
+describe("BitoCard's own stores and adjustments", () => {
+  const augFrom = '2025-08-01T00:00:00.000Z';
+  const augTo = '2025-08-04T00:00:00.000Z';
+  const aug1 = new Date('2025-08-01T12:00:00.000Z');
+
+  before(async () => {
+    // A market's house account: its earnings are BitoCard's retail margin on its own stores.
+    const { HouseService } = await import('../dist/checkout/house.service.js');
+    const house = await server.app.get(HouseService).resellerFor('KE');
+    // A reseller's earnings are theirs, never BitoCard's revenue.
+    const { resellerId } = await resellerClient(server, { country: 'NG' });
+    const posts = [
+      {
+        type: 'earnings',
+        reference: 'reports_test:house_margin',
+        resellerId: house.id,
+        lines: [
+          { account: { kind: 'provider_balance', currency: 'USD', provider: 'manual' }, debit: 700n },
+          { account: { kind: 'reseller_earnings_held', currency: 'USD', resellerId: house.id }, credit: 700n },
+        ],
+      },
+      {
+        type: 'earnings',
+        reference: 'reports_test:reseller_margin',
+        resellerId,
+        lines: [
+          { account: { kind: 'provider_balance', currency: 'USD', provider: 'manual' }, debit: 999n },
+          { account: { kind: 'reseller_earnings_held', currency: 'USD', resellerId }, credit: 999n },
+        ],
+      },
+      {
+        // A goodwill credit to a reseller: BitoCard's expense.
+        type: 'adjustment',
+        reference: 'reports_test:goodwill',
+        resellerId,
+        lines: [
+          { account: { kind: 'adjustments', currency: 'USD' }, debit: 300n },
+          { account: { kind: 'reseller_funding', currency: 'USD', resellerId }, credit: 300n },
+        ],
+      },
+      {
+        // Seized crypto lands in `adjustments` in the coin's units: never money, never priced here.
+        type: 'crypto_seize',
+        reference: 'reports_test:seize',
+        lines: [
+          { account: { kind: 'crypto_custody', currency: 'USDT' }, debit: 5_000_000n },
+          { account: { kind: 'adjustments', currency: 'USDT' }, credit: 5_000_000n },
+        ],
+      },
+    ];
+    for (const post of posts) {
+      await ledger.post({ mode: 'live', description: post.reference, ...post });
+      await prisma.journalEntry.update({ where: { reference: post.reference }, data: { createdAt: aug1 } });
+    }
+  });
+
+  test("the retail margin of BitoCard's own stores is revenue; resellers' earnings are not; adjustments are an expense", async () => {
+    for (const currency of ['USD', undefined]) {
+      const result = await admin.get(`/v1/admin/reports/pnl?mode=live&from=${augFrom}&to=${augTo}${currency ? `&currency=${currency}` : ''}`);
+      assert.equal(result.status, 200, JSON.stringify(result.json));
+      const byKind = Object.fromEntries(result.json.breakdown.map(row => [row.kind, row.amount]));
+      assert.deepEqual([result.json.revenue, result.json.operating_expenses, result.json.net_profit], [700, 300, 400], currency ?? 'every market');
+      assert.deepEqual([byKind.retail_margin, byKind.adjustments], [700, 300]);
+      assert.deepEqual(result.json.unconverted, [], 'a crypto asset is never a currency to convert');
+    }
+  });
+
+  test('the statement and growth count the retail margin too, and never a crypto posting', async () => {
+    const statement = await admin.get(`/v1/admin/reports/statement?mode=live&from=${augFrom}&to=${augTo}`);
+    assert.equal(statement.status, 200, JSON.stringify(statement.json));
+    const margin = statement.json.data.find(row => row.reference === 'reports_test:house_margin');
+    assert.deepEqual([margin.kind, margin.label, margin.credit], ['retail_margin', "Retail margin on BitoCard's own stores", 700]);
+    assert.ok(!statement.json.data.some(row => row.reference === 'reports_test:reseller_margin'), "a reseller's earnings are not BitoCard's");
+    assert.ok(!statement.json.data.some(row => row.currency === 'USDT'), 'crypto postings are left out');
+
+    const growth = await admin.get(`/v1/admin/reports/growth?mode=live&from=${augFrom}&to=${augTo}&metric=platform_revenue`);
+    assert.deepEqual(growth.json.points.filter(point => !point.projected).map(point => point.value), [7, 0, 0]);
   });
 });

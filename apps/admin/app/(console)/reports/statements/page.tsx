@@ -9,6 +9,9 @@ import { type Mode, reportExportUrl, type StatementRow, useCountriesQuery, useSt
 const money = (minor: number | null, currency: string) => (minor === null ? "—" : `${(minor / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`);
 const shortDate = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
+/** The most rows drawn on the page; the CSV and PDF exports hold every one. */
+const shown = 500;
+
 const columns: Array<Column<StatementRow>> = [
   { key: "date", header: "Date", cell: row => shortDate(row.date) },
   { key: "reference", header: "Reference", hideOnMobile: true, cell: row => row.reference },
@@ -28,6 +31,8 @@ export default function StatementsPage() {
   const statement = useStatementReportQuery(query);
   const countries = useCountriesQuery();
   const currencies = [...new Set((countries.data?.data ?? []).map(country => country.currency))].sort();
+  const rows = statement.data?.data ?? [];
+  const described = rows.length > shown ? `The first ${shown} of ${rows.length} postings in this range: download the CSV for every one.` : `${rows.length} postings in this range.`;
 
   return (
     <AdminShell section="reports" current="/reports/statements" crumbs={[{ label: "Reports", href: "/reports" }, { label: "Statements" }]}>
@@ -67,8 +72,8 @@ export default function StatementsPage() {
       </div>
 
       <Card>
-        <CardHeader title="Rows" description={`${statement.data?.data.length ?? 0} postings in this range.`} />
-        <DataTable columns={columns} rows={statement.data?.data} rowKey={row => `${row.reference}:${row.kind}`} loading={statement.isLoading} error={statement.error ? errorMessage(statement.error) : null} onRetry={statement.refetch} empty="No activity in this range." />
+        <CardHeader title="Rows" description={described} />
+        <DataTable columns={columns} rows={statement.data ? rows.slice(0, shown) : undefined} rowKey={row => `${row.reference}:${row.kind}:${row.currency}`} loading={statement.isLoading} error={statement.error ? errorMessage(statement.error) : null} onRetry={statement.refetch} empty="No activity in this range." />
       </Card>
     </AdminShell>
   );
