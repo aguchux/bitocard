@@ -30,6 +30,7 @@ import { EsimsModule } from './esims/esims.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
 import { IdentityModule } from './identity/identity.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { ReportsModule } from './reports/reports.module.js';
 import { IntegrationsAdminModule } from './integrations/integrations.admin.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { ResellerIntegrationsModule } from './reseller-integrations/reseller-integrations.module.js';
@@ -95,6 +96,7 @@ export class AppModule {
         WebhooksModule,
         IdentityModule,
         AdminModule,
+        ReportsModule,
         IntegrationsAdminModule,
         ResellerIntegrationsModule,
         FeesModule,

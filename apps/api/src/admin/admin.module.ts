@@ -5,6 +5,7 @@ import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'cla
 import { AdminRoles, RealmOnly } from '../auth/caller.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { FxModule } from '../fx/fx.module.js';
 import { AdminOverviewService } from './overview.service.js';
 
 class OverviewQueryDto {
@@ -70,5 +71,5 @@ export class AdminActivityController {
   }
 }
 
-@Module({ controllers: [AdminOverviewController, AdminActivityController], providers: [AdminOverviewService] })
+@Module({ imports: [FxModule], controllers: [AdminOverviewController, AdminActivityController], providers: [AdminOverviewService] })
 export class AdminModule {}

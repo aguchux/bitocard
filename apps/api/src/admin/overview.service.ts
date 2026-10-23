@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
+import { FxService } from '../fx/fx.service.js';
 import { minor } from '../ledger/mode.js';
 import { receiptNumber } from '../orders/orders.service.js';
 import { stockSupplier } from '../suppliers/stock.adapter.js';
@@ -14,18 +15,13 @@ const floatAccounts = ['reseller_funding', 'reseller_earnings', 'reseller_earnin
 
 const dateKey = (date: Date) => date.toISOString().slice(0, 10);
 
-/** Minor-unit digits of a currency (2 for NGN, GHS, KES and USD; 0 for JPY). */
-const digitsOf = (currency: string) => new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-
-/** Rates for reporting: the reference (mid-market) rate, else Flutterwave's offered rate. Never the charged rate. */
-const rateSources = ['open_exchange_rates', 'flutterwave'];
-
 /** The admin dashboard: sales and orders by currency, money held for resellers, supplier health and what needs attention. */
 @Injectable()
 export class AdminOverviewService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adapters: SupplierAdapters,
+    private readonly fx: FxService,
   ) {}
 
   async overview(input: { days: number; mode: LedgerMode }, now = new Date()) {
@@ -154,30 +150,18 @@ export class AdminOverviewService {
       float: Array<{ currency: string; _sum: { balanceMinor: bigint | null } }>;
     },
   ) {
-    const others = currencies.filter(currency => currency !== 'USD');
-    const rows = others.length ? await this.prisma.exchangeRate.findMany({ where: { currency: { in: others }, source: { in: rateSources } } }) : [];
-    const rates = new Map<string, { unitsPerUsd: number; fetchedAt: Date }>([['USD', { unitsPerUsd: 1, fetchedAt: new Date(0) }]]);
-    for (const source of [...rateSources].reverse()) {
-      for (const row of rows.filter(item => item.source === source)) rates.set(row.currency, { unitsPerUsd: row.unitsPerUsd.toNumber(), fetchedAt: row.fetchedAt });
-    }
-    const unconverted = currencies.filter(currency => !rates.has(currency));
-    const toCents = (amount: bigint, currency: string) => {
-      const rate = rates.get(currency);
-      return rate ? Math.round((Number(amount) / 10 ** digitsOf(currency) / rate.unitsPerUsd) * 100) : 0;
-    };
-    const used = others.filter(currency => rates.has(currency)).map(currency => rates.get(currency)!.fetchedAt.getTime());
-
+    const { toUsdCents, unconverted, ratesAsOf } = await this.fx.reportingRates(currencies);
     const total = { gross: 0, orders: 0, previous_gross: 0, previous_orders: 0 };
     for (const [currency, item] of data.totals) {
-      total.gross += toCents(item.gross, currency);
-      total.previous_gross += toCents(item.previousGross, currency);
+      total.gross += toUsdCents(item.gross, currency);
+      total.previous_gross += toUsdCents(item.previousGross, currency);
       total.orders += item.orders;
       total.previous_orders += item.previousOrders;
     }
     return {
       currency: 'USD' as const,
       /** The oldest rate used, so the dashboard can say how current the conversion is (null when only USD was involved). */
-      rates_as_of: used.length ? new Date(Math.min(...used)).toISOString() : null,
+      rates_as_of: ratesAsOf?.toISOString() ?? null,
       unconverted,
       total,
       series: data.dates.map(date => {
@@ -186,12 +170,12 @@ export class AdminOverviewService {
         for (const [currency, byDay] of data.points) {
           const point = byDay.get(date);
           if (!point) continue;
-          gross += toCents(point.gross, currency);
+          gross += toUsdCents(point.gross, currency);
           orders += point.orders;
         }
         return { date, gross, orders };
       }),
-      wallet_float: data.float.reduce((sum, row) => sum + toCents(row._sum.balanceMinor ?? 0n, row.currency), 0),
+      wallet_float: data.float.reduce((sum, row) => sum + toUsdCents(row._sum.balanceMinor ?? 0n, row.currency), 0),
     };
   }
 }

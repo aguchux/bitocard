@@ -1325,6 +1325,7 @@ model Supplier {
   updatedAt            DateTime          @updatedAt @map("updated_at")
   markets              SupplierMarket[]
   products             SupplierProduct[]
+  fundingMovements     SupplierFundingMovement[]
 
   @@map("suppliers")
 }
@@ -3216,6 +3217,40 @@ model ReserveMovement {
 
   @@index([status, createdAt])
   @@map("reserve_movements")
+}
+
+/// Money an admin recorded as sent to a supplier outside BitoCard (a bank transfer to its account): funds
+/// `supplier_float`, confirmed by a code emailed to the admin who asked, exactly like a reserve movement.
+model SupplierFundingMovement {
+  id            String     @id @default(uuid()) @db.Uuid
+  /// Shown as SF-000123.
+  number        Int        @unique @default(autoincrement())
+  mode          LedgerMode
+  supplierCode  String     @map("supplier_code")
+  /// The supplier's cost currency.
+  currency      String     @db.VarChar(10)
+  amount        BigInt
+  /// What the money was for, and (when given) the bank transfer's own reference. Recorded in the activity log.
+  reason        String
+  /// awaiting_code, completed or cancelled.
+  status        String     @default("awaiting_code")
+  requestedBy   String     @map("requested_by") @db.Uuid
+  cancelledBy   String?    @map("cancelled_by") @db.Uuid
+  codeHash      String?    @map("code_hash")
+  codeExpiresAt DateTime?  @map("code_expires_at")
+  codeAttempts  Int        @default(0) @map("code_attempts")
+  codeSentAt    DateTime?  @map("code_sent_at")
+  /// Codes sent for this request (capped, so resends cannot give unlimited guesses).
+  codeSends     Int        @default(1) @map("code_sends")
+  entryId       String?    @map("entry_id") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  completedAt   DateTime?  @map("completed_at")
+  supplier      Supplier   @relation(fields: [supplierCode], references: [code], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([supplierCode])
+  @@map("supplier_funding_movements")
 }
 
 model CryptoWithdrawal {

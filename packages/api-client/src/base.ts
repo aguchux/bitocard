@@ -128,6 +128,8 @@ export const tagTypes = [
   'Verification',
   'Order',
   'Supplier',
+  'SupplierFunding',
+  'Report',
   'Product',
   'PricingRule',
   'Switch',

@@ -486,3 +486,5 @@ export * from './top-ups';
 export * from './vpn';
 export * from './exchange';
 export * from './domains';
+export * from './reports';
+export * from './supplier-funding';

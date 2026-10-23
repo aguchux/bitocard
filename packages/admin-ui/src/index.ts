@@ -19,3 +19,4 @@ export { searchDelayMs, useDebouncedValue } from './ui/hooks';
 export { StoreCustomersTable, StoreCustomerView, type StoreCustomerDetailView, type StoreCustomerPurchase, type StoreCustomerRow } from './ui/store-customers';
 export { ImageViewer, KycCaseActions, KycCaseView, kycCanDecide, useKycDocuments, type KycDocumentFetcher } from './ui/kyc-review';
 export { ManualTopUpsList, resendWait, topUpProblems, topUpSourceLabels, WalletTopUpDialog } from './ui/top-up';
+export { DateRangePicker, defaultDateRange, type DateRange } from './ui/date-range-picker';

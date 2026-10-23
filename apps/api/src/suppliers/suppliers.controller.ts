@@ -1,12 +1,14 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
+import type { ConfirmMethod } from '../auth/confirm-methods.js';
 import { adminId, ParseCategoryPipe } from '../countries/countries.controller.js';
 import { productCategories } from '../countries/countries.service.js';
-import type { ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
+import type { LedgerMode, ProductCategory, SupplierStatus } from '../generated/prisma/client.js';
 import { PageDto } from '../ledger/wallet.controller.js';
+import { SupplierFundingService } from './supplier-funding.service.js';
 import { SuppliersService } from './suppliers.service.js';
 
 const statuses = ['mvp_live', 'mvp_qualify', 'pilot', 'later', 'backup'] as const;
@@ -80,17 +82,86 @@ class UpdateOfferDto {
   @IsOptional() @IsBoolean() available?: boolean;
 }
 
+class FundingModeDto extends PageDto {
+  @IsOptional() @IsIn(['test', 'live']) mode?: LedgerMode;
+}
+
+class FundingFilterDto extends FundingModeDto {
+  @IsOptional() @Matches(/^[a-z0-9_]{2,40}$/) supplier_code?: string;
+  @IsOptional() @IsIn(['awaiting_code', 'completed', 'cancelled']) status?: string;
+}
+
+class FloatTrackingDto {
+  @IsIn(['test', 'live'])
+  mode: LedgerMode;
+
+  @IsDateString()
+  from: string;
+
+  @IsDateString()
+  to: string;
+}
+
+class RequestFundingDto {
+  @IsIn(['test', 'live'])
+  mode: LedgerMode;
+
+  @Matches(/^[a-z0-9_]{2,40}$/, { message: 'supplier_code must be a supplier code' })
+  supplier_code: string;
+
+  @IsOptional() @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value)) @Matches(/^[A-Z]{3}$/)
+  currency?: string;
+
+  /** Minor units of the funding currency. */
+  @IsInt() @Min(1) @Max(1_000_000_000_00)
+  amount: number;
+
+  @IsString() @Length(5, 300)
+  reason: string;
+}
+
+class ConfirmFundingDto {
+  @Matches(/^\d{6}$/, { message: 'code must be the 6-digit code from your authenticator app or the email' })
+  code: string;
+
+  @IsOptional() @IsIn(['authenticator', 'email'])
+  method?: ConfirmMethod;
+}
+
 /** Supplier registry, markets, catalogue sync and product mapping. Admin only; never in the public API description. */
 @ApiExcludeController()
 @RealmOnly('admin')
 @Controller('admin')
 export class AdminSuppliersController {
-  constructor(private readonly suppliers: SuppliersService) {}
+  constructor(
+    private readonly suppliers: SuppliersService,
+    private readonly funding: SupplierFundingService,
+  ) {}
 
   @AdminRoles('operations', 'finance')
   @Get('suppliers')
   list() {
     return this.suppliers.list();
+  }
+
+  // Static paths under `suppliers/` must be registered before `suppliers/:code`, or that route would catch them.
+  /** Funded, drawn down (`cost_of_sales` over the period) and remaining, per supplier and currency. */
+  @AdminRoles('finance', 'operations')
+  @Get('suppliers/float')
+  float(@Query() query: FloatTrackingDto) {
+    return this.funding.floatTracking({ mode: query.mode, from: new Date(query.from), to: new Date(query.to) });
+  }
+
+  @AdminRoles('finance', 'operations')
+  @Get('suppliers/funding')
+  listFunding(@Query() query: FundingFilterDto) {
+    return this.funding.list(query);
+  }
+
+  @AdminRoles('finance', 'operations')
+  @Get('suppliers/funding/:id')
+  getFunding(@Param('id', ParseUUIDPipe) id: string) {
+    return this.funding.get(id);
   }
 
   @AdminRoles('operations', 'finance')
@@ -150,5 +221,33 @@ export class AdminSuppliersController {
   @Patch('supplier-products/:id')
   updateOffer(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateOfferDto) {
     return this.suppliers.updateOffer(adminId(caller), id, body);
+  }
+
+  /** Emails a code to the signed-in admin; nothing is recorded until it is confirmed. */
+  @AdminRoles('finance')
+  @Post('suppliers/funding')
+  requestFunding(@CurrentCaller() caller: Caller, @Body() body: RequestFundingDto) {
+    return this.funding.request(adminId(caller)!, { mode: body.mode, supplierCode: body.supplier_code, currency: body.currency, amount: body.amount, reason: body.reason });
+  }
+
+  @AdminRoles('finance')
+  @Post('suppliers/funding/:id/confirm')
+  @HttpCode(HttpStatus.OK)
+  confirmFunding(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ConfirmFundingDto) {
+    return this.funding.confirm(adminId(caller)!, id, body.code, body.method);
+  }
+
+  @AdminRoles('finance')
+  @Post('suppliers/funding/:id/resend-code')
+  @HttpCode(HttpStatus.OK)
+  resendFundingCode(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.funding.resendCode(adminId(caller)!, id);
+  }
+
+  @AdminRoles('finance')
+  @Post('suppliers/funding/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancelFunding(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.funding.cancel(adminId(caller)!, id);
   }
 }

@@ -29,6 +29,9 @@ export type FxRate = {
 export const conversionUnavailable = (currency: string) =>
   new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'conversion_unavailable', `Conversions to and from ${currency} are paused. Try again later.`);
 
+/** Minor-unit digits of a currency (2 for NGN, GHS, KES and USD; 0 for JPY). */
+const digitsOf = (currency: string) => new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
+
 /**
  * Exchange rates. Open Exchange Rates is the reference, checked against the rates Flutterwave offers. Conversions
  * use the less favourable of the two plus an admin-set margin, so movements between quote and settlement never
@@ -166,6 +169,34 @@ export class FxService {
     const rates = await this.freshRates(currency);
     if (rates.length === 0) throw conversionUnavailable(currency);
     return rates.reduce((sum, rate) => sum.plus(rate.unitsPerUsd), new Decimal(0)).div(rates.length);
+  }
+
+  /**
+   * Reference rates for reporting (dashboards, P&L, growth): the latest `open_exchange_rates` rate, else
+   * Flutterwave's, never the charged `pay`/`receive` rate and never blocked by a paused currency. A currency with no
+   * fresh rate is left out of `toUsdCents` (returns 0) and listed in `unconverted`, so one stale market never fails
+   * a whole report.
+   */
+  async reportingRates(currencies: string[]) {
+    const others = [...new Set(currencies)].filter(currency => currency !== 'USD');
+    const rows = others.length ? await this.prisma.exchangeRate.findMany({ where: { currency: { in: others }, source: { in: [...rateSources] } } }) : [];
+    const rates = new Map<string, { unitsPerUsd: number; fetchedAt: Date }>([['USD', { unitsPerUsd: 1, fetchedAt: new Date(0) }]]);
+    // Earlier sources first, so a later one in the list (the reference rate) wins when both have a row.
+    for (const source of [...rateSources].reverse()) {
+      for (const row of rows.filter(item => item.source === source)) rates.set(row.currency, { unitsPerUsd: row.unitsPerUsd.toNumber(), fetchedAt: row.fetchedAt });
+    }
+    const unconverted = others.filter(currency => !rates.has(currency));
+    const used = others.filter(currency => rates.has(currency)).map(currency => rates.get(currency)!.fetchedAt.getTime());
+    return {
+      unconverted,
+      /** The oldest rate used, so a report can say how current its conversion is (null when only USD was involved). */
+      ratesAsOf: used.length ? new Date(Math.min(...used)) : null,
+      /** Minor units of `currency` to whole US cents; 0 for a currency with no fresh rate. */
+      toUsdCents: (amount: bigint, currency: string) => {
+        const rate = rates.get(currency);
+        return rate ? Math.round((Number(amount) / 10 ** digitsOf(currency) / rate.unitsPerUsd) * 100) : 0;
+      },
+    };
   }
 
   /** What to charge in `currency` (minor units, rounded up) for a price in US cents. Returns the rate used. */

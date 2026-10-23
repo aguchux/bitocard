@@ -446,6 +446,22 @@ export function reserveMovementCodeEmail(to: string, input: { code: string; numb
   };
 }
 
+/** The code an admin enters to confirm money sent to a supplier outside BitoCard (funding its float). */
+export function supplierFundingCodeEmail(to: string, input: { code: string; number: string; amount: string; supplier: string; sandbox: boolean }): EmailMessage {
+  return {
+    to,
+    subject: `${input.code} confirms ${input.number}: fund ${input.supplier}${input.sandbox ? ' (sandbox)' : ''}`,
+    ...layout(
+      `Confirm supplier funding ${input.number}`,
+      [
+        `Enter this code in the admin app to record ${input.amount} sent to ${input.supplier}${input.sandbox ? ' (sandbox)' : ''}. It expires in 10 minutes.`,
+        'Nothing is recorded until the code is entered. If you did not ask for this, do not share the code: change your password and tell a super admin.',
+      ],
+      input.code,
+    ),
+  };
+}
+
 /** The code that confirms a crypto withdrawal, naming exactly what it sends and where (under the store's name). */
 export function cryptoWithdrawalCodeEmail(to: string, input: { store: string; code: string; amount: string; asset: string; network: string; address: string }): EmailMessage {
   const heading = 'Confirm your crypto withdrawal';

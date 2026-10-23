@@ -142,6 +142,7 @@ export const notificationTypes = {
   'admin.crypto.custody_shortfall': { realm: 'admin', roles: ['finance', 'operations'], severity: 'critical', label: 'Crypto custody shortfall' },
   'admin.crypto.deposit_stuck': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Crypto deposit cannot be settled' },
   'admin.wallet.manual_top_up': { realm: 'admin', roles: ['finance'], severity: 'info', label: 'Wallet topped up by hand' },
+  'admin.supplier.funded': { realm: 'admin', roles: ['finance', 'operations'], severity: 'info', label: 'Supplier funded by hand' },
   'admin.exchange.reserve_low': { realm: 'admin', roles: ['finance', 'operations'], severity: 'warning', label: 'Exchange reserve running low' },
   'admin.exchange.price_divergence': { realm: 'admin', roles: ['operations'], severity: 'warning', label: 'Exchange price sources disagree' },
 

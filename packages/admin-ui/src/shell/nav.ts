@@ -1,6 +1,6 @@
-import { AlertTriangle, Crown, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, Truck, Users, Zap, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Crown, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, Zap, type LucideIcon } from 'lucide-react';
 
-export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'support' | 'settings';
+export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'reports' | 'support' | 'settings';
 
 export type NavItem<K extends string = SectionKey> = { key: K; label: string; href: string; icon: LucideIcon };
 
@@ -14,6 +14,7 @@ export const sections: NavItem[] = [
   { key: 'activity', label: 'Activity', href: '/activity', icon: History },
   { key: 'storefront', label: 'Storefront', href: '/storefront', icon: LayoutGrid },
   { key: 'crypto', label: 'Crypto', href: '/crypto', icon: Coins },
+  { key: 'reports', label: 'Reports', href: '/reports', icon: TrendingUp },
   { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy },
   { key: 'settings', label: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -103,6 +104,15 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Spin rewards', href: '/crypto/spins', icon: Gift },
       { label: 'Chains', href: '/crypto/chains', icon: PlugZap },
       { label: 'Assets', href: '/crypto/assets', icon: Coins },
+    ],
+  },
+  reports: {
+    title: 'Reports',
+    items: [
+      { label: 'P&L', href: '/reports', icon: ChartNoAxesColumn },
+      { label: 'Growth', href: '/reports/growth', icon: TrendingUp },
+      { label: 'Supplier funding', href: '/reports/suppliers', icon: Wallet },
+      { label: 'Statements', href: '/reports/statements', icon: ReceiptText },
     ],
   },
   settings: {
