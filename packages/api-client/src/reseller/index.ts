@@ -21,3 +21,4 @@ export * from './vpn';
 export * from './disputes';
 export * from './support';
 export * from '../support-bots';
+export * from './reports';

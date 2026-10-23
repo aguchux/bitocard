@@ -29,6 +29,7 @@ import {
   Package,
   Percent,
   Phone,
+  PieChart,
   Plug,
   ReceiptText,
   Settings,
@@ -36,6 +37,7 @@ import {
   Sparkles,
   Store,
   type LucideIcon,
+  TrendingUp,
   UserCog,
   Users,
   Globe,
@@ -43,7 +45,7 @@ import {
   Webhook,
 } from "lucide-react";
 
-export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "exchange" | "store" | "support" | "integrations" | "developers" | "team" | "settings";
+export type ShqSection = "home" | "orders" | "catalogue" | "wallet" | "exchange" | "store" | "reports" | "support" | "integrations" | "developers" | "team" | "settings";
 export type ShqNavItem = { key: ShqSection; label: string; href: string; icon: LucideIcon };
 export type ShqSubNavItem = { label: string; href: string; icon?: LucideIcon };
 
@@ -55,6 +57,7 @@ export const sections: ShqNavItem[] = [
   { key: "wallet", label: "Wallet", href: "/wallet", icon: Wallet },
   { key: "exchange", label: "Exchange", href: "/exchange", icon: ArrowLeftRight },
   { key: "store", label: "Store", href: "/store", icon: Store },
+  { key: "reports", label: "Reports", href: "/reports", icon: PieChart },
   { key: "support", label: "Support", href: "/support", icon: LifeBuoy },
   { key: "integrations", label: "Integrations", href: "/integrations", icon: Plug },
   { key: "developers", label: "Developers", href: "/developers", icon: Code2 },
@@ -116,6 +119,14 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Your stores", href: "/store", icon: Store },
       { label: "Customers", href: "/store/customers", icon: Users },
       { label: "Domains", href: "/store/domains", icon: Globe },
+    ],
+  },
+  reports: {
+    title: "Reports",
+    items: [
+      { label: "P&L", href: "/reports", icon: PieChart },
+      { label: "Growth", href: "/reports/growth", icon: TrendingUp },
+      { label: "Statements", href: "/reports/statements", icon: ReceiptText },
     ],
   },
   support: {
