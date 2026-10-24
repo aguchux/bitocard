@@ -176,7 +176,8 @@ describe('Startup, Premium and Enterprise', () => {
     assert.equal(overview.plans[0].name, 'Startup');
     const enterprise = overview.plans.find(plan => plan.code === 'enterprise');
     assert.deepEqual([enterprise.available, enterprise.free], [false, false]);
-    assert.deepEqual(enterprise.features, overview.features.map(feature => feature.code), 'every feature');
+    // Every feature, in any order (features added to it later by migration, such as white_label, come back last).
+    assert.deepEqual([...enterprise.features].sort(), overview.features.map(feature => feature.code).sort(), 'every feature');
     assert.ok(Object.values(enterprise.limits).every(value => value === null), 'no limits');
     assert.ok(!(await client(server.base).get('/v1/plans')).json.data.some(plan => plan.code === 'enterprise'), 'hidden from resellers');
     // An admin can still put a reseller on it while hidden, and resellers see it once shown.
