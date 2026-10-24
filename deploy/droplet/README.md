@@ -25,7 +25,7 @@ visitor ──https──▶ Cloudflare (proxied, Full (strict)) ──https─�
 ## 1. Create the droplet
 
 - **Image:** Ubuntu 24.04 LTS. **Region:** NYC3, the nearest to the Neon database (AWS us-east-2).
-- **Size:** Basic, 2 vCPU / 4 GB to start. Resize later without changing anything else.
+- **Size:** Basic, 1 vCPU / 2 GB / 50 GB to start (the stack uses about 250 MB; images are built in CI, never on the droplet). Grow it with **Resize > CPU and RAM only**: it keeps the disk and the IP address, and can be undone. A disk resize cannot.
 - **SSH key:** your own, for root.
 - Turn on **monitoring** and **backups** (weekly snapshots).
 - Its public IPv4 address is the API's fixed outgoing address. Give it to suppliers who allowlist callers (Remita,
