@@ -1,6 +1,5 @@
-// Smoke tests against a running API: a Vercel deployment or the local Docker API.
+// Smoke tests against a running API: production (each droplet deploy runs it) or the local Docker API.
 //   node scripts/smoke.mjs https://api.bitocard.com
-// Protected Vercel previews need VERCEL_AUTOMATION_BYPASS_SECRET in the environment.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -9,8 +8,7 @@ if (!base) {
   console.error('Usage: node scripts/smoke.mjs <base-url>');
   process.exit(2);
 }
-const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-const get = path => fetch(`${base}${path}`, { headers: bypass ? { 'x-vercel-protection-bypass': bypass } : {} });
+const get = path => fetch(`${base}${path}`);
 
 test(`health is ok and the database is reachable (${base})`, async () => {
   const res = await get('/health');
@@ -78,7 +76,7 @@ test('wallets, provider webhooks and scheduled jobs refuse unauthenticated calls
   assert.equal((await get('/v1/webhook-endpoints')).status, 401);
   const webhook = await fetch(`${base}/v1/webhooks/flutterwave`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', ...(bypass ? { 'x-vercel-protection-bypass': bypass } : {}) },
+    headers: { 'content-type': 'application/json' },
     body: '{}',
   });
   assert.equal(webhook.status, 401);
