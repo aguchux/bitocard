@@ -6,6 +6,7 @@ import type { LedgerMode } from '../generated/prisma/client.js';
 import { FlutterwaveProvider } from './flutterwave.provider.js';
 import { MonnifyProvider } from './monnify.provider.js';
 import { PawapayPaymentsProvider } from './pawapay.provider.js';
+import { PaystackProvider } from './paystack.provider.js';
 import type { CheckoutProvider, ReservedAccountProvider, TransferProvider } from './providers.js';
 import { SandboxProvider } from './sandbox.provider.js';
 import { type MobileMoneyPayouts, PawapayPayouts, SandboxMobileMoney } from '../payouts/mobile-money.js';
@@ -17,6 +18,7 @@ export const paymentGateways = {
   flutterwave: { name: 'Flutterwave', label: 'Card, bank or mobile money', description: 'Cards, bank transfer, USSD and mobile money where available' },
   monnify: { name: 'Monnify', label: 'Bank transfer or card', description: 'Nigerian bank transfer, USSD or card' },
   pawapay: { name: 'pawaPay', label: 'Mobile money', description: 'Approve the payment on your phone with your mobile money provider' },
+  paystack: { name: 'Paystack', label: 'Card, bank or USSD', description: 'Cards, bank transfer, USSD and mobile money where available' },
 } as const;
 export type PaymentGateway = keyof typeof paymentGateways;
 export const isPaymentGateway = (value: string): value is PaymentGateway => Object.hasOwn(paymentGateways, value);
@@ -37,6 +39,7 @@ export class PaymentProviders {
     monnify: MonnifyProvider | null;
     stripe: StripeProvider | null;
     pawapay: PawapayPaymentsProvider | null;
+    paystack: PaystackProvider | null;
   };
 
   constructor(private readonly integrations: IntegrationsService) {
@@ -54,6 +57,7 @@ export class PaymentProviders {
             : null,
         stripe: config.STRIPE_SECRET_KEY && !inSandbox(settings, 'stripe') && this.liveKey('stripe', config.STRIPE_SECRET_KEY) ? new StripeProvider(config.STRIPE_SECRET_KEY, config.STRIPE_API_URL, config.STRIPE_WEBHOOK_SECRET, config.STRIPE_TAX_CODE) : null,
         pawapay: config.PAWAPAY_API_TOKEN && !inSandbox(settings, 'pawapay') ? new PawapayPaymentsProvider(config.PAWAPAY_API_TOKEN, config.PAWAPAY_API_URL, config.PAWAPAY_CALLBACK_TOKEN) : null,
+        paystack: config.PAYSTACK_SECRET_KEY && !inSandbox(settings, 'paystack') && this.liveKey('paystack', config.PAYSTACK_SECRET_KEY) ? new PaystackProvider(config.PAYSTACK_SECRET_KEY, config.PAYSTACK_API_URL) : null,
       };
     });
   }
@@ -86,6 +90,10 @@ export class PaymentProviders {
     return this.clients().pawapay;
   }
 
+  get paystack() {
+    return this.clients().paystack;
+  }
+
   /** A gateway set up for live payments (credentials set, not switched to its sandbox), or null. */
   live(gateway: string): CheckoutProvider | null {
     if (!isPaymentGateway(gateway)) return null;
@@ -105,6 +113,7 @@ export class PaymentProviders {
     const config = urlsFor(this.integrations.config, 'live');
     if (gateway === 'stripe' && credentials.secret_key) return new StripeProvider(credentials.secret_key, config.STRIPE_API_URL, credentials.webhook_secret || undefined);
     if (gateway === 'flutterwave' && credentials.secret_key) return new FlutterwaveProvider(credentials.secret_key, config.FLUTTERWAVE_API_URL, credentials.webhook_hash || undefined);
+    if (gateway === 'paystack' && credentials.secret_key) return new PaystackProvider(credentials.secret_key, config.PAYSTACK_API_URL);
     if (gateway === 'monnify' && credentials.api_key && credentials.secret_key && credentials.contract_code) {
       return new MonnifyProvider(credentials.api_key, credentials.secret_key, credentials.contract_code, config.MONNIFY_API_URL);
     }

@@ -1,11 +1,11 @@
-// Payment methods per market (wallet top-ups and customer checkout), the Stripe, pawaPay and Monnify payment pages,
+// Payment methods per market (wallet top-ups and customer checkout), the Stripe, pawaPay, Monnify and Paystack payment pages,
 // store customer accounts, and checkout on bitocard.com: a customer pays first, the order is placed only once the
 // payment is confirmed, its cost is held from what they paid, and a failed order refunds them to how they paid.
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { adminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
-import { fakeFlutterwave, fakeMonnify, fakePawapay, fakeStripe } from './fakes.mjs';
+import { fakeFlutterwave, fakeMonnify, fakePawapay, fakePaystack, fakeStripe } from './fakes.mjs';
 
 const { EmailService } = await import('../dist/notifications/email.service.js');
 
@@ -16,10 +16,11 @@ let stripe;
 let pawapay;
 let monnify;
 let flw;
+let paystack;
 
 before(async () => {
-  [stripe, pawapay, monnify, flw] = await Promise.all([fakeStripe(), fakePawapay(), fakeMonnify(), fakeFlutterwave()]);
-  server = await startApp({ env: { ...stripe.env, ...pawapay.env, ...monnify.env, ...flw.env, CRON_SECRET: 'cron-secret' } });
+  [stripe, pawapay, monnify, flw, paystack] = await Promise.all([fakeStripe(), fakePawapay(), fakeMonnify(), fakeFlutterwave(), fakePaystack()]);
+  server = await startApp({ env: { ...stripe.env, ...pawapay.env, ...monnify.env, ...flw.env, ...paystack.env, CRON_SECRET: 'cron-secret' } });
   prisma = server.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
   // Paying at checkout (customer wallets, on by default, are tested in customer-wallets.test.mjs).
   await prisma.featureSwitch.create({ data: { key: 'customer_wallets', enabled: false } });
@@ -36,7 +37,7 @@ before(async () => {
 
 after(async () => {
   await server?.close();
-  await Promise.all([stripe?.close(), pawapay?.close(), monnify?.close(), flw?.close()]);
+  await Promise.all([stripe?.close(), pawapay?.close(), monnify?.close(), flw?.close(), paystack?.close()]);
 });
 
 async function verifiedReseller(options) {
@@ -277,6 +278,49 @@ describe('wallet top-ups through each gateway', () => {
     const cron = await fetch(`${server.base}/v1/cron/payments`, { headers: { authorization: 'Bearer cron-secret' } });
     assert.equal(cron.status, 200);
     assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 1_200_000);
+  });
+
+  test('Paystack: its payment page, settled from a signed notification or by the scheduled check', async () => {
+    const before = (await admin.get('/v1/admin/countries/NG/payment-methods')).json.wallet_top_up.filter(row => row.enabled).map(row => row.gateway);
+    assert.equal((await setMethods('NG', 'wallet_top_up', [...before, 'paystack'])).status, 200);
+    try {
+      const reseller = await verifiedReseller();
+      const offered = (await reseller.browser.get('/v1/wallet/payment-methods')).json.data.find(method => method.id === 'paystack');
+      assert.deepEqual([offered?.label, offered?.description], ['Card, bank or USSD', 'Cards, bank transfer, USSD and mobile money where available']);
+
+      const created = await reseller.browser.post('/v1/wallet/top-ups', { amount: 1_000_000, method: 'paystack' });
+      assert.equal(created.status, 201, JSON.stringify(created.json));
+      assert.match(created.json.checkout_url, /^https:\/\/checkout\.paystack\.com\//);
+      const payment = await prisma.payment.findUniqueOrThrow({ where: { id: created.json.id } });
+      const tx = paystack.state.transactions[payment.reference.replaceAll('_', '.')];
+      assert.deepEqual([tx.amount, tx.currency], [1_000_000, 'NGN'], 'in kobo, under Paystack’s form of our reference');
+
+      const notify = (body, secret = 'sk_live_fake') => {
+        const raw = JSON.stringify(body);
+        return fetch(`${server.base}/v1/webhooks/paystack`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-paystack-signature': createHmac('sha512', secret).update(raw).digest('hex') },
+          body: raw,
+        });
+      };
+      const paid = { event: 'charge.success', data: { reference: tx.reference, amount: 99_999_999 } };
+      Object.assign(tx, { status: 'success', fees: 15_000 });
+      assert.equal((await notify(paid, 'sk_live_other')).status, 401, 'signed with another key');
+      assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 0);
+      assert.equal((await notify(paid)).status, 200);
+      assert.equal((await notify(paid)).status, 200, 'a repeat is harmless');
+      assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 1_000_000, 'what Paystack says was paid, credited once, never the notification’s amount');
+      const settled = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      assert.deepEqual([settled.status, settled.feeMinor, settled.providerTransactionId], ['succeeded', 15_000n, String(tx.id)]);
+
+      const later = await reseller.browser.post('/v1/wallet/top-ups', { amount: 200_000, method: 'paystack' });
+      const unnotified = await prisma.payment.update({ where: { id: later.json.id }, data: { createdAt: new Date(Date.now() - 5 * 60_000) } });
+      paystack.state.transactions[unnotified.reference.replaceAll('_', '.')].status = 'success';
+      assert.equal((await fetch(`${server.base}/v1/cron/payments`, { headers: { authorization: 'Bearer cron-secret' } })).status, 200);
+      assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 1_200_000);
+    } finally {
+      await setMethods('NG', 'wallet_top_up', before);
+    }
   });
 
   test('money paid for another amount, or after the payment closed, is never credited: finance is told and it is refunded', async () => {

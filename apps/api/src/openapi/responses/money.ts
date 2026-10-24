@@ -149,7 +149,7 @@ const PaymentMethod = objectSchema(
   'PaymentMethod',
   {
     object: constant('payment_method'),
-    id: oneOf('Pass it as `method` when topping up.', ['stripe', 'flutterwave', 'monnify', 'pawapay']),
+    id: oneOf('Pass it as `method` when topping up.', ['stripe', 'flutterwave', 'monnify', 'pawapay', 'paystack']),
     label: str('What payers see, for example `Card` or `Mobile money`.'),
     description: str('A line explaining it.'),
     networks: array(str('A mobile money network, as payers know it.'), 'Mobile money methods: the networks payers in your country can pay from (for example `MTN` or `Telecel`), from the payment provider. Empty for cards and bank transfer.'),

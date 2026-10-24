@@ -153,6 +153,11 @@ export const configSchema = z.object({
     .optional(),
   /** on: the test secret key (sk_test_…) for checks only; Stripe is never used for live payments. */
   STRIPE_SANDBOX: flag.prefault('off'),
+  /** Paystack: payment pages (card, bank, USSD, mobile money). Test keys (sk_test_…) use the same address; PAYSTACK_SANDBOX marks them as test keys. */
+  PAYSTACK_SECRET_KEY: z.string().optional(),
+  PAYSTACK_API_URL: z.string().url().default('https://api.paystack.co'),
+  /** on: the test secret key (sk_test_…) for checks only; Paystack is never used for live payments. */
+  PAYSTACK_SANDBOX: flag.prefault('off'),
   /** Where the payment page sends the payer back to when the caller gives no return_url. */
   PAYMENT_RETURN_URL: z.string().url().default('https://shq.bitocard.com/wallet'),
   /** on: customer checkout on bitocard.com runs in the sandbox (simulated payment pages and SANDBOX- codes), for testing before launch. */

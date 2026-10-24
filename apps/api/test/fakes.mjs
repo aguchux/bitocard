@@ -164,6 +164,48 @@ export async function fakeMonnify() {
   return { ...service, state, env: { MONNIFY_API_KEY: 'MK_TEST_fake', MONNIFY_SECRET_KEY: 'monnify-secret', MONNIFY_CONTRACT_CODE: '1234567890', MONNIFY_API_URL: service.url } };
 }
 
+/**
+ * Paystack. `state.transactions` maps Paystack's reference (dots for our underscores) to { id, reference, amount, currency,
+ * status, fees }: `abandoned` until a test pays it. `refunds` by ID, made with `state.refundStatus`. References with
+ * characters Paystack refuses (underscores) are refused, as Paystack does.
+ */
+export async function fakePaystack() {
+  const state = { transactions: {}, refunds: {}, refundStatus: 'processed', next: 4000 };
+  const ok = data => ({ body: { status: true, message: 'ok', data } });
+  const refused = (status, message) => ({ status, body: { status: false, message } });
+  const service = await fakeService(({ method, url, headers, body }) => {
+    const [path, search = ''] = url.split('?');
+    const query = new URLSearchParams(search);
+    if (!/^Bearer sk_(live|test)_/.test(headers.authorization ?? '')) return refused(401, 'Invalid key');
+    if (method === 'GET' && path === '/balance') return ok([{ currency: 'NGN', balance: 0 }]);
+    if (method === 'POST' && path === '/transaction/initialize') {
+      if (!/^[A-Za-z0-9.=-]+$/.test(body.reference ?? '')) return refused(400, 'Invalid transaction reference');
+      if (state.transactions[body.reference]) return refused(400, 'Duplicate Transaction Reference');
+      if (!/^\d+$/.test(String(body.amount))) return refused(400, 'Invalid amount');
+      const id = (state.next += 1);
+      state.transactions[body.reference] = { id, reference: body.reference, amount: Number(body.amount), currency: body.currency, status: 'abandoned', fees: null, gateway_response: null, body };
+      return ok({ authorization_url: `https://checkout.paystack.com/acc_${id}`, access_code: `acc_${id}`, reference: body.reference });
+    }
+    const verify = /^\/transaction\/verify\/(.+)$/.exec(path);
+    if (method === 'GET' && verify) {
+      const found = state.transactions[decodeURIComponent(verify[1])];
+      return found ? ok({ ...found, body: undefined }) : refused(400, 'Transaction reference not found');
+    }
+    if (method === 'POST' && path === '/refund') {
+      const tx = Object.values(state.transactions).find(item => String(item.id) === String(body.transaction) || item.reference === body.transaction);
+      if (!tx) return refused(404, 'Transaction not found');
+      const id = (state.next += 1);
+      state.refunds[id] = { id, transaction: tx.id, amount: Number(body.amount ?? tx.amount), currency: tx.currency, status: state.refundStatus };
+      return ok(state.refunds[id]);
+    }
+    if (method === 'GET' && path === '/refund') return ok(Object.values(state.refunds).filter(refund => !query.get('transaction') || String(refund.transaction) === query.get('transaction')));
+    const refund = /^\/refund\/(\d+)$/.exec(path);
+    if (method === 'GET' && refund) return state.refunds[refund[1]] ? ok(state.refunds[refund[1]]) : refused(404, 'Refund not found');
+    return refused(404, `Fake Paystack has no ${method} ${path}`);
+  });
+  return { ...service, state, env: { PAYSTACK_SECRET_KEY: 'sk_live_fake', PAYSTACK_API_URL: service.url } };
+}
+
 /** Open Exchange Rates latest.json. `state.rates` maps currency to units per USD. */
 export async function fakeOpenExchangeRates() {
   const state = { rates: {}, down: false };

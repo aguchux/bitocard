@@ -32,6 +32,8 @@ const addresses: Record<string, Address[]> = {
   flutterwave: [{ key: 'FLUTTERWAVE_API_URL', live: 'https://api.flutterwave.com/v3', sandbox: 'https://api.flutterwave.com/v3' }],
   // Stripe test keys (sk_test_â€¦) use the live address too.
   stripe: [{ key: 'STRIPE_API_URL', live: 'https://api.stripe.com', sandbox: 'https://api.stripe.com' }],
+  // Paystack test keys (sk_test_...) use the live address too.
+  paystack: [{ key: 'PAYSTACK_API_URL', live: 'https://api.paystack.co', sandbox: 'https://api.paystack.co' }],
 };
 
 /** Each integration's Sandbox switch. */
@@ -46,6 +48,7 @@ export const sandboxSwitches = {
   monnify: 'MONNIFY_SANDBOX',
   flutterwave: 'FLUTTERWAVE_SANDBOX',
   stripe: 'STRIPE_SANDBOX',
+  paystack: 'PAYSTACK_SANDBOX',
 } as const satisfies Record<string, keyof AppConfig>;
 
 type Config = Partial<Record<keyof AppConfig, unknown>>;
@@ -54,7 +57,7 @@ type Config = Partial<Record<keyof AppConfig, unknown>>;
  * Gateways that tell test from live by the key itself, at the same address: Flutterwave's FLWSECK_TEST-… and Stripe's
  * sk_test_…/rk_test_… keys. A test key must never be used for live payments, where test cards would credit real money.
  */
-const testKeyPatterns: Record<string, RegExp> = { flutterwave: /^FLWSECK_TEST/i, stripe: /^(sk|rk)_test_/ };
+const testKeyPatterns: Record<string, RegExp> = { flutterwave: /^FLWSECK_TEST/i, stripe: /^(sk|rk)_test_/, paystack: /^sk_test_/ };
 
 /** Whether the key is the gateway's test key (always false for gateways whose sandbox is a separate address). */
 export function isTestKey(id: string, key: string | undefined) {

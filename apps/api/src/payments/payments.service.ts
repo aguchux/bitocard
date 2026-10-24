@@ -65,7 +65,7 @@ export function presentTopUp(payment: Payment) {
     source: payment.purpose === 'reserved_account_deposit' ? ('bank_transfer' as const) : ('checkout' as const),
     amount: minor(payment.amountMinor),
     currency: payment.currency,
-    /** The gateway the payer used (`stripe`, `flutterwave`, `monnify`, `pawapay`; `sandbox` in test mode); bank transfers name the account's provider. */
+    /** The gateway the payer used (`stripe`, `flutterwave`, `monnify`, `pawapay`, `paystack`; `sandbox` in test mode); bank transfers name the account's provider. */
     method: payment.provider,
     checkout_url: payment.status === 'pending' ? payment.checkoutUrl : null,
     failure_reason: payment.failureReason,
@@ -923,7 +923,7 @@ export class PaymentsService {
 
   /**
    * A notification naming a payment by the provider's own ID (Stripe's session, pawaPay's deposit) or our reference
-   * (Monnify's paymentReference). It only says something happened: the payment is re-read from the provider.
+   * (Monnify's paymentReference, Paystack's reference). It only says something happened: the payment is re-read from the provider.
    */
   async paymentNotice(provider: string, by: { providerTransactionId?: string; reference?: string }) {
     const payment = by.providerTransactionId

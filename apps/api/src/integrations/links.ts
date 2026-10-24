@@ -37,6 +37,7 @@ export const integrationLinks: Record<string, IntegrationLink[]> = {
   google: [keys('https://console.cloud.google.com/apis/credentials', 'Google Cloud credentials'), docs('https://developers.google.com/identity/protocols/oauth2/web-server')],
   flutterwave: [signUp('https://app.flutterwave.com/register'), keys('https://app.flutterwave.com/dashboard/settings/apis'), docs('https://developer.flutterwave.com/')],
   stripe: [signUp('https://dashboard.stripe.com/register'), keys('https://dashboard.stripe.com/apikeys'), { label: 'Webhooks', url: 'https://dashboard.stripe.com/webhooks' }, docs('https://docs.stripe.com/api/checkout/sessions')],
+  paystack: [signUp('https://dashboard.paystack.com/#/signup'), keys('https://dashboard.paystack.com/#/settings/developers', 'API keys and webhooks'), docs('https://paystack.com/docs/api/transaction/')],
   monnify: [signUp('https://app.monnify.com/create-account'), keys('https://app.monnify.com/developer'), docs('https://developers.monnify.com/')],
   exchange_rates: [signUp('https://openexchangerates.org/signup'), keys('https://openexchangerates.org/account/app-ids', 'Get an App ID'), docs('https://docs.openexchangerates.org/')],
   didit: [signUp('https://business.didit.me/'), docs('https://docs.didit.me/')],

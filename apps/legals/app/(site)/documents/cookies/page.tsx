@@ -39,7 +39,7 @@ export default function CookieNotice() {
           </li>
         </ul>
         <p>We do not use local storage, pixels, fingerprinting or other tracking technologies on our websites, other than to remember on your own device choices you make in our dashboards (for example which account you were using).</p>
-        <p>When you pay for an order, you do so on the payment provider&apos;s own page (for example Stripe, Flutterwave, Monnify or pawaPay), which uses its own cookies under its own cookie notice.</p>
+        <p>When you pay for an order, you do so on the payment provider&apos;s own page (for example Stripe, Flutterwave, Monnify, Paystack or pawaPay), which uses its own cookies under its own cookie notice.</p>
         <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/documents/privacy">privacy notice</Link>. This does not involve cookies on your device. Visits to resellers&apos; stores are also counted without cookies (see the privacy notice): nothing is stored on your device, and nothing follows you across sites or days. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
       </Section>
 

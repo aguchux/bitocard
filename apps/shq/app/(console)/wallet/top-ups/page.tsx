@@ -28,6 +28,7 @@ const paidWith: Record<TopUp["method"], string> = {
   stripe: "Card",
   flutterwave: "Card, bank or mobile money",
   monnify: "Bank transfer or card",
+  paystack: "Card, bank or USSD",
   pawapay: "Mobile money",
   sandbox: "Sandbox",
 };

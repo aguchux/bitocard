@@ -1,6 +1,6 @@
 import { bitocardApi } from '../base';
 
-export type PaymentGateway = 'stripe' | 'flutterwave' | 'monnify' | 'pawapay';
+export type PaymentGateway = 'stripe' | 'flutterwave' | 'monnify' | 'pawapay' | 'paystack';
 export type PaymentMethodPurpose = 'wallet_top_up' | 'checkout';
 
 /** One gateway in a market, for one purpose. */

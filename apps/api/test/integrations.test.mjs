@@ -35,7 +35,7 @@ describe('integration settings', () => {
     assert.equal(status, 200);
     assert.deepEqual(
       json.data.filter(item => item.section === 'platform').map(item => item.id),
-      ['general', 'email', 'sms', 'sms_africas_talking', 'web_push', 'file_storage', 'kyc_storage', 'google', 'flutterwave', 'monnify', 'stripe', 'checkout', 'exchange_rates', 'anthropic', 'openai', 'deepseek', 'support_ai', 'github', 'domains', 'store_hosts', 'didit'],
+      ['general', 'email', 'sms', 'sms_africas_talking', 'web_push', 'file_storage', 'kyc_storage', 'google', 'flutterwave', 'monnify', 'stripe', 'paystack', 'checkout', 'exchange_rates', 'anthropic', 'openai', 'deepseek', 'support_ai', 'github', 'domains', 'store_hosts', 'didit'],
     );
     // Every supplier in the registry has a group (Flutterwave virtual cards use the Flutterwave keys; BitoCard's own stock needs none).
     const registry = await prisma.supplier.findMany({ select: { code: true } });

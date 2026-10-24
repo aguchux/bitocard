@@ -9,6 +9,7 @@ import { PayoutsService } from '../payouts/payouts.service.js';
 import { ChargebacksService } from './chargebacks.service.js';
 import { PaymentProviders } from './payment-providers.js';
 import { PaymentsService } from './payments.service.js';
+import { fromPaystackReference } from './paystack.provider.js';
 
 const untrusted = () => new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'signature_invalid', 'Webhook signature is missing or wrong.');
 
@@ -19,6 +20,8 @@ type MonnifyEvent = { eventType?: string; eventData?: { transactionReference?: s
 type StripeEvent = { type?: string; data?: { object?: { id?: string; object?: string } } };
 
 type PawapayDeposit = { depositId?: string };
+
+type PaystackEvent = { event?: string; data?: { reference?: string } };
 
 /**
  * Notifications from payment providers. Each is authenticated, then the result is re-read from the provider before
@@ -90,5 +93,16 @@ export class ProviderWebhooksController {
     if (!this.providers.pawapay?.callbackTrusted(token)) throw untrusted();
     if (!body.depositId) return { received: true };
     return { received: true, ...(await this.payments.paymentNotice('pawapay', { providerTransactionId: body.depositId })) };
+  }
+
+  /** Paystack: a successful charge, named by our reference (sent with dots for underscores), is re-read from Paystack. */
+  @Post('paystack')
+  @HttpCode(HttpStatus.OK)
+  async paystack(@Req() req: Request & { rawBody?: Buffer }, @Body() body: PaystackEvent) {
+    if (!this.providers.paystack?.webhookTrusted(req.rawBody, req.get('x-paystack-signature'))) throw untrusted();
+    if (body.event === 'charge.success' && body.data?.reference) {
+      return { received: true, ...(await this.payments.paymentNotice('paystack', { reference: fromPaystackReference(body.data.reference) })) };
+    }
+    return { received: true };
   }
 }

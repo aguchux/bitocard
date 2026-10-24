@@ -2461,7 +2461,7 @@ enum PaymentMethodPurpose {
 model PaymentMethod {
   countryCode String               @map("country_code") @db.Char(2)
   purpose     PaymentMethodPurpose
-  /// stripe, flutterwave, monnify or pawapay.
+  /// stripe, flutterwave, monnify, pawapay or paystack.
   gateway     String
   enabled     Boolean              @default(true)
   /// Lower first; the first offered is the default.

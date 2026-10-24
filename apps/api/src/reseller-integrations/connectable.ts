@@ -18,7 +18,7 @@ export type ConnectableField = {
 };
 
 /** The provider addresses checks use, already resolved for live or sandbox (`urlsFor`; tests point them at fakes). */
-type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL'>;
+type Urls = Pick<AppConfig, 'RELOADLY_AUTH_URL' | 'RELOADLY_TOPUPS_URL' | 'VTPASS_API_URL' | 'DIDWW_API_URL' | 'ZENDIT_API_URL' | 'PAWAPAY_API_URL' | 'REMITA_API_URL' | 'AFRICAS_TALKING_API_URL' | 'ESIM_ACCESS_API_URL' | 'FLUTTERWAVE_API_URL' | 'MONNIFY_API_URL' | 'STRIPE_API_URL' | 'PAYSTACK_API_URL'>;
 
 export type ConnectableIntegration = {
   /** Matches the platform integration group's id, so admins find both in one place. */
@@ -235,6 +235,22 @@ export const connectableIntegrations: ConnectableIntegration[] = [
       if (!login?.requestSuccessful) throw refused('monnify');
     },
     fromSettings: config => ({ api_key: config.MONNIFY_API_KEY, secret_key: config.MONNIFY_SECRET_KEY, contract_code: config.MONNIFY_CONTRACT_CODE }),
+  },
+  {
+    id: 'paystack',
+    kind: 'payment_gateway',
+    name: 'Paystack',
+    description: 'Card, bank transfer, USSD and mobile money checkout in Nigeria, Ghana, Kenya and South Africa, paid into your own Paystack account.',
+    fields: [secret('secret_key', 'Secret key', { help: 'Paystack dashboard > Settings > API Keys & Webhooks. Test keys (sk_test_…) are for the sandbox, live keys (sk_live_…) for live.' })],
+    check: async (values, urls, environment) => {
+      // Paystack decides test or live by the key itself (sk_test_… for test), at the same address.
+      if (isTestKey('paystack', values.secret_key) !== (environment === 'sandbox')) {
+        throw new ProviderError('paystack', environment === 'sandbox' ? 'a live key was given for the sandbox' : 'a test key was given for live', true);
+      }
+      const result = await providerRequest<{ status?: boolean }>('paystack', `${urls.PAYSTACK_API_URL}/balance`, { headers: { authorization: `Bearer ${values.secret_key}` } });
+      if (result?.status !== true) throw refused('paystack');
+    },
+    fromSettings: config => ({ secret_key: config.PAYSTACK_SECRET_KEY }),
   },
 ];
 

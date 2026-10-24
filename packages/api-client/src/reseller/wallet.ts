@@ -115,7 +115,7 @@ export type ExchangeRate = {
 export type TopUpStatus = 'pending' | 'succeeded' | 'failed';
 
 /** The payment gateways BitoCard offers per market. */
-export type PaymentGateway = 'stripe' | 'flutterwave' | 'monnify' | 'pawapay';
+export type PaymentGateway = 'stripe' | 'flutterwave' | 'monnify' | 'pawapay' | 'paystack';
 
 /** A way to pay that BitoCard offers in the reseller's market (`GET /v1/wallet/payment-methods`). */
 /** `networks`: the mobile money networks payers can pay from (MTN, Telecel…); empty for cards and bank. */

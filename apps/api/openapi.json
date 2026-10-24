@@ -38992,7 +38992,8 @@
               "stripe",
               "flutterwave",
               "monnify",
-              "pawapay"
+              "pawapay",
+              "paystack"
             ]
           },
           "return_url": {
@@ -40285,12 +40286,13 @@
           },
           "method": {
             "type": "string",
-            "description": "How it was paid: `stripe` (card), `flutterwave` (card, bank or mobile money), `monnify` (bank transfer or card), `pawapay` (mobile money), or `sandbox` in test mode. Bank transfers into a reserved account name the account’s provider.",
+            "description": "How it was paid: `stripe` (card), `flutterwave` (card, bank or mobile money), `monnify` (bank transfer or card), `pawapay` (mobile money), `paystack` (card, bank transfer or USSD), or `sandbox` in test mode. Bank transfers into a reserved account name the account’s provider.",
             "enum": [
               "stripe",
               "flutterwave",
               "monnify",
               "pawapay",
+              "paystack",
               "sandbox"
             ]
           },
@@ -45748,7 +45750,8 @@
               "stripe",
               "flutterwave",
               "monnify",
-              "pawapay"
+              "pawapay",
+              "paystack"
             ]
           },
           "label": {
@@ -53004,7 +53007,8 @@
               "esim_access",
               "flutterwave",
               "stripe",
-              "monnify"
+              "monnify",
+              "paystack"
             ]
           },
           "kind": {
@@ -53154,7 +53158,8 @@
               "esim_access",
               "flutterwave",
               "stripe",
-              "monnify"
+              "monnify",
+              "paystack"
             ]
           },
           "mode": {

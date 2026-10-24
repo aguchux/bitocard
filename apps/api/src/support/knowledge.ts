@@ -172,7 +172,7 @@ const refundText: Record<string, string> = {
   vpn: 'VPN access: a full refund within 14 days while the sign-in details were never shown; afterwards only if it cannot be made to work.',
 };
 
-const gatewayLabels: Record<string, string> = { stripe: 'card', flutterwave: 'card, bank transfer or mobile money', monnify: 'bank transfer or card', pawapay: 'mobile money' };
+const gatewayLabels: Record<string, string> = { stripe: 'card', flutterwave: 'card, bank transfer or mobile money', monnify: 'bank transfer or card', pawapay: 'mobile money', paystack: 'card, bank transfer or USSD' };
 
 export type StoreKnowledgeData = Awaited<ReturnType<StoreKnowledgeService['gather']>>;
 

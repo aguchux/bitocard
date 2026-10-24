@@ -75,6 +75,8 @@ const integrationKeyList = [
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_SANDBOX',
   'STRIPE_TAX_CODE',
+  'PAYSTACK_SECRET_KEY',
+  'PAYSTACK_SANDBOX',
   'CHECKOUT_SANDBOX',
   'OPEN_EXCHANGE_RATES_APP_ID',
   'FX_MAX_AGE_MINUTES',
@@ -321,6 +323,18 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       field('STRIPE_TAX_CODE', 'Default product tax code', {
         help: 'Only needed while Stripe Managed Payments is on for the account (Stripe then refuses payments without a tax code). Software checkouts always send txcd_10202000 (downloadable software). This code is sent for everything else: wallet top-ups, gift cards, airtime and other products. Managed Payments only takes digital products (software, games, digital media, online services), so for those other payments the right fix is to turn Managed Payments off in Stripe, not to give them a digital-services code. Leave empty to send none.',
       }),
+    ],
+  },
+  {
+    id: 'paystack',
+    name: 'Paystack',
+    description: 'Payment pages (card, bank transfer, USSD and mobile money where local) for wallet top-ups and customer checkout in Nigeria, Ghana, Kenya and South Africa, where an admin offers it (Settings > Markets). A Paystack account takes its own country’s currency: offer it only in that market.',
+    webhookPath: '/v1/webhooks/paystack',
+    fields: [
+      secret('PAYSTACK_SECRET_KEY', 'Secret key', {
+        help: 'Paystack dashboard > Settings > API Keys & Webhooks. Also set the Live Webhook URL there to https://api.bitocard.com/v1/webhooks/paystack: Paystack signs its notifications with this key.',
+      }),
+      field('PAYSTACK_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: test the test secret key (sk_test_…) with Test connection; Paystack is not used for live payments. Off: live.' }),
     ],
   },
   {

@@ -21,14 +21,14 @@ function Change({ amount, currency }: { amount: number; currency: string }) {
 
 /**
  * The payment page sends the payer back here (the API's payment return address) with the provider's own query
- * parameters: Flutterwave adds `status`, `tx_ref` and `transaction_id`; Monnify adds `paymentReference`. They are only
+ * parameters: Flutterwave adds `status`, `tx_ref` and `transaction_id`; Monnify adds `paymentReference`; Paystack `trxref`. They are only
  * a hint: the wallet is credited once BitoCard confirms the payment with the provider.
  */
 function PaymentReturn() {
   const search = useSearchParams();
   const router = useRouter();
   const status = search.get("status")?.toLowerCase();
-  const returned = status || search.get("tx_ref") || search.get("paymentReference") || search.get("transaction_id");
+  const returned = status || search.get("tx_ref") || search.get("paymentReference") || search.get("trxref") || search.get("transaction_id");
   if (!returned) return null;
   const cancelled = status === "cancelled" || status === "canceled";
   const failed = status === "failed";

@@ -66,8 +66,8 @@ export const eventObjectSchemas: Record<string, Schema> = {
     source: str('`checkout` (payment page) or `bank_transfer` (into your reserved bank account).', { enum: ['checkout', 'bank_transfer'] }),
     amount: money('Amount added to your wallet'),
     currency: str('ISO 4217 currency.'),
-    method: str('How it was paid: `stripe` (card), `flutterwave` (card, bank or mobile money), `monnify` (bank transfer or card), `pawapay` (mobile money), or `sandbox` in test mode. Bank transfers into a reserved account name the account’s provider.', {
-      enum: ['stripe', 'flutterwave', 'monnify', 'pawapay', 'sandbox'],
+    method: str('How it was paid: `stripe` (card), `flutterwave` (card, bank or mobile money), `monnify` (bank transfer or card), `pawapay` (mobile money), `paystack` (card, bank transfer or USSD), or `sandbox` in test mode. Bank transfers into a reserved account name the account’s provider.', {
+      enum: ['stripe', 'flutterwave', 'monnify', 'pawapay', 'paystack', 'sandbox'],
     }),
     checkout_url: nullableStr('The payment page to send the payer to, while a checkout top-up is pending; null otherwise, and always null in events.'),
     failure_reason: nullableStr('Why the payment failed, for failed top-ups.'),
