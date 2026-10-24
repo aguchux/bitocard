@@ -63,12 +63,16 @@ describe('payment methods per market', () => {
     const listed = await admin.get('/v1/admin/countries/NG/payment-methods');
     assert.equal(listed.status, 200, JSON.stringify(listed.json));
     const top = listed.json.wallet_top_up;
-    assert.deepEqual(top.filter(row => row.enabled).map(row => row.gateway), ['flutterwave'], 'Flutterwave top-ups as before');
+    assert.deepEqual(top.filter(row => row.enabled).map(row => row.gateway), ['flutterwave', 'paystack'], 'Flutterwave top-ups as before, then Paystack');
     assert.ok(top.every(row => row.configured), 'every fake gateway is set up');
-    assert.deepEqual(listed.json.checkout.filter(row => row.enabled), [], 'checkout methods start switched off');
+    assert.deepEqual(listed.json.checkout.filter(row => row.enabled).map(row => row.gateway), ['paystack'], 'only Paystack starts switched on for checkout (NG, GH and KE)');
+    assert.deepEqual(
+      (await admin.get('/v1/admin/countries/GH/payment-methods')).json.wallet_top_up.filter(row => row.enabled).map(row => row.gateway),
+      ['flutterwave', 'paystack'],
+    );
 
     const reseller = await verifiedReseller();
-    assert.deepEqual((await reseller.browser.get('/v1/wallet/payment-methods')).json.data.map(method => method.id), ['flutterwave']);
+    assert.deepEqual((await reseller.browser.get('/v1/wallet/payment-methods')).json.data.map(method => method.id), ['flutterwave', 'paystack']);
 
     const set = await setMethods('NG', 'wallet_top_up', ['stripe', 'flutterwave', 'monnify']);
     assert.equal(set.status, 200, JSON.stringify(set.json));
