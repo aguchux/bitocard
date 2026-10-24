@@ -51,6 +51,9 @@ if [ ! -f /swapfile ]; then
   swapon /swapfile
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
+# Swap only under real pressure, never as working memory.
+echo 'vm.swappiness=10' > /etc/sysctl.d/90-bitocard.conf
+sysctl -q --system
 
 echo "[setup] SSH: keys only, no root password logins"
 cat > /etc/ssh/sshd_config.d/90-bitocard.conf <<'EOF'

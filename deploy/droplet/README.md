@@ -25,7 +25,9 @@ visitor ──https──▶ Cloudflare (proxied, Full (strict)) ──https─�
 ## 1. Create the droplet
 
 - **Image:** Ubuntu 24.04 LTS. **Region:** NYC3, the nearest to the Neon database (AWS us-east-2).
-- **Size:** Basic, 1 vCPU / 2 GB / 50 GB to start (the stack uses about 250 MB; images are built in CI, never on the droplet). Grow it with **Resize > CPU and RAM only**: it keeps the disk and the IP address, and can be undone. A disk resize cannot.
+- **Size:** Basic, 1 vCPU / 2 GB / 50 GB ($12) to start. The API uses about 220 MB, Caddy and the scheduler about 30 MB,
+  and images are built in CI, never on the droplet. Each container's memory is capped (`docker-compose.yml`), so a
+  runaway API restarts itself. Grow when needed (Growing, below).
 - **SSH key:** your own, for root.
 - Turn on **monitoring** and **backups** (weekly snapshots).
 - Its public IPv4 address is the API's fixed outgoing address. Give it to suppliers who allowlist callers (Remita,
@@ -126,6 +128,23 @@ same day.
 
 Rolling back the cutover: point `api` back at Vercel (`cname.vercel-dns.com`, DNS only), add the domain back to the
 project and resume it.
+
+## Growing
+
+Watch the droplet's Graphs. Grow when memory stays above about 85% (swap in use outside deploys), the API container
+restarts (`docker compose ps` shows a recent start; `docker inspect bitocard-api-1 --format '{{.State.OOMKilled}}'`),
+or CPU stays above about 70%.
+
+1. Power off, then **Resize > CPU and RAM only** (for example 2 vCPU / 4 GB). It keeps the
+   disk and the IP address, so suppliers' allowlists still match, and it can be undone. A disk resize cannot.
+2. Power on. The API starts by itself (`restart: unless-stopped`); expect a few minutes offline, so pick a quiet hour.
+3. Raise the caps in `/opt/bitocard/.env`, then `docker compose up -d`:
+
+| Droplet | `API_MEMORY` | `API_HEAP_MB` |
+|---|---|---|
+| 2 GB (the defaults) | `1024m` | `768` |
+| 4 GB | `2560m` | `2048` |
+| 8 GB | `5120m` | `4096` |
 
 ## Day to day
 

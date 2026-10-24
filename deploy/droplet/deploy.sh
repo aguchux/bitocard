@@ -17,8 +17,9 @@ docker pull --quiet "$IMAGE" || docker image inspect "$IMAGE" >/dev/null
 echo "[deploy] applying migrations"
 API_IMAGE="$IMAGE" docker compose run --rm --no-deps api node scripts/migrate-deploy.mjs
 
-# Compose reads API_IMAGE from .env, so a manual `docker compose up -d` later starts this same image.
-printf 'API_IMAGE=%s\n' "$IMAGE" > .env
+# Compose reads API_IMAGE from .env, so a manual `docker compose up -d` later starts this same image. Other settings
+# there (API_MEMORY, API_HEAP_MB) are kept.
+{ grep -v '^API_IMAGE=' .env 2>/dev/null || true; printf 'API_IMAGE=%s\n' "$IMAGE"; } > .env.new && mv .env.new .env
 
 echo "[deploy] starting the API"
 docker compose up -d --remove-orphans --wait --wait-timeout 180 api
@@ -26,8 +27,11 @@ docker compose up -d --remove-orphans scheduler caddy
 # Caddy reloads its config only when told; a changed Caddyfile takes effect here.
 docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
 
-# Newest first, for rollbacks.
+# Newest first, for rollbacks. Only the last three API images are kept on disk (each is over 1 GB; a small droplet's
+# disk would fill); older ones are pulled again from the registry if ever rolled back to.
 { echo "$IMAGE"; cat images.log 2>/dev/null || true; } | awk '!seen[$0]++' | head -20 > images.log.new && mv images.log.new images.log
-docker image prune -af --filter "until=336h" >/dev/null 2>&1 || true
+sed -n '4,$p' images.log | while read -r old; do docker image rm "$old" >/dev/null 2>&1 || true; done
+docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -af >/dev/null 2>&1 || true
 
 echo "[deploy] done: $(docker compose ps --format '{{.Service}} {{.Status}}' | tr '\n' ';')"

@@ -2,6 +2,10 @@
 # Lives in /opt/bitocard on the droplet; CI copies it there and runs deploy.sh with the image to run
 # (.github/workflows/deploy-api.yml). Secrets are in /etc/bitocard/api.env, never in this repository.
 # Runbook: deploy/droplet/README.md.
+#
+# Memory is capped per container, so on a small droplet a runaway API restarts itself instead of the kernel killing
+# whatever it picks (Docker, SSH). The caps suit the 2 GB droplet; after a resize, raise them in /opt/bitocard/.env
+# (API_MEMORY, API_HEAP_MB; README.md, Growing) and run `docker compose up -d`.
 name: bitocard
 
 x-logging: &logging
@@ -19,6 +23,9 @@ services:
       PORT: "3001"
       # One proxy (Caddy), which writes the visitor's address from Cloudflare's CF-Connecting-IP.
       TRUST_PROXY: "1"
+      # Node's heap, kept inside the container's cap with room for buffers and Prisma's engine.
+      NODE_OPTIONS: --max-old-space-size=${API_HEAP_MB:-768}
+    mem_limit: ${API_MEMORY:-1024m}
     expose: ["3001"]
     init: true
     # Lets requests in flight finish when a deploy replaces the container.
@@ -33,6 +40,8 @@ services:
     env_file: /etc/bitocard/api.env
     environment:
       API_INTERNAL_URL: http://api:3001
+      NODE_OPTIONS: --max-old-space-size=48
+    mem_limit: 96m
     healthcheck:
       disable: true
     init: true
@@ -53,6 +62,7 @@ services:
       - /etc/bitocard/certs:/etc/caddy/certs:ro
       - caddy-data:/data
       - caddy-config:/config
+    mem_limit: 96m
     depends_on:
       - api
     restart: unless-stopped
