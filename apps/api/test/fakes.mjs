@@ -343,6 +343,15 @@ export async function fakeVtpass() {
       dstv: { ServiceName: 'DSTV Subscription', variations: [{ variation_code: 'dstv-padi', name: 'DStv Padi N3,600', variation_amount: '3600.00', fixedPrice: 'Yes' }, { variation_code: 'dstv-yanga', name: 'DStv Yanga N5,100', variation_amount: '5100.00', fixedPrice: 'Yes' }] },
       gotv: { ServiceName: 'Gotv Payment', varations: [{ variation_code: 'gotv-smallie', name: 'GOtv Smallie N1,575', variation_amount: '1575.00', fixedPrice: 'Yes' }] },
       'ikeja-electric': { ServiceName: 'Ikeja Electric Payment - IKEDC', variations: [{ variation_code: 'prepaid', name: 'Prepaid', variation_amount: '0', fixedPrice: 'No' }, { variation_code: 'postpaid', name: 'Postpaid', variation_amount: '0', fixedPrice: 'No' }] },
+      'mtn-data': {
+        ServiceName: 'MTN Data',
+        variations: [
+          { variation_code: 'mtn-10mb-100', name: 'N100 100MB - 24 hrs', variation_amount: '100.00', fixedPrice: 'Yes' },
+          { variation_code: 'mtn-20gb-7500', name: 'N7,500 20GB - 30 days', variation_amount: '7500.00', fixedPrice: 'Yes' },
+          { variation_code: 'mtn-flexi', name: 'Flexi plan', variation_amount: '0.00', fixedPrice: 'No' },
+        ],
+      },
+      'glo-data': { ServiceName: 'Glo Data', varations: [{ variation_code: 'glo1000', name: 'Glo Data N1000 - 2.6GB - 30 days', variation_amount: '1000.00', fixedPrice: 'Yes' }] },
     },
     accounts: { '1212121212': { Customer_Name: 'TEST DSTV CUSTOMER ', Current_Bouquet: 'DStv Compact', Due_Date: '2026-10-30', Renewal_Amount: 15700 } },
     /** Reply to payments: { code, status } (VTpass codes: 000 success, 099 processing, 016 failed), or { http: 500 }. */
@@ -370,7 +379,7 @@ export async function fakeVtpass() {
         code: reply.code,
         response_description: reply.code === '000' ? 'TRANSACTION SUCCESSFUL' : 'TRANSACTION FAILED',
         // `state.totalAmount` (naira): what VTpass says it charged after its commission.
-        content: { transactions: { status: reply.status, transactionId: `VT${(state.nextId += 1)}`, ...(state.totalAmount === undefined ? {} : { total_amount: state.totalAmount }) } },
+        content: { transactions: { status: reply.status, transactionId: `VT${(state.nextId += 1)}`, ...(state.totalAmount === undefined ? {} : { total_amount: typeof state.totalAmount === 'function' ? state.totalAmount(body) : state.totalAmount }) } },
         ...(electric && reply.status === 'delivered' ? { purchased_code: 'Token : 1234-5678-9012-3456-7890', units: '79.9' } : {}),
         request: body,
       };

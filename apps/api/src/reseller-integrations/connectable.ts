@@ -79,14 +79,22 @@ export const connectableIntegrations: ConnectableIntegration[] = [
     kind: 'supplier',
     name: 'VTpass',
     description: 'Nigerian pay-TV, electricity, airtime and data from your own VTpass account.',
-    fields: [secret('api_key', 'API key'), secret('public_key', 'Public key'), secret('secret_key', 'Secret key')],
+    fields: [
+      secret('api_key', 'API key'),
+      secret('public_key', 'Public key'),
+      secret('secret_key', 'Secret key'),
+      field('commissions', 'Airtime and data commissions (%)', {
+        required: false,
+        help: 'Your commission per service, for airtime and data: for example mtn 3; airtel 3.4; mtn-data 3 (etisalat is 9mobile). Services without one are not synced.',
+      }),
+    ],
     check: async (values, urls) => {
       const balance = await providerRequest<{ code?: number | string }>('vtpass', `${urls.VTPASS_API_URL}/balance`, {
         headers: { 'api-key': values.api_key, 'public-key': values.public_key },
       });
       if (String(balance?.code) !== '1') throw refused('vtpass');
     },
-    fromSettings: config => ({ api_key: config.VTPASS_API_KEY, public_key: config.VTPASS_PUBLIC_KEY, secret_key: config.VTPASS_SECRET_KEY }),
+    fromSettings: config => ({ api_key: config.VTPASS_API_KEY, public_key: config.VTPASS_PUBLIC_KEY, secret_key: config.VTPASS_SECRET_KEY, commissions: config.VTPASS_COMMISSIONS }),
   },
   {
     id: 'didww',

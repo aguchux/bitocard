@@ -44,7 +44,7 @@ export class SupplierAdapters {
       const live = (code: string) => !inSandbox(settings, code);
       const adapters: SupplierAdapter[] = [
         reloadly(config, live('reloadly') ? { clientId: config.RELOADLY_CLIENT_ID, clientSecret: config.RELOADLY_CLIENT_SECRET } : {}),
-        new VtpassAdapter(live('vtpass') ? { apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY } : {}, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE),
+        new VtpassAdapter(live('vtpass') ? { apiKey: config.VTPASS_API_KEY, publicKey: config.VTPASS_PUBLIC_KEY, secretKey: config.VTPASS_SECRET_KEY } : {}, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE, config.VTPASS_COMMISSIONS),
         new DidwwAdapter({
           apiKey: live('didww') ? config.DIDWW_API_KEY : undefined,
           baseUrl: config.DIDWW_API_URL,
@@ -90,7 +90,7 @@ export class SupplierAdapters {
     // Always the providers' live addresses, whatever BitoCard's own Sandbox switches say.
     const config = urlsFor(this.integrations.config, 'live');
     if (code === 'reloadly') return reloadly(config, { clientId: credentials.client_id, clientSecret: credentials.client_secret });
-    if (code === 'vtpass') return new VtpassAdapter({ apiKey: credentials.api_key, publicKey: credentials.public_key, secretKey: credentials.secret_key }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE);
+    if (code === 'vtpass') return new VtpassAdapter({ apiKey: credentials.api_key, publicKey: credentials.public_key, secretKey: credentials.secret_key }, config.VTPASS_API_URL, config.VTPASS_CONTACT_PHONE, credentials.commissions);
     if (code === 'didww') return new DidwwAdapter({ apiKey: credentials.api_key, baseUrl: config.DIDWW_API_URL, countries: config.DIDWW_COUNTRIES, callbackBase: config.DIDWW_CALLBACK_URL, connectionId });
     if (code === 'zendit') return new ZenditAdapter({ apiKey: credentials.api_key, baseUrl: config.ZENDIT_API_URL });
     if (code === 'esim_access') return new EsimAccessAdapter({ accessCode: credentials.access_code, secretKey: credentials.secret_key, baseUrl: config.ESIM_ACCESS_API_URL });

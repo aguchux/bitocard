@@ -119,10 +119,17 @@ export const maxResellerMarkupBps = 10_000;
 /** Single-value products can take a fixed price; a fixed price on a range or a list of values would be one price for all. */
 export const singleValue = (product: Pick<Product, 'denominationType' | 'fixedValues'>) => product.denominationType === 'fixed' && product.fixedValues.length === 1;
 
-/** Offers for one face value only (a supplier listing each value as its own offer) carry it as `meta.face_value`. */
+/**
+ * Offers for one face value only (a supplier listing each value as its own offer) carry it as `meta.face_value`; offers
+ * on a shared any-amount product with narrower limits than the product's (VTpass airtime) carry `meta.min_value` and
+ * `meta.max_value`, since another supplier's sync may widen the product's own range.
+ */
 export const offerCovers = (offer: { meta: Prisma.JsonValue | null }, faceValue: bigint) => {
-  const only = (offer.meta as { face_value?: string } | null)?.face_value;
-  return only === undefined || BigInt(only) === faceValue;
+  const meta = offer.meta as { face_value?: string; min_value?: string; max_value?: string } | null;
+  if (meta?.face_value !== undefined) return BigInt(meta.face_value) === faceValue;
+  if (meta?.min_value !== undefined && faceValue < BigInt(meta.min_value)) return false;
+  if (meta?.max_value !== undefined && faceValue > BigInt(meta.max_value)) return false;
+  return true;
 };
 
 const mulBps = (amount: bigint, bps: number) => amount * BigInt(bps);

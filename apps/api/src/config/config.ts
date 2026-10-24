@@ -177,6 +177,8 @@ export const configSchema = z.object({
   VTPASS_SANDBOX: flag.prefault('off'),
   /** VTpass needs a phone number on every payment; used when the customer gave none. */
   VTPASS_CONTACT_PHONE: z.string().default('08011111111'),
+  /** The commission agreed with VTpass per airtime and data service: `mtn 3; airtel 3.4; mtn-data 3`. */
+  VTPASS_COMMISSIONS: z.string().optional(),
   DIDWW_API_KEY: z.string().optional(),
   /** Leave at the default to follow DIDWW_SANDBOX; any other value overrides it. */
   DIDWW_API_URL: z.string().url().default('https://api.didww.com/v3'),
