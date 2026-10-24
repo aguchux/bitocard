@@ -68,12 +68,15 @@ ssh -t deploy@<droplet> sh /opt/bitocard/set-env.sh ENCRYPTION_KEY
 
 ## 4. TLS and Cloudflare
 
-1. Cloudflare > bitocard.com > SSL/TLS > Origin Server > **Create certificate**: hosts `*.bitocard.com` and
-   `bitocard.com`, 15 years.
-2. Save it as `/etc/bitocard/certs/origin.pem` and the key as `/etc/bitocard/certs/origin.key`, both mode 600 and
-   owned by `deploy`.
-3. SSL/TLS > Overview: **Full (strict)**.
-4. Cloudflare must not block or challenge the API's callers: suppliers', payment providers' and GitHub's webhooks, and
+1. On the droplet, make the key and its signing request (the key never leaves the droplet):
+   `ssh deploy@<droplet> sh /opt/bitocard/origin-cert.sh csr` prints the CSR (`-----BEGIN CERTIFICATE REQUEST-----`).
+2. Cloudflare > bitocard.com > SSL/TLS > Origin Server > **Create certificate** > **Use my private key and CSR**: paste
+   the CSR, hostname `api.bitocard.com` only, 15 years. Copy the certificate it shows (PEM).
+3. Install it: `ssh deploy@<droplet> sh /opt/bitocard/origin-cert.sh install`, paste the certificate, then Ctrl-D. It
+   refuses a certificate that is not for the droplet's key or does not cover `api.bitocard.com`, then reloads Caddy.
+   The files are `/etc/bitocard/certs/origin.key` and `origin.pem`, mode 600, owned by `deploy`.
+4. SSL/TLS > Overview: **Full (strict)**.
+5. Cloudflare must not block or challenge the API's callers: suppliers', payment providers' and GitHub's webhooks, and
    resellers' servers.
    - Keep **Bot Fight Mode off**.
    - Add a WAF custom rule **Skip** (all remaining custom rules, Super Bot Fight Mode, managed rules) for
