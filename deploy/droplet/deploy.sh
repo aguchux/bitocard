@@ -12,6 +12,11 @@ echo "[deploy] pulling $IMAGE"
 # An image already loaded on the machine (`docker load`) may be deployed without the registry.
 docker pull --quiet "$IMAGE" || docker image inspect "$IMAGE" >/dev/null
 
+# The environment first: the database answers, ENCRYPTION_KEY opens the secrets already stored, Redis accepts its
+# token, production's safety settings hold. Anything wrong stops here, before migrations, with the old image serving.
+echo "[deploy] checking the environment"
+API_IMAGE="$IMAGE" docker compose run --rm --no-deps api node scripts/check-env.mjs
+
 # Migrations once, before the new code runs, with the API's own environment and network (Prisma's lock keeps a
 # parallel run safe; the script retries a held lock). A failure stops here, with the old image still serving.
 echo "[deploy] applying migrations"

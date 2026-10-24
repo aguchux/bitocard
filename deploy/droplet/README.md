@@ -49,20 +49,22 @@ also turns on automatic security updates and turns off SSH password logins.
 
 ## 3. The environment
 
-Fill `/etc/bitocard/api.env` (template: `api.env.example`) with the **same values** as the Vercel project. They are
-listed in Vercel > `bitocard-api` > Settings > Environment Variables (Production). Or, from `apps/api` on your machine:
+`/etc/bitocard/api.env` (template: `api.env.example`) holds the same settings as the Vercel project `bitocard-api`.
+Vercel never gives back variables marked Sensitive (`vercel env pull` writes `[SENSITIVE]`), so secrets come from where
+they were first saved. Set each one without it showing anywhere, from your own terminal:
 
 ```sh
-vercel env pull /tmp/api.env --environment=production --scope golojan-tech-ltd
-scp /tmp/api.env deploy@<droplet>:/etc/bitocard/api.env && rm /tmp/api.env
+ssh -t deploy@<droplet> sh /opt/bitocard/set-env.sh ENCRYPTION_KEY
 ```
 
-Then on the droplet:
-
-- Delete the lines Vercel adds itself (`VERCEL*`, `TURBO*`, `NX_*`).
-- Check `COOKIE_SECURE=on`.
-
-`ENCRYPTION_KEY` must be exactly the production value.
+- **`ENCRYPTION_KEY`** must be exactly the production value. Every deploy first runs `scripts/check-env.mjs`, which
+  refuses to go on unless the key opens the secrets already stored in the database, the database answers, Redis
+  accepts its token, and `COOKIE_SECURE`, `ALLOWED_ORIGINS` (no `http://`) and `CRON_SECRET` (32 characters or more)
+  are safe for production.
+- **`STORE_SERVER_SECRET`** must equal the storefront project's own. If it is lost, set a new one (at least 32
+  characters) on both: the droplet, and Vercel `bitocard-storefront` (redeploy it).
+- **`UPSTASH_REDIS_REST_TOKEN`**: Upstash console > the database > REST API (or Vercel > Storage > the Upstash store).
+- **`CRON_SECRET`** is the droplet's own (only its scheduler sends it), a new random value.
 
 ## 4. TLS and Cloudflare
 

@@ -81,7 +81,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           echo "${{ secrets.API_DROPLET_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
       - name: Copy the droplet's files
-        run: scp deploy/droplet/docker-compose.yml deploy/droplet/Caddyfile deploy/droplet/deploy.sh "deploy@$HOST:/opt/bitocard/"
+        run: scp deploy/droplet/docker-compose.yml deploy/droplet/Caddyfile deploy/droplet/deploy.sh deploy/droplet/set-env.sh "deploy@$HOST:/opt/bitocard/"
       - name: Deploy ${{ env.IMAGE }}
         # The job's own token pulls the private image: sent on SSH's input (never on a command line), logged out after.
         run: |
