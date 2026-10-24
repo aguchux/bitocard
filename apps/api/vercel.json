@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nestjs",
   "installCommand": "cd ../.. && npm ci",
-  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api && npm run db:migrate:deploy -w @bitocard/api",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/api && npm run db:migrate:deploy -w @bitocard/api && node apps/api/scripts/key-handoff.mjs",
   "ignoreCommand": "npx turbo-ignore",
   "functions": {
     "api/webhook-queue.mjs": {
