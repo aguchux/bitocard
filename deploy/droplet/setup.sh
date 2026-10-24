@@ -61,6 +61,7 @@ PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 EOF
-systemctl reload ssh || systemctl reload sshd || true
+# Ubuntu 24.04 starts sshd per connection (ssh.socket), which reads this at once; older releases need a reload.
+systemctl try-reload-or-restart ssh.service 2>/dev/null || true
 
 echo "[setup] done. Next (README.md): fill /etc/bitocard/api.env, add the Cloudflare origin certificate to /etc/bitocard/certs, attach the DigitalOcean firewall, then deploy from CI."
