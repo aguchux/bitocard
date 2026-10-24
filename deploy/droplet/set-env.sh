@@ -40,3 +40,10 @@ umask 077
 mv "$FILE.new" "$FILE"
 chmod 600 "$FILE"
 echo "$NAME set (${#VALUE} characters)."
+
+# Whether the key opens the secrets already stored (and the rest of the deploy check), with the newest API image here.
+image=$(docker images ghcr.io/aguchux/bitocard-api --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | head -1)
+if [ "$NAME" = ENCRYPTION_KEY ] && [ -n "$image" ] && [ -f /opt/bitocard/docker-compose.yml ]; then
+  echo "Checking it against the database..."
+  API_IMAGE="$image" docker compose -f /opt/bitocard/docker-compose.yml run --rm --no-deps api node scripts/check-env.mjs 2>&1 | grep '\[env\]' || true
+fi
