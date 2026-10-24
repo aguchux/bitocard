@@ -55,7 +55,10 @@ test('the pilot countries and plans are published', async () => {
   const countries = await (await get('/v1/countries')).json();
   assert.ok(countries.data.some(country => country.code === 'NG'));
   const plans = await (await get('/v1/plans')).json();
-  assert.deepEqual(plans.data.map(plan => plan.code), ['standard', 'premium']);
+  // Admins add and show plans (Enterprise, others); the free plan and Premium are always there.
+  const codes = plans.data.map(plan => plan.code);
+  assert.equal(codes[0], 'standard');
+  assert.ok(codes.includes('premium'), `plans: ${codes.join(', ')}`);
 });
 
 test('exchange rates are listed for the pilot currencies', async () => {
