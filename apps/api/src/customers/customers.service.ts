@@ -8,6 +8,7 @@ import { type Country, type Customer, type CustomerCodePurpose, Prisma, type Sto
 import { EmailService } from '../notifications/email.service.js';
 import { SmsService } from '../notifications/sms.service.js';
 import { customerCodeEmail } from '../notifications/templates.js';
+import { houseSubdomain } from './store-key.js';
 
 const minute = 60 * 1000;
 /** Customers stay signed in for 30 days on the store's own cookie. */
@@ -88,6 +89,22 @@ export class CustomersService {
     if (!session || session.revokedAt || session.expiresAt <= new Date() || session.customer.status !== 'active') return null;
     if (Date.now() - session.lastSeenAt.getTime() > touchEveryMs) await this.prisma.customerSession.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
     return { customer: session.customer, sessionId: session.id };
+  }
+
+  /** Country stores by subdomain, briefly: asked on every signed-in request to one. */
+  private readonly countryStores = new Map<string, { store: CustomerWithStore['store'] | null; until: number }>();
+
+  /**
+   * The published BitoCard country store at this subdomain (a house account's store other than bitocard.com itself),
+   * whose customers are bitocard.com's own; null for anything else.
+   */
+  async countryStore(subdomain: string): Promise<CustomerWithStore['store'] | null> {
+    const cached = this.countryStores.get(subdomain);
+    if (cached && cached.until > Date.now()) return cached.store;
+    const found = subdomain === houseSubdomain ? null : await this.prisma.store.findUnique({ where: { subdomain }, include: { reseller: { select: { house: true } } } });
+    const store = found && found.status === 'published' && found.reseller.house ? found : null;
+    this.countryStores.set(subdomain, { store, until: Date.now() + 60_000 });
+    return store;
   }
 
   private async startSession(customerId: string) {

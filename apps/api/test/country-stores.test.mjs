@@ -3,7 +3,7 @@
 // visiting customer's own country, so a same-country purchase never needs foreign-currency conversion.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 import { fakeStripe } from './fakes.mjs';
 
 let server;
@@ -313,5 +313,54 @@ describe('country stores: general rollout, not just the pilots (Stage 5)', () =>
     assert.equal(again.json.id, created.json.id, 'asking again returns the same store, not a second one');
     const audited = await prisma.auditLog.findFirst({ where: { action: 'country_store.provisioned', targetId: created.json.id } });
     assert.ok(audited);
+  });
+});
+
+describe('country stores share bitocard.com customer accounts', () => {
+  const houseStoreId = '00000000-0000-4000-8000-0000000000b2';
+
+  test('a bitocard.com account signs in on ng.bitocard.com, and one session works on both', async () => {
+    await house.storeFor('NG');
+    const root = await customer(null, 'NG');
+    const email = (await prisma.customer.findUniqueOrThrow({ where: { id: root.id } })).email;
+
+    const onNg = storeServer('ng');
+    const signin = await onNg.post('/v1/store/account/signin', { email, password: 'correct horse battery' });
+    assert.equal(signin.status, 200, JSON.stringify(signin.json));
+    assert.equal(signin.json.customer.id, root.id, 'the same account, not a new one');
+    assert.equal((await onNg.get('/v1/store/account')).json.id, root.id);
+    assert.equal((await root.get('/v1/store/account')).json.id, root.id, 'the bitocard.com session still works there');
+  });
+
+  test('signing up on ng.bitocard.com makes a bitocard.com account, and a password reset there finds it', async () => {
+    const onNg = storeServer('ng');
+    const email = `ng-signup-${Date.now()}@example.com`;
+    const signup = await onNg.post('/v1/store/account/signup', { name: 'Ada Eze', email, password: 'correct horse battery', country: 'NG' });
+    assert.equal(signup.status, 201, JSON.stringify(signup.json));
+    const row = await prisma.customer.findUniqueOrThrow({ where: { id: signup.json.customer.id } });
+    assert.equal(row.storeId, houseStoreId, "kept in bitocard.com's own accounts");
+    assert.equal((await storeServer(null).post('/v1/store/account/signin', { email, password: 'correct horse battery' })).status, 200);
+
+    assert.equal((await onNg.post('/v1/store/account/password/forgot', { email })).json.sent, true);
+    const code = await lastEmailCode(server.app, email);
+    const reset = await onNg.post('/v1/store/account/password/reset', { email, code, password: 'a brand new passphrase' });
+    assert.equal(reset.status, 200, JSON.stringify(reset.json));
+    assert.equal((await storeServer(null).post('/v1/store/account/signin', { email, password: 'a brand new passphrase' })).status, 200);
+  });
+
+  test("a bitocard.com session is refused on a reseller's store, which keeps its own accounts", async () => {
+    const reseller = await resellerClient(server);
+    const subdomain = `ownaccounts${Date.now() % 100000}`;
+    const store = await reseller.browser.post('/v1/stores', { name: 'Ada Digital', subdomain });
+    assert.equal(store.status, 201, JSON.stringify(store.json));
+    await prisma.store.update({ where: { id: store.json.id }, data: { status: 'published', publishedAt: new Date() } });
+
+    const root = storeServer(null);
+    const email = `root-only-${Date.now()}@example.com`;
+    const signup = await root.post('/v1/store/account/signup', { name: 'Ada Eze', email, password: 'correct horse battery', country: 'NG' });
+    assert.equal(signup.status, 201);
+    const asReseller = await fetch(`${server.base}/v1/store/account`, { headers: { 'bitocard-store': subdomain, 'bitocard-customer-session': signup.json.session.token } });
+    assert.equal(asReseller.status, 401);
+    assert.equal((await storeServer(subdomain).post('/v1/store/account/signin', { email, password: 'correct horse battery' })).status, 401, 'the account does not exist there');
   });
 });

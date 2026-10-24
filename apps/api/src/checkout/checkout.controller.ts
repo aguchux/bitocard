@@ -217,27 +217,27 @@ export class CustomerAccountController {
   @SkipIdempotency()
   @Post('signup')
   async signup(@StoreKey() store: string | null, @Body() body: SignUpDto) {
-    return this.customers.signup(await this.stores.resolve(store), body);
+    return this.customers.signup(await this.stores.accountStore(store), body);
   }
 
   @SkipIdempotency()
   @Post('signin')
   @HttpCode(HttpStatus.OK)
   async signin(@StoreKey() store: string | null, @Body() body: SignInDto) {
-    return this.customers.signin(await this.stores.resolve(store), body);
+    return this.customers.signin(await this.stores.accountStore(store), body);
   }
 
   @Post('password/forgot')
   @HttpCode(HttpStatus.OK)
   async forgot(@StoreKey() store: string | null, @Body() body: ForgotDto) {
-    return this.customers.forgotPassword(await this.stores.resolve(store), body.email);
+    return this.customers.forgotPassword(await this.stores.accountStore(store), body.email);
   }
 
   @SkipIdempotency()
   @Post('password/reset')
   @HttpCode(HttpStatus.OK)
   async reset(@StoreKey() store: string | null, @Body() body: ResetDto) {
-    return this.customers.resetPassword(await this.stores.resolve(store), body);
+    return this.customers.resetPassword(await this.stores.accountStore(store), body);
   }
 
   @UseGuards(CustomerGuard)

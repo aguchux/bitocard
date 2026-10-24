@@ -62,6 +62,16 @@ export class StoreSellers {
     return store;
   }
 
+  /**
+   * The store whose customer accounts a request signs up, signs in and resets passwords at: a reseller's store keeps
+   * its own, while every BitoCard store (root bitocard.com and each market's country store) shares root's, so one
+   * bitocard.com account works on ng.bitocard.com and the rest (docs/BITOCARD_COUNTRY_STORES_PLAN.md).
+   */
+  async accountStore(key: string | null): Promise<Store & { reseller: Reseller }> {
+    const store = await this.resolve(key);
+    return this.isHouse(store) && !this.isRoot(store) ? this.house.store() : store;
+  }
+
   /** Whether the store's checkout is live or the sandbox. Every house store (root or a country store) shares BitoCard's own switch. */
   mode(store: HouseAwareStore): LedgerMode {
     return this.isHouse(store) ? this.house.mode() : store.checkoutMode;
