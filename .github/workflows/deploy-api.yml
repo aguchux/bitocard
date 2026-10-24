@@ -1,6 +1,7 @@
 # The API on the DigitalOcean droplet (deploy/droplet/README.md): on each push to main that touches it, build its image,
 # push it to GitHub's container registry, deploy it over SSH (migrations, then the new image, waiting until healthy),
-# then smoke test it (API_SMOKE_URL, default api.bitocard.com) and check it serves this commit.
+# then smoke test api.bitocard.com and check it serves this commit. deploy.sh has already checked the droplet itself
+# (api.bitocard.com through its own Caddy), which holds before DNS points at it.
 #
 # The deploy job runs only once the repository variable API_DROPLET_HOST is set (Settings > Secrets and variables >
 # Actions > Variables), with the secrets API_DROPLET_SSH_KEY (the deploy user's private key) and
@@ -90,8 +91,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      # Before api.bitocard.com moves to the droplet, API_SMOKE_URL is its test address (https://api-next.bitocard.com).
-      - name: Smoke test
-        run: node apps/api/scripts/smoke.mjs "${{ vars.API_SMOKE_URL || 'https://api.bitocard.com' }}"
+      - name: Smoke test api.bitocard.com
+        run: node apps/api/scripts/smoke.mjs https://api.bitocard.com
         env:
           EXPECT_COMMIT: ${{ inputs.image && '' || github.sha }}

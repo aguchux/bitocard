@@ -9,8 +9,7 @@
 	}
 }
 
-# api-next is the droplet's test address while api.bitocard.com still points at Vercel (README.md, Cutover).
-api.bitocard.com, api-next.bitocard.com {
+api.bitocard.com {
 	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
 
 	# Uploads (identity documents, chat files) are at most 4 MB; leave room for multipart overhead.

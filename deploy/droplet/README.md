@@ -93,9 +93,7 @@ Docker opens published ports past `ufw`, so this firewall (outside the droplet) 
 
 GitHub > the repository > Settings > Secrets and variables > Actions:
 
-- **Variables:**
-  - `API_DROPLET_HOST`: the droplet's address.
-  - `API_SMOKE_URL`: `https://api-next.bitocard.com` until the cutover.
+- **Variable** `API_DROPLET_HOST`: the droplet's address. Set it last: from then on every push deploys.
 - **Secrets:**
   - `API_DROPLET_SSH_KEY`: the private key `bitocard-deploy`.
   - `API_DROPLET_KNOWN_HOSTS`: the output of `ssh-keyscan <droplet address>`.
@@ -103,28 +101,27 @@ GitHub > the repository > Settings > Secrets and variables > Actions:
 
 Then Actions > Deploy API > Run workflow (or push to `main`).
 
-## 7. Try it before moving the address
+## 7. Check the droplet before moving the address
 
-Cloudflare DNS: add `api-next` as an A record to the droplet, **proxied**. The droplet serves it exactly like
-`api.bitocard.com` (`Caddyfile`).
+The first deploy ends with `deploy.sh` asking the droplet itself for `https://api.bitocard.com/health` through its own
+Caddy and certificate, and failing unless it is healthy and serves the new commit. That holds while DNS still points at
+Vercel. By hand, on the droplet:
 
-- `https://api-next.bitocard.com/health` shows `"environment":"production"`, the commit and `"database":"ok"`.
-- `node apps/api/scripts/smoke.mjs https://api-next.bitocard.com` passes.
+- `curl -sk --resolve api.bitocard.com:443:127.0.0.1 https://api.bitocard.com/health` shows `"environment":"production"`,
+  the commit and `"database":"ok"`.
 - `docker compose -f /opt/bitocard/docker-compose.yml logs scheduler` shows each job `ok`.
 
-Until the cutover both Vercel and the droplet run the scheduled jobs. Every job is safe to run twice, but cut over the
-same day.
+From the first deploy until the cutover, both Vercel and the droplet run the scheduled jobs. Every job is safe to run
+twice, but cut over the same day. Until then CI's smoke test still reaches Vercel.
 
 ## 8. Cutover
 
-1. Cloudflare DNS: `api` becomes an **A record to the droplet, proxied** (today a DNS-only CNAME to Vercel).
-2. Check it is the droplet: `curl -s https://api.bitocard.com/health` shows `"environment":"production"` and the
-   droplet's commit.
-3. Remove `api.bitocard.com` from the Vercel project's domains, then **pause** the project (Settings > General). Its
-   cron jobs stop, and nothing reaches it any more.
-4. Set `API_SMOKE_URL` to `https://api.bitocard.com` (or delete it). Delete the `api-next` record when you no longer
-   need it.
-5. Webhook addresses given to suppliers and payment providers keep working: they name `api.bitocard.com`.
+1. Cloudflare DNS: `api` becomes an **A record to `138.197.85.139`, proxied** (today a DNS-only CNAME to Vercel).
+2. Check it is the droplet: `curl -sI https://api.bitocard.com/health` shows `server: cloudflare` (Vercel answered as
+   `server: Vercel`), and the body the droplet's commit.
+3. Remove `api.bitocard.com` from the Vercel project `bitocard-api`'s domains, then **pause** the project (Settings >
+   General). Its cron jobs stop, and nothing reaches it any more.
+4. Webhook addresses given to suppliers and payment providers keep working: they name `api.bitocard.com`.
 
 Rolling back the cutover: point `api` back at Vercel (`cname.vercel-dns.com`, DNS only), add the domain back to the
 project and resume it.
