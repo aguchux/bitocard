@@ -5,7 +5,7 @@ import { activeTab } from "@/components/app/tabs";
 
 describe("account screens", () => {
   test("every screen has its own address, in menu order, with the identity check at its old one", () => {
-    expect(accountSections.map(section => section.key)).toEqual(["profile", "security", "identity", "referrals", "notifications"]);
+    expect(accountSections.map(section => section.key)).toEqual(["profile", "security", "identity", "support", "referrals", "notifications"]);
     expect(new Set(accountSections.map(section => section.href)).size).toBe(accountSections.length);
     expect(accountSections.find(section => section.key === "identity")?.href).toBe("/account/verification");
   });
