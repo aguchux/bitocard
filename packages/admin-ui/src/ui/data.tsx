@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../format';
 import { EmptyState, ErrorState, RefreshFailed } from './status';
@@ -71,12 +71,13 @@ export function DataTable<T>({
   onRowIntent?: (row: T) => void;
   caption?: string;
 }) {
-  const intended = useRef(new Set<string>());
+  // A plain set kept for the table's life (never rendered from), so a row's intent is reported once per mount.
+  const [intended] = useState(() => new Set<string>());
   const intent = (row: T) => {
     if (!onRowIntent) return;
     const key = rowKey(row);
-    if (intended.current.has(key)) return;
-    intended.current.add(key);
+    if (intended.has(key)) return;
+    intended.add(key);
     onRowIntent(row);
   };
   // Rows already shown win over a failed refresh: the error panel is only for when there are none to show.

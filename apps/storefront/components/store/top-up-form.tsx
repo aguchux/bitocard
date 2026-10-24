@@ -40,13 +40,21 @@ export function TopUpForm({ country, currency, wallet, signedIn, back }: { count
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
 
-  // A fresh number (or switching tab) clears what was resolved for the last one.
-  useEffect(() => {
+  // A fresh number (or switching tab) clears what was resolved for the last one, during render (not in an effect, which
+  // would draw the stale result first).
+  const lookup = `${category}|${country}|${currency ?? ""}|${phone}`;
+  const [resolvedFor, setResolvedFor] = useState(lookup);
+  if (resolvedFor !== lookup) {
+    setResolvedFor(lookup);
     setGuess({ detected: false, product: null });
     setNetworks(null);
     setChosenBrand("");
     setDataBundles(null);
     setChosenBundle("");
+  }
+
+  // Then the number is looked up once the customer stops typing.
+  useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
     if (phone.trim().length < 6) return;
     timer.current = setTimeout(() => {
@@ -55,7 +63,6 @@ export function TopUpForm({ country, currency, wallet, signedIn, back }: { count
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-detect only when the number or tab changes, not every render
   }, [phone, category, country, currency]);
 
   // Detection failed: offer every network on sale, so the customer picks one instead.
@@ -80,7 +87,6 @@ export function TopUpForm({ country, currency, wallet, signedIn, back }: { count
       const all = await topUpProducts("data", country, currency);
       setDataBundles(all.filter(item => item.brand.slug === brand));
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per resolved brand
   }, [category, guess.product, manualProduct, country, currency, dataBundles]);
 
   const product = category === "data" ? (dataBundles ?? []).find(item => item.key === chosenBundle) : (guess.product ?? manualProduct);
