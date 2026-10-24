@@ -224,6 +224,17 @@ describe('country stores: storefront routing and the root redirect (Stage 4)', (
     assert.ok(home.countries.length > 0);
   });
 
+  test('the storefront’s cacheable catalogue reads name a country store by its 2-letter `?store=` too', async () => {
+    const product = await nairaGiftCard('Amazon Country Store Query Card');
+    for (const path of ['/v1/store/home?store=ng', '/v1/store/navigation?store=ng', `/v1/store/products?store=ng&market=NG&limit=60`, '/v1/store/search?store=ng&q=amazon']) {
+      const res = await fetch(`${server.base}${path}`);
+      assert.equal(res.status, 200, `${path}: ${await res.clone().text()}`);
+    }
+    const listed = await (await fetch(`${server.base}/v1/store/products?store=ng&limit=60`)).json();
+    assert.ok(listed.data.some(item => item.key === product.key), 'the admin-listed product shows on ng.bitocard.com');
+    assert.equal((await fetch(`${server.base}/v1/store/products?store=n`)).status, 400, 'one letter is still not a store');
+  });
+
   test('root offers a market’s live, ready country store; a market with no switch or no ready store stays null', async () => {
     const gh = await house.storeFor('GH');
     // GH's store exists (as NG's did before its switch and ready host were set) but is not yet switched on or ready.

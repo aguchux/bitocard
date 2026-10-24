@@ -14,13 +14,15 @@ import { StorefrontService } from './storefront.service.js';
 const categories = Object.keys(categoryLabels) as ProductCategory[];
 const groups = navigationGroups.map(group => group.key);
 const httpsUrl = /^https:\/\/\S+$/;
+// A reseller's store subdomain (3 to 30 characters), or a market's own country store (its 2-letter code: ng.bitocard.com).
+const storeSubdomain = /^[a-z0-9-]{2,30}$/;
 const lower = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 
 /** Endpoints that only take the store. */
 class StoreQueryDto {
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain): only the products that reseller listed for their store. Without it, bitocard.com.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 
   @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
@@ -38,7 +40,7 @@ class MarketQueryDto {
 
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 }
 
@@ -50,7 +52,7 @@ class HomeQueryDto {
 
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 
   @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
@@ -73,7 +75,7 @@ class StoreProductsQueryDto {
 
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 
   @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
@@ -172,7 +174,7 @@ class NetworkDetectDto {
 
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain): only a network it sells.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 }
 
@@ -184,7 +186,7 @@ class SearchQueryDto {
 
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 
   @ApiPropertyOptional({ description: 'The signed-in customer’s currency (ISO 4217): each product then has `price`, its face values converted into it. What the customer pays is quoted at checkout.', example: 'NGN' })
@@ -220,7 +222,7 @@ class BrandsQueryDto {
 
   @ApiPropertyOptional({ description: 'A reseller’s hosted store (its subdomain, as in `<subdomain>.bitocard.com`): only the products that reseller listed for their store, in their country. Without it, bitocard.com.', example: 'adadigital' })
   @IsOptional()
-  @Matches(/^[a-z0-9-]{3,30}$/, { message: 'store must be a store subdomain' })
+  @Matches(storeSubdomain, { message: 'store must be a store subdomain' })
   store?: string;
 
   @ApiPropertyOptional({ description: 'Only brands with this tag, for example gaming.' })
