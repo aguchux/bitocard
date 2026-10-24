@@ -10,7 +10,7 @@ type NodeHandler = ReturnType<WebhookQueue['nodeHandler']>;
 let handler: Promise<NodeHandler> | null = null;
 
 /**
- * The Vercel Queues consumer function (`api/webhook-queue.mjs`): the API's services without its HTTP routes, started
+ * The Vercel Queues consumer (for a Vercel push function; unused on the droplet): the API's services without its HTTP routes, started
  * once per instance, delivering the endpoint each pushed message names.
  */
 export async function webhookQueueHandler(...args: Parameters<NodeHandler>) {

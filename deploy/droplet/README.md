@@ -116,20 +116,15 @@ Vercel. By hand, on the droplet:
   the commit and `"database":"ok"`.
 - `docker compose -f /opt/bitocard/docker-compose.yml logs scheduler` shows each job `ok`.
 
-From the first deploy until the cutover, both Vercel and the droplet run the scheduled jobs. Every job is safe to run
-twice, but cut over the same day. Until then CI's smoke test still reaches Vercel.
+## 8. Cutover (done 24 October 2026)
 
-## 8. Cutover
-
-1. Cloudflare DNS: `api` becomes an **A record to `138.197.85.139`, proxied** (today a DNS-only CNAME to Vercel).
-2. Check it is the droplet: `curl -sI https://api.bitocard.com/health` shows `server: cloudflare` (Vercel answered as
-   `server: Vercel`), and the body the droplet's commit.
-3. Remove `api.bitocard.com` from the Vercel project `bitocard-api`'s domains, then **pause** the project (Settings >
-   General). Its cron jobs stop, and nothing reaches it any more.
+1. Cloudflare DNS: `api` became an **A record to `138.197.85.139`, proxied** (it was a DNS-only CNAME to Vercel).
+2. Checked: `curl -sI https://api.bitocard.com/health` shows `server: cloudflare` and the droplet's commit, and Caddy's
+   log shows callers' own addresses.
+3. The Vercel project `bitocard-api` was deleted, with its cron jobs and its environment, and the API's `vercel.json`,
+   Vercel Queues entry and post-deployment smoke workflow were removed from the repository. There is no Vercel copy to
+   fall back to: a broken droplet is fixed by rolling back an image (Day to day), or by a new droplet from this runbook.
 4. Webhook addresses given to suppliers and payment providers keep working: they name `api.bitocard.com`.
-
-Rolling back the cutover: point `api` back at Vercel (`cname.vercel-dns.com`, DNS only), add the domain back to the
-project and resume it.
 
 ## Growing
 

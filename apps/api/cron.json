@@ -1,5 +1,5 @@
 {
-  "$comment": "When each scheduled job (GET /v1/cron/<job>) runs, in UTC. The droplet scheduler (scripts/scheduler.mjs) reads this; vercel.json keeps the same list while the API is still on Vercel (test/scheduler.test.mjs checks they match).",
+  "$comment": "When each scheduled job (GET /v1/cron/<job>) runs, in UTC. The droplet scheduler (scripts/scheduler.mjs) reads this; test/scheduler.test.mjs checks it lists every job the API has.",
   "jobs": [
     {
       "job": "exchange-rates",

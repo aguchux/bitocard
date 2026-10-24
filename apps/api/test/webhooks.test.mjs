@@ -438,7 +438,7 @@ describe('Vercel Queues transport', () => {
     queuePrisma = queued.app.get((await import('../dist/database/prisma.service.js')).PrismaService);
     queueDelivery = queued.app.get((await import('../dist/webhooks/delivery.service.js')).WebhookDeliveryService);
     const { WebhookQueue } = await import('../dist/webhooks/queue.js');
-    // Stands in for the Vercel function (api/webhook-queue.mjs): Node request with a parsed JSON body.
+    // Stands in for a Vercel Queues push function: Node request with a parsed JSON body.
     const handle = queued.app.get(WebhookQueue).nodeHandler(message => queueDelivery.handleQueueMessage(message));
     const { default: express } = await import('express');
     const fn = express();
@@ -527,11 +527,7 @@ describe('Vercel Queues transport', () => {
     assert.equal(hook.state.calls.length, 0);
   });
 
-  test('the Vercel function exports the consumer; the database transport has none and queues nothing', async () => {
-    const fn = await import('../api/webhook-queue.mjs');
-    assert.equal(typeof fn.default, 'function');
-    const vercel = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
-    assert.deepEqual(vercel.functions['api/webhook-queue.mjs'].experimentalTriggers[0], { type: 'queue/v2beta', topic: 'webhook-deliveries', retryAfterSeconds: 30 });
+  test('the database transport has no consumer and queues nothing', async () => {
     const { WebhookQueue } = await import('../dist/webhooks/queue.js');
     const databaseQueue = server.app.get(WebhookQueue);
     assert.equal(databaseQueue.enabled, false);

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { QueueClient, type RetryHandler } from '@vercel/queue';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 
-/** The Vercel Queues topic; its consumer trigger is configured in vercel.json. */
+/** The Vercel Queues topic. Unused on the droplet (`WEBHOOK_QUEUE` defaults to `database` off Vercel). */
 export const webhookTopic = 'webhook-deliveries';
 
 /** A message says "this endpoint has deliveries due (now or after the delay)". */
@@ -54,7 +54,7 @@ export class WebhookQueue {
   }
 
   /**
-   * The push consumer: a Connect-style handler for the Vercel Queues callback (`api/webhook-queue.mjs`, triggered by
+   * The push consumer: a Connect-style handler for the Vercel Queues callback (a Vercel function triggered by
    * the `webhook-deliveries` topic). A forged callback can only make the API deliver work that is already due, and the
    * queue service refuses to acknowledge it. A busy endpoint returns the message for a short wait.
    */

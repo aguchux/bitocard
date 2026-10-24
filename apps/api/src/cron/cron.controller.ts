@@ -38,7 +38,8 @@ import { RepliesService } from '../support/replies.service.js';
 import { TicketsService } from '../support/tickets.service.js';
 
 /**
- * Scheduled jobs, called by Vercel Cron (see vercel.json) with `Authorization: Bearer <CRON_SECRET>`.
+ * Scheduled jobs, called by the droplet's scheduler (`scripts/scheduler.mjs`, schedules in `cron.json`) with
+ * `Authorization: Bearer <CRON_SECRET>`.
  * Every job is safe to run twice or late.
  */
 @ApiExcludeController()

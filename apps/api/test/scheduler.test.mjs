@@ -26,15 +26,13 @@ describe('schedules', () => {
     for (const bad of ['* * * *', '61 * * * *', '*/0 * * * *', 'every minute * * * *']) assert.throws(() => parseSchedule(bad));
   });
 
-  test('cron.json schedules every job the API has, and matches vercel.json while both exist', () => {
+  test('cron.json schedules every job the API has', () => {
     const jobs = loadJobs();
     const source = readFileSync(new URL('../src/cron/cron.controller.ts', import.meta.url), 'utf8');
     const table = source.slice(source.indexOf('this.jobs = {'), source.indexOf('@Get('));
     const defined = [...table.matchAll(/^\s{6}'?([a-z-]+)'?: (?:async )?\(\) =>/gm)].map(match => match[1]).sort();
     assert.ok(defined.length >= 20, 'the job table was read');
     assert.deepEqual(jobs.map(job => job.job).sort(), defined);
-    const vercel = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
-    if (vercel.crons) assert.deepEqual(vercel.crons.map(cron => [cron.path.replace('/v1/cron/', ''), cron.schedule]).sort(), jobs.map(job => [job.job, job.schedule]).sort());
   });
 });
 
