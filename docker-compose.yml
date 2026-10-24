@@ -1,4 +1,4 @@
-# Local environment: the same services the API uses on Vercel (Postgres and Upstash-style Redis).
+# Local environment: the same services the API uses in production (Postgres and Upstash-style Redis).
 #   npm run docker:up     start everything and wait until healthy
 #   npm run docker:down   stop (data is kept in named volumes; add -v to wipe it)
 name: bitocard
@@ -52,6 +52,10 @@ services:
       UPSTASH_REDIS_REST_URL: http://redis-http:80
       UPSTASH_REDIS_REST_TOKEN: local_token
       LOG_LEVEL: info
+      # Plain http://localhost here; production (APP_ENV=production) always uses secure cookies.
+      COOKIE_SECURE: "off"
+    # Migrations are a deploy step on the droplet; locally, run them before starting.
+    command: ["sh", "-c", "node scripts/migrate-deploy.mjs && node dist/main"]
     ports: ["3001:3001"]
     depends_on:
       postgres:

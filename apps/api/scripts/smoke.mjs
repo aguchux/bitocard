@@ -18,6 +18,8 @@ test(`health is ok and the database is reachable (${base})`, async () => {
   const body = await res.json();
   assert.equal(body.status, 'ok');
   assert.equal(body.checks.database, 'ok');
+  // After a droplet deploy: the address serves the image just deployed, not an old one (or the old host).
+  if (process.env.EXPECT_COMMIT) assert.equal(body.commit, process.env.EXPECT_COMMIT.slice(0, 7), `serving ${body.commit}, expected ${process.env.EXPECT_COMMIT.slice(0, 7)}`);
 });
 
 test('security headers and request IDs are present', async () => {

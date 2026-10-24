@@ -1,0 +1,97 @@
+# The API on the DigitalOcean droplet (deploy/droplet/README.md): on each push to main that touches it, build its image,
+# push it to GitHub's container registry, deploy it over SSH (migrations, then the new image, waiting until healthy),
+# then smoke test it (API_SMOKE_URL, default api.bitocard.com) and check it serves this commit.
+#
+# The deploy job runs only once the repository variable API_DROPLET_HOST is set (Settings > Secrets and variables >
+# Actions > Variables), with the secrets API_DROPLET_SSH_KEY (the deploy user's private key) and
+# API_DROPLET_KNOWN_HOSTS (`ssh-keyscan <host>`). Until then images are built and pushed only.
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/api/**
+      - packages/eslint-config/**
+      - packages/typescript-config/**
+      - package.json
+      - package-lock.json
+      - turbo.json
+      - deploy/droplet/**
+      - .github/workflows/deploy-api.yml
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Deploy this image instead of building (a rollback), for example ghcr.io/aguchux/bitocard-api:<commit>
+        required: false
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    if: ${{ !inputs.image }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.name.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/bitocard-api:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          build-args: GIT_COMMIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ steps.name.outputs.image }}
+            ghcr.io/${{ github.repository_owner }}/bitocard-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    if: ${{ always() && vars.API_DROPLET_HOST != '' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.image)) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      IMAGE: ${{ inputs.image || needs.build.outputs.image }}
+      HOST: ${{ vars.API_DROPLET_HOST }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.API_DROPLET_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.API_DROPLET_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Copy the droplet's files
+        run: scp deploy/droplet/docker-compose.yml deploy/droplet/Caddyfile deploy/droplet/deploy.sh "deploy@$HOST:/opt/bitocard/"
+      - name: Deploy ${{ env.IMAGE }}
+        # The job's own token pulls the private image: sent on SSH's input (never on a command line), logged out after.
+        run: |
+          echo "$REGISTRY_TOKEN" | ssh "deploy@$HOST" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin >/dev/null && sh /opt/bitocard/deploy.sh '$IMAGE'; status=\$?; docker logout ghcr.io >/dev/null; exit \$status"
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # Before api.bitocard.com moves to the droplet, API_SMOKE_URL is its test address (https://api-next.bitocard.com).
+      - name: Smoke test
+        run: node apps/api/scripts/smoke.mjs "${{ vars.API_SMOKE_URL || 'https://api.bitocard.com' }}"
+        env:
+          EXPECT_COMMIT: ${{ inputs.image && '' || github.sha }}

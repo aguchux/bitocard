@@ -7,6 +7,12 @@ const list = z
 const flag = z.enum(['on', 'off']).transform(value => value === 'on');
 
 export const configSchema = z.object({
+  /**
+   * Which deployment this is, wherever it runs: `production` on the DigitalOcean droplet (`deploy/droplet`), set
+   * there explicitly. Unset: Vercel's own VERCEL_ENV, else local. Production means secure cookies and no private
+   * webhook addresses.
+   */
+  APP_ENV: z.enum(['production', 'preview', 'development']).optional(),
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
   /** Set to 1 by Vercel at build and run time. */
   VERCEL: z.string().optional(),
@@ -23,7 +29,8 @@ export const configSchema = z.object({
   AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
   /**
    * How many proxies in front of the API to trust for the client's address (`X-Forwarded-For`): 1 on Vercel (its edge
-   * sets the header) or behind one load balancer; 0 when clients connect directly. Never "all": the client writes the
+   * sets the header) or behind one proxy (the droplet's Caddy, which writes the visitor's address from Cloudflare's
+   * CF-Connecting-IP only for requests from Cloudflare's own ranges); 0 when clients connect directly. Never "all": the client writes the
    * left end of the header, so trusting every hop lets anyone choose their own address and dodge per-address limits.
    */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
@@ -310,7 +317,12 @@ export const configSchema = z.object({
   EVENTS_SETTLE_SECONDS: z.coerce.number().int().min(0).max(60).default(5),
 });
 
-export type AppConfig = z.infer<typeof configSchema> & { cookieSecure: boolean; webhookQueue: 'vercel' | 'database' };
+export type AppConfig = z.infer<typeof configSchema> & {
+  /** APP_ENV, else Vercel's VERCEL_ENV; undefined when running locally or in tests. */
+  appEnv: 'production' | 'preview' | 'development' | undefined;
+  cookieSecure: boolean;
+  webhookQueue: 'vercel' | 'database';
+};
 
 /** Empty strings count as unset, so a blank line in .env never fails validation. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -321,12 +333,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error(`Invalid environment configuration: ${problems}`);
   }
   const config = parsed.data;
-  if (config.WEBHOOK_ALLOW_PRIVATE_URLS && config.VERCEL_ENV === 'production') {
+  const appEnv = config.APP_ENV ?? config.VERCEL_ENV;
+  if (config.WEBHOOK_ALLOW_PRIVATE_URLS && appEnv === 'production') {
     throw new Error('Invalid environment configuration: WEBHOOK_ALLOW_PRIVATE_URLS must be off in production');
+  }
+  // Session cookies over plain HTTP in production would leak sessions: refuse to start rather than run that way.
+  if (config.COOKIE_SECURE === false && appEnv === 'production') {
+    throw new Error('Invalid environment configuration: COOKIE_SECURE must be on in production');
   }
   return {
     ...config,
-    cookieSecure: config.COOKIE_SECURE ?? Boolean(config.VERCEL_ENV),
+    appEnv,
+    cookieSecure: config.COOKIE_SECURE ?? Boolean(appEnv),
     webhookQueue: config.WEBHOOK_QUEUE ?? (config.VERCEL === '1' ? 'vercel' : 'database'),
   };
 }

@@ -12,8 +12,9 @@ export class HealthService {
     return {
       status: database === 'unavailable' ? 'degraded' : 'ok',
       service: 'bitocard-api',
-      environment: process.env.VERCEL_ENV ?? 'local',
-      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
+      environment: process.env.APP_ENV ?? process.env.VERCEL_ENV ?? 'local',
+      // The droplet's deploy sets GIT_COMMIT_SHA; Vercel sets its own.
+      commit: (process.env.GIT_COMMIT_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA)?.slice(0, 7) ?? null,
       checks: { database },
     };
   }

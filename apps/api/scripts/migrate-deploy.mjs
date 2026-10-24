@@ -1,4 +1,4 @@
-// Applies pending migrations during a Vercel build. Skips (without failing) when no database is configured,
+// Applies pending migrations: during a Vercel build, and as the droplet deploy's first step (deploy/droplet/deploy.sh). Skips (without failing) when no database is configured,
 // so builds of branches without a database still succeed. Migrates over the direct (non-pooled) address
 // (`migrate-url.mjs`), and retries when Prisma's migration lock is briefly held by another run.
 import { execSync } from 'node:child_process';

@@ -1,0 +1,63 @@
+# The API on the DigitalOcean droplet: the API itself, the scheduler that runs its jobs, and Caddy in front.
+# Lives in /opt/bitocard on the droplet; CI copies it there and runs deploy.sh with the image to run
+# (.github/workflows/deploy-api.yml). Secrets are in /etc/bitocard/api.env, never in this repository.
+# Runbook: deploy/droplet/README.md.
+name: bitocard
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: "5"
+
+services:
+  api:
+    image: ${API_IMAGE:?API_IMAGE is set by deploy.sh}
+    env_file: /etc/bitocard/api.env
+    environment:
+      APP_ENV: production
+      PORT: "3001"
+      # One proxy (Caddy), which writes the visitor's address from Cloudflare's CF-Connecting-IP.
+      TRUST_PROXY: "1"
+    expose: ["3001"]
+    init: true
+    # Lets requests in flight finish when a deploy replaces the container.
+    stop_grace_period: 30s
+    restart: unless-stopped
+    logging: *logging
+
+  # Calls each job in apps/api/cron.json on its schedule (UTC), straight to the API, never through Cloudflare.
+  scheduler:
+    image: ${API_IMAGE:?API_IMAGE is set by deploy.sh}
+    command: ["node", "scripts/scheduler.mjs"]
+    env_file: /etc/bitocard/api.env
+    environment:
+      API_INTERNAL_URL: http://api:3001
+    healthcheck:
+      disable: true
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Cloudflare's origin certificate for api.bitocard.com (origin.pem, origin.key).
+      - /etc/bitocard/certs:/etc/caddy/certs:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  caddy-data:
+  caddy-config:

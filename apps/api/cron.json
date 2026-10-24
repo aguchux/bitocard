@@ -1,0 +1,105 @@
+{
+  "$comment": "When each scheduled job (GET /v1/cron/<job>) runs, in UTC. The droplet scheduler (scripts/scheduler.mjs) reads this; vercel.json keeps the same list while the API is still on Vercel (test/scheduler.test.mjs checks they match).",
+  "jobs": [
+    {
+      "job": "exchange-rates",
+      "schedule": "5 * * * *"
+    },
+    {
+      "job": "payments",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "job": "checkout",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "job": "earnings",
+      "schedule": "15 * * * *"
+    },
+    {
+      "job": "plans",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "job": "invoices",
+      "schedule": "20 * * * *"
+    },
+    {
+      "job": "catalogue",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "job": "orders",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "job": "crypto",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "job": "crypto-reconcile",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "job": "chain-health",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "job": "numbers",
+      "schedule": "20 * * * *"
+    },
+    {
+      "job": "domains",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "job": "esims",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "job": "vpn",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "job": "vpn-reconcile",
+      "schedule": "40 3 * * *"
+    },
+    {
+      "job": "support",
+      "schedule": "20 4 * * *"
+    },
+    {
+      "job": "support-replies",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "job": "webhooks",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "job": "webhooks-cleanup",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "job": "identity",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "job": "supplier-webhooks",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "job": "push",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "job": "notifications-cleanup",
+      "schedule": "50 3 * * *"
+    },
+    {
+      "job": "media-cleanup",
+      "schedule": "55 3 * * *"
+    }
+  ]
+}
