@@ -385,7 +385,7 @@ export type AdminPricePreview = {
     rule: ResolvedPriceRule;
     scheme: 'discount' | 'markup' | null;
     sellable: boolean;
-    reason: 'not_offered' | 'cost_above_face_value' | 'price_below_cost' | 'not_priced' | null;
+    reason: 'not_offered' | 'cost_above_face_value' | 'price_below_cost' | 'no_exchange_rate' | 'not_priced' | null;
     wholesale: number | null;
     bitocard_profit: number | null;
     reseller_discount: number | null;

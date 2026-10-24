@@ -110,4 +110,19 @@ describe('exchange rates', () => {
     const support = await adminClient(server, ['support']);
     assert.equal((await support.patch('/v1/admin/currencies/NGN', { margin_bps: 100 })).status, 403);
   });
+
+  test("a supplier's own currency (Zendit's wallet in pounds) gets a rate like a market's, from the reference rate alone", async () => {
+    const product = await prisma.product.create({ data: { key: `airtime:NG:fx-test:${Date.now()}`, category: 'airtime', country: 'NG', brand: 'fx-test', name: 'FX test', faceCurrency: 'NGN', denominationType: 'range', minValueMinor: 5000n, maxValueMinor: 5_000_000n } });
+    await prisma.supplierProduct.create({ data: { supplierCode: 'zendit', productId: product.id, sku: `fx-test-${Date.now()}`, costCurrency: 'GBP', costRatio: 0.0005, syncedAt: new Date() } });
+    oxr.state.rates = { NGN: 1500, GHS: 15, KES: 129, GBP: 0.75 };
+    flw.state.rates = { NGN: 1520, GHS: 15.05, KES: 130 };
+    const asked = flw.calls.length;
+    const run = await refresh();
+    assert.equal(run.result.fetched.open_exchange_rates, 4);
+    assert.equal(run.result.fetched.flutterwave, 3, 'Flutterwave is asked only for the markets’ currencies');
+    assert.ok(!flw.calls.slice(asked).some(call => call.url.includes('GBP')));
+    const { GBP } = await rates();
+    assert.equal(GBP.available, true);
+    assert.equal(GBP.pay, '0.76125', '0.75 plus 1.5%');
+  });
 });

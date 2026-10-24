@@ -64,8 +64,12 @@ export class FxService {
 
   /** Fetches the latest rates from every configured source, then checks them against each other. */
   async refresh() {
+    await this.trackSupplierCurrencies();
     const settings = await this.prisma.currencySetting.findMany();
     const currencies = settings.map(s => s.currency);
+    // Flutterwave's offered rates are for the markets' own currencies (what payers pay in); a supplier's currency is
+    // priced from the reference rate alone.
+    const markets = new Set((await this.prisma.country.findMany({ select: { currency: true } })).map(country => country.currency));
     const fetched: Record<string, number> = {};
     const errors: string[] = [];
     const now = new Date();
@@ -84,7 +88,7 @@ export class FxService {
     }
     if (this.providers.flutterwave) {
       let count = 0;
-      for (const currency of currencies) {
+      for (const currency of currencies.filter(code => markets.has(code))) {
         try {
           await this.store(currency, 'flutterwave', await this.providers.flutterwave.unitsPerUsd(currency), now);
           count += 1;
@@ -105,6 +109,21 @@ export class FxService {
       }
     }
     return { fetched, errors: errors.length, paused };
+  }
+
+  /**
+   * Gives every currency a supplier charges in (Zendit's wallet in pounds) or prices face values in (a UK gift card's
+   * pounds) a currency setting, so its rate is fetched like a market's. Without one, every offer in it is unpriceable.
+   */
+  private async trackSupplierCurrencies() {
+    const [offers, own, products] = await Promise.all([
+      this.prisma.supplierProduct.findMany({ where: { available: true }, distinct: ['costCurrency'], select: { costCurrency: true } }),
+      this.prisma.resellerOffer.findMany({ where: { available: true }, distinct: ['costCurrency'], select: { costCurrency: true } }),
+      this.prisma.product.findMany({ where: { active: true }, distinct: ['faceCurrency'], select: { faceCurrency: true } }),
+    ]);
+    const used = new Set([...offers.map(row => row.costCurrency), ...own.map(row => row.costCurrency), ...products.map(row => row.faceCurrency)]);
+    const missing = [...used].map(code => code.trim().toUpperCase()).filter(code => code !== 'USD' && /^[A-Z]{3}$/.test(code));
+    if (missing.length) await this.prisma.currencySetting.createMany({ data: missing.map(currency => ({ currency })), skipDuplicates: true });
   }
 
   private store(currency: string, source: string, unitsPerUsd: number, fetchedAt: Date) {

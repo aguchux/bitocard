@@ -482,6 +482,23 @@ describe('quotes', () => {
     }
   });
 
+  test("an offer in a currency with no rate (a supplier's wallet in pounds) is left out, never the whole product", async () => {
+    const padi = await productId('pay_tv:NG:dstv:dstv-padi');
+    await prisma.supplier.update({ where: { code: 'quickteller' }, data: { enabled: true } });
+    await prisma.supplierMarket.create({ data: { supplierCode: 'quickteller', countryCode: 'NG', category: 'pay_tv', enabled: true } });
+    await prisma.supplierProduct.create({ data: { supplierCode: 'quickteller', productId: padi, sku: 'qt-dstv-padi-gbp', costCurrency: 'GBP', costRatio: 0.0003, syncedAt: new Date() } });
+    try {
+      const { browser } = await resellerClient(server);
+      const quote = await browser.post('/v1/quotes', { product_id: padi, face_value: 360_000, recipient: { account_number: '1212121212' } }, sandbox);
+      assert.equal(quote.status, 201, JSON.stringify(quote.json));
+      assert.equal((await prisma.quote.findUnique({ where: { id: quote.json.id } })).supplierCode, 'vtpass');
+    } finally {
+      await prisma.supplierProduct.deleteMany({ where: { supplierCode: 'quickteller' } });
+      await prisma.supplierMarket.deleteMany({ where: { supplierCode: 'quickteller' } });
+      await prisma.supplier.update({ where: { code: 'quickteller' }, data: { enabled: false } });
+    }
+  });
+
   test('quotes need the quotes:write scope', async () => {
     const { browser } = await resellerClient(server);
     const readOnly = (await browser.post('/v1/api-keys', { name: 'Read', mode: 'test', scopes: ['catalogue:read'] })).json.secret;

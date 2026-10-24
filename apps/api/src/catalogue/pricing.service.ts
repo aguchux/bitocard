@@ -342,12 +342,21 @@ export class PricingService {
   async price(ctx: PricingContext, product: ProductWithOffers, faceValue: bigint, exclude?: ReadonlySet<string>): Promise<Priced> {
     const face = await this.faceIn(ctx, product, faceValue);
     let best: (Priced & { offer: Offer }) | null = null;
+    let unconverted: ApiError | null = null;
     for (const offer of this.eligibleOffers(ctx, product, exclude)) {
-      const priced = await this.priceOffer(ctx, product, faceValue, face, offer);
+      // An offer whose cost currency has no usable rate (a supplier's wallet currency not fetched, or paused) is left
+      // out, never the whole product: another supplier may still sell it.
+      const priced = await this.priceOffer(ctx, product, faceValue, face, offer).catch((error: unknown) => {
+        if (error instanceof ApiError && error.code === 'conversion_unavailable') {
+          unconverted = error;
+          return null;
+        }
+        throw error;
+      });
       if (!priced) continue;
       if (!best || priced.cost < best.cost || (priced.cost === best.cost && offer.priority < best.offer.priority)) best = priced;
     }
-    if (!best) throw unavailable('product_unavailable', 'This product is not available right now.');
+    if (!best) throw unconverted ?? unavailable('product_unavailable', 'This product is not available right now.');
     return best;
   }
 
@@ -414,7 +423,7 @@ export class PricingService {
     try {
       return await this.price(ctx, product, faceValue);
     } catch (error) {
-      if (own && error instanceof ApiError && error.code === 'product_unavailable') return own;
+      if (own && error instanceof ApiError && (error.code === 'product_unavailable' || error.code === 'conversion_unavailable')) return own;
       throw error;
     }
   }
@@ -743,7 +752,7 @@ export class PricingService {
         rule: presentResolved(priced?.rule ?? rule),
         scheme: priced ? (priced.basis === 'discount' ? 'discount' : 'markup') : null,
         sellable: Boolean(priced),
-        reason: priced ? null : !eligible ? 'not_offered' : rule.kind === 'discount' ? 'cost_above_face_value' : rule.kind === 'fixed' ? 'price_below_cost' : 'not_priced',
+        reason: priced ? null : !eligible ? 'not_offered' : cost === null ? 'no_exchange_rate' : rule.kind === 'discount' || (rule.kind === 'auto' && offerFaceLocal !== null && cost > offerFaceLocal) ? 'cost_above_face_value' : rule.kind === 'fixed' ? 'price_below_cost' : 'not_priced',
         wholesale: priced ? minor(priced.wholesale) : null,
         bitocard_profit: priced ? minor(priced.wholesale - priced.cost) : null,
         reseller_discount: priced && priced.basis === 'discount' ? minor(priced.face - priced.wholesale) : null,

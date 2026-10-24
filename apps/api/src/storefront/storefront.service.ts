@@ -118,10 +118,9 @@ export class StorefrontService {
     if (!currency) return undefined;
     const settings = await this.prisma.currencySetting.findMany({ select: { currency: true } });
     const perUsd = new Map<string, Decimal>([['USD', new Decimal(1)]]);
-    for (const { currency: code } of settings) {
-      const rate = await this.fx.rate(code).catch(() => null);
-      if (rate) perUsd.set(code, rate.pay);
-    }
+    // Suppliers' currencies are tracked too (a UK gift card's pounds), so read them together rather than one by one.
+    const rates = await Promise.all(settings.map(({ currency: code }) => this.fx.rate(code).catch(() => null)));
+    for (const rate of rates) if (rate) perUsd.set(rate.currency, rate.pay);
     return perUsd.has(currency) ? { currency, perUsd } : undefined;
   }
 

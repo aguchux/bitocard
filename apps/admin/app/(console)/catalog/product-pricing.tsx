@@ -45,6 +45,7 @@ const reasons: Record<string, string> = {
   not_offered: "Not offered in this market",
   cost_above_face_value: "Costs more than face value: cannot be sold at a discount",
   price_below_cost: "The fixed price is below cost",
+  no_exchange_rate: "No exchange rate for the supplier's currency",
   not_priced: "Not priced",
 };
 
