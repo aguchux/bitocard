@@ -14,7 +14,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # Lint, typecheck, build and the in-process tests take about 12 minutes; the API and signer tests against Postgres
+    # and Redis follow, so 20 minutes cut them off.
+    timeout-minutes: 45
 
     services:
       postgres:

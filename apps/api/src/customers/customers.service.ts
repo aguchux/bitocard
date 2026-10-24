@@ -50,9 +50,11 @@ export function presentCustomer(customer: Customer & { market?: Pick<Country, 'c
  * `meta.driverAdapterError.cause.constraint.fields`.
  */
 function violatedFields(error: Prisma.PrismaClientKnownRequestError): string[] {
-  const meta = error.meta as { target?: unknown; driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } } } | undefined;
-  const fromDriver = meta?.driverAdapterError?.cause?.constraint?.fields;
-  if (Array.isArray(fromDriver)) return fromDriver.filter((field): field is string => typeof field === 'string');
+  const meta = error.meta as { target?: unknown; driverAdapterError?: { cause?: { constraint?: { fields?: unknown; index?: unknown } } } } | undefined;
+  // The driver names the columns (PGlite) or only the index (Postgres: `customers_store_id_phone_key`); either says which.
+  const constraint = meta?.driverAdapterError?.cause?.constraint;
+  if (Array.isArray(constraint?.fields)) return constraint.fields.filter((field): field is string => typeof field === 'string');
+  if (typeof constraint?.index === 'string') return [constraint.index];
   const target = meta?.target;
   if (Array.isArray(target)) return target.filter((field): field is string => typeof field === 'string');
   return typeof target === 'string' ? [target] : [];
