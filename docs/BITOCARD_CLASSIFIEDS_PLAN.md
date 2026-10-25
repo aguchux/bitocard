@@ -1,10 +1,10 @@
 # BitoCard Classifieds: implementation plan
 
-**Status:** plan, 25 October 2026. Nothing built. The owner decided on 25 October 2026: **Safe pay from the start**, as **the buyer's opt-in per purchase**, with **fees on both sides, each capped**: the buyer pays x% of the price on top and the seller y% out of what they are paid, each the percentage or that side's cap, whichever is smaller, all set by admins; **anyone can sell and anyone can buy** (every account does both, with no seller approval; B2B open to all); **inside the customer account app on each country store** (`ng.bitocard.com/shop`; Shop takes the account app's last tab, Account moving to the header), not a separate app; and phase 1 first (shops, deals and B2B in phase 2). The other recommended defaults below stand unless changed.
+**Status:** plan, 25 October 2026. Nothing built. The owner decided on 25 October 2026: **Safe pay from the start**, as **the buyer's opt-in per purchase**, with **fees on both sides, each capped**: the buyer pays x% of the price on top and the seller y% out of what they are paid, each the percentage or that side's cap, whichever is smaller, all set by admins; **anyone can sell and anyone can buy** (every account does both, with no seller approval; B2B open to all); the **public marketplace at `shop.bitocard.com`**, every page carrying its country (`shop.bitocard.com/ng/…`), with a price-free global showcase across countries, and each customer's **management in the Shop tab of the account app** on their country store (`ng.bitocard.com/shop`; Shop takes the last tab, Account moving to the header); and phase 1 first (shops, deals and B2B in phase 2). The other recommended defaults below stand unless changed.
 
 ## What we are building
 
-**BitoCard Classifieds** (the **Shop**, at `/shop` on BitoCard's country stores, `https://ng.bitocard.com/shop`, in `apps/storefront`): an open market where anyone posts items for sale and buyers contact sellers, in the style of Jiji, plus **shops**: businesses with their own page, many listings and deals. It serves people buying from people and businesses (C2C, B2C), and businesses buying stock from other businesses (B2B: wholesale quantities and prices).
+**BitoCard Shop** (Classifieds): browsed at `https://shop.bitocard.com` (`apps/shop`; each country's market at `/<cc>`, for example `/ng`), managed in the **Shop** tab of the customer account app on the customer's country store (`https://ng.bitocard.com/shop`, `apps/storefront`): an open market where anyone posts items for sale and buyers contact sellers, in the style of Jiji, plus **shops**: businesses with their own page, many listings and deals. It serves people buying from people and businesses (C2C, B2C), and businesses buying stock from other businesses (B2B: wholesale quantities and prices).
 
 - **Anyone can sell and anyone can buy.** There are no seller or buyer accounts: every BitoCard account (signing up is open to anyone) can post listings and buy, and no one needs approval to start. Posting is free (limited per month, against spam). Anyone can also open a **shop** for more listings, a shop page and deals; businesses that pass BitoCard Verify KYB get the **Verified business** badge.
 - **Buyers** browse and search without an account. To contact a seller they sign in, then chat in the app or reveal the seller's phone number (when the seller has confirmed one and chosen to show it).
@@ -19,9 +19,10 @@ What it is not: not part of the reseller storefronts (resellers' customers do no
 
 | Question | Decision | Why |
 |---|---|---|
-| Address | **`<country>.bitocard.com/shop`** in the storefront (`apps/storefront`), on BitoCard's own country stores only (owner's decision, replacing `shop.bitocard.com` and `apps/shop`). The account app's tabs become Home, Catalog, Orders, Wallet, Crypto, **Shop**: Shop takes the last tab, and Account moves to the header (the account button and the menu drawer). Shop has its own sub menu: Browse, Post an ad, My listings, Messages, Orders, Favourites, Safe pay | One place for everything a customer does with BitoCard, no new app or Vercel project, and the country comes from the store's own address. |
-| Accounts | **bitocard.com customer accounts**, which country stores already share (`StoreSellers.accountStore`, the `bc_customer` cookie the storefront already keeps per host), so no extra sign-in | One account for buying gift cards and selling. |
-| Which country | **The store's address decides it:** `ng.bitocard.com/shop` is Nigeria's market, `gh.bitocard.com/shop` Ghana's. A listing belongs to one country, is priced in its currency and never shows in another's. People post only in their account's own (fixed) country, and Safe pay works only between people of the same country; browsing another open country's Shop is fine. `bitocard.com/shop` sends a signed-in customer to their country's store, and a visitor to the market they chose (`bc_market`), else asks | Each country is its own market anyway (currency, Safe pay, payouts, fees, legal review); the country stores already exist. |
+| Address | Two places with one job each (owner's decision): **`shop.bitocard.com`** (`apps/shop`, Vercel project `bitocard-shop`) is the **only public marketplace**: browsing, listing pages, contacting and buying. **`<country>.bitocard.com/shop`** is the customer's **Shop tab** in the account app: post an ad, my listings, messages, orders, favourites and Safe pay set-up, private and never indexed. The tabs become Home, Catalog, Orders, Wallet, Crypto, **Shop**; Account moves to the header (the account button and the menu drawer) | Every listing has one public address, so nothing is duplicated for search engines, all the marketplace's search authority builds on one host, and everyday management sits with the rest of the customer's BitoCard account. |
+| Which country | **In the address, always:** `shop.bitocard.com/ng/…` is Nigeria's market, `/gh/…` Ghana's. Never from a cookie or the IP address alone: the same address always shows the same thing (search engines crawl without cookies, mostly from the US; shared links must open the same listing for everyone; pages are cached by address). The visitor's chosen market is remembered (a cookie on `shop.bitocard.com`) only to offer "Continue to Nigeria" and to skip the switch prompt. A listing belongs to one country, is priced in its currency and never shows in another's market; people post only in their account's own (fixed) country, and Safe pay works only between people of the same country | Each country is its own market anyway (currency, Safe pay, payouts, fees, legal review). |
+| Global showcase | **`shop.bitocard.com`** lists listings from every open country with photo, name, the country's flag and the seller, **never a price** (no conversions). A listing's link goes straight to its country page; a visitor who has not chosen that country is first asked "This is in Nigeria. Switch to the Nigeria market to see prices in naira?" (remembered). Once a country is chosen, prices show in its own currency. **Shown from the second country**: while only Nigeria is open, `shop.bitocard.com` redirects (302, not 301) to `/ng` | One market shown as "worldwide" looks empty. Diaspora buyers simply see naira. |
+| Accounts | **bitocard.com customer accounts** everywhere (`StoreSellers.accountStore`). `shop.bitocard.com` keeps its own host-only `bc_customer` cookie and sends `BitoCard-Store: bitocard`; **"Continue with your BitoCard account"** signs in with one click when the customer is already signed in on their country store (the handoff, below), and the same from the Shop tab back to `shop.bitocard.com` | One account for buying gift cards and selling, with no second password step. |
 | Resellers' stores | **No Shop**: Classifieds is BitoCard's own, so resellers' stores keep Account as the last tab | Listings, chats and Safe pay are between BitoCard's customers. |
 | Who sells and buys | **Anyone** (owner's decision): any signed-in account sells and buys, with no approval. The account's email is confirmed, as for every bitocard.com account; a phone is optional (it earns the Phone confirmed badge and is needed for Show phone). Shops are open to anyone; KYB through BitoCard Verify earns the Verified business badge. Being paid through Safe pay still needs the identity check and a payout account (below) | Lowest barrier to listing, as on Jiji. Scams are held back by moderation, posting limits, reports, badges that buyers can filter on, and Safe pay. |
 | Payments | **Safe pay in phase 1** (owner's decision), **the buyer's opt-in per purchase**; buyers who do not opt in carry on in chat or by phone and pay the seller directly | Buyer protection is the reason to choose BitoCard over a plain classifieds site. It is a regulated activity: see Legal owed. |
@@ -162,7 +163,7 @@ Buyer and seller agree how to pay, inspect, test and stay safe. BitoCard gives t
   7. Prohibited items (the marketplace terms) and personal data: share only what a trade needs, never ID photos.
   8. Reporting and blocking; what BitoCard does about it (removal, suspension, help to the police on a lawful request).
   9. Safe pay as the protected option, and its release code given only after inspection.
-- **The Safe Trade Guide** (`/shop/safe-trade`, short and printable): a checklist for each side.
+- **The Safe Trade Guide** (`shop.bitocard.com/safe-trade`, short and printable): a checklist for each side.
   - **Before meeting:** chat on BitoCard; check the seller's badges and reviews; is the price realistic; agree the place, time and how to pay; tell someone.
   - **At the meeting:** public place, daylight; inspect and test with the category's checklist; check documents and serial numbers; pay only when satisfied, and confirm a transfer in the banking app.
   - **Sellers:** money in your account before hand-over; refuse overpayments; check notes.
@@ -171,17 +172,18 @@ Buyer and seller agree how to pay, inspect, test and stay safe. BitoCard gives t
 
 ## Country and locality
 
-- **Country** is a hard boundary, from the store's address (above): every query is limited to that country.
+- **Country** is a hard boundary, from the address (`shop.bitocard.com/<cc>`, above): every query is limited to that country.
 - **Locality is a ranking, never a filter.** Areas are country, state, then city or area (`classified_areas`), each area with a centre point (public map data, never anyone's position), so nearby areas can be ordered by distance.
   - The visitor chooses their locality ("Lagos > Ikeja"); it is remembered in a cookie, and a signed-in customer can save a home area on their profile. An optional **Use my location** matches them to the nearest area in the browser; the position is never sent or kept.
   - Never guessed from the IP address: Nigerian mobile networks often route through Lagos, so a buyer in Abuja would see Lagos.
   - Results run local first: in the area, then nearby areas, then the rest of the state, then the whole country, each as its own heading, so a small town's search is never empty. In SQL: the country always in the `WHERE`, then sorted by that tier before the chosen sort (listings keep `state_id` beside `area_id`; index on country, status, state and area).
 - **Delivers to:** a seller can mark a listing "Delivers to my state" or "nationwide"; it then also shows in other areas' results, labelled **Delivers to you** (most useful for shops and B2B).
-- **Location pages** for search engines: `/shop/lagos`, `/shop/lagos/ikeja`, `/shop/lagos/ikeja/phones`, server-rendered with their own titles, one sitemap per country store; a page with very few listings points search engines to its state's page so thin pages do not hurt the rest.
+- **Location pages** for search engines: `/ng/lagos`, `/ng/lagos/ikeja`, `/ng/lagos/ikeja/phones` on `shop.bitocard.com`, server-rendered with their own titles and a short unique introduction; one with very few listings is `noindex` and points to its state's page, so thin pages do not hurt the rest.
 
 ## API (`/v1/classifieds`, `src/classifieds`)
 
-- **Public, cached a minute** (`@Public`, `?store=<country store>`, which sets the country; `area` and `near` for the locality): `GET features?q=` (the library, searched by name and search words), `GET categories` (with their suggested features), `GET areas`, `GET listings` (filters, sort, cursor paging), `GET listings/:id`, `GET search/suggest`; phase 2 `GET shops/:slug`, `GET deals`.
+- **Public, cached a minute** (`@Public`, `?country=<cc>`, required except for the global showcase's `GET showcase`, which returns no prices; `area` and `near` for the locality): `GET features?q=` (the library, searched by name and search words), `GET categories` (with their suggested features), `GET areas`, `GET listings` (filters, sort, cursor paging), `GET listings/:id`, `GET search/suggest`; phase 2 `GET shops/:slug`, `GET deals`.
+- **Sign-in handoff** (`POST /v1/store/account/handoff { to }`, a signed-in customer on one BitoCard host, `to` one of BitoCard's own origins: a one-time code, 60 seconds, only its hash kept, bound to that origin; `POST /v1/store/account/handoff/exchange { code }` from the other host's server: a new session there). The code travels in the address's fragment and is posted by the page, as BitoCard Verify's links are, so it never reaches a log or a Referer.
 - **Signed-in customers** (`CustomerGuard`, the house store's accounts):
   - Listings: `POST/PATCH/DELETE listings(/:id)`, `POST listings/:id/media` (multipart, a photo or the video), `PATCH listings/:id/media` (order), `DELETE listings/:id/media/:media`, `POST listings/:id/renew|sold`, `GET me/listings`.
   - Contact: `POST listings/:id/phone` (reveal), `GET/POST conversations(/:id/messages)`, `POST conversations/:id/block`, `GET/POST/DELETE favourites`, `POST reports`.
@@ -191,22 +193,51 @@ Buyer and seller agree how to pay, inspect, test and stay safe. BitoCard gives t
 - **Payments:** no payment pages of its own: Safe pay is paid from the wallet (the `customer_wallet` ledger account, as wallet purchases are), and wallets are topped up through the existing top-ups. The escrow entry is written in the same transaction as the order turning `paid`.
 - **Jobs** (in `cron.json`, run by the droplet's scheduler): `classifieds` every 15 minutes (expire listings and offers, lapse requests not accepted or not paid in time, refund orders past their hand-over deadline, release delivered orders past their confirmation time, send saved-search alerts, re-check flagged listings); a daily cleanup (photos of deleted listings, old conversations by the retention rule).
 
-## In the storefront (`apps/storefront`)
+## The public marketplace (`apps/shop`, `shop.bitocard.com`)
 
-Built in the storefront like the rest of the customer account app: server components fetching the API on the server, the customer's existing `bc_customer` session, the store's design tokens, mobile first, no horizontal scroll at phone width. Only on BitoCard's country stores where `classifieds` is on; elsewhere the tabs stay as they are.
+Next.js App Router, built like the storefront: server components fetching the API on the server (`lib/api.ts`), the customer session in its own `bc_customer` cookie (`lib/customer.ts`), the shopper's address signed with `STORE_SERVER_SECRET` for rate limits, Tailwind with the BitoCard tokens, mobile first, no horizontal scroll at phone width.
+
+- **Global** (from the second country): `/` (country tiles with flags and listing counts, categories, recent and trending across countries, never a price; "Continue to <country>" for a returning visitor), `/c/<category>` (a section per country), `/safe-trade` (the Safe Trade Guide, with each category's checklist; the policy itself is on the legals site).
+- **A country's market** (`/<cc>`): `/ng` (search with locality, category grid, near you, recent), `/ng/c/<category>`, `/ng/<state>(/<area>)(/<category>)`, `/ng/search?q=`, `/ng/l/<id>-<slug>` (the listing: gallery and video, price, condition, features, description, seller, Safe trade tips, **Chat** in place, Show phone, Favourite, **Buy with Safe pay**, Report), `/ng/l/<id>/buy` (Safe pay: price, fee and total, what is covered, meet-up or delivery, send the request; then pay from the wallet once the seller accepts), phase 2 `/ng/s/<shop>` and `/ng/deals`.
+- **Header:** the country with its flag (change), search, **Sell** (Post an ad in the Shop tab) and **My Shop** (the Shop tab on the customer's own country store, through the handoff).
+- Acting (chat, Show phone, favourite, Safe pay) asks a visitor to sign in ("Continue with your BitoCard account", or the email and password) and returns them (`next`).
+- Tests in `apps/shop/test` (Vitest) for every `lib/` helper and server action.
+
+## The Shop tab (`apps/storefront`, `<country>.bitocard.com/shop`)
+
+In the customer account app, signed in, never indexed. Only on BitoCard's country stores where `classifieds` is on; resellers' stores keep Account as the last tab.
 
 - **Tabs** (`components/app/tabs.ts`): Home, Catalog, Orders, Wallet, Crypto, **Shop** (`/shop`). Account leaves the tabs and is reached from the header's account button and the menu drawer (Profile, Security, Identity check, Help & support, sign out); Shop's sub rail and pills follow the existing sub menus (`components/app/sub-menus.ts`, a `shop` menu).
-- **Public and signed in alike:** `/shop` and its browsing pages (home, categories, locations, search, listings, shops) are public and indexed. Its layout shows the account app's shell, with Shop current, to signed-in customers, and the store's header and footer to visitors (a route group of its own, since `(app)` requires sign-in). Everything that acts (post, chat, favourite, Show phone, Safe pay) asks visitors to sign in and returns them (`next`).
-- **Pages:**
-  - Browse: `/shop` (search with locality, category grid, near you, recent), `/shop/c/<category>`, `/shop/<state>(/<area>)(/<category>)`, `/shop/search?q=`, `/shop/l/<id>-<slug>` (a listing), phase 2 `/shop/s/<shop>` and `/shop/deals`.
+- **Sub menu:**
+  - **Browse:** opens `shop.bitocard.com/<country>` (through the handoff).
   - **Post an ad:** `/shop/post`, one short screen on a phone: photos and video first (camera or gallery, several at once, drag to reorder), then title, category, price, condition chips, features (the category's suggested keys as chips, a search for any other), description, then location (the saved area by default), delivery, contact and Safe pay. The draft saves as they go; uploads run in the background while they type.
-  - **My listings:** `/shop/listings` (active, in review, sold, expired; edit, renew, mark sold, delete).
-  - **Messages:** `/shop/messages(/<id>)`, chats about listings, with offers.
-  - **Orders:** `/shop/orders(/<id>)`, Safe pay orders as buyer (status, pay, release code, received, dispute) and as seller (accept or decline, hand-over, enter the code, mark sent), apart from the Orders tab's store orders. Buying is `/shop/l/<id>/buy` (price, fee and total, what is covered, meet-up or delivery, send the request; then pay once the seller accepts).
+  - **My listings:** `/shop/listings` (active, in review, sold, expired; edit, renew, mark sold, delete; each links to its public page).
+  - **Messages:** `/shop/messages(/<id>)`, every chat about listings, with offers (a chat started on a listing page continues here).
+  - **Orders:** `/shop/orders(/<id>)`, Safe pay orders as buyer (status, pay, release code, received, dispute) and as seller (accept or decline, hand-over, enter the code, mark sent), apart from the Orders tab's store orders.
   - **Favourites:** `/shop/favourites`. **Safe pay:** `/shop/safe-pay` (identity check and payout account, to be paid).
-  - **Safe trade:** `/shop/safe-trade` (the Safe Trade Guide, with each category's checklist), linked from every listing, chat and Show phone, and from the footer; the policy itself is on the legals site.
   - Phase 2: `/shop/my-shop`.
-- Shared code from `@bitocard/ui` and `@bitocard/api-client` (a `classifieds` entry with its types), the account app's `Slider`, chat and photo components. Tests in `apps/storefront/test` (Vitest) for every `lib/` helper and server action.
+- Home gets a Shop card ("Sell what you don't use"), and notifications about listings, chats and orders link here.
+- Shared code from `@bitocard/ui` and `@bitocard/api-client` (a `classifieds` entry with its types), the account app's `Slider`, chat (`ChatPanel`) and photo components, used by both apps. Tests in `apps/storefront/test` (Vitest).
+
+## Search engines
+
+1. **One address per listing:** `shop.bitocard.com/<cc>/l/<id>-<slug>`, with a canonical tag to itself; a changed title keeps the id and redirects the old slug (301). Nothing public on the country stores: an old or mistaken `<cc>.bitocard.com/shop/l/…` redirects (301) there.
+2. **The global showcase has no listing pages:** it only links into the country pages.
+3. **hreflang only between true regional versions:** a country's category and location pages (`/ng/c/phones`, `/gh/c/phones`) as `en-NG`, `en-GH`, with the global `/c/phones` as `x-default`; never on listings, which are unique.
+4. **Product and Offer JSON-LD only on country pages**, where the price is (what Google needs for price rich results); global cards carry no offer.
+5. **No content by cookie or IP:** the global home page shows "Continue to Nigeria" as a banner, never an automatic redirect (once the showcase is on).
+6. **Indexing:** search results and filter combinations `noindex, follow`; location pages indexed once they have enough listings; a sitemap per country under one sitemap index; Open Graph images from the first photo.
+7. **Sold listings** stay about 30 days, marked Sold with similar listings and no offer markup, then answer 410.
+8. **Internal links** (the gift-card stores, emails, notifications, shares) always point to `shop.bitocard.com/<cc>`.
+
+## Marketing at launch
+
+- **Name and message:** "BitoCard Shop: buy and sell near you, protected by Safe pay"; lead with Safe pay and the verified badges, which set it apart from Jiji.
+- **Nigeria first, without the global showcase**; turn it on with the second country as "BitoCard Shop across Africa".
+- **WhatsApp first:** a share button on every listing and a strong preview (photo, price, area, Safe pay badge); a "share my listings" link for sellers.
+- **Local pages** ("Phones for sale in Ikeja", "3-bedroom flats in Lekki") with unique introductions, the search traffic classifieds live on.
+- **Sellers:** free listings at launch, a "first sellers in your area" push, and shops for small businesses selling on Instagram and WhatsApp catalogues.
+- **Existing customers:** the Shop tab, the Home card and a prompt after a purchase; the Safe Trade Guide made easy to share (trust marketing).
 
 ## Legal owed before switching on in a market
 
@@ -223,6 +254,8 @@ Built in the storefront like the rest of the customer account app: server compon
 3. API: conversations and messages, offers, phone reveal and leads, notifications.
 4. API: Safe pay: the buyer's request with the fee, the seller's acceptance and set-up, orders paid from the wallet, escrow entries, release codes, sent and received, deadlines in the job, cancellations and refunds, disputes and admin decisions, release into the payout hold.
 5. Admin app: the Classifieds section (queue, reports, listings, users, categories, limits, Safe pay orders, disputes and settings).
-6. Storefront: the Shop tab (Account to the header), the `/shop` route group and its sub menu, browsing and location pages, post an ad, my listings, messages, Safe pay (buy, orders, release code, set-up), favourites.
-7. SEO for the country stores' Shop pages (sitemaps per country, titles, JSON-LD) and the `bitocard.com/shop` redirect.
-8. Tests: the API on PGlite and Postgres (Safe pay money paths with parallel requests, as for P2P trades), the app's Vitest; legal drafts; then a closed pilot in Nigeria, with Safe pay in the sandbox until legal clearance.
+6. API and both apps: the sign-in handoff.
+7. `apps/shop`: a country's market (home, category, location pages, search, listing with chat, Show phone, favourite, Safe pay buying), the safe trade guide, search engine work (canonical tags, sitemaps, JSON-LD, hreflang), and the global showcase behind the second country.
+8. Storefront: the Shop tab (Account to the header) and its sub menu: post an ad, my listings, messages, orders, favourites, Safe pay set-up, the Home card.
+9. Vercel project `bitocard-shop` (skip unaffected builds and the deep clone on, as for the other projects), `shop.bitocard.com` on Cloudflare (DNS only, to Vercel), `STORE_SERVER_SECRET` shared with it.
+10. Tests: the API on PGlite and Postgres (Safe pay money paths with parallel requests, as for P2P trades), both apps' Vitest; legal drafts; then a closed pilot in Nigeria, with Safe pay in the sandbox until legal clearance.
