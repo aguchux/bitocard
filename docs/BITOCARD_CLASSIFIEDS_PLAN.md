@@ -95,7 +95,7 @@ Browse, search, post, contact, pay safely, moderate. Nigeria only, behind `class
   - Card chargebacks are handled like checkout chargebacks; released money stays inside the payout hold.
   - New sellers have a lower order limit. A seller who loses disputes or cancels often is limited or suspended.
   - Buyer and seller must be different people, and not the same verified identity.
-- **What each side sees:** both see the order, its status and timeline. The buyer sees the price, their fee and the total; the seller sees the price, their fee and what they will be paid. Neither sees the other's fee, and the seller never sees how the buyer paid. The seller sees and the buyer's delivery address only after payment and only for delivery. Neither sees the other's bank details.
+- **What each side sees:** both see the order, its status and timeline. The buyer sees the price, their fee and the total; the seller sees the price, their fee and what they will be paid. Neither sees the other's fee, and the seller never sees how the buyer paid. The seller sees the buyer's delivery address only after payment and only for delivery. Neither sees the other's bank details.
 
 ### Phase 2: shops, deals and B2B
 
