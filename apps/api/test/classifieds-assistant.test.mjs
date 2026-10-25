@@ -112,6 +112,8 @@ async function customer(name) {
   const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   return shopper;
 }

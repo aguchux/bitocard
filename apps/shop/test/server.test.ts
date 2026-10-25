@@ -5,7 +5,7 @@ import { request, setRequest } from "./request";
 import { customerApi, safeNext, shopperHeader, signInPath, siteOrigin } from "@/lib/customer";
 import { countryStoreOrigin, forgetSignedIn, myShopHref, rememberSignedIn, signedInElsewhere } from "@/lib/handoff";
 import { continueSignIn } from "@/lib/handoff-actions";
-import { answerOffer, loadChat, makeOffer, requestSafePay, saveListing, showPhone, startChat } from "@/lib/listing-actions";
+import { acceptShopTerms, answerOffer, loadChat, makeOffer, requestSafePay, saveListing, shopTerms, showPhone, startChat } from "@/lib/listing-actions";
 import { marketFor } from "@/lib/api";
 import { GET as handoffGo } from "@/app/(global)/handoff/go/route";
 import { listingGone, proxy } from "@/proxy";
@@ -152,6 +152,16 @@ describe("listing actions", () => {
       { listing_id: listing, fulfilment: "meet_up" },
       { listing_id: listing, offer_id: listing, fulfilment: "delivery", delivery_address: "12 Allen Avenue, Ikeja" },
     ]);
+  });
+
+  test("the BitoCard Shop terms: read, then accepted by the version shown; a refused request says why", async () => {
+    reply = url => (url.endsWith("/orders") ? Response.json({ error: { code: "terms_not_accepted", message: "Accept the BitoCard Shop terms.", param: "terms" } }, { status: 409 }) : Response.json({ object: "classified_terms", version: "2026-10-25", path: "/documents/shop-terms", accepted: false, accepted_at: null, previous_version: null }));
+    expect(await requestSafePay({ listingId: listing, fulfilment: "meet_up" })).toMatchObject({ ok: false, code: "terms_not_accepted" });
+    expect(await shopTerms()).toMatchObject({ version: "2026-10-25" });
+    expect(await acceptShopTerms("2026-10-25")).toMatchObject({ ok: true });
+    expect(await acceptShopTerms("any")).toMatchObject({ ok: false });
+    expect(calls.map(call => `${call.method} ${call.url.replace("https://api.test", "")}`)).toEqual(["POST /v1/classifieds/orders", "GET /v1/classifieds/terms", "POST /v1/classifieds/terms/accept"]);
+    expect(calls[2]!.body).toEqual({ version: "2026-10-25" });
   });
 });
 

@@ -19,6 +19,7 @@ import type {
   ShopSuggestion,
   ShopVideoUpload,
 } from "@bitocard/api-client/classifieds";
+import type { ShopTermsStatus } from "@bitocard/ui/shop-terms";
 import { apiUrl } from "./api";
 import { type CustomerResult, customerApi } from "./customer";
 import { toMinor, uuidPattern } from "./shop";
@@ -34,6 +35,20 @@ function answer<T>(result: CustomerResult<T>): ShopResult<T> {
 }
 
 const id = (value: string) => uuidPattern.test(value);
+
+// ---- The BitoCard Shop terms ----
+
+/** The terms' current version and whether this customer accepted it (needed to post and to use Safe pay). */
+export async function shopTerms(): Promise<ShopTermsStatus | null> {
+  const result = await customerApi<ShopTermsStatus>("GET", "/v1/classifieds/terms");
+  return result.ok ? result.data : null;
+}
+
+/** Records the customer's acceptance of the version they were shown. */
+export async function acceptShopTerms(version: string): Promise<ShopResult<ShopTermsStatus>> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) return refused("No such version of the terms.");
+  return answer(await customerApi<ShopTermsStatus>("POST", "/v1/classifieds/terms/accept", { version }));
+}
 
 // ---- Listings ----
 

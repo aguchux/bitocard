@@ -52,6 +52,8 @@ async function customer(name) {
   const email = `safepay${(counter += 1)}-${Date.now()}@example.com`;
   const signup = await shopper.post('/v1/store/account/signup', { name, email, password: 'correct horse battery', country: 'NG' });
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   shopper.name = name;
   return shopper;
@@ -292,6 +294,23 @@ describe('Safe pay', () => {
     assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.dispute_decided', targetId: order.id } }), 1);
     assert.equal((await admin.post(`/v1/admin/classifieds/orders/${order.id}/dispute/decide`, { decision: 'release', note: 'again' })).json.error.code, 'dispute_closed');
     assert.equal(await prisma.notification.count({ where: { customerId: buyer.id, type: 'customer.classifieds.dispute_decided' } }), 1);
+  });
+
+  test('asking and accepting need the current BitoCard Shop terms accepted', async () => {
+    const seller = await customer('Funke Ade');
+    const buyer = await customer('Segun Bello');
+    await ready(seller);
+    const listing = await live(seller, 'Skyworth 43 inch TV');
+    await prisma.classifiedTermsAcceptance.deleteMany({ where: { customerId: { in: [buyer.id, seller.id] } } });
+    const asked = await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' });
+    assert.deepEqual([asked.status, asked.json.error.code], [409, 'terms_not_accepted']);
+    const version = (await buyer.get('/v1/classifieds/terms')).json.version;
+    await buyer.post('/v1/classifieds/terms/accept', { version });
+    const order = (await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).json;
+    assert.equal(order.status, 'requested', JSON.stringify(order));
+    assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/accept`)).json.error.code, 'terms_not_accepted');
+    await seller.post('/v1/classifieds/terms/accept', { version });
+    assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/accept`)).json.status, 'awaiting_payment');
   });
 
   test('admins list and read orders; each side lists its own', async () => {

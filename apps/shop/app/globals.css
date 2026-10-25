@@ -3,6 +3,7 @@
 @import "@bitocard/ui/styles/interactive.css";
 /* Shared components styled with Tailwind utilities. */
 @source "../../../packages/ui/src/handoff-ui.tsx";
+@source "../../../packages/ui/src/shop-terms.tsx";
 @theme inline { --color-background: var(--color-page); --color-foreground: var(--color-navy-900); }
 /* In the base layer, so a field's own focus style (a utility) wins. Text fields never get the outline: they show focus
    with their own border or ring, or their bar's (the search bar), so no pink box is drawn inside a control. */

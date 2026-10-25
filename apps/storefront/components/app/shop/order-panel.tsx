@@ -7,7 +7,8 @@ import { Camera, Check, LoaderCircle, ShieldCheck } from "lucide-react";
 import { disputeReasonLabels, shopMoney, type ShopDispute, type ShopDisputeMessage, type ShopDisputeReason, type ShopOrder, type ShopReadiness } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl, type OrderAction } from "@/lib/shop";
-import { disputeMessage, enterReleaseCode, openDispute, orderStep, releaseCode } from "@/lib/shop-actions";
+import { ShopTermsAccept, shopTermsCode } from "@bitocard/ui/shop-terms";
+import { acceptShopTerms, disputeMessage, enterReleaseCode, openDispute, orderStep, releaseCode, shopTerms } from "@/lib/shop-actions";
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
 const primary = "flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-navy-900 px-5 font-bold text-white hover:bg-navy-700 disabled:opacity-60";
@@ -47,15 +48,18 @@ export function OrderPanel({
   const has = (action: OrderAction) => actions.includes(action);
   const total = order.total ?? order.price;
   const short = balance !== null && balance < total ? total - balance : 0;
-  const run = (task: () => Promise<{ ok: boolean; message?: string }>) => {
+  // Accepting needs the BitoCard Shop terms accepted: the step waiting for them, retried once they are.
+  const [termsFor, setTermsFor] = useState<Parameters<typeof orderStep>[1] | null>(null);
+  const run = (task: () => Promise<{ ok: boolean; message?: string; code?: string | null }>, retry?: Parameters<typeof orderStep>[1]) => {
     setError(null);
     start(async () => {
       const result = await task();
-      if (!result.ok) setError(result.message ?? "Something went wrong. Try again.");
-      else router.refresh();
+      if (result.ok) return router.refresh();
+      if (retry && result.code === shopTermsCode) return setTermsFor(retry);
+      setError(result.message ?? "Something went wrong. Try again.");
     });
   };
-  const step = (name: Parameters<typeof orderStep>[1], input: Parameters<typeof orderStep>[2] = {}) => run(() => orderStep(order.id, name, input).then(result => (result.ok ? result : { ok: false, message: result.message })));
+  const step = (name: Parameters<typeof orderStep>[1], input: Parameters<typeof orderStep>[2] = {}) => run(() => orderStep(order.id, name, input).then(result => (result.ok ? result : { ok: false, message: result.message, code: result.code })), name);
 
   return (
     <div className="grid gap-4">
@@ -263,6 +267,17 @@ export function OrderPanel({
       ) : null}
 
       {pending ? <LoaderCircle className="size-5 animate-spin text-slate-500" aria-label="Working" /> : null}
+      {termsFor ? (
+        <ShopTermsAccept
+          load={shopTerms}
+          accept={acceptShopTerms}
+          onAccepted={() => {
+            const retry = termsFor;
+            setTermsFor(null);
+            step(retry);
+          }}
+        />
+      ) : null}
       {error ? (
         <p role="alert" className="text-sm font-semibold text-brand-700">
           {error}

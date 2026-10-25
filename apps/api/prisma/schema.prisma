@@ -2536,6 +2536,7 @@ model Customer {
   exchangeTrades            ExchangeTrade[]
   classifiedListings        ClassifiedListing[]
   classifiedSeller          ClassifiedSeller?
+  classifiedTermsAcceptances ClassifiedTermsAcceptance[]
   classifiedReportsMade     ClassifiedReport[]        @relation("ClassifiedReporter")
   classifiedReportsAbout    ClassifiedReport[]        @relation("ClassifiedReported")
   classifiedFavourites      ClassifiedFavourite[]
@@ -4615,6 +4616,18 @@ model ClassifiedReport {
   @@index([status, createdAt])
   @@index([listingId, status])
   @@map("classified_reports")
+}
+
+/// A customer's acceptance of the BitoCard Shop terms, once per version: needed to post a listing or use Safe pay.
+model ClassifiedTermsAcceptance {
+  customerId String   @map("customer_id") @db.Uuid
+  /// The terms' version (`shopTermsVersion`, their date).
+  version    String   @db.VarChar(20)
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, version])
+  @@map("classified_terms_acceptances")
 }
 
 /// A customer's standing in BitoCard Shop: suspended sellers cannot post, and their listings leave the market.

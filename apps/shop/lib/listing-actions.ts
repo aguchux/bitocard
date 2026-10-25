@@ -1,6 +1,7 @@
 "use server";
 
 import type { ShopChat, ShopMessage, ShopOrder, ShopPhone, ShopReportReason } from "@bitocard/api-client/classifieds";
+import type { ShopTermsStatus } from "@bitocard/ui/shop-terms";
 import { type CustomerResult, customerApi } from "@/lib/customer";
 
 /** What a listing action answers: its data, or why not (`signIn` when the session has ended). */
@@ -12,6 +13,18 @@ const refused = (message: string): ActionResult<never> => ({ ok: false, message,
 function answer<T>(result: CustomerResult<T>): ActionResult<T> {
   if (result.ok) return { ok: true, data: result.data };
   return { ok: false, message: result.status === 401 ? "Sign in again to carry on." : result.message, code: result.code, signIn: result.status === 401 };
+}
+
+/** The BitoCard Shop terms' current version and whether this customer accepted it (needed for Safe pay). */
+export async function shopTerms(): Promise<ShopTermsStatus | null> {
+  const result = await customerApi<ShopTermsStatus>("GET", "/v1/classifieds/terms");
+  return result.ok ? result.data : null;
+}
+
+/** Records the customer's acceptance of the version they were shown. */
+export async function acceptShopTerms(version: string): Promise<ActionResult<ShopTermsStatus>> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) return refused("No such version of the terms.");
+  return answer(await customerApi<ShopTermsStatus>("POST", "/v1/classifieds/terms/accept", { version }));
 }
 
 /** Saves a listing to the customer's favourites, or takes it off. */

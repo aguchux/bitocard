@@ -21,6 +21,7 @@ import { ListingsService } from './listings.service.js';
 import type { MediaUpload } from './media.service.js';
 import { invalid, priceText } from './rules.js';
 import { publicName } from './search.service.js';
+import { ShopTermsService } from './terms.service.js';
 
 const hourMs = 3_600_000;
 const dayMs = 24 * hourMs;
@@ -93,6 +94,7 @@ export class SafePayService {
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
     private readonly guards: SafePayGuardsService,
+    private readonly terms: ShopTermsService,
   ) {}
 
   private encryption() {
@@ -180,6 +182,7 @@ export class SafePayService {
   async request(customer: CustomerWithStore, input: { listing_id: string; offer_id?: string; fulfilment: 'meet_up' | 'delivery'; delivery_address?: string }) {
     const { country, mode, settings } = await this.open(customer);
     const { listing, price, offerId } = await this.priceFor(customer, country, input.listing_id, input.offer_id);
+    await this.terms.require(customer.id);
     await this.guards.requireDifferentPeople(customer.id, listing.customerId);
     await this.guards.requireNotLimited(listing.customerId, country, false);
     if (input.fulfilment === 'delivery' && listing.delivery === 'none') throw invalid('parameter_invalid', 'This seller does not deliver: choose to meet in person.', 'fulfilment');
@@ -324,6 +327,7 @@ export class SafePayService {
     const order = await this.mine(customer, id, 'seller');
     const now = new Date();
     if (order.status !== 'requested' || order.acceptBy <= now) throw this.wrongStatus(order, 'accepted');
+    await this.terms.require(customer.id);
     await this.guards.requireNotLimited(customer.id, order.country, true);
     await this.guards.requireDifferentPeople(order.buyerId, customer.id);
     const ready = await this.readinessOf(customer.id, mode, house.id, order.country);

@@ -20,7 +20,8 @@ import {
 } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { featureValue, fromMinor, toggleList, wrapSelection } from "@/lib/shop";
-import { createListing, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
+import { ShopTermsAccept } from "@bitocard/ui/shop-terms";
+import { acceptShopTerms, createListing, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, shopTerms, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
 import { type DraftPick, FillFromPhotos, ImproveListing, SuggestPrice } from "./assistant-help";
 import { ShopIcon } from "./icon";
 
@@ -679,7 +680,16 @@ export function ListingForm({
       {/* Posting: fixed above the bottom bar on phones, in place on desktop. */}
       <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:static lg:border-0 lg:bg-transparent lg:p-0">
         <div className="mx-auto grid max-w-6xl gap-2">
-          {problem ? (
+          {problem?.param === "terms" ? (
+            <ShopTermsAccept
+              load={shopTerms}
+              accept={acceptShopTerms}
+              onAccepted={() => {
+                setProblem(null);
+                void post();
+              }}
+            />
+          ) : problem ? (
             <p role="alert" className="text-sm font-semibold text-brand-700">
               {problem.message}
             </p>

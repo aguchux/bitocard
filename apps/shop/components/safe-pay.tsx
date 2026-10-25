@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { shopMoney, type ShopSafePayQuote } from "@bitocard/api-client/classifieds";
-import { cancelSafePay, paySafePay, requestSafePay } from "@/lib/listing-actions";
+import { ShopTermsAccept, shopTermsCode } from "@bitocard/ui/shop-terms";
+import { acceptShopTerms, cancelSafePay, paySafePay, requestSafePay, shopTerms } from "@/lib/listing-actions";
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
 
@@ -15,22 +16,32 @@ export function SafePayRequest({ quote, sellerName, acceptHours }: { quote: Shop
   const [address, setAddress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [key] = useState(nonce);
+  const [key, setKey] = useState(nonce);
+  const [needsTerms, setNeedsTerms] = useState(false);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const send = async (attempt: string) => {
     setBusy(true);
     setError(null);
-    const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, nonce: key });
-    if (result.ok) router.refresh();
-    else {
-      setError(result.message);
-      setBusy(false);
-    }
+    const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, nonce: attempt });
+    if (result.ok) return router.refresh();
+    setBusy(false);
+    // Safe pay needs the BitoCard Shop terms accepted: ask, then send again (a refused request is final, so a new key).
+    if (result.code === shopTermsCode) return setNeedsTerms(true);
+    setError(result.message);
+  };
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    void send(key);
+  };
+  const afterTerms = () => {
+    setNeedsTerms(false);
+    const next = nonce();
+    setKey(next);
+    void send(next);
   };
 
   return (
-    <form onSubmit={event => void submit(event)} className="grid gap-4">
+    <form onSubmit={submit} className="grid gap-4">
       <fieldset className="grid gap-2.5">
         <legend className="mb-1 text-base font-bold">How will you get it?</legend>
         <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
@@ -62,7 +73,8 @@ export function SafePayRequest({ quote, sellerName, acceptHours }: { quote: Shop
           {error}
         </p>
       ) : null}
-      <button type="submit" disabled={busy} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
+      {needsTerms ? <ShopTermsAccept load={shopTerms} accept={acceptShopTerms} onAccepted={afterTerms} /> : null}
+      <button type="submit" disabled={busy || needsTerms} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
         <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Sending…" : "Send request to seller"}
       </button>
       <p className="text-center text-sm text-navy-600">

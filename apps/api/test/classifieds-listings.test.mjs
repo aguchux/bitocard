@@ -40,12 +40,16 @@ function storeServer(subdomain = null) {
 }
 
 let counter = 0;
-async function seller({ country = 'NG', verify = true } = {}) {
+async function seller({ country = 'NG', verify = true, terms = true } = {}) {
   const shopper = storeServer();
   const email = `seller${(counter += 1)}-${Date.now()}@example.com`;
   const signup = await shopper.post('/v1/store/account/signup', { name: 'Chinedu Okafor', email, password: 'correct horse battery', country });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
-  if (verify) assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+  if (verify) {
+    assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+    // The BitoCard Shop terms, accepted before posting or Safe pay.
+    if (terms) await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
+  }
   shopper.id = signup.json.customer.id;
   return shopper;
 }
@@ -202,6 +206,38 @@ describe('submitting', () => {
     assert.deepEqual((await prisma.classifiedPriceHistory.findMany({ where: { listingId: next.id }, orderBy: { from: 'asc' } })).map(row => [Number(row.priceMinor), row.to === null]), [[36500000, false], [34000000, true]]);
     const emptied = await shopper.patch(`/v1/classifieds/listings/${next.id}`, { title: null });
     assert.equal(emptied.json.error.code, 'listing_incomplete', 'a live listing keeps everything a buyer needs');
+  });
+
+  test('posting needs the current BitoCard Shop terms accepted, recorded by version', async () => {
+    await open();
+    const shopper = await seller({ terms: false });
+    const status = await shopper.get('/v1/classifieds/terms');
+    assert.deepEqual(status.json, { object: 'classified_terms', version: status.json.version, path: '/documents/shop-terms', accepted: false, accepted_at: null, previous_version: null });
+    assert.match(status.json.version, /^\d{4}-\d{2}-\d{2}$/);
+
+    const draft = (await shopper.post('/v1/classifieds/listings', await phone({ title: 'iPhone 11, 64 GB' }))).json;
+    assert.ok(draft.id, 'drafts are saved before the terms are accepted');
+    await addPhotos(draft.id, 4);
+    const refused = await shopper.post(`/v1/classifieds/listings/${draft.id}/submit`);
+    assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.param], [409, 'terms_not_accepted', 'terms']);
+
+    const stale = await shopper.post('/v1/classifieds/terms/accept', { version: '2020-01-01' });
+    assert.deepEqual([stale.status, stale.json.error.code], [409, 'terms_changed'], 'only the version the customer was shown');
+    const accepted = await shopper.post('/v1/classifieds/terms/accept', { version: status.json.version });
+    assert.equal(accepted.status, 200, JSON.stringify(accepted.json));
+    assert.equal(accepted.json.accepted, true);
+    assert.ok(accepted.json.accepted_at);
+    assert.equal((await shopper.post('/v1/classifieds/terms/accept', { version: status.json.version })).json.accepted_at, accepted.json.accepted_at, 'accepting again changes nothing');
+    assert.equal(await prisma.classifiedTermsAcceptance.count({ where: { customerId: shopper.id } }), 1);
+    assert.equal((await shopper.post(`/v1/classifieds/listings/${draft.id}/submit`)).status, 200);
+
+    // New terms: an earlier acceptance no longer counts, and the apps can say the terms changed.
+    await prisma.classifiedTermsAcceptance.updateMany({ where: { customerId: shopper.id }, data: { version: '2026-01-01' } });
+    const changed = (await shopper.get('/v1/classifieds/terms')).json;
+    assert.deepEqual([changed.accepted, changed.previous_version], [false, '2026-01-01']);
+    const next = (await shopper.post('/v1/classifieds/listings', await phone({ title: 'iPhone XR, 64 GB' }))).json;
+    await addPhotos(next.id, 4);
+    assert.equal((await shopper.post(`/v1/classifieds/listings/${next.id}/submit`)).json.error.code, 'terms_not_accepted');
   });
 
   test('a seller posts a limited number per top category every 30 days', async () => {

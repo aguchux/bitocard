@@ -42,6 +42,8 @@ async function customer() {
   const email = `fav${(counter += 1)}-${Date.now()}@example.com`;
   const signup = await shopper.post('/v1/store/account/signup', { name: 'Kemi Ade', email, password: 'correct horse battery', country: 'NG' });
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
+  // The BitoCard Shop terms, accepted before posting or Safe pay.
+  await shopper.post('/v1/classifieds/terms/accept', { version: (await shopper.get('/v1/classifieds/terms')).json.version });
   shopper.id = signup.json.customer.id;
   return shopper;
 }

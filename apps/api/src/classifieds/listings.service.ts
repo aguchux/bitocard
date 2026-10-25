@@ -6,6 +6,7 @@ import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ModerationService, type ReviewFlag } from './moderation.service.js';
+import { ShopTermsService } from './terms.service.js';
 import {
   checkDescription,
   checkFeatureValue,
@@ -84,6 +85,7 @@ export class ListingsService {
     private readonly settings: SettingsService,
     private readonly storage: MediaStorage,
     private readonly moderation: ModerationService,
+    private readonly terms: ShopTermsService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -214,6 +216,7 @@ export class ListingsService {
     const settings = await this.marketSettings(country);
     const listing = await this.own(customer, id);
     if (!['draft', 'rejected'].includes(listing.status)) throw conflict('listing_not_draft', 'Only drafts and rejected listings are submitted.');
+    await this.terms.require(customer.id);
     this.requireComplete(listing);
     const photos = listing.media.filter(item => item.kind === 'photo' && item.status === 'ready').length;
     if (photos < settings.minPhotos) throw invalid('photos_required', `Add at least ${settings.minPhotos} photos.`, 'photos');

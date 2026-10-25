@@ -21,6 +21,7 @@
     "./chat": "./src/chat.ts",
     "./handoff": "./src/handoff.ts",
     "./handoff-ui": "./src/handoff-ui.tsx",
+    "./shop-terms": "./src/shop-terms.tsx",
     "./image": "./src/image.ts"
   },
   "scripts": {

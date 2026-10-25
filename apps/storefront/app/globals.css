@@ -4,6 +4,7 @@
 /* Shared components styled with Tailwind utilities. */
 @source "../../../packages/ui/src/phone-input.tsx";
 @source "../../../packages/ui/src/handoff-ui.tsx";
+@source "../../../packages/ui/src/shop-terms.tsx";
 /* Short names for the plain-CSS pages (/resellers); Tailwind code uses the utilities (`text-navy-900`, `bg-brand-500`). */
 :root { --navy: var(--color-navy-900); --pink: var(--color-brand-500); --background: var(--color-page); }
 @theme inline { --color-background: var(--color-page); --color-foreground: var(--color-navy-900); }

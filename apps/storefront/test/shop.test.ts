@@ -252,6 +252,22 @@ describe("the shop assistant for sellers", () => {
     expect(await actions.assistantSuggestion("improve", { listingId: "../x" })).toMatchObject({ ok: false });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  test("the BitoCard Shop terms: read, then accepted by the version shown; anything else never leaves", async () => {
+    const status = { object: "classified_terms", version: "2026-10-25", path: "/documents/shop-terms", accepted: false, accepted_at: null, previous_version: null };
+    const fetch = vi.fn(async () => reply(status));
+    vi.stubGlobal("fetch", fetch);
+    expect(await actions.shopTerms()).toMatchObject({ version: "2026-10-25", accepted: false });
+    expect(await actions.acceptShopTerms("2026-10-25")).toMatchObject({ ok: true });
+    expect(await actions.acceptShopTerms("latest")).toMatchObject({ ok: false });
+    const calls = fetch.mock.calls as unknown as Call[];
+    expect(calls.map(call => [call[0], call[1].method])).toEqual([
+      ["http://api.test/v1/classifieds/terms", "GET"],
+      ["http://api.test/v1/classifieds/terms/accept", "POST"],
+    ]);
+    expect(JSON.parse(String(calls[1][1].body))).toEqual({ version: "2026-10-25" });
+    expect(calls[1][1].headers["bitocard-customer-session"]).toBe("bcc_session");
+  });
 });
 
 describe("photos through this site", () => {

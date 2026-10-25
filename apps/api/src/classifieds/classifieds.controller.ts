@@ -20,6 +20,7 @@ import { ModerationService, type ReportReason, reportReasons } from './moderatio
 import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ShopDirectoryService } from './directory.service.js';
+import { ShopTermsService } from './terms.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, priceKinds } from './rules.js';
 
@@ -319,18 +320,37 @@ export class ClassifiedVideoUploadsController {
   }
 }
 
-/** A seller's own listings (bitocard.com customers, through the store's server). */
+class TermsAcceptDto {
+  /** The version the customer was shown (`GET terms`): a newer one must be read first. */
+  @IsString() @MaxLength(20)
+  version: string;
+}
+
+/** A seller's own listings and the BitoCard Shop terms (bitocard.com customers, through the store's server). */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
 export class ClassifiedListingsController {
   constructor(
+    private readonly terms: ShopTermsService,
     private readonly listings: ListingsService,
     private readonly media: ListingMediaService,
     private readonly moderation: ModerationService,
     private readonly favourites: FavouritesService,
   ) {}
+
+  /** The BitoCard Shop terms' current version and whether the customer has accepted it (needed to post or use Safe pay). */
+  @Get('terms')
+  termsStatus(@CurrentCustomer() caller: CustomerCaller) {
+    return this.terms.status(caller.customer.id);
+  }
+
+  @Post('terms/accept')
+  @HttpCode(HttpStatus.OK)
+  acceptTerms(@CurrentCustomer() caller: CustomerCaller, @Body() body: TermsAcceptDto) {
+    return this.terms.accept(caller.customer.id, body.version);
+  }
 
   /** Saved listings, newest saved first: live, sold (30 days) or gone, with any price drop since saving. */
   @Get('favourites')
