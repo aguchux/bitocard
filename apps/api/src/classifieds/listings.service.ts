@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
@@ -80,6 +81,7 @@ export class ListingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
+    private readonly storage: MediaStorage,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -179,6 +181,7 @@ export class ListingsService {
     const photos = listing.media.filter(item => item.kind === 'photo' && item.status === 'ready').length;
     if (photos < settings.minPhotos) throw invalid('photos_required', `Add at least ${settings.minPhotos} photos.`, 'photos');
     if (listing.media.some(item => item.status === 'failed')) throw invalid('media_failed', 'Remove the photo or video that could not be used, or add it again.', 'photos');
+    if (listing.media.some(item => item.status === 'processing')) throw conflict('video_processing', 'Your video is still being prepared. Submit again in a minute.');
 
     const topCategory = listing.category!.parentId ?? listing.category!.id;
     const now = new Date();
@@ -236,7 +239,10 @@ export class ListingsService {
     await this.sellerCountry(customer);
     const listing = await this.own(customer, id);
     if (listing.status === 'draft') {
-      await this.prisma.classifiedListing.deleteMany({ where: { id, status: 'draft' } });
+      const removed = await this.prisma.classifiedListing.deleteMany({ where: { id, status: 'draft' } });
+      // Its published photos and video go too (best effort: a leftover object is never linked anywhere).
+      const keys = removed.count ? listing.media.flatMap(item => (item.storageKey ? [item.storageKey, ...(item.posterUrl ? [item.storageKey.replace(/\.mp4$/, '.jpg')] : [])] : [])) : [];
+      if (keys.length && this.storage.configured()) await Promise.all(keys.map(key => this.storage.remove(key))).catch(() => undefined);
       return;
     }
     const now = new Date();
@@ -337,7 +343,7 @@ export class ListingsService {
         .map(value => ({ key: value.feature.key, name: value.feature.name, icon: value.feature.icon, unit: value.feature.unit, value: featureValueOut(value.feature.dataType, value) }))
         .sort((a, b) => a.name.localeCompare(b.name)),
       photos: photos.map(item => ({ id: item.id, url: item.url, width: item.width, height: item.height, status: item.status })),
-      video: video ? { id: video.id, url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, status: video.status } : null,
+      video: video ? { id: video.id, url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, status: video.status, failure_reason: video.failureReason } : null,
       delivery: listing.delivery,
       contact: listing.contact,
       views: listing.views,

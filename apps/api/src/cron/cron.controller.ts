@@ -1,4 +1,5 @@
 import { ListingsService } from '../classifieds/listings.service.js';
+import { ListingMediaService } from '../classifieds/media.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { DomainsService } from '../domains/domains.service.js';
 import { StoreHostsService } from '../stores/store-hosts.service.js';
@@ -83,6 +84,7 @@ export class CronController {
     tickets: TicketsService,
     invoices: InvoicesService,
     listings: ListingsService,
+    listingMedia: ListingMediaService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -154,8 +156,8 @@ export class CronController {
       'chain-health': () => deposits.checkAll(),
       /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */
       'crypto-reconcile': async () => ({ live: await reconciliation.run('live'), test: await reconciliation.run('test') }),
-      /** Every 15 minutes: BitoCard Shop listings past their time expire. */
-      classifieds: async () => ({ listings: await listings.expireDue() }),
+      /** Every 15 minutes: BitoCard Shop listings past their time expire, and videos stuck processing fail. */
+      classifieds: async () => ({ listings: await listings.expireDue(), stale_videos: await listingMedia.failStale() }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),
     };

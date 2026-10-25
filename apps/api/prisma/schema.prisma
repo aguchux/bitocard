@@ -4358,25 +4358,27 @@ model ClassifiedListingFeature {
 
 /// A listing's photos (the first is the cover) and its one video, uploaded through the API with their metadata removed.
 model ClassifiedMedia {
-  id          String            @id @default(uuid()) @db.Uuid
-  listingId   String            @map("listing_id") @db.Uuid
+  id            String            @id @default(uuid()) @db.Uuid
+  listingId     String            @map("listing_id") @db.Uuid
   /// photo or video.
-  kind        String
-  position    Int               @default(0)
+  kind          String
+  position      Int               @default(0)
   /// The public address once ready.
-  url         String?
+  url           String?
   /// Its object key in the media bucket (removed with the listing).
-  storageKey  String?           @map("storage_key")
-  width       Int?
-  height      Int?
+  storageKey    String?           @map("storage_key")
+  width         Int?
+  height        Int?
   /// SHA-256 of the photo as published, so the same photo used by another seller is noticed.
-  contentHash String?           @map("content_hash")
-  durationMs  Int?              @map("duration_ms")
-  posterUrl   String?           @map("poster_url")
+  contentHash   String?           @map("content_hash")
+  durationMs    Int?              @map("duration_ms")
+  posterUrl     String?           @map("poster_url")
   /// processing, ready or failed.
-  status      String            @default("ready")
-  createdAt   DateTime          @default(now()) @map("created_at")
-  listing     ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  status        String            @default("ready")
+  /// Why a video failed, shown to the seller.
+  failureReason String?           @map("failure_reason")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  listing       ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId, kind, position])
   @@index([contentHash])

@@ -18,6 +18,8 @@ RUN npx turbo run build --filter=@bitocard/api
 
 FROM node:22-alpine
 ENV NODE_ENV=production PORT=3001
+# ffmpeg re-encodes BitoCard Shop's listing videos (src/classifieds/video.ts), dropping their metadata.
+RUN apk add --no-cache ffmpeg
 WORKDIR /repo
 COPY --from=build --chown=node:node /repo /repo
 WORKDIR /repo/apps/api

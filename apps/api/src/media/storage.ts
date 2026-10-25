@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { AppConfig } from '../config/config.js';
@@ -110,11 +111,29 @@ export class MediaStorage {
     return true;
   }
 
-  private async send(method: string, key: string, headers: Record<string, string> = {}) {
+  /**
+   * Stores bytes the API has already checked straight at their public, immutable key (for files that must pass through
+   * the API to have their metadata removed, such as BitoCard Shop's photos and videos). Never SVG.
+   */
+  async putPublic(key: string, bytes: Buffer, contentType: string) {
+    if (contentType === 'image/svg+xml') throw new Error('SVG is only published through checked uploads');
+    const res = await this.send('PUT', key, { 'x-amz-acl': 'public-read', 'content-type': contentType, 'cache-control': uploadCacheControl }, bytes);
+    if (!res.ok) throw unavailable();
+    return this.publicUrl(key);
+  }
+
+  private async send(method: string, key: string, headers: Record<string, string> = {}, body?: Buffer) {
     const spaces = this.require();
     const url = this.objectUrl(spaces, key);
+    const payloadHash = body ? createHash('sha256').update(body).digest('hex') : undefined;
     try {
-      return await fetch(url, { method, headers: signRequest({ method, url, headers, credentials: spaces.credentials }), redirect: 'error', signal: AbortSignal.timeout(10_000) });
+      return await fetch(url, {
+        method,
+        headers: signRequest({ method, url, headers, credentials: spaces.credentials, ...(payloadHash ? { payloadHash } : {}) }),
+        body: body ? new Uint8Array(body) : undefined,
+        redirect: 'error',
+        signal: AbortSignal.timeout(body ? 60_000 : 10_000),
+      });
     } catch {
       throw unavailable();
     }

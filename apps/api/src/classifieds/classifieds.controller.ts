@@ -1,11 +1,16 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { Allow, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateNested } from 'class-validator';
+import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
+import { maxDocumentBytes } from '../kyc/files.js';
 import { Public } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { ListingsService } from './listings.service.js';
+import { ListingMediaService, type MediaUpload } from './media.service.js';
+import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, priceKinds } from './rules.js';
 
@@ -63,6 +68,14 @@ class ListingDto {
   features?: FeatureValueDto[];
 }
 
+class PhotoOrderDto {
+  @IsArray() @ArrayMaxSize(30) @IsUUID('all', { each: true })
+  order: string[];
+}
+
+const photoUpload = FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 1 } });
+const videoUpload = FileInterceptor('file', { limits: { fileSize: maxVideoBytes + 1, files: 1, fields: 1 } });
+
 class MyListingsDto extends PageDto {
   @IsOptional() @IsIn(listingStatuses)
   status?: ListingStatus;
@@ -100,7 +113,10 @@ export class ClassifiedReferenceController {
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
 export class ClassifiedListingsController {
-  constructor(private readonly listings: ListingsService) {}
+  constructor(
+    private readonly listings: ListingsService,
+    private readonly media: ListingMediaService,
+  ) {}
 
   @Get('me/listings')
   mine(@CurrentCustomer() caller: CustomerCaller, @Query() query: MyListingsDto) {
@@ -144,5 +160,33 @@ export class ClassifiedListingsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     await this.listings.remove(caller.customer, id);
+  }
+
+  /** A photo (JPEG or PNG, at most 4 MB), its metadata removed. Sending the same photo again returns it. */
+  @Post('listings/:id/photos')
+  @SkipIdempotency()
+  @UseInterceptors(photoUpload)
+  addPhoto(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file?: MediaUpload) {
+    return this.media.addPhoto(caller.customer, id, file);
+  }
+
+  /** The video (MP4, MOV or WebM, at most 50 MB and 60 seconds): accepted as processing, re-encoded after the reply. */
+  @Post('listings/:id/video')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @SkipIdempotency()
+  @UseInterceptors(videoUpload)
+  addVideo(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file?: MediaUpload) {
+    return this.media.addVideo(caller.customer, id, file);
+  }
+
+  @Patch('listings/:id/photos')
+  reorder(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: PhotoOrderDto) {
+    return this.media.reorder(caller.customer, id, body.order);
+  }
+
+  @Delete('listings/:id/media/:media')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeMedia(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('media', ParseUUIDPipe) media: string) {
+    await this.media.remove(caller.customer, id, media);
   }
 }
