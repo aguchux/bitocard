@@ -9,7 +9,7 @@
 - **Anyone can sell and anyone can buy.** There are no seller or buyer accounts: every BitoCard account (signing up is open to anyone) can post listings and buy, and no one needs approval to start. Posting is free (limited per month, against spam). Anyone can also open a **shop** for more listings, a shop page and deals; businesses that pass BitoCard Verify KYB get the **Verified business** badge.
 - **Buyers** browse and search without an account. To contact a seller they sign in, then chat in the app or reveal the seller's phone number (when the seller has confirmed one and chosen to show it).
 - **B2B is open to everyone too:** anyone can post a listing for businesses (wholesale quantities and prices) and anyone can buy from one.
-- **Safe pay, the buyer's choice:** a buyer who wants protection opts in on a purchase and pays the item's price plus **the buyer's Safe pay fee** (a percentage of the price, capped). BitoCard holds the price until they confirm they have the item (by giving the seller a release code when they meet, or confirming delivery), then pays the seller the price less **the seller's Safe pay fee** (a percentage of the price, capped). If the item never comes or is not as described, BitoCard decides the dispute and can refund. Buyers who do not opt in carry on with the seller in BitoCard's chat (or by phone) and pay the seller directly, as on Jiji.
+- **Safe pay, the buyer's choice:** a buyer who wants protection opts in on a purchase and pays the item's price plus **the buyer's Safe pay fee** (a percentage of the price, capped). BitoCard holds the price until they confirm they have the item (by giving the seller a release code when they meet, or confirming delivery), then pays the seller the price less **the seller's Safe pay fee** (a percentage of the price, capped). If the item never comes or is not as described, BitoCard decides the dispute and can refund. **Safe pay is the only payment BitoCard collects, and only from the buyer's BitoCard wallet.** Buyers who do not opt in carry on with the seller in BitoCard's chat (or by phone) and agree between themselves how to pay, where to meet, and how the item is inspected and tested, as on Jiji; BitoCard guides them with **BitoCard's Safe Trade Policy** and the **Safe Trade Guide** checklist (below).
 - **Deals:** shops run sales and price drops, shown with honest "was" prices taken from the listing's own price history.
 - **BitoCard earns** the Safe pay fees from both sides of each Safe pay sale, and later from promotions (boosts) and shop plans.
 
@@ -29,7 +29,8 @@ What it is not: not part of the reseller storefronts (resellers' customers do no
 | Fees on a refund | **The buyer's fee is refunded with the price** whenever the item does not change hands (the seller declines or misses the deadline, either side cancels before hand-over, or BitoCard refunds in full on a dispute), and **kept** on a part refund or once released. **The seller's fee is taken only from money released to them**: none on a full refund; on a part refund, worked out on the part released (and capped) | Each side pays only for a sale that went ahead. |
 | Which listings | **Any listing**: the buyer asks for Safe pay and the **seller accepts** before the buyer pays (within 24 hours) | Buyers choose it, so it cannot depend on sellers switching it on in advance; accepting first means a buyer never pays for an item the seller will not sell this way. |
 | What the seller needs | To accept, the seller passes the **identity check** (Verify) and adds a **payout bank account in their verified name** (asked the first time) | They are paid out to a bank account, and customer payouts already require both (`CustomerPayoutsService`). |
-| How buyers pay with Safe pay | **BitoCard's payment gateways only** (card, bank, mobile money: the market's checkout methods), **not the store wallet** at first | Store-wallet money is spend-only; paying it to a seller would turn it into withdrawable cash, which needs legal advice first (the same open point as the crypto exchange). |
+| How buyers pay with Safe pay | **From the buyer's BitoCard wallet only** (owner's decision), in the country's currency. A buyer short of the total tops up first (card, bank, mobile money or their account number, as today) and comes back to pay. Refunds go back to the wallet at once | One way in and out, no payment page or gateway refund per order. **Open legal point:** store-wallet money is spend-only, and Safe pay turns it into a seller's withdrawable money, the same question as the crypto exchange; take advice before Safe pay runs live, and keep the payout hold and the recent-card-top-up review in place. |
+| Trades without Safe pay | **Agreed between buyer and seller** (owner's decision): how to pay (cash, transfer, anything else), where to meet, inspecting and testing, and their own safety. BitoCard handles none of that money and does not decide those disputes; it publishes **BitoCard's Safe Trade Policy** and the **Safe Trade Guide**, takes reports and removes bad actors | BitoCard is only a party to what it holds. |
 | Paying the seller | On release the money becomes the seller's withdrawable money (`customer_withdrawable`), **inside the country's payout hold**, then cashed out with the existing bank payouts | A card chargeback after release can still be put right during the hold. It reuses payouts, name checks and holds. |
 | Revenue later | Phase 3: **boosts** and **shop plans**, paid from the customer's wallet | Spend-only store credit spent on BitoCard's own service is what the wallet is for; no new payment flows. |
 | Markets | Per country behind a feature switch **`classifieds`** (off by default; global or country), and **`classifieds_safe_pay`** (off by default) for paying through BitoCard, **Nigeria first** | Legal review per country; Safe pay can stay off where it is not cleared while the market itself runs. |
@@ -63,7 +64,7 @@ Browse, search, post, contact, pay safely, moderate. Nigeria only, behind `class
   - Reports on listings and users (reason, details); three reports send a listing back to review at once.
   - Verification badges: phone confirmed, ID checked (Verify KYC), business verified (KYB).
   - Blocking: one user blocks another in chat. Admins suspend users and remove listings, audited.
-  - Safety tips on every listing and at the start of every chat: "Use Safe pay, or meet in public, inspect before paying and never pay in advance."
+  - Safety tips on every listing and at the start of every chat ("Use Safe pay, or meet in public, inspect before paying and never pay in advance"), each linking to the **Safe Trade Guide** (below).
 - **Admin** (admin app, a new **Classifieds** section): moderation queue (approve, reject with a reason, ask for changes), reports, listings, users and shops (suspend, unsuspend), categories and attributes, areas, prohibited words, limits, Safe pay orders and disputes, Safe pay settings per country. Operations edit, support views, finance decides money; every action audited (`classifieds.*`).
 - **SEO:** listing and category pages are server-rendered and indexed, with Product and Offer JSON-LD, a sitemap of active listings, and Open Graph images from the first photo. Sold, expired and removed listings leave the sitemap and answer 410 after a grace period.
 
@@ -80,7 +81,7 @@ Browse, search, post, contact, pay safely, moderate. Nigeria only, behind `class
   3. Buyers who do not opt in simply carry on in chat or by phone, and pay the seller directly.
 - **Accepting (the seller):**
   - The seller is told and accepts or declines within 24 hours (no answer: the request lapses). Before accepting they see the price, their fee and what they will be paid. Accepting the first time asks for the identity check and a payout bank account in their verified name; a seller who cannot finish them declines.
-  - Once accepted, the buyer has 24 hours to pay the total on the market's payment page. This reuses the checkout payment flow: gateways, the payment timeout, Cancel payment and gateway refunds. Nothing is reserved until it is paid.
+  - Once accepted, the buyer has 24 hours to pay the total **from their BitoCard wallet** (the country's currency). Short of it, **Add funds** tops the wallet up as today and brings them back. Paying moves the total from the wallet to escrow in the same transaction that marks the order paid, once (the ledger's balance check stops parallel payments overspending). Nothing is reserved until it is paid. Safe pay needs customer wallets on in the market.
 - **Paid:** the price and the fee are held in escrow, the listing shows as reserved, and the seller is told to hand it over.
 - **Handing over:**
   - **Meet in person:** the buyer's app shows a **6-digit release code**. They inspect the item, then give the code; the seller enters it, and the money is released at once. The code is never shown to the seller and never sent in chat; the seller has 5 tries.
@@ -89,13 +90,13 @@ Browse, search, post, contact, pay safely, moderate. Nigeria only, behind `class
 - **Cancelling and refunds:**
   - Before hand-over either side can cancel: the buyer is refunded in full, **fee included**.
   - A seller who misses the hand-over deadline: refunded in full, fee included, automatically by the job.
-  - Refunds go back through the same gateway, as failed store checkouts are refunded today.
+  - Refunds go back to the buyer's wallet at once (where the money came from).
 - **Disputes** (before release only):
   - The buyer opens one (not received, not as described, damaged), which stops the release.
   - Both sides add messages and photos. **BitoCard decides**: a full refund (fee included), a part refund (the rest to the seller, less the seller's fee worked out on that rest; the buyer's fee kept), or release to the seller (both fees kept). Operations decide; refunds need finance.
   - A refund that needs the item back is decided once the seller confirms it was returned. Decisions are audited.
 - **Protection against abuse:**
-  - Card chargebacks are handled like checkout chargebacks; released money stays inside the payout hold.
+  - A chargeback on the card top-up that funded the wallet is handled as for any customer wallet top-up; released money stays inside the payout hold, and a seller paid from recent card top-ups waits for review before a bank payout, as for P2P money.
   - New sellers have a lower order limit. A seller who loses disputes or cancels often is limited or suspended.
   - Buyer and seller must be different people, and not the same verified identity.
 - **What each side sees:** both see the order, its status and timeline. The buyer sees the price, their fee and the total; the seller sees the price, their fee and what they will be paid. Neither sees the other's fee, and the seller never sees how the buyer paid. The seller sees the buyer's delivery address only after payment and only for delivery. Neither sees the other's bank details.
@@ -119,7 +120,7 @@ Browse, search, post, contact, pay safely, moderate. Nigeria only, behind `class
 
 ### Phase 4 (later): Safe pay additions
 
-Paying from the store wallet (after legal advice), courier integrations with tracked delivery, B2B orders paid by quantity, and partial shipments.
+Courier integrations with tracked delivery, B2B orders paid by quantity, and partial shipments.
 
 ## Data model (Prisma, new migrations)
 
@@ -136,7 +137,28 @@ Paying from the store wallet (after legal advice), courier integrations with tra
 - **`classified_leads`**: phone reveals and first chats per listing and buyer (rate limits and seller stats).
 - **`classified_favourites`**; **`classified_reports`**: `listing_id` or `reported_customer_id`, `reporter_id`, `reason`, `details`, `status`, `decided_by`.
 - Phase 2: **`classified_shops`** (owner, slug, name, logo, cover, description, area, status, `kyc_case_id`, `plan_code`), **`classified_price_tiers`**, **`classified_sales`**, **`classified_quotes`**, **`classified_reviews`**, **`classified_saved_searches`**. Phase 3: **`classified_boosts`**.
-- **Ledger:** `classified_escrow` (money held for Safe pay orders: BitoCard's liability, per mode and currency, never below zero) and `classifieds_revenue` (fees, later boosts and plans). Entries: `classified_order:<id>:paid` (the gateway payment, price and the buyer's fee, into escrow), `classified_order:<id>:released` (the price less the seller's fee from escrow to the seller's `customer_withdrawable`, both fees to revenue), `classified_order:<id>:refund` (the price and the buyer's fee back out through the gateway), `classified_order:<id>:partial` (a part of the price refunded, the rest to the seller less the seller's fee on it, both fees to revenue).
+- **Ledger:** `classified_escrow` (money held for Safe pay orders: BitoCard's liability, per mode and currency, never below zero) and `classifieds_revenue` (fees, later boosts and plans). Entries: `classified_order:<id>:paid` (price and the buyer's fee from the buyer's `customer_wallet` into escrow), `classified_order:<id>:released` (the price less the seller's fee from escrow to the seller's `customer_withdrawable`, both fees to revenue), `classified_order:<id>:refund` (the price and the buyer's fee from escrow back to the buyer's `customer_wallet`), `classified_order:<id>:partial` (a part of the price refunded, the rest to the seller less the seller's fee on it, both fees to revenue).
+
+## Safe trade (trades without Safe pay)
+
+Buyer and seller agree how to pay, inspect, test and stay safe. BitoCard gives them two things:
+
+- **BitoCard's Safe Trade Policy** (`apps/legals`, `/documents/safe-trade-policy`, in `legalDocuments`; `legalUpdated` bumped): the rules, in plain words.
+  1. What BitoCard does and does not do: it hosts listings and chat and runs Safe pay; it is not a party to a trade paid directly, does not hold, inspect or guarantee those goods or that money, and does not decide their disputes.
+  2. Paying outside Safe pay is agreed between the two; never pay in advance for an item not seen; BitoCard never asks anyone to pay it outside the wallet, and never asks for a release code, password or one-time code.
+  3. Meeting: a public, busy place in daylight; bring someone or tell someone; never to a remote place or a stranger's home; property and vehicles only with their documents.
+  4. Inspecting and testing before paying, with the category's checklist.
+  5. Red flags: urgency, prices far below the market, deposits or "delivery fees" up front, fake payment alerts and screenshots, overpayment and refund requests, moving the chat off BitoCard, asking for codes.
+  6. Sellers: hand over only once the money shows in their own bank or mobile money app (never an SMS or screenshot); check cash.
+  7. Prohibited items (the marketplace terms) and personal data: share only what a trade needs, never ID photos.
+  8. Reporting and blocking; what BitoCard does about it (removal, suspension, help to the police on a lawful request).
+  9. Safe pay as the protected option, and its release code given only after inspection.
+- **The Safe Trade Guide** (`/shop/safe-trade`, short and printable): a checklist for each side.
+  - **Before meeting:** chat on BitoCard; check the seller's badges and reviews; is the price realistic; agree the place, time and how to pay; tell someone.
+  - **At the meeting:** public place, daylight; inspect and test with the category's checklist; check documents and serial numbers; pay only when satisfied, and confirm a transfer in the banking app.
+  - **Sellers:** money in your account before hand-over; refuse overpayments; check notes.
+  - **Category checklists**, set by admins per category (`classified_categories.safety_checklist`): phones (powers on, IMEI matches the box and is not blacklisted, iCloud or Google account signed out, charging, camera and screen), laptops (charger, battery, keyboard, storage), vehicles (papers in the seller's name, chassis number, a mechanic, a test drive), property (title documents, the agent's identity, never pay to view), animals, and so on.
+  - Shown in short on every listing and at the start of every chat, and before Show phone the first time.
 
 ## Country and locality
 
@@ -154,10 +176,10 @@ Paying from the store wallet (after legal advice), courier integrations with tra
 - **Signed-in customers** (`CustomerGuard`, the house store's accounts):
   - Listings: `POST/PATCH/DELETE listings(/:id)`, `POST listings/:id/photos` (multipart), `POST listings/:id/renew|sold`, `GET me/listings`.
   - Contact: `POST listings/:id/phone` (reveal), `GET/POST conversations(/:id/messages)`, `POST conversations/:id/block`, `GET/POST/DELETE favourites`, `POST reports`.
-  - Safe pay: `GET listings/:id/safe-pay` (the buyer's fee and total), `GET me/safe-pay` (what a seller still needs: identity check, payout account), `POST conversations/:id/offers`, `POST offers/:id/accept|decline`, `POST orders { listing_id | offer_id, fulfilment, delivery_address? }` (the buyer's request), `POST orders/:id/accept|decline` (the seller; the order shows them their fee and payout first), `POST orders/:id/pay` (the buyer, once accepted: opens the payment page), `GET orders(/:id)` (as buyer or seller), `GET orders/:id/release-code` (the buyer, once paid, meet-up only), `POST orders/:id/release { code }` (the seller), `POST orders/:id/sent { tracking_note }`, `POST orders/:id/received`, `POST orders/:id/cancel`, `POST orders/:id/dispute` (+ messages and photos).
+  - Safe pay: `GET listings/:id/safe-pay` (the buyer's fee and total), `GET me/safe-pay` (what a seller still needs: identity check, payout account), `POST conversations/:id/offers`, `POST offers/:id/accept|decline`, `POST orders { listing_id | offer_id, fulfilment, delivery_address? }` (the buyer's request), `POST orders/:id/accept|decline` (the seller; the order shows them their fee and payout first), `POST orders/:id/pay` (the buyer, once accepted: pays from the wallet, `wallet_balance_low` saying how much to add), `GET orders(/:id)` (as buyer or seller), `GET orders/:id/release-code` (the buyer, once paid, meet-up only), `POST orders/:id/release { code }` (the seller), `POST orders/:id/sent { tracking_note }`, `POST orders/:id/received`, `POST orders/:id/cancel`, `POST orders/:id/dispute` (+ messages and photos).
 - **Admin** (`/v1/admin/classifieds`): moderation queue and decisions, reports, listings, users, categories and attributes, areas, limits, prohibited words, Safe pay settings per country, orders, and disputes (`POST disputes/:id/decide { decision, refund_minor?, note }`, refunds finance only, behind the step-up window); all audited.
 - Left out of the public OpenAPI document, like the store's customer endpoints, so resellers' API is unchanged. Gated by the switches (`classifieds_unavailable`, `safe_pay_unavailable`).
-- **Payments:** a new payment purpose `classified_order` on the existing `PaymentsService` (gateway choice, timeout, cancel, verification, unmatched money and refunds all as today); when paid, the escrow entry is written in the same transaction as the order turning `paid`.
+- **Payments:** no payment pages of its own: Safe pay is paid from the wallet (the `customer_wallet` ledger account, as wallet purchases are), and wallets are topped up through the existing top-ups. The escrow entry is written in the same transaction as the order turning `paid`.
 - **Jobs** (in `cron.json`, run by the droplet's scheduler): `classifieds` every 15 minutes (expire listings and offers, lapse requests not accepted or not paid in time, refund orders past their hand-over deadline, release delivered orders past their confirmation time, send saved-search alerts, re-check flagged listings); a daily cleanup (photos of deleted listings, old conversations by the retention rule).
 
 ## In the storefront (`apps/storefront`)
@@ -173,15 +195,24 @@ Built in the storefront like the rest of the customer account app: server compon
   - **Messages:** `/shop/messages(/<id>)`, chats about listings, with offers.
   - **Orders:** `/shop/orders(/<id>)`, Safe pay orders as buyer (status, pay, release code, received, dispute) and as seller (accept or decline, hand-over, enter the code, mark sent), apart from the Orders tab's store orders. Buying is `/shop/l/<id>/buy` (price, fee and total, what is covered, meet-up or delivery, send the request; then pay once the seller accepts).
   - **Favourites:** `/shop/favourites`. **Safe pay:** `/shop/safe-pay` (identity check and payout account, to be paid).
+  - **Safe trade:** `/shop/safe-trade` (the Safe Trade Guide, with each category's checklist), linked from every listing, chat and Show phone, and from the footer; the policy itself is on the legals site.
   - Phase 2: `/shop/my-shop`.
 - Shared code from `@bitocard/ui` and `@bitocard/api-client` (a `classifieds` entry with its types), the account app's `Slider`, chat and photo components. Tests in `apps/storefront/test` (Vitest) for every `lib/` helper and server action.
+
+## Legal owed before switching on in a market
+
+- **Safe pay, before taking any payment:** BitoCard holds buyers' money for third parties and pays sellers, and Safe pay turns spend-only wallet money into a seller's withdrawable money, which may be a regulated payment or escrow service in each country (Nigeria: CBN payment service licensing; take advice on whether a licensed partner must hold the funds). Safe pay terms: that it is the buyer's choice, its fees (the buyer's and the seller's, each a percentage of the price up to a cap; the buyer's refunded when the item does not change hands, the seller's taken only from money released to them), holding, release codes, deadlines, cancellation, refunds and disputes, that BitoCard is not the seller and does not inspect goods, and sellers' payouts with the payout hold. Until cleared, Safe pay runs only in the sandbox (`classifieds_safe_pay` off live).
+- **BitoCard's Safe Trade Policy** (see Safe trade): drafted for the legals site and reviewed by lawyers, so it guides without implying that BitoCard guarantees or takes part in trades paid directly.
+- **Marketplace terms** (`apps/legals`): BitoCard hosts listings and is not a party to a sale paid directly; sellers' warranties (they own the goods and the listing is true); prohibited items (weapons, drugs, counterfeit and stolen goods, restricted animals, financial products, adult content and anything illegal locally); honest prices and "was" prices; moderation, removal and suspension; reviews; boosts and shop plans.
+- **Privacy notice:** listings and seller profiles are public; phone numbers shown to signed-in buyers who ask; chats kept for a set period and read by moderators only on a report or dispute; photo metadata removed; leads and views counted; delivery addresses shown only to the seller; payment, payout and dispute data and their retention; Verify checks for Safe pay sellers and shops.
+- **Per country:** consumer protection on pricing and discounts (Nigeria FCCPA), data protection (NDPA), and any rules on online marketplaces and particular categories (vehicles, property, jobs, animals). Lawyers' review before launch.
 
 ## Order of work for phase 1
 
 1. Migrations and seed: categories with attributes, Nigerian areas, the switches, Safe pay settings.
 2. API: listings (create, edit, lifecycle, limits), photos through the API, public reads and search, automatic checks and moderation, reports, favourites.
 3. API: conversations and messages, offers, phone reveal and leads, notifications.
-4. API: Safe pay: the buyer's request with the fee, the seller's acceptance and set-up, orders and the `classified_order` payment purpose, escrow entries, release codes, sent and received, deadlines in the job, cancellations and refunds, disputes and admin decisions, release into the payout hold.
+4. API: Safe pay: the buyer's request with the fee, the seller's acceptance and set-up, orders paid from the wallet, escrow entries, release codes, sent and received, deadlines in the job, cancellations and refunds, disputes and admin decisions, release into the payout hold.
 5. Admin app: the Classifieds section (queue, reports, listings, users, categories, limits, Safe pay orders, disputes and settings).
 6. Storefront: the Shop tab (Account to the header), the `/shop` route group and its sub menu, browsing and location pages, post an ad, my listings, messages, Safe pay (buy, orders, release code, set-up), favourites.
 7. SEO for the country stores' Shop pages (sitemaps per country, titles, JSON-LD) and the `bitocard.com/shop` redirect.
