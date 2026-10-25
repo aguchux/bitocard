@@ -50,9 +50,19 @@ describe('Stripe product tax codes', () => {
       assert.match(refused.message, /^stripe: Invalid line_items\[0\]: the product tax code is missing/);
       assert.match(refused.message, /Turn Managed Payments off in the Stripe dashboard/);
       assert.equal(refused.message.match(/stripe: /g).length, 1, 'named once');
+      assert.doesNotMatch(refused.message, /which is enabled by Stripe/, 'Stripe’s message ends at a full sentence before the advice');
+      assert.match(refused.message, /product-tax-code-requirements\)\. Stripe Managed Payments is on/);
     } finally {
       stripe.state.managedPayments = false;
     }
+  });
+
+  test('long provider messages end at a full sentence, else a whole word, never mid-sentence', async () => {
+    const { clip } = await import('../dist/payments/provider-error.js');
+    assert.equal(clip('Short.', 300), 'Short.');
+    const long = `${'First sentence is here. '.repeat(10)}And the last one is cut`;
+    assert.equal(clip(long, 250), 'First sentence is here. '.repeat(10).trimEnd());
+    assert.equal(clip('word '.repeat(80), 30), `${'word '.repeat(6).trimEnd()}…`);
   });
 
   test('the integration setting is validated as a Stripe tax code', async () => {

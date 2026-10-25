@@ -825,7 +825,7 @@ export async function fakeStripe() {
       }
       // Stripe Managed Payments on: every line item needs a product tax code.
       if (state.managedPayments && !fields['line_items[0][price_data][product_data][tax_code]']) {
-        return { status: 400, body: { error: { type: 'invalid_request_error', message: 'Invalid line_items[0]: the product tax code is missing. Set the tax_code field of the product to an eligible product tax code.' } } };
+        return { status: 400, body: { error: { type: 'invalid_request_error', message: "Invalid line_items[0]: the product tax code is missing. Set the product's tax_code field to an eligible product tax code (more details: https://docs.stripe.com/payments/managed-payments/eligibility#product-tax-code-requirements). Product tax code is required for Managed Payments, which is enabled by default for accounts that have turned it on in the Dashboard." } } };
       }
       const id = `cs_test_${(state.next += 1)}`;
       state.sessions[id] = { fields, status: 'open', payment_status: 'unpaid', payment_intent: `pi_${state.next}`, key: headers.authorization.slice(7) };

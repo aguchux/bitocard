@@ -30,6 +30,19 @@ type ErrorReply = {
 };
 
 /**
+ * A provider's message cut to `max` characters at the last full sentence that fits, else the last whole word with an
+ * ellipsis, so admins never read a sentence broken off in the middle.
+ */
+export function clip(message: string, max: number) {
+  if (message.length <= max) return message;
+  const head = message.slice(0, max);
+  const sentence = head.lastIndexOf('. ');
+  if (sentence >= max / 2) return head.slice(0, sentence + 1);
+  const word = head.lastIndexOf(' ');
+  return `${(word > 0 ? head.slice(0, word) : head.slice(0, max - 1)).trimEnd()}…`;
+}
+
+/**
  * What a provider said when it refused a request: the usual message fields (Stripe, Flutterwave, Monnify, pawaPay's
  * `failureReason` and `errorMessage`), else a short excerpt of the body, else the status. Never the request itself.
  */
@@ -38,7 +51,7 @@ export function errorText(body: unknown, text: string, status: number) {
   const failure = reply.failureReason ? [reply.failureReason.failureCode, reply.failureReason.failureMessage].filter(Boolean).join(': ') : '';
   const found =
     reply.message ?? reply.responseMessage ?? reply.errorMessage ?? (typeof reply.error === 'string' ? reply.error : reply.error?.message) ?? (failure || reply.errorCode) ?? (Array.isArray(reply.errors) ? reply.errors.map(error => error?.message).filter(Boolean).join('; ') || undefined : undefined);
-  if (found) return found.slice(0, 300);
+  if (found) return clip(found, 300);
   const excerpt = text.replace(/\s+/g, ' ').trim().slice(0, 200);
   return excerpt ? `HTTP ${status}: ${excerpt}` : `HTTP ${status}`;
 }
