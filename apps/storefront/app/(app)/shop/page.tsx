@@ -6,7 +6,7 @@ import { ShopPills, ShopTitle } from "@/components/app/shop/shop-nav";
 import { Thumb } from "@/components/app/shop/thumb";
 import { customerApi } from "@/lib/customer";
 import { listingActions, listingFilters, listingMeta, listingTones } from "@/lib/shop";
-import { requireShop, shopListingHref } from "@/lib/shop-server";
+import { requireShop, shopAssistant, shopListingHref } from "@/lib/shop-server";
 
 export const metadata: Metadata = { title: "Shop" };
 
@@ -23,11 +23,12 @@ const posted: Record<string, string> = {
  */
 export default async function ShopHome({ searchParams }: Props) {
   const { status, posted: done } = await searchParams;
-  const { shop } = await requireShop("/shop");
+  const { shop, market } = await requireShop("/shop");
   const filter = listingFilters.find(item => item.status === status) ?? listingFilters[0]!;
-  const [shown, all] = await Promise.all([
+  const [shown, all, assistant] = await Promise.all([
     customerApi<ShopMyListings>("GET", `/v1/classifieds/me/listings?limit=50${filter.status ? `&status=${filter.status}` : ""}`),
     filter.status ? customerApi<ShopMyListings>("GET", "/v1/classifieds/me/listings?limit=100") : null,
+    shopAssistant(market.country),
   ]);
   const source = all ?? shown;
   const every = source.ok ? source.data.data : [];
@@ -97,7 +98,7 @@ export default async function ShopHome({ searchParams }: Props) {
                       <span className="text-xs text-slate-600">{listingMeta(listing)}</span>
                     </span>
                   </Link>
-                  <ListingButtons id={listing.id} actions={listingActions(listing)} publicHref={shopListingHref(listing.url)} />
+                  <ListingButtons id={listing.id} actions={listingActions(listing)} publicHref={shopListingHref(listing.url)} improve={assistant && listing.status === "active" ? assistant.name : null} />
                 </article>
               </li>
             ))}

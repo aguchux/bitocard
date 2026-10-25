@@ -16,6 +16,7 @@ import type {
   ShopPriceKind,
   ShopReleaseCode,
   ShopReportReason,
+  ShopSuggestion,
   ShopVideoUpload,
 } from "@bitocard/api-client/classifieds";
 import { apiUrl } from "./api";
@@ -237,4 +238,18 @@ export async function removeFavourite(listingId: string): Promise<ShopResult<unk
   const result = answer(await customerApi("DELETE", `/v1/classifieds/favourites/${listingId}`));
   if (result.ok) revalidatePath("/shop/favourites");
   return result;
+}
+
+// ---- The shop assistant ----
+
+/**
+ * A suggestion from the shop assistant for the seller to accept or change: from the listing's photos (`draft`), a price
+ * range from comparable listings (`price`), what would make it better (`improve`), or a reply in a chat (`reply`).
+ * Every suggestion is checked by BitoCard before it comes back; nothing changes until the seller presses a button.
+ */
+export async function assistantSuggestion(kind: ShopSuggestion["kind"], input: { listingId?: string; conversationId?: string }): Promise<ShopResult<ShopSuggestion>> {
+  if (input.listingId && !id(input.listingId)) return refused("No such listing.");
+  if (input.conversationId && !id(input.conversationId)) return refused("No such chat.");
+  if (kind === "reply" ? !input.conversationId : !input.listingId) return refused(kind === "reply" ? "Open a chat first." : "Save the ad first.");
+  return answer(await customerApi<ShopSuggestion>("POST", "/v1/classifieds/assistant/suggestions", { kind, ...(input.listingId ? { listing_id: input.listingId } : {}), ...(input.conversationId ? { conversation_id: input.conversationId } : {}) }));
 }

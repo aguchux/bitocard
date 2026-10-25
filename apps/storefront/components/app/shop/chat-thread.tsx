@@ -7,6 +7,7 @@ import { reportReasonLabels, shopMoney, type ShopChat, type ShopMessage, type Sh
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl } from "@/lib/shop";
 import { answerOffer, blockChat, loadChat, makeOffer, reportChat, sendMessage } from "@/lib/shop-actions";
+import { SuggestReply } from "./assistant-help";
 
 const pollMs = 4000;
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
@@ -28,7 +29,7 @@ function hoursLeft(iso: string) {
  * photos, offers with their answers, and a menu to block or report the other person. New messages are fetched every
  * few seconds while the page is open and visible.
  */
-export function ChatThread({ initial, buy }: { initial: ShopChat; buy: { handoff: string; path: string } | null }) {
+export function ChatThread({ initial, buy, assistant = null }: { initial: ShopChat; buy: { handoff: string; path: string } | null; assistant?: { name: string } | null }) {
   const [chat, setChat] = useState(initial);
   const [messages, setMessages] = useState(initial.messages);
   const [body, setBody] = useState("");
@@ -244,6 +245,7 @@ export function ChatThread({ initial, buy }: { initial: ShopChat; buy: { handoff
               </button>
             </form>
           ) : null}
+          {assistant ? <SuggestReply name={assistant.name} conversationId={chat.id} onText={setBody} /> : null}
           <form
             className="flex items-end gap-2"
             onSubmit={event => {

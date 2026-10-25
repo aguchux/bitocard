@@ -12,7 +12,7 @@ const confirmText: Partial<Record<ListingAction, string>> = {
 };
 
 /** A listing's buttons on My listings: edit, mark sold, renew, open its public page, delete. */
-export function ListingButtons({ id, actions, publicHref }: { id: string; actions: ListingAction[]; publicHref: string | null }) {
+export function ListingButtons({ id, actions, publicHref, improve = null }: { id: string; actions: ListingAction[]; publicHref: string | null; improve?: string | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -53,6 +53,11 @@ export function ListingButtons({ id, actions, publicHref }: { id: string; action
           );
         })}
       </div>
+      {improve ? (
+        <Link href={`/shop/listings/${id}#improve`} className="text-[13px] font-semibold text-brand-700 hover:underline">
+          Improve this listing with {improve}
+        </Link>
+      ) : null}
       {error ? (
         <p role="alert" className="text-sm font-semibold text-brand-700">
           {error}

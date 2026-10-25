@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import type { ShopMarkets, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
+import type { ShopAssistantProfile, ShopMarkets, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
 import { appUrl } from "@bitocard/ui/site";
 import { apiUrl } from "./api";
 import { currentCustomer, customerApi } from "./customer";
@@ -62,6 +62,16 @@ export async function requireShop(path: string) {
   const unread = await customerApi<{ unread: number }>("GET", "/v1/classifieds/conversations/unread");
   return { customer, market, shop: { browse: shopHref(`/${market.country.toLowerCase()}`), unread: unread.ok ? unread.data.unread : 0 } };
 }
+
+/**
+ * The shop assistant that helps sellers in this country (Fill from photos, Suggest a price, Improve, Suggest a reply), or
+ * null where none does: `classifieds_assistant` off, no active assistant, or its roles leave sellers out.
+ */
+export const shopAssistant = cache(async (country: string): Promise<{ name: string } | null> => {
+  const result = await customerApi<ShopAssistantProfile>("GET", `/v1/classifieds/assistant?country=${encodeURIComponent(country)}&surface=sell`);
+  const assistant = result.ok ? result.data.assistant : null;
+  return assistant?.roles.includes("sell") ? { name: assistant.name } : null;
+});
 
 async function publicList<T>(path: string): Promise<T[]> {
   try {

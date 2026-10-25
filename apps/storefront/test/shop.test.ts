@@ -227,6 +227,33 @@ describe("Shop actions", () => {
   });
 });
 
+describe("the shop assistant for sellers", () => {
+  test("offered where the country's assistant helps sellers, never otherwise", async () => {
+    const { shopAssistant } = await import("@/lib/shop-server");
+    const fetch = vi.fn(async (url: string) => reply({ object: "shop_assistant", assistant: url.includes("country=NG") ? { name: "Anjio", roles: ["browse", "sell"] } : url.includes("country=GH") ? { name: "Kofi", roles: ["browse"] } : null, languages: [] }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await shopAssistant("NG")).toEqual({ name: "Anjio" });
+    expect(await shopAssistant("GH")).toBeNull();
+    expect(await shopAssistant("KE")).toBeNull();
+    expect((fetch.mock.calls as unknown as Call[])[0]![0]).toBe("http://api.test/v1/classifieds/assistant?country=NG&surface=sell");
+  });
+
+  test("suggestions name the listing or the chat they are for; nothing leaves without one", async () => {
+    const fetch = vi.fn(async () => reply({ object: "assistant_suggestion", kind: "draft", message_id: "m1", suggestion: null }));
+    vi.stubGlobal("fetch", fetch);
+    await actions.assistantSuggestion("draft", { listingId: listing });
+    await actions.assistantSuggestion("reply", { conversationId: order });
+    expect((fetch.mock.calls as unknown as Call[]).map(call => [call[0], JSON.parse(String(call[1].body))])).toEqual([
+      ["http://api.test/v1/classifieds/assistant/suggestions", { kind: "draft", listing_id: listing }],
+      ["http://api.test/v1/classifieds/assistant/suggestions", { kind: "reply", conversation_id: order }],
+    ]);
+    expect(await actions.assistantSuggestion("price", {})).toMatchObject({ ok: false });
+    expect(await actions.assistantSuggestion("reply", { listingId: listing })).toMatchObject({ ok: false });
+    expect(await actions.assistantSuggestion("improve", { listingId: "../x" })).toMatchObject({ ok: false });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("photos through this site", () => {
   const form = (fields: Record<string, Blob | string>) => {
     const body = new FormData();

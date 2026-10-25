@@ -21,6 +21,7 @@ import {
 import { compressImage } from "@bitocard/ui/image";
 import { featureValue, fromMinor, toggleList, wrapSelection } from "@/lib/shop";
 import { createListing, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
+import { type DraftPick, FillFromPhotos, ImproveListing, SuggestPrice } from "./assistant-help";
 import { ShopIcon } from "./icon";
 
 const maxPhotos = 12;
@@ -86,7 +87,8 @@ function Chips<T extends string>({ label, options, value, onChange, disabled }: 
  * Post board: photos and video first, then title, category, price and condition, features from BitoCard Shop's
  * registry, the description with its small toolbar, then location, delivery and contact. The draft is made on the
  * seller's first change and every change after it is saved as they go; photos upload while they type (scaled to 1600 px
- * JPEG here first), and the video goes from the browser straight to the API with a 15-minute link.
+ * JPEG here first), and the video goes from the browser straight to the API with a 15-minute link. Where the country's
+ * shop assistant helps sellers: Fill from photos, Suggest a price and Improve this listing, each for the seller to accept.
  */
 export function ListingForm({
   listing,
@@ -95,6 +97,7 @@ export function ListingForm({
   currency,
   phoneConfirmed,
   minPhotos,
+  assistant = null,
 }: {
   listing: ShopMyListing | null;
   categories: ShopTopCategory[];
@@ -102,6 +105,7 @@ export function ListingForm({
   currency: string;
   phoneConfirmed: boolean;
   minPhotos: number;
+  assistant?: { name: string } | null;
 }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(listing?.id ?? null);
@@ -300,6 +304,52 @@ export function ListingForm({
     router.refresh();
   };
 
+  // ---- The shop assistant's suggestions (applied only when the seller accepts them) ----
+  /** Everything saved and every photo sent, so a suggestion reads the ad as it is now. */
+  const latest = async () => {
+    await flush();
+    await queue.current;
+    return idRef.current;
+  };
+  const applyDraft = (pick: DraftPick) => {
+    const changes: ListingFields = {};
+    if (pick.title) {
+      setTitle(pick.title);
+      changes.title = pick.title;
+    }
+    const nextCategory = pick.categoryId && findCategory(categories, pick.categoryId) ? pick.categoryId : categoryId;
+    if (nextCategory !== categoryId && nextCategory) {
+      setCategoryId(nextCategory);
+      changes.category_id = nextCategory;
+    }
+    if (pick.condition) {
+      setCondition(pick.condition);
+      changes.condition = pick.condition;
+    }
+    if (pick.description) {
+      setDescription(pick.description);
+      changes.description = pick.description;
+    }
+    if (pick.features?.length) {
+      const defs = findCategory(categories, nextCategory)?.category.features ?? [];
+      const rows = [...features];
+      for (const item of pick.features) {
+        const at = rows.findIndex(row => row.key === item.key);
+        const value = rawValue(item.value);
+        if (at >= 0) rows[at] = { ...rows[at]!, value };
+        else if (rows.length < maxFeatures) rows.push({ ...defFor({ key: item.key, name: item.name, icon: "tag", unit: null, value: item.value }, defs), value });
+      }
+      setFeatures(rows);
+      changes.features = featureList(rows);
+    }
+    save(changes);
+  };
+  const addSuggestedFeature = (key: string) => {
+    if (features.some(row => row.key === key) || features.length >= maxFeatures) return;
+    const def = suggested.find(item => item.key === key);
+    if (def) setFeatures([...features, { ...def, value: def.data_type === "boolean" ? false : (def.default_value ?? "") }]);
+  };
+
   const ready = photos.filter(photo => photo.status === "ready").length;
   const uploading = photos.filter(photo => photo.status === "uploading").length;
   const state = states.find(item => item.slug === stateSlug) ?? null;
@@ -327,6 +377,17 @@ export function ListingForm({
         <p className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-700">
           <strong>Sent back by BitoCard:</strong> {listing.review_reason ?? "change it and post it again."}
         </p>
+      ) : null}
+      {assistant && listing && listing.status !== "draft" ? (
+        <ImproveListing
+          name={assistant.name}
+          listingId={listing.id}
+          onTitle={value => {
+            setTitle(value);
+            save({ title: value });
+          }}
+          onAddFeature={addSuggestedFeature}
+        />
       ) : null}
 
       {/* Photos and video */}
@@ -419,6 +480,7 @@ export function ListingForm({
           </li>
         </ul>
         <p className="text-xs text-slate-500">The first photo is the cover: drag them, or use the arrows, to change the order. Locations stored in photos are removed.</p>
+        {assistant ? <FillFromPhotos name={assistant.name} ensureListing={latest} ready={ready >= minPhotos && !uploading} onAccept={applyDraft} /> : null}
       </section>
 
       {/* Title, category, price, condition */}
@@ -493,6 +555,21 @@ export function ListingForm({
               </button>
             ))}
           </div>
+          {assistant ? (
+            <SuggestPrice
+              name={assistant.name}
+              ensureListing={latest}
+              enabled={Boolean(categoryId)}
+              currency={currency}
+              onUse={minor => {
+                const value = fromMinor(minor);
+                setPrice(value);
+                const kind = priceKind === "on_request" ? "fixed" : priceKind;
+                setPriceKind(kind);
+                save({ price: value, price_kind: kind });
+              }}
+            />
+          ) : null}
         </div>
         <Chips
           label="Condition"

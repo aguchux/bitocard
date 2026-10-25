@@ -7,7 +7,7 @@ import { ChatThread } from "@/components/app/shop/chat-thread";
 import { Thumb } from "@/components/app/shop/thumb";
 import { customerApi } from "@/lib/customer";
 import { uuidPattern } from "@/lib/shop";
-import { requireShop, shopHref, shopOrigin } from "@/lib/shop-server";
+import { requireShop, shopAssistant, shopHref, shopOrigin } from "@/lib/shop-server";
 
 export const metadata: Metadata = { title: "Chat" };
 
@@ -16,9 +16,9 @@ type Props = { params: Promise<{ id: string }> };
 /** A chat about a listing: who with, the listing (its public page for the buyer, the seller's own ad for the seller), then the thread. */
 export default async function ChatPage({ params }: Props) {
   const { id } = await params;
-  await requireShop(`/shop/messages/${id}`);
+  const { market } = await requireShop(`/shop/messages/${id}`);
   if (!uuidPattern.test(id)) notFound();
-  const result = await customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${id}`);
+  const [result, assistant] = await Promise.all([customerApi<ShopChat>("GET", `/v1/classifieds/conversations/${id}`), shopAssistant(market.country)]);
   if (!result.ok) notFound();
   const chat = result.data;
   const { listing } = chat;
@@ -65,7 +65,7 @@ export default async function ChatPage({ params }: Props) {
           Safe Trade Guide
         </a>
       </p>
-      <ChatThread initial={chat} buy={buy} />
+      <ChatThread initial={chat} buy={buy} assistant={assistant} />
     </div>
   );
 }

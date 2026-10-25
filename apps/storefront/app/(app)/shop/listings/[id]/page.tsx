@@ -5,7 +5,7 @@ import type { ShopListingStats, ShopMyListing } from "@bitocard/api-client/class
 import { ListingForm } from "@/components/app/shop/listing-form";
 import { customerApi } from "@/lib/customer";
 import { uuidPattern } from "@/lib/shop";
-import { requireShop, shopListingHref, shopReference } from "@/lib/shop-server";
+import { requireShop, shopAssistant, shopListingHref, shopReference } from "@/lib/shop-server";
 
 export const metadata: Metadata = { title: "Your ad" };
 
@@ -16,10 +16,11 @@ export default async function ListingPage({ params }: Props) {
   const { id } = await params;
   const { customer, market } = await requireShop(`/shop/listings/${id}`);
   if (!uuidPattern.test(id)) notFound();
-  const [listing, stats, reference] = await Promise.all([
+  const [listing, stats, reference, assistant] = await Promise.all([
     customerApi<ShopMyListing>("GET", `/v1/classifieds/me/listings/${id}`),
     customerApi<ShopListingStats>("GET", `/v1/classifieds/me/listings/${id}/stats`),
     shopReference(market.country),
+    shopAssistant(market.country),
   ]);
   if (!listing.ok) notFound();
   const closed = ["sold", "expired", "removed"].includes(listing.data.status);
@@ -61,7 +62,7 @@ export default async function ListingPage({ params }: Props) {
           </Link>
         </div>
       ) : (
-        <ListingForm listing={listing.data} categories={reference.categories} states={reference.states} currency={market.currency} phoneConfirmed={customer.phone_verified} minPhotos={4} />
+        <ListingForm listing={listing.data} categories={reference.categories} states={reference.states} currency={market.currency} phoneConfirmed={customer.phone_verified} minPhotos={4} assistant={assistant} />
       )}
     </div>
   );
