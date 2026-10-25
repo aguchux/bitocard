@@ -239,10 +239,11 @@ export class ListingSearchService {
     });
     if (!row || row.country !== code || ['draft', 'pending_review'].includes(row.status)) throw notFound();
     if (row.status === 'sold' ? !row.soldAt || Date.now() - row.soldAt.getTime() > soldVisibleMs : row.status !== 'active') throw gone();
-    const [checked, active, responseRate] = await Promise.all([
+    const [checked, active, responseRate, holding] = await Promise.all([
       this.idChecked([row.customerId]),
       this.prisma.classifiedListing.count({ where: { customerId: row.customerId, status: 'active' } }),
       this.leads.responseRate(row.customerId),
+      this.prisma.classifiedOrder.count({ where: { listingId: row.id, status: { in: ['paid', 'sent', 'disputed'] } } }),
     ]);
     const order = new Map(row.category!.features.map(link => [link.featureId, link.position]));
     const photos = row.media.filter(item => item.kind === 'photo');
@@ -272,6 +273,8 @@ export class ListingSearchService {
       photos: photos.map(item => ({ url: item.url, width: item.width, height: item.height })),
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
+      /** Paid for with Safe pay and waiting for the hand-over. */
+      reserved: holding > 0,
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
       seller: { name: publicName(row.customer.name), member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
       published_at: row.publishedAt?.toISOString() ?? null,

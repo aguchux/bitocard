@@ -1,6 +1,7 @@
 import { ListingsService } from '../classifieds/listings.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
+import { SafePayService } from '../classifieds/safe-pay.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { DomainsService } from '../domains/domains.service.js';
 import { StoreHostsService } from '../stores/store-hosts.service.js';
@@ -87,6 +88,7 @@ export class CronController {
     listings: ListingsService,
     listingMedia: ListingMediaService,
     conversations: ConversationsService,
+    safePay: SafePayService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -160,9 +162,11 @@ export class CronController {
       'crypto-reconcile': async () => ({ live: await reconciliation.run('live'), test: await reconciliation.run('test') }),
       /**
        * Every 15 minutes: BitoCard Shop listings past their time expire, videos stuck processing fail, open offers past
-       * their time expire, unread messages are emailed, and chats a year old are deleted.
+       * their time expire, unread messages are emailed, chats a year old are deleted, and Safe pay orders past a deadline
+       * lapse, are refunded (not handed over) or released (delivery not confirmed or disputed).
        */
       classifieds: async () => ({
+        safe_pay: await safePay.runDue(),
         listings: await listings.expireDue(),
         stale_videos: await listingMedia.failStale(),
         offers: await conversations.expireOffers(),

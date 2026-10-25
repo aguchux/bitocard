@@ -28,6 +28,8 @@ const protectedRoutes = [
   ['patch', `/v1/admin/crypto/networks/${randomId}`, { withdrawals_enabled: false }],
   ['put', '/v1/admin/crypto/chains/ETHEREUM/routes', { order: [], disabled: [] }],
   ['post', `/v1/admin/orders/${randomId}/refund`, { reason: 'x' }],
+  ['post', `/v1/admin/classifieds/orders/${randomId}/dispute/decide`, { decision: 'release', note: 'ok' }],
+  ['put', '/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 100 }],
   ['post', `/v1/admin/vpn/subscriptions/${randomId}/enable`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/startup-allowance`, {}],
   ['post', `/v1/admin/resellers/${randomId}/startup-allowance/revoke`, { reason: 'x' }],

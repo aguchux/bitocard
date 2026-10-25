@@ -25,6 +25,6 @@ import { StoreSellers } from './store-sellers.js';
   imports: [AuthModule, CatalogueModule, EsimsModule, FeesModule, FxModule, IdentityModule, OrdersModule, PaymentsModule, ResellerIntegrationsModule, SettingsModule, StoresModule],
   controllers: [CustomerAccountController, CheckoutController, CustomerWalletController, StoreCustomersController, AdminStoreCustomersController, AdminCountryStoresController],
   providers: [CustomersService, CustomerGuard, CheckoutService, CustomerWalletsService, HouseService, StoreSellers, StoreCustomersService],
-  exports: [CheckoutService, HouseService, CustomersService, StoreSellers],
+  exports: [CheckoutService, HouseService, CustomersService, StoreSellers, CustomerWalletsService],
 })
 export class CheckoutModule {}

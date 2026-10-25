@@ -13,6 +13,7 @@ import { sendPhoto } from './chat-files.js';
 import { ConversationsService, maxMessage } from './conversations.service.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
+import { type DisputeReason, disputeReasons, SafePayService } from './safe-pay.service.js';
 import { FavouritesService } from './favourites.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
 import { ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
@@ -479,5 +480,176 @@ export class ClassifiedChatsController {
   @HttpCode(HttpStatus.OK)
   withdraw(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.conversations.withdrawOffer(caller.customer, id);
+  }
+}
+
+class SafePayQuoteDto {
+  @IsOptional() @IsUUID()
+  offer_id?: string;
+}
+
+class SafePayRequestDto {
+  @IsUUID()
+  listing_id: string;
+
+  /** An offer the seller accepted (its price), else the listed price. */
+  @IsOptional() @IsUUID()
+  offer_id?: string;
+
+  @IsIn(['meet_up', 'delivery'])
+  fulfilment: 'meet_up' | 'delivery';
+
+  @IsOptional() @IsString() @MaxLength(500)
+  delivery_address?: string;
+}
+
+class ReasonOptionalDto {
+  @IsOptional() @IsString() @MaxLength(300)
+  reason?: string;
+}
+
+class ReleaseDto {
+  @IsString() @Matches(/^\s*\d{6}\s*$/, { message: 'code must be the 6 digits the buyer shows you' })
+  code: string;
+}
+
+class SentDto {
+  @IsOptional() @IsString() @MaxLength(300)
+  tracking_note?: string;
+}
+
+class DisputeDto {
+  @IsIn(disputeReasons)
+  reason: DisputeReason;
+
+  @IsString() @MaxLength(2000)
+  details: string;
+}
+
+class DisputeMessageDto {
+  @IsOptional() @IsString() @MaxLength(2000)
+  body?: string;
+}
+
+class OrdersDto {
+  @IsOptional() @IsIn(['buying', 'selling'])
+  role?: 'buying' | 'selling';
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+/** BitoCard Shop's Safe pay: the buyer's request and payment from the wallet, the seller's acceptance and hand-over, disputes. */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('classifieds')
+export class ClassifiedSafePayController {
+  constructor(private readonly safePay: SafePayService) {}
+
+  /** The buyer's price, Safe pay fee and total for a listing (or an accepted offer), and what it covers. */
+  @Get('listings/:id/safe-pay')
+  quote(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Query() query: SafePayQuoteDto) {
+    return this.safePay.quote(caller.customer, id, query.offer_id);
+  }
+
+  /** What a seller still needs before accepting Safe pay orders. */
+  @Get('me/safe-pay')
+  readiness(@CurrentCustomer() caller: CustomerCaller) {
+    return this.safePay.readiness(caller.customer);
+  }
+
+  @Get('orders')
+  orders(@CurrentCustomer() caller: CustomerCaller, @Query() query: OrdersDto) {
+    return this.safePay.list(caller.customer, query);
+  }
+
+  @Post('orders')
+  request(@CurrentCustomer() caller: CustomerCaller, @Body() body: SafePayRequestDto) {
+    return this.safePay.request(caller.customer, body);
+  }
+
+  @Get('orders/:id')
+  order(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.get(caller.customer, id);
+  }
+
+  @Post('orders/:id/accept')
+  @HttpCode(HttpStatus.OK)
+  accept(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.accept(caller.customer, id);
+  }
+
+  @Post('orders/:id/decline')
+  @HttpCode(HttpStatus.OK)
+  decline(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonOptionalDto) {
+    return this.safePay.decline(caller.customer, id, body.reason);
+  }
+
+  /** The buyer pays the total from their wallet into escrow (`wallet_balance_low` says how much to add). */
+  @Post('orders/:id/pay')
+  @HttpCode(HttpStatus.OK)
+  pay(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.pay(caller.customer, id);
+  }
+
+  /** The buyer's release code for a meet-up (never shown to the seller). */
+  @Get('orders/:id/release-code')
+  @Header('Cache-Control', 'no-store')
+  releaseCode(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.releaseCode(caller.customer, id);
+  }
+
+  /** The seller enters the buyer's code at the meet-up: the money is released at once (5 tries). */
+  @Post('orders/:id/release')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  release(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReleaseDto) {
+    return this.safePay.release(caller.customer, id, body.code);
+  }
+
+  @Post('orders/:id/sent')
+  @HttpCode(HttpStatus.OK)
+  sent(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SentDto) {
+    return this.safePay.markSent(caller.customer, id, body.tracking_note);
+  }
+
+  @Post('orders/:id/received')
+  @HttpCode(HttpStatus.OK)
+  received(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.received(caller.customer, id);
+  }
+
+  /** Either side, before the hand-over; once paid, the buyer is refunded in full. */
+  @Post('orders/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ReasonOptionalDto) {
+    return this.safePay.cancel(caller.customer, id, body.reason);
+  }
+
+  @Post('orders/:id/dispute')
+  openDispute(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DisputeDto) {
+    return this.safePay.dispute(caller.customer, id, body);
+  }
+
+  @Get('orders/:id/dispute')
+  disputeThread(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.disputeThread(caller.customer, id);
+  }
+
+  /** A message on the dispute, with an optional photo (multipart `file`, JPEG or PNG up to 4 MB). */
+  @Post('orders/:id/dispute/messages')
+  @SkipIdempotency()
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 2 } }))
+  disputeMessage(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DisputeMessageDto, @UploadedFile() file?: MediaUpload) {
+    return this.safePay.disputeMessage(caller.customer, id, body.body ?? '', file);
+  }
+
+  @Get('orders/:id/dispute/photos/:message')
+  async disputePhoto(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendPhoto(res, await this.safePay.disputePhoto(caller.customer, id, message));
   }
 }

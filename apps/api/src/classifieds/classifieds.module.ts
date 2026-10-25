@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
-import { AdminClassifiedsController, ClassifiedsAdminService } from './admin.controller.js';
-import { ClassifiedChatsController, ClassifiedListingsController, ClassifiedReferenceController } from './classifieds.controller.js';
+import { AdminClassifiedsController, AdminSafePayController, ClassifiedsAdminService } from './admin.controller.js';
+import { ClassifiedChatsController, ClassifiedListingsController, ClassifiedReferenceController, ClassifiedSafePayController } from './classifieds.controller.js';
+import { SafePayService } from './safe-pay.service.js';
+import { IdentityModule } from '../identity/identity.module.js';
 import { ConversationsService } from './conversations.service.js';
 import { LeadsService } from './leads.service.js';
 import { KycStorage } from '../kyc/storage.js';
@@ -16,9 +18,9 @@ import { FavouritesService } from './favourites.service.js';
 
 /** BitoCard Shop (classifieds): docs/BITOCARD_CLASSIFIEDS_PLAN.md. */
 @Module({
-  imports: [CheckoutModule, SettingsModule],
-  controllers: [ClassifiedReferenceController, ClassifiedListingsController, ClassifiedChatsController, AdminClassifiedsController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService],
-  exports: [ListingsService, ListingMediaService, ConversationsService],
+  imports: [CheckoutModule, SettingsModule, IdentityModule],
+  controllers: [ClassifiedReferenceController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, AdminClassifiedsController, AdminSafePayController],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService],
+  exports: [ListingsService, ListingMediaService, ConversationsService, SafePayService],
 })
 export class ClassifiedsModule {}

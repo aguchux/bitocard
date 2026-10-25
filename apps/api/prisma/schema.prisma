@@ -936,6 +936,11 @@ enum AccountKind {
   reseller_crypto
   /// A reseller's coins on their way out on chain (asked, confirmed, being sent), never negative.
   reseller_crypto_withdrawing
+  /// Money held for BitoCard Shop's Safe pay orders (the price and the buyer's fee): what BitoCard owes until it is
+  /// released to the seller or refunded to the buyer.
+  classified_escrow
+  /// BitoCard Shop's fees: both sides' Safe pay fees (later promotions and shop plans). Revenue.
+  classifieds_revenue
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -2537,6 +2542,8 @@ model Customer {
   classifiedBuying          ClassifiedConversation[]  @relation("ClassifiedBuying")
   classifiedSelling         ClassifiedConversation[]  @relation("ClassifiedSelling")
   classifiedLeads           ClassifiedLead[]
+  classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
+  classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4347,6 +4354,7 @@ model ClassifiedListing {
   reports      ClassifiedReport[]
   favourites   ClassifiedFavourite[]
   chats        ClassifiedConversation[]
+  orders       ClassifiedOrder[]
   offers       ClassifiedOffer[]
   leadRows     ClassifiedLead[]
 
@@ -4583,4 +4591,109 @@ model ClassifiedLead {
   @@id([listingId, buyerId, kind])
   @@index([buyerId, kind, firstAt])
   @@map("classified_leads")
+}
+
+/// A Safe pay order (`SP-000123`): the buyer's request at the listed or agreed price, the seller's acceptance, payment
+/// from the buyer's wallet into escrow, hand-over (a release code at a meet-up, or sent and received), then release to
+/// the seller or a refund. Each side's fee is fixed when the buyer asks.
+model ClassifiedOrder {
+  id                       String             @id @default(uuid()) @db.Uuid
+  number                   BigInt             @unique @default(autoincrement())
+  listingId                String             @map("listing_id") @db.Uuid
+  buyerId                  String             @map("buyer_id") @db.Uuid
+  sellerId                 String             @map("seller_id") @db.Uuid
+  /// The accepted offer it was asked at, if any.
+  offerId                  String?            @map("offer_id") @db.Uuid
+  mode                     LedgerMode
+  country                  String             @db.Char(2)
+  currency                 String             @db.Char(3)
+  priceMinor               BigInt             @map("price_minor")
+  buyerFeeBps              Int                @map("buyer_fee_bps")
+  buyerFeeCapMinor         BigInt             @map("buyer_fee_cap_minor")
+  buyerFeeMinor            BigInt             @map("buyer_fee_minor")
+  sellerFeeBps             Int                @map("seller_fee_bps")
+  sellerFeeCapMinor        BigInt             @map("seller_fee_cap_minor")
+  /// Taken at release, on what is released.
+  sellerFeeMinor           BigInt?            @map("seller_fee_minor")
+  /// meet_up or delivery.
+  fulfilment               String
+  /// Encrypted; shown to the seller only once paid, and only for delivery.
+  deliveryAddress          String?            @map("delivery_address")
+  trackingNote             String?            @map("tracking_note")
+  /// requested, declined, lapsed, awaiting_payment, cancelled, paid, sent, disputed, released, refunded or partly_refunded.
+  status                   String             @default("requested")
+  /// Encrypted 6-digit code the buyer gives at a meet-up; never shown to the seller.
+  releaseCode              String?            @map("release_code")
+  releaseAttempts          Int                @default(0) @map("release_attempts")
+  acceptBy                 DateTime           @map("accept_by")
+  payBy                    DateTime?          @map("pay_by")
+  handoverBy               DateTime?          @map("handover_by")
+  confirmBy                DateTime?          @map("confirm_by")
+  acceptedAt               DateTime?          @map("accepted_at")
+  paidAt                   DateTime?          @map("paid_at")
+  sentAt                   DateTime?          @map("sent_at")
+  releasedAt               DateTime?          @map("released_at")
+  refundedAt               DateTime?          @map("refunded_at")
+  /// When it ended without money moving (declined, lapsed or cancelled before payment).
+  closedAt                 DateTime?          @map("closed_at")
+  /// buyer, seller or bitocard: who cancelled, declined or let it lapse.
+  endedBy                  String?            @map("ended_by")
+  endReason                String?            @map("end_reason")
+  /// What went back to the buyer (the price and their fee, or part of the price).
+  refundMinor              BigInt?            @map("refund_minor")
+  createdAt                DateTime           @default(now()) @map("created_at")
+  updatedAt                DateTime           @updatedAt @map("updated_at")
+  listing                  ClassifiedListing  @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  buyer                    Customer           @relation("ClassifiedOrdersBought", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller                   Customer           @relation("ClassifiedOrdersSold", fields: [sellerId], references: [id], onDelete: Restrict)
+  dispute                  ClassifiedDispute?
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([listingId, status])
+  @@index([status, updatedAt])
+  @@map("classified_orders")
+}
+
+/// The buyer's dispute on a Safe pay order before release: it stops the release until BitoCard decides.
+model ClassifiedDispute {
+  id          String                     @id @default(uuid()) @db.Uuid
+  orderId     String                     @unique @map("order_id") @db.Uuid
+  /// not_received, not_as_described, damaged or other.
+  reason      String
+  /// open or decided.
+  status      String                     @default("open")
+  /// refund, partial or release.
+  decision    String?
+  /// What a partial refund gave back of the price.
+  refundMinor BigInt?                    @map("refund_minor")
+  note        String?
+  decidedById String?                    @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime?                  @map("decided_at")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  order       ClassifiedOrder            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  messages    ClassifiedDisputeMessage[]
+
+  @@index([status, createdAt])
+  @@map("classified_disputes")
+}
+
+/// A message (and optional photo, in the private bucket) on a Safe pay dispute, from either side or BitoCard.
+model ClassifiedDisputeMessage {
+  id          String            @id @default(uuid()) @db.Uuid
+  disputeId   String            @map("dispute_id") @db.Uuid
+  /// buyer, seller or bitocard.
+  author      String
+  authorId    String?           @map("author_id") @db.Uuid
+  body        String            @default("")
+  objectKey   String?           @map("object_key")
+  contentType String?           @map("content_type")
+  size        Int?
+  width       Int?
+  height      Int?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  dispute     ClassifiedDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, createdAt])
+  @@map("classified_dispute_messages")
 }

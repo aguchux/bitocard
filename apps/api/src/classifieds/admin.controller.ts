@@ -4,7 +4,7 @@ import type { Response } from 'express';
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
 import { AuditService } from '../audit/audit.service.js';
-import { AdminRoles, type Caller, CurrentCaller, RealmOnly } from '../auth/caller.js';
+import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -14,6 +14,7 @@ import { ConversationsService } from './conversations.service.js';
 import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
 import { type ListingStatus, listingStatuses } from './rules.js';
+import { type DisputeDecision, disputeDecisions, SafePayService } from './safe-pay.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -306,5 +307,137 @@ export class AdminClassifiedsController {
   @AdminRoles('operations')
   setMarketSettings(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: MarketSettingsDto) {
     return this.admin.setMarketSettings(adminId(caller), country.toUpperCase(), body);
+  }
+}
+
+class AdminOrdersDto {
+  @IsOptional() @IsIn(['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded'])
+  status?: string;
+
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
+
+  /** An order number (SP-100001) or a buyer's or seller's email. */
+  @IsOptional() @IsString() @Length(1, 100)
+  q?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class AdminDisputesDto {
+  @IsOptional() @IsIn(['open', 'decided'])
+  status?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class DisputeBodyDto {
+  @IsString() @Length(1, 2000)
+  body: string;
+}
+
+class DecideDto {
+  @IsIn(disputeDecisions)
+  decision: DisputeDecision;
+
+  /** For `partial`: what goes back to the buyer, in minor units, less than the price. */
+  @IsOptional() @IsInt() @Min(1)
+  refund?: number;
+
+  @IsString() @Length(3, 500)
+  note: string;
+}
+
+class SafePaySettingsDto {
+  @IsOptional() @IsInt() @Min(0) @Max(2000)
+  buyer_fee_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  buyer_fee_cap?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(2000)
+  seller_fee_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  seller_fee_cap?: number;
+
+  @IsOptional() @IsInt() @Min(1)
+  new_seller_order_limit?: number | null;
+
+  @IsOptional() @IsInt() @Min(1) @Max(168)
+  accept_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(168)
+  pay_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(30)
+  handover_days?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(30)
+  confirm_days?: number;
+}
+
+/** Admin Classifieds: Safe pay orders, disputes and their decisions, and Safe pay settings per country. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('support', 'operations', 'finance')
+@Controller('admin/classifieds')
+export class AdminSafePayController {
+  constructor(private readonly safePay: SafePayService) {}
+
+  @Get('orders')
+  orders(@Query() query: AdminOrdersDto) {
+    return this.safePay.adminList(query);
+  }
+
+  @Get('orders/:id')
+  order(@Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.adminGet(id);
+  }
+
+  @Get('disputes')
+  disputes(@Query() query: AdminDisputesDto) {
+    return this.safePay.adminDisputes(query);
+  }
+
+  @Get('orders/:id/dispute/photos/:message')
+  async disputePhoto(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendPhoto(res, await this.safePay.adminDisputePhoto(adminId(caller), id, message));
+  }
+
+  @Post('orders/:id/dispute/messages')
+  @AdminRoles('support', 'operations', 'finance')
+  disputeMessage(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DisputeBodyDto) {
+    return this.safePay.adminDisputeMessage(adminId(caller), id, body.body);
+  }
+
+  /** Decides an open dispute: release (operations or finance), or a full or part refund (finance). */
+  @Post('orders/:id/dispute/decide')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('operations', 'finance')
+  @StepUp()
+  decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideDto) {
+    return this.safePay.decide(adminId(caller), caller.kind === 'session' ? caller.adminRoles : [], id, body);
+  }
+
+  @Get('safe-pay-settings/:country')
+  settings(@Param('country') country: string) {
+    return this.safePay.adminSettings(country.toUpperCase());
+  }
+
+  /** Each side's fee (rate and cap), the new-seller limit and the time limits: new requests use them. */
+  @Put('safe-pay-settings/:country')
+  @AdminRoles('finance')
+  @StepUp()
+  updateSettings(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: SafePaySettingsDto) {
+    return this.safePay.updateSettings(adminId(caller), country.toUpperCase(), body);
   }
 }
