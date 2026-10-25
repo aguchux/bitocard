@@ -110,3 +110,13 @@ export function featureValueOut(dataType: string, value: FeatureValue): string |
   if (dataType === 'boolean') return value.valueText === 'true';
   return value.valueText;
 }
+
+/** A price as people read it in chats and notices: "₦220,000", or with kobo when there are any. */
+export function priceText(minor: bigint | number, currency: string) {
+  const value = Number(minor) / 100;
+  try {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency, currencyDisplay: 'narrowSymbol', minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 }).format(value);
+  } catch {
+    return `${currency} ${value.toLocaleString('en-GB')}`;
+  }
+}

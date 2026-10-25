@@ -2534,6 +2534,9 @@ model Customer {
   classifiedReportsMade     ClassifiedReport[]        @relation("ClassifiedReporter")
   classifiedReportsAbout    ClassifiedReport[]        @relation("ClassifiedReported")
   classifiedFavourites      ClassifiedFavourite[]
+  classifiedBuying          ClassifiedConversation[]  @relation("ClassifiedBuying")
+  classifiedSelling         ClassifiedConversation[]  @relation("ClassifiedSelling")
+  classifiedLeads           ClassifiedLead[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4343,6 +4346,9 @@ model ClassifiedListing {
   priceHistory ClassifiedPriceHistory[]
   reports      ClassifiedReport[]
   favourites   ClassifiedFavourite[]
+  chats        ClassifiedConversation[]
+  offers       ClassifiedOffer[]
+  leadRows     ClassifiedLead[]
 
   @@index([customerId, status])
   @@index([country, status, stateId, areaId])
@@ -4425,22 +4431,25 @@ model ClassifiedProhibitedWord {
 
 /// A customer's report of a listing (or, from chat, of another customer), decided by a moderator.
 model ClassifiedReport {
-  id                 String             @id @default(uuid()) @db.Uuid
-  listingId          String?            @map("listing_id") @db.Uuid
-  reportedCustomerId String?            @map("reported_customer_id") @db.Uuid
-  reporterId         String             @map("reporter_id") @db.Uuid
+  id                 String                  @id @default(uuid()) @db.Uuid
+  listingId          String?                 @map("listing_id") @db.Uuid
+  reportedCustomerId String?                 @map("reported_customer_id") @db.Uuid
+  /// The chat a customer was reported from (moderators may then read it).
+  conversationId     String?                 @map("conversation_id") @db.Uuid
+  reporterId         String                  @map("reporter_id") @db.Uuid
   /// scam, prohibited, wrong_category, duplicate, sold, offensive or other.
   reason             String
   details            String?
   /// open, dismissed or actioned.
-  status             String             @default("open")
+  status             String                  @default("open")
   note               String?
-  decidedById        String?            @map("decided_by_id") @db.Uuid
-  decidedAt          DateTime?          @map("decided_at")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  listing            ClassifiedListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  reporter           Customer           @relation("ClassifiedReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  reported           Customer?          @relation("ClassifiedReported", fields: [reportedCustomerId], references: [id], onDelete: Cascade)
+  decidedById        String?                 @map("decided_by_id") @db.Uuid
+  decidedAt          DateTime?               @map("decided_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  listing            ClassifiedListing?      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter           Customer                @relation("ClassifiedReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported           Customer?               @relation("ClassifiedReported", fields: [reportedCustomerId], references: [id], onDelete: Cascade)
+  conversation       ClassifiedConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([status, createdAt])
   @@index([listingId, status])
@@ -4472,4 +4481,106 @@ model ClassifiedFavourite {
   @@index([customerId, createdAt])
   @@index([listingId])
   @@map("classified_favourites")
+}
+
+/// A buyer's chat with a seller about one listing: one per listing and buyer, read by moderators only on a report.
+model ClassifiedConversation {
+  id              String              @id @default(uuid()) @db.Uuid
+  listingId       String              @map("listing_id") @db.Uuid
+  buyerId         String              @map("buyer_id") @db.Uuid
+  sellerId        String              @map("seller_id") @db.Uuid
+  country         String              @db.Char(2)
+  lastMessageAt   DateTime            @default(now()) @map("last_message_at")
+  /// Each side's last read; later messages from the other side are unread.
+  buyerReadAt     DateTime?           @map("buyer_read_at")
+  sellerReadAt    DateTime?           @map("seller_read_at")
+  /// The last in-app notice to each side (at most one every 10 minutes per chat).
+  buyerAlertedAt  DateTime?           @map("buyer_alerted_at")
+  sellerAlertedAt DateTime?           @map("seller_alerted_at")
+  /// The last unread-messages email to each side.
+  buyerEmailedAt  DateTime?           @map("buyer_emailed_at")
+  sellerEmailedAt DateTime?           @map("seller_emailed_at")
+  /// When the buyer blocked the seller, or the seller the buyer: the blocked side can no longer write.
+  buyerBlockedAt  DateTime?           @map("buyer_blocked_at")
+  sellerBlockedAt DateTime?           @map("seller_blocked_at")
+  /// The seller's first reply (their response rate and time).
+  sellerRepliedAt DateTime?           @map("seller_replied_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  listing         ClassifiedListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer           Customer            @relation("ClassifiedBuying", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller          Customer            @relation("ClassifiedSelling", fields: [sellerId], references: [id], onDelete: Cascade)
+  messages        ClassifiedMessage[]
+  offers          ClassifiedOffer[]
+  reports         ClassifiedReport[]
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId, lastMessageAt])
+  @@index([sellerId, lastMessageAt])
+  @@index([lastMessageAt])
+  @@map("classified_conversations")
+}
+
+/// A message in a listing chat: text (card numbers, codes and links masked), a photo (in the private bucket), an offer or a note from BitoCard.
+model ClassifiedMessage {
+  /// In order of writing, for polling (`after`) and paging back (`before`).
+  seq            BigInt                 @unique @default(autoincrement())
+  id             String                 @id @default(uuid()) @db.Uuid
+  conversationId String                 @map("conversation_id") @db.Uuid
+  /// Null for BitoCard's own notes (an offer accepted, a safety tip).
+  senderId       String?                @map("sender_id") @db.Uuid
+  /// text, photo, offer or system.
+  kind           String
+  body           String                 @default("")
+  offerId        String?                @map("offer_id") @db.Uuid
+  objectKey      String?                @map("object_key")
+  contentType    String?                @map("content_type")
+  size           Int?
+  width          Int?
+  height         Int?
+  createdAt      DateTime               @default(now()) @map("created_at")
+  conversation   ClassifiedConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  offer          ClassifiedOffer?       @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, seq])
+  @@map("classified_messages")
+}
+
+/// A price offered in a listing chat, by either side, for the other to accept or decline; one open at a time per chat.
+model ClassifiedOffer {
+  id             String                 @id @default(uuid()) @db.Uuid
+  conversationId String                 @map("conversation_id") @db.Uuid
+  listingId      String                 @map("listing_id") @db.Uuid
+  madeById       String                 @map("made_by_id") @db.Uuid
+  priceMinor     BigInt                 @map("price_minor")
+  currency       String                 @db.Char(3)
+  /// open, accepted, declined, withdrawn, replaced (by a newer offer) or expired.
+  status         String                 @default("open")
+  expiresAt      DateTime               @map("expires_at")
+  decidedAt      DateTime?              @map("decided_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  conversation   ClassifiedConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  listing        ClassifiedListing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  messages       ClassifiedMessage[]
+
+  @@index([conversationId, createdAt])
+  @@index([status, expiresAt])
+  @@map("classified_offers")
+}
+
+/// A buyer's interest in a listing, once per kind (phone revealed, chat started): the seller's leads and the reveal limit.
+model ClassifiedLead {
+  listingId String            @map("listing_id") @db.Uuid
+  buyerId   String            @map("buyer_id") @db.Uuid
+  /// phone or chat.
+  kind      String
+  /// Times the phone was shown (chat leads stay 1).
+  count     Int               @default(1)
+  firstAt   DateTime          @default(now()) @map("first_at")
+  lastAt    DateTime          @default(now()) @map("last_at")
+  listing   ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer     Customer          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@id([listingId, buyerId, kind])
+  @@index([buyerId, kind, firstAt])
+  @@map("classified_leads")
 }

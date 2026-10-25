@@ -1,5 +1,6 @@
 import { ListingsService } from '../classifieds/listings.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
+import { ConversationsService } from '../classifieds/conversations.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { DomainsService } from '../domains/domains.service.js';
 import { StoreHostsService } from '../stores/store-hosts.service.js';
@@ -85,6 +86,7 @@ export class CronController {
     invoices: InvoicesService,
     listings: ListingsService,
     listingMedia: ListingMediaService,
+    conversations: ConversationsService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -156,8 +158,17 @@ export class CronController {
       'chain-health': () => deposits.checkAll(),
       /** Daily: each asset's crypto_custody against what the signer's wallets hold (live; the sandbox only with a test signer). */
       'crypto-reconcile': async () => ({ live: await reconciliation.run('live'), test: await reconciliation.run('test') }),
-      /** Every 15 minutes: BitoCard Shop listings past their time expire, and videos stuck processing fail. */
-      classifieds: async () => ({ listings: await listings.expireDue(), stale_videos: await listingMedia.failStale() }),
+      /**
+       * Every 15 minutes: BitoCard Shop listings past their time expire, videos stuck processing fail, open offers past
+       * their time expire, unread messages are emailed, and chats a year old are deleted.
+       */
+      classifieds: async () => ({
+        listings: await listings.expireDue(),
+        stale_videos: await listingMedia.failStale(),
+        offers: await conversations.expireOffers(),
+        unread: await conversations.emailUnread(),
+        old_chats: await conversations.purgeOld(),
+      }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),
     };

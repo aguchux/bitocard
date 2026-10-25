@@ -193,12 +193,13 @@ export class ModerationService {
     return { object: 'list' as const, data: rows.map(row => ({ ...this.presentReport(row), listing: row.listing ? { id: row.listing.id, ref: Number(row.listing.ref), title: row.listing.title, status: row.listing.status, country: row.listing.country } : null, reporter: row.reporter })) };
   }
 
-  presentReport(report: { id: string; listingId: string | null; reportedCustomerId: string | null; reason: string; details: string | null; status: string; note: string | null; decidedAt: Date | null; createdAt: Date }) {
+  presentReport(report: { id: string; listingId: string | null; reportedCustomerId: string | null; conversationId: string | null; reason: string; details: string | null; status: string; note: string | null; decidedAt: Date | null; createdAt: Date }) {
     return {
       object: 'classified_report' as const,
       id: report.id,
       listing_id: report.listingId,
       reported_customer_id: report.reportedCustomerId,
+      conversation_id: report.conversationId,
       reason: report.reason,
       details: report.details,
       status: report.status,

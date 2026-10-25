@@ -1,13 +1,17 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiExcludeController } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { Transform, Type } from 'class-transformer';
-import { Allow, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Allow, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsPositive, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { maxDocumentBytes } from '../kyc/files.js';
 import { Public } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PageDto } from '../ledger/wallet.controller.js';
+import { sendPhoto } from './chat-files.js';
+import { ConversationsService, maxMessage } from './conversations.service.js';
+import { LeadsService } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
 import { FavouritesService } from './favourites.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
@@ -148,6 +152,62 @@ class ReportDto {
 
   @IsOptional() @IsString() @MaxLength(1000)
   details?: string;
+}
+
+class StartChatDto {
+  @IsUUID()
+  listing_id: string;
+
+  @IsString() @MaxLength(maxMessage + 500)
+  body: string;
+}
+
+class MessageDto {
+  @IsString() @MaxLength(maxMessage + 500)
+  body: string;
+}
+
+class PhotoCaptionDto {
+  @IsOptional() @IsString() @MaxLength(500)
+  caption?: string;
+}
+
+class ChatsDto {
+  @IsOptional() @IsIn(['buying', 'selling'])
+  role?: 'buying' | 'selling';
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class ChatPageDto {
+  /** Messages after this one (polling). */
+  @IsOptional() @IsUUID()
+  after?: string;
+
+  /** Messages before this one (paging back). */
+  @IsOptional() @IsUUID()
+  before?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+}
+
+class ChatReportDto {
+  @IsIn(reportReasons)
+  reason: ReportReason;
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  details?: string;
+}
+
+class OfferDto {
+  /** In the currency's minor units (kobo). */
+  @IsInt() @IsPositive()
+  price: number;
 }
 
 class MyListingsDto extends PageDto {
@@ -312,5 +372,112 @@ export class ClassifiedListingsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeMedia(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('media', ParseUUIDPipe) media: string) {
     await this.media.remove(caller.customer, id, media);
+  }
+}
+
+/** BitoCard Shop's chats between buyers and sellers, offers, and Show phone (bitocard.com customers). */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('classifieds')
+export class ClassifiedChatsController {
+  constructor(
+    private readonly conversations: ConversationsService,
+    private readonly leads: LeadsService,
+  ) {}
+
+  /** The seller's confirmed number (a few new listings an hour); each buyer counts once as a lead. */
+  @Post('listings/:id/phone')
+  @HttpCode(HttpStatus.OK)
+  phone(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.leads.revealPhone(caller.customer, id);
+  }
+
+  /** Views, leads, phone reveals, chats and offers on one of the seller's listings. */
+  @Get('me/listings/:id/stats')
+  stats(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.leads.stats(caller.customer, id);
+  }
+
+  @Get('conversations')
+  chats(@CurrentCustomer() caller: CustomerCaller, @Query() query: ChatsDto) {
+    return this.conversations.list(caller.customer, query);
+  }
+
+  @Get('conversations/unread')
+  unread(@CurrentCustomer() caller: CustomerCaller) {
+    return this.conversations.unreadCount(caller.customer);
+  }
+
+  /** The buyer's first message about a listing opens the chat (or continues theirs). */
+  @Post('conversations')
+  start(@CurrentCustomer() caller: CustomerCaller, @Body() body: StartChatDto) {
+    return this.conversations.start(caller.customer, body);
+  }
+
+  /** The latest messages (reading them marks the chat read), `after` to poll, `before` to page back. */
+  @Get('conversations/:id')
+  chat(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Query() query: ChatPageDto) {
+    return this.conversations.get(caller.customer, id, query);
+  }
+
+  @Post('conversations/:id/messages')
+  send(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: MessageDto) {
+    return this.conversations.send(caller.customer, id, body.body);
+  }
+
+  /** A photo (JPEG or PNG, at most 4 MB), its metadata removed, with an optional `caption`. */
+  @Post('conversations/:id/photos')
+  @SkipIdempotency()
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 2 } }))
+  sendPhoto(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: PhotoCaptionDto, @UploadedFile() file?: MediaUpload) {
+    return this.conversations.sendPhoto(caller.customer, id, file, body.caption);
+  }
+
+  @Get('conversations/:id/photos/:message')
+  async photo(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendPhoto(res, await this.conversations.photo(caller.customer, id, message));
+  }
+
+  @Post('conversations/:id/block')
+  @HttpCode(HttpStatus.OK)
+  block(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.conversations.block(caller.customer, id, true);
+  }
+
+  @Post('conversations/:id/unblock')
+  @HttpCode(HttpStatus.OK)
+  unblock(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.conversations.block(caller.customer, id, false);
+  }
+
+  /** Reports the other person; moderators may then read the chat. */
+  @Post('conversations/:id/report')
+  reportChat(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ChatReportDto) {
+    return this.conversations.report(caller.customer, id, body);
+  }
+
+  /** A price offer (either side); it replaces an open one and stays open 48 hours. */
+  @Post('conversations/:id/offers')
+  offer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: OfferDto) {
+    return this.conversations.makeOffer(caller.customer, id, body.price);
+  }
+
+  @Post('offers/:id/accept')
+  @HttpCode(HttpStatus.OK)
+  accept(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.conversations.acceptOffer(caller.customer, id);
+  }
+
+  @Post('offers/:id/decline')
+  @HttpCode(HttpStatus.OK)
+  decline(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.conversations.declineOffer(caller.customer, id);
+  }
+
+  @Post('offers/:id/withdraw')
+  @HttpCode(HttpStatus.OK)
+  withdraw(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.conversations.withdrawOffer(caller.customer, id);
   }
 }

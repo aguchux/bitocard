@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
 import { conditions, featureValueOut, invalid } from './rules.js';
 
@@ -55,6 +56,7 @@ export class ListingSearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly listings: ListingsService,
+    private readonly leads: LeadsService,
   ) {}
 
   private async features(filters: string[] | undefined) {
@@ -237,9 +239,10 @@ export class ListingSearchService {
     });
     if (!row || row.country !== code || ['draft', 'pending_review'].includes(row.status)) throw notFound();
     if (row.status === 'sold' ? !row.soldAt || Date.now() - row.soldAt.getTime() > soldVisibleMs : row.status !== 'active') throw gone();
-    const [checked, active] = await Promise.all([
+    const [checked, active, responseRate] = await Promise.all([
       this.idChecked([row.customerId]),
       this.prisma.classifiedListing.count({ where: { customerId: row.customerId, status: 'active' } }),
+      this.leads.responseRate(row.customerId),
     ]);
     const order = new Map(row.category!.features.map(link => [link.featureId, link.position]));
     const photos = row.media.filter(item => item.kind === 'photo');
@@ -270,7 +273,7 @@ export class ListingSearchService {
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
-      seller: { name: publicName(row.customer.name), member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active },
+      seller: { name: publicName(row.customer.name), member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
       published_at: row.publishedAt?.toISOString() ?? null,
       sold_at: row.soldAt?.toISOString() ?? null,
     };

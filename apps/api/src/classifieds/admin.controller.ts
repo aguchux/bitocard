@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Put, Query, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { Transform, Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
 import { AuditService } from '../audit/audit.service.js';
@@ -8,6 +9,8 @@ import { ApiError } from '../common/errors/api-error.js';
 import { adminId } from '../countries/countries.controller.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { sendPhoto } from './chat-files.js';
+import { ConversationsService } from './conversations.service.js';
 import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
 import { type ListingStatus, listingStatuses } from './rules.js';
@@ -197,7 +200,19 @@ export class AdminClassifiedsController {
   constructor(
     private readonly admin: ClassifiedsAdminService,
     private readonly moderation: ModerationService,
+    private readonly conversations: ConversationsService,
   ) {}
+
+  /** A reported chat, read in full (only once someone has reported it; every read is audited). */
+  @Get('conversations/:id')
+  conversation(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.conversations.adminGet(adminId(caller), id);
+  }
+
+  @Get('conversations/:id/photos/:message')
+  async conversationPhoto(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendPhoto(res, await this.conversations.adminPhoto(adminId(caller), id, message));
+  }
 
   @Get('queue')
   queue(@Query() query: CountryQueryDto) {

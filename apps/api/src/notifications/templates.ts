@@ -557,3 +557,21 @@ export function chatReplyEmail(to: string, input: { store: string; name: string;
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', `Sent for ${input.store}.`].join('\n') };
 }
+
+/** BitoCard Shop: messages waiting unread in the person's chats (sent once per batch, after a short wait). */
+export function shopMessagesEmail(to: string, input: { name: string; chats: { title: string; from: string; unread: number }[]; link: string }): EmailMessage {
+  const count = input.chats.reduce((sum, chat) => sum + chat.unread, 0);
+  const heading = count === 1 ? 'You have a new message on BitoCard Shop' : `You have ${count} new messages on BitoCard Shop`;
+  const lines = input.chats.slice(0, 5).map(chat => `${chat.from} about "${chat.title}": ${chat.unread} new`);
+  const more = input.chats.length > 5 ? [`And ${input.chats.length - 5} more chats.`] : [];
+  const paragraphs = [`Hi ${input.name}, people are waiting for your reply.`, ...lines, ...more, 'Stay safe: keep the chat on BitoCard, meet in a public place, inspect before paying, and never pay in advance.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(heading)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Open your messages</a></p>`,
+    '<p style="font-size:13px;color:#5b6488">BitoCard, a Golojan Ltd venture.</p>',
+    '</div>',
+  ].join('');
+  return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', 'BitoCard, a Golojan Ltd venture.'].join('\n') };
+}
