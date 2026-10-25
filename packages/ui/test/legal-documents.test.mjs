@@ -40,6 +40,20 @@ describe('legal documents', () => {
     for (const id of ['stores', 'content', 'domains', 'customers', 'disputes', 'wallet']) assert.match(terms, new RegExp(`<Section id="${id}"`), `section ${id}`);
   });
 
+  test('BitoCard Shop has its terms (a draft), its privacy entry and its cookies', () => {
+    const shop = readFileSync(new URL('app/(site)/documents/shop-terms/page.tsx', legals), 'utf8');
+    const privacy = readFileSync(new URL('app/(site)/documents/privacy/page.tsx', legals), 'utf8');
+    const cookies = readFileSync(new URL('app/(site)/documents/cookies/page.tsx', legals), 'utf8');
+    assert.match(shop, /This is a draft/);
+    for (const id of ['role', 'listings', 'prohibited', 'moderation', 'safe-pay', 'safe-pay-fees', 'safe-pay-disputes', 'safe-trade', 'assistants']) assert.match(shop, new RegExp(`id="${id}"`), id);
+    const numbers = [...shop.matchAll(/<Section id="[a-z-]+" title="(\d+)\./g)].map(([, n]) => Number(n));
+    assert.deepEqual(numbers, numbers.map((_, index) => index + 1), 'sections are numbered in order');
+    assert.match(privacy, /When you buy and sell on BitoCard Shop/);
+    assert.match(privacy, /Anthropic or OpenAI/);
+    // Every cookie BitoCard's sites set is in the cookie notice.
+    for (const name of ['bc_market', 'bc_customer', 'bc_signed_in', 'bc_access', 'bc_chat', 'bc_assistant', 'bc_kyc', 'bc_session', 'bc_admin_session']) assert.match(cookies, new RegExp(`<strong>${name}</strong>`), name);
+  });
+
   test('VPN access has its terms of sale and its privacy entry, and is never sold on renewal', () => {
     const terms = readFileSync(new URL('app/(site)/documents/terms/page.tsx', legals), 'utf8');
     const privacy = readFileSync(new URL('app/(site)/documents/privacy/page.tsx', legals), 'utf8');

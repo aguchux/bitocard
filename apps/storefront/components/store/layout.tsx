@@ -142,8 +142,9 @@ export function StoreFooter({ groups, store = null }: { groups: StoreNavigationG
   const reseller = Boolean(store) && !store!.house;
   // Any store (house or reseller) lists only what it sells; bitocard.com every group, "Soon" where none is open yet.
   const shown = store ? groups.filter(group => group.on_sale) : groups;
-  // Reseller terms are for resellers: bitocard.com shows them with its business links, never on a store.
-  const legal = legalDocuments.filter(doc => doc.href !== "/documents/reseller-terms");
+  // Reseller terms are for resellers: bitocard.com shows them with its business links, never on a store. BitoCard Shop's
+  // terms only on BitoCard's own sites, which offer it.
+  const legal = legalDocuments.filter(doc => doc.href !== "/documents/reseller-terms" && !(reseller && doc.href === "/documents/shop-terms"));
   const credit = storeCredit(store, brand.credit);
   return (
     <footer className="mt-12 border-t border-slate-100 bg-white pb-[env(safe-area-inset-bottom)] sm:mt-16">

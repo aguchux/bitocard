@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { brand, appUrl } from "@bitocard/ui/site";
 
-const customerDocuments = ["/documents/terms", "/documents/privacy", "/documents/cookies", "/documents/notice"] as const;
+const customerDocuments = ["/documents/shop-terms", "/documents/terms", "/documents/privacy", "/documents/cookies", "/documents/notice"] as const;
 const labels: Record<(typeof customerDocuments)[number], string> = {
+  "/documents/shop-terms": "Shop terms",
   "/documents/terms": "Terms of use",
   "/documents/privacy": "Privacy",
   "/documents/cookies": "Cookies",

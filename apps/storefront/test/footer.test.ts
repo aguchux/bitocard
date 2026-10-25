@@ -27,11 +27,12 @@ describe("store footer", () => {
   test("bitocard.com shows its business links and credit", () => {
     const html = render(null);
     for (const text of ["Open a reseller store", "Reseller sign in", "Reseller terms", "A Golojan Ltd venture"]) expect(html).toContain(text);
+    expect(html, "BitoCard Shop is BitoCard's own").toContain("/documents/shop-terms");
   });
 
   test("a reseller's store shows nothing of BitoCard's own business, only what it sells, and who sells it", () => {
     const html = render(store(false));
-    for (const text of ["Open a reseller store", "Reseller sign in", "Reseller terms", "/resellers", "Golojan"]) expect(html).not.toContain(text);
+    for (const text of ["Open a reseller store", "Reseller sign in", "Reseller terms", "/resellers", "Golojan", "/documents/shop-terms"]) expect(html).not.toContain(text);
     expect(html).toContain("Ada Digital · Sold and delivered by BitoCard");
     expect(html).not.toContain("/catalogs/rdp");
     for (const text of ["Privacy", "Terms", "Cookies"]) expect(html).toContain(text);

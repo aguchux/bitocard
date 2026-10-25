@@ -29,6 +29,7 @@ export default function TermsOfUse() {
         </ul>
         <p>Crypto wallets and peer-to-peer (P2P) trading are not offered in any country yet. Section 4 explains how they will work where we switch them on.</p>
         <p>VPN access is not sold in any country yet either. Section 5 sets out its terms for when it is.</p>
+        <p>BitoCard Shop (shop.bitocard.com), our marketplace for buying and selling near you, is not open in any country yet. Buying and selling there, Safe pay and its shop assistants follow our <Link href="/documents/shop-terms">BitoCard Shop terms</Link>.</p>
         <p>When a service launches, it will be governed by separate terms, such as our <Link href="/documents/reseller-terms">reseller terms</Link> and customer terms of sale, which you will need to accept before using it.</p>
       </Section>
 

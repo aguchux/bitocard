@@ -38,10 +38,16 @@ export default function CookieNotice() {
             <strong>bc_chat</strong> (bitocard.com and the stores on it): when you chat with a store without signing in, keeps your chat on this browser so you can come back to it. It is strictly necessary for the chat you asked for, is set only when you start a chat with your name and email, holds a random token (the store&apos;s server keeps your name and email, not the cookie), works only on that store&apos;s address, and lasts 30 days.
           </li>
           <li>
+            <strong>bc_assistant</strong> (BitoCard Shop): when you ask a shop assistant (such as Anjio) a question without signing in, keeps your conversation on this browser so you can carry on with it. It is strictly necessary for the conversation you asked for, is set only when you ask your first question, holds a random token (we keep only a one-way code of it), works only on shop.bitocard.com, is read only by its server, and lasts 30 days.
+          </li>
+          <li>
+            <strong>bc_kyc</strong> (BitoCard Verify, verify.bitocard.com): keeps your identity check open while you complete it, after you open the link we gave you. It is strictly necessary, holds a random token only our servers can read, works only on verify.bitocard.com, and lasts two hours.
+          </li>
+          <li>
             <strong>bc_session</strong> and <strong>bc_admin_session</strong> (our reseller dashboard and admin console): keep you signed in and protect your account. They are strictly necessary, are set only when you sign in, and end when you sign out or the session expires.
           </li>
         </ul>
-        <p>We do not use local storage, pixels, fingerprinting or other tracking technologies on our websites, other than to remember on your own device choices you make in our dashboards (for example which account you were using).</p>
+        <p>We do not use local storage, pixels, fingerprinting or other tracking technologies on our websites, other than to remember on your own device choices you make: in our dashboards (for example which account you were using), and on BitoCard Shop the language you chose for the shop assistant. These stay on your device and are never sent to us.</p>
         <p>When you pay for an order, you do so on the payment provider&apos;s own page (for example Stripe, Flutterwave, Monnify, Paystack or pawaPay), which uses its own cookies under its own cookie notice.</p>
         <p>Our hosting provider processes technical information such as your IP address to deliver and protect the websites, as described in our <Link href="/documents/privacy">privacy notice</Link>. This does not involve cookies on your device. Visits to resellers&apos; stores are also counted without cookies (see the privacy notice): nothing is stored on your device, and nothing follows you across sites or days. The only exception is when its security systems detect suspicious traffic. They may then set a strictly necessary cookie to confirm you are not an automated attack, which is used only for that purpose.</p>
       </Section>
