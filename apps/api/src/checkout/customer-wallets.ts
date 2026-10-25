@@ -224,6 +224,13 @@ export class CustomerWalletsService {
     return presentCustomerTopUp(payment);
   }
 
+  /** The customer gave up on the payment page: closed as cancelled (credited instead if it was paid after all). */
+  async cancelTopUp(customer: CustomerWithStore, id: string) {
+    const payment = await this.prisma.payment.findFirst({ where: { id, customerId: customer.id, purpose: 'customer_top_up' } });
+    if (!payment) throw notFound('top-up');
+    return presentCustomerTopUp(await this.payments.cancel(payment));
+  }
+
   /** Sandbox stores only: finish a top-up as paid or failed. */
   async simulateTopUp(customer: CustomerWithStore, id: string, outcome: 'succeeded' | 'failed') {
     const payment = await this.prisma.payment.findFirst({ where: { id, customerId: customer.id, purpose: 'customer_top_up' } });
@@ -380,6 +387,12 @@ export class CustomerWalletController {
   @Get('top-ups/:id')
   getTopUp(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
     return this.wallets.getTopUp(caller.customer, id);
+  }
+
+  @Post('top-ups/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancelTopUp(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.wallets.cancelTopUp(caller.customer, id);
   }
 
   /** Sandbox stores only. */

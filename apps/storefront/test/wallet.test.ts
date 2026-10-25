@@ -9,8 +9,9 @@ const revalidatePath = vi.fn();
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(path) }));
 
-const { topUpWallet, openBankAccount } = await import("@/lib/wallet");
-const { startCheckout } = await import("@/lib/account-actions");
+const { topUpWallet, openBankAccount, cancelTopUp } = await import("@/lib/wallet");
+const { startCheckout, cancelCheckout } = await import("@/lib/account-actions");
+const { cancelErrorText } = await import("@/lib/cancel-payment");
 const { paymentMethodsFor } = await import("@/lib/payment-methods");
 
 type Call = [string, RequestInit & { headers: Record<string, string> }];
@@ -33,6 +34,36 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+
+describe("cancelling a payment the customer gave up on", () => {
+  test("a cancelled top-up returns to the wallet tab with no notice; one paid after all shows as added", async () => {
+    const fetch = vi.fn(async () => reply({ object: "customer_top_up", id: "t9", status: "failed" }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(cancelTopUp(form({ id: "t9", back: "/account/wallet?wallet=USD" }))).rejects.toThrow("redirect:/account/wallet?wallet=USD");
+    expect((fetch.mock.calls as unknown as Call[])[0][0]).toBe("http://api.test/v1/store/wallet/top-ups/t9/cancel");
+    expect(revalidatePath).toHaveBeenCalledWith("/account/wallet");
+
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ object: "customer_top_up", id: "t9", status: "succeeded" })));
+    await expect(cancelTopUp(form({ id: "t9", back: "/account/wallet" }))).rejects.toThrow("redirect:/account/wallet?top_up=t9");
+  });
+
+  test("a refusal keeps the notice and says why; a back address outside the wallet is ignored", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { type: "conflict_error", code: "payment_in_progress", message: "x" } }, 409)));
+    await expect(cancelTopUp(form({ id: "t9", back: "https://evil.example/x" }))).rejects.toThrow("redirect:/account/wallet?top_up=t9&cancel_error=payment_in_progress");
+    expect(cancelErrorText("payment_in_progress")).toMatch(/still being confirmed/);
+    expect(cancelErrorText("api_error")).toMatch(/Try again in a minute/);
+  });
+
+  test("an order's payment: cancelled in place, or back to the order saying why it could not be", async () => {
+    const fetch = vi.fn(async () => reply({ object: "checkout", id: "c1", status: "failed" }));
+    vi.stubGlobal("fetch", fetch);
+    await cancelCheckout(form({ id: "c1" }));
+    expect((fetch.mock.calls as unknown as Call[])[0][0]).toBe("http://api.test/v1/store/checkouts/c1/cancel");
+    expect(revalidatePath).toHaveBeenCalledWith("/account/orders/c1");
+    vi.stubGlobal("fetch", vi.fn(async () => reply({ error: { type: "api_error", code: "payment_check_unavailable", message: "x" } }, 503)));
+    await expect(cancelCheckout(form({ id: "c1" }))).rejects.toThrow("redirect:/account/orders/c1?cancel_error=payment_check_unavailable");
+  });
 });
 
 describe("topping the wallet up", () => {

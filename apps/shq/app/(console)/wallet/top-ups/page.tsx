@@ -4,7 +4,7 @@ import { Suspense, useId, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, CreditCard, ExternalLink, XCircle } from "lucide-react";
 import { Button, Card, CardHeader, currencyDigits, DataTable, errorMessage, Field, formatDateTime, formatMoney, Input, LoadMore, Notice, PageHeader, StatusBadge } from "@bitocard/admin-ui";
-import { type PaymentGateway, type TopUp, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpMethodsQuery, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
+import { type PaymentGateway, type TopUp, useCancelTopUpMutation, useCreateTopUpMutation, useSimulateTopUpMutation, useTopUpMethodsQuery, useTopUpsInfiniteQuery, useWalletQuery } from "@bitocard/api-client/reseller";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 import { walletName, WalletSwitch } from "@/components/wallets";
@@ -156,6 +156,7 @@ function TopUps() {
   const chosen = wallets.find(item => item.currency === asked) ?? wallets.find(item => item.primary);
   const topUps = useTopUpsInfiniteQuery(undefined, { skip: !allowed });
   const [simulate, simulateState] = useSimulateTopUpMutation();
+  const [cancel, cancelState] = useCancelTopUpMutation();
   const [busy, setBusy] = useState<string | null>(null);
   const rows = topUps.data?.pages.flatMap(page => page.data);
 
@@ -166,6 +167,21 @@ function TopUps() {
       .catch(() => null);
     setBusy(null);
   };
+
+  /** Gives up on a payment page: closed as cancelled (or credited, if the provider shows it was paid after all). */
+  const giveUp = async (row: TopUp) => {
+    setBusy(`${row.id}:cancel`);
+    await cancel({ id: row.id })
+      .unwrap()
+      .catch(() => null);
+    setBusy(null);
+  };
+
+  const cancelButton = (row: TopUp) => (
+    <Button size="sm" variant="ghost" loading={busy === `${row.id}:cancel`} disabled={busy !== null} onClick={() => giveUp(row)}>
+      Cancel
+    </Button>
+  );
 
   return (
     <ShqShell section="wallet" current="/wallet/top-ups" crumbs={[{ label: "Wallet", href: "/wallet" }, { label: "Top-ups" }]}>
@@ -180,6 +196,7 @@ function TopUps() {
           <WalletSwitch wallets={wallets} value={chosen?.currency ?? ""} onChange={code => router.replace(wallets.find(item => item.currency === code)?.primary ? "/wallet/top-ups" : `/wallet/top-ups?currency=${code}`, { scroll: false })} />
           <NewTopUp key={chosen?.currency ?? ""} currency={chosen?.currency ?? ""} primary={chosen?.primary ?? true} sandbox={sandbox} />
           {simulateState.error ? <Notice tone="red">{errorMessage(simulateState.error)}</Notice> : null}
+          {cancelState.error ? <Notice tone="red">{errorMessage(cancelState.error)}</Notice> : null}
           <Card>
             <CardHeader title="Your top-ups" description="Card and bank payments, and bank transfers into your bank transfer accounts, newest first." className="pb-4" />
             <DataTable<TopUp>
@@ -218,13 +235,19 @@ function TopUps() {
                         <Button size="sm" variant="ghost" icon={<XCircle className="size-4" aria-hidden />} loading={busy === `${row.id}:failed`} disabled={busy !== null} onClick={() => run(row, "failed")}>
                           Mark failed
                         </Button>
+                        {cancelButton(row)}
                       </span>
-                    ) : row.checkout_url ? (
-                      <a href={row.checkout_url} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-brand-600 hover:bg-brand-50">
-                        Continue payment
-                        <ExternalLink className="size-3.5" aria-hidden />
-                      </a>
-                    ) : null,
+                    ) : (
+                      <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                        {row.checkout_url ? (
+                          <a href={row.checkout_url} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-brand-600 hover:bg-brand-50">
+                            Continue payment
+                            <ExternalLink className="size-3.5" aria-hidden />
+                          </a>
+                        ) : null}
+                        {cancelButton(row)}
+                      </span>
+                    ),
                 },
               ]}
             />

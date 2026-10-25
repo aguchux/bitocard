@@ -49,6 +49,9 @@ describe('sandbox wallet money', () => {
     assert.equal(paid.status, 'succeeded');
     const failing = (await browser.post('/v1/wallet/top-ups', { amount: 20_000 }, sandbox)).json;
     await expect(browser, 'POST', `/v1/wallet/top-ups/${failing.id}/simulate`, 'POST /v1/wallet/top-ups/{id}/simulate', 200, { outcome: 'failed' }, sandbox);
+    const abandoned = (await browser.post('/v1/wallet/top-ups', { amount: 30_000 }, sandbox)).json;
+    const cancelled = await expect(browser, 'POST', `/v1/wallet/top-ups/${abandoned.id}/cancel`, 'POST /v1/wallet/top-ups/{id}/cancel', 200, {}, sandbox);
+    assert.deepEqual([cancelled.status, cancelled.failure_reason, cancelled.checkout_url], ['failed', 'You cancelled this payment.', null]);
 
     const accounts = await expect(browser, 'POST', '/v1/wallet/reserved-accounts', 'POST /v1/wallet/reserved-accounts', 201, {}, sandbox);
     assert.equal(accounts.data.length, 1);
@@ -57,7 +60,7 @@ describe('sandbox wallet money', () => {
     assert.equal(deposit.credited, true);
 
     const list = await expect(browser, 'GET', '/v1/wallet/top-ups', 'GET /v1/wallet/top-ups', 200, undefined, sandbox);
-    assert.deepEqual(list.data.map(item => item.source).sort(), ['bank_transfer', 'checkout', 'checkout']);
+    assert.deepEqual(list.data.map(item => item.source).sort(), ['bank_transfer', 'checkout', 'checkout', 'checkout']);
     const wallet = await expect(browser, 'GET', '/v1/wallet', 'GET /v1/wallet', 200, undefined, sandbox);
     assert.deepEqual([wallet.available, wallet.startup_allowance], [570_000, null]);
     const transactions = await expect(browser, 'GET', '/v1/wallet/transactions', 'GET /v1/wallet/transactions', 200, undefined, sandbox);

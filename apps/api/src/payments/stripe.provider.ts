@@ -33,6 +33,16 @@ export function forgetStripeCurrencies() {
   noManagedPaymentsParam.clear();
 }
 
+/**
+ * When Stripe's page expires, in Unix seconds: BitoCard's timeout, kept within what Stripe takes (30 minutes to 24
+ * hours from now, with a minute's margin each way).
+ */
+export function stripeExpiry(at: Date, now = Date.now()) {
+  const minute = 60_000;
+  const clamped = Math.min(Math.max(at.getTime(), now + 31 * minute), now + 24 * 60 * minute - minute);
+  return Math.floor(clamped / 1000);
+}
+
 /** How far a webhook's signed time may be from ours. */
 const toleranceSeconds = 300;
 
@@ -186,6 +196,7 @@ export class StripeProvider implements CheckoutProvider {
         'metadata[reference]': input.reference,
         'payment_intent_data[metadata][reference]': input.reference,
         ...(optOut ? { 'managed_payments[enabled]': 'false' } : {}),
+        ...(input.expiresAt ? { expires_at: String(stripeExpiry(input.expiresAt)) } : {}),
       },
     });
     if (!session.url) throw new ProviderError(this.name, 'no checkout link returned', false);
@@ -210,6 +221,12 @@ export class StripeProvider implements CheckoutProvider {
 
   private session(id: string) {
     return this.call<Session>(`/v1/checkout/sessions/${encodeURIComponent(id)}?expand[]=payment_intent.latest_charge.balance_transaction`);
+  }
+
+  /** Expires the Checkout Session so it can no longer be paid. Stripe refuses (400) once it is complete or already expired. */
+  async closePage(payment: PaymentRef) {
+    if (!payment.providerTransactionId) return;
+    await this.call(`/v1/checkout/sessions/${encodeURIComponent(payment.providerTransactionId)}/expire`, { method: 'POST', form: {} });
   }
 
   async verify(payment: PaymentRef): Promise<ChargeResult | null> {

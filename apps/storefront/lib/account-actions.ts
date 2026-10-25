@@ -162,6 +162,14 @@ export async function startCheckout(_state: FormState, form: FormData): Promise<
 }
 
 /** Sandbox orders only: pay (or fail) without a payment page. */
+/** The customer gave up on an order's payment page: the order is closed (placed instead if it was paid after all). */
+export async function cancelCheckout(form: FormData) {
+  const id = text(form, "id");
+  const result = await customerApi("POST", `/v1/store/checkouts/${encodeURIComponent(id)}/cancel`, {});
+  revalidatePath(`/account/orders/${id}`);
+  if (!result.ok) redirect(`/account/orders/${encodeURIComponent(id)}?cancel_error=${encodeURIComponent(result.code ?? "unavailable")}`);
+}
+
 export async function simulateCheckout(form: FormData) {
   const id = text(form, "id");
   await customerApi("POST", `/v1/store/checkouts/${encodeURIComponent(id)}/simulate`, { outcome: text(form, "outcome"), order: text(form, "order") || undefined });

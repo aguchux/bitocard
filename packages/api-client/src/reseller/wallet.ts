@@ -204,6 +204,11 @@ export const resellerWalletApi = bitocardApi.injectEndpoints({
       query: body => ({ url: '/v1/wallet/top-ups', method: 'POST', body }),
       invalidatesTags: [{ type: 'TopUp', id: 'LIST' }],
     }),
+    /** Closes a pending top-up the payer gave up on (credited instead if the provider shows it was paid). */
+    cancelTopUp: build.mutation<TopUp, { id: string }>({
+      query: ({ id }) => ({ url: `/v1/wallet/top-ups/${id}/cancel`, method: 'POST', body: {} }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'TopUp', id }, { type: 'TopUp', id: 'LIST' }, 'Wallet'],
+    }),
     /** Sandbox only. */
     simulateTopUp: build.mutation<TopUp, { id: string; outcome: 'succeeded' | 'failed' }>({
       query: ({ id, ...body }) => ({ url: `/v1/wallet/top-ups/${id}/simulate`, method: 'POST', body }),
@@ -235,6 +240,7 @@ export const {
   useTopUpQuery,
   useTopUpMethodsQuery,
   useCreateTopUpMutation,
+  useCancelTopUpMutation,
   useSimulateTopUpMutation,
   useReservedAccountsQuery,
   useCreateReservedAccountsMutation,

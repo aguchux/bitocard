@@ -41,11 +41,18 @@ export type CheckoutListener = { paid(paymentId: string): Promise<void>; failed(
 /** Finds the provider for a payment taken through a reseller's own gateway connection (null when it is no longer usable). */
 export type OwnGatewayResolver = (connectionId: string, gateway: string) => Promise<CheckoutProvider | null>;
 
-const day = 24 * 60 * 60 * 1000;
-/** A checkout not paid within this time is closed as failed. */
-const checkoutLifetimeMs = day;
 /** Refusals before finance is asked to refund unmatched money by hand. */
 const maxUnmatchedRefundAttempts = 5;
+
+/** Why a payment page was closed: the payer cancelled it, or it was not paid within the timeout. */
+export const cancelled = 'You cancelled this payment.';
+const notCompleted = 'The payment was not completed in time.';
+
+const paymentInProgress = () =>
+  new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'payment_in_progress', 'This payment has been made and is still being confirmed, so it cannot be cancelled.');
+
+const cannotCheckPayment = () =>
+  new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'payment_check_unavailable', 'We could not check this payment with the payment provider just now. Try again in a minute.');
 
 export const testModeOnly = () =>
   new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'livemode_not_allowed', 'Simulations work only in test mode (the sandbox).');
@@ -144,6 +151,15 @@ export class PaymentsService {
     private readonly methods: PaymentMethodsService,
     private readonly fx: FxService,
   ) {}
+
+  /** How long a payment page may stay unpaid before it is closed (admin: Settings > Integrations > Customer checkout). */
+  private get timeoutMs() {
+    return this.config.PAYMENT_TIMEOUT_MINUTES * 60_000;
+  }
+
+  private expired(payment: Payment) {
+    return Date.now() - payment.createdAt.getTime() > this.timeoutMs;
+  }
 
   /** The checkout service listens for its payments (registered once at start-up). */
   onCheckout(listener: CheckoutListener) {
@@ -271,6 +287,7 @@ export class PaymentsService {
         returnUrl: input.returnUrl,
         description: input.description,
         category: input.category ?? null,
+        expiresAt: new Date(payment.createdAt.getTime() + this.timeoutMs),
       });
     try {
       const fallback = provider.fallbackCurrency && provider.fallbackCurrency !== input.currency.toUpperCase() ? provider.fallbackCurrency : null;
@@ -350,18 +367,55 @@ export class PaymentsService {
     if (!provider) {
       // The gateway is no longer usable (a reseller's own connection suspended, rejected or switched off): it can never be
       // checked, so after its lifetime it is closed instead of holding the checkout and BitoCard's fee open for ever.
-      if (Date.now() - payment.createdAt.getTime() <= checkoutLifetimeMs) return payment;
+      if (!this.expired(payment)) return payment;
       this.logger.error({ paymentId: payment.id, provider: payment.provider, own: Boolean(payment.connectionId) }, 'Pending payment closed: its gateway can no longer be checked');
       return this.fail(payment, 'The payment could not be confirmed.');
     }
     const result = await provider.verify(paymentRef(payment));
     if (result && result.status !== 'pending') return this.settle(payment, result);
-    if (Date.now() - payment.createdAt.getTime() > checkoutLifetimeMs) return this.fail(payment, 'The payment was not completed in time.');
+    if (this.expired(payment)) return this.fail(payment, notCompleted);
     return payment;
+  }
+
+  /**
+   * The payer gave up on a payment page: closed as cancelled, so its waiting notice goes away. The gateway is asked
+   * first, so money already paid is credited instead; Stripe's page is expired so it cannot be paid afterwards (money
+   * paid later on another gateway's page is refunded, never credited). If the gateway cannot answer, nothing changes.
+   */
+  async cancel(payment: Payment) {
+    if (payment.status !== 'pending') return payment;
+    if (payment.mode === 'live' && payment.provider !== 'sandbox') {
+      const provider = await this.providerFor(payment);
+      if (provider) {
+        const result = await provider.verify(paymentRef(payment)).catch(() => {
+          throw cannotCheckPayment();
+        });
+        if (result && result.status !== 'pending') return this.settle(payment, result);
+        if (provider.closePage) {
+          try {
+            await provider.closePage(paymentRef(payment));
+          } catch (error) {
+            // Stripe refuses to expire a page that was just paid, or whose payment is still settling (a bank debit):
+            // read it again, and never close one that may still be paid.
+            const again = await provider.verify(paymentRef(payment)).catch(() => null);
+            if (again && again.status !== 'pending') return this.settle(payment, again);
+            if (error instanceof ProviderError && error.definite) throw paymentInProgress();
+            throw cannotCheckPayment();
+          }
+        }
+      }
+    }
+    return this.fail(payment, cancelled);
   }
 
   /** Requeries live top-ups and checkout payments still pending after a couple of minutes. Run on a schedule. */
   async requeryPending(olderThanMs = 2 * 60_000) {
+    // Sandbox payments wait for a simulated result: past the timeout they are closed like live ones.
+    const staleTests = await this.prisma.payment.findMany({
+      where: { status: 'pending', mode: 'test', purpose: { in: ['wallet_top_up', 'checkout', 'customer_top_up'] }, createdAt: { lt: new Date(Date.now() - this.timeoutMs) } },
+      take: 100,
+    });
+    for (const payment of staleTests) await this.fail(payment, notCompleted);
     const pending = await this.prisma.payment.findMany({
       where: { status: 'pending', purpose: { in: ['wallet_top_up', 'checkout', 'customer_top_up'] }, mode: 'live', createdAt: { lt: new Date(Date.now() - olderThanMs) } },
       orderBy: { createdAt: 'asc' },
@@ -558,6 +612,12 @@ export class PaymentsService {
     if (current.status !== 'failed' || current.mode !== 'live' || result.reference !== current.reference) return;
     this.logger.error({ paymentId, providerTransactionId: result.providerTransactionId }, 'Payment succeeded after it was closed; refunding');
     await this.unmatched(current, result, 'late');
+  }
+
+  async cancelTopUp(resellerId: string, mode: LedgerMode, id: string) {
+    const payment = await this.prisma.payment.findFirst({ where: { id, resellerId, mode, customerId: null, purpose: 'wallet_top_up' } });
+    if (!payment) throw notFound('top-up');
+    return presentTopUp(await this.cancel(payment));
   }
 
   async simulateTopUp(resellerId: string, mode: LedgerMode, id: string, outcome: 'succeeded' | 'failed') {

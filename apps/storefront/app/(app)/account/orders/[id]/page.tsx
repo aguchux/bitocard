@@ -8,7 +8,8 @@ import { EsimManage } from "@/components/store/esim-manage";
 import { CopyValue, VpnAccess } from "@/components/store/vpn-access";
 import { RefreshWhile, StatusPill } from "@/components/store/order-status";
 import { currentCustomer, customerApi } from "@/lib/customer";
-import { simulateCheckout } from "@/lib/account-actions";
+import { cancelCheckout, simulateCheckout } from "@/lib/account-actions";
+import { cancelErrorText } from "@/lib/cancel-payment";
 import { canDispute } from "@/lib/disputes";
 
 export const metadata: Metadata = { title: "Your order", robots: { index: false, follow: false } };
@@ -16,8 +17,9 @@ export const metadata: Metadata = { title: "Your order", robots: { index: false,
 const detailLabels: Record<string, string> = { duration: "Licence term", expires_at: "Expires", redemption_url: "Redeem at", number: "Number" };
 
 /** One order: its status, the codes once delivered, and the payment page while it is waiting for payment. */
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ cancel_error?: string }> }) {
   const { id } = await params;
+  const { cancel_error: cancelError } = await searchParams;
   if (!(await currentCustomer())) redirect(`/signin?next=${encodeURIComponent(`/account/orders/${id}`)}`);
   const result = await customerApi<StoreCheckout>("GET", `/v1/store/checkouts/${encodeURIComponent(id)}`);
   if (!result.ok) notFound();
@@ -87,10 +89,23 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           ) : order.checkout_url ? (
             <>
               <p className="text-slate-700">We have not received your payment yet. If you have paid, this page updates by itself.</p>
-              <a href={order.checkout_url} className="mt-4 inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
-                Go to the payment page <ExternalLink className="size-4" aria-hidden="true" />
-              </a>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <a href={order.checkout_url} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand-500 px-5 font-semibold text-white hover:bg-brand-600">
+                  Go to the payment page <ExternalLink className="size-4" aria-hidden="true" />
+                </a>
+                <form action={cancelCheckout}>
+                  <input type="hidden" name="id" value={order.id} />
+                  <button type="submit" className="inline-flex min-h-12 items-center rounded-xl border border-slate-200 px-5 font-semibold text-slate-700 hover:border-slate-300">
+                    Cancel payment
+                  </button>
+                </form>
+              </div>
             </>
+          ) : null}
+          {cancelError ? (
+            <p className="mt-3 text-sm text-red-700" role="alert">
+              {cancelErrorText(cancelError)}
+            </p>
           ) : null}
         </section>
       ) : null}

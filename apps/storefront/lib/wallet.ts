@@ -49,6 +49,25 @@ export async function openBankAccount(_state: FormState, form: FormData): Promis
   return { notice: "Your account number is ready. Transfers into it top up your wallet." };
 }
 
+/**
+ * The customer gave up on a top-up's payment page: it is closed, so the waiting notice goes. Paid after all, it is
+ * credited and shown as added instead. `back` is the wallet tab they were on.
+ */
+export async function cancelTopUp(form: FormData) {
+  const id = text(form, "id");
+  const back = text(form, "back");
+  const target = new URL(back.startsWith("/account/wallet") ? back : "/account/wallet", "https://store.invalid");
+  const result = await customerApi<StoreWalletTopUp>("POST", `/v1/store/wallet/top-ups/${encodeURIComponent(id)}/cancel`, {});
+  revalidatePath("/account/wallet");
+  if (!result.ok) {
+    target.searchParams.set("top_up", id);
+    target.searchParams.set("cancel_error", result.code ?? "unavailable");
+  } else if (result.data.status === "succeeded") {
+    target.searchParams.set("top_up", id);
+  }
+  redirect(`${target.pathname}${target.search}`);
+}
+
 /** Sandbox stores only: finish a top-up as paid or failed. */
 export async function simulateTopUp(form: FormData) {
   const id = text(form, "id");

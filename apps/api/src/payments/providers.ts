@@ -38,6 +38,8 @@ export type CheckoutInput = {
   description: string;
   /** What is paid for: a store checkout's product category; null for wallet top-ups (Stripe picks its tax code from it). */
   category?: string | null;
+  /** When BitoCard closes the payment if it is still unpaid; gateways that can expire their page do so then (Stripe). */
+  expiresAt?: Date;
 };
 
 export type RefundResult = { status: 'refunded' | 'pending' | 'failed'; providerRefundId: string; failureReason?: string };
@@ -64,6 +66,11 @@ export interface CheckoutProvider {
   createCheckout(input: CheckoutInput): Promise<{ checkoutUrl: string; providerTransactionId?: string }>;
   /** Null when the provider has no transaction for it yet (the payer has not paid). */
   verify(payment: PaymentRef): Promise<ChargeResult | null>;
+  /**
+   * Closes an unpaid payment page so it can no longer be paid (the payer cancelled). Gateways without one leave the page
+   * open; money paid on it after the payment is closed is refunded. Throws a definite ProviderError if it was paid.
+   */
+  closePage?(payment: PaymentRef): Promise<void>;
   /** Returns a confirmed payment to the payer, in full. Repeating it with the same refund reference is safe. */
   refund(payment: PaymentRef & { refundReference: string }): Promise<RefundResult>;
   /** A refund sent earlier: has it reached the payer? */

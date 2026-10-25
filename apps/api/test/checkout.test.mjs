@@ -169,6 +169,67 @@ describe('wallet top-ups through each gateway', () => {
     assert.equal(fee.balanceMinor, 7500n, 'Stripe’s fee is BitoCard’s cost');
   });
 
+  test('the payer cancels an unpaid top-up: Stripe’s page is expired and the top-up closed; one paid after all is credited instead', async () => {
+    const reseller = await verifiedReseller();
+    const open = async amount => {
+      const created = await reseller.browser.post('/v1/wallet/top-ups', { amount, method: 'stripe' });
+      assert.equal(created.status, 201, JSON.stringify(created.json));
+      const payment = await prisma.payment.findUniqueOrThrow({ where: { id: created.json.id } });
+      return { payment, session: stripe.state.sessions[payment.providerTransactionId] };
+    };
+
+    const { payment, session } = await open(400_000);
+    const day = payment.createdAt.getTime() / 1000 + 24 * 60 * 60;
+    assert.ok(Math.abs(Number(session.fields.expires_at) - day) <= 120, 'Stripe’s page expires with the timeout (a day by default, within Stripe’s limit)');
+    const cancelled = await reseller.browser.post(`/v1/wallet/top-ups/${payment.id}/cancel`, {});
+    assert.equal(cancelled.status, 200, JSON.stringify(cancelled.json));
+    assert.deepEqual([cancelled.json.status, cancelled.json.failure_reason, cancelled.json.checkout_url], ['failed', 'You cancelled this payment.', null]);
+    assert.equal(session.status, 'expired', 'it can no longer be paid');
+    assert.equal((await reseller.browser.post(`/v1/wallet/top-ups/${payment.id}/cancel`, {})).json.status, 'failed', 'again: unchanged');
+
+    const paid = await open(150_000);
+    Object.assign(paid.session, { status: 'complete', payment_status: 'paid' });
+    const credited = await reseller.browser.post(`/v1/wallet/top-ups/${paid.payment.id}/cancel`, {});
+    assert.equal(credited.json.status, 'succeeded', 'paid before the payer pressed cancel: credited, not cancelled');
+    assert.equal((await reseller.browser.get('/v1/wallet')).json.available, 150_000);
+
+    const settling = await open(90_000);
+    Object.assign(settling.session, { status: 'complete', payment_status: 'unpaid' });
+    const refused = await reseller.browser.post(`/v1/wallet/top-ups/${settling.payment.id}/cancel`, {});
+    assert.deepEqual([refused.status, refused.json.error.code], [409, 'payment_in_progress']);
+    assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: settling.payment.id } })).status, 'pending', 'a payment still settling is never closed');
+
+    const other = await verifiedReseller();
+    assert.equal((await other.browser.post(`/v1/wallet/top-ups/${settling.payment.id}/cancel`, {})).status, 404, 'only your own');
+  });
+
+  test('admins set how long a payment page may stay unpaid: past it, live and sandbox payments close as not completed', async () => {
+    const setTimeoutMinutes = async minutes => (await admin.put('/v1/admin/integrations/checkout', { values: { PAYMENT_TIMEOUT_MINUTES: minutes }, code: await adminCode(server, admin) })).status;
+    assert.equal(await setTimeoutMinutes(5), 400, 'at least 10 minutes');
+    assert.equal(await setTimeoutMinutes(30), 200);
+    try {
+      const reseller = await verifiedReseller();
+      const live = await reseller.browser.post('/v1/wallet/top-ups', { amount: 200_000, method: 'monnify' });
+      const sandbox = await reseller.browser.post('/v1/wallet/top-ups', { amount: 200_000 }, { 'bitocard-mode': 'test' });
+      const fresh = await reseller.browser.post('/v1/wallet/top-ups', { amount: 200_000, method: 'monnify' });
+      const stale = new Date(Date.now() - 31 * 60_000);
+      await prisma.payment.updateMany({ where: { id: { in: [live.json.id, sandbox.json.id] } }, data: { createdAt: stale } });
+      assert.equal((await fetch(`${server.base}/v1/cron/payments`, { headers: { authorization: 'Bearer cron-secret' } })).status, 200);
+      for (const id of [live.json.id, sandbox.json.id]) {
+        const closed = await prisma.payment.findUniqueOrThrow({ where: { id } });
+        assert.deepEqual([closed.status, closed.failureReason], ['failed', 'The payment was not completed in time.']);
+      }
+      assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: fresh.json.id } })).status, 'pending', 'still within the timeout');
+
+      const stripePage = await reseller.browser.post('/v1/wallet/top-ups', { amount: 50_000, method: 'stripe' });
+      const payment = await prisma.payment.findUniqueOrThrow({ where: { id: stripePage.json.id } });
+      const expiresAt = Number(stripe.state.sessions[payment.providerTransactionId].fields.expires_at);
+      assert.ok(expiresAt >= Math.floor(Date.now() / 1000) + 30 * 60, 'never sooner than Stripe’s 30-minute minimum');
+    } finally {
+      assert.equal(await setTimeoutMinutes(1440), 200);
+    }
+  });
+
   test('pawaPay: mobile money through its payment page, credited when the deposit completes', async () => {
     await setMethods('GH', 'wallet_top_up', ['pawapay']);
     const reseller = await verifiedReseller({ country: 'GH' });
@@ -602,6 +663,11 @@ describe('checkout on bitocard.com (sandbox)', () => {
     const closed = await shopper.post(`/v1/store/checkouts/${unpaid.json.id}/simulate`, { outcome: 'failed' });
     assert.deepEqual([closed.json.status, closed.json.order], ['failed', null]);
     assert.ok(!(await shopper.get('/v1/store/checkouts')).json.data.some(item => item.id === unpaid.json.id), 'unpaid checkouts are not orders');
+
+    const abandoned = await shopper.post('/v1/store/checkouts', { product_id: product.id, face_value: 2500, country: 'NG', return_url: returnUrl });
+    const cancelled = await shopper.post(`/v1/store/checkouts/${abandoned.json.id}/cancel`, {});
+    assert.equal(cancelled.status, 200, JSON.stringify(cancelled.json));
+    assert.deepEqual([cancelled.json.status, cancelled.json.order], ['failed', null], 'the customer gave up: closed, nothing ordered');
   });
 
   test('where the market requires it, customers pass the identity check before buying', async () => {

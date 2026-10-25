@@ -8,19 +8,36 @@ import { AddFunds, BankAccountDialog, BankAccountLink } from "@/components/app/w
 import { activityHref, cryptoMoves, recentItems } from "@/lib/activity";
 import { walletExchangeLinks } from "@/lib/exchange";
 import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
-import { simulateTopUp, walletFor } from "@/lib/wallet";
+import { cancelErrorText } from "@/lib/cancel-payment";
+import { cancelTopUp, simulateTopUp, walletFor } from "@/lib/wallet";
 
 export const metadata: Metadata = { title: "Wallet" };
 
 const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
-type Search = { top_up?: string; back?: string; amount?: string; wallet?: string };
+type Search = { top_up?: string; back?: string; amount?: string; wallet?: string; cancel_error?: string };
 
 /** "US dollars" or the country's currency code, as the wallet tabs name them. */
 const walletLabel = (currency: string) => (currency === "USD" ? "US dollars" : currency);
 
-/** A top-up just made (back from the payment page, or in the sandbox): where it stands. */
-async function TopUpStatus({ id }: { id: string }) {
+/** Gives up on a payment page: the top-up is closed and this notice goes. */
+function CancelPayment({ id, back }: { id: string; back: string }) {
+  return (
+    <form action={cancelTopUp}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="back" value={back} />
+      <button type="submit" className="min-h-10 rounded-xl bg-white px-3 font-semibold text-amber-900 ring-1 ring-amber-200 hover:ring-amber-300">
+        Cancel payment
+      </button>
+    </form>
+  );
+}
+
+/**
+ * A top-up just made (back from the payment page, or in the sandbox): where it stands. While it waits, the customer can
+ * go back to the payment page or cancel it; unpaid, it also closes by itself after the store's payment timeout.
+ */
+async function TopUpStatus({ id, back, cancelError }: { id: string; back: string; cancelError?: string }) {
   const result = await customerApi<StoreWalletTopUp>("GET", `/v1/store/wallet/top-ups/${encodeURIComponent(id)}`);
   if (!result.ok) return null;
   const topUp = result.data;
@@ -36,6 +53,11 @@ async function TopUpStatus({ id }: { id: string }) {
       <p className="flex items-center gap-2 font-semibold">
         <Clock className="size-4" aria-hidden="true" /> Waiting for your payment of {money} to be confirmed.
       </p>
+      {cancelError ? (
+        <p className="text-red-800" role="alert">
+          {cancelErrorText(cancelError)}
+        </p>
+      ) : null}
       {topUp.mode === "test" ? (
         <div className="flex flex-wrap gap-2">
           {(["succeeded", "failed"] as const).map(outcome => (
@@ -47,12 +69,18 @@ async function TopUpStatus({ id }: { id: string }) {
               </button>
             </form>
           ))}
+          <CancelPayment id={topUp.id} back={back} />
         </div>
-      ) : topUp.checkout_url ? (
-        <a href={topUp.checkout_url} className="font-semibold underline">
-          Back to the payment page
-        </a>
-      ) : null}
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {topUp.checkout_url ? (
+            <a href={topUp.checkout_url} className="font-semibold underline">
+              Back to the payment page
+            </a>
+          ) : null}
+          <CancelPayment id={topUp.id} back={back} />
+        </div>
+      )}
     </div>
   );
 }
@@ -216,7 +244,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <ChevronLeft className="size-4" aria-hidden="true" /> Back to your purchase
         </Link>
       ) : null}
-      {params.top_up ? <TopUpStatus id={params.top_up} /> : null}
+      {params.top_up ? <TopUpStatus id={params.top_up} back={params.wallet ? `/account/wallet?wallet=${encodeURIComponent(params.wallet)}` : "/account/wallet"} cancelError={params.cancel_error} /> : null}
       {/* The sub rail's Crypto item where the store offers no crypto and nothing is held: say so above the money wallet. */}
       {showCrypto && overview.ok && !crypto ? (
         <p className={`${card} text-slate-600`} role="status">

@@ -399,6 +399,14 @@ export class CheckoutController {
     return this.checkout.get(caller.customer, id);
   }
 
+  /** The customer gave up on the payment page. */
+  @UseGuards(CustomerGuard)
+  @Post('checkouts/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.checkout.cancel(caller.customer, id);
+  }
+
   /** Sandbox checkouts only (Settings > Integrations > Customer checkout > Sandbox). */
   @UseGuards(CustomerGuard)
   @Post('checkouts/:id/simulate')

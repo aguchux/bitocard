@@ -14518,6 +14518,165 @@
         "x-bitocard-auth": "api_key"
       }
     },
+    "/v1/wallet/top-ups/{id}/cancel": {
+      "post": {
+        "description": "Closes a pending top-up the payer gave up on, so it no longer shows as waiting (`status: failed`, `failure_reason` says it was cancelled). The payment provider is asked first: a top-up already paid is credited and returned as `succeeded` instead. A top-up that is no longer pending is returned unchanged. Unpaid top-ups also close by themselves after BitoCard’s payment timeout.",
+        "operationId": "PaymentsController_cancelTopUp",
+        "parameters": [
+          {
+            "name": "BitoCard-Mode",
+            "in": "header",
+            "description": "Dashboard sessions only: test for the sandbox, live (default) otherwise. API keys always use their own mode.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The top-up: `failed` and cancelled if it was still unpaid; `succeeded` if the provider shows it was paid after all; unchanged if it was no longer pending.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopUp"
+                },
+                "example": {
+                  "object": "top_up",
+                  "id": "6c5b4a39-2817-4f6e-9d5c-4b3a29180f7e",
+                  "mode": "live",
+                  "status": "failed",
+                  "source": "checkout",
+                  "amount": 5000000,
+                  "currency": "NGN",
+                  "method": "stripe",
+                  "checkout_url": null,
+                  "failure_reason": "You cancelled this payment.",
+                  "created_at": "2026-10-06T10:42:05.318Z",
+                  "completed_at": "2026-10-06T10:47:51.220Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a top-up",
+        "tags": [
+          "Wallet"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "finance"
+        ],
+        "x-bitocard-scopes": [
+          "wallet:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/wallet/top-ups/{id}/simulate": {
       "post": {
         "description": "Completes a sandbox top-up as paid or failed.",

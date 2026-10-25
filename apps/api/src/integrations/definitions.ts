@@ -78,6 +78,7 @@ const integrationKeyList = [
   'PAYSTACK_SECRET_KEY',
   'PAYSTACK_SANDBOX',
   'CHECKOUT_SANDBOX',
+  'PAYMENT_TIMEOUT_MINUTES',
   'OPEN_EXCHANGE_RATES_APP_ID',
   'FX_MAX_AGE_MINUTES',
   'RELOADLY_CLIENT_ID',
@@ -340,11 +341,15 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
   {
     id: 'checkout',
     name: 'Customer checkout',
-    description: 'Checkout on bitocard.com. The payment methods offered are set per market (Settings > Markets > Payment methods).',
+    description: 'Checkout on bitocard.com, and how long any payment page (customers’ and resellers’ top-ups and checkouts) may stay unpaid. The payment methods offered are set per market (Settings > Markets > Payment methods).',
     fields: [
       field('CHECKOUT_SANDBOX', 'Sandbox', {
         kind: 'flag',
         help: 'On: bitocard.com checkout runs in the sandbox, for trying it before launch: simulated payment pages, no real money, SANDBOX- codes. Off: live payments.',
+      }),
+      field('PAYMENT_TIMEOUT_MINUTES', 'Unpaid payment timeout (minutes)', {
+        kind: 'number',
+        help: 'A wallet top-up or checkout not paid within this time is closed as not completed, and its waiting notice goes away. 10 to 1440 (a day, the default). Stripe’s payment page expires with it (at least 30 minutes, Stripe’s minimum). Money paid after it closes is refunded, never credited, so allow time for bank transfers and USSD.',
       }),
     ],
   },

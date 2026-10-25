@@ -109,6 +109,18 @@ export class PaymentsController {
     return this.payments.getTopUp(resellerOf(caller), mode, id);
   }
 
+  @ApiOperation({
+    summary: 'Cancel a top-up',
+    description:
+      'Closes a pending top-up the payer gave up on, so it no longer shows as waiting (`status: failed`, `failure_reason` says it was cancelled). The payment provider is asked first: a top-up already paid is credited and returned as `succeeded` instead. A top-up that is no longer pending is returned unchanged. Unpaid top-ups also close by themselves after BitoCard’s payment timeout.',
+  })
+  @Scopes('wallet:write')
+  @Post('top-ups/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancelTopUp(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payments.cancelTopUp(resellerOf(caller), mode, id);
+  }
+
   @ApiOperation({ summary: 'Simulate a top-up result (test mode)', description: 'Completes a sandbox top-up as paid or failed.' })
   @Scopes('wallet:write')
   @Post('top-ups/:id/simulate')

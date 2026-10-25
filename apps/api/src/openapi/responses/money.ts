@@ -690,6 +690,12 @@ export const moneyDocs: DocsArea = {
       example: listExample([pendingTopUp, resellerTopUp({ id: '8c7b6a5f-4e3d-4c2b-9a1f-0e9d8c7b6a5f', source: 'bank_transfer', amount: 2_000_000, created_at: '2026-10-05T16:22:40.000Z', completed_at: '2026-10-05T16:22:40.000Z' }), resellerTopUp()]),
     },
     'GET /v1/wallet/top-ups/{id}': { status: 200, description: 'The top-up. A pending live top-up is checked with the payment provider first.', schema: 'TopUp', example: resellerTopUp() },
+    'POST /v1/wallet/top-ups/{id}/cancel': {
+      status: 200,
+      description: 'The top-up: `failed` and cancelled if it was still unpaid; `succeeded` if the provider shows it was paid after all; unchanged if it was no longer pending.',
+      schema: 'TopUp',
+      example: resellerTopUp({ id: '6c5b4a39-2817-4f6e-9d5c-4b3a29180f7e', status: 'failed', method: 'stripe', failure_reason: 'You cancelled this payment.', created_at: '2026-10-06T10:42:05.318Z', completed_at: '2026-10-06T10:47:51.220Z' }),
+    },
     'POST /v1/wallet/top-ups/{id}/simulate': {
       status: 200,
       description: 'The sandbox top-up with its simulated outcome.',

@@ -145,6 +145,20 @@ describe('customer wallets on bitocard.com', () => {
     await ledgerOk();
   });
 
+  test('a top-up the customer gave up on is cancelled: Stripe’s page expires and the wallet is not credited', async () => {
+    const shopper = await customer();
+    const started = await shopper.post('/v1/store/wallet/top-ups', { amount: 75_000, method: 'stripe', return_url: returnUrl });
+    assert.equal(started.status, 201, JSON.stringify(started.json));
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { id: started.json.id } });
+    const cancelled = await shopper.post(`/v1/store/wallet/top-ups/${started.json.id}/cancel`, {});
+    assert.equal(cancelled.status, 200, JSON.stringify(cancelled.json));
+    assert.deepEqual([cancelled.json.status, cancelled.json.failure_reason], ['failed', 'You cancelled this payment.']);
+    assert.equal(stripe.state.sessions[payment.providerTransactionId].status, 'expired');
+    assert.equal((await shopper.get('/v1/store/wallet')).json.balance, 0);
+    const stranger = await customer();
+    assert.equal((await stranger.post(`/v1/store/wallet/top-ups/${started.json.id}/cancel`, {})).status, 404);
+  });
+
   test('the customer sees the price first: a preview pays nothing, and paying that quote charges exactly it, once', async () => {
     const product = await giftCard('Amazon Preview Card', ['PREVIEW-CODE-0001', 'PREVIEW-CODE-0002']);
     const shopper = await customer();

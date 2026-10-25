@@ -160,6 +160,11 @@ export const configSchema = z.object({
   PAYSTACK_SANDBOX: flag.prefault('off'),
   /** Where the payment page sends the payer back to when the caller gives no return_url. */
   PAYMENT_RETURN_URL: z.string().url().default('https://shq.bitocard.com/wallet'),
+  /**
+   * How long a payment page (a wallet top-up or a checkout) may stay unpaid before it is closed as not completed, in
+   * minutes (10 to 1440). Money paid after that is refunded, never credited.
+   */
+  PAYMENT_TIMEOUT_MINUTES: z.coerce.number().int().min(10).max(1440).default(1440),
   /** on: customer checkout on bitocard.com runs in the sandbox (simulated payment pages and SANDBOX- codes), for testing before launch. */
   CHECKOUT_SANDBOX: flag.prefault('off'),
 

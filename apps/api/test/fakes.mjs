@@ -845,6 +845,15 @@ export async function fakeStripe() {
       const found = state.disputes[dispute[1]];
       return found ? { body: { id: dispute[1], object: 'dispute', ...found } } : { status: 404, body: { error: { message: 'No such dispute' } } };
     }
+    // Like Stripe, only an open session can be expired.
+    const expire = /^\/v1\/checkout\/sessions\/([\w-]+)\/expire$/.exec(path);
+    if (method === 'POST' && expire) {
+      const session = state.sessions[expire[1]];
+      if (!session) return { status: 404, body: { error: { message: 'No such checkout.session' } } };
+      if (session.status !== 'open') return { status: 400, body: { error: { type: 'invalid_request_error', message: 'Only Checkout Sessions with a status in ["open"] can be expired.' } } };
+      session.status = 'expired';
+      return { body: { id: expire[1], object: 'checkout.session', status: 'expired', payment_status: session.payment_status } };
+    }
     const one = /^\/v1\/checkout\/sessions\/([\w-]+)$/.exec(path);
     if (method === 'GET' && one) {
       const session = state.sessions[one[1]];

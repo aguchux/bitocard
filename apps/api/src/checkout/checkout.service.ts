@@ -543,6 +543,17 @@ export class CheckoutService implements OnModuleInit {
     return this.present(checkout, true);
   }
 
+  /**
+   * The customer gave up on the payment page: its payment is closed as cancelled, which closes the checkout. Paid after
+   * all, it is settled and the order placed instead. A checkout no longer waiting for payment is returned unchanged.
+   */
+  async cancel(customer: CustomerWithStore, id: string) {
+    const checkout = await this.load({ id });
+    if (!checkout || checkout.customerId !== customer.id) throw notFound();
+    if (checkout.status === 'awaiting_payment' && checkout.payment?.status === 'pending') await this.payments.cancel(checkout.payment);
+    return this.present((await this.load({ id }))!, true);
+  }
+
   /** Sandbox checkouts only: finish the payment as paid or failed, and the order it places as delivered or failed. */
   async simulate(customer: CustomerWithStore, id: string, outcome: 'succeeded' | 'failed', order: 'completed' | 'failed' = 'completed') {
     const checkout = await this.load({ id });
