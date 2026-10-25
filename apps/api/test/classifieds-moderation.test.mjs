@@ -210,4 +210,55 @@ describe('moderators', () => {
     assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.market_settings_changed' } }), 1);
     await admin.put('/v1/admin/classifieds/market-settings/NG', { listing_days: 30, max_photos: 12 });
   });
+
+  test('sellers are listed and opened with their listings, reports and Safe pay standing', async () => {
+    const seller = await customer();
+    const live = (await submit(seller, await draft(seller, { title: 'Standing fan, 18 inch', category: 'home-appliances' }))).json;
+    await (await customer()).post('/v1/classifieds/reports', { listing_id: live.id, reason: 'duplicate' });
+    await customer(); // A customer who never listed is not a seller.
+
+    const list = await support.get(`/v1/admin/classifieds/sellers?country=NG&q=${encodeURIComponent(seller.email)}`);
+    assert.equal(list.status, 200, JSON.stringify(list.json));
+    assert.equal(list.json.total, 1);
+    const row = list.json.data[0];
+    assert.deepEqual([row.id, row.listings.active, row.listings.total, row.open_reports, row.suspended, row.safe_pay_sales], [seller.id, 1, 1, 1, false, 0]);
+
+    const detail = await support.get(`/v1/admin/classifieds/sellers/${seller.id}`);
+    assert.equal(detail.status, 200, JSON.stringify(detail.json));
+    assert.deepEqual([detail.json.reports.length, detail.json.reports[0].listing.id, detail.json.safe_pay.strikes, detail.json.safe_pay.limited, detail.json.safe_pay.strike_limit], [1, live.id, 0, false, 3]);
+
+    await admin.post(`/v1/admin/classifieds/sellers/${seller.id}/suspend`, { reason: 'Duplicate ads again.' });
+    const suspended = (await support.get('/v1/admin/classifieds/sellers?status=suspended&limit=100')).json.data;
+    assert.ok(suspended.some(item => item.id === seller.id && item.suspended_reason === 'Duplicate ads again.'));
+    assert.ok(suspended.every(item => item.suspended));
+    await admin.post(`/v1/admin/classifieds/sellers/${seller.id}/unsuspend`, { reason: 'Cleaned up.' });
+  });
+
+  test('categories are opened and closed per country, or switched off everywhere, by operations', async () => {
+    const tree = await support.get('/v1/admin/classifieds/categories?country=NG');
+    assert.equal(tree.status, 200, JSON.stringify(tree.json));
+    const top = tree.json.data.find(item => item.slug === 'home-garden') ?? tree.json.data.find(item => item.children.some(child => child.slug === 'furniture'));
+    const furniture = top.children.find(child => child.slug === 'furniture');
+    assert.deepEqual([top.open, top.enabled, furniture.open], [true, true, true]);
+    assert.equal((await support.put(`/v1/admin/classifieds/categories/${top.id}/countries/NG`, { open: false })).status, 403, 'support views, operations change');
+
+    const seller = await customer();
+    const closed = await admin.put(`/v1/admin/classifieds/categories/${top.id}/countries/ng`, { open: false });
+    assert.deepEqual([closed.status, closed.json.open], [200, false]);
+    const area = await prisma.classifiedArea.findFirstOrThrow({ where: { slug: 'surulere' } });
+    const refused = await seller.post('/v1/classifieds/listings', { title: 'Dining table, six seats', category_id: furniture.id, area_id: area.id });
+    assert.equal(refused.json.error?.param, 'category_id', 'a closed top category closes its subcategories');
+    const open = (await fetch(`${server.base}/v1/classifieds/categories?country=NG`).then(res => res.json())).data;
+    assert.ok(!open.some(item => item.id === top.id));
+    await admin.put(`/v1/admin/classifieds/categories/${top.id}/countries/NG`, { open: true });
+
+    const off = await admin.patch(`/v1/admin/classifieds/categories/${furniture.id}`, { enabled: false });
+    assert.deepEqual([off.status, off.json.enabled], [200, false]);
+    assert.equal((await support.get('/v1/admin/classifieds/categories?country=NG')).json.data.find(item => item.id === top.id).children.find(child => child.id === furniture.id).enabled, false);
+    await admin.patch(`/v1/admin/classifieds/categories/${furniture.id}`, { enabled: true });
+    assert.equal((await seller.post('/v1/classifieds/listings', { title: 'Dining table, six seats', category_id: furniture.id, area_id: area.id })).status, 201);
+    assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.category_country_changed', targetId: top.id } }), 2);
+    assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.category_changed', targetId: furniture.id } }), 2);
+    assert.equal((await support.get('/v1/admin/classifieds/categories?country=ZZ')).status, 404);
+  });
 });

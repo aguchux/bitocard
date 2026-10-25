@@ -319,9 +319,9 @@ export class ListingsService {
     if (input.category_id !== undefined) {
       if (input.category_id === null) fields.categoryId = null;
       else {
-        const category = await this.prisma.classifiedCategory.findUnique({ where: { id: input.category_id }, include: { parent: true, countries: true, children: { select: { id: true }, take: 1 } } });
+        const category = await this.prisma.classifiedCategory.findUnique({ where: { id: input.category_id }, include: { parent: { include: { countries: true } }, countries: true, children: { select: { id: true }, take: 1 } } });
         const open = (c: { enabled: boolean; countries: { country: string; enabled: boolean }[] } | null) => !c || (c.enabled && c.countries.some(row => row.country === country && row.enabled));
-        if (!category || !category.enabled || !open(category) || (category.parent && !category.parent.enabled)) throw invalid('parameter_invalid', 'Choose a category open in your country.', 'category_id');
+        if (!category || !category.enabled || !open(category) || (category.parent && !open(category.parent))) throw invalid('parameter_invalid', 'Choose a category open in your country.', 'category_id');
         if (category.children.length) throw invalid('parameter_invalid', 'Choose a subcategory.', 'category_id');
         fields.categoryId = category.id;
       }

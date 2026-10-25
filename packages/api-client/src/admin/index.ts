@@ -482,6 +482,7 @@ export * from './stock';
 export * from './payment-methods';
 export * from './crypto';
 export * from './kyc';
+export * from './classifieds';
 export * from './top-ups';
 export * from './vpn';
 export * from './exchange';

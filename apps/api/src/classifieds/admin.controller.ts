@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Injectable, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
 import { AuditService } from '../audit/audit.service.js';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -13,6 +13,7 @@ import { sendPhoto } from './chat-files.js';
 import { ConversationsService } from './conversations.service.js';
 import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
+import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { type ListingStatus, listingStatuses } from './rules.js';
 import { type DisputeDecision, disputeDecisions, SafePayService } from './safe-pay.service.js';
 
@@ -100,6 +101,39 @@ class MarketSettingsDto {
   max_photos?: number;
 }
 
+class SellersDto {
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
+
+  /** A name or email address. */
+  @IsOptional() @IsString() @Length(1, 100)
+  q?: string;
+
+  @IsOptional() @IsIn(['all', 'suspended'])
+  status?: 'all' | 'suspended';
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class CategoriesDto {
+  @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country: string;
+}
+
+class CategoryDto {
+  @IsBoolean()
+  enabled: boolean;
+}
+
+class CategoryCountryDto {
+  @IsBoolean()
+  open: boolean;
+}
+
 const adminInclude = {
   category: { include: { parent: true } },
   area: { include: { parent: true } },
@@ -109,6 +143,8 @@ const adminInclude = {
   reports: { where: { status: 'open' }, select: { id: true, reason: true, details: true, createdAt: true } },
 } satisfies Prisma.ClassifiedListingInclude;
 
+const sellerSelect = { id: true, name: true, email: true, country: true, createdAt: true, phoneVerifiedAt: true, classifiedSeller: true } satisfies Prisma.CustomerSelect;
+
 /** The moderators' reads: listings with their seller (email included, admins only), flags and open reports. */
 @Injectable()
 export class ClassifiedsAdminService {
@@ -116,6 +152,7 @@ export class ClassifiedsAdminService {
     private readonly prisma: PrismaService,
     private readonly listings: ListingsService,
     private readonly audit: AuditService,
+    private readonly guards: SafePayGuardsService,
   ) {}
 
   private present(row: Prisma.ClassifiedListingGetPayload<{ include: typeof adminInclude }>, counts?: Map<string, number>) {
@@ -165,6 +202,151 @@ export class ClassifiedsAdminService {
     const row = await this.prisma.classifiedListing.findUnique({ where: { id }, include: adminInclude });
     if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
     return this.present(row, await this.sellerCounts([row.customerId]));
+  }
+
+  // ---- Sellers ----
+
+  /** Customers who have put up a listing (anything but a draft) or have a BitoCard Shop record, newest first. */
+  async sellers(filter: SellersDto) {
+    const insensitive = 'insensitive' as const;
+    const where: Prisma.CustomerWhereInput = {
+      AND: [
+        { OR: [{ classifiedListings: { some: { status: { not: 'draft' } } } }, { classifiedSeller: { isNot: null } }] },
+        ...(filter.country ? [{ country: filter.country }] : []),
+        ...(filter.status === 'suspended' ? [{ classifiedSeller: { is: { suspendedAt: { not: null } } } }] : []),
+        ...(filter.q ? [{ OR: [{ email: { contains: filter.q, mode: insensitive } }, { name: { contains: filter.q, mode: insensitive } }] }] : []),
+      ],
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.customer.findMany({ where, select: sellerSelect, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: filter.limit ?? 50, skip: filter.offset ?? 0 }),
+      this.prisma.customer.count({ where }),
+    ]);
+    const stats = await this.sellerStats(rows.map(row => row.id));
+    return { object: 'list' as const, data: rows.map(row => this.presentSeller(row, stats)), total };
+  }
+
+  /** One seller: their listings by status, reports about them or their listings, and their Safe pay standing. */
+  async seller(id: string) {
+    const row = await this.prisma.customer.findUnique({ where: { id }, select: sellerSelect });
+    if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such seller.');
+    const [stats, reports, bought, standing] = await Promise.all([
+      this.sellerStats([id]),
+      this.prisma.classifiedReport.findMany({
+        where: { OR: [{ reportedCustomerId: id }, { listing: { customerId: id } }] },
+        include: { listing: { select: { id: true, ref: true, title: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+      this.prisma.classifiedOrder.count({ where: { buyerId: id, status: { in: ['released', 'partly_refunded'] } } }),
+      row.country ? this.guards.standing(id, row.country) : null,
+    ]);
+    return {
+      ...this.presentSeller(row, stats),
+      safe_pay: { bought, ...(standing ?? { strikes: 0, strike_limit: null, limited: false, cancelled_after_accepting: 0, not_handed_over: 0, disputes_lost: 0, cleared_at: null }) },
+      reports: reports.map(report => ({
+        id: report.id,
+        reason: report.reason,
+        details: report.details,
+        status: report.status,
+        note: report.note,
+        listing: report.listing ? { id: report.listing.id, ref: Number(report.listing.ref), title: report.listing.title } : null,
+        conversation_id: report.conversationId,
+        created_at: report.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  private async sellerStats(ids: string[]) {
+    const [listings, reports, sales] = await Promise.all([
+      this.prisma.classifiedListing.groupBy({ by: ['customerId', 'status'], where: { customerId: { in: ids } }, _count: { _all: true } }),
+      this.prisma.classifiedReport.findMany({ where: { status: 'open', OR: [{ reportedCustomerId: { in: ids } }, { listing: { customerId: { in: ids } } }] }, select: { reportedCustomerId: true, listing: { select: { customerId: true } } } }),
+      this.prisma.classifiedOrder.groupBy({ by: ['sellerId'], where: { sellerId: { in: ids }, status: { in: ['released', 'partly_refunded'] } }, _count: { _all: true } }),
+    ]);
+    const openReports = new Map<string, number>();
+    for (const report of reports) {
+      const about = report.reportedCustomerId ?? report.listing?.customerId;
+      if (about) openReports.set(about, (openReports.get(about) ?? 0) + 1);
+    }
+    return { listings, openReports, sales: new Map(sales.map(row => [row.sellerId, row._count._all])) };
+  }
+
+  private presentSeller(row: Prisma.CustomerGetPayload<{ select: typeof sellerSelect }>, stats: Awaited<ReturnType<ClassifiedsAdminService['sellerStats']>>) {
+    const count = (status: string) => stats.listings.find(item => item.customerId === row.id && item.status === status)?._count._all ?? 0;
+    const seller = row.classifiedSeller;
+    return {
+      object: 'classified_seller' as const,
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      country: row.country,
+      member_since: row.createdAt.toISOString(),
+      phone_confirmed: Boolean(row.phoneVerifiedAt),
+      suspended: Boolean(seller?.suspendedAt),
+      suspended_reason: seller?.suspendedReason ?? null,
+      suspended_at: seller?.suspendedAt?.toISOString() ?? null,
+      listings: {
+        active: count('active'),
+        pending_review: count('pending_review'),
+        sold: count('sold'),
+        removed: count('removed'),
+        total: stats.listings.filter(item => item.customerId === row.id && item.status !== 'draft' && item.status !== 'deleted').reduce((sum, item) => sum + item._count._all, 0),
+      },
+      open_reports: stats.openReports.get(row.id) ?? 0,
+      safe_pay_sales: stats.sales.get(row.id) ?? 0,
+    };
+  }
+
+  // ---- Categories ----
+
+  /** Every category (switched off ones too), top categories with their subcategories, open or not in the country. */
+  async categories(country: string) {
+    await this.requireCountry(country);
+    const [rows, counts] = await Promise.all([
+      this.prisma.classifiedCategory.findMany({ include: { countries: { where: { country } } }, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
+      this.prisma.classifiedListing.groupBy({ by: ['categoryId'], where: { country, status: 'active' }, _count: { _all: true } }),
+    ]);
+    const live = new Map(counts.map(row => [row.categoryId, row._count._all]));
+    const present = (row: (typeof rows)[number]) => ({
+      object: 'classified_admin_category' as const,
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      icon: row.icon,
+      b2b: row.b2b,
+      enabled: row.enabled,
+      open: row.countries[0]?.enabled ?? false,
+      active_listings: live.get(row.id) ?? 0,
+    });
+    const data = rows
+      .filter(row => !row.parentId)
+      .map(top => {
+        const children = rows.filter(row => row.parentId === top.id).map(present);
+        return { ...present(top), active_listings: children.reduce((sum, child) => sum + child.active_listings, live.get(top.id) ?? 0), children };
+      });
+    return { object: 'list' as const, country, data };
+  }
+
+  /** Switches a category off everywhere (or back on): no new listings in it; live ones stay until they end. */
+  async setCategory(actorId: string | null, id: string, enabled: boolean) {
+    const row = await this.prisma.classifiedCategory.findUnique({ where: { id } });
+    if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such category.');
+    await this.prisma.classifiedCategory.update({ where: { id }, data: { enabled } });
+    await this.audit.record({ actorId, action: 'classifieds.category_changed', targetType: 'classified_category', targetId: id, before: { enabled: row.enabled }, after: { enabled } });
+    return { object: 'classified_admin_category' as const, id, slug: row.slug, enabled };
+  }
+
+  /** Opens or closes a category in one country (a top category closes all of its subcategories there). */
+  async setCategoryCountry(actorId: string | null, id: string, country: string, open: boolean) {
+    await this.requireCountry(country);
+    const row = await this.prisma.classifiedCategory.findUnique({ where: { id }, include: { countries: { where: { country } } } });
+    if (!row) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such category.');
+    await this.prisma.classifiedCategoryCountry.upsert({ where: { categoryId_country: { categoryId: id, country } }, create: { categoryId: id, country, enabled: open }, update: { enabled: open } });
+    await this.audit.record({ actorId, action: 'classifieds.category_country_changed', targetType: 'classified_category', targetId: id, before: { country, open: row.countries[0]?.enabled ?? false }, after: { country, open } });
+    return { object: 'classified_admin_category' as const, id, slug: row.slug, country, open };
+  }
+
+  private async requireCountry(country: string) {
+    if (!(await this.prisma.country.findUnique({ where: { code: country } }))) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such country.');
   }
 
   async marketSettings(country: string) {
@@ -266,6 +448,16 @@ export class AdminClassifiedsController {
     return this.moderation.resolveReport(adminId(caller), id, body);
   }
 
+  @Get('sellers')
+  sellers(@Query() query: SellersDto) {
+    return this.admin.sellers(query);
+  }
+
+  @Get('sellers/:customer')
+  seller(@Param('customer', ParseUUIDPipe) customer: string) {
+    return this.admin.seller(customer);
+  }
+
   @Post('sellers/:customer/suspend')
   @HttpCode(HttpStatus.OK)
   @AdminRoles('operations')
@@ -278,6 +470,23 @@ export class AdminClassifiedsController {
   @AdminRoles('operations')
   unsuspend(@CurrentCaller() caller: Caller, @Param('customer', ParseUUIDPipe) customer: string, @Body() body: ReasonDto) {
     return this.moderation.unsuspend(adminId(caller), customer, body.reason);
+  }
+
+  @Get('categories')
+  categories(@Query() query: CategoriesDto) {
+    return this.admin.categories(query.country);
+  }
+
+  @Patch('categories/:id')
+  @AdminRoles('operations')
+  setCategory(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: CategoryDto) {
+    return this.admin.setCategory(adminId(caller), id, body.enabled);
+  }
+
+  @Put('categories/:id/countries/:country')
+  @AdminRoles('operations')
+  setCategoryCountry(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('country') country: string, @Body() body: CategoryCountryDto) {
+    return this.admin.setCategoryCountry(adminId(caller), id, country.toUpperCase(), body.open);
   }
 
   @Get('prohibited-words')

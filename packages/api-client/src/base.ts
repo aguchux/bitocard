@@ -186,6 +186,13 @@ export const tagTypes = [
   'BrandRegistry',
   'Email',
   'Category',
+  // BitoCard Shop (admin)
+  'ClassifiedListing',
+  'ClassifiedReport',
+  'ClassifiedSeller',
+  'ClassifiedCategory',
+  'ClassifiedOrder',
+  'ClassifiedSettings',
 ] as const;
 
 /**
