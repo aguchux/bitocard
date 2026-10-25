@@ -512,7 +512,7 @@ export function ShopAssistantDetail({ context, bot, extraActions }: { context: A
       {tab === "conversations" ? <Conversations bot={bot} /> : null}
       {tab === "evals" ? <Evals bot={bot} /> : null}
       <p className="text-sm">
-        <AppLink href="/support/assistants/coverage" className="font-semibold text-brand-600 hover:underline">
+        <AppLink href="/support/assistants/who-answers" className="font-semibold text-brand-600 hover:underline">
           Coverage: who answers in each country and language
         </AppLink>
       </p>

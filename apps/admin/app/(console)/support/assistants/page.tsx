@@ -89,7 +89,7 @@ export default function AdminAssistantsPage() {
           title="BitoCard Shop"
           description="Anjio answers every country without its own assistant; others take over in their countries and languages."
           actions={
-            <AppLink href="/support/assistants/coverage" className="text-sm font-semibold text-brand-600 hover:underline">
+            <AppLink href="/support/assistants/who-answers" className="text-sm font-semibold text-brand-600 hover:underline">
               Coverage
             </AppLink>
           }
