@@ -16,6 +16,7 @@ import { type Line, LedgerService } from '../ledger/ledger.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { cleanMessage } from './conversations.service.js';
+import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { ListingsService } from './listings.service.js';
 import type { MediaUpload } from './media.service.js';
 import { invalid, priceText } from './rules.js';
@@ -91,6 +92,7 @@ export class SafePayService {
     private readonly storage: KycStorage,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly guards: SafePayGuardsService,
   ) {}
 
   private encryption() {
@@ -116,8 +118,9 @@ export class SafePayService {
 
   /** What a seller still needs before accepting Safe pay orders: their identity check and a payout bank account (live). */
   async readiness(customer: CustomerWithStore) {
-    const { mode, house } = await this.open(customer);
-    return this.readinessOf(customer.id, mode, house.id, customer.country!);
+    const { mode, house, country } = await this.open(customer);
+    const [ready, standing] = await Promise.all([this.readinessOf(customer.id, mode, house.id, country), this.guards.standing(customer.id, country)]);
+    return { ...ready, ready: ready.ready && !standing.limited, limited: standing.limited, strikes: standing.strikes, strike_limit: standing.strike_limit };
   }
 
   private async readinessOf(customerId: string, mode: LedgerMode, houseId: string, country: string) {
@@ -174,6 +177,8 @@ export class SafePayService {
   async request(customer: CustomerWithStore, input: { listing_id: string; offer_id?: string; fulfilment: 'meet_up' | 'delivery'; delivery_address?: string }) {
     const { country, mode, settings } = await this.open(customer);
     const { listing, price, offerId } = await this.priceFor(customer, country, input.listing_id, input.offer_id);
+    await this.guards.requireDifferentPeople(customer.id, listing.customerId);
+    await this.guards.requireNotLimited(listing.customerId, country, false);
     if (input.fulfilment === 'delivery' && listing.delivery === 'none') throw invalid('parameter_invalid', 'This seller does not deliver: choose to meet in person.', 'fulfilment');
     const address = input.fulfilment === 'delivery' ? (input.delivery_address ?? '').trim() : '';
     if (input.fulfilment === 'delivery' && (address.length < 10 || address.length > 500)) throw invalid('parameter_invalid', 'Give the full delivery address (10 to 500 characters).', 'delivery_address');
@@ -222,6 +227,7 @@ export class SafePayService {
     const now = new Date();
     if (order.status !== 'awaiting_payment' || !order.payBy || order.payBy <= now) throw this.wrongStatus(order, 'paid');
     if (order.listing.status !== 'active') throw conflict('listing_unavailable', 'This listing is no longer live.');
+    await this.guards.requireDifferentPeople(customer.id, order.sellerId);
     const total = order.priceMinor + order.buyerFeeMinor;
     const balance = await this.wallets.balance(customer.id, order.mode, order.currency);
     if (balance < total) throw this.walletLow(total - balance, order.currency);
@@ -315,6 +321,8 @@ export class SafePayService {
     const order = await this.mine(customer, id, 'seller');
     const now = new Date();
     if (order.status !== 'requested' || order.acceptBy <= now) throw this.wrongStatus(order, 'accepted');
+    await this.guards.requireNotLimited(customer.id, order.country, true);
+    await this.guards.requireDifferentPeople(order.buyerId, customer.id);
     const ready = await this.readinessOf(customer.id, mode, house.id, order.country);
     if (!ready.identity_checked) throw conflict('seller_not_ready', 'Finish your identity check before accepting Safe pay orders.', 'identity');
     if (!ready.payout_account) throw conflict('seller_not_ready', 'Add a payout bank account in your verified name before accepting Safe pay orders.', 'payout_account');
@@ -386,6 +394,7 @@ export class SafePayService {
       throw this.wrongStatus(order, 'cancelled');
     }
     const ended = await this.reload(order.id);
+    if (side === 'seller' && ended.acceptedAt) await this.guards.afterStrike(ended.seller, ended.country);
     const money = ended.status === 'refunded' ? ' The buyer is refunded in full.' : '';
     await this.noteInChat(ended, `The Safe pay order was cancelled by the ${side}.${money}`);
     await this.tell(ended, side === 'buyer' ? 'seller' : 'buyer', 'customer.classifieds.order_cancelled', `SP-${ended.number} was cancelled`, `The ${side} cancelled the Safe pay order for "${ended.listing.title}".${side === 'seller' ? money.replace('The buyer is', 'You are') : ''}`);
@@ -462,11 +471,12 @@ export class SafePayService {
 
   // ---- BitoCard ----
 
-  async adminList(filter: { status?: string; country?: string; q?: string; limit?: number; offset?: number }) {
+  async adminList(filter: { status?: string; country?: string; q?: string; payout_review?: string; limit?: number; offset?: number }) {
     const number = filter.q ? /^(?:SP-)?(\d{6,})$/i.exec(filter.q.trim())?.[1] : undefined;
     const where: Prisma.ClassifiedOrderWhereInput = {
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.country ? { country: filter.country } : {}),
+      ...(filter.payout_review ? { payoutReview: filter.payout_review } : {}),
       ...(filter.q ? (number ? { number: BigInt(number) } : { OR: [{ buyer: { email: { contains: filter.q, mode: 'insensitive' } } }, { seller: { email: { contains: filter.q, mode: 'insensitive' } } }] }) : {}),
     };
     const [rows, total] = await Promise.all([
@@ -532,9 +542,41 @@ export class SafePayService {
     });
     await this.audit.record({ actorId, action: 'classifieds.dispute_decided', targetType: 'classified_order', targetId: order.id, before: { status: 'disputed' }, after: { decision: input.decision, refund: decision.kind === 'partial' ? Number(decision.refund) : null, note: input.note } });
     const decided = await this.reload(order.id);
+    if (input.decision !== 'release') await this.guards.afterStrike(decided.seller, decided.country);
     const outcome = { release: 'the money was released to the seller', refund: 'the buyer was refunded in full', partial: `${priceText(decision.kind === 'partial' ? decision.refund : 0n, order.currency)} was refunded to the buyer and the rest released to the seller` }[input.decision];
     for (const side of ['buyer', 'seller'] as const) await this.tell(decided, side, 'customer.classifieds.dispute_decided', `The dispute on SP-${decided.number} is decided`, `BitoCard decided: ${outcome}. ${input.note}`.slice(0, 280));
     return this.adminGet(order.id);
+  }
+
+  /** Finance approves a held payout (the seller can withdraw it after the payout hold) or keeps it held. */
+  async decidePayoutReview(actorId: string | null, id: string, input: { decision: 'approve' | 'reject'; note: string }) {
+    const order = await this.prisma.classifiedOrder.findUnique({ where: { id }, include: orderInclude });
+    if (!order) throw notFound();
+    if (order.payoutReview !== 'pending' && !(order.payoutReview === 'rejected' && input.decision === 'approve')) throw conflict('no_payout_review', 'This payout is not waiting for review.');
+    const outcome = input.decision === 'approve' ? 'approved' : 'rejected';
+    const claimed = await this.prisma.classifiedOrder.updateMany({ where: { id, payoutReview: order.payoutReview }, data: { payoutReview: outcome, payoutReviewedAt: new Date(), payoutReviewedById: actorId, payoutReviewNote: input.note } });
+    if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
+    await this.audit.record({ actorId, action: 'classifieds.payout_review_decided', targetType: 'classified_order', targetId: id, before: { payout_review: order.payoutReview }, after: { payout_review: outcome, note: input.note } });
+    if (outcome === 'approved') {
+      await this.tell(order, 'seller', 'customer.classifieds.order_released', `Your payment for SP-${order.number} is checked`, `${priceText(order.sellerPayoutMinor ?? 0n, order.currency)} can be withdrawn once the payout hold ends.`);
+    }
+    return this.adminGet(id);
+  }
+
+  /** A seller's Safe pay strikes and whether they are limited. */
+  async sellerStanding(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, country: true } });
+    if (!customer?.country) throw notFound('seller');
+    return { object: 'classified_safe_pay_standing' as const, customer_id: customer.id, ...(await this.guards.standing(customer.id, customer.country)) };
+  }
+
+  /** Lifts a seller's limit: strikes before now no longer count. */
+  async clearStrikes(actorId: string | null, customerId: string, reason: string) {
+    const before = await this.sellerStanding(customerId);
+    const now = new Date();
+    await this.prisma.classifiedSeller.upsert({ where: { customerId }, create: { customerId, safePayClearedAt: now }, update: { safePayClearedAt: now } });
+    await this.audit.record({ actorId, action: 'classifieds.safe_pay_limit_cleared', targetType: 'customer', targetId: customerId, before: { strikes: before.strikes, limited: before.limited }, after: { reason } });
+    return this.sellerStanding(customerId);
   }
 
   async adminSettings(country: string) {
@@ -543,7 +585,7 @@ export class SafePayService {
     return presentSettings(row);
   }
 
-  async updateSettings(actorId: string | null, country: string, input: Partial<{ buyer_fee_bps: number; buyer_fee_cap: number; seller_fee_bps: number; seller_fee_cap: number; new_seller_order_limit: number | null; accept_hours: number; pay_hours: number; handover_days: number; confirm_days: number }>) {
+  async updateSettings(actorId: string | null, country: string, input: Partial<{ buyer_fee_bps: number; buyer_fee_cap: number; seller_fee_bps: number; seller_fee_cap: number; new_seller_order_limit: number | null; accept_hours: number; pay_hours: number; handover_days: number; confirm_days: number; strike_limit: number }>) {
     const before = await this.adminSettings(country);
     const data: Prisma.ClassifiedSafePaySettingsUpdateInput = {
       ...(input.buyer_fee_bps !== undefined ? { buyerFeeBps: input.buyer_fee_bps } : {}),
@@ -555,6 +597,7 @@ export class SafePayService {
       ...(input.pay_hours !== undefined ? { payHours: input.pay_hours } : {}),
       ...(input.handover_days !== undefined ? { handoverDays: input.handover_days } : {}),
       ...(input.confirm_days !== undefined ? { confirmDays: input.confirm_days } : {}),
+      ...(input.strike_limit !== undefined ? { strikeLimit: input.strike_limit } : {}),
     };
     const after = presentSettings(await this.prisma.classifiedSafePaySettings.update({ where: { country }, data }));
     await this.audit.record({ actorId, action: 'classifieds.safe_pay_settings_changed', targetType: 'country', targetId: country, before, after });
@@ -585,6 +628,7 @@ export class SafePayService {
         refunded += 1;
         const ended = await this.reload(order.id);
         await this.tell(ended, 'seller', 'customer.classifieds.order_cancelled', `SP-${ended.number} was cancelled`, 'It was not handed over in time, so the buyer was refunded.');
+        await this.guards.afterStrike(ended.seller, ended.country);
       } catch (error) {
         if (!(error instanceof ApiError)) throw error;
       }
@@ -638,6 +682,8 @@ export class SafePayService {
       refund = decision.refund;
       [status, type] = ['partly_refunded', 'classified_partial'];
     }
+    const sellerPayout = decision.kind === 'refund' ? null : order.priceMinor - (refund ?? 0n) - (sellerFee ?? 0n);
+    const review = sellerPayout !== null && sellerPayout > 0n && (await this.guards.reversibleFunds(order.buyerId, order.mode));
     const entry = await this.ledger.prepare({
       mode: order.mode,
       type,
@@ -656,6 +702,8 @@ export class SafePayService {
           ...(status === 'partly_refunded' ? { refundedAt: now } : {}),
           sellerFeeMinor: sellerFee,
           refundMinor: refund,
+          sellerPayoutMinor: sellerPayout,
+          ...(review ? { payoutReview: 'pending' } : {}),
           ...(decision.kind === 'refund' ? { endedBy: decision.endedBy, endReason: decision.reason } : {}),
         },
       });
@@ -667,7 +715,16 @@ export class SafePayService {
     });
     const done = await this.reload(order.id);
     if (status !== 'refunded') {
-      await this.tell(done, 'seller', 'customer.classifieds.order_released', `You were paid for SP-${done.number}`, `${priceText(order.priceMinor - (refund ?? 0n) - (sellerFee ?? 0n), order.currency)} is in your Shop money, ready to withdraw once the payout hold ends.`);
+      await this.tell(
+        done,
+        'seller',
+        'customer.classifieds.order_released',
+        `You were paid for SP-${done.number}`,
+        review
+          ? `${priceText(sellerPayout!, order.currency)} is in your Shop money. BitoCard checks this payment before it can be withdrawn; you will be told when it is ready.`
+          : `${priceText(sellerPayout!, order.currency)} is in your Shop money, ready to withdraw once the payout hold ends.`,
+      );
+      if (review) await this.inbox.admins('admin.classifieds.payout_review', { subject: done.id, title: `Check the payout of SP-${done.number}`, body: `The buyer topped up by card or mobile money in the last 60 days. Approve the seller's ${priceText(sellerPayout!, order.currency)} for withdrawal, or keep it held.`, link: `/classifieds/orders/${done.id}` });
       await this.noteInChat(done, 'Safe pay released the money to the seller.');
     }
     if (refund !== null) await this.tell(done, 'buyer', 'customer.classifieds.order_refunded', `SP-${done.number} was refunded`, `${priceText(refund, order.currency)} is back in your wallet.`);
@@ -769,12 +826,13 @@ export class SafePayService {
       },
       ended_by: order.endedBy,
       end_reason: order.endReason,
+      payout_review: viewer === 'buyer' ? null : order.payoutReview,
       dispute: order.dispute ? { id: order.dispute.id, status: order.dispute.status, reason: order.dispute.reason, decision: order.dispute.decision } : null,
     };
   }
 }
 
-function presentSettings(row: { country: string; buyerFeeBps: number | null; buyerFeeCapMinor: bigint | null; sellerFeeBps: number | null; sellerFeeCapMinor: bigint | null; newSellerOrderLimitMinor: bigint | null; acceptHours: number; payHours: number; handoverDays: number; confirmDays: number }) {
+function presentSettings(row: { country: string; buyerFeeBps: number | null; buyerFeeCapMinor: bigint | null; sellerFeeBps: number | null; sellerFeeCapMinor: bigint | null; newSellerOrderLimitMinor: bigint | null; acceptHours: number; payHours: number; handoverDays: number; confirmDays: number; strikeLimit: number }) {
   const num = (value: bigint | null) => (value === null ? null : Number(value));
   return {
     object: 'classified_safe_pay_settings' as const,
@@ -788,6 +846,7 @@ function presentSettings(row: { country: string; buyerFeeBps: number | null; buy
     pay_hours: row.payHours,
     handover_days: row.handoverDays,
     confirm_days: row.confirmDays,
+    strike_limit: row.strikeLimit,
     ready: row.buyerFeeBps !== null && row.buyerFeeCapMinor !== null && row.sellerFeeBps !== null && row.sellerFeeCapMinor !== null,
   };
 }

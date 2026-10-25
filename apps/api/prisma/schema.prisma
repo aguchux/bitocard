@@ -4280,6 +4280,8 @@ model ClassifiedSafePaySettings {
   /// Days the seller has to hand over once paid, and the buyer to confirm a delivery.
   handoverDays             Int      @default(5) @map("handover_days")
   confirmDays              Int      @default(3) @map("confirm_days")
+  /// Strikes in 90 days (cancelling after accepting, not handing over, disputes lost) that stop a seller taking Safe pay orders.
+  strikeLimit              Int      @default(3) @map("strike_limit")
   updatedAt                DateTime @updatedAt @map("updated_at")
 
   @@map("classified_safe_pay_settings")
@@ -4470,6 +4472,8 @@ model ClassifiedSeller {
   suspendedAt     DateTime? @map("suspended_at")
   suspendedReason String?   @map("suspended_reason")
   suspendedById   String?   @map("suspended_by_id") @db.Uuid
+  /// Safe pay strikes before this no longer count (an admin lifted the seller's limit).
+  safePayClearedAt DateTime? @map("safe_pay_cleared_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -4641,6 +4645,14 @@ model ClassifiedOrder {
   endReason                String?            @map("end_reason")
   /// What went back to the buyer (the price and their fee, or part of the price).
   refundMinor              BigInt?            @map("refund_minor")
+  /// What the seller was paid (the price released less their fee), once released.
+  sellerPayoutMinor        BigInt?            @map("seller_payout_minor")
+  /// pending, approved or rejected: the buyer paid from a recent card or mobile money top-up, so the seller's payout of
+  /// it waits for finance (null: no review).
+  payoutReview             String?            @map("payout_review")
+  payoutReviewedAt         DateTime?          @map("payout_reviewed_at")
+  payoutReviewedById       String?            @map("payout_reviewed_by_id") @db.Uuid
+  payoutReviewNote         String?            @map("payout_review_note")
   createdAt                DateTime           @default(now()) @map("created_at")
   updatedAt                DateTime           @updatedAt @map("updated_at")
   listing                  ClassifiedListing  @relation(fields: [listingId], references: [id], onDelete: Restrict)
@@ -4652,6 +4664,7 @@ model ClassifiedOrder {
   @@index([sellerId, createdAt])
   @@index([listingId, status])
   @@index([status, updatedAt])
+  @@index([sellerId, payoutReview])
   @@map("classified_orders")
 }
 

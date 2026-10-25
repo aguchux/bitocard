@@ -140,7 +140,7 @@ describe('Safe pay', () => {
 
     const notReady = await seller.post(`/v1/classifieds/orders/${order.json.id}/accept`);
     assert.deepEqual([notReady.json.error.code, notReady.json.error.param], ['seller_not_ready', 'identity']);
-    assert.deepEqual((await seller.get('/v1/classifieds/me/safe-pay')).json, { object: 'classified_safe_pay_readiness', identity_checked: false, payout_account: false, ready: false });
+    assert.deepEqual((await seller.get('/v1/classifieds/me/safe-pay')).json, { object: 'classified_safe_pay_readiness', identity_checked: false, payout_account: false, ready: false, limited: false, strikes: 0, strike_limit: 3 });
     await ready(seller);
     assert.equal((await buyer.post(`/v1/classifieds/orders/${order.json.id}/accept`)).json.error.code, 'order_not_yours');
     const accepted = await seller.post(`/v1/classifieds/orders/${order.json.id}/accept`);
@@ -300,5 +300,108 @@ describe('Safe pay', () => {
     assert.equal((await buyer.get('/v1/classifieds/orders?role=buying')).json.data[0].id, order.id);
     assert.equal((await seller.get('/v1/classifieds/orders?role=buying')).json.total, 0);
     assert.equal((await (await customer('Lola Ige')).get(`/v1/classifieds/orders/${order.id}`)).status, 404);
+  });
+});
+
+describe('Safe pay protections', () => {
+  /** A BitoCard Verify case for the customer with these details. */
+  async function verifyCase(customer, details) {
+    const house = await services.house.resellerFor('NG');
+    const check = await prisma.identityVerification.create({
+      data: { subject: 'customer', resellerId: house.id, mode: 'live', customerReference: customer.id, method: 'document', provider: 'bitocard', providerReference: randomUUID(), status: 'approved', country: 'NG', consentAt: new Date() },
+    });
+    await prisma.kycCase.create({ data: { verificationId: check.id, subject: 'customer', kind: 'kyc', mode: 'live', country: 'NG', resellerId: house.id, customerReference: customer.id, status: 'approved', ...details } });
+  }
+
+  test('the same verified person cannot be buyer and seller: by ID document, name and birth date, or bank account', async () => {
+    const seller = await customer('Amaka Obi');
+    const listing = await live(seller, 'Hisense 32 inch TV');
+    const twin = await customer('Amaka N. Obi');
+    await verifyCase(seller, { idFingerprint: 'fp-amaka', fullName: 'Amaka Obi', dateOfBirth: '1990-04-01' });
+    await verifyCase(twin, { idFingerprint: 'fp-amaka' });
+    const refused = await twin.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' });
+    assert.deepEqual([refused.status, refused.json.error.code], [403, 'same_person']);
+    assert.doesNotMatch(refused.json.error.message, /document|bank|name/, 'never says how they matched');
+    assert.equal((await prisma.notification.count({ where: { type: 'admin.classifieds.same_person' } })) > 0, true);
+
+    const named = await customer('Obi Amaka');
+    await verifyCase(named, { idFingerprint: 'fp-other', fullName: 'OBI  amaka', dateOfBirth: '1990-04-01' });
+    assert.equal((await named.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).json.error.code, 'same_person');
+
+    const { Encryption } = await import('../dist/common/encryption.js');
+    const { IntegrationsService } = await import('../dist/integrations/integrations.service.js');
+    const sealed = new Encryption(server.app.get(IntegrationsService).env.ENCRYPTION_KEY);
+    const account = (customerId, name) => ({ customerId, mode: 'live', country: 'NG', currency: 'NGN', bankCode: '058', bankName: 'GTBank', accountNumberEncrypted: sealed.encrypt('0123456789'), accountNumberLast4: '6789', accountName: name, payoutsFrom: new Date() });
+    const banked = await customer('Chuka Eze');
+    await prisma.customerBankAccount.create({ data: account(seller.id, 'Amaka Obi') });
+    await prisma.customerBankAccount.create({ data: account(banked.id, 'Chuka Eze') });
+    assert.equal((await banked.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).json.error.code, 'same_person');
+
+    const stranger = await customer('Femi Ade');
+    await verifyCase(stranger, { idFingerprint: 'fp-femi', fullName: 'Femi Ade', dateOfBirth: '1992-01-01' });
+    assert.equal((await stranger.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).status, 201);
+  });
+
+  test('a seller with three strikes in 90 days cannot take Safe pay orders until an admin lifts it', async () => {
+    const seller = await customer('Bayo Ola');
+    await ready(seller);
+    for (const n of [1, 2, 3]) {
+      const buyer = await customer(`Strike Buyer ${n}`);
+      const listing = await live(seller, `Sony ${40 + n} inch TV`);
+      const order = (await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).json;
+      await seller.post(`/v1/classifieds/orders/${order.id}/accept`);
+      assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/cancel`, { reason: 'Changed my mind' })).json.status, 'cancelled');
+    }
+    const readiness = (await seller.get('/v1/classifieds/me/safe-pay')).json;
+    assert.deepEqual([readiness.limited, readiness.strikes, readiness.strike_limit, readiness.ready], [true, 3, 3, false]);
+    assert.equal(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.classifieds.safe_pay_limited' } }), 1);
+    assert.equal((await prisma.notification.count({ where: { type: 'admin.classifieds.seller_limited' } })) > 0, true);
+
+    const buyer = await customer('Next Buyer');
+    const listing = await live(seller, 'Sony 50 inch TV');
+    const refused = await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' });
+    assert.equal(refused.json.error.code, 'safe_pay_limited');
+    assert.match(refused.json.error.message, /still chat/);
+
+    assert.equal((await admin.get(`/v1/admin/classifieds/sellers/${seller.id}/safe-pay`)).json.cancelled_after_accepting, 3);
+    const cleared = await admin.post(`/v1/admin/classifieds/sellers/${seller.id}/safe-pay/clear`, { reason: 'Stock problem, now fixed' });
+    assert.deepEqual([cleared.json.strikes, cleared.json.limited], [0, false]);
+    assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.safe_pay_limit_cleared', targetId: seller.id } }), 1);
+    assert.equal((await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).status, 201);
+  });
+
+  test('paid from a recent card top-up: the payout to the seller waits for finance', async () => {
+    const seller = await customer('Dapo Bello');
+    const buyer = await customer('Card Buyer');
+    await ready(seller);
+    const house = await services.house.resellerFor('NG');
+    await prisma.payment.create({ data: { resellerId: house.id, customerId: buyer.id, mode: 'live', purpose: 'customer_top_up', provider: 'stripe', reference: `bc_test_${randomUUID()}`, amountMinor: 30000000n, currency: 'NGN', status: 'succeeded', completedAt: new Date() } });
+    const listing = await live(seller, 'Samsung 40 inch TV', { price: 10000000 });
+    const order = (await buyer.post('/v1/classifieds/orders', { listing_id: listing.id, fulfilment: 'meet_up' })).json;
+    await seller.post(`/v1/classifieds/orders/${order.id}/accept`);
+    await fund(buyer, order.total);
+    await buyer.post(`/v1/classifieds/orders/${order.id}/pay`);
+    const code = (await buyer.get(`/v1/classifieds/orders/${order.id}/release-code`)).json.code;
+    const released = (await seller.post(`/v1/classifieds/orders/${order.id}/release`, { code })).json;
+    assert.deepEqual([released.status, released.payout_review], ['released', 'pending']);
+    assert.equal((await buyer.get(`/v1/classifieds/orders/${order.id}`)).json.payout_review, null, 'the buyer never sees it');
+    assert.equal((await prisma.notification.count({ where: { type: 'admin.classifieds.payout_review' } })) > 0, true);
+
+    // With no payout hold in the market, only the review holds it.
+    await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: 0 } });
+    try {
+      const cash = await seller.get('/v1/store/crypto/cash');
+      assert.equal(cash.status, 200, JSON.stringify(cash.json));
+      assert.deepEqual([cash.json.held, cash.json.available], [released.payout, 0]);
+      const finance = await adminClient(server, ['finance']);
+      const approved = await finance.post(`/v1/admin/classifieds/orders/${order.id}/payout-review`, { decision: 'approve', note: 'Card payment settled, no dispute.' });
+      assert.equal(approved.json.payout_review, 'approved');
+      const after = (await seller.get('/v1/store/crypto/cash')).json;
+      assert.deepEqual([after.held, after.available], [0, released.payout]);
+      assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.payout_review_decided', targetId: order.id } }), 1);
+    } finally {
+      await prisma.country.update({ where: { code: 'NG' }, data: { payoutHoldDays: 15 } });
+    }
+    assert.equal((await admin.get('/v1/admin/classifieds/orders?payout_review=approved')).json.data.some(row => row.id === order.id), true);
   });
 });

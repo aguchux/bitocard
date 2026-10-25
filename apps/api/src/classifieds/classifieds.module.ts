@@ -4,6 +4,7 @@ import { SettingsModule } from '../settings/settings.module.js';
 import { AdminClassifiedsController, AdminSafePayController, ClassifiedsAdminService } from './admin.controller.js';
 import { ClassifiedChatsController, ClassifiedListingsController, ClassifiedReferenceController, ClassifiedSafePayController } from './classifieds.controller.js';
 import { SafePayService } from './safe-pay.service.js';
+import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { ConversationsService } from './conversations.service.js';
 import { LeadsService } from './leads.service.js';
@@ -20,7 +21,7 @@ import { FavouritesService } from './favourites.service.js';
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
   controllers: [ClassifiedReferenceController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, AdminClassifiedsController, AdminSafePayController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService],
   exports: [ListingsService, ListingMediaService, ConversationsService, SafePayService],
 })
 export class ClassifiedsModule {}

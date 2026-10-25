@@ -321,6 +321,10 @@ class AdminOrdersDto {
   @IsOptional() @IsString() @Length(1, 100)
   q?: string;
 
+  /** Sellers' payouts waiting for finance (`pending`), or decided. */
+  @IsOptional() @IsIn(['pending', 'approved', 'rejected'])
+  payout_review?: string;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   limit?: number;
 
@@ -383,6 +387,17 @@ class SafePaySettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(30)
   confirm_days?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(20)
+  strike_limit?: number;
+}
+
+class PayoutReviewDto {
+  @IsIn(['approve', 'reject'])
+  decision: 'approve' | 'reject';
+
+  @IsString() @Length(3, 500)
+  note: string;
 }
 
 /** Admin Classifieds: Safe pay orders, disputes and their decisions, and Safe pay settings per country. */
@@ -426,6 +441,29 @@ export class AdminSafePayController {
   @StepUp()
   decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideDto) {
     return this.safePay.decide(adminId(caller), caller.kind === 'session' ? caller.adminRoles : [], id, body);
+  }
+
+  /** Finance approves a seller's payout held because the buyer paid from a recent card top-up, or keeps it held. */
+  @Post('orders/:id/payout-review')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('finance')
+  @StepUp()
+  payoutReview(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: PayoutReviewDto) {
+    return this.safePay.decidePayoutReview(adminId(caller), id, body);
+  }
+
+  /** A seller's Safe pay strikes and whether they can take orders. */
+  @Get('sellers/:customer/safe-pay')
+  standing(@Param('customer', ParseUUIDPipe) customer: string) {
+    return this.safePay.sellerStanding(customer);
+  }
+
+  /** Lifts a seller's Safe pay limit (strikes so far no longer count). */
+  @Post('sellers/:customer/safe-pay/clear')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('operations')
+  clearStrikes(@CurrentCaller() caller: Caller, @Param('customer', ParseUUIDPipe) customer: string, @Body() body: ReasonDto) {
+    return this.safePay.clearStrikes(adminId(caller), customer, body.reason);
   }
 
   @Get('safe-pay-settings/:country')

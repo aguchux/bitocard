@@ -5,7 +5,7 @@ import { Encryption } from '../common/encryption.js';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { CustomerBankAccount, CustomerPayout, LedgerMode } from '../generated/prisma/client.js';
+import type { CustomerBankAccount, CustomerPayout, LedgerMode, Prisma } from '../generated/prisma/client.js';
 import { accountNameMatches } from '../identity/providers.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { minor } from '../ledger/mode.js';
@@ -97,7 +97,7 @@ export class CustomerPayoutsService {
     const country = await this.prisma.country.findUniqueOrThrow({ where: { code: context.country } });
     const accountId = await this.ledger.accountId(context.mode, this.ref(context.customer.id, 'customer_withdrawable', context.currency));
     const account = await this.prisma.ledgerAccount.findUniqueOrThrow({ where: { id: accountId } });
-    const held = await this.held(accountId, country.payoutHoldDays);
+    const held = await this.held(accountId, country.payoutHoldDays, { customerId: context.customer.id, mode: context.mode, currency: context.currency });
     const available = account.balanceMinor > held ? account.balanceMinor - held : 0n;
     return {
       object: 'p2p_cash' as const,
@@ -111,14 +111,25 @@ export class CustomerPayoutsService {
     };
   }
 
-  /** Money from P2P sales (and BitoCard Shop Safe pay sales) credited inside the hold: not withdrawable yet. */
-  private async held(accountId: string, holdDays: number) {
-    if (holdDays <= 0) return 0n;
-    const recent = await this.prisma.ledgerPosting.aggregate({
-      where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['p2p_trade', 'exchange_trade', 'classified_release', 'classified_partial'] }, createdAt: { gt: new Date(Date.now() - holdDays * dayMs) } } },
-      _sum: { amountMinor: true },
+  /**
+   * Money not withdrawable yet: from P2P sales (and BitoCard Shop Safe pay sales) credited inside the hold, and Safe
+   * pay money finance has not approved (the buyer paid from a recent card or mobile money top-up), whenever released.
+   */
+  private async held(accountId: string, holdDays: number, owner: { customerId: string; mode: LedgerMode; currency: string }, db: Pick<Prisma.TransactionClient, 'ledgerPosting' | 'classifiedOrder'> = this.prisma) {
+    const holdStart = new Date(Date.now() - Math.max(holdDays, 0) * dayMs);
+    const recent =
+      holdDays > 0
+        ? await db.ledgerPosting.aggregate({
+            where: { accountId, amountMinor: { lt: 0n }, entry: { type: { in: ['p2p_trade', 'exchange_trade', 'classified_release', 'classified_partial'] }, createdAt: { gt: holdStart } } },
+            _sum: { amountMinor: true },
+          })
+        : { _sum: { amountMinor: 0n } };
+    // Released before the hold window (inside it, the money is already counted above).
+    const reviewing = await db.classifiedOrder.aggregate({
+      where: { sellerId: owner.customerId, mode: owner.mode, currency: owner.currency, payoutReview: { in: ['pending', 'rejected'] }, releasedAt: { lte: holdStart } },
+      _sum: { sellerPayoutMinor: true },
     });
-    return -(recent._sum.amountMinor ?? 0n);
+    return -(recent._sum.amountMinor ?? 0n) + (reviewing._sum.sellerPayoutMinor ?? 0n);
   }
 
   // -- Banks and accounts ---------------------------------------------------------------------------------------
@@ -227,14 +238,14 @@ export class CustomerPayoutsService {
     const payout = await this.prisma.$transaction(async tx => {
       const balances = await this.ledger.lockBalances(tx, [sourceId, pendingId]);
       // With the account locked: what is withdrawable now, after the payout hold.
-      const held = await this.held(sourceId, country.payoutHoldDays);
+      const held = await this.held(sourceId, country.payoutHoldDays, { customerId: customer.id, mode, currency }, tx);
       const available = (balances.get(sourceId) ?? 0n) - held;
       if (amount > available) {
         throw new ApiError(
           HttpStatus.PAYMENT_REQUIRED,
           'invalid_request_error',
           'insufficient_funds',
-          `You can pay out up to ${formatMoney(available > 0n ? available : 0n, currency)} now. Money from P2P sales can be paid out ${country.payoutHoldDays} days after each sale.`,
+          `You can pay out up to ${formatMoney(available > 0n ? available : 0n, currency)} now. Money from P2P and Shop sales can be paid out ${country.payoutHoldDays} days after each sale, and Safe pay money BitoCard is checking once it is approved.`,
           'amount',
         );
       }
