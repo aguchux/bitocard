@@ -539,6 +539,13 @@ Store customers buy and sell popular coins and stablecoins with each other, safe
   6. **Classic P2P:** settlement holds, then bank or mobile money paid off platform with crypto in escrow, mark paid, release with a code, appeals through disputes, timeouts by a `p2p` job.
 - **Legal:** licensing advice per market, crypto and P2P terms and risk warnings, and the privacy notice before switching anything on.
 
+## 6c. BitoCard Classifieds (Planned 25 October 2026; plan in `docs/BITOCARD_CLASSIFIEDS_PLAN.md`)
+
+An open market in the style of Jiji at `https://shop.bitocard.com` (`apps/shop`): anyone with a bitocard.com account and a confirmed email and phone posts listings; buyers chat or reveal the seller's phone; businesses later open verified **shops** with deals (honest "was" prices from price history) and **B2B** listings (minimum quantities, quantity prices, requests for quote).
+
+- **Decided by the owner:** **Safe pay from the start** (buyers pay through BitoCard's gateways, held in escrow until a release code is given at a meet-up or delivery is confirmed, then paid to the seller less BitoCard's fee, inside the payout hold; BitoCard decides disputes), sellers need a confirmed email and phone (Safe pay sellers also the identity check and a payout account in their verified name), the address `shop.bitocard.com`, and phase 1 (open market with Safe pay) before phase 2 (shops, deals, B2B).
+- **Gates:** `classifieds` and `classifieds_safe_pay` switches, off by default; Nigeria first. Safe pay stays in the sandbox until legal advice on holding buyers' money (CBN payment service licensing) and the Safe pay and marketplace terms are done.
+
 ## 7. API, docs and webhooks (Decided)
 
 - One unified REST API at `https://api.bitocard.com/v1`, described by OpenAPI. No GraphQL. Sandbox and live share the address; the key decides the mode.
