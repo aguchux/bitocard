@@ -9,12 +9,13 @@ import { ListingsService } from './listings.service.js';
 import { ListingMediaService } from './media.service.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ListingSearchService } from './search.service.js';
+import { FavouritesService } from './favourites.service.js';
 
 /** BitoCard Shop (classifieds): docs/BITOCARD_CLASSIFIEDS_PLAN.md. */
 @Module({
   imports: [CheckoutModule, SettingsModule],
   controllers: [ClassifiedReferenceController, ClassifiedListingsController, AdminClassifiedsController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService],
   exports: [ListingsService, ListingMediaService],
 })
 export class ClassifiedsModule {}

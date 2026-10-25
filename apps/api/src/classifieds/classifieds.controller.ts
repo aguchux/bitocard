@@ -9,6 +9,7 @@ import { Public } from '../auth/caller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { ListingsService } from './listings.service.js';
+import { FavouritesService } from './favourites.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
 import { ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
 import { maxVideoBytes } from './video.js';
@@ -125,6 +126,19 @@ class PhotoOrderDto {
 const photoUpload = FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 1 } });
 const videoUpload = FileInterceptor('file', { limits: { fileSize: maxVideoBytes + 1, files: 1, fields: 1 } });
 
+class FavouriteDto {
+  @IsUUID()
+  listing_id: string;
+}
+
+class FavouritesPageDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
 class ReportDto {
   @IsUUID()
   listing_id: string;
@@ -200,7 +214,26 @@ export class ClassifiedListingsController {
     private readonly listings: ListingsService,
     private readonly media: ListingMediaService,
     private readonly moderation: ModerationService,
+    private readonly favourites: FavouritesService,
   ) {}
+
+  /** Saved listings, newest saved first: live, sold (30 days) or gone, with any price drop since saving. */
+  @Get('favourites')
+  savedListings(@CurrentCustomer() caller: CustomerCaller, @Query() query: FavouritesPageDto) {
+    return this.favourites.list(caller.customer, query);
+  }
+
+  @Post('favourites')
+  @HttpCode(HttpStatus.OK)
+  save(@CurrentCustomer() caller: CustomerCaller, @Body() body: FavouriteDto) {
+    return this.favourites.add(caller.customer, body.listing_id);
+  }
+
+  @Delete('favourites/:listing')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unsave(@CurrentCustomer() caller: CustomerCaller, @Param('listing', ParseUUIDPipe) listing: string) {
+    await this.favourites.remove(caller.customer, listing);
+  }
 
   /** Reports a listing to BitoCard's moderators (once per listing while open; three reporters send it to review). */
   @Post('reports')

@@ -2533,6 +2533,7 @@ model Customer {
   classifiedSeller          ClassifiedSeller?
   classifiedReportsMade     ClassifiedReport[]        @relation("ClassifiedReporter")
   classifiedReportsAbout    ClassifiedReport[]        @relation("ClassifiedReported")
+  classifiedFavourites      ClassifiedFavourite[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4341,6 +4342,7 @@ model ClassifiedListing {
   media        ClassifiedMedia[]
   priceHistory ClassifiedPriceHistory[]
   reports      ClassifiedReport[]
+  favourites   ClassifiedFavourite[]
 
   @@index([customerId, status])
   @@index([country, status, stateId, areaId])
@@ -4455,4 +4457,19 @@ model ClassifiedSeller {
   customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@map("classified_sellers")
+}
+
+/// A buyer's saved listing, with its price when saved (so a drop can be shown).
+model ClassifiedFavourite {
+  customerId      String            @map("customer_id") @db.Uuid
+  listingId       String            @map("listing_id") @db.Uuid
+  savedPriceMinor BigInt?           @map("saved_price_minor")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  listing         ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, listingId])
+  @@index([customerId, createdAt])
+  @@index([listingId])
+  @@map("classified_favourites")
 }

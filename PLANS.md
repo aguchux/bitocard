@@ -539,7 +539,7 @@ Store customers buy and sell popular coins and stablecoins with each other, safe
   6. **Classic P2P:** settlement holds, then bank or mobile money paid off platform with crypto in escrow, mark paid, release with a code, appeals through disputes, timeouts by a `p2p` job.
 - **Legal:** licensing advice per market, crypto and P2P terms and risk warnings, and the privacy notice before switching anything on.
 
-## 6c. BitoCard Classifieds (Planned 25 October 2026, building: step 1 of phase 1 built; plan in `docs/BITOCARD_CLASSIFIEDS_PLAN.md`)
+## 6c. BitoCard Classifieds (Planned 25 October 2026, building: steps 1 and 2 of phase 1 built (reference data, the listings API, search, moderation); plan in `docs/BITOCARD_CLASSIFIEDS_PLAN.md`)
 
 An open market in the style of Jiji, **BitoCard Shop**: browsed at `https://shop.bitocard.com` (`apps/shop`), every page carrying its country (`/ng/…`; a price-free global showcase across countries from the second country), and managed in the **Shop** tab of the customer account app on the customer's country store (`ng.bitocard.com/shop`, where Shop takes the last tab and Account moves to the header); listings ranked by locality: anyone with a bitocard.com account sells and buys, with no approval; buyers chat or reveal the seller's phone; later anyone can open a **shop** (KYB earns the Verified business badge) with deals (honest "was" prices from price history) and post or buy **B2B** listings (minimum quantities, quantity prices, requests for quote).
 

@@ -169,7 +169,7 @@ export class ListingSearchService {
   }
 
   /** The buyer's card for each listing, in one read. */
-  private async cards(ids: string[]) {
+  async cards(ids: string[]) {
     const rows = await this.prisma.classifiedListing.findMany({
       where: { id: { in: ids } },
       include: {
