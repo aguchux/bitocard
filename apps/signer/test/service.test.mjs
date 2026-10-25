@@ -271,9 +271,11 @@ describe('the HTTP interface', () => {
     assert.ok(replyValid(res.headers.get('bitocard-signer-signature'), header.split('v1=')[1], 200, text));
 
     const path = '/v1/transfers/nope';
-    const missing = await fetch(`${base}${path}`, { headers: { 'bitocard-signer-signature': sign(path) } });
+    // Signed once: signing again could fall in the next second and differ.
+    const pathHeader = sign(path);
+    const missing = await fetch(`${base}${path}`, { headers: { 'bitocard-signer-signature': pathHeader } });
     assert.equal(missing.status, 404);
-    assert.ok(replyValid(missing.headers.get('bitocard-signer-signature'), sign(path).split('v1=')[1], 404, await missing.text()));
+    assert.ok(replyValid(missing.headers.get('bitocard-signer-signature'), pathHeader.split('v1=')[1], 404, await missing.text()));
 
     const health = await fetch(`${base}/signer/v1/health`, { headers: { 'bitocard-signer-signature': sign('/signer/v1/health') } });
     const json = await health.json();
