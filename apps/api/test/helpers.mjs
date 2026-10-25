@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { PGlite } from '@electric-sql/pglite';
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { PrismaPGlite } from 'pglite-prisma-adapter';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -56,7 +57,8 @@ async function dockerDatabase(url) {
 }
 
 async function pgliteDatabase() {
-  const db = new PGlite();
+  // pg_trgm, as on Neon and Postgres (BitoCard Shop's search).
+  const db = new PGlite({ extensions: { pg_trgm } });
   for (const sql of migrationSql()) await db.exec(sql);
   return { adapter: new PrismaPGlite(db), close: () => db.close() };
 }

@@ -141,6 +141,7 @@ export class ListingsService {
     const created = await this.prisma.$transaction(async tx => {
       const listing = await tx.classifiedListing.create({ data: { customerId: customer.id, country, currency: market.currency, ...data.fields } });
       if (data.features) await tx.classifiedListingFeature.createMany({ data: data.features.map(value => ({ listingId: listing.id, ...value })) });
+      await this.refreshSearch(tx, listing.id);
       return listing;
     });
     return this.present(await this.own(customer, created.id));
@@ -160,8 +161,26 @@ export class ListingsService {
       }
       const price = data.fields.priceMinor;
       if (price !== undefined && listing.status !== 'draft' && price !== listing.priceMinor) await this.recordPrice(tx, id, price);
+      await this.refreshSearch(tx, id);
     });
     return this.present(await this.own(customer, id));
+  }
+
+  /**
+   * Rebuilds the listing's search vector: its title first, then its features (name, value and unit), its category and
+   * the category above it, then its description.
+   */
+  private async refreshSearch(tx: Prisma.TransactionClient, listingId: string) {
+    await tx.$executeRaw`
+      UPDATE "classified_listings" l SET "search" =
+        setweight(to_tsvector('english', coalesce(l."title", '')), 'A') ||
+        setweight(to_tsvector('english', coalesce((
+          SELECT string_agg(f."name" || ' ' || coalesce(v."value_text", v."value_number"::text) || coalesce(' ' || f."unit", ''), ' ')
+          FROM "classified_listing_features" v JOIN "classified_features" f ON f."id" = v."feature_id" WHERE v."listing_id" = l."id"), '')), 'B') ||
+        setweight(to_tsvector('english', coalesce((
+          SELECT c."name" || coalesce(' ' || p."name", '') FROM "classified_categories" c LEFT JOIN "classified_categories" p ON p."id" = c."parent_id" WHERE c."id" = l."category_id"), '')), 'C') ||
+        setweight(to_tsvector('english', coalesce(l."description", '')), 'D')
+      WHERE l."id" = ${listingId}::uuid`;
   }
 
   /** Closes the current price and opens the new one (or none, for "contact for price"). */

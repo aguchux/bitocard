@@ -4324,6 +4324,8 @@ model ClassifiedListing {
   closedAt     DateTime?                  @map("closed_at")
   views        Int                        @default(0)
   leads        Int                        @default(0)
+  /// Full-text search over the title, features, category and description, kept by the API (GIN index in SQL).
+  search       Unsupported("tsvector")?
   createdAt    DateTime                   @default(now()) @map("created_at")
   updatedAt    DateTime                   @updatedAt @map("updated_at")
   customer     Customer                   @relation(fields: [customerId], references: [id], onDelete: Cascade)

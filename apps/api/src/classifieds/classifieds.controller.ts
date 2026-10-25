@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { Allow, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateNested } from 'class-validator';
+import { Allow, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { maxDocumentBytes } from '../kyc/files.js';
 import { Public } from '../auth/caller.js';
@@ -12,6 +12,7 @@ import { ListingsService } from './listings.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
 import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
+import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, priceKinds } from './rules.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
@@ -19,6 +20,53 @@ const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? va
 class CountryDto {
   @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
   country: string;
+}
+
+const list = ({ value }: { value: unknown }) => (value === undefined ? undefined : (Array.isArray(value) ? value : [value]).flatMap(item => String(item).split(',')).map(item => item.trim()).filter(Boolean));
+const many = ({ value }: { value: unknown }) => (value === undefined ? undefined : Array.isArray(value) ? value.map(String) : [String(value)]);
+const slug = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+class SearchDto extends CountryDto {
+  @IsOptional() @IsString() @MaxLength(100)
+  q?: string;
+
+  @IsOptional() @Matches(slug)
+  category?: string;
+
+  /** The buyer's area (city or area slug), for local-first results; `state` narrows it or stands alone. */
+  @IsOptional() @Matches(slug)
+  area?: string;
+
+  @IsOptional() @Matches(slug)
+  state?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  price_min?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  price_max?: number;
+
+  /** new, used, untested and parts, comma separated. */
+  @IsOptional() @Transform(list) @IsArray() @ArrayMaxSize(4) @IsString({ each: true })
+  condition?: string[];
+
+  /** Feature filters, repeated: `f=memory:4..16&f=colour:black,white`. */
+  @IsOptional() @Transform(many) @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(120, { each: true })
+  f?: string[];
+
+  @IsOptional() @IsIn(searchSorts)
+  sort?: SearchSort;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(maxOffset)
+  offset?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(maxResults)
+  limit?: number;
+}
+
+class SuggestDto extends CountryDto {
+  @IsString() @MaxLength(60)
+  q: string;
 }
 
 class FeatureSearchDto {
@@ -86,7 +134,30 @@ class MyListingsDto extends PageDto {
 @Public()
 @Controller('classifieds')
 export class ClassifiedReferenceController {
-  constructor(private readonly reference: ClassifiedReferenceService) {}
+  constructor(
+    private readonly reference: ClassifiedReferenceService,
+    private readonly search: ListingSearchService,
+  ) {}
+
+  /** Live listings in one country: words, category, price, condition and feature filters; local first from `area`. */
+  @Get('listings')
+  @Header('Cache-Control', 'public, max-age=60')
+  listings(@Query() query: SearchDto) {
+    return this.search.search(query);
+  }
+
+  /** A listing's public page by its number (`/ng/l/<ref>-<slug>`); 410 once gone. */
+  @Get('listings/:ref')
+  @Header('Cache-Control', 'public, max-age=60')
+  listing(@Param('ref', ParseIntPipe) ref: number, @Query() query: CountryDto) {
+    return this.search.listing(query.country, ref);
+  }
+
+  @Get('search/suggest')
+  @Header('Cache-Control', 'public, max-age=60')
+  suggest(@Query() query: SuggestDto) {
+    return this.search.suggest(query.country, query.q);
+  }
 
   @Get('features')
   @Header('Cache-Control', 'public, max-age=60')
