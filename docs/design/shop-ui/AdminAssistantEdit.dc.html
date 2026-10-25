@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, edit a shop assistant</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1400px; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+    <div>
+      <a href="AdminAssistants.dc.html" style="font-size: 13px; font-weight: 600">‹ Assistants</a>
+      <h1 style="margin: 4px 0 0; font-size: 24px; font-weight: 800">Ada · Shop assistant</h1>
+      <p style="margin: 4px 0 0; font-size: 13px; color: #4b5578">Draft · nothing changes in the Shop until you activate it</p>
+    </div>
+    <span style="display: flex; gap: 8px">
+      <button type="button" style="height: 42px; padding: 0 16px; border-radius: 12px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 14px Inter, sans-serif">Try it</button>
+      <button type="button" style="height: 42px; padding: 0 16px; border-radius: 12px; border: 0; background: #070f4c; color: #ffffff; font: 700 14px Inter, sans-serif">Activate</button>
+    </span>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+    <nav aria-label="Steps" style="flex: 1 1 220px; max-width: 260px; padding: 12px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 4px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="8">
+        <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; text-decoration: none; color: #070f4c; background: {{s.bg}}; font-size: 13px; font-weight: 600">
+          <span style="width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; background: {{s.dotBg}}; color: {{s.dotFg}}">{{s.mark}}</span>{{s.label}}
+        </a>
+      </sc-for>
+    </nav>
+
+    <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Kind and roles</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{kinds}}" as="k" hint-placeholder-count="3"><span style="padding: 8px 14px; border-radius: 12px; border: {{k.border}}; font-size: 13px; font-weight: 600; background: {{k.bg}}">{{k.label}}</span></sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px">
+          <sc-for list="{{roles}}" as="r" hint-placeholder-count="3">
+            <label style="display: flex; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid #e3e7f2"><input type="checkbox" checked="{{r.on}}" style="width: 18px; height: 18px; margin: 2px 0 0; accent-color: #070f4c"><span style="display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">{{r.name}}</strong><span style="font-size: 12px; color: #4b5578; line-height: 1.4">{{r.detail}}</span></span></label>
+          </sc-for>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; max-width: 420px">AI model
+          <select style="height: 42px; padding: 0 10px; border-radius: 10px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; background: #ffffff"><option>Anthropic · Claude (reads photos)</option><option>OpenAI (reads photos)</option><option disabled>DeepSeek · not offered for shop assistants</option></select>
+        </label>
+      </section>
+
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 2px solid #070f4c; display: flex; flex-direction: column; gap: 12px">
+        <span style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Languages</h2><button type="button" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">+ Add language</button></span>
+        <p style="margin: 0; font-size: 12px; color: #4b5578">The first is its main language. It answers in the user's language when it is one of these, else in its main one. Each needs a greeting.</p>
+        <sc-for list="{{languages}}" as="l" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; align-items: start; padding-top: 10px; border-top: 1px solid #f0f2f8">
+            <span style="display: flex; flex-direction: column; gap: 4px"><strong style="font-size: 14px">{{l.name}}</strong><span style="font-size: 11px; color: #4b5578">{{l.code}}</span><sc-if value="{{l.main}}" hint-placeholder-val="{{false}}"><span style="align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: #070f4c; color: #ffffff; font-size: 11px; font-weight: 700">Main</span></sc-if></span>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">Greeting
+              <textarea rows="2" style="padding: 8px 10px; border-radius: 10px; border: {{l.border}}; font: 500 13px Inter, sans-serif; resize: none">{{l.greeting}}</textarea>
+              <sc-if value="{{l.missing}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #9c1c3a; font-weight: 600">Needed before activating</span></sc-if>
+            </label>
+          </div>
+        </sc-for>
+      </section>
+
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+        <span style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Countries</h2><button type="button" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">+ Assign a country</button></span>
+        <div style="padding: 12px; border-radius: 12px; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+          <span style="display: flex; justify-content: space-between; align-items: center"><strong style="font-size: 15px">🇳🇬 Nigeria</strong><button type="button" style="border: 0; background: transparent; color: #9c1c3a; font: 600 13px Inter, sans-serif">Remove</button></span>
+          <span style="display: flex; gap: 16px; font-size: 13px"><label style="display: flex; gap: 6px; align-items: center"><input type="radio" name="ng" style="accent-color: #070f4c"> All its languages</label><label style="display: flex; gap: 6px; align-items: center"><input type="radio" name="ng" checked style="accent-color: #070f4c"> Only these</label></span>
+          <span style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{ngLangs}}" as="n" hint-placeholder-count="5"><span style="padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; border: {{n.border}}; background: {{n.bg}}; color: {{n.fg}}">{{n.label}}</span></sc-for>
+          </span>
+          <span style="padding: 10px 12px; border-radius: 10px; background: #fff8ec; border: 1px solid #f4dcb0; font-size: 12px; color: #5a3200; line-height: 1.45">Activating takes over from Anjio for Naijá, Yorùbá, Hausa and Igbo in Nigeria. English stays with Anjio.</span>
+        </div>
+        <label style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #4b5578"><input type="checkbox" style="width: 18px; height: 18px; margin: 0; accent-color: #070f4c"> Make this the default for every country, in place of Anjio</label>
+      </section>
+
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Knowledge, per country</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #f3f6fd; flex-wrap: wrap">
+          <span style="display: flex; flex-direction: column"><strong style="font-size: 14px">🇳🇬 Nigeria · version 3</strong><span style="font-size: 12px; color: #4b5578">BitoCard's sections generated 25 Oct (categories, Safe pay fees, the Safe Trade Guide, prohibited items). Your own sections are shared by every country.</span></span>
+          <span style="display: flex; gap: 8px"><button type="button" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">Edit</button><button type="button" style="height: 34px; padding: 0 12px; border-radius: 10px; border: 0; background: #070f4c; color: #ffffff; font: 700 13px Inter, sans-serif">Update knowledge base</button></span>
+        </div>
+      </section>
+
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Limits</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px">
+          <sc-for list="{{limits}}" as="m" hint-placeholder-count="4">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">{{m.label}}<input type="text" value="{{m.value}}" style="height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid #c9cee6; font: 600 14px Inter, sans-serif"></label>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = (label, state) => ({ label, mark: state === 'done' ? '✓' : state === 'todo' ? '!' : '•', bg: state === 'here' ? '#f3f6fd' : 'transparent', dotBg: state === 'done' ? '#e8f6f1' : state === 'todo' ? '#fdecef' : '#070f4c', dotFg: state === 'done' ? '#064c39' : state === 'todo' ? '#9c1c3a' : '#ffffff' });
+    const k = (label, on) => ({ label, border: on ? '2px solid #070f4c' : '1px solid #e3e7f2', bg: on ? '#f3f6fd' : '#ffffff' });
+    const n = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#4b5578' });
+    const l = (name, code, greeting, main) => ({ name, code, greeting, main, missing: !greeting, border: greeting ? '1px solid #c9cee6' : '1px solid #e89aac' });
+    return {
+      steps: [s('Kind and roles', 'done'), s('AI model', 'done'), s('Profile', 'done'), s('Languages', 'todo'), s('Countries', 'here'), s('Knowledge', 'done'), s('Limits', 'done'), s('Activate', 'todo')],
+      kinds: [k('Support assistant'), k('Shop assistant', true), k('SHQ assistant')],
+      roles: [
+        { name: 'Browse', detail: 'Buyers on shop.bitocard.com: finding and comparing listings, prices, safety, the Safe pay fee.', on: true },
+        { name: 'Sell', detail: 'Sellers in the Shop tab: Fill from photos, price guidance, improving a listing, reply suggestions.', on: true },
+        { name: 'Help', detail: 'How the Shop and Safe pay work, and the customer’s own orders. Hands over to a person.', on: false },
+      ],
+      languages: [
+        l('Naijá', 'pcm · Nigerian Pidgin', 'How you dey! Na Ada be dis, BitoCard AI assistant. Wetin you dey find today?', true),
+        l('Yorùbá', 'yo', 'Ẹ n lẹ! Ada ni mí, olùrànlọ́wọ́ AI ti BitoCard. Kí ni ẹ ń wá lónìí?'),
+        l('Hausa', 'ha', 'Sannu! Ni ce Ada, mataimakiyar AI ta BitoCard. Me kuke nema yau?'),
+        l('Igbo', 'ig', ''),
+      ],
+      ngLangs: [n('English'), n('Naijá', true), n('Yorùbá', true), n('Hausa', true), n('Igbo', true)],
+      limits: [
+        { label: 'Messages a day, signed in', value: '50' },
+        { label: 'Messages a day, visitors', value: '10' },
+        { label: 'Photos read per draft', value: '8' },
+        { label: 'Monthly spend cap (US$)', value: '500' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

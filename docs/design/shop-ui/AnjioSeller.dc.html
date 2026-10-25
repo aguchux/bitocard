@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Improve a listing and suggest a reply</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1320px; box-sizing: border-box; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+  <section aria-labelledby="improve-title" style="background: #ffffff; padding: 16px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid #e3e7f2">
+    <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4b5578">My listings › Improve</span>
+    <div style="display: flex; gap: 10px; align-items: center">
+      <span style="width: 56px; height: 56px; border-radius: 12px; background: #fff4e5"></span>
+      <span style="flex: 1; display: flex; flex-direction: column"><strong id="improve-title" style="font-size: 15px">Generator for sale</strong><span style="font-size: 13px; color: #4b5578">₦480,000 · 38 views · 1 chat</span></span>
+    </div>
+    <div style="padding: 12px; border-radius: 14px; background: linear-gradient(135deg, #fff0f7, #eef1fb); display: flex; gap: 10px; align-items: flex-start">
+      <span style="width: 32px; height: 32px; flex: none; border-radius: 999px; background: linear-gradient(135deg, #ff2382, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px">A</span>
+      <span style="font-size: 13px; line-height: 1.45">Similar generators with these details get about twice as many chats. Three things to fix:</span>
+    </div>
+    <sc-for list="{{tips}}" as="t" hint-placeholder-count="3">
+      <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid #f0f2f8">
+        <span style="width: 26px; height: 26px; flex: none; border-radius: 999px; background: #f3f6fd; color: #1d2873; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">{{t.n}}</span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">{{t.title}}</strong><span style="font-size: 12px; color: #4b5578; line-height: 1.4">{{t.detail}}</span></span>
+        <button type="button" style="height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 12px Inter, sans-serif; flex: none">{{t.action}}</button>
+      </div>
+    </sc-for>
+  </section>
+
+  <section aria-label="Suggest a reply" style="margin-top: 14px; background: #ffffff; border-top: 1px solid #e3e7f2">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #e3e7f2">
+      <span style="width: 36px; height: 36px; border-radius: 999px; background: #070f4c; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px">TB</span>
+      <span style="flex: 1; display: flex; flex-direction: column"><strong style="font-size: 14px">Tunde B.</strong><span style="font-size: 12px; color: #4b5578">About: 3.5 kVA generator</span></span>
+    </div>
+    <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px; background: #f3f6fd">
+      <div style="display: flex"><span style="max-width: 80%; padding: 10px 12px; border-radius: 16px 16px 16px 4px; background: #ffffff; font-size: 14px; line-height: 1.4">What's your last price? Can you deliver to Yaba?</span></div>
+      <div style="padding: 12px; border-radius: 14px; background: #ffffff; border: 2px dashed #c9cee6; display: flex; flex-direction: column; gap: 8px">
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #4b5578"><span style="width: 20px; height: 20px; border-radius: 999px; background: linear-gradient(135deg, #ff2382, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 9px">A</span>Suggested replies · edit before sending</span>
+        <sc-for list="{{replies}}" as="r" hint-placeholder-count="3">
+          <button type="button" style="text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid #e3e7f2; background: #fcfdff; color: #070f4c; font: 500 13px/1.45 Inter, sans-serif">{{r}}</button>
+        </sc-for>
+        <span style="font-size: 11px; color: #4b5578">Anjio reads this chat only because you asked. It never sends anything.</span>
+      </div>
+    </div>
+    <form style="margin: 0; padding: 10px 12px 18px; display: flex; gap: 8px; border-top: 1px solid #e3e7f2">
+      <button type="button" style="height: 42px; padding: 0 12px; border-radius: 999px; border: 1px solid #f6c9de; background: #fff0f7; color: #c00b58; font: 700 13px Inter, sans-serif; flex: none">✦ Suggest</button>
+      <input type="text" value="₦465,000 is my last price. Delivery to Yaba is ₦8,000, or" aria-label="Message" style="flex: 1; min-width: 0; height: 42px; padding: 0 14px; border-radius: 999px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif">
+      <button type="button" aria-label="Send" style="width: 42px; height: 42px; flex: none; border-radius: 999px; border: 0; background: #c00b58; color: #ffffff; font: 700 16px Inter, sans-serif">↑</button>
+    </form>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      tips: [
+        { n: '1', title: 'Say what it is in the title', detail: '“3.5 kVA petrol generator, key start” instead of “Generator for sale”.', action: 'Use title' },
+        { n: '2', title: 'Add 3 features buyers filter on', detail: 'Power (kVA), Fuel and Start type. Buyers filtering by them can’t find you yet.', action: 'Add' },
+        { n: '3', title: 'Replace photo 2', detail: 'It is dark and blurred. A photo of the control panel helps.', action: 'Replace' },
+      ],
+      replies: [
+        '₦465,000 is my last price. Delivery to Yaba is ₦8,000, or we can meet in Lekki.',
+        'The price is fixed, but I can deliver to Yaba for ₦8,000. You can buy with Safe pay.',
+        'I can do ₦470,000 with free delivery to Yaba this week.',
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

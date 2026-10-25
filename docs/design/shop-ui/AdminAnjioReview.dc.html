@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Anjio conversations and evals</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1000px; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="width: 48px; height: 48px; border-radius: 999px; background: linear-gradient(135deg, #ff2382, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px">A✦</span>
+      <div>
+        <a href="AdminAssistants.dc.html" style="font-size: 13px; font-weight: 600">‹ Assistants</a>
+        <h1 style="margin: 2px 0 0; font-size: 24px; font-weight: 800">Anjio</h1>
+        <p style="margin: 2px 0 0; font-size: 13px; color: #4b5578">Default · every country · Anthropic Claude · active</p>
+      </div>
+    </div>
+    <nav aria-label="Sections" style="display: flex; gap: 6px">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5"><a href="#" style="height: 36px; padding: 0 14px; border-radius: 999px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; background: {{t.bg}}; color: {{t.fg}}; border: {{t.border}}">{{t.label}}</a></sc-for>
+    </nav>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+    <sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+      <div style="padding: 14px 16px; border-radius: 14px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #4b5578">{{s.label}}</span><strong style="font-size: 22px; font-weight: 800">{{s.value}}</strong><span style="font-size: 12px; color: {{s.fg}}">{{s.sub}}</span></div>
+    </sc-for>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+    <section style="flex: 1 1 480px; min-width: 0; padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700">Reported and low-rated answers</h2>
+      <sc-for list="{{reports}}" as="r" hint-placeholder-count="3">
+        <article style="padding: 12px; border-radius: 12px; background: #f9fafe; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 6px">
+          <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #4b5578"><span>{{r.where}}</span><span style="padding: 2px 8px; border-radius: 999px; background: {{r.tagBg}}; color: {{r.tagFg}}; font-weight: 700">{{r.tag}}</span></span>
+          <span style="font-size: 13px"><strong>Asked:</strong> {{r.q}}</span>
+          <span style="font-size: 13px; color: #1d2873"><strong>Anjio:</strong> {{r.a}}</span>
+          <span style="font-size: 12px; color: #4b5578">Tools: {{r.tools}}</span>
+          <span style="display: flex; gap: 8px"><button type="button" style="height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 12px Inter, sans-serif">Open conversation</button><button type="button" style="height: 32px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 12px Inter, sans-serif">Add to evals</button><button type="button" style="height: 32px; padding: 0 12px; border-radius: 10px; border: 0; background: #f3f6fd; color: #4b5578; font: 600 12px Inter, sans-serif">Dismiss</button></span>
+        </article>
+      </sc-for>
+    </section>
+
+    <section style="flex: 1 1 420px; min-width: 0; padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+      <span style="display: flex; justify-content: space-between; align-items: center; gap: 10px"><h2 style="margin: 0; font-size: 16px; font-weight: 700">Evals</h2><button type="button" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 0; background: #070f4c; color: #ffffff; font: 700 13px Inter, sans-serif">Run evals</button></span>
+      <p style="margin: 0; font-size: 12px; color: #4b5578; line-height: 1.45">Run on a fixed sample market. Compare a new model here before switching Anjio to it.</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px">
+        <thead><tr style="text-align: left; color: #4b5578; font-size: 12px"><th style="padding: 8px 6px; font-weight: 600">Set</th><th style="padding: 8px 6px; font-weight: 600">Current model</th><th style="padding: 8px 6px; font-weight: 600">Candidate</th></tr></thead>
+        <tbody>
+          <sc-for list="{{evals}}" as="e" hint-placeholder-count="4">
+            <tr style="border-top: 1px solid #e3e7f2">
+              <td style="padding: 10px 6px"><span style="display: flex; flex-direction: column"><strong>{{e.set}}</strong><span style="font-size: 11px; color: #4b5578">{{e.detail}}</span></span></td>
+              <td style="padding: 10px 6px; font-weight: 700">{{e.now}}</td>
+              <td style="padding: 10px 6px; font-weight: 700; color: {{e.fg}}">{{e.next}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+      <span style="padding: 10px 12px; border-radius: 10px; background: #fdecef; color: #7d0f2b; font-size: 12px; line-height: 1.45">The candidate failed 1 red-team case: it repeated a phone number written in a listing's description. Keep the current model.</span>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    const tag = t => t === 'Reported' ? { tagBg: '#fdecef', tagFg: '#7d0f2b' } : { tagBg: '#fff4e5', tagFg: '#7a4100' };
+    return {
+      tabs: [chip('Settings', false), chip('Knowledge', false), chip('Conversations', true), chip('Evals', false), chip('Usage', false)],
+      stats: [
+        { label: 'Conversations, 30 days', value: '8,214', sub: 'Nigeria, English', fg: '#4b5578' },
+        { label: 'Helpful', value: '91%', sub: 'of 1,920 rated answers', fg: '#064c39' },
+        { label: 'Reported', value: '6', sub: '3 waiting for review', fg: '#7d0f2b' },
+        { label: 'Spent this month', value: '$412', sub: 'of the $1,500 cap', fg: '#4b5578' },
+      ],
+      reports: [
+        { where: 'Nigeria · Browse · 2 h ago', tag: 'Reported', ...tag('Reported'), q: 'Is this seller legit?', a: 'This seller is trustworthy and has many sales.', tools: 'get_listing', },
+        { where: 'Nigeria · Sell · yesterday', tag: 'Thumbs down', ...tag('Low'), q: 'Fill from photos', a: 'Suggested Storage 256 GB; the seller says 128 GB.', tools: 'draft_from_photos' },
+        { where: 'Nigeria · Browse · yesterday', tag: 'Thumbs down', ...tag('Low'), q: 'Toyota Corolla 2012 in Abuja under 5m', a: 'No cars found under ₦5,000,000.', tools: 'search_listings (area: Abuja, price ≤ ₦5,000,000)' },
+      ],
+      evals: [
+        { set: 'Buyer searches', detail: '48 questions → expected filters', now: '46 / 48', next: '47 / 48', fg: '#064c39' },
+        { set: 'Fill from photos', detail: '30 listings → expected features', now: '29 / 30', next: '29 / 30', fg: '#070f4c' },
+        { set: 'Languages', detail: '20 per language: answers in it', now: '20 / 20', next: '20 / 20', fg: '#070f4c' },
+        { set: 'Red team', detail: 'phones, codes, prohibited items, other countries, injected text', now: '40 / 40', next: '39 / 40', fg: '#9c1c3a' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

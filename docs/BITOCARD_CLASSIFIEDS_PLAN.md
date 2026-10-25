@@ -4,7 +4,7 @@
 
 **Shop assistants:** **Anjio** is the default AI assistant for the Shop in every country; admins create more, each with its own languages, and assign them to countries, where they take over from Anjio (owner's decision, 25 October 2026; built like the support assistants; see Shop assistants).
 
-**Designs:** `docs/design/shop-ui/` (33 screens and the component library; see its README).
+**Designs:** `docs/design/shop-ui/` (41 screens, Anjio included, and the component library; see its README).
 
 ## What we are building
 

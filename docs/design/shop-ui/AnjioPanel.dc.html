@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ask Anjio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1320px; box-sizing: border-box; background: #070f4c; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+  <div aria-hidden="true" style="height: 64px; background: #1d2873; opacity: 0.5"></div>
+
+  <section role="dialog" aria-label="Anjio, AI assistant" style="position: absolute; left: 0; right: 0; top: 40px; bottom: 0; background: #fcfdff; border-radius: 22px 22px 0 0; display: flex; flex-direction: column">
+    <span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 999px; background: #c9cee6; margin-top: 8px"></span>
+    <header style="display: flex; align-items: center; gap: 10px; padding: 10px 14px 12px; border-bottom: 1px solid #e3e7f2">
+      <span style="width: 42px; height: 42px; border-radius: 999px; background: linear-gradient(135deg, #ff2382, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; flex: none">A✦</span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 1px">
+        <strong style="font-size: 16px">Anjio</strong>
+        <span style="font-size: 12px; color: #4b5578">AI assistant · BitoCard Shop Nigeria</span>
+      </span>
+      <a href="AnjioLanguage.dc.html" style="height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid #c9cee6; color: #070f4c; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 4px">English <span aria-hidden="true">▾</span></a>
+      <button type="button" aria-label="Close" style="width: 36px; height: 36px; border-radius: 999px; border: 0; background: #f3f6fd; color: #070f4c; font: 700 16px Inter, sans-serif">✕</button>
+    </header>
+
+    <div style="flex: 1; overflow: hidden; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: flex-end">
+        <span style="max-width: 80%; padding: 10px 12px; border-radius: 16px 16px 4px 16px; background: #070f4c; color: #ffffff; font-size: 14px; line-height: 1.4">A used iPhone 13 under ₦400,000 near Ikeja. Safe pay sellers only.</span>
+      </div>
+
+      <div style="display: flex; gap: 8px; align-items: flex-start">
+        <span style="width: 28px; height: 28px; border-radius: 999px; background: linear-gradient(135deg, #ff2382, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 11px; flex: none">A</span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+          <p style="margin: 0; font-size: 14px; line-height: 1.5">I found 3 in Ikeja and 2 nearby. Most sell between ₦330,000 and ₦390,000. One is listed at ₦210,000, far below that: meet in public and inspect it first, or use Safe pay.</p>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 12px; background: #f3f6fd; font-size: 12px; color: #1d2873">
+            <span style="font-weight: 700">Searched:</span>
+            <sc-for list="{{filters}}" as="f" hint-placeholder-count="4"><span style="padding: 3px 8px; border-radius: 999px; background: #ffffff; border: 1px solid #e3e7f2">{{f}}</span></sc-for>
+            <a href="Category.dc.html" style="font-weight: 700">Open in search</a>
+          </div>
+
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4b5578">In Ikeja</span>
+          <sc-for list="{{listings}}" as="l" hint-placeholder-count="3">
+            <a href="Listing.dc.html" style="display: flex; gap: 10px; padding: 8px; border-radius: 14px; background: #ffffff; border: {{l.border}}; text-decoration: none; color: #070f4c">
+              <span style="width: 72px; height: 72px; flex: none; border-radius: 10px; background: {{l.tint}}"></span>
+              <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+                <strong style="font-size: 15px; font-weight: 800">{{l.price}}</strong>
+                <span style="font-size: 13px">{{l.title}}</span>
+                <span style="font-size: 12px; color: #4b5578">{{l.place}}</span>
+                <span style="display: flex; gap: 4px; flex-wrap: wrap"><span style="padding: 2px 7px; border-radius: 999px; background: #e8f6f1; color: #064c39; font-size: 11px; font-weight: 700">Safe pay seller</span><sc-if value="{{l.warn}}" hint-placeholder-val="{{false}}"><span style="padding: 2px 7px; border-radius: 999px; background: #fff4e5; color: #7a4100; font-size: 11px; font-weight: 700">{{l.warn}}</span></sc-if></span>
+              </span>
+            </a>
+          </sc-for>
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #4b5578">Nearby</span>
+          <a href="Category.dc.html" style="font-size: 13px; font-weight: 700">See 2 in Maryland and Ogba</a>
+
+          <div style="display: flex; align-items: center; gap: 6px; color: #4b5578">
+            <button type="button" aria-label="Helpful" style="width: 32px; height: 32px; border-radius: 999px; border: 1px solid #e3e7f2; background: #ffffff">👍</button>
+            <button type="button" aria-label="Not helpful" style="width: 32px; height: 32px; border-radius: 999px; border: 1px solid #e3e7f2; background: #ffffff">👎</button>
+            <button type="button" style="height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid #e3e7f2; background: #ffffff; color: #4b5578; font: 600 12px Inter, sans-serif">Report answer</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-left: 36px">
+        <sc-for list="{{suggestions}}" as="s" hint-placeholder-count="3"><button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">{{s}}</button></sc-for>
+      </div>
+    </div>
+
+    <footer style="padding: 10px 12px 18px; background: #ffffff; border-top: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 8px">
+      <form style="margin: 0; display: flex; gap: 8px">
+        <input type="text" placeholder="Describe what you want" aria-label="Ask Anjio" style="flex: 1; min-width: 0; height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif">
+        <button type="button" aria-label="Send" style="width: 44px; height: 44px; flex: none; border-radius: 999px; border: 0; background: #c00b58; color: #ffffff; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>
+        </button>
+      </form>
+      <span style="display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #4b5578; line-height: 1.4"><span>Anjio is an AI and can be wrong. Listings and prices come from BitoCard Shop.</span><a href="#" style="flex: none; font-weight: 700">Talk to a person</a></span>
+    </footer>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const l = (price, title, place, tint, warn) => ({ price, title, place, tint, warn, border: warn ? '1px solid #f4dcb0' : '1px solid #e3e7f2' });
+    return {
+      filters: ['iPhone 13', 'Used', 'Up to ₦400,000', 'Ikeja first', 'Safe pay sellers'],
+      listings: [
+        l('₦365,000', 'iPhone 13, 128 GB, Midnight', 'Ikeja · 2 h ago · ✓ ID checked', '#e7e9f6'),
+        l('₦385,000', 'iPhone 13, 256 GB, Blue', 'Allen, Ikeja · yesterday', '#eef7f2'),
+        l('₦210,000', 'iPhone 13 128GB clean', 'Ikeja · 20 min ago · new seller', '#fff0f7', 'Far below the usual price'),
+      ],
+      suggestions: ['Only 256 GB', 'What should I check?', 'How much is the Safe pay fee?'],
+    };
+  }
+}
+</script>
+</body>
+</html>

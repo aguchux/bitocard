@@ -1,6 +1,6 @@
 # BitoCard Shop UI designs
 
-Mockups for BitoCard Shop (Classifieds), drawn for `docs/BITOCARD_CLASSIFIEDS_PLAN.md`. The live canvas is the private artifact <https://claude.ai/artifact/1jGHRf5zizCEdduZCsPAsx>; these files are a copy of its 33 artboards, kept here as the reference for building the screens. They are design references, not app code: each `.dc.html` is a Design Component page (inline styles, sample data in its `renderVals()`), and they render only on the canvas, which supplies `support.js`. `canvas.json` is the canvas's layout.
+Mockups for BitoCard Shop (Classifieds), drawn for `docs/BITOCARD_CLASSIFIEDS_PLAN.md`. The live canvas is the private artifact <https://claude.ai/artifact/1jGHRf5zizCEdduZCsPAsx>; these files are a copy of its 41 artboards, kept here as the reference for building the screens. They are design references, not app code: each `.dc.html` is a Design Component page (inline styles, sample data in its `renderVals()`), and they render only on the canvas, which supplies `support.js`. `canvas.json` is the canvas's layout.
 
 Colours and type follow the storefront's tokens (`packages/ui/src/styles/tokens.css`: navy 900 `#070f4c`, pink 500 `#ff2382`, pink 700 `#c00b58` for pink text and buttons, Inter), with green `#0b7a5c` for Safe pay. Photos are coloured placeholders; names, prices and counts are sample data. Fee rates show as `[x]%` and `[y]%`; the admin settings screen uses 2% capped at ₦20,000 for the buyer and 3% capped at ₦30,000 for the seller only as an example.
 
@@ -32,6 +32,14 @@ Colours and type follow the storefront's tokens (`packages/ui/src/styles/tokens.
 | `AdminFeatures.dc.html` | Feature registry: key, icon, data type, unit, default, placeholder, limits, search words, sellers' suggestions | admin Classifieds |
 | `AdminSafePay.dc.html` | Safe pay settings per country: both rates and caps, time limits, worked examples | admin Classifieds |
 | `AdminDispute.dc.html` | A dispute: both sides, the decision and its money | admin Classifieds |
+| `AnjioPanel.dc.html` | Ask Anjio: the assistant panel with the language menu, the search it ran, listing cards from its tools, Talk to a person | `shop.bitocard.com/ng` |
+| `AnjioListing.dc.html` | Ask Anjio about a listing: price range, the category checklist, the Safe pay fee and a draft first message | `/ng/l/<id>-<slug>` |
+| `AnjioLanguage.dc.html` | Choosing the language, and Ada (a Nigerian assistant) answering in Pidgin | `shop.bitocard.com/ng` |
+| `AnjioFill.dc.html` | Fill from photos: suggestions to accept or edit, features from the registry, a price range | `/shop/post` |
+| `AnjioSeller.dc.html` | Improve this listing, and Suggest a reply in a chat | `/shop/listings`, `/shop/messages` |
+| `AdminAssistants.dc.html` | Shop assistants with Anjio as the default, and the coverage by country and language | admin Support > Assistants |
+| `AdminAssistantEdit.dc.html` | A shop assistant: roles, model, languages with greetings, countries per language, knowledge per country, limits | admin Support > Assistants |
+| `AdminAnjioReview.dc.html` | Anjio's reported answers and evals (current model against a candidate) | admin Support > Assistants |
 | `ShopPage.dc.html`, `Deals.dc.html`, `B2B.dc.html` | Phase 2: a business shop, deals with honest "was" prices, a B2B listing with price tiers and a request for quote | `/ng/s/<shop>`, `/ng/deals` |
 
 Reviews on the seller profile and the shop page are phase 2 (`classified_reviews`).

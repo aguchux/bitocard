@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Choose the assistant's language</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1100px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; display: flex; flex-direction: column; overflow: hidden">
+  <section aria-labelledby="lang-title" style="padding: 18px 16px; display: flex; flex-direction: column; gap: 10px; background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <h2 id="lang-title" style="margin: 0; font-size: 18px; font-weight: 800">Chat in your language</h2>
+    <p style="margin: 0; font-size: 13px; color: #4b5578; line-height: 1.45">Languages offered in Nigeria. Changing it starts a new conversation.</p>
+    <div role="radiogroup" aria-label="Language" style="display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{languages}}" as="l" hint-placeholder-count="5">
+        <label style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; border: {{l.border}}; background: {{l.bg}}">
+          <input type="radio" name="language" checked="{{l.on}}" style="width: 18px; height: 18px; margin: 0; accent-color: #070f4c">
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 1px"><strong style="font-size: 15px">{{l.name}}</strong><span style="font-size: 12px; color: #4b5578">{{l.english}}</span></span>
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #1d2873; font-weight: 600"><span style="width: 24px; height: 24px; border-radius: 999px; background: {{l.avatar}}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800">{{l.initial}}</span>{{l.bot}}</span>
+        </label>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-label="Conversation in Pidgin" style="flex: 1; display: flex; flex-direction: column">
+    <header style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #e3e7f2">
+      <span style="width: 38px; height: 38px; border-radius: 999px; background: linear-gradient(135deg, #0b7a5c, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px">Ad</span>
+      <span style="flex: 1; display: flex; flex-direction: column"><strong style="font-size: 15px">Ada</strong><span style="font-size: 12px; color: #4b5578">AI assistant · Naijá</span></span>
+      <span style="height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid #c9cee6; font-size: 13px; font-weight: 600; display: flex; align-items: center">Naijá ▾</span>
+    </header>
+    <div style="padding: 14px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; gap: 8px; align-items: flex-start">
+        <span style="width: 28px; height: 28px; border-radius: 999px; background: linear-gradient(135deg, #0b7a5c, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 10px; flex: none">Ad</span>
+        <span style="padding: 10px 12px; border-radius: 16px 16px 16px 4px; background: #ffffff; border: 1px solid #e3e7f2; font-size: 14px; line-height: 1.45">How you dey! Na Ada be dis, BitoCard AI assistant. Wetin you dey find today?</span>
+      </div>
+      <div style="display: flex; justify-content: flex-end"><span style="max-width: 80%; padding: 10px 12px; border-radius: 16px 16px 4px 16px; background: #070f4c; color: #ffffff; font-size: 14px; line-height: 1.4">I wan buy generator wey no too cost for Abuja</span></div>
+      <div style="display: flex; gap: 8px; align-items: flex-start">
+        <span style="width: 28px; height: 28px; border-radius: 999px; background: linear-gradient(135deg, #0b7a5c, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 10px; flex: none">Ad</span>
+        <span style="padding: 10px 12px; border-radius: 16px 16px 16px 4px; background: #ffffff; border: 1px solid #e3e7f2; font-size: 14px; line-height: 1.45">I see 14 for Abuja. How much you wan spend, and which size: 2.5 kVA for small house, or 3.5 kVA and above?</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-left: 36px">
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="3"><button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">{{c}}</button></sc-for>
+      </div>
+    </div>
+    <p style="margin: auto 14px 18px; padding: 10px 12px; border-radius: 12px; background: #f3f6fd; font-size: 12px; color: #4b5578; line-height: 1.45">The Shop's pages stay in English. Only the assistant's chat changes language. Where a country has no assistant for a language, Anjio answers.</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const anjio = 'linear-gradient(135deg, #ff2382, #070f4c)';
+    const ada = 'linear-gradient(135deg, #0b7a5c, #070f4c)';
+    const l = (name, english, bot, avatar, initial, on) => ({ name, english, bot, avatar, initial, on, border: on ? '2px solid #070f4c' : '1px solid #e3e7f2', bg: on ? '#f3f6fd' : '#ffffff' });
+    return {
+      languages: [
+        l('English', 'English', 'Anjio', anjio, 'A'),
+        l('Naijá', 'Nigerian Pidgin', 'Ada', ada, 'Ad', true),
+        l('Yorùbá', 'Yoruba', 'Ada', ada, 'Ad'),
+        l('Hausa', 'Hausa', 'Ada', ada, 'Ad'),
+        l('Igbo', 'Igbo', 'Ada', ada, 'Ad'),
+      ],
+      chips: ['Under ₦300,000', '2.5 kVA', '3.5 kVA and above'],
+    };
+  }
+}
+</script>
+</body>
+</html>

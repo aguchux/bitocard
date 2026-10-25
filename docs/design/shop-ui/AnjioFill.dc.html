@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fill from photos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1560px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+  <header style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <a href="Post.dc.html" aria-label="Back" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+    </a>
+    <h1 style="margin: 0; flex: 1; font-size: 18px; font-weight: 800">Post an ad</h1>
+    <span style="font-size: 12px; color: #4b5578">Draft saved</span>
+  </header>
+
+  <section style="padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{photos}}" as="p" hint-placeholder-count="4"><span style="aspect-ratio: 1; border-radius: 12px; background: {{p}}"></span></sc-for>
+    </div>
+    <div style="padding: 14px; border-radius: 16px; background: linear-gradient(135deg, #fff0f7, #eef1fb); border: 1px solid #f6c9de; display: flex; gap: 12px; align-items: center">
+      <span style="width: 40px; height: 40px; flex: none; border-radius: 999px; background: linear-gradient(135deg, #ff2382, #070f4c); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800">A✦</span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">Anjio filled these from your 4 photos</strong><span style="font-size: 12px; color: #4b5578; line-height: 1.4">Nothing goes on your ad until you accept it. Check every value.</span></span>
+    </div>
+  </section>
+
+  <section style="padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <sc-for list="{{fields}}" as="f" hint-placeholder-count="4">
+      <div style="padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 12px; font-weight: 700; color: #4b5578">{{f.label}}</span>
+        <span style="font-size: 15px; font-weight: 600">{{f.value}}</span>
+        <sc-if value="{{f.why}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #4b5578">{{f.why}}</span></sc-if>
+        <span style="display: flex; gap: 8px"><button type="button" style="height: 34px; padding: 0 14px; border-radius: 10px; border: 0; background: #070f4c; color: #ffffff; font: 700 13px Inter, sans-serif">Accept</button><button type="button" style="height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">Edit</button></span>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="margin: 14px 16px 0; padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 12px; font-weight: 700; color: #4b5578">Features</span>
+    <sc-for list="{{features}}" as="k" hint-placeholder-count="5">
+      <label style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #f0f2f8">
+        <input type="checkbox" checked="{{k.on}}" style="width: 18px; height: 18px; margin: 0; accent-color: #070f4c">
+        <span style="width: 28px; height: 28px; border-radius: 8px; background: #f3f6fd; color: #1d2873; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800">{{k.glyph}}</span>
+        <span style="flex: 1; font-size: 13px">{{k.name}}</span>
+        <strong style="font-size: 13px; color: {{k.fg}}">{{k.value}}</strong>
+      </label>
+    </sc-for>
+  </section>
+
+  <section style="margin: 14px 16px 0; padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 12px; font-weight: 700; color: #4b5578">Description</span>
+    <div style="font-size: 13px; line-height: 1.5">iPhone 13 in Midnight, 128 GB, used and in good condition.<ul style="margin: 6px 0 0; padding-left: 18px"><li>Small scratch on the back, near the camera</li><li>Comes with the box and a cable</li></ul></div>
+    <span style="display: flex; gap: 8px"><button type="button" style="height: 34px; padding: 0 14px; border-radius: 10px; border: 0; background: #070f4c; color: #ffffff; font: 700 13px Inter, sans-serif">Accept</button><button type="button" style="height: 34px; padding: 0 14px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">Edit</button></span>
+  </section>
+
+  <section style="margin: 14px 16px 0; padding: 12px; border-radius: 14px; background: #f3f6fd; display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 12px; font-weight: 700; color: #4b5578">Suggest a price</span>
+    <span style="font-size: 15px; font-weight: 700">Similar phones sell for ₦330,000 to ₦390,000</span>
+    <span style="font-size: 12px; color: #4b5578">24 listings in Nigeria over 90 days. You choose the price.</span>
+  </section>
+
+  <div style="padding: 16px; display: flex; gap: 8px">
+    <button type="button" style="flex: 1; height: 50px; border-radius: 14px; border: 0; background: #c00b58; color: #ffffff; font: 700 15px Inter, sans-serif">Accept ticked</button>
+    <button type="button" style="height: 50px; padding: 0 16px; border-radius: 14px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 14px Inter, sans-serif">Dismiss</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const k = (glyph, name, value, on = true) => ({ glyph, name, value, on, fg: on ? '#070f4c' : '#7a4100' });
+    return {
+      photos: ['#e7e9f6', '#eef7f2', '#fff0f7', '#f3f6fd'],
+      fields: [
+        { label: 'Title', value: 'iPhone 13, 128 GB, Midnight', why: '' },
+        { label: 'Category', value: 'Phones & tablets › Mobile phones', why: '' },
+        { label: 'Condition', value: 'Used', why: 'A small scratch shows on the back in photo 3.' },
+      ],
+      features: [
+        k('BR', 'Brand', 'Apple'),
+        k('MD', 'Model', 'iPhone 13'),
+        k('ROM', 'Storage (ROM)', '128 GB'),
+        k('CL', 'Colour', 'Midnight'),
+        k('BH', 'Battery health', 'Can’t tell from photos: add it', false),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, shop assistants</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 1000px; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+    <div>
+      <span style="font-size: 13px; font-weight: 600; color: #4b5578">Support › Assistants</span>
+      <h1 style="margin: 4px 0 0; font-size: 24px; font-weight: 800">Assistants</h1>
+      <p style="margin: 4px 0 0; font-size: 13px; color: #4b5578">Anjio answers in every country's Shop. An assistant assigned to a country and language takes over from Anjio there.</p>
+    </div>
+    <a href="AdminAssistantEdit.dc.html" style="height: 42px; padding: 0 16px; border-radius: 12px; background: #070f4c; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; display: flex; align-items: center">+ New assistant</a>
+  </div>
+
+  <nav aria-label="Kind" style="display: flex; gap: 6px">
+    <sc-for list="{{kinds}}" as="k" hint-placeholder-count="3"><a href="#" style="height: 36px; padding: 0 14px; border-radius: 999px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; background: {{k.bg}}; color: {{k.fg}}; border: {{k.border}}">{{k.label}}</a></sc-for>
+  </nav>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px">
+    <sc-for list="{{bots}}" as="b" hint-placeholder-count="3">
+      <a href="{{b.href}}" style="padding: 16px; border-radius: 16px; background: #ffffff; border: {{b.border}}; text-decoration: none; color: #070f4c; display: flex; flex-direction: column; gap: 10px">
+        <span style="display: flex; align-items: center; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 999px; background: {{b.avatar}}; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex: none">{{b.initial}}</span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 16px">{{b.name}}</strong><span style="font-size: 12px; color: #4b5578">{{b.model}}</span></span>
+          <span style="padding: 3px 10px; border-radius: 999px; background: {{b.statusBg}}; color: {{b.statusFg}}; font-size: 12px; font-weight: 700">{{b.status}}</span>
+        </span>
+        <span style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{b.tags}}" as="t" hint-placeholder-count="3"><span style="padding: 3px 9px; border-radius: 999px; background: #f3f6fd; color: #1d2873; font-size: 12px; font-weight: 600">{{t}}</span></sc-for>
+        </span>
+        <span style="font-size: 13px; color: #1d2873">{{b.where}}</span>
+        <span style="display: flex; flex-direction: column; gap: 4px">
+          <span style="display: flex; justify-content: space-between; font-size: 12px; color: #4b5578"><span>Spent this month</span><span>{{b.spend}}</span></span>
+          <span style="height: 6px; border-radius: 999px; background: #eef1fb; overflow: hidden"><span style="display: block; height: 100%; width: {{b.pct}}; background: #070f4c"></span></span>
+        </span>
+      </a>
+    </sc-for>
+  </div>
+
+  <section style="border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; overflow-x: auto">
+    <div style="padding: 14px 16px; border-bottom: 1px solid #e3e7f2; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+      <span style="display: flex; flex-direction: column"><strong style="font-size: 16px">Coverage</strong><span style="font-size: 12px; color: #4b5578">Who answers each country and language, worked out as the Shop does: the country's assistant for that language, then for all languages, then Anjio.</span></span>
+    </div>
+    <table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px">
+      <thead><tr style="text-align: left; color: #4b5578; font-size: 12px"><th style="padding: 10px 16px; font-weight: 600">Country</th><th style="padding: 10px 16px; font-weight: 600">Language</th><th style="padding: 10px 16px; font-weight: 600">Answered by</th><th style="padding: 10px 16px; font-weight: 600">Knowledge</th><th style="padding: 10px 16px; font-weight: 600">Conversations (30 days)</th></tr></thead>
+      <tbody>
+        <sc-for list="{{coverage}}" as="c" hint-placeholder-count="7">
+          <tr style="border-top: 1px solid #e3e7f2">
+            <td style="padding: 10px 16px; font-weight: 600">{{c.country}}</td>
+            <td style="padding: 10px 16px">{{c.language}}</td>
+            <td style="padding: 10px 16px"><span style="display: flex; flex-direction: column"><strong>{{c.bot}}</strong><sc-if value="{{c.note}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; color: #7a4100">{{c.note}}</span></sc-if></span></td>
+            <td style="padding: 10px 16px; color: {{c.kFg}}">{{c.knowledge}}</td>
+            <td style="padding: 10px 16px; color: #4b5578">{{c.count}}</td>
+          </tr>
+        </sc-for>
+      </tbody>
+    </table>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    const status = s => s === 'Active' ? { statusBg: '#e8f6f1', statusFg: '#064c39' } : { statusBg: '#fff4e5', statusFg: '#7a4100' };
+    const c = (country, language, bot, knowledge, count, note) => ({ country, language, bot, knowledge, count, note, kFg: knowledge.startsWith('Out') ? '#7a4100' : '#064c39' });
+    return {
+      kinds: [chip('Support', false), chip('Shop', true), chip('SHQ', false)],
+      bots: [
+        { name: 'Anjio', initial: 'A✦', avatar: 'linear-gradient(135deg, #ff2382, #070f4c)', model: 'Anthropic · Claude', status: 'Active', ...status('Active'), tags: ['Default', 'English', 'Browse', 'Sell', 'Help'], where: 'Every country, unless another is assigned', spend: '$412 of $1,500', pct: '27%', border: '2px solid #070f4c', href: 'AdminAnjioReview.dc.html' },
+        { name: 'Ada', initial: 'Ad', avatar: 'linear-gradient(135deg, #0b7a5c, #070f4c)', model: 'Anthropic · Claude', status: 'Active', ...status('Active'), tags: ['Naijá', 'Yorùbá', 'Hausa', 'Igbo', 'Browse', 'Sell'], where: 'Nigeria · Naijá, Yorùbá, Hausa and Igbo', spend: '$96 of $500', pct: '19%', border: '1px solid #e3e7f2', href: 'AdminAssistantEdit.dc.html' },
+        { name: 'Kofi', initial: 'K', avatar: 'linear-gradient(135deg, #e0a100, #070f4c)', model: 'OpenAI', status: 'Draft', ...status('Draft'), tags: ['Twi', 'English', 'Browse', 'Help'], where: 'Ghana · Twi (not active yet: Anjio answers)', spend: '$0 of $300', pct: '0%', border: '1px solid #e3e7f2', href: 'AdminAssistantEdit.dc.html' },
+      ],
+      coverage: [
+        c('🇳🇬 Nigeria', 'English', 'Anjio (default)', 'Up to date · 25 Oct', '8,214'),
+        c('🇳🇬 Nigeria', 'Naijá', 'Ada', 'Up to date · 25 Oct', '3,102'),
+        c('🇳🇬 Nigeria', 'Yorùbá', 'Ada', 'Up to date · 25 Oct', '1,240'),
+        c('🇳🇬 Nigeria', 'Hausa', 'Ada', 'Up to date · 25 Oct', '980'),
+        c('🇳🇬 Nigeria', 'Igbo', 'Ada', 'Up to date · 25 Oct', '611'),
+        c('🇬🇭 Ghana', 'English', 'Anjio (default)', 'Out of date: Safe pay fee changed', '0'),
+        c('🇬🇭 Ghana', 'Twi', 'Anjio (default)', 'Out of date: Safe pay fee changed', '0', 'Kofi takes over once activated'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
