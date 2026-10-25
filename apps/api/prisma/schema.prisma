@@ -2529,6 +2529,7 @@ model Customer {
   manualTopUps              ManualTopUp[]
   exchangeQuotes            ExchangeQuote[]
   exchangeTrades            ExchangeTrade[]
+  classifiedListings        ClassifiedListing[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4159,6 +4160,7 @@ model ClassifiedFeature {
   createdAt    DateTime                    @default(now()) @map("created_at")
   updatedAt    DateTime                    @updatedAt @map("updated_at")
   categories   ClassifiedCategoryFeature[]
+  listings     ClassifiedListingFeature[]
 
   @@map("classified_features")
 }
@@ -4183,6 +4185,7 @@ model ClassifiedCategory {
   children        ClassifiedCategory[]        @relation("ClassifiedCategoryTree")
   features        ClassifiedCategoryFeature[]
   countries       ClassifiedCategoryCountry[]
+  listings        ClassifiedListing[]
 
   @@index([parentId, position])
   @@map("classified_categories")
@@ -4236,6 +4239,8 @@ model ClassifiedArea {
   enabled   Boolean          @default(true)
   parent    ClassifiedArea?  @relation("ClassifiedAreaTree", fields: [parentId], references: [id], onDelete: Restrict)
   children  ClassifiedArea[] @relation("ClassifiedAreaTree")
+  listings  ClassifiedListing[] @relation("ClassifiedListingArea")
+  inState   ClassifiedListing[] @relation("ClassifiedListingState")
 
   @@index([country, kind])
   @@index([parentId])
@@ -4264,4 +4269,129 @@ model ClassifiedSafePaySettings {
   updatedAt                DateTime @updatedAt @map("updated_at")
 
   @@map("classified_safe_pay_settings")
+}
+
+/// BitoCard Shop's rules per country: how long a listing lasts, how many a seller may post, and which go to review.
+model ClassifiedMarketSettings {
+  country               String   @id @db.Char(2)
+  /// Days a listing stays up before it expires (renewable).
+  listingDays           Int      @default(30) @map("listing_days")
+  /// Listings a seller may post in one top category in 30 days.
+  monthlyListingLimit   Int      @default(10) @map("monthly_listing_limit")
+  /// A new seller's first listings wait for a moderator.
+  firstListingsReviewed Int      @default(3) @map("first_listings_reviewed")
+  minPhotos             Int      @default(4) @map("min_photos")
+  maxPhotos             Int      @default(12) @map("max_photos")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("classified_market_settings")
+}
+
+/// A listing in BitoCard Shop: one seller (a bitocard.com customer), one country, priced in its currency.
+model ClassifiedListing {
+  id           String                     @id @default(uuid()) @db.Uuid
+  /// The short number in its public address (`/ng/l/<ref>-<slug>`).
+  ref          BigInt                     @unique @default(autoincrement())
+  customerId   String                     @map("customer_id") @db.Uuid
+  categoryId   String?                    @map("category_id") @db.Uuid
+  country      String                     @db.Char(2)
+  currency     String                     @db.Char(3)
+  stateId      String?                    @map("state_id") @db.Uuid
+  areaId       String?                    @map("area_id") @db.Uuid
+  title        String?
+  /// From the title, for the address.
+  slug         String?
+  /// Limited Markdown (bold, italic, lists, paragraphs), rendered escaped.
+  description  String?
+  /// fixed, negotiable or on_request (no price shown).
+  priceKind    String                     @default("fixed") @map("price_kind")
+  priceMinor   BigInt?                    @map("price_minor")
+  /// new, used, untested or parts.
+  condition    String?
+  /// none (its area and state only), state or nationwide.
+  delivery     String                     @default("none")
+  /// chat, phone or both.
+  contact      String                     @default("chat")
+  /// draft, pending_review, active, sold, expired, rejected, removed (by BitoCard) or deleted (by the seller).
+  status       String                     @default("draft")
+  /// Why it waits for review (first_listings, flagged…), or why it was rejected or removed.
+  reviewReason String?                    @map("review_reason")
+  submittedAt  DateTime?                  @map("submitted_at")
+  publishedAt  DateTime?                  @map("published_at")
+  expiresAt    DateTime?                  @map("expires_at")
+  soldAt       DateTime?                  @map("sold_at")
+  /// When it left the market for good (deleted, removed or rejected).
+  closedAt     DateTime?                  @map("closed_at")
+  views        Int                        @default(0)
+  leads        Int                        @default(0)
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+  customer     Customer                   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  category     ClassifiedCategory?        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  state        ClassifiedArea?            @relation("ClassifiedListingState", fields: [stateId], references: [id], onDelete: Restrict)
+  area         ClassifiedArea?            @relation("ClassifiedListingArea", fields: [areaId], references: [id], onDelete: Restrict)
+  features     ClassifiedListingFeature[]
+  media        ClassifiedMedia[]
+  priceHistory ClassifiedPriceHistory[]
+
+  @@index([customerId, status])
+  @@index([country, status, stateId, areaId])
+  @@index([categoryId, status])
+  @@index([status, expiresAt])
+  @@map("classified_listings")
+}
+
+/// A listing's feature values, one per key, checked against the registry; numbers in the key's unit.
+model ClassifiedListingFeature {
+  listingId   String            @map("listing_id") @db.Uuid
+  featureId   String            @map("feature_id") @db.Uuid
+  valueText   String?           @map("value_text")
+  valueNumber Float?            @map("value_number")
+  listing     ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  feature     ClassifiedFeature @relation(fields: [featureId], references: [id], onDelete: Restrict)
+
+  @@id([listingId, featureId])
+  @@index([featureId, valueNumber])
+  @@index([featureId, valueText])
+  @@map("classified_listing_features")
+}
+
+/// A listing's photos (the first is the cover) and its one video, uploaded through the API with their metadata removed.
+model ClassifiedMedia {
+  id          String            @id @default(uuid()) @db.Uuid
+  listingId   String            @map("listing_id") @db.Uuid
+  /// photo or video.
+  kind        String
+  position    Int               @default(0)
+  /// The public address once ready.
+  url         String?
+  /// Its object key in the media bucket (removed with the listing).
+  storageKey  String?           @map("storage_key")
+  width       Int?
+  height      Int?
+  /// SHA-256 of the photo as published, so the same photo used by another seller is noticed.
+  contentHash String?           @map("content_hash")
+  durationMs  Int?              @map("duration_ms")
+  posterUrl   String?           @map("poster_url")
+  /// processing, ready or failed.
+  status      String            @default("ready")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  listing     ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, kind, position])
+  @@index([contentHash])
+  @@map("classified_media")
+}
+
+/// Every price a listing has had and when, so "was" prices are real.
+model ClassifiedPriceHistory {
+  id         String            @id @default(uuid()) @db.Uuid
+  listingId  String            @map("listing_id") @db.Uuid
+  priceMinor BigInt            @map("price_minor")
+  from       DateTime          @default(now())
+  to         DateTime?
+  listing    ClassifiedListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, from])
+  @@map("classified_price_history")
 }

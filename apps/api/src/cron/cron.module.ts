@@ -14,6 +14,7 @@ import { DomainsModule } from '../domains/domains.module.js';
 import { StoresModule } from '../stores/stores.module.js';
 import { CronController } from './cron.controller.js';
 import { SupportModule } from '../support/support.module.js';
+import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 
-@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule], controllers: [CronController] })
+@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule], controllers: [CronController] })
 export class CronModule {}

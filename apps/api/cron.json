@@ -100,6 +100,10 @@
     {
       "job": "media-cleanup",
       "schedule": "55 3 * * *"
+    },
+    {
+      "job": "classifieds",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
