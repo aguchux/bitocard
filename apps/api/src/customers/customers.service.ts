@@ -107,7 +107,8 @@ export class CustomersService {
     return store;
   }
 
-  private async startSession(customerId: string) {
+  /** A new 30-day session (sign-in, sign-up, and the handoff from another of BitoCard's sites). */
+  async startSession(customerId: string) {
     const token = `bcc_${randomToken()}`;
     const expiresAt = new Date(Date.now() + customerSessionMs);
     await this.prisma.customerSession.create({ data: { customerId, tokenHash: sha256(token), expiresAt } });

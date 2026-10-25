@@ -18,7 +18,8 @@
     "./tokens": "./src/tokens.ts",
     "./phone": "./src/phone.ts",
     "./phone-input": "./src/phone-input.tsx",
-    "./chat": "./src/chat.ts"
+    "./chat": "./src/chat.ts",
+    "./handoff": "./src/handoff.ts"
   },
   "scripts": {
     "lint": "eslint .",

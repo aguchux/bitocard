@@ -26,6 +26,9 @@ export default function CookieNotice() {
             <strong>bc_customer</strong> (bitocard.com): keeps you signed in to your customer account on our store, so you can buy and see your orders. It is strictly necessary, is set only when you sign in or create an account, holds a random sign-in token that only our servers can read, and lasts up to 30 days or until you sign out.
           </li>
           <li>
+            <strong>bc_signed_in</strong> (bitocard.com, its country stores and BitoCard Shop): after you sign in on one of these sites, lets the others offer &ldquo;Continue as&rdquo; with your first name, so you can sign in there with one click instead of typing your password again. It holds only your first name and which of our sites you are signed in on. It is not a sign-in token: continuing always asks that site for a one-time code that works once, for one minute. It is shared across those sites, read only by our servers, set only when you sign in, lasts up to 30 days, and is removed when you sign out of the site it names. It is never set on resellers&apos; stores.
+          </li>
+          <li>
             <strong>bc_public_spin</strong> (bitocard.com and its country stores): keeps the free visitor spins you asked us to save before creating an account. It holds only a random claim token that our servers can read, not the prize values; those stay on our server. It works across BitoCard&apos;s country subdomains, lasts up to 30 days, and is removed after the claim is credited, dismissed, expires or is found ineligible.
           </li>
           <li>

@@ -1,12 +1,13 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { Equals, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Public } from '../auth/caller.js';
 import { passwordLength } from '../auth/passwords.service.js';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { CustomersService } from '../customers/customers.service.js';
+import { HandoffService } from '../customers/handoff.service.js';
 import { StoreKey } from '../customers/store-key.js';
 import { IdentityService } from '../identity/identity.service.js';
 import { PageDto } from '../ledger/wallet.controller.js';
@@ -197,6 +198,19 @@ class VerificationDto {
   consent: boolean;
 }
 
+class HandoffDto {
+  @IsString() @MaxLength(200)
+  to: string;
+}
+
+class HandoffExchangeDto {
+  @IsString() @MaxLength(200)
+  code: string;
+
+  @IsString() @MaxLength(200)
+  origin: string;
+}
+
 /**
  * Customer accounts on hosted stores: bitocard.com, or a reseller's store named in `BitoCard-Store` (an account exists
  * at one store only). Called by the store's server, never by browsers: it keeps the session token in its own cookie and
@@ -211,6 +225,7 @@ export class CustomerAccountController {
     private readonly customers: CustomersService,
     private readonly stores: StoreSellers,
     private readonly identity: IdentityService,
+    private readonly handoffs: HandoffService,
   ) {}
 
   /** Returns the session token, so it is never stored for replay. */
@@ -238,6 +253,26 @@ export class CustomerAccountController {
   @HttpCode(HttpStatus.OK)
   async reset(@StoreKey() store: string | null, @Body() body: ResetDto) {
     return this.customers.resetPassword(await this.stores.accountStore(store), body);
+  }
+
+  /**
+   * A one-time code (60 seconds) that signs this bitocard.com customer in on another of BitoCard's own sites: `to` is
+   * its origin (bitocard.com, a country store, shop.bitocard.com). Returns the code, so it is never stored for replay.
+   */
+  @UseGuards(CustomerGuard)
+  @SkipIdempotency()
+  @Post('handoff')
+  @HttpCode(HttpStatus.OK)
+  handoff(@CurrentCustomer() caller: CustomerCaller, @Body() body: HandoffDto) {
+    return this.handoffs.issue(caller.customer, body.to);
+  }
+
+  /** The other site's server exchanges the code, naming its own origin, for a session there. */
+  @SkipIdempotency()
+  @Post('handoff/exchange')
+  @HttpCode(HttpStatus.OK)
+  exchange(@Body() body: HandoffExchangeDto) {
+    return this.handoffs.exchange(body.code, body.origin);
   }
 
   @UseGuards(CustomerGuard)

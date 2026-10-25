@@ -122,6 +122,7 @@ export const configSchema = z.object({
   STOREFRONT_URL: z.string().url().default('https://bitocard.com'),
   /** BitoCard Verify, where people complete identity checks in Verify countries. */
   VERIFY_URL: z.string().url().default('https://verify.bitocard.com'),
+  SHOP_URL: z.string().url().default('https://shop.bitocard.com'),
 
   // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),

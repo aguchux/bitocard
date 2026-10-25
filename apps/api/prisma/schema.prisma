@@ -2545,6 +2545,7 @@ model Customer {
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
   classifiedFeatureSuggestions ClassifiedFeatureSuggestion[]
+  handoffs                  CustomerHandoff[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -2552,6 +2553,24 @@ model Customer {
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
+/// A one-time code that signs a bitocard.com customer in on another of BitoCard's own sites (a country store,
+/// shop.bitocard.com) without typing their password: 60 seconds, once, only for the site it was made for.
+model CustomerHandoff {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  /// SHA-256 of the code; the code itself is never kept.
+  codeHash   String    @unique @map("code_hash") @db.Char(64)
+  /// The site it signs in on (an origin: https://shop.bitocard.com).
+  toOrigin   String    @map("to_origin")
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("customer_handoffs")
+}
+
 model CustomerSession {
   id         String    @id @default(uuid()) @db.Uuid
   customerId String    @map("customer_id") @db.Uuid

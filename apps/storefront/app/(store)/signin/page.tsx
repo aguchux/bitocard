@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Store } from "lucide-react";
+import { ArrowRight, ChevronRight, Store } from "lucide-react";
+import { firstName, handoffStart } from "@bitocard/ui/handoff";
 import { appUrl } from "@bitocard/ui/site";
 import { SignInForm } from "@/components/store/account-forms";
-import { currentCustomer, safeNext } from "@/lib/customer";
+import { currentCustomer, safeNext, siteOrigin } from "@/lib/customer";
+import { signedInElsewhere } from "@/lib/handoff";
 import { onResellerStore } from "@/lib/store";
 
 export const metadata: Metadata = {
@@ -19,10 +21,33 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const next = safeNext((await searchParams).next);
   if (await currentCustomer()) redirect(next);
   const resellerStore = await onResellerStore();
+  const elsewhere = await signedInElsewhere();
+  const continueHref = elsewhere ? handoffStart(elsewhere.origin, await siteOrigin(), next) : null;
   return (
     <div className="mx-auto grid max-w-3xl gap-5 py-6 sm:py-12">
       <h1 className="font-display text-3xl font-extrabold tracking-tight text-navy-900 sm:text-4xl">Sign in</h1>
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
+        {resellerStore ? null : <p className="mb-5 text-slate-600">Use the same BitoCard account you buy gift cards and airtime with.</p>}
+        {elsewhere ? (
+          <>
+            {/* Signed in on another BitoCard site: one click, through a one-time code from that site. */}
+            <a href={continueHref!} className="flex items-center gap-3 rounded-2xl border-2 border-navy-900 p-3.5 text-navy-900 hover:bg-slate-50">
+              <span className="grid size-11 shrink-0 place-items-center rounded-full bg-navy-900 font-bold text-white" aria-hidden="true">
+                {firstName(elsewhere.name).slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <strong className="block">Continue as {elsewhere.name}</strong>
+                <span className="block text-sm text-slate-600">Signed in on {elsewhere.host}</span>
+              </span>
+              <ChevronRight className="size-5 shrink-0" aria-hidden="true" />
+            </a>
+            <p className="my-5 flex items-center gap-3 text-sm text-slate-500">
+              <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+              or sign in
+              <span className="h-px flex-1 bg-slate-200" aria-hidden="true" />
+            </p>
+          </>
+        ) : null}
         <SignInForm next={next} />
         <p className="mt-6 text-sm text-slate-600">
           New here?{" "}

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { StoreWalletOption } from "@bitocard/api-client/storefront";
 import { type Customer, customerApi, dropSession, keepSession, safeNext, siteOrigin } from "@/lib/customer";
+import { forgetSignedIn, rememberSignedIn } from "@/lib/handoff";
 
 /** What a form shows after its action: an error (with the field it is about), or a note. */
 export type FormState = {
@@ -30,6 +31,7 @@ export async function signUp(_state: FormState, form: FormData): Promise<FormSta
   });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
+  await rememberSignedIn(result.data.customer);
   redirect(`/account/verify?next=${encodeURIComponent(safeNext(form.get("next")))}`);
 }
 
@@ -37,6 +39,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
   const result = await customerApi<SessionReply>("POST", "/v1/store/account/signin", { email: text(form, "email"), password: String(form.get("password") ?? "") });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
+  await rememberSignedIn(result.data.customer);
   const next = safeNext(form.get("next"));
   redirect(result.data.customer.email_verified ? next : `/account/verify?next=${encodeURIComponent(next)}`);
 }
@@ -44,6 +47,7 @@ export async function signIn(_state: FormState, form: FormData): Promise<FormSta
 export async function signOut() {
   await customerApi("POST", "/v1/store/account/signout", {});
   await dropSession();
+  await forgetSignedIn();
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -74,6 +78,7 @@ export async function resetPassword(_state: FormState, form: FormData): Promise<
   });
   if (!result.ok) return failed(result);
   await keepSession(result.data.session);
+  await rememberSignedIn(result.data.customer);
   redirect("/account");
 }
 
