@@ -4129,3 +4129,139 @@ model InvoiceLine {
   @@index([invoiceId, createdAt])
   @@map("invoice_lines")
 }
+
+/// BitoCard Shop's feature registry: every key a listing can carry (Memory, Storage (ROM), Bedrooms…), with what its value field needs.
+model ClassifiedFeature {
+  id           String                      @id @default(uuid()) @db.Uuid
+  /// Stable key, lower case with underscores (`memory`).
+  key          String                      @unique
+  name         String
+  /// A lucide icon name (`memory-stick`), drawn by the apps.
+  icon         String
+  /// text, number, choice or boolean.
+  dataType     String                      @map("data_type")
+  /// Numbers only: GB, m², km…
+  unit         String?
+  /// Choice only: the values offered, in order.
+  choices      String[]                    @default([])
+  /// Prefilled value (booleans `true` or `false`); null for none.
+  defaultValue String?                     @map("default_value")
+  /// The hint inside the value field ("e.g. 8").
+  placeholder  String?
+  /// Numbers only: the smallest and largest value accepted.
+  min          Float?
+  max          Float?
+  /// Search words that find it (RAM finds Memory).
+  synonyms     String[]                    @default([])
+  /// Usable as a filter in categories that choose it as one.
+  filterable   Boolean                     @default(false)
+  enabled      Boolean                     @default(true)
+  createdAt    DateTime                    @default(now()) @map("created_at")
+  updatedAt    DateTime                    @updatedAt @map("updated_at")
+  categories   ClassifiedCategoryFeature[]
+
+  @@map("classified_features")
+}
+
+/// BitoCard Shop's categories: two levels (a top category and its subcategories), managed by admins.
+model ClassifiedCategory {
+  id              String                      @id @default(uuid()) @db.Uuid
+  parentId        String?                     @map("parent_id") @db.Uuid
+  slug            String                      @unique
+  name            String
+  /// A lucide icon name.
+  icon            String
+  position        Int                         @default(0)
+  /// Listings here are for businesses (wholesale).
+  b2b             Boolean                     @default(false)
+  enabled         Boolean                     @default(true)
+  /// What to inspect and test before paying (the Safe Trade Guide); subcategories without one use their parent's.
+  safetyChecklist String[]                    @default([]) @map("safety_checklist")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  updatedAt       DateTime                    @updatedAt @map("updated_at")
+  parent          ClassifiedCategory?         @relation("ClassifiedCategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children        ClassifiedCategory[]        @relation("ClassifiedCategoryTree")
+  features        ClassifiedCategoryFeature[]
+  countries       ClassifiedCategoryCountry[]
+
+  @@index([parentId, position])
+  @@map("classified_categories")
+}
+
+/// The feature keys a category suggests, in order, which are its filters, and its own default and placeholder.
+model ClassifiedCategoryFeature {
+  categoryId   String             @map("category_id") @db.Uuid
+  featureId    String             @map("feature_id") @db.Uuid
+  position     Int                @default(0)
+  /// A filter on this category's pages (the feature must be filterable).
+  filter       Boolean            @default(false)
+  /// Overrides the feature's default here; null keeps it.
+  defaultValue String?            @map("default_value")
+  /// Overrides the feature's placeholder here ("e.g. 42" for shoes); null keeps it.
+  placeholder  String?
+  category     ClassifiedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  feature      ClassifiedFeature  @relation(fields: [featureId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, featureId])
+  @@index([featureId])
+  @@map("classified_category_features")
+}
+
+/// Where a category is open (per country; a top category closed closes its subcategories).
+model ClassifiedCategoryCountry {
+  categoryId String             @map("category_id") @db.Uuid
+  country    String             @db.Char(2)
+  enabled    Boolean            @default(true)
+  category   ClassifiedCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, country])
+  @@index([country])
+  @@map("classified_category_countries")
+}
+
+/// Places listings are in: a country's states (`state`), then their cities or areas (`area`), each with a centre point from
+/// public map data (never anyone's position), so nearby areas can be ranked by distance.
+model ClassifiedArea {
+  id        String           @id @default(uuid()) @db.Uuid
+  country   String           @db.Char(2)
+  /// The state, for an area; null for a state.
+  parentId  String?          @map("parent_id") @db.Uuid
+  /// state or area.
+  kind      String
+  slug      String
+  name      String
+  latitude  Decimal          @db.Decimal(9, 6)
+  longitude Decimal          @db.Decimal(9, 6)
+  position  Int              @default(0)
+  enabled   Boolean          @default(true)
+  parent    ClassifiedArea?  @relation("ClassifiedAreaTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  ClassifiedArea[] @relation("ClassifiedAreaTree")
+
+  @@index([country, kind])
+  @@index([parentId])
+  @@map("classified_areas")
+}
+
+/// Safe pay's settings per country. Each side's fee is min(price x rate, cap); Safe pay opens in a country only once both
+/// rates and both caps are set. Orders keep the rates and caps they were requested under.
+model ClassifiedSafePaySettings {
+  country                  String   @id @db.Char(2)
+  /// The buyer's fee, in basis points of the price, on top (null: not set).
+  buyerFeeBps              Int?     @map("buyer_fee_bps")
+  /// The most the buyer's fee can be, in the country's minor units (null: not set).
+  buyerFeeCapMinor         BigInt?  @map("buyer_fee_cap_minor")
+  /// The seller's fee, in basis points of what is released to them (null: not set).
+  sellerFeeBps             Int?     @map("seller_fee_bps")
+  sellerFeeCapMinor        BigInt?  @map("seller_fee_cap_minor")
+  /// The largest order during a seller's first five Safe pay sales (null: no limit).
+  newSellerOrderLimitMinor BigInt?  @map("new_seller_order_limit_minor")
+  /// Hours the seller has to accept a request, and the buyer to pay once accepted.
+  acceptHours              Int      @default(24) @map("accept_hours")
+  payHours                 Int      @default(24) @map("pay_hours")
+  /// Days the seller has to hand over once paid, and the buyer to confirm a delivery.
+  handoverDays             Int      @default(5) @map("handover_days")
+  confirmDays              Int      @default(3) @map("confirm_days")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("classified_safe_pay_settings")
+}

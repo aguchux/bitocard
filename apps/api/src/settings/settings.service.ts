@@ -111,6 +111,18 @@ export const switchDefinitions = {
     description:
       'bitocard.com serves this market through its own country store (`<country>.bitocard.com`, for example ng.bitocard.com), with that market’s house account as seller of record for every purchase there, instead of the buyer’s own country. Root bitocard.com redirects into it once set up. Off: root bitocard.com serves the market as today.',
   },
+  classifieds: {
+    scopes: ['global', 'country'],
+    description: 'BitoCard Shop (classifieds) in this market: browsing at shop.bitocard.com/<country>, posting and chatting, and the Shop tab on its country store. Off until the marketplace terms are cleared there.',
+  },
+  classifieds_safe_pay: {
+    scopes: ['global', 'country'],
+    description: "Safe pay in BitoCard Shop: buyers pay from their wallet, BitoCard holds the money until they confirm, then pays the seller. Needs classifieds on and the market's Safe pay fees set. Off until holding buyers' money is cleared there.",
+  },
+  classifieds_assistant: {
+    scopes: ['global', 'country'],
+    description: "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
+  },
 } as const;
 
 export type OptionKey = keyof typeof optionDefinitions;
