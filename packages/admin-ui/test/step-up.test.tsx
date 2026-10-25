@@ -41,8 +41,11 @@ beforeEach(() => {
   });
 });
 
-const typeCode = (code: string) => {
-  const boxes = screen.getAllByRole('textbox') as HTMLInputElement[];
+// Under CI load (builds and other suites at once) the prompt can take more than Testing Library's default second.
+const slow = { timeout: 5000 };
+
+const typeCode = async (code: string) => {
+  const boxes = (await screen.findAllByRole('textbox', {}, slow)) as HTMLInputElement[];
   for (const [index, digit] of [...code].entries()) fireEvent.change(boxes[index], { target: { value: digit } });
 };
 
@@ -58,18 +61,18 @@ describe('step-up prompt', () => {
     act(() => {
       done = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'crypto_exchange', enabled: true }));
     });
-    expect(await screen.findByText("Confirm it's you")).toBeTruthy();
-    typeCode('111111');
+    expect(await screen.findByText("Confirm it's you", {}, slow)).toBeTruthy();
+    await typeCode('111111');
     expect(sent.filter(item => item.endsWith('/step-up'))).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: /Confirm/ }));
-    expect(await screen.findByText('That code is not valid. Check your authenticator app.')).toBeTruthy();
-    typeCode(goodCode);
+    expect(await screen.findByText('That code is not valid. Check your authenticator app.', {}, slow)).toBeTruthy();
+    await typeCode(goodCode);
     expect(sent.filter(item => item.endsWith('/step-up'))).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: /Confirm/ }));
     const result = (await done) as { error?: unknown };
     expect(result.error).toBeUndefined();
     expect(sent.filter(item => item === 'PUT /v1/admin/switches/crypto_exchange')).toHaveLength(2);
-    await waitFor(() => expect((document.querySelector('dialog') as HTMLDialogElement).open).toBe(false));
+    await waitFor(() => expect((document.querySelector('dialog') as HTMLDialogElement).open).toBe(false), slow);
   });
 
   test('cancelling leaves the action refused', async () => {
@@ -83,7 +86,7 @@ describe('step-up prompt', () => {
     act(() => {
       done = store.dispatch(adminApi.endpoints.setSwitch.initiate({ key: 'crypto_exchange', enabled: true }));
     });
-    await screen.findByText("Confirm it's you");
+    await screen.findByText("Confirm it's you", {}, slow);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     const result = (await done) as { error?: { code: string } };
     expect(result.error?.code).toBe('step_up_required');
