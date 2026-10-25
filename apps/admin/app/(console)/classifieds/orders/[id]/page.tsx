@@ -2,16 +2,16 @@
 
 import { useParams } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
-import { ActionDialog, amountToMinor, Badge, Button, Card, CardHeader, cn, errorMessage, Field, formatDateTime, formatMoney, Input, KeyValue, Notice, PageHeader, QueryView, Select, Skeleton, Textarea } from "@bitocard/admin-ui";
+import { ActionDialog, amountToMinor, Badge, Button, Card, CardHeader, cn, errorMessage, Field, formatDateTime, formatMoney, Input, KeyValue, Notice, PageHeader, QueryView, Skeleton, Textarea } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type AdminClassifiedOrderDetail, type ClassifiedDisputeDecision, useClassifiedOrderQuery, useDecideClassifiedDisputeMutation, useDecideClassifiedPayoutReviewMutation, useWriteClassifiedDisputeMutation } from "@bitocard/api-client/admin";
+import { type AdminClassifiedOrderDetail, type ClassifiedDisputeDecision, disputeOutcome, useClassifiedOrderQuery, useDecideClassifiedDisputeMutation, useDecideClassifiedPayoutReviewMutation, useWriteClassifiedDisputeMutation } from "@bitocard/api-client/admin";
 import { disputeReasonLabels, ListingCell, OrderStatus, PersonCell, PrivatePhoto, payoutReviewLabels, payoutReviewTones } from "@/components/classifieds";
 
-const decisionLabels: Record<ClassifiedDisputeDecision, string> = {
-  release: "Release to the seller (both fees kept)",
-  refund: "Refund the buyer in full (price and their fee)",
-  partial: "Part refund (the rest to the seller, less their fee on it)",
-};
+const decisions: Array<{ value: ClassifiedDisputeDecision; title: string; detail: string }> = [
+  { value: "refund", title: "Full refund", detail: "Price and buyer fee back to the buyer's wallet. No seller fee." },
+  { value: "partial", title: "Part refund", detail: "Part of the price back; the rest to the seller less their fee on it. Buyer fee kept." },
+  { value: "release", title: "Release to the seller", detail: "Seller paid less their fee. Both fees kept." },
+];
 
 const authorLabels = { buyer: "Buyer", seller: "Seller", bitocard: "BitoCard" } as const;
 
@@ -34,7 +34,6 @@ export default function ClassifiedOrderPage() {
 
 function Order({ order }: { order: AdminClassifiedOrderDetail }) {
   const admin = useAdmin();
-  const [deciding, setDeciding] = useState(false);
   const [reviewing, setReviewing] = useState<"approve" | "reject" | null>(null);
   const [reviewPayout] = useDecideClassifiedPayoutReviewMutation();
   const money = (minor: number) => formatMoney(minor, order.currency);
@@ -49,7 +48,6 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
         description={`${order.country} · ${order.fulfilment === "meet_up" ? "Meet-up" : "Delivery"}${order.mode === "test" ? " · test" : ""}`}
         actions={
           <span className="flex flex-wrap gap-2">
-            {order.dispute?.status === "open" && decides ? <Button onClick={() => setDeciding(true)}>Decide the dispute</Button> : null}
             {reviewable && finance ? (
               <>
                 <Button onClick={() => setReviewing("approve")}>Approve the payout</Button>
@@ -120,6 +118,7 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
           </Card>
         </div>
         <div className="space-y-6">
+          {order.dispute?.status === "open" && decides ? <Decision order={order} finance={finance} /> : null}
           <Card>
             <CardHeader title="The ad" />
             <div className="px-5 pb-5 sm:px-6">
@@ -153,7 +152,6 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
           </Card>
         </div>
       </div>
-      {deciding && order.dispute ? <DecideDialog order={order} finance={finance} onClose={() => setDeciding(false)} /> : null}
       {reviewing ? (
         <ActionDialog
           open
@@ -239,41 +237,85 @@ function Dispute({ order }: { order: AdminClassifiedOrderDetail }) {
   );
 }
 
-function DecideDialog({ order, finance, onClose }: { order: AdminClassifiedOrderDetail; finance: boolean; onClose: () => void }) {
+/**
+ * The decision beside the dispute, as the canvas draws it: the three outcomes, the refund for a part refund, where the
+ * money goes (worked out as the API settles it) and the reason both sides are told. Deciding asks once more, then the
+ * money moves; refunds need finance, and the step-up code is asked for when the window is closed.
+ */
+function Decision({ order, finance }: { order: AdminClassifiedOrderDetail; finance: boolean }) {
   const id = useId();
-  const [decision, setDecision] = useState<ClassifiedDisputeDecision>("release");
+  const [decision, setDecision] = useState<ClassifiedDisputeDecision>(finance ? "partial" : "release");
   const [refund, setRefund] = useState("");
+  const [note, setNote] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [decide] = useDecideClassifiedDisputeMutation();
+  const money = (minor: number) => formatMoney(minor, order.currency);
   const refundMinor = amountToMinor(refund);
-  const options = (["release", "refund", "partial"] as const).filter(value => value === "release" || finance);
+  const refundProblem = decision === "partial" && (refundMinor === null || refundMinor <= 0 || refundMinor >= order.price) ? `More than nothing and less than ${money(order.price)}.` : null;
+  const outcome = disputeOutcome(order, decision, refundMinor ?? 0);
+  const ready = !refundProblem && note.trim().length >= 5;
 
   return (
-    <ActionDialog
-      open
-      onClose={onClose}
-      title={`Decide the dispute on ${order.number}`}
-      description={`The price is ${formatMoney(order.price, order.currency)}. The money moves at once and both sides are told your note. ${finance ? "" : "Refunds are decided by finance."}`}
-      confirmLabel="Decide"
-      tone={decision === "release" ? "primary" : "danger"}
-      onConfirm={note => {
-        if (decision === "partial" && (refundMinor === null || refundMinor <= 0 || refundMinor >= order.price)) return Promise.reject(new Error(`A part refund is more than nothing and less than ${formatMoney(order.price, order.currency)}.`));
-        return decide({ id: order.id, decision, note, ...(decision === "partial" && refundMinor !== null ? { refund: refundMinor } : {}) }).unwrap();
-      }}
-    >
-      <Field label="Decision" htmlFor={`${id}-decision`}>
-        <Select id={`${id}-decision`} value={decision} onChange={event => setDecision(event.target.value as ClassifiedDisputeDecision)}>
-          {options.map(value => (
-            <option key={value} value={value}>
-              {decisionLabels[value]}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      {decision === "partial" ? (
-        <Field label={`Refund to the buyer (${order.currency})`} htmlFor={`${id}-refund`} hint="Less than the price. The buyer's fee is not refunded on a part refund.">
-          <Input id={`${id}-refund`} inputMode="decimal" value={refund} onChange={event => setRefund(event.target.value)} placeholder="e.g. 25000" />
+    <Card>
+      <CardHeader title="Decision" description={finance ? "Refunds need finance and your authenticator code." : "Refunds are decided by finance; you can release."} />
+      <div className="space-y-4 px-5 pb-5 sm:px-6">
+        <fieldset className="space-y-2">
+          <legend className="sr-only">Decision</legend>
+          {decisions.map(option => {
+            const allowed = option.value === "release" || finance;
+            return (
+              <label key={option.value} className={cn("flex gap-3 rounded-xl border p-3", decision === option.value ? "border-2 border-ink" : "border-line", !allowed && "opacity-50")}>
+                <input type="radio" name={`${id}-decision`} value={option.value} checked={decision === option.value} disabled={!allowed} onChange={() => setDecision(option.value)} className="mt-1 size-4 accent-ink" />
+                <span>
+                  <span className="block text-sm font-semibold text-ink">{option.title}</span>
+                  <span className="block text-xs text-muted">{option.detail}</span>
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+        {decision === "partial" ? (
+          <Field label={`Refund to the buyer (${order.currency})`} htmlFor={`${id}-refund`} error={refund.trim() && refundProblem ? refundProblem : undefined}>
+            <Input id={`${id}-refund`} inputMode="decimal" value={refund} onChange={event => setRefund(event.target.value)} placeholder="e.g. 120000" />
+          </Field>
+        ) : null}
+        <dl className="space-y-1 rounded-xl bg-canvas p-3 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt>Buyer gets back</dt>
+            <dd className="font-semibold text-ink">{money(outcome.buyer_gets)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt>Seller is paid</dt>
+            <dd className="font-semibold text-ink">{money(outcome.seller_gets)}</dd>
+          </div>
+          <div className="flex justify-between gap-3 text-muted">
+            <dt>Seller fee{decision === "partial" && refundMinor !== null ? ` on ${money(order.price - refundMinor)}` : ""}</dt>
+            <dd>{money(outcome.seller_fee)}</dd>
+          </div>
+          <div className="flex justify-between gap-3 text-muted">
+            <dt>Buyer fee (kept)</dt>
+            <dd>{money(outcome.buyer_fee_kept)}</dd>
+          </div>
+        </dl>
+        <Field label="Reason, shown to both" htmlFor={`${id}-note`} hint="At least 5 characters. Recorded in the activity log.">
+          <Textarea id={`${id}-note`} rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} />
         </Field>
+        <Button className="w-full" disabled={!ready} onClick={() => setConfirming(true)}>
+          Decide
+        </Button>
+      </div>
+      {confirming ? (
+        <ActionDialog
+          open
+          requireReason={false}
+          onClose={() => setConfirming(false)}
+          title={`${decisions.find(option => option.value === decision)?.title} on ${order.number}?`}
+          description={`The buyer gets back ${money(outcome.buyer_gets)} and the seller is paid ${money(outcome.seller_gets)}, at once. Both sides are told your reason.`}
+          confirmLabel="Decide"
+          tone={decision === "release" ? "primary" : "danger"}
+          onConfirm={() => decide({ id: order.id, decision, note: note.trim(), ...(decision === "partial" && refundMinor !== null ? { refund: refundMinor } : {}) }).unwrap()}
+        />
       ) : null}
-    </ActionDialog>
+    </Card>
   );
 }

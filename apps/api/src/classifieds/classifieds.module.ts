@@ -16,12 +16,13 @@ import { ListingMediaService } from './media.service.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ListingSearchService } from './search.service.js';
 import { FavouritesService } from './favourites.service.js';
+import { AdminRegistryController, ClassifiedRegistryService, ClassifiedSuggestionsController } from './registry.service.js';
 
 /** BitoCard Shop (classifieds): docs/BITOCARD_CLASSIFIEDS_PLAN.md. */
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
-  controllers: [ClassifiedReferenceController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, AdminClassifiedsController, AdminSafePayController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService],
+  controllers: [ClassifiedReferenceController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService],
   exports: [ListingsService, ListingMediaService, ConversationsService, SafePayService],
 })
 export class ClassifiedsModule {}

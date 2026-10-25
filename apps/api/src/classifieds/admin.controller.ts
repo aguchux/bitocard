@@ -79,6 +79,17 @@ class WordDto {
   country?: string | null;
 }
 
+export const queueViews = ['all', 'new_sellers', 'flagged', 'reported'] as const;
+type QueueView = (typeof queueViews)[number];
+
+class QueueDto {
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
+  country?: string;
+
+  @IsOptional() @IsIn(queueViews)
+  view?: QueueView;
+}
+
 class CountryQueryDto {
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
   country?: string;
@@ -176,11 +187,41 @@ export class ClassifiedsAdminService {
     return new Map(rows.map(row => [row.customerId, row._count._all]));
   }
 
-  /** Listings waiting for review, oldest submission first. */
-  async queue(country?: string) {
-    const rows = await this.prisma.classifiedListing.findMany({ where: { status: 'pending_review', ...(country ? { country } : {}) }, include: adminInclude, orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }], take: 100 });
+  /**
+   * Listings waiting for review, oldest submission first: all of them, a new seller's first ads, those the automatic
+   * checks flagged, or those customers reported. `stats` counts the whole queue and today's decisions (UTC).
+   */
+  async queue(country?: string, view: QueueView = 'all') {
+    const inMarket = country ? { country } : {};
+    const flagged: Prisma.ClassifiedListingWhereInput = {
+      all: {},
+      new_sellers: { reviewFlags: { has: 'first_listings' } },
+      flagged: { reviewFlags: { hasSome: ['prohibited_words', 'price_low', 'photo_reused', 'posting_fast'] } },
+      reported: { reviewFlags: { has: 'reported' } },
+    }[view];
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const [rows, waiting, oldest, decided] = await Promise.all([
+      this.prisma.classifiedListing.findMany({ where: { status: 'pending_review', ...inMarket, ...flagged }, include: adminInclude, orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }], take: 100 }),
+      this.prisma.classifiedListing.count({ where: { status: 'pending_review', ...inMarket } }),
+      this.prisma.classifiedListing.findFirst({ where: { status: 'pending_review', ...inMarket }, orderBy: { submittedAt: 'asc' }, select: { submittedAt: true } }),
+      this.prisma.auditLog.findMany({ where: { action: { in: ['classifieds.listing_approved', 'classifieds.listing_rejected', 'classifieds.listing_removed'] }, createdAt: { gte: today } }, select: { action: true, targetId: true } }),
+    ]);
+    // Decisions in the market asked for: the audit log names the listing, not its country.
+    const markets = country ? new Set((await this.prisma.classifiedListing.findMany({ where: { id: { in: [...new Set(decided.map(row => row.targetId))] }, country }, select: { id: true } })).map(row => row.id)) : null;
+    const count = (action: string) => decided.filter(row => row.action === action && (!markets || markets.has(row.targetId))).length;
     const counts = await this.sellerCounts(rows.map(row => row.customerId));
-    return { object: 'list' as const, data: rows.map(row => this.present(row, counts)) };
+    return {
+      object: 'list' as const,
+      data: rows.map(row => this.present(row, counts)),
+      stats: {
+        waiting,
+        oldest_submitted_at: oldest?.submittedAt?.toISOString() ?? null,
+        approved_today: count('classifieds.listing_approved'),
+        sent_back_today: count('classifieds.listing_rejected'),
+        removed_today: count('classifieds.listing_removed'),
+      },
+    };
   }
 
   async list(filter: AdminListingsDto) {
@@ -398,8 +439,8 @@ export class AdminClassifiedsController {
   }
 
   @Get('queue')
-  queue(@Query() query: CountryQueryDto) {
-    return this.admin.queue(query.country);
+  queue(@Query() query: QueueDto) {
+    return this.admin.queue(query.country, query.view);
   }
 
   @Get('listings')

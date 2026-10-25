@@ -803,7 +803,13 @@ export class SafePayService {
       status: order.status,
       listing: { id: order.listing.id, ref: Number(order.listing.ref), title: order.listing.title, slug: order.listing.slug, cover_url: order.listing.media[0]?.url ?? null },
       ...(viewer === 'admin'
-        ? { buyer: { id: order.buyer.id, name: order.buyer.name, email: order.buyer.email }, seller: { id: order.seller.id, name: order.seller.name, email: order.seller.email }, mode: order.mode, country: order.country }
+        ? {
+            buyer: { id: order.buyer.id, name: order.buyer.name, email: order.buyer.email },
+            seller: { id: order.seller.id, name: order.seller.name, email: order.seller.email },
+            mode: order.mode,
+            country: order.country,
+            rates: { buyer_fee_bps: order.buyerFeeBps, buyer_fee_cap: Number(order.buyerFeeCapMinor), seller_fee_bps: order.sellerFeeBps, seller_fee_cap: Number(order.sellerFeeCapMinor) },
+          }
         : { with: { name: publicName(them.name) } }),
       fulfilment: order.fulfilment,
       currency: order.currency,

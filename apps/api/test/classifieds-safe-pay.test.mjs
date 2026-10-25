@@ -275,6 +275,8 @@ describe('Safe pay', () => {
     const thread = await buyer.get(`/v1/classifieds/orders/${order.id}/dispute`);
     assert.deepEqual(thread.json.messages.map(message => message.from), ['me', 'them']);
     await admin.post(`/v1/admin/classifieds/orders/${order.id}/dispute/messages`, { body: 'Please both send photos.' });
+    const seen = (await admin.get(`/v1/admin/classifieds/orders/${order.id}`)).json;
+    assert.deepEqual(seen.rates, { buyer_fee_bps: 150, buyer_fee_cap: 100000, seller_fee_bps: 200, seller_fee_cap: 500000 }, 'admins see the rates fixed on the order');
 
     const operations = await adminClient(server, ['operations']);
     assert.equal((await operations.post(`/v1/admin/classifieds/orders/${order.id}/dispute/decide`, { decision: 'refund', note: 'Cracked' })).json.error.code, 'finance_required');

@@ -1,10 +1,13 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { amountToMinor, Badge, bpsToPercent, Button, Card, CardHeader, errorMessage, Field, Input, Notice, PageHeader, percentToBps, QueryView, Skeleton } from "@bitocard/admin-ui";
+import { amountToMinor, Badge, bpsToPercent, Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, PageHeader, percentToBps, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type ClassifiedSafePaySettings, type ClassifiedSafePaySettingsInput, useClassifiedSafePaySettingsQuery, useCountriesQuery, useUpdateClassifiedSafePaySettingsMutation } from "@bitocard/api-client/admin";
+import { type ClassifiedSafePaySettings, type ClassifiedSafePaySettingsInput, safePayFee, useClassifiedSafePaySettingsQuery, useCountriesQuery, useUpdateClassifiedSafePaySettingsMutation } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
+
+/** Example prices, in whole units of the market's currency. */
+const examplePrices = [50_000, 520_000, 1_200_000, 8_900_000];
 
 const whole = (value: string) => (/^\d+$/.test(value.trim()) ? Number(value) : null);
 const major = (minor: number | null) => (minor === null ? "" : String(minor / 100));
@@ -40,6 +43,58 @@ export default function ClassifiedSafePayPage() {
         </QueryView>
       </div>
     </AdminShell>
+  );
+}
+
+/** What people would pay at a few prices with the rates being typed, so a change is seen before it is saved. */
+function FeeExamples({ currency, buyerBps, buyerCap, sellerBps, sellerCap }: { currency: string; buyerBps: number | null; buyerCap: number | null; sellerBps: number | null; sellerCap: number | null }) {
+  const ready = buyerBps !== null && buyerCap !== null && sellerBps !== null && sellerCap !== null;
+  const money = (minor: number) => formatMoney(minor, currency);
+  return (
+    <Card>
+      <CardHeader title="What people would pay" description="With the fees as typed above." />
+      <div className="space-y-3 px-5 pb-5 sm:px-6">
+        {ready ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted">
+                  <th scope="col" className="py-2 pr-2 font-semibold">Price</th>
+                  <th scope="col" className="py-2 pr-2 font-semibold">Buyer fee</th>
+                  <th scope="col" className="py-2 pr-2 font-semibold">Seller fee</th>
+                  <th scope="col" className="py-2 font-semibold">BitoCard</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {examplePrices.map(major => {
+                  const price = major * 100;
+                  const buyer = safePayFee(price, buyerBps, buyerCap);
+                  const seller = safePayFee(price, sellerBps, sellerCap);
+                  return (
+                    <tr key={major}>
+                      <td className="py-2 pr-2 font-semibold text-ink">{money(price)}</td>
+                      <td className="py-2 pr-2">
+                        {money(buyer)}
+                        {buyer === buyerCap && buyerBps > 0 ? <span className="text-xs text-muted"> cap</span> : null}
+                      </td>
+                      <td className="py-2 pr-2">
+                        {money(seller)}
+                        {seller === sellerCap && sellerBps > 0 ? <span className="text-xs text-muted"> cap</span> : null}
+                      </td>
+                      <td className="py-2 font-semibold text-ink">{money(buyer + seller)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-muted">Enter both fees and their caps to see examples.</p>
+        )}
+        <p className="text-xs text-muted">&ldquo;cap&rdquo; marks a fee held at its cap.</p>
+        <Notice tone="amber">Keep Safe pay to the sandbox in a market until the legal advice on holding buyers&apos; money there is done.</Notice>
+      </div>
+    </Card>
   );
 }
 
@@ -120,6 +175,8 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
       <div className="flex flex-wrap items-center gap-2">
         {saved.ready ? <Badge tone="green">Fees set: Safe pay can open here</Badge> : <Badge tone="amber">Fees not set: Safe pay stays closed</Badge>}
       </div>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="space-y-6">
       <Card>
         <CardHeader title="Fees" description="Each side's fee is its rate of the price, or its cap when that is lower. Leave a fee blank to keep Safe pay closed." />
         <div className="grid gap-4 px-5 pb-5 sm:grid-cols-2 sm:px-6">
@@ -140,6 +197,9 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
           {input("confirm_days", "Days for the buyer to confirm a delivery", "After it is sent; then the money is released.")}
         </div>
       </Card>
+      </div>
+      <FeeExamples currency={currency} buyerBps={percentToBps(form.buyer_fee)} buyerCap={amountToMinor(form.buyer_cap)} sellerBps={percentToBps(form.seller_fee)} sellerCap={amountToMinor(form.seller_cap)} />
+      </div>
       {problems.length ? (
         <Notice tone="red">
           <ul className="list-disc pl-4">

@@ -262,3 +262,108 @@ describe('moderators', () => {
     assert.equal((await support.get('/v1/admin/classifieds/categories?country=ZZ')).status, 404);
   });
 });
+
+describe('reference data and the queue', () => {
+  test('the queue filters by why ads are there and counts today\'s decisions', async () => {
+    await prisma.classifiedMarketSettings.update({ where: { country: 'NG' }, data: { firstListingsReviewed: 1 } });
+    try {
+      const fresh = await customer();
+      const first = (await submit(fresh, await draft(fresh, { title: 'Rechargeable fan, new', category: 'home-appliances' }))).json;
+      const doubtful = (await submit(fresh, await draft(fresh, { title: 'Replica handbag, looks real', category: 'clothing' }))).json;
+      assert.equal(first.status, 'pending_review');
+
+      const all = (await support.get('/v1/admin/classifieds/queue?country=NG')).json;
+      assert.ok(all.stats.waiting >= 2);
+      assert.ok(all.stats.oldest_submitted_at);
+      const newSellers = (await support.get('/v1/admin/classifieds/queue?country=NG&view=new_sellers')).json.data;
+      assert.ok(newSellers.some(item => item.id === first.id) && newSellers.every(item => item.review_flags.includes('first_listings')));
+      const flagged = (await support.get('/v1/admin/classifieds/queue?view=flagged')).json.data;
+      assert.ok(flagged.some(item => item.id === doubtful.id) && !flagged.some(item => item.id === first.id));
+      assert.equal((await support.get('/v1/admin/classifieds/queue?view=nonsense')).status, 400);
+
+      const before = all.stats.approved_today;
+      await admin.post(`/v1/admin/classifieds/listings/${first.id}/approve`, {});
+      await admin.post(`/v1/admin/classifieds/listings/${doubtful.id}/reject`, { reason: 'Replicas cannot be sold.' });
+      const after = (await support.get('/v1/admin/classifieds/queue?country=NG')).json.stats;
+      assert.equal(after.approved_today, before + 1);
+      assert.ok(after.sent_back_today >= 1);
+      assert.equal((await support.get('/v1/admin/classifieds/queue?country=GH')).json.stats.approved_today, 0, 'decisions count in their own market');
+    } finally {
+      await prisma.classifiedMarketSettings.update({ where: { country: 'NG' }, data: { firstListingsReviewed: 0 } });
+    }
+  });
+
+  test('the feature registry: operations add and change keys, checked against their data type, audited', async () => {
+    assert.equal((await support.post('/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Refresh rate', icon: 'monitor', data_type: 'number' })).status, 403);
+    const created = await admin.post('/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Refresh rate', icon: 'monitor', data_type: 'number', unit: 'Hz', min: 30, max: 500, placeholder: 'e.g. 120', synonyms: ['Hz', 'refresh'], filterable: true });
+    assert.equal(created.status, 201, JSON.stringify(created.json));
+    assert.deepEqual([created.json.key, created.json.unit, created.json.synonyms, created.json.enabled], ['refresh_rate', 'Hz', ['hz', 'refresh'], true]);
+    assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Again', icon: 'monitor', data_type: 'text' })).json.error.code, 'feature_exists');
+    assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'screen_finish', name: 'Screen finish', icon: 'monitor', data_type: 'choice' })).json.error.param, 'choices');
+    assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'warranty', name: 'Warranty', icon: 'shield', data_type: 'text', unit: 'months' })).json.error.param, 'unit');
+    assert.equal((await admin.post('/v1/admin/classifieds/features', { key: 'ports', name: 'Ports', icon: 'plug', data_type: 'number', default_value: 'many' })).json.error.code, 'feature_value_invalid');
+
+    const changed = await admin.patch('/v1/admin/classifieds/features/refresh_rate', { max: 360, default_value: '60' });
+    assert.deepEqual([changed.status, changed.json.max, changed.json.default_value], [200, 360, '60']);
+    assert.equal((await admin.patch('/v1/admin/classifieds/features/refresh_rate', { min: 400 })).json.error.param, 'max');
+    assert.ok((await support.get('/v1/admin/classifieds/features?q=hz')).json.data.some(item => item.key === 'refresh_rate'));
+
+    // A choice a listing uses cannot be taken away.
+    const colour = (await support.get('/v1/admin/classifieds/features?q=colour')).json.data.find(item => item.key === 'colour');
+    const seller = await customer();
+    const ad = await draft(seller, { title: 'Black office chair' });
+    const used = colour.choices[0];
+    assert.equal((await seller.patch(`/v1/classifieds/listings/${ad.id}`, { features: [{ key: 'colour', value: used }] })).status, 200);
+    assert.equal((await admin.patch('/v1/admin/classifieds/features/colour', { choices: colour.choices.slice(1) })).json.error.param, 'choices');
+    assert.equal((await admin.patch('/v1/admin/classifieds/features/refresh_rate', { enabled: false })).json.enabled, false);
+    assert.ok(!(await fetch(`${server.base}/v1/classifieds/features?q=refresh`).then(res => res.json())).data.some(item => item.key === 'refresh_rate'), 'switched off keys leave the sellers\' list');
+    assert.equal(await prisma.auditLog.count({ where: { action: 'classifieds.feature_changed' } }), 2);
+  });
+
+  test('sellers suggest missing keys; admins add or dismiss them', async () => {
+    const one = await customer();
+    const two = await customer();
+    const category = await prisma.classifiedCategory.findUniqueOrThrow({ where: { slug: 'mobile-phones' } });
+    const asked = await one.post('/v1/classifieds/feature-suggestions', { name: 'Charging  Speed', category_id: category.id });
+    assert.equal(asked.status, 201, JSON.stringify(asked.json));
+    assert.equal((await one.post('/v1/classifieds/feature-suggestions', { name: 'charging speed' })).json.id, asked.json.id, 'asking again is the same suggestion');
+    await two.post('/v1/classifieds/feature-suggestions', { name: 'Charging speed' });
+    await two.post('/v1/classifieds/feature-suggestions', { name: 'Plot shape' });
+    assert.equal((await two.post('/v1/classifieds/feature-suggestions', { name: 'Memory' })).json.error.code, 'feature_exists');
+    assert.equal((await two.post('/v1/classifieds/feature-suggestions', { name: 'see www.example.com' })).json.error.param, 'name');
+
+    const list = (await support.get('/v1/admin/classifieds/feature-suggestions')).json.data;
+    const charging = list.find(item => item.name_key === 'charging speed');
+    assert.deepEqual([charging.sellers, charging.categories], [2, [category.name]]);
+    assert.ok(list.findIndex(item => item.name_key === 'charging speed') < list.findIndex(item => item.name_key === 'plot shape'), 'most asked first');
+
+    const added = await admin.post('/v1/admin/classifieds/features', { key: 'charging_speed', name: 'Charging speed', icon: 'battery-charging', data_type: 'number', unit: 'W', min: 1, max: 300, suggestion: 'Charging speed' });
+    assert.equal(added.status, 201);
+    assert.equal(await prisma.classifiedFeatureSuggestion.count({ where: { nameKey: 'charging speed', status: 'added', featureId: added.json.id } }), 2);
+    assert.equal((await admin.post('/v1/admin/classifieds/feature-suggestions/dismiss', { name_key: 'Plot  shape' })).json.dismissed, 1);
+    assert.equal((await admin.post('/v1/admin/classifieds/feature-suggestions/dismiss', { name_key: 'plot shape' })).status, 404);
+    assert.ok(!(await support.get('/v1/admin/classifieds/feature-suggestions')).json.data.some(item => item.name_key === 'plot shape' || item.name_key === 'charging speed'));
+  });
+
+  test('states and areas: names and centre points corrected, areas added or switched off', async () => {
+    const tree = (await support.get('/v1/admin/classifieds/areas?country=NG')).json;
+    const lagos = tree.data.find(state => state.slug === 'lagos');
+    const surulere = lagos.areas.find(area => area.slug === 'surulere');
+    assert.deepEqual([lagos.kind, surulere.kind, surulere.state_id, typeof surulere.latitude], ['state', 'area', lagos.id, 'number']);
+
+    const added = await admin.post('/v1/admin/classifieds/areas', { country: 'ng', state_id: lagos.id, name: 'Ojodu  Berger', latitude: 6.64, longitude: 3.37 });
+    assert.equal(added.status, 201, JSON.stringify(added.json));
+    assert.deepEqual([added.json.slug, added.json.name, added.json.kind], ['ojodu-berger', 'Ojodu Berger', 'area']);
+    assert.equal((await admin.post('/v1/admin/classifieds/areas', { country: 'NG', state_id: lagos.id, name: 'Ojodu Berger', latitude: 6.64, longitude: 3.37 })).json.error.code, 'area_exists');
+    assert.equal((await admin.post('/v1/admin/classifieds/areas', { country: 'NG', state_id: lagos.id, name: 'Nowhere', latitude: 95, longitude: 3 })).status, 400);
+
+    const renamed = await admin.patch(`/v1/admin/classifieds/areas/${added.json.id}`, { name: 'Ojodu-Berger', latitude: 6.645 });
+    assert.deepEqual([renamed.json.name, renamed.json.slug, renamed.json.latitude], ['Ojodu-Berger', 'ojodu-berger', 6.645], 'the address stays');
+    await admin.patch(`/v1/admin/classifieds/areas/${added.json.id}`, { enabled: false });
+    const seller = await customer();
+    const refused = await seller.post('/v1/classifieds/listings', { title: 'Bicycle for sale', area_id: added.json.id });
+    assert.equal(refused.json.error?.param, 'area_id', 'no new ads in a switched-off area');
+    assert.equal(await prisma.auditLog.count({ where: { action: { in: ['classifieds.area_created', 'classifieds.area_changed'] }, targetId: added.json.id } }), 3);
+    assert.equal((await support.patch(`/v1/admin/classifieds/areas/${added.json.id}`, { enabled: true })).status, 403);
+  });
+});

@@ -2544,6 +2544,7 @@ model Customer {
   classifiedLeads           ClassifiedLead[]
   classifiedOrdersBought    ClassifiedOrder[]         @relation("ClassifiedOrdersBought")
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
+  classifiedFeatureSuggestions ClassifiedFeatureSuggestion[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4175,6 +4176,7 @@ model ClassifiedFeature {
   updatedAt    DateTime                    @updatedAt @map("updated_at")
   categories   ClassifiedCategoryFeature[]
   listings     ClassifiedListingFeature[]
+  suggestions  ClassifiedFeatureSuggestion[]
 
   @@map("classified_features")
 }
@@ -4200,12 +4202,38 @@ model ClassifiedCategory {
   features        ClassifiedCategoryFeature[]
   countries       ClassifiedCategoryCountry[]
   listings        ClassifiedListing[]
+  featureSuggestions ClassifiedFeatureSuggestion[]
 
   @@index([parentId, position])
   @@map("classified_categories")
 }
 
 /// The feature keys a category suggests, in order, which are its filters, and its own default and placeholder.
+/// A feature key a seller asked for (free-text keys are never allowed): admins add it to the registry or dismiss it.
+model ClassifiedFeatureSuggestion {
+  id           String              @id @default(uuid()) @db.Uuid
+  customerId   String              @map("customer_id") @db.Uuid
+  /// As the seller typed it.
+  name         String
+  /// Lower case, single spaces: suggestions of the same name are counted together.
+  nameKey      String              @map("name_key")
+  categoryId   String?             @map("category_id") @db.Uuid
+  /// open, added or dismissed.
+  status       String              @default("open")
+  /// The registry key it became.
+  featureId    String?             @map("feature_id") @db.Uuid
+  decidedById  String?             @map("decided_by_id") @db.Uuid
+  decidedAt    DateTime?           @map("decided_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  customer     Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  category     ClassifiedCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  feature      ClassifiedFeature?  @relation(fields: [featureId], references: [id], onDelete: SetNull)
+
+  @@index([status, nameKey])
+  @@index([customerId, createdAt])
+  @@map("classified_feature_suggestions")
+}
+
 model ClassifiedCategoryFeature {
   categoryId   String             @map("category_id") @db.Uuid
   featureId    String             @map("feature_id") @db.Uuid

@@ -46,6 +46,55 @@ export type AdminClassifiedListing = ClassifiedListing & {
   open_reports: Array<{ id: string; reason: ClassifiedReportReason; details: string | null; created_at: string }>;
 };
 
+/** Why ads are in the queue: all, a new seller's first ads, those the automatic checks flagged, or reported ones. */
+export type ClassifiedQueueView = 'all' | 'new_sellers' | 'flagged' | 'reported';
+export type ClassifiedQueue = List<AdminClassifiedListing> & {
+  /** The whole queue in the market, and today's decisions (UTC). */
+  stats: { waiting: number; oldest_submitted_at: string | null; approved_today: number; sent_back_today: number; removed_today: number };
+};
+
+export type ClassifiedFeatureDataType = 'text' | 'number' | 'choice' | 'boolean';
+/** A registry key as admins see it: switched-off ones too, with the categories suggesting it and how many listings use it. */
+export type AdminClassifiedFeature = {
+  object: 'classified_feature';
+  id: string;
+  key: string;
+  name: string;
+  icon: string;
+  data_type: ClassifiedFeatureDataType;
+  unit: string | null;
+  choices: string[];
+  default_value: string | null;
+  placeholder: string | null;
+  min: number | null;
+  max: number | null;
+  synonyms: string[];
+  filterable: boolean;
+  enabled: boolean;
+  categories: string[];
+  listings: number;
+  updated_at: string;
+};
+export type ClassifiedFeatureInput = Partial<Pick<AdminClassifiedFeature, 'name' | 'icon' | 'unit' | 'choices' | 'default_value' | 'placeholder' | 'min' | 'max' | 'synonyms' | 'filterable' | 'enabled'>>;
+export type ClassifiedFeatureCreate = ClassifiedFeatureInput & { key: string; name: string; icon: string; data_type: ClassifiedFeatureDataType; suggestion?: string };
+/** Sellers asking for the same missing key, counted together. */
+export type ClassifiedFeatureSuggestionGroup = { object: 'classified_feature_suggestion_group'; name_key: string; name: string; sellers: number; categories: string[]; first_at: string; last_at: string };
+
+export type AdminClassifiedArea = {
+  object: 'classified_admin_area';
+  id: string;
+  country: string;
+  kind: 'state' | 'area';
+  state_id: string | null;
+  slug: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  enabled: boolean;
+  active_listings: number;
+};
+export type AdminClassifiedState = AdminClassifiedArea & { areas: AdminClassifiedArea[] };
+
 export type AdminClassifiedListingFilter = { status?: ClassifiedListingStatus; country?: string; customer_id?: string; q?: string; offset?: number };
 
 export type AdminClassifiedReport = {
@@ -160,6 +209,8 @@ export type AdminClassifiedOrder = {
   seller: { id: string; name: string; email: string };
   mode: 'live' | 'test';
   country: string;
+  /** Each side's rate and cap, fixed when the buyer asked. */
+  rates: { buyer_fee_bps: number; buyer_fee_cap: number; seller_fee_bps: number; seller_fee_cap: number };
   fulfilment: 'meet_up' | 'delivery';
   currency: string;
   price: number;
@@ -222,6 +273,21 @@ export type ClassifiedSafePaySettings = {
 };
 export type ClassifiedSafePaySettingsInput = Partial<Omit<ClassifiedSafePaySettings, 'object' | 'country' | 'ready'>>;
 
+/** The fee on a price in minor units: its rate of the price, rounded down, or the cap when that is lower (as the API). */
+export const safePayFee = (price: number, bps: number, cap: number) => Math.min(Math.floor((price * bps) / 10000), cap);
+
+/**
+ * Where a disputed order's money goes for each decision, as the API settles it: `refund` returns the price and the
+ * buyer's fee; `partial` returns part of the price, pays the seller the rest less their fee on it, and keeps the buyer's
+ * fee; `release` pays the seller the price less their fee and keeps both fees.
+ */
+export function disputeOutcome(order: Pick<AdminClassifiedOrder, 'price' | 'buyer_fee' | 'rates'>, decision: ClassifiedDisputeDecision, refund = 0) {
+  if (decision === 'refund') return { buyer_gets: order.price + order.buyer_fee, seller_gets: 0, seller_fee: 0, buyer_fee_kept: 0 };
+  const released = decision === 'partial' ? order.price - refund : order.price;
+  const sellerFee = safePayFee(released, order.rates.seller_fee_bps, order.rates.seller_fee_cap);
+  return { buyer_gets: decision === 'partial' ? refund : 0, seller_gets: released - sellerFee, seller_fee: sellerFee, buyer_fee_kept: order.buyer_fee };
+}
+
 type Paged<T> = List<T> & { total: number };
 
 /** Drops empty values so query strings stay clean. */
@@ -234,8 +300,8 @@ const orderTags = (id: string) => [{ type: 'ClassifiedOrder' as const, id }, { t
 export const adminClassifiedsApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     // ---- Moderation ----
-    classifiedQueue: build.query<List<AdminClassifiedListing>, { country?: string } | void>({
-      query: arg => ({ url: '/v1/admin/classifieds/queue', params: params({ country: arg?.country }) }),
+    classifiedQueue: build.query<ClassifiedQueue, { country?: string; view?: ClassifiedQueueView } | void>({
+      query: arg => ({ url: '/v1/admin/classifieds/queue', params: params({ country: arg?.country, view: arg?.view === 'all' ? undefined : arg?.view }) }),
       providesTags: [{ type: 'ClassifiedListing', id: 'LIST' }],
     }),
     classifiedListings: build.query<Paged<AdminClassifiedListing>, AdminClassifiedListingFilter>({
@@ -306,6 +372,39 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
         await settleOptimistic([patch], queryFulfilled, () => dispatch(adminClassifiedsApi.util.invalidateTags([{ type: 'ClassifiedCategory', id: country }])));
       },
       invalidatesTags: ['Activity'],
+    }),
+    classifiedFeatures: build.query<List<AdminClassifiedFeature>, string | void>({
+      query: q => ({ url: '/v1/admin/classifieds/features', params: params({ q: q ?? undefined }) }),
+      providesTags: [{ type: 'ClassifiedSettings', id: 'FEATURES' }],
+    }),
+    createClassifiedFeature: build.mutation<AdminClassifiedFeature, ClassifiedFeatureCreate>({
+      query: body => ({ url: '/v1/admin/classifieds/features', method: 'POST', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'FEATURES' }, { type: 'ClassifiedSettings', id: 'SUGGESTIONS' }, 'Activity'],
+    }),
+    updateClassifiedFeature: build.mutation<AdminClassifiedFeature, ClassifiedFeatureInput & { key: string }>({
+      query: ({ key, ...body }) => ({ url: `/v1/admin/classifieds/features/${encodeURIComponent(key)}`, method: 'PATCH', body }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'FEATURES' }, 'Activity'],
+    }),
+    classifiedFeatureSuggestions: build.query<List<ClassifiedFeatureSuggestionGroup>, void>({
+      query: () => '/v1/admin/classifieds/feature-suggestions',
+      providesTags: [{ type: 'ClassifiedSettings', id: 'SUGGESTIONS' }],
+    }),
+    dismissClassifiedFeatureSuggestion: build.mutation<unknown, string>({
+      query: nameKey => ({ url: '/v1/admin/classifieds/feature-suggestions/dismiss', method: 'POST', body: { name_key: nameKey } }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'SUGGESTIONS' }, 'Activity'],
+    }),
+    classifiedAreas: build.query<List<AdminClassifiedState> & { country: string }, string>({
+      query: country => ({ url: '/v1/admin/classifieds/areas', params: { country } }),
+      providesTags: (_result, _error, country) => [{ type: 'ClassifiedSettings', id: `AREAS:${country}` }],
+    }),
+    createClassifiedArea: build.mutation<AdminClassifiedArea, { country: string; state_id?: string; name: string; latitude: number; longitude: number }>({
+      query: body => ({ url: '/v1/admin/classifieds/areas', method: 'POST', body }),
+      invalidatesTags: (_result, _error, { country }) => [{ type: 'ClassifiedSettings', id: `AREAS:${country}` }, 'Activity'],
+    }),
+    /** `country` names the list to refresh; it is not sent. */
+    updateClassifiedArea: build.mutation<AdminClassifiedArea, { id: string; country: string; name?: string; latitude?: number; longitude?: number; enabled?: boolean }>({
+      query: ({ id, name, latitude, longitude, enabled }) => ({ url: `/v1/admin/classifieds/areas/${encodeURIComponent(id)}`, method: 'PATCH', body: { name, latitude, longitude, enabled } }),
+      invalidatesTags: (_result, _error, { country }) => [{ type: 'ClassifiedSettings', id: `AREAS:${country}` }, 'Activity'],
     }),
     classifiedWords: build.query<List<ClassifiedProhibitedWord>, string | void>({
       query: country => ({ url: '/v1/admin/classifieds/prohibited-words', params: params({ country: country ?? undefined }) }),
@@ -380,6 +479,14 @@ export const {
   useClassifiedCategoriesQuery,
   useSetClassifiedCategoryMutation,
   useSetClassifiedCategoryCountryMutation,
+  useClassifiedFeaturesQuery,
+  useCreateClassifiedFeatureMutation,
+  useUpdateClassifiedFeatureMutation,
+  useClassifiedFeatureSuggestionsQuery,
+  useDismissClassifiedFeatureSuggestionMutation,
+  useClassifiedAreasQuery,
+  useCreateClassifiedAreaMutation,
+  useUpdateClassifiedAreaMutation,
   useClassifiedWordsQuery,
   useAddClassifiedWordMutation,
   useRemoveClassifiedWordMutation,

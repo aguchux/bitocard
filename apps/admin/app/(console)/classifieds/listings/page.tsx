@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, formatNumber, Input, PageHeader, useDebouncedValue, type Column } from "@bitocard/admin-ui";
 import { AdminShell } from "@bitocard/admin-ui/shell";
@@ -20,7 +20,6 @@ export default function ClassifiedListingsPage() {
 }
 
 function Listings() {
-  const router = useRouter();
   const customer = useSearchParams().get("customer") ?? undefined;
   const [status, setStatus] = useState<ClassifiedListingStatus | "">("");
   const [country, setCountry] = useState("");
@@ -82,7 +81,6 @@ function Listings() {
           loading={listings.isLoading}
           error={listings.error ? errorMessage(listings.error) : null}
           onRetry={listings.refetch}
-          onRowClick={item => router.push(`/classifieds/listings/${item.id}`)}
           empty="No ads match."
         />
       </Card>

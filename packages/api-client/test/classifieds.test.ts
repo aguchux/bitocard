@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { adminClassifiedsApi } from '../src/admin';
+import { adminClassifiedsApi, disputeOutcome, safePayFee } from '../src/admin';
 import { makeStore } from '../src';
 
 type Call = { url: string; method: string; body: string | null };
@@ -75,5 +75,34 @@ describe('admin classifieds', () => {
       ['POST', 'http://api.test/v1/admin/classifieds/orders/o1/payout-review', { decision: 'approve', note: 'Settled.' }],
       ['PUT', 'http://api.test/v1/admin/classifieds/safe-pay-settings/NG', { buyer_fee_bps: 150, strike_limit: 4 }],
     ]);
+  });
+
+  test("the queue view, the feature registry, sellers' suggestions and areas", async () => {
+    const store = makeStore();
+    await store.dispatch(adminClassifiedsApi.endpoints.classifiedQueue.initiate({ country: 'NG', view: 'reported' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.classifiedQueue.initiate({ view: 'all' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.createClassifiedFeature.initiate({ key: 'refresh_rate', name: 'Refresh rate', icon: 'monitor', data_type: 'number', unit: 'Hz', suggestion: 'refresh rate' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.updateClassifiedFeature.initiate({ key: 'refresh_rate', enabled: false }));
+    await store.dispatch(adminClassifiedsApi.endpoints.dismissClassifiedFeatureSuggestion.initiate('plot shape'));
+    await store.dispatch(adminClassifiedsApi.endpoints.createClassifiedArea.initiate({ country: 'NG', state_id: 's1', name: 'Ojodu', latitude: 6.6, longitude: 3.4 }));
+    await store.dispatch(adminClassifiedsApi.endpoints.updateClassifiedArea.initiate({ id: 'a1', country: 'NG', enabled: false }));
+    expect(calls.filter(call => call.method === 'GET').map(call => call.url)).toEqual(['http://api.test/v1/admin/classifieds/queue?country=NG&view=reported', 'http://api.test/v1/admin/classifieds/queue?']);
+    expect(sent()).toEqual([
+      ['POST', 'http://api.test/v1/admin/classifieds/features', { key: 'refresh_rate', name: 'Refresh rate', icon: 'monitor', data_type: 'number', unit: 'Hz', suggestion: 'refresh rate' }],
+      ['PATCH', 'http://api.test/v1/admin/classifieds/features/refresh_rate', { enabled: false }],
+      ['POST', 'http://api.test/v1/admin/classifieds/feature-suggestions/dismiss', { name_key: 'plot shape' }],
+      ['POST', 'http://api.test/v1/admin/classifieds/areas', { country: 'NG', state_id: 's1', name: 'Ojodu', latitude: 6.6, longitude: 3.4 }],
+      ['PATCH', 'http://api.test/v1/admin/classifieds/areas/a1', { enabled: false }],
+    ]);
+  });
+
+  test('fees and dispute outcomes are worked out as the API settles them', () => {
+    expect(safePayFee(5_000_000, 200, 2_000_000)).toBe(100_000);
+    expect(safePayFee(120_000_000, 200, 2_000_000)).toBe(2_000_000);
+    expect(safePayFee(333, 150, 1_000)).toBe(4);
+    const order = { price: 48_000_000, buyer_fee: 960_000, rates: { buyer_fee_bps: 200, buyer_fee_cap: 2_000_000, seller_fee_bps: 300, seller_fee_cap: 3_000_000 } };
+    expect(disputeOutcome(order, 'refund')).toEqual({ buyer_gets: 48_960_000, seller_gets: 0, seller_fee: 0, buyer_fee_kept: 0 });
+    expect(disputeOutcome(order, 'partial', 12_000_000)).toEqual({ buyer_gets: 12_000_000, seller_gets: 34_920_000, seller_fee: 1_080_000, buyer_fee_kept: 960_000 });
+    expect(disputeOutcome(order, 'release')).toEqual({ buyer_gets: 0, seller_gets: 46_560_000, seller_fee: 1_440_000, buyer_fee_kept: 960_000 });
   });
 });

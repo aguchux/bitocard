@@ -25,7 +25,7 @@ export const maxPriceMinor = 1_000_000_000_000_000n;
 export const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
 
 /** Links, web addresses and HTML: what scammers use to take buyers off BitoCard. Titles and descriptions refuse them. */
-const linkPattern = /(https?:\/\/|www\.|\]\(|!\[|<\s*[a-z/!?]|\b[a-z0-9-]+\.(com|net|org|ng|io|co|me|ly|link|app|xyz|shop|store)\b)/i;
+export const linkPattern = /(https?:\/\/|www\.|\]\(|!\[|<\s*[a-z/!?]|\b[a-z0-9-]+\.(com|net|org|ng|io|co|me|ly|link|app|xyz|shop|store)\b)/i;
 
 export function checkTitle(value: string) {
   const title = value.replace(/\s+/g, ' ').trim();

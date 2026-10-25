@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Badge, Button, Card, DataTable, errorMessage, FilterSelect, formatDateTime, formatMoney, formatNumber, Input, PageHeader, useDebouncedValue, type Column } from "@bitocard/admin-ui";
-import { AdminShell } from "@bitocard/admin-ui/shell";
+import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { type AdminClassifiedOrder, type ClassifiedOrderStatus, type ClassifiedPayoutReview, classifiedOrderStatuses, useClassifiedOrdersQuery } from "@bitocard/api-client/admin";
 import { ListingCell, MarketFilter, OrderStatus, orderStatusLabels, PersonCell, payoutReviewLabels, payoutReviewTones } from "@/components/classifieds";
 
@@ -23,7 +23,6 @@ export default function ClassifiedOrdersPage() {
 }
 
 function Orders() {
-  const router = useRouter();
   const linked = useSearchParams().get("payout_review") as ClassifiedPayoutReview | null;
   const [status, setStatus] = useState<ClassifiedOrderStatus | "">("");
   const [review, setReview] = useState<ClassifiedPayoutReview | "">(linked ?? "");
@@ -41,7 +40,9 @@ function Orders() {
       header: "Order",
       cell: item => (
         <span className="block">
-          <span className="block font-semibold text-ink">{item.number}</span>
+          <AppLink href={`/classifieds/orders/${item.id}`} className="block font-semibold text-brand-600 hover:underline">
+            {item.number}
+          </AppLink>
           <span className="block text-xs text-muted">
             {formatDateTime(item.timeline.requested_at)} · {item.fulfilment === "meet_up" ? "Meet-up" : "Delivery"}
             {item.mode === "test" ? " · test" : ""}
@@ -133,7 +134,6 @@ function Orders() {
           loading={orders.isLoading}
           error={orders.error ? errorMessage(orders.error) : null}
           onRetry={orders.refetch}
-          onRowClick={item => router.push(`/classifieds/orders/${item.id}`)}
           empty="No Safe pay orders match."
         />
       </Card>

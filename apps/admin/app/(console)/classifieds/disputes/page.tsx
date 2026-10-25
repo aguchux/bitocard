@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge, Card, DataTable, errorMessage, formatDateTime, formatMoney, formatRelative, PageHeader, Tabs, type Column } from "@bitocard/admin-ui";
-import { AdminShell } from "@bitocard/admin-ui/shell";
+import { AdminShell, AppLink } from "@bitocard/admin-ui/shell";
 import { type AdminClassifiedDisputeRow, useClassifiedDisputesQuery } from "@bitocard/api-client/admin";
 import { disputeReasonLabels, ListingCell, PersonCell } from "@/components/classifieds";
 
@@ -11,7 +10,6 @@ const decisionLabels: Record<string, string> = { release: "Released to the selle
 
 /** BitoCard Shop > Disputes: Safe pay orders a buyer disputed, oldest first. Open one to read it and decide. */
 export default function ClassifiedDisputesPage() {
-  const router = useRouter();
   const [status, setStatus] = useState<"open" | "decided">("open");
   const disputes = useClassifiedDisputesQuery({ status });
 
@@ -21,7 +19,9 @@ export default function ClassifiedDisputesPage() {
       header: "Order",
       cell: item => (
         <span className="block">
-          <span className="block font-semibold text-ink">{item.order.number}</span>
+          <AppLink href={`/classifieds/orders/${item.order.id}`} className="block font-semibold text-brand-600 hover:underline">
+            {item.order.number}
+          </AppLink>
           <span className="block text-xs text-muted">
             {formatMoney(item.order.price, item.order.currency)} · {item.order.fulfilment === "meet_up" ? "Meet-up" : "Delivery"}
           </span>
@@ -71,7 +71,6 @@ export default function ClassifiedDisputesPage() {
           loading={disputes.isLoading}
           error={disputes.error ? errorMessage(disputes.error) : null}
           onRetry={disputes.refetch}
-          onRowClick={item => router.push(`/classifieds/orders/${item.order.id}`)}
           empty={status === "open" ? "No open disputes." : "No disputes decided yet."}
         />
       </Card>

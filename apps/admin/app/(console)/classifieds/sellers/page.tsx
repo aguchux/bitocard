@@ -60,8 +60,8 @@ export default function ClassifiedSellersPage() {
   ];
 
   return (
-    <AdminShell section="classifieds" current="/classifieds/sellers" crumbs={[{ label: "BitoCard Shop", href: "/classifieds" }, { label: "Sellers" }]}>
-      <PageHeader title="Sellers" description="bitocard.com customers who have put up an ad on BitoCard Shop. Open one to see their ads, the reports about them and their Safe pay strikes, or to suspend them." />
+    <AdminShell section="classifieds" current="/classifieds/sellers" crumbs={[{ label: "BitoCard Shop", href: "/classifieds" }, { label: "Users" }]}>
+      <PageHeader title="Users" description="bitocard.com customers who have put up an ad on BitoCard Shop. Open one to see their ads, the reports about them and their Safe pay strikes, or to suspend them." />
       <div className="mt-6">
         <Tabs
           label="Sellers shown"

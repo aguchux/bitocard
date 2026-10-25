@@ -1,4 +1,4 @@
-import { AlertTriangle, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Store, Flag, HandCoins, SlidersHorizontal, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, Zap, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Crown, Landmark, Gift, Inbox, LifeBuoy, MessagesSquare, Cpu, Bot, ShieldEllipsis, Store, Flag, HandCoins, SlidersHorizontal, Tags, MapPin, ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Coins, Snowflake, Bell, CreditCard, MessageSquareWarning, BellRing, PlugZap, Plug, Percent, BadgePercent, Boxes, Building2, ChartNoAxesColumn, Clock, Globe2, History, House, KeyRound, Image, Images, BookImage, LayoutGrid, Shapes, ListChecks, Package, ReceiptText, Settings, ShieldCheck, ScanFace, Smartphone, ToggleRight, TrendingUp, Truck, Users, Wallet, Zap, type LucideIcon } from 'lucide-react';
 
 export type SectionKey = 'home' | 'orders' | 'catalog' | 'resellers' | 'verifications' | 'activity' | 'storefront' | 'crypto' | 'classifieds' | 'reports' | 'support' | 'settings';
 
@@ -111,13 +111,15 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
   classifieds: {
     title: 'BitoCard Shop',
     items: [
-      { label: 'Review queue', href: '/classifieds', icon: ListChecks },
+      { label: 'Moderation queue', href: '/classifieds', icon: ListChecks },
       { label: 'Reports', href: '/classifieds/reports', icon: Flag },
       { label: 'Listings', href: '/classifieds/listings', icon: Package },
-      { label: 'Sellers', href: '/classifieds/sellers', icon: Users },
+      { label: 'Users', href: '/classifieds/sellers', icon: Users },
+      { label: 'Categories', href: '/classifieds/categories', icon: Shapes },
+      { label: 'Feature registry', href: '/classifieds/features', icon: Tags },
+      { label: 'Areas', href: '/classifieds/areas', icon: MapPin },
       { label: 'Safe pay orders', href: '/classifieds/orders', icon: HandCoins },
       { label: 'Disputes', href: '/classifieds/disputes', icon: MessageSquareWarning },
-      { label: 'Categories', href: '/classifieds/categories', icon: Shapes },
       { label: 'Limits and words', href: '/classifieds/rules', icon: SlidersHorizontal },
       { label: 'Safe pay settings', href: '/classifieds/safe-pay', icon: Percent },
     ],

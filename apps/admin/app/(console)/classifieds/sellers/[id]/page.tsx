@@ -43,7 +43,7 @@ export default function ClassifiedSellerPage() {
     <AdminShell
       section="classifieds"
       current="/classifieds/sellers"
-      crumbs={[{ label: "BitoCard Shop", href: "/classifieds" }, { label: "Sellers", href: "/classifieds/sellers" }, { label: seller.data?.name ?? "Seller" }]}
+      crumbs={[{ label: "BitoCard Shop", href: "/classifieds" }, { label: "Users", href: "/classifieds/sellers" }, { label: seller.data?.name ?? "Seller" }]}
     >
       <QueryView query={seller} loading={<Skeleton className="h-96 w-full" />}>
         {data => (

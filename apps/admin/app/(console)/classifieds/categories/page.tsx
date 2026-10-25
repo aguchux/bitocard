@@ -86,8 +86,14 @@ function CategoryRow({
         </span>
       </span>
       {!category.enabled ? <Badge tone="grey">Off everywhere</Badge> : null}
-      <Toggle label={`Open in ${country}`} checked={category.open} disabled={!changes} onChange={onOpen} />
-      <Toggle label="On everywhere" checked={category.enabled} disabled={!changes} onChange={onEnable} />
+      <span className="flex items-center gap-2 text-xs font-semibold text-muted">
+        Open in {country}
+        <Toggle label={`${category.name}: open in ${country}`} checked={category.open} disabled={!changes} onChange={onOpen} />
+      </span>
+      <span className="flex items-center gap-2 text-xs font-semibold text-muted">
+        On everywhere
+        <Toggle label={`${category.name}: on everywhere`} checked={category.enabled} disabled={!changes} onChange={onEnable} />
+      </span>
     </div>
   );
 }

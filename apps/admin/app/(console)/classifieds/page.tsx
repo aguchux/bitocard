@@ -1,57 +1,142 @@
 "use client";
 
 import { useState } from "react";
-import { ActionDialog, Badge, Button, Card, EmptyState, formatDateTime, PageHeader, QueryView, Skeleton } from "@bitocard/admin-ui";
+import { ActionDialog, Badge, Button, Card, DataTable, errorMessage, formatNumber, formatRelative, PageHeader, StatCard, Tabs, type Column } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type AdminClassifiedListing, useClassifiedQueueQuery, useModerateClassifiedListingMutation } from "@bitocard/api-client/admin";
-import { flagLabels, listingPrice, MarketFilter, reportReasonLabels } from "@/components/classifieds";
+import { type AdminClassifiedListing, type ClassifiedQueueView, useClassifiedQueueQuery, useModerateClassifiedListingMutation } from "@bitocard/api-client/admin";
+import { CheckCircle2, Clock, Inbox, XCircle } from "lucide-react";
+import { flagLabels, ListingCell, listingPrice, MarketFilter } from "@/components/classifieds";
 
 type Decision = { listing: AdminClassifiedListing; action: "approve" | "reject" | "remove" };
 
 const dialogs = {
   approve: { title: "Put this ad live?", confirm: "Approve", tone: "primary", description: "It goes on BitoCard Shop now and the seller is told. Open reports on it are dismissed with your note." },
-  reject: { title: "Send this ad back?", confirm: "Send back", tone: "primary", description: "The seller sees your reason, fixes the ad and submits it again." },
-  remove: { title: "Remove this ad for good?", confirm: "Remove", tone: "danger", description: "For banned goods or scams: it can never go live again, and the seller is told why." },
+  reject: { title: "Ask for changes?", confirm: "Ask for changes", tone: "primary", description: "The seller sees what to fix, changes the ad and submits it again." },
+  remove: { title: "Reject this ad for good?", confirm: "Reject", tone: "danger", description: "For banned goods or scams: it leaves BitoCard Shop, can never go live again, and the seller is told why." },
 } as const;
 
+const views: Array<{ value: ClassifiedQueueView; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "new_sellers", label: "New sellers" },
+  { value: "flagged", label: "Flagged" },
+  { value: "reported", label: "Reported" },
+];
+
+const badFlags = new Set(["reported", "photo_reused", "price_low"]);
+
 /**
- * BitoCard Shop > Review queue: ads waiting for a moderator (a new seller's first ads, doubtful words, a price far
- * below the usual, another seller's photo, posting fast, or reported by three customers), oldest first. Support
- * reads; operations decide. Every decision is audited and the seller is told.
+ * BitoCard Shop > Moderation queue: ads waiting for a person (a new seller's first ads, doubtful words, a price far
+ * below the usual, another seller's photo, posting fast, or reported by three customers), oldest first, with the
+ * queue's size and today's decisions. Support reads; operations decide. Every decision is audited and the seller told.
  */
 export default function ClassifiedQueuePage() {
   const admin = useAdmin();
-  const [country, setCountry] = useState("");
-  const queue = useClassifiedQueueQuery(country ? { country } : undefined);
+  const [country, setCountry] = useState("NG");
+  const [view, setView] = useState<ClassifiedQueueView>("all");
+  const queue = useClassifiedQueueQuery({ country: country || undefined, view });
   const [moderate] = useModerateClassifiedListingMutation();
   const [open, setOpen] = useState<Decision | null>(null);
   const decides = can(admin, "operations");
+  const stats = queue.data?.stats;
+
+  const columns: Array<Column<AdminClassifiedListing>> = [
+    {
+      key: "listing",
+      header: "Listing",
+      cell: item => (
+        <span className="block min-w-0">
+          <ListingCell listing={item} />
+          <span className="mt-1 block text-xs text-muted">
+            {listingPrice(item.price)} · {item.category?.name ?? "No category"}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "seller",
+      header: "Seller",
+      hideOnMobile: true,
+      cell: item => (
+        <AppLink href={`/classifieds/sellers/${item.seller.id}`} className="block min-w-0 hover:underline">
+          <span className="block font-semibold text-ink">{item.seller.name}</span>
+          <span className="block text-xs text-muted">
+            Joined {formatRelative(item.seller.member_since)} · {item.seller.published_listings ? `${item.seller.published_listings} ads before` : "first ad"}
+            {item.seller.phone_confirmed ? "" : " · no phone"}
+          </span>
+        </AppLink>
+      ),
+    },
+    {
+      key: "why",
+      header: "Why it is here",
+      cell: item => (
+        <span className="flex max-w-72 flex-wrap gap-1">
+          {item.review_flags.map(flag => (
+            <Badge key={flag} tone={badFlags.has(flag) ? "red" : flag === "first_listings" ? "blue" : "amber"}>
+              {flagLabels[flag] ?? flag}
+            </Badge>
+          ))}
+          {!item.review_flags.length && item.review_reason ? <span className="text-xs text-muted">{item.review_reason}</span> : null}
+          {item.open_reports.length ? <span className="w-full text-xs text-red-700">{item.open_reports.length} open reports</span> : null}
+        </span>
+      ),
+    },
+    { key: "waiting", header: "Waiting", hideOnMobile: true, cell: item => <span className="whitespace-nowrap text-sm text-muted">{formatRelative(item.submitted_at)}</span> },
+    {
+      key: "decide",
+      header: "Decide",
+      align: "right",
+      cell: item =>
+        decides ? (
+          <span className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setOpen({ listing: item, action: "reject" })}>
+              Ask for changes
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => setOpen({ listing: item, action: "remove" })}>
+              Reject
+            </Button>
+            <Button size="sm" onClick={() => setOpen({ listing: item, action: "approve" })}>
+              Approve
+            </Button>
+          </span>
+        ) : null,
+    },
+  ];
 
   return (
-    <AdminShell section="classifieds" current="/classifieds" crumbs={[{ label: "BitoCard Shop", href: "/classifieds" }, { label: "Review queue" }]}>
-      <PageHeader title="Review queue" description="Ads waiting for a person before they go live, oldest first. Check the photos, the price and the words; approve, send back with what to fix, or remove scams and banned goods." />
-      <div className="mt-6 flex flex-wrap gap-3">
-        <MarketFilter id="queue-market" value={country} onChange={setCountry} />
+    <AdminShell section="classifieds" current="/classifieds" crumbs={[{ label: "BitoCard Shop", href: "/classifieds" }, { label: "Moderation queue" }]}>
+      <PageHeader
+        title="Moderation queue"
+        description="Oldest first: new sellers' first listings and anything the checks flagged or customers reported. Open an ad to see every photo before deciding."
+        actions={<MarketFilter id="queue-market" value={country} onChange={setCountry} />}
+      />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Waiting" value={stats ? formatNumber(stats.waiting) : "—"} icon={<Inbox className="size-5" />} loading={!stats} />
+        <StatCard label="Oldest" value={stats?.oldest_submitted_at ? formatRelative(stats.oldest_submitted_at) : "—"} icon={<Clock className="size-5" />} tone="amber" loading={!stats} />
+        <StatCard label="Approved today" value={stats ? formatNumber(stats.approved_today) : "—"} icon={<CheckCircle2 className="size-5" />} tone="green" loading={!stats} />
+        <StatCard
+          label="Rejected today"
+          value={stats ? formatNumber(stats.sent_back_today + stats.removed_today) : "—"}
+          icon={<XCircle className="size-5" />}
+          tone="violet"
+          footer={stats ? `${stats.sent_back_today} asked for changes, ${stats.removed_today} rejected` : undefined}
+          loading={!stats}
+        />
       </div>
-      <div className="mt-4">
-        <QueryView query={queue} loading={<Skeleton className="h-64 w-full" />}>
-          {data =>
-            data.data.length ? (
-              <ul className="space-y-4">
-                {data.data.map(listing => (
-                  <li key={listing.id}>
-                    <QueueCard listing={listing} decides={decides} onDecide={action => setOpen({ listing, action })} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Card>
-                <EmptyState title="Nothing to review">New ads that need a person show up here.</EmptyState>
-              </Card>
-            )
-          }
-        </QueryView>
+      <div className="mt-6">
+        <Tabs label="Why ads are here" variant="pills" value={view} onChange={setView} items={views} />
       </div>
+      <Card className="mt-4">
+        <DataTable
+          columns={columns}
+          rows={queue.data?.data}
+          rowKey={item => item.id}
+          loading={queue.isLoading}
+          error={queue.error ? errorMessage(queue.error) : null}
+          onRetry={queue.refetch}
+          empty="Nothing waiting here."
+        />
+      </Card>
       {open ? (
         <ActionDialog
           open
@@ -65,77 +150,5 @@ export default function ClassifiedQueuePage() {
         />
       ) : null}
     </AdminShell>
-  );
-}
-
-function QueueCard({ listing, decides, onDecide }: { listing: AdminClassifiedListing; decides: boolean; onDecide: (action: Decision["action"]) => void }) {
-  return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex gap-2 overflow-x-auto lg:w-80 lg:shrink-0 lg:flex-wrap">
-          {listing.photos.slice(0, 6).map(photo => (
-            <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="shrink-0">
-              <img src={photo.url} alt="" className="size-24 rounded-lg border border-line object-cover" loading="lazy" />
-            </a>
-          ))}
-          {listing.video ? <Badge tone="blue">Video {listing.video.status === "ready" ? "" : `(${listing.video.status})`}</Badge> : null}
-        </div>
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <AppLink href={`/classifieds/listings/${listing.id}`} className="text-lg font-semibold text-ink hover:underline">
-                {listing.title ?? "Untitled"}
-              </AppLink>
-              <p className="text-sm text-muted">
-                #{listing.ref} · {listing.category ? `${listing.category.parent?.name ?? ""}${listing.category.parent ? " › " : ""}${listing.category.name}` : "No category"} · {listing.area?.name ?? "—"}
-                {listing.area?.state ? `, ${listing.area.state.name}` : ""} · submitted {formatDateTime(listing.submitted_at)}
-              </p>
-            </div>
-            <p className="text-lg font-semibold text-ink">{listingPrice(listing.price)}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {listing.review_flags.map(flag => (
-              <Badge key={flag} tone={flag === "reported" || flag === "photo_reused" ? "red" : "amber"}>
-                {flagLabels[flag] ?? flag}
-              </Badge>
-            ))}
-          </div>
-          {listing.description ? <p className="line-clamp-4 whitespace-pre-line text-sm text-ink">{listing.description}</p> : null}
-          <p className="text-sm text-muted">
-            Seller:{" "}
-            <AppLink href={`/classifieds/sellers/${listing.seller.id}`} className="font-medium text-brand-600 hover:underline">
-              {listing.seller.name}
-            </AppLink>{" "}
-            ({listing.seller.email}) · member since {formatDateTime(listing.seller.member_since)} · {listing.seller.published_listings ?? 0} ads before
-            {listing.seller.phone_confirmed ? " · phone confirmed" : " · no phone"}
-            {listing.seller.suspended ? " · suspended" : ""}
-          </p>
-          {listing.open_reports.length ? (
-            <ul className="space-y-1 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-              {listing.open_reports.map(report => (
-                <li key={report.id}>
-                  <span className="font-semibold">{reportReasonLabels[report.reason] ?? report.reason}</span>
-                  {report.details ? `: ${report.details}` : ""} <span className="text-xs">({formatDateTime(report.created_at)})</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {decides ? (
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" onClick={() => onDecide("approve")}>
-                Approve
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => onDecide("reject")}>
-                Send back
-              </Button>
-              <Button size="sm" variant="danger" onClick={() => onDecide("remove")}>
-                Remove
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-      {listing.review_reason && !listing.review_flags.length ? <p className="mt-3 text-xs text-muted">Why: {listing.review_reason}</p> : null}
-    </Card>
   );
 }
