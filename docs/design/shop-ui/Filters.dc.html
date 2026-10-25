@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Filters</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1100px; box-sizing: border-box; background: #ffffff; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #e3e7f2">
+    <a href="Category.dc.html" aria-label="Close filters" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 17px; font-weight: 700">Filters</h1>
+    <button type="button" style="height: 40px; padding: 0 8px; border: 0; background: transparent; color: #c00b58; font: 600 14px Inter, sans-serif">Clear</button>
+  </header>
+
+  <div style="padding: 0 16px; display: flex; flex-direction: column">
+    <section style="padding: 16px 0; border-bottom: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Price (₦)</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4b5578; font-weight: 600">From<input type="text" inputmode="numeric" placeholder="Any" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; color: #070f4c"></label>
+        <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #4b5578; font-weight: 600">To<input type="text" inputmode="numeric" value="600,000" style="height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; color: #070f4c"></label>
+      </div>
+    </section>
+
+    <section style="padding: 16px 0; border-bottom: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Condition</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{conditions}}" as="c" hint-placeholder-count="4">
+          <button type="button" style="height: 36px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{c.border}}; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding: 16px 0; border-bottom: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Storage (ROM)</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{storage}}" as="c" hint-placeholder-count="5">
+          <button type="button" style="height: 36px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{c.border}}; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding: 16px 0; border-bottom: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Memory (RAM), at least</h2>
+      <input type="range" min="2" max="16" value="6" aria-label="Memory at least, GB" style="width: 100%; accent-color: #070f4c">
+      <span style="font-size: 13px; color: #4b5578">6 GB or more</span>
+    </section>
+
+    <section style="padding: 16px 0; border-bottom: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Brand</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{brands}}" as="c" hint-placeholder-count="5">
+          <button type="button" style="height: 36px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{c.border}}; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="padding: 16px 0; display: flex; flex-direction: column; gap: 4px">
+      <h2 style="margin: 0 0 6px; font-size: 15px; font-weight: 700">Sellers and delivery</h2>
+      <sc-for list="{{toggles}}" as="t" hint-placeholder-count="3">
+        <label style="display: flex; align-items: center; justify-content: space-between; min-height: 44px; font-size: 14px">
+          {{t.label}}
+          <input type="checkbox" checked="{{t.on}}" style="width: 22px; height: 22px; accent-color: #070f4c">
+        </label>
+      </sc-for>
+    </section>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #ffffff; border-top: 1px solid #e3e7f2">
+    <a href="Category.dc.html" style="display: flex; align-items: center; justify-content: center; height: 50px; border-radius: 14px; background: #070f4c; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 15px">Show 85 listings</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    return {
+      conditions: [chip('New', false), chip('Used', true), chip('Untested', false), chip('For parts', false)],
+      storage: [chip('64 GB', false), chip('128 GB', true), chip('256 GB', true), chip('512 GB', false), chip('1 TB', false)],
+      brands: [chip('Apple', true), chip('Samsung', false), chip('Tecno', false), chip('Infinix', false), chip('Xiaomi', false)],
+      toggles: [{ label: 'Verified sellers only', on: false }, { label: 'ID checked sellers', on: false }, { label: 'Delivers to me', on: true }],
+    };
+  }
+}
+</script>
+</body>
+</html>

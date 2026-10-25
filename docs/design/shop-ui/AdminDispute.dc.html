@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Safe pay dispute</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 900px; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+    <div>
+      <a href="AdminModeration.dc.html" style="font-size: 13px; font-weight: 600">‹ Disputes</a>
+      <h1 style="margin: 4px 0 0; font-size: 24px; font-weight: 800">SP-000131 · 3.5 kVA generator</h1>
+      <p style="margin: 4px 0 0; font-size: 13px; color: #4b5578">Opened by the buyer 2 days ago · delivery · release stopped</p>
+    </div>
+    <span style="padding: 4px 12px; border-radius: 999px; background: #fdecef; color: #7d0f2b; font-size: 13px; font-weight: 700">Disputed</span>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+    <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px">
+        <sc-for list="{{facts}}" as="f" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #4b5578">{{f.label}}</span><strong style="font-size: 15px">{{f.value}}</strong></div>
+        </sc-for>
+      </section>
+
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Both sides</h2>
+        <sc-for list="{{thread}}" as="t" hint-placeholder-count="3">
+          <article style="padding: 12px; border-radius: 12px; background: {{t.bg}}; display: flex; flex-direction: column; gap: 6px">
+            <span style="display: flex; justify-content: space-between; font-size: 12px"><strong>{{t.who}}</strong><span style="color: #4b5578">{{t.when}}</span></span>
+            <span style="font-size: 14px; line-height: 1.45">{{t.text}}</span>
+            <sc-if value="{{t.photos}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 6px"><span style="width: 64px; height: 64px; border-radius: 8px; background: #e7e9f6"></span><span style="width: 64px; height: 64px; border-radius: 8px; background: #fff0f7"></span></span></sc-if>
+          </article>
+        </sc-for>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600">Message both sides
+          <textarea rows="2" placeholder="Ask for photos, a video or the courier receipt" style="padding: 10px 12px; border-radius: 10px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; resize: none"></textarea>
+        </label>
+      </section>
+    </div>
+
+    <section style="flex: 1 1 340px; min-width: 0; padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700">Decision</h2>
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="padding: 0; margin-bottom: 6px; font-size: 12px; color: #4b5578">Refunds need finance and your authenticator code.</legend>
+        <sc-for list="{{options}}" as="o" hint-placeholder-count="3">
+          <label style="display: flex; gap: 10px; padding: 12px; border-radius: 12px; border: {{o.border}}">
+            <input type="radio" name="decision" checked="{{o.on}}" style="width: 18px; height: 18px; margin: 2px 0 0; accent-color: #070f4c">
+            <span style="display: flex; flex-direction: column; gap: 2px"><strong style="font-size: 14px">{{o.title}}</strong><span style="font-size: 12px; color: #4b5578; line-height: 1.4">{{o.detail}}</span></span>
+          </label>
+        </sc-for>
+      </fieldset>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">Refund to the buyer
+        <span style="display: flex; align-items: center; height: 42px; border-radius: 10px; border: 1px solid #c9cee6; overflow: hidden"><span style="padding: 0 10px; height: 100%; display: flex; align-items: center; background: #f3f6fd; font-weight: 700">₦</span><input type="text" value="120,000" style="flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: none; font: 600 14px Inter, sans-serif"></span>
+      </label>
+      <div style="padding: 12px; border-radius: 12px; background: #f3f6fd; font-size: 13px; line-height: 1.6">
+        <div style="display: flex; justify-content: space-between"><span>Buyer gets back</span><strong>₦120,000</strong></div>
+        <div style="display: flex; justify-content: space-between"><span>Seller is paid</span><strong>₦349,200</strong></div>
+        <div style="display: flex; justify-content: space-between; color: #4b5578"><span>Seller fee on ₦360,000</span><span>₦10,800</span></div>
+        <div style="display: flex; justify-content: space-between; color: #4b5578"><span>Buyer fee (kept)</span><span>₦9,600</span></div>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">Reason, shown to both
+        <textarea rows="2" style="padding: 10px 12px; border-radius: 10px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; resize: none">Tank damaged in delivery; the engine works after a new tank.</textarea>
+      </label>
+      <button type="button" style="height: 46px; border-radius: 12px; border: 0; background: #070f4c; color: #ffffff; font: 700 14px Inter, sans-serif">Decide</button>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const o = (title, detail, on) => ({ title, detail, on, border: on ? '2px solid #070f4c' : '1px solid #e3e7f2' });
+    return {
+      facts: [
+        { label: 'Price', value: '₦480,000' }, { label: 'Buyer paid', value: '₦489,600' },
+        { label: 'Buyer', value: 'Emeka D. · ✓ ID' }, { label: 'Seller', value: 'PowerHub · ✓ business' },
+      ],
+      thread: [
+        { who: 'Buyer · Emeka D.', when: 'Thu 23 Oct, 14:10', text: 'Arrived with a cracked fuel tank and does not start. Listing said working.', photos: true, bg: '#f3f6fd' },
+        { who: 'Seller · PowerHub', when: 'Thu 23 Oct, 16:42', text: 'It was tested before dispatch. The courier must have dropped it. We can replace the tank.', photos: false, bg: '#fff8fb' },
+        { who: 'BitoCard · Operations', when: 'Fri 24 Oct, 09:05', text: 'Please send the courier receipt and a video of the generator starting before dispatch.', photos: false, bg: '#eef7f2' },
+      ],
+      options: [
+        o('Full refund', 'Price and buyer fee back to the buyer’s wallet. No seller fee.'),
+        o('Part refund', 'Part of the price back; the rest to the seller less their fee on it. Buyer fee kept.', true),
+        o('Release to the seller', 'Seller paid less their fee. Both fees kept.'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

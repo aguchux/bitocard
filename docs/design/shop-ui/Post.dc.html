@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Post an ad</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1780px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <span style="display: flex; align-items: center; gap: 10px">
+      <a href="ShopTab.dc.html" aria-label="Back to my listings" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+      </a>
+      <h1 style="margin: 0; font-size: 17px; font-weight: 700">Post an ad</h1>
+    </span>
+    <span style="font-size: 12px; color: #4b5578">Draft saved</span>
+  </header>
+
+  <section style="padding: 16px 16px 0">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Photos <span style="font-weight: 500; color: #4b5578; font-size: 13px">at least 4</span></h2>
+      <span style="font-size: 12px; color: #0b7a5c; font-weight: 600">4 of 12 · uploading 1</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{photos}}" as="p" hint-placeholder-count="4">
+        <span style="aspect-ratio: 1; border-radius: 12px; background: {{p.tint}}; position: relative; display: flex; align-items: flex-end; padding: 6px; box-sizing: border-box">
+          <sc-if value="{{p.cover}}" hint-placeholder-val="{{false}}">
+            <span style="padding: 2px 7px; border-radius: 999px; background: #070f4c; color: #ffffff; font-size: 11px; font-weight: 600">Cover</span>
+          </sc-if>
+          <sc-if value="{{p.uploading}}" hint-placeholder-val="{{false}}">
+            <span style="position: absolute; left: 8px; right: 8px; bottom: 8px; height: 4px; border-radius: 999px; background: #ffffff"><span style="display: block; width: 60%; height: 4px; border-radius: 999px; background: #0b7a5c"></span></span>
+          </sc-if>
+        </span>
+      </sc-for>
+      <button type="button" style="aspect-ratio: 1; border-radius: 12px; border: 2px dashed #c9cee6; background: #ffffff; color: #1d2873; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 600 12px Inter, sans-serif">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+        Add photos
+      </button>
+      <button type="button" style="aspect-ratio: 1; border-radius: 12px; border: 2px dashed #c9cee6; background: #ffffff; color: #1d2873; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 600 12px Inter, sans-serif; text-align: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.87a.5.5 0 0 0-.75-.43L16 10.5"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect></svg>
+        Add video
+        <span style="font-weight: 500; color: #4b5578; font-size: 11px">optional, 60 s</span>
+      </button>
+    </div>
+  </section>
+
+  <section style="padding: 18px 16px 0; display: flex; flex-direction: column; gap: 14px">
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Title
+      <input type="text" value="iPhone 13 Pro, 256 GB, Sierra Blue" style="height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 15px Inter, sans-serif; color: #070f4c">
+    </label>
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Category
+      <span style="display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid #c9cee6; background: #ffffff">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4b5578" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <input type="text" value="Phones &amp; tablets › Mobile phones" style="flex: 1; min-width: 0; border: 0; outline: none; font: 500 15px Inter, sans-serif; color: #070f4c">
+      </span>
+    </label>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="price" style="font-size: 13px; font-weight: 600">Price</label>
+      <span style="display: flex; align-items: center; height: 46px; border-radius: 12px; border: 1px solid #c9cee6; background: #ffffff; overflow: hidden">
+        <span style="padding: 0 12px; height: 100%; display: flex; align-items: center; background: #f3f6fd; font-weight: 700">₦</span>
+        <input id="price" type="text" inputmode="numeric" value="520,000" style="flex: 1; min-width: 0; height: 100%; padding: 0 12px; border: 0; outline: none; font: 600 15px Inter, sans-serif; color: #070f4c">
+      </span>
+      <div style="display: flex; gap: 6px">
+        <sc-for list="{{priceKinds}}" as="k" hint-placeholder-count="3">
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{k.border}}; background: {{k.bg}}; color: {{k.fg}}">{{k.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <span style="font-size: 13px; font-weight: 600">Condition</span>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+        <sc-for list="{{conditions}}" as="c" hint-placeholder-count="4">
+          <button type="button" style="height: 40px; border-radius: 12px; font: 600 13px Inter, sans-serif; border: {{c.border}}; background: {{c.bg}}; color: {{c.fg}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding: 20px 16px 0">
+    <h2 style="margin: 0 0 4px; font-size: 15px; font-weight: 700">Features</h2>
+    <p style="margin: 0 0 10px; font-size: 12px; color: #4b5578">Tap to add. Each one knows what to ask for.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px">
+      <sc-for list="{{suggested}}" as="s" hint-placeholder-count="3">
+        <button type="button" style="display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: 999px; border: 1px dashed #9aa3c7; background: #ffffff; color: #1d2873; font: 600 12px Inter, sans-serif">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>{{s}}
+        </button>
+      </sc-for>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{features}}" as="f" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: #ffffff; border: 1px solid #e3e7f2">
+          <span style="width: 32px; height: 32px; flex: none; border-radius: 9px; background: #f3f6fd; color: #1d2873; display: flex; align-items: center; justify-content: center">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{f.icon}}"></path></svg>
+          </span>
+          <span style="width: 96px; flex: none; font-size: 13px; font-weight: 600">{{f.key}}</span>
+          <sc-if value="{{f.isInput}}" hint-placeholder-val="{{true}}">
+            <span style="flex: 1; min-width: 0; display: flex; align-items: center; height: 38px; border-radius: 10px; border: 1px solid #c9cee6; overflow: hidden">
+              <input type="text" aria-label="{{f.key}}" value="{{f.value}}" placeholder="{{f.placeholder}}" style="flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: none; font: 500 14px Inter, sans-serif; color: #070f4c">
+              <sc-if value="{{f.unit}}" hint-placeholder-val="{{false}}"><span style="padding: 0 10px; font-size: 13px; font-weight: 600; color: #4b5578">{{f.unit}}</span></sc-if>
+            </span>
+          </sc-if>
+          <sc-if value="{{f.isChoice}}" hint-placeholder-val="{{false}}">
+            <span style="flex: 1; min-width: 0; display: flex; gap: 4px; flex-wrap: wrap">
+              <sc-for list="{{f.choices}}" as="o" hint-placeholder-count="3">
+                <button type="button" style="height: 30px; padding: 0 9px; border-radius: 999px; font: 600 12px Inter, sans-serif; border: {{o.border}}; background: {{o.bg}}; color: {{o.fg}}">{{o.label}}</button>
+              </sc-for>
+            </span>
+          </sc-if>
+          <sc-if value="{{f.isToggle}}" hint-placeholder-val="{{false}}">
+            <label style="flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 13px; color: #4b5578">No
+              <input type="checkbox" role="switch" aria-label="{{f.key}}" style="width: 40px; height: 22px; accent-color: #070f4c">
+            </label>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <label style="margin-top: 10px; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; background: #f3f6fd; color: #4b5578">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      <input type="search" placeholder="Any other feature: ram, size, bedrooms…" aria-label="Search all features" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 500 14px Inter, sans-serif; color: #070f4c">
+    </label>
+  </section>
+
+  <section style="padding: 20px 16px 0">
+    <h2 style="margin: 0 0 8px; font-size: 15px; font-weight: 700">Description</h2>
+    <div style="border-radius: 12px; border: 1px solid #c9cee6; background: #ffffff; overflow: hidden">
+      <div style="display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid #e3e7f2; background: #f9fafe">
+        <button type="button" aria-label="Bold" style="width: 34px; height: 34px; border-radius: 8px; border: 0; background: transparent; font: 800 15px Inter, sans-serif; color: #070f4c">B</button>
+        <button type="button" aria-label="Italic" style="width: 34px; height: 34px; border-radius: 8px; border: 0; background: transparent; font: italic 600 15px Georgia, serif; color: #070f4c">I</button>
+        <button type="button" aria-label="Bullet list" style="width: 34px; height: 34px; border-radius: 8px; border: 0; background: transparent; color: #070f4c; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>
+        </button>
+        <button type="button" aria-label="Numbered list" style="width: 34px; height: 34px; border-radius: 8px; border: 0; background: transparent; color: #070f4c; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>
+        </button>
+      </div>
+      <div style="padding: 10px 12px; min-height: 96px; font-size: 14px; line-height: 1.5; color: #1d2873">
+        Clean phone, <strong>never repaired</strong>. Face ID and all cameras work.
+        <ul style="margin: 6px 0 0; padding-left: 20px"><li>Battery health 88%</li><li>Box and cable included</li></ul>
+      </div>
+      <div style="padding: 0 12px 8px; text-align: right; font-size: 11px; color: #4b5578">142 / 5,000</div>
+    </div>
+  </section>
+
+  <section style="padding: 20px 16px 0; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; background: #ffffff; border: 1px solid #e3e7f2">
+      <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #4b5578">Location</span><strong style="font-size: 14px">Ikeja, Lagos</strong></span>
+      <a href="#" style="font-size: 13px; font-weight: 600">Change</a>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <span style="font-size: 13px; font-weight: 600">Delivery</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{delivery}}" as="d" hint-placeholder-count="3">
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{d.border}}; background: {{d.bg}}; color: {{d.fg}}">{{d.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #ffffff; border-top: 1px solid #e3e7f2">
+    <button type="button" style="width: 100%; height: 50px; border-radius: 14px; border: 0; background: #c00b58; color: #ffffff; font: 700 15px Inter, sans-serif">Post ad</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1780}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    return {
+      photos: [
+        { tint: '#e7e9f6', cover: true, uploading: false },
+        { tint: '#f3f6fd', cover: false, uploading: false },
+        { tint: '#fff0f7', cover: false, uploading: false },
+        { tint: '#eef7f2', cover: false, uploading: true },
+      ],
+      priceKinds: [chip('Fixed', false), chip('Negotiable', true), chip('Contact for price', false)],
+      conditions: [chip('New', false), chip('Used', true), chip('Untested', false), chip('For parts', false)],
+      suggested: ['Battery health', 'Screen size', 'Warranty'],
+      features: [
+        { key: 'Brand', icon: 'M12 2a3 3 0 0 0-3 3v1h6V5a3 3 0 0 0-3-3ZM5 6h14l-1 15H6z', isInput: true, value: 'Apple', placeholder: 'e.g. Samsung', unit: '' },
+        { key: 'Storage (ROM)', icon: 'M22 12H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6 16h.01M10 16h.01', isInput: true, value: '256', placeholder: 'e.g. 128', unit: 'GB' },
+        { key: 'Memory (RAM)', icon: 'M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 5h6v6H9zM15 2v2M9 2v2M15 20v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2', isInput: true, value: '', placeholder: 'e.g. 6', unit: 'GB' },
+        { key: 'Colour', icon: 'M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.55C21.97 6.01 17.46 2 12 2zM7 12h.01M9 7h.01M15 7h.01', isChoice: true, choices: [chip('Black', false), chip('Blue', true), chip('Gold', false), chip('More', false)] },
+        { key: 'Dual SIM', icon: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm2 12h6v4H9z', isToggle: true },
+      ],
+      delivery: [chip('Meet-up only', false), chip('Delivers in Lagos State', true), chip('Nationwide', false)],
+    };
+  }
+}
+</script>
+</body>
+</html>

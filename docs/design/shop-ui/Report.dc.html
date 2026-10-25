@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Report a listing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 900px; box-sizing: border-box; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+  <div style="position: absolute; inset: 0; background: rgba(4, 9, 53, 0.55)"></div>
+  <section role="dialog" aria-modal="true" aria-labelledby="report-title" style="position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 20px 28px; border-radius: 24px 24px 0 0; background: #ffffff; display: flex; flex-direction: column; gap: 12px">
+    <span style="align-self: center; width: 40px; height: 4px; border-radius: 999px; background: #c9cee6"></span>
+    <h2 id="report-title" style="margin: 0; font-size: 19px; font-weight: 800">Report this listing</h2>
+    <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 6px">
+      <legend style="padding: 0; margin-bottom: 6px; font-size: 13px; color: #4b5578">What is wrong?</legend>
+      <sc-for list="{{reasons}}" as="r" hint-placeholder-count="6">
+        <label style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 12px; border: {{r.border}}; font-size: 14px">
+          <input type="radio" name="reason" checked="{{r.on}}" style="width: 18px; height: 18px; margin: 0; accent-color: #070f4c">{{r.label}}
+        </label>
+      </sc-for>
+    </fieldset>
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Details (optional)
+      <textarea rows="3" placeholder="Tell us what happened" style="padding: 10px 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; resize: none"></textarea>
+    </label>
+    <label style="display: flex; align-items: center; gap: 10px; font-size: 14px">
+      <input type="checkbox" style="width: 20px; height: 20px; margin: 0; accent-color: #070f4c">Also block this seller
+    </label>
+    <button type="button" style="height: 50px; border-radius: 14px; border: 0; background: #070f4c; color: #ffffff; font: 700 15px Inter, sans-serif">Send report</button>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const r = (label, on) => ({ label, on, border: on ? '2px solid #070f4c' : '1px solid #e3e7f2' });
+    return { reasons: [r('Looks like a scam', true), r('Asked to pay in advance'), r('Prohibited or illegal item'), r('Wrong category or details'), r('Already sold'), r('Offensive content')] };
+  }
+}
+</script>
+</body>
+</html>

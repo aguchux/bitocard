@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chat with Chinedu</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 900px; box-sizing: border-box; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+
+  <header style="background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px">
+      <a href="Messages.dc.html" aria-label="Back to messages" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+      </a>
+      <span style="width: 40px; height: 40px; border-radius: 999px; background: #070f4c; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">CO</span>
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 1px">
+        <strong style="font-size: 15px">Chinedu O.</strong>
+        <span style="font-size: 12px; color: #0b7a5c; font-weight: 600">✓ ID checked · replies within an hour</span>
+      </span>
+      <button type="button" aria-label="More: report, block" style="width: 40px; height: 40px; border-radius: 999px; border: 0; background: transparent; color: #070f4c; font: 800 18px Inter, sans-serif">⋯</button>
+    </div>
+    <a href="Listing.dc.html" style="display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid #e3e7f2; text-decoration: none; color: #070f4c">
+      <span style="width: 40px; height: 40px; border-radius: 8px; background: #e7e9f6"></span>
+      <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 13px; font-weight: 600">iPhone 13 Pro, 256 GB</span><span style="font-size: 13px; font-weight: 800">₦520,000</span></span>
+      <span style="padding: 6px 10px; border-radius: 10px; background: #0b7a5c; color: #ffffff; font-size: 12px; font-weight: 700">Safe pay</span>
+    </a>
+  </header>
+
+  <div style="padding: 12px; display: flex; flex-direction: column; gap: 10px">
+    <div style="padding: 10px 12px; border-radius: 12px; background: #fff8ec; border: 1px solid #f4dcb0; font-size: 12px; line-height: 1.45; color: #5a3200">Keep the chat here. Meet in a busy place, inspect before paying, never pay in advance. BitoCard never asks for codes. <a href="SafeTrade.dc.html" style="font-weight: 700">Safe Trade Guide</a></div>
+
+    <sc-for list="{{messages}}" as="m" hint-placeholder-count="4">
+      <div style="display: flex; justify-content: {{m.align}}">
+        <span style="max-width: 78%; padding: 10px 12px; border-radius: {{m.radius}}; background: {{m.bg}}; color: {{m.fg}}; font-size: 14px; line-height: 1.4">{{m.text}}<span style="display: block; margin-top: 4px; font-size: 10px; opacity: 0.75; text-align: right">{{m.time}}</span></span>
+      </div>
+    </sc-for>
+
+    <div style="display: flex; justify-content: flex-end">
+      <div style="width: 78%; padding: 12px; border-radius: 16px 16px 4px 16px; background: #ffffff; border: 2px solid #070f4c; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #4b5578">Your offer</span>
+        <strong style="font-size: 20px; font-weight: 800">₦490,000</strong>
+        <span style="font-size: 12px; color: #4b5578">Waiting for Chinedu · expires in 23 h</span>
+        <button type="button" style="height: 36px; border-radius: 10px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 13px Inter, sans-serif">Withdraw offer</button>
+      </div>
+    </div>
+  </div>
+
+  <form style="position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 10px 12px 18px; background: #ffffff; border-top: 1px solid #e3e7f2; display: flex; align-items: center; gap: 8px">
+    <button type="button" aria-label="Send a photo" style="width: 42px; height: 42px; flex: none; border-radius: 999px; border: 1px solid #e3e7f2; background: #ffffff; color: #1d2873; display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+    </button>
+    <a href="Offer.dc.html" style="height: 42px; padding: 0 12px; flex: none; border-radius: 999px; border: 1px solid #c9cee6; color: #070f4c; text-decoration: none; font-size: 13px; font-weight: 700; display: flex; align-items: center">Offer</a>
+    <input type="text" placeholder="Write a message" aria-label="Message" style="flex: 1; min-width: 0; height: 42px; padding: 0 14px; border-radius: 999px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif">
+    <button type="button" aria-label="Send" style="width: 42px; height: 42px; flex: none; border-radius: 999px; border: 0; background: #c00b58; color: #ffffff; display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>
+    </button>
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const them = (text, time) => ({ text, time, align: 'flex-start', bg: '#ffffff', fg: '#070f4c', radius: '16px 16px 16px 4px' });
+    const me = (text, time) => ({ text, time, align: 'flex-end', bg: '#070f4c', fg: '#ffffff', radius: '16px 16px 4px 16px' });
+    return {
+      messages: [
+        me('Hello, is it still available? Is the battery original?', '10:31'),
+        them('Yes it is. Original battery, 88% health. Never opened.', '10:35'),
+        me('Can we meet at Ikeja City Mall tomorrow?', '10:40'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

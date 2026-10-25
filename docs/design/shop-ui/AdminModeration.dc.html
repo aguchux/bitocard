@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Classifieds moderation queue</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 900px; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; display: flex; flex-wrap: wrap">
+  <nav aria-label="Classifieds" style="flex: 1 1 220px; max-width: 100%; background: #070f4c; color: #ffffff; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px">
+    <span style="padding: 0 10px 14px; font-size: 18px; font-weight: 800"><span>Bito</span><span style="color: #ff2382">card</span> <span style="font-size: 12px; color: #c9cee6; font-weight: 600">Admin</span></span>
+    <span style="padding: 0 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #9aa3c7">Classifieds</span>
+    <sc-for list="{{menu}}" as="m" hint-placeholder-count="10">
+      <a href="{{m.href}}" style="display: flex; justify-content: space-between; align-items: center; min-height: 38px; padding: 0 10px; border-radius: 10px; text-decoration: none; font-size: 14px; font-weight: 600; background: {{m.bg}}; color: {{m.fg}}">{{m.label}}<sc-if value="{{m.count}}" hint-placeholder-val="{{false}}"><span style="padding: 1px 8px; border-radius: 999px; background: #ff2382; color: #ffffff; font-size: 11px">{{m.count}}</span></sc-if></a>
+    </sc-for>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+      <div>
+        <h1 style="margin: 0; font-size: 24px; font-weight: 800">Moderation queue</h1>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #4b5578">Nigeria · oldest first · new sellers' first listings and anything flagged</p>
+      </div>
+      <div style="display: flex; gap: 6px">
+        <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{f.border}}; background: {{f.bg}}; color: {{f.fg}}">{{f.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px">
+      <sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+        <div style="padding: 14px; border-radius: 14px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 12px; color: #4b5578; font-weight: 600">{{s.label}}</span>
+          <strong style="font-size: 22px; font-weight: 800">{{s.value}}</strong>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; overflow-x: auto">
+      <table style="width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px">
+        <thead>
+          <tr style="text-align: left; color: #4b5578; font-size: 12px">
+            <th style="padding: 12px 14px; font-weight: 600">Listing</th>
+            <th style="padding: 12px 14px; font-weight: 600">Seller</th>
+            <th style="padding: 12px 14px; font-weight: 600">Why it is here</th>
+            <th style="padding: 12px 14px; font-weight: 600">Waiting</th>
+            <th style="padding: 12px 14px; font-weight: 600; text-align: right">Decide</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+            <tr style="border-top: 1px solid #e3e7f2">
+              <td style="padding: 12px 14px">
+                <span style="display: flex; align-items: center; gap: 10px">
+                  <span style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: {{r.tint}}"></span>
+                  <span style="display: flex; flex-direction: column"><strong>{{r.title}}</strong><span style="color: #4b5578">{{r.price}} · {{r.category}}</span></span>
+                </span>
+              </td>
+              <td style="padding: 12px 14px"><span style="display: flex; flex-direction: column"><span style="font-weight: 600">{{r.seller}}</span><span style="color: #4b5578">{{r.sellerMeta}}</span></span></td>
+              <td style="padding: 12px 14px">
+                <span style="display: flex; flex-wrap: wrap; gap: 4px">
+                  <sc-for list="{{r.flags}}" as="f" hint-placeholder-count="2">
+                    <span style="padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: {{f.bg}}; color: {{f.fg}}">{{f.label}}</span>
+                  </sc-for>
+                </span>
+              </td>
+              <td style="padding: 12px 14px; color: #4b5578">{{r.wait}}</td>
+              <td style="padding: 12px 14px">
+                <span style="display: flex; justify-content: flex-end; gap: 6px">
+                  <button type="button" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 12px Inter, sans-serif">Ask for changes</button>
+                  <button type="button" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid #f5c2cc; background: #ffffff; color: #7d0f2b; font: 600 12px Inter, sans-serif">Reject</button>
+                  <button type="button" style="height: 32px; padding: 0 10px; border-radius: 8px; border: 0; background: #0b7a5c; color: #ffffff; font: 700 12px Inter, sans-serif">Approve</button>
+                </span>
+              </td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const m = (label, on, count, href) => ({ label, count, href: href || '#', bg: on ? '#1d2873' : 'transparent', fg: on ? '#ffffff' : '#c9cee6' });
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    const warn = (label) => ({ label, bg: '#fff4e5', fg: '#8a4b00' });
+    const bad = (label) => ({ label, bg: '#fdecef', fg: '#7d0f2b' });
+    const info = (label) => ({ label, bg: '#eef1fb', fg: '#1d2873' });
+    return {
+      menu: [m('Moderation queue', true, '18'), m('Reports', false, '6'), m('Listings'), m('Users'), m('Categories'), m('Feature registry', false, '3', 'AdminFeatures.dc.html'), m('Areas'), m('Safe pay orders'), m('Disputes', false, '2', 'AdminDispute.dc.html'), m('Safe pay settings', false, '', 'AdminSafePay.dc.html')],
+      filters: [chip('All', true), chip('New sellers', false), chip('Flagged', false), chip('Reported', false)],
+      stats: [{ label: 'Waiting', value: '18' }, { label: 'Oldest', value: '42 min' }, { label: 'Approved today', value: '214' }, { label: 'Rejected today', value: '9' }],
+      rows: [
+        { title: 'iPhone 15 Pro Max, sealed', price: '₦350,000', category: 'Phones', seller: 'Fola T.', sellerMeta: 'Joined today · no phone', flags: [bad('Price far below usual'), info('New seller')], wait: '42 min', tint: '#e7e9f6' },
+        { title: 'Toyota Camry 2018', price: '₦14,500,000', category: 'Vehicles', seller: 'Kunle Autos', sellerMeta: '✓ Verified business', flags: [warn('Photo used by another seller')], wait: '31 min', tint: '#fff0f7' },
+        { title: 'Puppies for sale', price: '₦80,000', category: 'Animals', seller: 'Grace N.', sellerMeta: 'Joined 2 days ago', flags: [warn('Category needs review')], wait: '24 min', tint: '#eef7f2' },
+        { title: 'MacBook Air M2', price: '₦780,000', category: 'Computers', seller: 'Ibrahim S.', sellerMeta: '✓ ID checked', flags: [info('First listing')], wait: '12 min', tint: '#f3f6fd' },
+        { title: 'Land, 600 sqm, Ibeju-Lekki', price: '₦12,000,000', category: 'Property', seller: 'Prime Homes', sellerMeta: '✓ Verified business', flags: [info('Reported once')], wait: '5 min', tint: '#fff4e5' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

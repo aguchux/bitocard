@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Buy with Safe pay</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1120px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+
+  <header style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #e3e7f2; background: #ffffff">
+    <a href="Listing.dc.html" aria-label="Back to the listing" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 17px; font-weight: 700">Buy with Safe pay</h1>
+  </header>
+
+  <div style="margin: 16px 16px 0; display: flex; gap: 12px; padding: 10px; border-radius: 14px; background: #ffffff; border: 1px solid #e3e7f2">
+    <span style="width: 64px; height: 64px; flex: none; border-radius: 10px; background: #e7e9f6; display: flex; align-items: center; justify-content: center; color: #4b5578">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm5 16h.01"></path></svg>
+    </span>
+    <span style="display: flex; flex-direction: column; gap: 3px; justify-content: center">
+      <strong style="font-size: 14px">iPhone 13 Pro, 256 GB</strong>
+      <span style="font-size: 12px; color: #4b5578">Chinedu O. · Ikeja, Lagos</span>
+    </span>
+  </div>
+
+  <section style="margin: 16px 16px 0; padding: 14px; border-radius: 16px; background: #e8f6f1; border: 1px solid #bfe6d8">
+    <h2 style="margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #064c39">How Safe pay protects you</h2>
+    <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+        <li style="display: flex; gap: 10px; font-size: 13px; line-height: 1.4; color: #064c39">
+          <span style="width: 24px; height: 24px; flex: none; border-radius: 999px; background: #0b7a5c; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">{{s.n}}</span>
+          <span>{{s.text}}</span>
+        </li>
+      </sc-for>
+    </ol>
+  </section>
+
+  <fieldset style="margin: 18px 16px 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+    <legend style="padding: 0; margin-bottom: 8px; font-size: 15px; font-weight: 700">How will you get it?</legend>
+    <label style="display: flex; gap: 12px; padding: 14px; border-radius: 14px; border: 2px solid #070f4c; background: #ffffff">
+      <input type="radio" name="fulfilment" checked style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: #070f4c">
+      <span style="display: flex; flex-direction: column; gap: 2px">
+        <strong style="font-size: 14px">Meet in person</strong>
+        <span style="font-size: 12px; line-height: 1.4; color: #4b5578">Inspect it, then give the seller your 6-digit release code.</span>
+      </span>
+    </label>
+    <label style="display: flex; gap: 12px; padding: 14px; border-radius: 14px; border: 1px solid #c9cee6; background: #ffffff">
+      <input type="radio" name="fulfilment" style="width: 20px; height: 20px; margin: 2px 0 0; accent-color: #070f4c">
+      <span style="display: flex; flex-direction: column; gap: 2px">
+        <strong style="font-size: 14px">Delivery</strong>
+        <span style="font-size: 12px; line-height: 1.4; color: #4b5578">The seller sends it; confirm when it arrives.</span>
+      </span>
+    </label>
+  </fieldset>
+
+  <section style="margin: 18px 16px 0; padding: 14px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; justify-content: space-between; font-size: 14px"><span>Item price</span><span style="font-weight: 600">₦520,000</span></div>
+    <div style="display: flex; justify-content: space-between; font-size: 14px"><span>Safe pay fee <span style="color: #4b5578; font-size: 12px">([x]%, capped)</span></span><span style="font-weight: 600">₦10,400</span></div>
+    <div style="height: 1px; background: #e3e7f2"></div>
+    <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 800"><span>Total</span><span>₦530,400</span></div>
+    <p style="margin: 0; font-size: 12px; line-height: 1.45; color: #4b5578">The fee comes back to you if the item does not change hands.</p>
+  </section>
+
+  <section style="margin: 12px 16px 0; padding: 12px 14px; border-radius: 14px; background: #f3f6fd; display: flex; align-items: center; gap: 12px">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1d2873" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg>
+    <span style="flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 13px">
+      <strong>Paid from your BitoCard wallet</strong>
+      <span style="color: #4b5578">Balance ₦312,500 · add ₦217,900 before paying</span>
+    </span>
+    <a href="#" style="font-size: 13px; font-weight: 700">Add funds</a>
+  </section>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #ffffff; border-top: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 8px">
+    <button type="button" style="height: 50px; border-radius: 14px; border: 0; background: #0b7a5c; color: #ffffff; font: 700 15px Inter, sans-serif">Send request to seller</button>
+    <p style="margin: 0; text-align: center; font-size: 12px; color: #4b5578">You pay only after Chinedu accepts, within 24 hours.</p>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      steps: [
+        { n: '1', text: 'You ask; the seller accepts within 24 hours.' },
+        { n: '2', text: 'You pay from your BitoCard wallet. We hold the money.' },
+        { n: '3', text: 'You check the item, then release the money.' },
+        { n: '4', text: 'Not as described? Open a dispute and we decide.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

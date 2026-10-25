@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Messages</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+  <header style="padding: 16px 16px 0; background: #ffffff">
+    <h1 style="margin: 0; font-size: 22px; font-weight: 800">Messages</h1>
+    <div style="display: flex; gap: 6px; margin-top: 12px; padding-bottom: 12px; border-bottom: 1px solid #e3e7f2">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+        <button type="button" style="height: 34px; padding: 0 12px; border-radius: 999px; font: 600 13px Inter, sans-serif; border: {{t.border}}; background: {{t.bg}}; color: {{t.fg}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+  </header>
+  <ul style="list-style: none; margin: 0; padding: 0">
+    <sc-for list="{{threads}}" as="m" hint-placeholder-count="6">
+      <li style="border-bottom: 1px solid #e3e7f2; background: {{m.bg}}">
+        <a href="Chat.dc.html" style="display: flex; gap: 12px; padding: 12px 16px; text-decoration: none; color: #070f4c">
+          <span style="width: 52px; height: 52px; flex: none; border-radius: 12px; background: {{m.tint}}"></span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+            <span style="display: flex; justify-content: space-between; gap: 8px">
+              <strong style="font-size: 14px">{{m.name}}</strong>
+              <span style="font-size: 11px; color: #4b5578; flex: none">{{m.time}}</span>
+            </span>
+            <span style="font-size: 12px; color: #1d2873; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{m.listing}}</span>
+            <span style="display: flex; justify-content: space-between; gap: 8px">
+              <span style="font-size: 13px; color: #4b5578; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{m.last}}</span>
+              <sc-if value="{{m.unread}}" hint-placeholder-val="{{false}}"><span style="min-width: 20px; height: 20px; border-radius: 999px; background: #c00b58; color: #ffffff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{m.unread}}</span></sc-if>
+            </span>
+          </span>
+        </a>
+      </li>
+    </sc-for>
+  </ul>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    const t = (name, listing, last, time, unread, tint) => ({ name, listing, last, time, unread, tint, bg: unread ? '#fff8fb' : '#fcfdff' });
+    return {
+      tabs: [chip('All', true), chip('Buying', false), chip('Selling', false)],
+      threads: [
+        t('Chinedu O.', 'iPhone 13 Pro, 256 GB · ₦520,000', 'Offer: ₦490,000. Can we meet at Ikeja City Mall?', '10:42', '2', '#e7e9f6'),
+        t('Ngozi E.', 'You sell: Samsung 43" TV', 'Is the remote included?', '09:15', '1', '#fff0f7'),
+        t('PowerHub', '3.5 kVA generator · ₦480,000', 'Delivery to Yaba is ₦5,000.', 'Yesterday', '', '#eef7f2'),
+        t('Femi B.', 'You sell: PS4 Slim', 'Thanks, I will check and get back to you.', 'Mon', '', '#f3f6fd'),
+        t('Abuja Laptops', 'HP EliteBook 840 G6', 'Safe pay request accepted', 'Sun', '', '#e7e9f6'),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

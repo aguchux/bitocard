@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Safe Trade Guide</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1460px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+
+  <header style="background: #070f4c; padding: 16px 16px 22px; color: #ffffff; display: flex; flex-direction: column; gap: 10px">
+    <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #ff7ab6">BitoCard Shop</span>
+    <h1 style="margin: 0; font-size: 26px; font-weight: 800">Safe Trade Guide</h1>
+    <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #c9cee6">Tick these off for every trade you pay for yourself. With Safe pay, we hold the money for you.</p>
+    <div style="display: flex; gap: 8px">
+      <button type="button" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 0; background: #ffffff; color: #070f4c; font: 700 13px Inter, sans-serif">Share on WhatsApp</button>
+      <button type="button" style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid #2a3580; background: #111a5e; color: #ffffff; font: 600 13px Inter, sans-serif">Print</button>
+    </div>
+  </header>
+
+  <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+    <section style="padding: 18px 16px 0">
+      <h2 style="margin: 0 0 10px; font-size: 16px; font-weight: 700">{{g.title}}</h2>
+      <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+        <sc-for list="{{g.items}}" as="i" hint-placeholder-count="4">
+          <li>
+            <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #e3e7f2; font-size: 14px; line-height: 1.4">
+              <input type="checkbox" style="width: 20px; height: 20px; margin: 0; flex: none; accent-color: #0b7a5c">
+              {{i}}
+            </label>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+  </sc-for>
+
+  <section style="margin: 18px 16px 0; padding: 14px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 15px; font-weight: 700">Checks for this category</h2>
+    <div style="display: flex; gap: 6px; overflow: hidden">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+        <button type="button" style="flex: none; height: 32px; padding: 0 12px; border-radius: 999px; font: 600 12px Inter, sans-serif; border: {{t.border}}; background: {{t.bg}}; color: {{t.fg}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+    <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: #1d2873">
+      <li>It powers on, charges and the screen has no dead spots</li>
+      <li>The IMEI (dial *#06#) matches the box and is not blacklisted</li>
+      <li>iCloud or Google account is signed out in front of you</li>
+      <li>Cameras, speaker, microphone and Face ID work</li>
+    </ul>
+  </section>
+
+  <section style="margin: 14px 16px 0; padding: 14px; border-radius: 16px; background: #fdecef; border: 1px solid #f5c2cc; display: flex; flex-direction: column; gap: 6px">
+    <h2 style="margin: 0; font-size: 15px; font-weight: 700; color: #7d0f2b">Red flags</h2>
+    <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #7d0f2b">A price far below others, pressure to decide now, a deposit or "delivery fee" first, payment screenshots instead of money, overpaying and asking for change, moving the chat to another app, or asking for any code.</p>
+  </section>
+
+  <div style="padding: 16px">
+    <a href="#" style="font-size: 13px; font-weight: 600">Read BitoCard's Safe Trade Policy</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1460}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    return {
+      groups: [
+        { title: 'Before you meet', items: ['Keep the chat on BitoCard', 'Check the seller’s badges and reviews', 'The price is close to similar listings', 'Agree the place, time and how you will pay', 'Tell someone where you are going'] },
+        { title: 'At the meeting', items: ['A busy public place, in daylight', 'Inspect and test with the checks below', 'Check papers and serial numbers', 'Pay only when you are happy; confirm a transfer in your banking app'] },
+        { title: 'If you are selling', items: ['Hand over only when the money shows in your own account', 'Never trust an SMS alert or a screenshot', 'Refuse overpayments; check cash notes'] },
+      ],
+      tabs: [chip('Phones', true), chip('Vehicles', false), chip('Property', false), chip('Laptops', false)],
+    };
+  }
+}
+</script>
+</body>
+</html>

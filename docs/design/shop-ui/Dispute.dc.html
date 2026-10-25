@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Report a problem with an order</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1040px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+  <header style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <a href="BuyerOrder.dc.html" aria-label="Back to the order" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+    </a>
+    <span style="display: flex; flex-direction: column"><h1 style="margin: 0; font-size: 17px; font-weight: 700">Report a problem</h1><span style="font-size: 12px; color: #4b5578">SP-000131 · 3.5 kVA generator</span></span>
+  </header>
+
+  <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="padding: 12px 14px; border-radius: 14px; background: #e8f6f1; border: 1px solid #bfe6d8; font-size: 13px; line-height: 1.45; color: #064c39">Opening a dispute stops the payment to the seller. BitoCard reads both sides and decides, usually within 3 working days.</div>
+
+    <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 6px">
+      <legend style="padding: 0; margin-bottom: 8px; font-size: 15px; font-weight: 700">What happened?</legend>
+      <sc-for list="{{reasons}}" as="r" hint-placeholder-count="4">
+        <label style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border-radius: 12px; border: {{r.border}}; background: #ffffff; font-size: 14px">
+          <input type="radio" name="reason" checked="{{r.on}}" style="width: 18px; height: 18px; margin: 0; accent-color: #070f4c">{{r.label}}
+        </label>
+      </sc-for>
+    </fieldset>
+
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Tell us more
+      <textarea rows="4" style="padding: 10px 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 14px Inter, sans-serif; resize: none">It arrived with a cracked fuel tank and does not start. The listing said it was working.</textarea>
+    </label>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 13px; font-weight: 600">Photos <span style="font-weight: 500; color: #4b5578">(up to 6)</span></span>
+      <div style="display: flex; gap: 8px">
+        <span style="width: 72px; height: 72px; border-radius: 12px; background: #e7e9f6"></span>
+        <span style="width: 72px; height: 72px; border-radius: 12px; background: #f3f6fd"></span>
+        <button type="button" aria-label="Add a photo" style="width: 72px; height: 72px; border-radius: 12px; border: 2px dashed #c9cee6; background: #ffffff; color: #1d2873; font: 700 22px Inter, sans-serif">+</button>
+      </div>
+    </div>
+
+    <div style="padding: 12px 14px; border-radius: 14px; background: #f3f6fd; font-size: 13px; line-height: 1.45; color: #1d2873"><strong>What BitoCard can decide:</strong> a full refund (fee included), a part refund, or paying the seller. If you return the item, the refund waits until the seller confirms they have it back.</div>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 20px; background: #ffffff; border-top: 1px solid #e3e7f2">
+    <button type="button" style="width: 100%; height: 50px; border-radius: 14px; border: 0; background: #070f4c; color: #ffffff; font: 700 15px Inter, sans-serif">Open dispute</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const r = (label, on) => ({ label, on, border: on ? '2px solid #070f4c' : '1px solid #e3e7f2' });
+    return { reasons: [r('It never arrived'), r('Not as described', true), r('Damaged on arrival'), r('Something else')] };
+  }
+}
+</script>
+</body>
+</html>

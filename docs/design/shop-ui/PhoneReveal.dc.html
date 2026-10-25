@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Show phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; position: relative; overflow: hidden">
+  <div style="position: absolute; inset: 0; background: rgba(4, 9, 53, 0.55)"></div>
+  <section role="dialog" aria-modal="true" aria-labelledby="phone-title" style="position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 20px 28px; border-radius: 24px 24px 0 0; background: #ffffff; display: flex; flex-direction: column; gap: 14px">
+    <span style="align-self: center; width: 40px; height: 4px; border-radius: 999px; background: #c9cee6"></span>
+    <h2 id="phone-title" style="margin: 0; font-size: 19px; font-weight: 800">Before you call</h2>
+    <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{tips}}" as="t" hint-placeholder-count="3">
+        <li style="display: flex; gap: 10px; font-size: 14px; line-height: 1.4">
+          <span style="width: 22px; height: 22px; flex: none; border-radius: 999px; background: #e8f6f1; color: #0b7a5c; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800">✓</span>{{t}}
+        </li>
+      </sc-for>
+    </ul>
+    <div style="padding: 16px; border-radius: 16px; background: #f3f6fd; display: flex; align-items: center; justify-content: space-between; gap: 12px">
+      <span style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 12px; color: #4b5578">Chinedu O.</span>
+        <strong style="font-size: 22px; font-weight: 800; letter-spacing: 0.02em">0803 412 7789</strong>
+      </span>
+      <a href="#" style="height: 44px; padding: 0 16px; border-radius: 12px; background: #070f4c; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; display: flex; align-items: center">Call</a>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+      <button type="button" style="height: 44px; border-radius: 12px; border: 1px solid #c9cee6; background: #ffffff; color: #070f4c; font: 600 14px Inter, sans-serif">Copy number</button>
+      <a href="Chat.dc.html" style="height: 44px; border-radius: 12px; border: 1px solid #c9cee6; color: #070f4c; text-decoration: none; font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center">Chat instead</a>
+    </div>
+    <span style="font-size: 12px; color: #4b5578; text-align: center">The seller sees that you viewed their number.</span>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { tips: ['Agree to meet in a busy public place', 'Inspect and test before you pay', 'Never send money in advance'] };
+  }
+}
+</script>
+</body>
+</html>

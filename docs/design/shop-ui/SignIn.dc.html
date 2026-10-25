@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in to BitoCard Shop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; padding: 24px 20px; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+  <a href="Listing.dc.html" aria-label="Back" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c; margin-left: -8px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+  </a>
+  <span style="font-size: 26px; font-weight: 800; letter-spacing: -0.02em"><span>Bito</span><span style="color: #ff2382">card</span> <span style="font-size: 15px; font-weight: 600; color: #4b5578">Shop</span></span>
+  <h1 style="margin: 0; font-size: 22px; font-weight: 800; line-height: 1.25">Sign in to chat with the seller</h1>
+  <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #4b5578">Use the same BitoCard account you buy gift cards and airtime with.</p>
+
+  <a href="Listing.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; border: 2px solid #070f4c; background: #ffffff; text-decoration: none; color: #070f4c">
+    <span style="width: 44px; height: 44px; flex: none; border-radius: 999px; background: #070f4c; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700">AO</span>
+    <span style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+      <strong style="font-size: 15px">Continue as Adaeze</strong>
+      <span style="font-size: 12px; color: #4b5578">Signed in on ng.bitocard.com</span>
+    </span>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+  </a>
+
+  <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #4b5578"><span style="flex: 1; height: 1px; background: #e3e7f2"></span>or sign in<span style="flex: 1; height: 1px; background: #e3e7f2"></span></div>
+
+  <form style="display: flex; flex-direction: column; gap: 12px; margin: 0">
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Email
+      <input type="email" autocomplete="email" style="height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 15px Inter, sans-serif">
+    </label>
+    <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Password
+      <input type="password" autocomplete="current-password" style="height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid #c9cee6; font: 500 15px Inter, sans-serif">
+    </label>
+    <button type="button" style="height: 50px; border-radius: 14px; border: 0; background: #070f4c; color: #ffffff; font: 700 15px Inter, sans-serif">Sign in</button>
+  </form>
+  <div style="display: flex; justify-content: space-between; font-size: 13px">
+    <a href="#">Forgot password?</a>
+    <a href="#" style="font-weight: 700">Create an account</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

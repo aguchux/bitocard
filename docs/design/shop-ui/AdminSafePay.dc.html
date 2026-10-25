@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin, Safe pay settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; min-height: 900px; background: #f3f6fd; font-family: Inter, system-ui, sans-serif; color: #070f4c; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+    <div>
+      <a href="AdminModeration.dc.html" style="font-size: 13px; font-weight: 600">‹ Classifieds</a>
+      <h1 style="margin: 4px 0 0; font-size: 24px; font-weight: 800">Safe pay settings</h1>
+      <p style="margin: 4px 0 0; font-size: 13px; color: #4b5578">Per country. Changes apply to new requests only; open orders keep their rates. Finance, behind your authenticator code.</p>
+    </div>
+    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600">Country
+      <select style="height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #c9cee6; font: 600 14px Inter, sans-serif; background: #ffffff; color: #070f4c"><option>Nigeria (NGN)</option></select>
+    </label>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+    <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Fees</h2>
+        <p style="margin: 0; font-size: 13px; color: #4b5578">Each side pays its rate of the price, or its cap, whichever is smaller. A rate of 0 means no fee for that side.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+          <sc-for list="{{fees}}" as="f" hint-placeholder-count="2">
+            <fieldset style="margin: 0; padding: 14px; border-radius: 14px; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 10px">
+              <legend style="padding: 0 6px; font-size: 14px; font-weight: 700">{{f.side}}</legend>
+              <span style="font-size: 12px; color: #4b5578">{{f.note}}</span>
+              <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">Rate
+                <span style="display: flex; align-items: center; height: 42px; border-radius: 10px; border: 1px solid #c9cee6; overflow: hidden"><input type="text" value="{{f.rate}}" aria-label="{{f.side}} rate" style="flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: none; font: 600 14px Inter, sans-serif"><span style="padding: 0 10px; font-weight: 700; color: #4b5578">%</span></span>
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">Cap
+                <span style="display: flex; align-items: center; height: 42px; border-radius: 10px; border: 1px solid #c9cee6; overflow: hidden"><span style="padding: 0 10px; height: 100%; display: flex; align-items: center; background: #f3f6fd; font-weight: 700">₦</span><input type="text" value="{{f.cap}}" aria-label="{{f.side}} cap" style="flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: none; font: 600 14px Inter, sans-serif"></span>
+              </label>
+            </fieldset>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 700">Time limits and new sellers</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px">
+          <sc-for list="{{limits}}" as="l" hint-placeholder-count="5">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600">{{l.label}}
+              <span style="display: flex; align-items: center; height: 42px; border-radius: 10px; border: 1px solid #c9cee6; overflow: hidden"><input type="text" value="{{l.value}}" style="flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: none; font: 600 14px Inter, sans-serif"><span style="padding: 0 10px; color: #4b5578; font-weight: 600">{{l.unit}}</span></span>
+            </label>
+          </sc-for>
+        </div>
+      </section>
+      <div style="display: flex; justify-content: flex-end"><button type="button" style="height: 44px; padding: 0 20px; border-radius: 12px; border: 0; background: #070f4c; color: #ffffff; font: 700 14px Inter, sans-serif">Save for Nigeria</button></div>
+    </div>
+
+    <section style="flex: 1 1 340px; min-width: 0; padding: 18px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700">What people would pay</h2>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px">
+          <thead><tr style="text-align: left; color: #4b5578; font-size: 12px"><th style="padding: 8px 6px; font-weight: 600">Price</th><th style="padding: 8px 6px; font-weight: 600">Buyer fee</th><th style="padding: 8px 6px; font-weight: 600">Seller fee</th><th style="padding: 8px 6px; font-weight: 600">BitoCard</th></tr></thead>
+          <tbody>
+            <sc-for list="{{examples}}" as="e" hint-placeholder-count="4">
+              <tr style="border-top: 1px solid #e3e7f2"><td style="padding: 8px 6px; font-weight: 700">{{e.price}}</td><td style="padding: 8px 6px">{{e.buyer}}</td><td style="padding: 8px 6px">{{e.seller}}</td><td style="padding: 8px 6px; font-weight: 700">{{e.total}}</td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <span style="font-size: 12px; color: #4b5578">"cap" marks a fee held at its cap.</span>
+      <div style="padding: 12px; border-radius: 12px; background: #fff8ec; border: 1px solid #f4dcb0; font-size: 12px; line-height: 1.45; color: #5a3200">Safe pay is sandbox only in Nigeria until the legal advice on holding buyers' money is done.</div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      fees: [
+        { side: 'Buyer pays (x)', note: 'Added on top of the price, shown before they ask.', rate: '2.0', cap: '20,000' },
+        { side: 'Seller pays (y)', note: 'Taken from what they are paid, shown before they accept.', rate: '3.0', cap: '30,000' },
+      ],
+      limits: [
+        { label: 'Seller must accept within', value: '24', unit: 'hours' },
+        { label: 'Buyer must pay within', value: '24', unit: 'hours' },
+        { label: 'Hand-over within', value: '5', unit: 'days' },
+        { label: 'Buyer confirms delivery within', value: '3', unit: 'days' },
+        { label: 'Largest order, first 5 sales', value: '200,000', unit: '₦' },
+      ],
+      examples: [
+        { price: '₦50,000', buyer: '₦1,000', seller: '₦1,500', total: '₦2,500' },
+        { price: '₦520,000', buyer: '₦10,400', seller: '₦15,600', total: '₦26,000' },
+        { price: '₦1,200,000', buyer: '₦20,000 cap', seller: '₦30,000 cap', total: '₦50,000' },
+        { price: '₦8,900,000', buyer: '₦20,000 cap', seller: '₦30,000 cap', total: '₦50,000' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

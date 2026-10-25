@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PowerHub shop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 1200px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+  <div style="height: 140px; background: #1d2873; position: relative">
+    <span style="position: absolute; right: 12px; bottom: 10px; font-size: 11px; color: #c9cee6">[Shop cover image]</span>
+  </div>
+  <section style="padding: 0 16px; margin-top: -36px; display: flex; flex-direction: column; gap: 10px">
+    <span style="width: 72px; height: 72px; border-radius: 18px; background: #ffffff; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(7, 15, 76, 0.15); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #c00b58">PH</span>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px">
+      <span style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800">PowerHub</h1>
+        <span style="font-size: 13px; color: #4b5578">Generators, inverters and solar · Lekki, Lagos</span>
+      </span>
+      <button type="button" style="height: 38px; padding: 0 14px; border-radius: 999px; border: 0; background: #070f4c; color: #ffffff; font: 700 13px Inter, sans-serif; flex: none">Follow</button>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px">
+      <span style="padding: 4px 10px; border-radius: 999px; background: #eef1fb; color: #1d2873; font-size: 12px; font-weight: 700">✓ Verified business</span>
+      <span style="padding: 4px 10px; border-radius: 999px; background: #e8f6f1; color: #064c39; font-size: 12px; font-weight: 700">✓ Safe pay seller</span>
+      <span style="padding: 4px 10px; border-radius: 999px; background: #eef1fb; color: #1d2873; font-size: 12px; font-weight: 700">Delivers nationwide</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{stats}}" as="s" hint-placeholder-count="3">
+        <div style="padding: 10px; border-radius: 12px; background: #ffffff; border: 1px solid #e3e7f2; display: flex; flex-direction: column"><strong style="font-size: 16px">{{s.value}}</strong><span style="font-size: 11px; color: #4b5578">{{s.label}}</span></div>
+      </sc-for>
+    </div>
+    <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #1d2873">Open Mon to Sat, 9 am to 6 pm. Free installation in Lagos on generators above 5 kVA.</p>
+  </section>
+
+  <nav aria-label="Shop sections" style="display: flex; gap: 6px; padding: 14px 16px 0">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+      <a href="#" style="height: 34px; padding: 0 12px; border-radius: 999px; text-decoration: none; font-size: 13px; font-weight: 600; display: flex; align-items: center; background: {{t.bg}}; color: {{t.fg}}; border: {{t.border}}">{{t.label}}</a>
+    </sc-for>
+  </nav>
+
+  <div style="padding: 14px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+    <sc-for list="{{items}}" as="l" hint-placeholder-count="4">
+      <a href="Listing.dc.html" style="display: flex; flex-direction: column; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; overflow: hidden; text-decoration: none; color: #070f4c">
+        <span style="height: 110px; background: {{l.tint}}; position: relative"><sc-if value="{{l.deal}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 999px; background: #c00b58; color: #ffffff; font-size: 11px; font-weight: 700">{{l.deal}}</span></sc-if></span>
+        <span style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px">
+          <strong style="font-size: 14px; font-weight: 800">{{l.price}}</strong>
+          <sc-if value="{{l.was}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; color: #4b5578; text-decoration: line-through">{{l.was}}</span></sc-if>
+          <span style="font-size: 12px">{{l.title}}</span>
+        </span>
+      </a>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const chip = (label, on) => ({ label, border: on ? '1px solid #070f4c' : '1px solid #c9cee6', bg: on ? '#070f4c' : '#ffffff', fg: on ? '#ffffff' : '#070f4c' });
+    return {
+      stats: [{ value: '4.9', label: 'Rating (48)' }, { value: '36', label: 'Listings' }, { value: '210', label: 'Followers' }],
+      tabs: [chip('All 36', true), chip('Deals 5', false), chip('For businesses 8', false)],
+      items: [
+        { price: '₦480,000', was: '₦540,000', deal: '−11%', title: '3.5 kVA generator', tint: '#eef7f2' },
+        { price: '₦1,150,000', was: '', deal: '', title: '5 kVA inverter + battery', tint: '#e7e9f6' },
+        { price: '₦265,000', was: '₦295,000', deal: '−10%', title: '400 W solar panel x2', tint: '#fff4e5' },
+        { price: '₦92,000', was: '', deal: '', title: 'Changeover switch, 100 A', tint: '#f3f6fd' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

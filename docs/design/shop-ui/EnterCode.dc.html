@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Enter the release code</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+  <header style="display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <a href="Orders.dc.html" aria-label="Back to orders" style="width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #070f4c">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+    </a>
+    <span style="display: flex; flex-direction: column"><h1 style="margin: 0; font-size: 17px; font-weight: 700">Hand over and get paid</h1><span style="font-size: 12px; color: #4b5578">SP-000147 · Samsung 43" Smart TV</span></span>
+  </header>
+
+  <div style="padding: 24px 20px; display: flex; flex-direction: column; gap: 18px">
+    <div style="padding: 14px; border-radius: 16px; background: #e8f6f1; border: 1px solid #bfe6d8; font-size: 13px; line-height: 1.45; color: #064c39"><strong>BitoCard is holding the buyer's payment.</strong> Let Ngozi check the TV. When she is happy she tells you a 6-digit code.</div>
+    <label for="code-1" style="font-size: 15px; font-weight: 700">Enter the buyer's release code</label>
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{boxes}}" as="b" hint-placeholder-count="6">
+        <input id="{{b.id}}" type="text" inputmode="numeric" maxlength="1" value="{{b.v}}" aria-label="{{b.label}}" style="height: 56px; width: 100%; box-sizing: border-box; border-radius: 12px; border: {{b.border}}; text-align: center; font: 800 24px Inter, sans-serif; color: #070f4c">
+      </sc-for>
+    </div>
+    <span style="font-size: 12px; color: #4b5578">5 tries. The code is only ever shown on the buyer's phone.</span>
+    <button type="button" style="height: 50px; border-radius: 14px; border: 0; background: #0b7a5c; color: #ffffff; font: 700 15px Inter, sans-serif">Confirm and get ₦179,450</button>
+    <div style="padding: 14px; border-radius: 16px; background: #f3f6fd; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.45">
+      <strong>After you confirm</strong>
+      <span style="color: #1d2873">The money is in your BitoCard money straight away and can be withdrawn to your bank after the payout hold.</span>
+    </div>
+    <a href="Chat.dc.html" style="font-size: 13px; font-weight: 600">The buyer won't give the code? Message them or get help</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const v = ['4', '8', '1', '', '', ''];
+    return { boxes: v.map((x, i) => ({ id: 'code-' + (i + 1), v: x, label: 'Digit ' + (i + 1), border: i === 3 ? '2px solid #070f4c' : '1px solid #c9cee6' })) };
+  }
+}
+</script>
+</body>
+</html>

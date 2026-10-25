@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BitoCard Shop, all countries</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; min-height: 1180px">
+
+  <header style="background: #070f4c">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px">
+      <a href="#" style="text-decoration: none; display: flex; align-items: baseline; gap: 6px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em">
+        <span><span style="color: #ffffff">Bito</span><span style="color: #ff2382">card</span></span>
+        <span style="font-size: 14px; font-weight: 600; color: #c9cee6">Shop</span>
+      </a>
+      <label style="flex: 1 1 320px; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border-radius: 14px; background: #ffffff; color: #4b5578">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        <input type="search" placeholder="Search every country" aria-label="Search every country" style="flex: 1; min-width: 0; border: 0; outline: none; font: 500 15px Inter, sans-serif; color: #070f4c; background: transparent">
+      </label>
+      <button type="button" style="height: 46px; padding: 0 16px; border-radius: 14px; border: 1px solid #2a3580; background: #111a5e; color: #ffffff; font: 600 14px Inter, sans-serif">Choose your country</button>
+      <a href="#" style="height: 46px; padding: 0 18px; border-radius: 14px; background: #c00b58; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; display: flex; align-items: center">Sell</a>
+    </div>
+  </header>
+
+  <section style="background: #070f4c; color: #ffffff">
+    <div style="max-width: 1200px; margin: 0 auto; padding: 24px 24px 40px; display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-end; justify-content: space-between">
+      <div style="flex: 1 1 420px; display: flex; flex-direction: column; gap: 12px">
+        <h1 style="margin: 0; font-size: 40px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em">Buy and sell near you,<br><span style="color: #ff7ab6">protected by Safe pay</span></h1>
+        <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #c9cee6; max-width: 520px">Choose your country to see prices in your currency, chat with sellers and buy safely.</p>
+      </div>
+      <div style="flex: 1 1 460px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+        <sc-for list="{{countries}}" as="c" hint-placeholder-count="3">
+          <a href="Main.dc.html" style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: #111a5e; border: 1px solid #2a3580; text-decoration: none; color: #ffffff">
+            <sc-if value="{{c.ng}}" hint-placeholder-val="{{false}}"><svg width="42" height="28" viewBox="0 0 3 2" aria-hidden="true" style="border-radius: 4px"><rect width="1" height="2" fill="#008751"></rect><rect x="1" width="1" height="2" fill="#ffffff"></rect><rect x="2" width="1" height="2" fill="#008751"></rect></svg></sc-if>
+            <sc-if value="{{c.gh}}" hint-placeholder-val="{{false}}"><svg width="42" height="28" viewBox="0 0 3 2" aria-hidden="true" style="border-radius: 4px"><rect width="3" height="2" fill="#006b3f"></rect><rect width="3" height="1.333" fill="#fcd116"></rect><rect width="3" height="0.667" fill="#ce1126"></rect><path d="M1.5.76l.1.3h.32l-.26.19.1.3-.26-.19-.26.19.1-.3-.26-.19h.32z" fill="#000000"></path></svg></sc-if>
+            <sc-if value="{{c.ke}}" hint-placeholder-val="{{false}}"><svg width="42" height="28" viewBox="0 0 3 2" aria-hidden="true" style="border-radius: 4px"><rect width="3" height="2" fill="#006600"></rect><rect width="3" height="1.32" fill="#ffffff"></rect><rect width="3" height="0.6" fill="#000000"></rect><rect y="0.68" width="3" height="0.56" fill="#bb0000"></rect></svg></sc-if>
+            <strong style="font-size: 16px">{{c.name}}</strong>
+            <span style="font-size: 13px; color: #c9cee6">[N] listings · {{c.currency}}</span>
+          </a>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <main style="max-width: 1200px; margin: 0 auto; padding: 32px 24px 48px">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 800">Trending across countries</h2>
+      <span style="font-size: 13px; color: #4b5578">Prices show once you choose a country</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px">
+      <sc-for list="{{items}}" as="i" hint-placeholder-count="8">
+        <a href="SwitchPrompt.dc.html" style="display: flex; flex-direction: column; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; overflow: hidden; text-decoration: none; color: #070f4c">
+          <span style="height: 160px; background: {{i.tint}}"></span>
+          <span style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 14px">
+            <strong style="font-size: 15px; line-height: 1.3">{{i.title}}</strong>
+            <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #1d2873; font-weight: 600">
+              <sc-if value="{{i.ng}}" hint-placeholder-val="{{false}}"><svg width="18" height="12" viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#008751"></rect><rect x="1" width="1" height="2" fill="#ffffff"></rect><rect x="2" width="1" height="2" fill="#008751"></rect></svg></sc-if>
+              <sc-if value="{{i.gh}}" hint-placeholder-val="{{false}}"><svg width="18" height="12" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#006b3f"></rect><rect width="3" height="1.333" fill="#fcd116"></rect><rect width="3" height="0.667" fill="#ce1126"></rect></svg></sc-if>
+              <sc-if value="{{i.ke}}" hint-placeholder-val="{{false}}"><svg width="18" height="12" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#006600"></rect><rect width="3" height="1.32" fill="#ffffff"></rect><rect width="3" height="0.6" fill="#000000"></rect><rect y="0.68" width="3" height="0.56" fill="#bb0000"></rect></svg></sc-if>
+              {{i.place}}
+            </span>
+            <span style="font-size: 12px; color: #4b5578">Seller: {{i.seller}}</span>
+            <span style="font-size: 13px; font-weight: 700; color: #c00b58">See price in {{i.country}}</span>
+          </span>
+        </a>
+      </sc-for>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const at = (cc) => ({ ng: cc === 'NG', gh: cc === 'GH', ke: cc === 'KE' });
+    return {
+      countries: [
+        { name: 'Nigeria', currency: 'naira', ...at('NG') },
+        { name: 'Ghana', currency: 'cedi', ...at('GH') },
+        { name: 'Kenya', currency: 'shilling', ...at('KE') },
+      ],
+      items: [
+        { title: 'iPhone 13 Pro, 256 GB', place: 'Ikeja, Nigeria', country: 'Nigeria', seller: 'Chinedu O.', tint: '#e7e9f6', ...at('NG') },
+        { title: 'Toyota Corolla 2014', place: 'East Legon, Ghana', country: 'Ghana', seller: 'Kofi Motors', tint: '#fff0f7', ...at('GH') },
+        { title: '2-bedroom flat, Kilimani', place: 'Nairobi, Kenya', country: 'Kenya', seller: 'Wanjiru K.', tint: '#eef7f2', ...at('KE') },
+        { title: 'HP EliteBook 840 G6', place: 'Wuse, Nigeria', country: 'Nigeria', seller: 'Abuja Laptops', tint: '#f3f6fd', ...at('NG') },
+        { title: 'Kente cloth, 6 yards', place: 'Kumasi, Ghana', country: 'Ghana', seller: 'Ama A.', tint: '#fff4e5', ...at('GH') },
+        { title: 'Samsung 43" Smart TV', place: 'Mombasa, Kenya', country: 'Kenya', seller: 'Otieno J.', tint: '#e7e9f6', ...at('KE') },
+        { title: 'Generator, 3.5 kVA', place: 'Lekki, Nigeria', country: 'Nigeria', seller: 'PowerHub', tint: '#fff0f7', ...at('NG') },
+        { title: 'Office desk and chair', place: 'Osu, Ghana', country: 'Ghana', seller: 'Yaw B.', tint: '#eef7f2', ...at('GH') },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Favourites</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#c00b58}a:hover{color:#8f0842}
+</style>
+</helmet>
+<div style="width: 390px; height: 900px; box-sizing: border-box; background: #fcfdff; font-family: Inter, system-ui, sans-serif; color: #070f4c; overflow: hidden">
+  <header style="padding: 16px; background: #ffffff; border-bottom: 1px solid #e3e7f2">
+    <h1 style="margin: 0; font-size: 22px; font-weight: 800">Favourites</h1>
+    <p style="margin: 4px 0 0; font-size: 13px; color: #4b5578">We tell you when a price drops or an item sells.</p>
+  </header>
+  <div style="padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+    <sc-for list="{{items}}" as="l" hint-placeholder-count="6">
+      <a href="Listing.dc.html" style="display: flex; flex-direction: column; border-radius: 16px; background: #ffffff; border: 1px solid #e3e7f2; overflow: hidden; text-decoration: none; color: #070f4c; opacity: {{l.opacity}}">
+        <span style="height: 120px; background: {{l.tint}}; position: relative">
+          <span style="position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 999px; background: #ffffff; color: #c00b58; display: flex; align-items: center; justify-content: center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+          </span>
+          <sc-if value="{{l.badge}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: {{l.badgeBg}}; color: {{l.badgeFg}}">{{l.badge}}</span></sc-if>
+        </span>
+        <span style="display: flex; flex-direction: column; gap: 3px; padding: 10px">
+          <strong style="font-size: 15px; font-weight: 800">{{l.price}}</strong>
+          <span style="font-size: 13px">{{l.title}}</span>
+          <span style="font-size: 12px; color: #4b5578">{{l.place}}</span>
+        </span>
+      </a>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const f = (price, title, place, tint, badge, badgeBg, badgeFg, sold) => ({ price, title, place, tint, badge, badgeBg, badgeFg, opacity: sold ? '0.6' : '1' });
+    return {
+      items: [
+        f('₦490,000', 'iPhone 13 Pro, 256 GB', 'Ikeja', '#e7e9f6', 'Price dropped', '#e8f6f1', '#064c39'),
+        f('₦8,900,000', 'Toyota Corolla 2014', 'Lekki', '#fff0f7', '', '', ''),
+        f('₦95,000', '3-seater fabric sofa', 'Allen', '#eef7f2', 'Sold', '#070f4c', '#ffffff', true),
+        f('₦2,500,000/yr', '2-bedroom flat, Yaba', 'Yaba', '#f3f6fd', '', '', ''),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

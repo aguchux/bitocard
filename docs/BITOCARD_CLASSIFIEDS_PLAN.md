@@ -2,6 +2,8 @@
 
 **Status:** plan, 25 October 2026. Nothing built. The owner decided on 25 October 2026: **Safe pay from the start**, as **the buyer's opt-in per purchase**, with **fees on both sides, each capped**: the buyer pays x% of the price on top and the seller y% out of what they are paid, each the percentage or that side's cap, whichever is smaller, all set by admins; **anyone can sell and anyone can buy** (every account does both, with no seller approval; B2B open to all); the **public marketplace at `shop.bitocard.com`**, every page carrying its country (`shop.bitocard.com/ng/…`), with a price-free global showcase across countries, and each customer's **management in the Shop tab of the account app** on their country store (`ng.bitocard.com/shop`; Shop takes the last tab, Account moving to the header); and phase 1 first (shops, deals and B2B in phase 2). The other recommended defaults below stand unless changed.
 
+**Designs:** `docs/design/shop-ui/` (33 screens and the component library; see its README).
+
 ## What we are building
 
 **BitoCard Shop** (Classifieds): browsed at `https://shop.bitocard.com` (`apps/shop`; each country's market at `/<cc>`, for example `/ng`), managed in the **Shop** tab of the customer account app on the customer's country store (`https://ng.bitocard.com/shop`, `apps/storefront`): an open market where anyone posts items for sale and buyers contact sellers, in the style of Jiji, plus **shops**: businesses with their own page, many listings and deals. It serves people buying from people and businesses (C2C, B2C), and businesses buying stock from other businesses (B2B: wholesale quantities and prices).
