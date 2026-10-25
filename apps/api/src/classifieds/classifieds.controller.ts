@@ -10,6 +10,7 @@ import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customer
 import { PageDto } from '../ledger/wallet.controller.js';
 import { ListingsService } from './listings.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
+import { ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
 import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
@@ -124,6 +125,17 @@ class PhotoOrderDto {
 const photoUpload = FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 1 } });
 const videoUpload = FileInterceptor('file', { limits: { fileSize: maxVideoBytes + 1, files: 1, fields: 1 } });
 
+class ReportDto {
+  @IsUUID()
+  listing_id: string;
+
+  @IsIn(reportReasons)
+  reason: ReportReason;
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  details?: string;
+}
+
 class MyListingsDto extends PageDto {
   @IsOptional() @IsIn(listingStatuses)
   status?: ListingStatus;
@@ -187,7 +199,15 @@ export class ClassifiedListingsController {
   constructor(
     private readonly listings: ListingsService,
     private readonly media: ListingMediaService,
+    private readonly moderation: ModerationService,
   ) {}
+
+  /** Reports a listing to BitoCard's moderators (once per listing while open; three reporters send it to review). */
+  @Post('reports')
+  async report(@CurrentCustomer() caller: CustomerCaller, @Body() body: ReportDto) {
+    await this.listings.sellerCountry(caller.customer);
+    return this.moderation.report(caller.customer, body);
+  }
 
   @Get('me/listings')
   mine(@CurrentCustomer() caller: CustomerCaller, @Query() query: MyListingsDto) {

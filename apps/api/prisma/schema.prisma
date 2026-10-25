@@ -2530,6 +2530,9 @@ model Customer {
   exchangeQuotes            ExchangeQuote[]
   exchangeTrades            ExchangeTrade[]
   classifiedListings        ClassifiedListing[]
+  classifiedSeller          ClassifiedSeller?
+  classifiedReportsMade     ClassifiedReport[]        @relation("ClassifiedReporter")
+  classifiedReportsAbout    ClassifiedReport[]        @relation("ClassifiedReported")
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4316,6 +4319,8 @@ model ClassifiedListing {
   status       String                     @default("draft")
   /// Why it waits for review (first_listings, flagged…), or why it was rejected or removed.
   reviewReason String?                    @map("review_reason")
+  /// Every reason it was sent to review: first_listings, prohibited_words, price_low, photo_reused, posting_fast, reported.
+  reviewFlags  String[]                   @default([]) @map("review_flags")
   submittedAt  DateTime?                  @map("submitted_at")
   publishedAt  DateTime?                  @map("published_at")
   expiresAt    DateTime?                  @map("expires_at")
@@ -4335,6 +4340,7 @@ model ClassifiedListing {
   features     ClassifiedListingFeature[]
   media        ClassifiedMedia[]
   priceHistory ClassifiedPriceHistory[]
+  reports      ClassifiedReport[]
 
   @@index([customerId, status])
   @@index([country, status, stateId, areaId])
@@ -4398,4 +4404,55 @@ model ClassifiedPriceHistory {
 
   @@index([listingId, from])
   @@map("classified_price_history")
+}
+
+/// Words and phrases BitoCard Shop refuses (`block`) or sends to a moderator (`review`), everywhere or in one country.
+model ClassifiedProhibitedWord {
+  id          String   @id @default(uuid()) @db.Uuid
+  /// Null: every country.
+  country     String?  @db.Char(2)
+  phrase      String
+  /// block or review.
+  action      String
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([country])
+  @@map("classified_prohibited_words")
+}
+
+/// A customer's report of a listing (or, from chat, of another customer), decided by a moderator.
+model ClassifiedReport {
+  id                 String             @id @default(uuid()) @db.Uuid
+  listingId          String?            @map("listing_id") @db.Uuid
+  reportedCustomerId String?            @map("reported_customer_id") @db.Uuid
+  reporterId         String             @map("reporter_id") @db.Uuid
+  /// scam, prohibited, wrong_category, duplicate, sold, offensive or other.
+  reason             String
+  details            String?
+  /// open, dismissed or actioned.
+  status             String             @default("open")
+  note               String?
+  decidedById        String?            @map("decided_by_id") @db.Uuid
+  decidedAt          DateTime?          @map("decided_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  listing            ClassifiedListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporter           Customer           @relation("ClassifiedReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported           Customer?          @relation("ClassifiedReported", fields: [reportedCustomerId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([listingId, status])
+  @@map("classified_reports")
+}
+
+/// A customer's standing in BitoCard Shop: suspended sellers cannot post, and their listings leave the market.
+model ClassifiedSeller {
+  customerId      String    @id @map("customer_id") @db.Uuid
+  suspendedAt     DateTime? @map("suspended_at")
+  suspendedReason String?   @map("suspended_reason")
+  suspendedById   String?   @map("suspended_by_id") @db.Uuid
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("classified_sellers")
 }

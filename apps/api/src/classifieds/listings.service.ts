@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { ModerationService, type ReviewFlag } from './moderation.service.js';
 import {
   checkDescription,
   checkFeatureValue,
@@ -82,6 +83,7 @@ export class ListingsService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly storage: MediaStorage,
+    private readonly moderation: ModerationService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -96,6 +98,7 @@ export class ListingsService {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'country_required', 'Choose your country on your account first.');
     }
     await this.requireOpen(customer.country);
+    await this.moderation.requireNotSuspended(customer.id);
     return customer.country;
   }
 
@@ -163,7 +166,22 @@ export class ListingsService {
       if (price !== undefined && listing.status !== 'draft' && price !== listing.priceMinor) await this.recordPrice(tx, id, price);
       await this.refreshSearch(tx, id);
     });
+    // A live listing whose words, category or price changed is checked again, and goes back to review if doubtful.
+    const changed = ['title', 'description', 'categoryId', 'priceMinor'].some(key => key in data.fields) || data.features !== null;
+    if (listing.status === 'active' && changed) await this.recheck(id);
     return this.present(await this.own(customer, id));
+  }
+
+  /** Runs the checks on a live listing again (after an edit or a new photo): doubtful ones go back to review. */
+  async recheck(id: string) {
+    const listing = await this.prisma.classifiedListing.findUniqueOrThrow({ where: { id } });
+    if (listing.status !== 'active') return;
+    const flags = await this.moderation.check(listing).catch(async error => {
+      // Words refused outright: the listing leaves the market until it is fixed and reviewed.
+      if ((error as { code?: string }).code === 'listing_prohibited') return ['prohibited_words'] as ReviewFlag[];
+      throw error;
+    });
+    if (flags.length) await this.prisma.classifiedListing.updateMany({ where: { id, status: 'active' }, data: { status: 'pending_review', reviewReason: flags[0], reviewFlags: flags } });
   }
 
   /**
@@ -202,6 +220,7 @@ export class ListingsService {
     if (listing.media.some(item => item.status === 'failed')) throw invalid('media_failed', 'Remove the photo or video that could not be used, or add it again.', 'photos');
     if (listing.media.some(item => item.status === 'processing')) throw conflict('video_processing', 'Your video is still being prepared. Submit again in a minute.');
 
+    const flags = await this.moderation.check(listing);
     const topCategory = listing.category!.parentId ?? listing.category!.id;
     const now = new Date();
     await this.prisma.$transaction(async tx => {
@@ -216,12 +235,12 @@ export class ListingsService {
         }
       }
       const published = await tx.classifiedListing.count({ where: { customerId: customer.id, publishedAt: { not: null } } });
-      const review = published < settings.firstListingsReviewed;
+      const review: ReviewFlag[] = [...(published < settings.firstListingsReviewed ? (['first_listings'] as const) : []), ...flags];
       const claimed = await tx.classifiedListing.updateMany({
         where: { id, status: listing.status },
-        data: review
-          ? { status: 'pending_review', reviewReason: 'first_listings', submittedAt: listing.submittedAt ?? now }
-          : { status: 'active', reviewReason: null, submittedAt: listing.submittedAt ?? now, publishedAt: listing.publishedAt ?? now, expiresAt: new Date(now.getTime() + settings.listingDays * dayMs) },
+        data: review.length
+          ? { status: 'pending_review', reviewReason: review[0], reviewFlags: review, submittedAt: listing.submittedAt ?? now }
+          : { status: 'active', reviewReason: null, reviewFlags: [], submittedAt: listing.submittedAt ?? now, publishedAt: listing.publishedAt ?? now, expiresAt: new Date(now.getTime() + settings.listingDays * dayMs) },
       });
       if (!claimed.count) throw conflict('listing_not_draft', 'This listing was already submitted.');
       if (!(await tx.classifiedPriceHistory.count({ where: { listingId: id } })) && listing.priceMinor !== null) await this.recordPrice(tx, id, listing.priceMinor);
@@ -351,6 +370,7 @@ export class ListingsService {
       ref: Number(listing.ref),
       status: listing.status,
       review_reason: listing.reviewReason,
+      review_flags: listing.reviewFlags,
       title: listing.title,
       description: listing.description,
       price: { kind: listing.priceKind, amount: listing.priceMinor === null ? null : Number(listing.priceMinor), currency: listing.currency },

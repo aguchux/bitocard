@@ -74,6 +74,8 @@ export class ListingMediaService {
     const media = await this.prisma.classifiedMedia.create({
       data: { listingId: listing.id, kind: 'photo', position, url, storageKey: key, width: checked.width, height: checked.height, contentHash: hash, status: 'ready' },
     });
+    // A new photo on a live listing is checked like the rest (another seller's photo sends it to review).
+    if (listing.status === 'active') await this.listings.recheck(listing.id);
     return this.present(media);
   }
 
