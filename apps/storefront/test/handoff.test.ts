@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { request, setRequest } from "./request";
-import { decodeSignedIn, encodeSignedIn, handoffStart, isHouseOrigin, signedInCookie, signedInDomain } from "@bitocard/ui/handoff";
+import { decodeSignedIn, encodeSignedIn, handoffStart, isHouseOrigin, readHandoffHash, signedInCookie, signedInDomain } from "@bitocard/ui/handoff";
 import { forgetSignedIn, rememberSignedIn, signedInElsewhere } from "@/lib/handoff";
 import { continueSignIn } from "@/lib/handoff-actions";
-import { readHandoffHash } from "@/components/store/handoff";
 import { GET } from "@/app/(store)/handoff/go/route";
 import { NextRequest } from "next/server";
 

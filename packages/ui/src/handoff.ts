@@ -60,6 +60,12 @@ export function decodeSignedIn(raw: string | undefined | null): SignedIn | null 
   }
 }
 
+/** `#c=<code>&n=<path>` (the landing page's fragment) as the code and where to go next. */
+export function readHandoffHash(hash: string) {
+  const values = new URLSearchParams(hash.replace(/^#/, ""));
+  return { code: values.get("c") ?? "", next: values.get("n") ?? "/" };
+}
+
 /** Where to start the handoff: the signed-in site's `/handoff/go`, sending the customer back to `next` on `to`. */
 export function handoffStart(from: string, to: string, next: string) {
   const url = new URL("/handoff/go", from);

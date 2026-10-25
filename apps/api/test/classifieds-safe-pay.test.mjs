@@ -124,6 +124,7 @@ describe('Safe pay', () => {
 
     const quote = await buyer.get(`/v1/classifieds/listings/${listing.id}/safe-pay`);
     assert.deepEqual([quote.json.price, quote.json.buyer_fee, quote.json.total], [25000000, 100000, 25100000], '1.5% capped at ₦1,000');
+    assert.ok(quote.json.accept_hours > 0 && quote.json.pay_hours > 0, 'the time limits the buyer is told');
     assert.deepEqual(quote.json.fulfilment, ['meet_up'], 'no delivery offered: meet in person');
     assert.equal((await seller.get(`/v1/classifieds/listings/${listing.id}/safe-pay`)).json.error.param, 'listing_id', 'not your own');
   });

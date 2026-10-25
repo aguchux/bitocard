@@ -26,7 +26,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "assets" / "logo.png"
-APPS = ["storefront", "docs", "legals", "admin", "shq", "verify"]
+APPS = ["storefront", "docs", "legals", "admin", "shq", "verify", "shop"]
 
 WHITE = np.array([255, 255, 255])
 

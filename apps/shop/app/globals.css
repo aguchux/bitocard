@@ -1,0 +1,31 @@
+@import "tailwindcss";
+@import "@bitocard/ui/styles/tokens.css";
+@import "@bitocard/ui/styles/interactive.css";
+/* Shared components styled with Tailwind utilities. */
+@source "../../../packages/ui/src/handoff-ui.tsx";
+@theme inline { --color-background: var(--color-page); --color-foreground: var(--color-navy-900); }
+/* In the base layer, so a field's own focus style (a utility) wins. Text fields never get the outline: they show focus
+   with their own border or ring, or their bar's (the search bar), so no pink box is drawn inside a control. */
+@layer base {
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--color-page); color: var(--color-navy-900); }
+  :focus-visible { outline: 3px solid var(--color-brand-700); outline-offset: 3px; }
+  :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"]), textarea, select):focus-visible { outline: none; }
+}
+/* Sheets (Show phone, Report, Make an offer): pulled up from the bottom on phones, centred above. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+dialog.sheet[open] {
+  animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.sheet::backdrop {
+  background: rgb(7 15 76 / 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.sheet[open] {
+    animation: none;
+  }
+}

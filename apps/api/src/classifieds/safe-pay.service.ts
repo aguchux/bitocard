@@ -169,6 +169,9 @@ export class SafePayService {
       total: Number(price + fee),
       fulfilment: listing.delivery === 'none' ? ['meet_up'] : ['meet_up', 'delivery'],
       reserved,
+      /** How long the seller has to accept, then the buyer to pay. */
+      accept_hours: settings.acceptHours,
+      pay_hours: settings.payHours,
       covers,
     };
   }

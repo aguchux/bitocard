@@ -1,0 +1,127 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { ShieldCheck } from "lucide-react";
+import { shopMoney, type ShopSafePayQuote } from "@bitocard/api-client/classifieds";
+import { cancelSafePay, paySafePay, requestSafePay } from "@/lib/listing-actions";
+
+const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
+
+/** The buyer's request: meet-up or delivery (with the address), then sent to the seller, who has the accept time to answer. */
+export function SafePayRequest({ quote, sellerName, acceptHours }: { quote: ShopSafePayQuote; sellerName: string; acceptHours: number | null }) {
+  const router = useRouter();
+  const [fulfilment, setFulfilment] = useState<"meet_up" | "delivery">(quote.fulfilment[0] ?? "meet_up");
+  const [address, setAddress] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [key] = useState(nonce);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, nonce: key });
+    if (result.ok) router.refresh();
+    else {
+      setError(result.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={event => void submit(event)} className="grid gap-4">
+      <fieldset className="grid gap-2.5">
+        <legend className="mb-1 text-base font-bold">How will you get it?</legend>
+        <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
+          <input type="radio" name="fulfilment" value="meet_up" checked={fulfilment === "meet_up"} onChange={() => setFulfilment("meet_up")} className="mt-1 size-4 accent-navy-900" />
+          <span className="grid gap-0.5">
+            <strong>Meet in person</strong>
+            <span className="text-sm text-navy-600">Inspect it, then give the seller your 6-digit release code.</span>
+          </span>
+        </label>
+        {quote.fulfilment.includes("delivery") ? (
+          <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
+            <input type="radio" name="fulfilment" value="delivery" checked={fulfilment === "delivery"} onChange={() => setFulfilment("delivery")} className="mt-1 size-4 accent-navy-900" />
+            <span className="grid gap-0.5">
+              <strong>Delivery</strong>
+              <span className="text-sm text-navy-600">The seller sends it; confirm when it arrives.</span>
+            </span>
+          </label>
+        ) : null}
+      </fieldset>
+      {fulfilment === "delivery" ? (
+        <label className="grid gap-1.5 text-sm font-semibold">
+          Delivery address
+          <textarea value={address} onChange={event => setAddress(event.target.value)} rows={3} minLength={10} maxLength={500} required placeholder="House number, street, area, city" className="rounded-xl border border-navy-200 px-3 py-2.5 text-[15px] font-normal focus:border-navy-500" />
+          <span className="text-xs font-normal text-navy-600">Only the seller sees it, once you have paid.</span>
+        </label>
+      ) : null}
+      {error ? (
+        <p className="text-sm font-semibold text-brand-700" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <button type="submit" disabled={busy} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
+        <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Sending…" : "Send request to seller"}
+      </button>
+      <p className="text-center text-sm text-navy-600">
+        You pay only after {sellerName} accepts{acceptHours ? `, within ${acceptHours} hours` : ""}.
+      </p>
+    </form>
+  );
+}
+
+/** Paying an accepted order from the wallet, or cancelling it; a balance too low says how much to add. */
+export function SafePayOrderActions({ orderId, canPay, canCancel, addFundsHref, total, currency }: { orderId: string; canPay: boolean; canCancel: boolean; addFundsHref: string | null; total: number; currency: string }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [low, setLow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [key] = useState(nonce);
+
+  const pay = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await paySafePay(orderId, key);
+    if (result.ok) router.refresh();
+    else {
+      setLow(result.code === "wallet_balance_low");
+      setError(result.message);
+    }
+    setBusy(false);
+  };
+  const cancel = async () => {
+    if (!window.confirm("Cancel this Safe pay request?")) return;
+    setBusy(true);
+    const result = await cancelSafePay(orderId);
+    if (result.ok) router.refresh();
+    else setError(result.message);
+    setBusy(false);
+  };
+
+  return (
+    <div className="grid gap-3">
+      {canPay ? (
+        <button type="button" onClick={() => void pay()} disabled={busy} className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-mint-700 font-bold text-white hover:bg-mint-500 disabled:opacity-60">
+          <ShieldCheck className="size-5" aria-hidden="true" /> {busy ? "Paying…" : `Pay ${shopMoney(total, currency)} from my wallet`}
+        </button>
+      ) : null}
+      {error ? (
+        <p className="text-sm font-semibold text-brand-700" role="alert">
+          {error}{" "}
+          {low && addFundsHref ? (
+            <a href={addFundsHref} className="underline">
+              Add funds
+            </a>
+          ) : null}
+        </p>
+      ) : null}
+      {canCancel ? (
+        <button type="button" onClick={() => void cancel()} disabled={busy} className="h-11 rounded-2xl border border-navy-200 font-semibold text-navy-700 hover:border-navy-500 disabled:opacity-60">
+          Cancel request
+        </button>
+      ) : null}
+    </div>
+  );
+}

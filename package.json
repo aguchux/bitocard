@@ -25,6 +25,7 @@
     "dev:shq": "turbo run dev --filter=@bitocard/shq",
     "dev:legals": "turbo run dev --filter=@bitocard/legals",
     "dev:verify": "turbo run dev --filter=@bitocard/verify",
+    "dev:shop": "turbo run dev --filter=@bitocard/shop",
     "docker:up": "docker compose up -d --wait",
     "docker:down": "docker compose down",
     "docker:api": "docker compose --profile api up -d --build --wait",

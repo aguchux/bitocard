@@ -19,6 +19,7 @@ import { ListingMediaService, type MediaUpload } from './media.service.js';
 import { ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
 import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
+import { ShopDirectoryService } from './directory.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
 import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, priceKinds } from './rules.js';
 
@@ -69,6 +70,17 @@ class SearchDto extends CountryDto {
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(maxResults)
   limit?: number;
+}
+
+class ShowcaseDto {
+  @IsOptional() @Matches(slug)
+  category?: string;
+}
+
+class SitemapDto extends CountryDto {
+  /** Listings after this number (the previous page's `next_after`). */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  after?: number;
 }
 
 class SuggestDto extends CountryDto {
@@ -224,7 +236,29 @@ export class ClassifiedReferenceController {
   constructor(
     private readonly reference: ClassifiedReferenceService,
     private readonly search: ListingSearchService,
+    private readonly directory: ShopDirectoryService,
   ) {}
+
+  /** The countries BitoCard Shop is open in, with their live listings, and whether the global showcase is on. */
+  @Get('markets')
+  @Header('Cache-Control', 'public, max-age=60')
+  markets() {
+    return this.directory.markets();
+  }
+
+  /** The global showcase (from the second market): countries, categories, recent and trending listings, never prices. */
+  @Get('showcase')
+  @Header('Cache-Control', 'public, max-age=60')
+  showcase(@Query() query: ShowcaseDto) {
+    return this.directory.showcase(query.category);
+  }
+
+  /** What a country's sitemap lists: category and place counts, and its listings a page at a time. */
+  @Get('sitemap')
+  @Header('Cache-Control', 'public, max-age=300')
+  sitemap(@Query() query: SitemapDto) {
+    return this.directory.sitemap(query.country, query.after);
+  }
 
   /** Live listings in one country: words, category, price, condition and feature filters; local first from `area`. */
   @Get('listings')
@@ -385,7 +419,14 @@ export class ClassifiedChatsController {
   constructor(
     private readonly conversations: ConversationsService,
     private readonly leads: LeadsService,
+    private readonly directory: ShopDirectoryService,
   ) {}
+
+  /** What the signed-in buyer already has with a listing: saved, a chat, an open Safe pay request or order. */
+  @Get('listings/:id/viewer')
+  viewer(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.directory.viewer(caller.customer, id);
+  }
 
   /** The seller's confirmed number (a few new listings an hour); each buyer counts once as a lead. */
   @Post('listings/:id/phone')

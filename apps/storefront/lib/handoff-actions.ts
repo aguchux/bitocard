@@ -2,10 +2,11 @@
 
 import { type Customer, customerApi, keepSession, safeNext, siteOrigin } from "@/lib/customer";
 import { onHouseSite, rememberSignedIn } from "@/lib/handoff";
+import type { HandoffResult } from "@bitocard/ui/handoff-ui";
 
 const codePattern = /^bch_[A-Za-z0-9_-]{20,200}$/;
 
-export type HandoffResult = { ok: true; next: string } | { ok: false; unreachable: boolean };
+export type { HandoffResult };
 
 /**
  * The code another BitoCard site sent here (read from `/handoff`'s fragment by the page), exchanged once by this

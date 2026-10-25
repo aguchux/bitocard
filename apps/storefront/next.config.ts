@@ -2,6 +2,8 @@ import { createNextConfig } from "@bitocard/next-config";
 
 // Mirrors appUrl("legals") in @bitocard/ui/site. The legal pages moved from /legal/* to their own subdomain.
 const legals = process.env.LEGALS_URL ?? (process.env.VERCEL ? "https://legals.bitocard.com" : "http://localhost:3005");
+// Mirrors appUrl("shop"): BitoCard Shop's listings live only there (docs/BITOCARD_CLASSIFIEDS_PLAN.md, Search engines).
+const shop = process.env.SHOP_URL ?? (process.env.VERCEL ? "https://shop.bitocard.com" : "http://localhost:3007");
 
 /**
  * A market's own country store (docs/BITOCARD_COUNTRY_STORES_PLAN.md) is bitocard.com itself, just localised, so the
@@ -21,6 +23,14 @@ export default createNextConfig({
       // The wallet's Activity screen is now Transactions.
       { source: "/account/wallet/activity", destination: "/account/wallet/transactions", permanent: true },
       { source: "/legal/:doc(privacy|terms|cookies|notice)", destination: `${legals}/documents/:doc`, permanent: true },
+      // Nothing public about a listing lives on the country stores: an old or mistaken /shop/l/<listing> on one goes to
+      // the listing's one address on BitoCard Shop (the Shop tab itself, /shop, stays here, signed in).
+      {
+        source: "/shop/l/:listing",
+        has: [{ type: "host", value: "(?<cc>[a-z]{2})\\.(?:bitocard\\.com|localhost(?::\\d+)?)" }],
+        destination: `${shop}/:cc/l/:listing`,
+        permanent: true,
+      },
       // Resellers' stores (<subdomain>.bitocard.com) are their own brand: BitoCard's reseller page lives on bitocard.com
       // only. A market's own country store is bitocard.com itself, just localised, so it keeps this page too.
       {

@@ -39,6 +39,30 @@ type FeatureFilter = { featureId: string; values?: string[]; min?: number; max?:
 const gone = () => new ApiError(HttpStatus.GONE, 'invalid_request_error', 'listing_gone', 'This listing is no longer on BitoCard Shop.');
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
 
+/** How many feature values a card shows under its title ("256 GB · 6 GB RAM · Black"). */
+export const cardHighlights = 3;
+
+/**
+ * A card's first few feature values, in the category's order, as people read them: a number with its unit, a choice or
+ * text as written, a yes as the feature's name (a no says nothing).
+ */
+export function highlights(
+  values: { featureId: string; valueText: string | null; valueNumber: number | null; feature: { name: string; dataType: string; unit: string | null; enabled: boolean } }[],
+  order: { featureId: string; position: number }[],
+) {
+  const place = new Map(order.map(link => [link.featureId, link.position]));
+  return values
+    .filter(value => value.feature.enabled)
+    .sort((a, b) => (place.get(a.featureId) ?? 1000) - (place.get(b.featureId) ?? 1000) || a.feature.name.localeCompare(b.feature.name))
+    .map(value => {
+      if (value.feature.dataType === 'number') return value.valueNumber === null ? null : `${value.valueNumber.toLocaleString('en-GB')}${value.feature.unit ? ` ${value.feature.unit}` : ''}`;
+      if (value.feature.dataType === 'boolean') return value.valueText === 'true' ? value.feature.name : null;
+      return value.valueText?.trim() || null;
+    })
+    .filter((text): text is string => Boolean(text))
+    .slice(0, cardHighlights);
+}
+
 /** "Chinedu Okafor" shows as "Chinedu O.": enough to recognise, never a full name on a public page. */
 export const publicName = (name: string) => {
   const [first, ...rest] = name.trim().split(/\s+/);
@@ -176,7 +200,8 @@ export class ListingSearchService {
       where: { id: { in: ids } },
       include: {
         area: { include: { parent: true } },
-        category: true,
+        category: { include: { features: { select: { featureId: true, position: true } } } },
+        features: { include: { feature: true } },
         customer: { select: { id: true, name: true, createdAt: true, phoneVerifiedAt: true } },
         media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }], select: { kind: true, url: true, width: true, height: true, posterUrl: true } },
       },
@@ -192,6 +217,8 @@ export class ListingSearchService {
             id: row.id,
             ref: Number(row.ref),
             title: row.title!,
+            slug: row.slug!,
+            country: row.country,
             url: `${shopOrigin}/${row.country.toLowerCase()}/l/${row.ref}-${row.slug}`,
             price: { kind: row.priceKind, amount: row.priceMinor === null ? null : Number(row.priceMinor), currency: row.currency },
             condition: row.condition,
@@ -200,6 +227,7 @@ export class ListingSearchService {
             cover: photos[0] ? { url: photos[0].url, width: photos[0].width, height: photos[0].height } : null,
             photo_count: photos.length,
             has_video: row.media.some(item => item.kind === 'video'),
+            highlights: highlights(row.features, row.category?.features ?? []),
             delivery: row.delivery,
             seller: { name: publicName(row.customer.name), badges: this.badges(row.customer, checked) },
             published_at: row.publishedAt?.toISOString() ?? null,

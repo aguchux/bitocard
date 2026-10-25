@@ -19,7 +19,8 @@
     "./phone": "./src/phone.ts",
     "./phone-input": "./src/phone-input.tsx",
     "./chat": "./src/chat.ts",
-    "./handoff": "./src/handoff.ts"
+    "./handoff": "./src/handoff.ts",
+    "./handoff-ui": "./src/handoff-ui.tsx"
   },
   "scripts": {
     "lint": "eslint .",
