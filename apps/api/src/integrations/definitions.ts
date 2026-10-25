@@ -321,7 +321,7 @@ const platformGroups: Array<Omit<IntegrationGroup, 'section' | 'adapterReady'>> 
       }),
       field('STRIPE_SANDBOX', 'Sandbox', { kind: 'flag', help: 'On: test the test secret key (sk_test_…) with Test connection; Stripe is not used for live payments. Off: live.' }),
       field('STRIPE_TAX_CODE', 'Default product tax code', {
-        help: 'Only needed while Stripe Managed Payments is on for the account (Stripe then refuses payments without a tax code). Software checkouts always send txcd_10202000 (downloadable software). This code is sent for everything else: wallet top-ups, gift cards, airtime and other products. Managed Payments only takes digital products (software, games, digital media, online services), so for those other payments the right fix is to turn Managed Payments off in Stripe, not to give them a digital-services code. Leave empty to send none.',
+        help: 'Rarely needed: BitoCard opts every payment out of Stripe Managed Payments, which otherwise refuses payments without a tax code. Software checkouts always send txcd_10202000 (downloadable software). This code is sent for everything else: wallet top-ups, gift cards, airtime and other products. Managed Payments only takes digital products (software, games, digital media, online services), so for those other payments the right fix is to turn Managed Payments off in Stripe, not to give them a digital-services code. Leave empty to send none.',
       }),
     ],
   },

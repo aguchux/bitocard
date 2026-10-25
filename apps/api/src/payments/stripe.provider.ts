@@ -21,9 +21,16 @@ const zeroDecimal = new Set(['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'M
 /** Currencies a Stripe account refused (by a hash of its key), so later payments go straight to US dollars. */
 const refusedCurrencies = new Map<string, Set<string>>();
 
-/** Forgets the currencies Stripe refused (tests, or after the account adds a currency). */
+/**
+ * Stripe accounts (by a hash of the key) that refused the `managed_payments` parameter as unknown, so later sessions
+ * leave it out instead of being refused once each.
+ */
+const noManagedPaymentsParam = new Set<string>();
+
+/** Forgets the currencies Stripe refused and the accounts that do not know `managed_payments` (tests, or after the account changes). */
 export function forgetStripeCurrencies() {
   refusedCurrencies.clear();
+  noManagedPaymentsParam.clear();
 }
 
 /** How far a webhook's signed time may be from ours. */
@@ -130,11 +137,12 @@ export class StripeProvider implements CheckoutProvider {
         refusedCurrencies.set(this.accountKey, refused);
         throw new ProviderError(this.name, `the Stripe account cannot take ${input.currency.toUpperCase()}`, true, 400, 'currency_unsupported');
       }
-      // Managed Payments is on for the account and this payment has no (eligible) tax code: a clear refusal, explained.
+      // Managed Payments applied although every session opts out (or the account does not know the opt-out) and this
+      // payment has no eligible tax code: a clear refusal, explained.
       if (error instanceof ProviderError && error.status === 400 && /tax[ _]code/i.test(error.message)) {
         throw new ProviderError(
           this.name,
-          `${error.message.replace(/^stripe: /, '')} Stripe Managed Payments is on for this account and only takes digital products with an eligible tax code. Turn Managed Payments off in the Stripe dashboard to take wallet top-ups, gift cards, airtime and other products; software checkouts send txcd_10202000 and the Stripe integration's Default product tax code covers the rest.`,
+          `${error.message.replace(/^stripe: /, '')} Stripe applied Managed Payments to this payment although BitoCard opts out of it on every payment, and it only takes digital products with an eligible tax code. Turn it off in the Stripe dashboard (Settings > Managed Payments) or ask Stripe Support to disable it for the account; wallet top-ups, gift cards, airtime and other products cannot be paid through it.`,
           true,
           400,
         );
@@ -143,7 +151,24 @@ export class StripeProvider implements CheckoutProvider {
     }
   }
 
+  /**
+   * BitoCard is the seller of record, so every session opts out of Stripe Managed Payments (where Stripe would be the
+   * seller, and which takes only digital products): accounts that have it on by default, with no account-wide switch,
+   * still take top-ups, gift cards and airtime. An account whose API version does not know the parameter is asked
+   * again without it, once, and remembered.
+   */
   private async openSession(input: CheckoutInput) {
+    const optOut = !noManagedPaymentsParam.has(this.accountKey);
+    try {
+      return await this.sessionFor(input, optOut);
+    } catch (error) {
+      if (!optOut || !(error instanceof ProviderError) || error.status !== 400 || !/unknown parameter[^.]*managed_payments/i.test(error.message)) throw error;
+      noManagedPaymentsParam.add(this.accountKey);
+      return this.sessionFor(input, false);
+    }
+  }
+
+  private async sessionFor(input: CheckoutInput, optOut: boolean) {
     const taxCode = this.taxCodeFor(input.category);
     const session = await this.call<Session>('/v1/checkout/sessions', {
       method: 'POST',
@@ -160,6 +185,7 @@ export class StripeProvider implements CheckoutProvider {
         ...(taxCode ? { 'line_items[0][price_data][product_data][tax_code]': taxCode } : {}),
         'metadata[reference]': input.reference,
         'payment_intent_data[metadata][reference]': input.reference,
+        ...(optOut ? { 'managed_payments[enabled]': 'false' } : {}),
       },
     });
     if (!session.url) throw new ProviderError(this.name, 'no checkout link returned', false);

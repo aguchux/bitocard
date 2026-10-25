@@ -1,4 +1,5 @@
-// Stripe product tax codes: Managed Payments refuses a payment without one, and takes only digital products. Software
+// Stripe product tax codes and Managed Payments: every session opts out of it (BitoCard is the seller); where Stripe
+// applies it anyway it refuses a payment without an eligible code. Software
 // checkouts send downloadable software's code; everything else sends the admin's default code, or none.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
@@ -36,8 +37,21 @@ describe('Stripe product tax codes', () => {
     assert.equal(taxCode((await open(provider, 'software')).providerTransactionId), 'txcd_10202000');
   });
 
-  test('Managed Payments refusing a payment without a code is a clear refusal that says what to change', async () => {
+  test('every session opts out of Managed Payments, so an account with it on by default still takes gift cards and top-ups', async () => {
     stripe.state.managedPayments = true;
+    try {
+      const provider = new StripeProvider('sk_live_x', stripe.url);
+      const opened = await open(provider, 'gift_cards');
+      assert.ok(opened.checkoutUrl, 'a gift card opens');
+      assert.equal(stripe.state.sessions[opened.providerTransactionId].fields['managed_payments[enabled]'], 'false');
+      assert.ok((await open(provider, null)).checkoutUrl, 'a wallet top-up opens');
+    } finally {
+      stripe.state.managedPayments = false;
+    }
+  });
+
+  test('Stripe applying Managed Payments anyway is a clear refusal that says what to change', async () => {
+    Object.assign(stripe.state, { managedPayments: true, ignoresOptOut: true });
     try {
       const provider = new StripeProvider('sk_live_x', stripe.url);
       assert.ok((await open(provider, 'software')).checkoutUrl, 'software still opens');
@@ -48,12 +62,30 @@ describe('Stripe product tax codes', () => {
       assert.ok(refused instanceof ProviderError);
       assert.equal(refused.definite, true);
       assert.match(refused.message, /^stripe: Invalid line_items\[0\]: the product tax code is missing/);
-      assert.match(refused.message, /Turn Managed Payments off in the Stripe dashboard/);
+      assert.match(refused.message, /Settings > Managed Payments\) or ask Stripe Support/);
       assert.equal(refused.message.match(/stripe: /g).length, 1, 'named once');
       assert.doesNotMatch(refused.message, /which is enabled by Stripe/, 'Stripe’s message ends at a full sentence before the advice');
-      assert.match(refused.message, /product-tax-code-requirements\)\. Stripe Managed Payments is on/);
+      assert.match(refused.message, /product-tax-code-requirements\)\. Stripe applied Managed Payments/);
     } finally {
-      stripe.state.managedPayments = false;
+      Object.assign(stripe.state, { managedPayments: false, ignoresOptOut: false });
+    }
+  });
+
+  test('an account that does not know the opt-out is asked again without it, once, and remembered', async () => {
+    const { forgetStripeCurrencies } = await import('../dist/payments/stripe.provider.js');
+    stripe.state.unknownManagedPayments = true;
+    try {
+      const provider = new StripeProvider('sk_live_old', stripe.url);
+      const before = stripe.calls.length;
+      const first = await open(provider, 'gift_cards');
+      assert.equal(stripe.state.sessions[first.providerTransactionId].fields['managed_payments[enabled]'], undefined);
+      assert.equal(stripe.calls.length - before, 2, 'refused once, then opened without it');
+      const second = await open(provider, 'gift_cards');
+      assert.ok(second.checkoutUrl);
+      assert.equal(stripe.calls.length - before, 3, 'later sessions leave it out straight away');
+    } finally {
+      stripe.state.unknownManagedPayments = false;
+      forgetStripeCurrencies();
     }
   });
 

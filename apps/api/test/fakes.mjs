@@ -810,7 +810,7 @@ export async function fakeStripe() {
   // idempotency keys to the refund they made, so a repeat returns it, as Stripe does.
   // `disputes` maps a dispute ID to { amount, currency, status, payment_intent, reason }.
   // `refuseCurrencies`: currencies the account cannot take (lower case), refused as Stripe does; `attempts` every session asked for.
-  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), attempts: [], managedPayments: false };
+  const state = { sessions: {}, refunds: {}, disputes: {}, byKey: {}, next: 1, fee: 0, feeCurrency: null, exchangeRate: null, refuseCurrencies: new Set(), attempts: [], managedPayments: false, ignoresOptOut: false, unknownManagedPayments: false };
   const form = body => (typeof body === 'string' ? Object.fromEntries(new URLSearchParams(body)) : {});
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
@@ -824,7 +824,12 @@ export async function fakeStripe() {
         return { status: 400, body: { error: { type: 'invalid_request_error', message: `Invalid currency: ${currency}. You can change your account to process transactions in ${currency} by adding a bank account for this currency at https://dashboard.stripe.com/account. Your account currently supports these currencies: usd, ngn.` } } };
       }
       // Stripe Managed Payments on: every line item needs a product tax code.
-      if (state.managedPayments && !fields['line_items[0][price_data][product_data][tax_code]']) {
+      // An older API version that does not know the parameter refuses it, as Stripe refuses any unknown parameter.
+      if (state.unknownManagedPayments && 'managed_payments[enabled]' in fields) {
+        return { status: 400, body: { error: { type: 'invalid_request_error', message: 'Received unknown parameter: managed_payments', param: 'managed_payments' } } };
+      }
+      const managed = state.managedPayments && (state.ignoresOptOut || fields['managed_payments[enabled]'] !== 'false');
+      if (managed && !fields['line_items[0][price_data][product_data][tax_code]']) {
         return { status: 400, body: { error: { type: 'invalid_request_error', message: "Invalid line_items[0]: the product tax code is missing. Set the product's tax_code field to an eligible product tax code (more details: https://docs.stripe.com/payments/managed-payments/eligibility#product-tax-code-requirements). Product tax code is required for Managed Payments, which is enabled by default for accounts that have turned it on in the Dashboard." } } };
       }
       const id = `cs_test_${(state.next += 1)}`;
