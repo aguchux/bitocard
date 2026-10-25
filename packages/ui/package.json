@@ -20,7 +20,8 @@
     "./phone-input": "./src/phone-input.tsx",
     "./chat": "./src/chat.ts",
     "./handoff": "./src/handoff.ts",
-    "./handoff-ui": "./src/handoff-ui.tsx"
+    "./handoff-ui": "./src/handoff-ui.tsx",
+    "./image": "./src/image.ts"
   },
   "scripts": {
     "lint": "eslint .",

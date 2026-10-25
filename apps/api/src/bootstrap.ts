@@ -16,6 +16,9 @@ import { addWebhooks } from './webhooks/openapi.js';
 /** Routes outside /v1: service info, health and robots.txt. Everything else is versioned. */
 const unversioned = ['/', 'health', 'robots.txt'];
 
+/** BitoCard Shop's listing video uploads, sent by the seller's browser with a signed link (no cookies). */
+export const isVideoUpload = (url: string | undefined) => /^\/v1\/classifieds\/video-uploads\/[^/?#]+(?:[?#]|$)/.test(url ?? '');
+
 /**
  * Builds the configured Nest application without listening, so tests and the OpenAPI export can reuse it.
  * Named `bootstrap` rather than `app`/`index`/`server`: Vercel treats those names in dist/ as the entrypoint.
@@ -30,14 +33,18 @@ export async function createApp(options: AppOptions = {}) {
   app.use(cookieParser());
   const config = app.get<AppConfig>(APP_CONFIG);
   // Browsers on BitoCard apps may call the API with cookies; anything else uses API keys and needs no CORS.
-  app.enableCors({
-    origin: (origin, done) => done(null, !origin || originAllowed(origin, config.ALLOWED_ORIGINS)),
+  const cors = {
+    origin: (origin: string | undefined, done: (error: Error | null, allow?: boolean) => void) => done(null, !origin || originAllowed(origin, config.ALLOWED_ORIGINS)),
     credentials: true,
     // `authorization`: the docs send a short-lived "Try it" token (never a stored API key) from the browser.
     allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'bitocard-reseller', 'bitocard-mode', 'x-request-id'],
     exposedHeaders: ['request-id', 'idempotent-replayed', 'ratelimit-limit', 'ratelimit-remaining', 'ratelimit-reset', 'retry-after'],
     maxAge: 600,
-  });
+  };
+  // A listing video sent with its upload link (BitoCard Shop): the link is the credential, so any page may send it, never
+  // with cookies (`ClassifiedVideoUploadsController`).
+  const videoUpload = { origin: true, credentials: false, methods: ['POST'], allowedHeaders: ['content-type'], exposedHeaders: ['request-id'], maxAge: 600 };
+  app.enableCors((req: Request, done: (error: Error | null, options: object) => void) => done(null, isVideoUpload(req.url) ? videoUpload : cors));
   app.setGlobalPrefix('v1', { exclude: unversioned });
   app.useGlobalPipes(validationPipe);
   app.enableShutdownHooks();

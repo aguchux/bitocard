@@ -190,7 +190,7 @@ export type ShopSafePayQuote = {
   covers: string[];
 };
 
-/** A Safe pay order as its buyer sees it (their fee and total; never the seller's money). */
+/** A Safe pay order as one side sees it: the buyer their fee and total, the seller their fee and payout, never the other's. */
 export type ShopOrder = {
   object: 'classified_order';
   id: string;
@@ -210,9 +210,93 @@ export type ShopOrder = {
   delivery_address: string | null;
   tracking_note: string | null;
   deadlines: { accept_by: string; pay_by: string | null; handover_by: string | null; confirm_by: string | null };
+  /** Meet-ups, to the seller: tries left at the buyer's release code. */
+  release_tries_left?: number | null;
+  timeline?: { requested_at: string; accepted_at: string | null; paid_at: string | null; sent_at: string | null; released_at: string | null; refunded_at: string | null; closed_at: string | null };
   ended_by: string | null;
   end_reason: string | null;
+  /** The seller's only: a release waiting for BitoCard's check before it can be cashed out. */
+  payout_review?: 'pending' | 'approved' | 'rejected' | null;
+  dispute?: { id: string; status: 'open' | 'decided'; reason: ShopDisputeReason; decision: 'refund' | 'partial' | 'release' | null } | null;
 };
+export type ShopOrders = { object: 'list'; data: ShopOrder[]; total: number };
+
+export type ShopDisputeReason = 'not_received' | 'not_as_described' | 'damaged' | 'other';
+export type ShopDisputeMessage = {
+  object: 'classified_dispute_message';
+  id: string;
+  from: 'me' | 'them' | 'bitocard';
+  body: string;
+  photo: { url: string; content_type: string | null; size: number | null; width: number | null; height: number | null } | null;
+  created_at: string;
+};
+export type ShopDispute = {
+  object: 'classified_dispute';
+  id: string;
+  order_id: string;
+  reason: ShopDisputeReason;
+  status: 'open' | 'decided';
+  decision: 'refund' | 'partial' | 'release' | null;
+  refund: number | null;
+  note: string | null;
+  decided_at: string | null;
+  created_at: string;
+  messages: ShopDisputeMessage[];
+};
+export type ShopReleaseCode = { object: 'classified_release_code'; order_id: string; code: string; tries_left: number };
+/** What a seller still needs before accepting Safe pay orders. */
+export type ShopReadiness = { object: 'classified_safe_pay_readiness'; identity_checked: boolean; payout_account: boolean; ready: boolean; limited: boolean; strikes: number; strike_limit: number };
+
+export type ShopListingStatus = 'draft' | 'pending_review' | 'active' | 'sold' | 'expired' | 'rejected' | 'removed';
+export type ShopContact = 'chat' | 'phone' | 'both';
+/** A seller's own listing, as the Shop tab edits it. */
+export type ShopMyListing = {
+  object: 'classified_listing';
+  id: string;
+  ref: number;
+  status: ShopListingStatus;
+  review_reason: string | null;
+  review_flags: string[];
+  title: string | null;
+  description: string | null;
+  price: ShopPrice;
+  condition: ShopCondition | null;
+  category: { id: string; slug: string; name: string; parent: { id: string; slug: string; name: string } | null } | null;
+  country: string;
+  area: { id: string; slug: string; name: string; state: { id: string; slug: string; name: string } | null } | null;
+  features: Array<{ key: string; name: string; icon: string; unit: string | null; value: string | number | boolean | null }>;
+  photos: Array<{ id: string; url: string; width: number | null; height: number | null; status: string }>;
+  video: { id: string; url: string | null; poster_url: string | null; duration_ms: number | null; status: 'processing' | 'ready' | 'failed'; failure_reason: string | null } | null;
+  delivery: ShopDelivery;
+  contact: ShopContact;
+  views: number;
+  leads: number;
+  /** Its public page on shop.bitocard.com, while live or recently sold. */
+  url: string | null;
+  created_at: string;
+  updated_at: string;
+  submitted_at: string | null;
+  published_at: string | null;
+  expires_at: string | null;
+  sold_at: string | null;
+};
+export type ShopMyListings = { object: 'list'; data: ShopMyListing[]; has_more: boolean };
+export type ShopMedia = { object: 'classified_media'; id: string; kind: 'photo' | 'video'; position: number; url: string | null; width: number | null; height: number | null; status: 'processing' | 'ready' | 'failed'; failure_reason: string | null };
+export type ShopVideoUpload = { object: 'classified_video_upload'; listing_id: string; path: string; expires_at: string };
+export type ShopListingStats = { object: 'classified_listing_stats'; listing_id: string; views: number; leads: number; phone_reveals: number; chats: number; offers: number };
+
+export type ShopFavourite = {
+  object: 'classified_favourite';
+  listing_id: string;
+  state: 'live' | 'sold' | 'gone';
+  saved_at: string;
+  saved_price: number | null;
+  /** How much the price fell since it was saved, while live. */
+  price_drop: number | null;
+  listing: ShopListingCard | null;
+};
+export type ShopFavourites = { object: 'list'; data: ShopFavourite[]; total: number };
+export type ShopConversations = { object: 'list'; data: ShopConversation[]; total: number };
 
 export type ShopWallet = { object: 'customer_wallet'; currency: string; balance: number };
 
@@ -245,6 +329,32 @@ export const buyerOrderLabels: Record<ShopOrderStatus, string> = {
   refunded: 'Refunded',
   partly_refunded: 'Partly refunded',
 };
+
+/** An order's state, as its seller reads it. */
+export const sellerOrderLabels: Record<ShopOrderStatus, string> = {
+  requested: 'Asked: accept or decline',
+  declined: 'You declined',
+  lapsed: 'Closed: not answered or paid in time',
+  awaiting_payment: 'Accepted: waiting for payment',
+  cancelled: 'Cancelled',
+  paid: 'Paid: hand it over',
+  sent: 'Sent: waiting for the buyer',
+  disputed: 'In dispute',
+  released: 'Paid to you',
+  refunded: 'Refunded to the buyer',
+  partly_refunded: 'Partly refunded',
+};
+export const listingStatusLabels: Record<ShopListingStatus, string> = {
+  draft: 'Draft',
+  pending_review: 'In review',
+  active: 'Active',
+  sold: 'Sold',
+  expired: 'Expired',
+  rejected: 'Needs changes',
+  removed: 'Removed',
+};
+export const disputeReasonLabels: Record<ShopDisputeReason, string> = { not_received: 'It never arrived', not_as_described: 'Not as described', damaged: 'Damaged on arrival', other: 'Something else' };
+export const contactLabels: Record<ShopContact, string> = { chat: 'Chat only', phone: 'Phone only', both: 'Chat and phone' };
 
 // ---- Addresses ----
 

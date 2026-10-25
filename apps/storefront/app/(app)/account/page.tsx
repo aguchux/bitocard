@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Wallet } from "lucide-react";
+import { ChevronRight, PackageCheck, ReceiptText, ShoppingBag, Store, Wallet } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreCustomerSummary, type StoreList, type StoreProduct, type StoreSpinRewards } from "@bitocard/api-client/storefront";
 import { CategoryEntry, ProductLine, SectionTitle, StatCard } from "@/components/app/blocks";
 import { SpinDialog } from "@/components/app/spin-dialog";
@@ -7,9 +7,10 @@ import { showSpin } from "@/lib/spin";
 import { StatsSlider } from "@/components/app/stats-slider";
 import { StatusPill } from "@/components/store/order-status";
 import { storeApi } from "@/lib/api";
-import { customerApi } from "@/lib/customer";
+import { currentCustomer, customerApi } from "@/lib/customer";
 import { inMarket } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
+import { shopMarketFor } from "@/lib/shop-server";
 import { walletFor } from "@/lib/wallet";
 
 const date = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso));
@@ -30,16 +31,20 @@ function spent(summary: StoreCustomerSummary | null) {
   return { value: amount(first.amount, first.currency), note: rest.length ? `+ ${rest.length} other ${rest.length === 1 ? "currency" : "currencies"}` : "On delivered orders" };
 }
 
-/** Home: the customer's figures, the product groups to start from, popular products and their latest orders. */
+/**
+ * Home: the customer's figures, BitoCard Shop's card where it is open for them, the product groups to start from,
+ * popular products and their latest orders.
+ */
 export default async function AccountHome({ searchParams }: { searchParams: Promise<{ spin?: string }> }) {
   const { spin } = await searchParams;
-  const [navigation, summary, popular, recent, wallet, spins] = await Promise.all([
+  const [navigation, summary, popular, recent, wallet, spins, shop] = await Promise.all([
     storeNavigation(),
     customerApi<StoreCustomerSummary>("GET", "/v1/store/account/summary"),
     inMarket("/v1/store/products?sort=popular&limit=8").then(path => storeApi<StoreList<StoreProduct>>(path)),
     customerApi<StoreList<StoreCheckout>>("GET", "/v1/store/checkouts?limit=3"),
     walletFor(),
     customerApi<StoreSpinRewards>("GET", "/v1/store/spins"),
+    currentCustomer().then(shopMarketFor),
   ]);
   const rewards = spins.ok ? spins.data : null;
   const figures = summary.ok ? summary.data : null;
@@ -81,6 +86,21 @@ export default async function AccountHome({ searchParams }: { searchParams: Prom
       {showSpin(rewards) ? (
         <section aria-label="Spin and win">
           <SpinDialog rewards={rewards} open={spin === "1"} />
+        </section>
+      ) : null}
+
+      {shop ? (
+        <section aria-label="BitoCard Shop">
+          <Link href="/shop/post" className="flex items-center gap-4 rounded-3xl bg-navy-900 p-5 text-white hover:bg-navy-800 sm:p-6">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white/10">
+              <Store className="size-6" aria-hidden="true" />
+            </span>
+            <span className="grid min-w-0 flex-1 gap-0.5">
+              <strong className="text-lg">Sell what you don’t use</strong>
+              <span className="text-sm text-white/75">Post an ad on BitoCard Shop in about a minute. Buyers can pay safely with Safe pay.</span>
+            </span>
+            <span className="hidden h-10 shrink-0 items-center rounded-full bg-brand-500 px-4 text-sm font-bold sm:flex">Post an ad</span>
+          </Link>
         </section>
       ) : null}
 

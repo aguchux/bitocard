@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { CheckoutModule } from '../checkout/checkout.module.js';
 import { SettingsModule } from '../settings/settings.module.js';
 import { AdminClassifiedsController, AdminSafePayController, ClassifiedsAdminService } from './admin.controller.js';
-import { ClassifiedChatsController, ClassifiedListingsController, ClassifiedReferenceController, ClassifiedSafePayController } from './classifieds.controller.js';
+import { ClassifiedChatsController, ClassifiedListingsController, ClassifiedReferenceController, ClassifiedSafePayController, ClassifiedVideoUploadsController } from './classifieds.controller.js';
 import { SafePayService } from './safe-pay.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
@@ -22,7 +22,7 @@ import { AdminRegistryController, ClassifiedRegistryService, ClassifiedSuggestio
 /** BitoCard Shop (classifieds): docs/BITOCARD_CLASSIFIEDS_PLAN.md. */
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
-  controllers: [ClassifiedReferenceController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
+  controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
   providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService],
   exports: [ListingsService, ListingMediaService, ConversationsService, SafePayService],
 })

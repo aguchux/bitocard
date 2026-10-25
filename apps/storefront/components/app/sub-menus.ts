@@ -4,16 +4,22 @@ import {
   ArrowUpFromLine,
   CircleCheck,
   Coins,
+  Compass,
   DollarSign,
   Gift,
+  Heart,
   History,
   Landmark,
   LayoutGrid,
+  LayoutList,
   ListOrdered,
   Megaphone,
   MessageSquareWarning,
+  MessagesSquare,
   ReceiptText,
   RotateCcw,
+  ShieldCheck,
+  SquarePlus,
   Truck,
   Wallet,
   Zap,
@@ -31,9 +37,13 @@ export type SubMenuItem = {
   soon?: boolean;
   /** Other paths that belong to this item (a withdrawal's own page belongs to Withdraw). */
   also?: string[];
+  /** Leaves the app (Browse opens shop.bitocard.com through the sign-in handoff): a plain link, never current. */
+  external?: boolean;
+  /** A count beside it (unread messages). */
+  badge?: number;
 };
 
-export type SubMenuKey = "catalog" | "orders" | "wallet" | "crypto" | "account";
+export type SubMenuKey = "catalog" | "orders" | "wallet" | "crypto" | "shop" | "account";
 
 export type SubMenu = {
   key: SubMenuKey;
@@ -47,8 +57,23 @@ export type SubMenu = {
   items: SubMenuItem[];
 };
 
-/** What the rails need from the signed-in customer and the store: the catalogue's groups and the customer's wallet currency. */
-export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null };
+/**
+ * What the rails need from the signed-in customer and the store: the catalogue's groups, the customer's wallet
+ * currency, and the Shop tab where BitoCard Shop is open for them (`browse`: their market on shop.bitocard.com through
+ * the handoff; `unread`: chat messages waiting).
+ */
+export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null; shop?: { browse: string; unread: number } | null };
+
+/** The Shop tab's places (the design canvas's ShopTab board): pills on phones and tablets, the sub rail on desktop. */
+export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenuItem[] => [
+  { href: shop.browse, label: "Browse", icon: Compass, external: true },
+  { href: "/shop/post", label: "Post an ad", icon: SquarePlus },
+  { href: "/shop", label: "My listings", icon: LayoutList, also: ["/shop/listings"] },
+  { href: "/shop/messages", label: "Messages", icon: MessagesSquare, ...(shop.unread ? { badge: shop.unread } : {}) },
+  { href: "/shop/orders", label: "Orders", icon: ReceiptText },
+  { href: "/shop/favourites", label: "Favourites", icon: Heart },
+  { href: "/shop/safe-pay", label: "Safe pay", icon: ShieldCheck },
+];
 
 /** The Crypto tab's places: pills under the title on phones and tablets, the sub rail on desktop. */
 export const cryptoSections: SubMenuItem[] = [
@@ -96,6 +121,7 @@ export function subMenusFor(context: SubMenuContext): SubMenu[] {
     { key: "orders", label: "Orders", href: "/account/orders", param: "show", owns: ["/account/orders", "/account/disputes"], items: orderSections },
     { key: "wallet", label: "Wallet", href: "/account/wallet", param: "wallet", owns: ["/account/wallet"], items: walletSections(context.currency) },
     { key: "crypto", label: "Crypto", href: "/account/crypto", owns: ["/account/crypto"], items: cryptoSections },
+    ...(context.shop ? [{ key: "shop" as const, label: "Shop", href: "/shop", owns: ["/shop"], items: shopSections(context.shop) }] : []),
     // Shown only on its screens (activeAccountSection), not on the Account page, whose rows are its menu.
     { key: "account", label: "Account", href: "/account/profile", owns: [], items: accountSections.map(({ href, label, icon, soon }) => ({ href, label, icon, soon })) },
   ];
@@ -122,8 +148,9 @@ function activeItem(menu: SubMenu, path: string, params: URLSearchParams): strin
   return (
     menu.items
       .filter(item => {
+        if (item.external) return false;
         const own = split(item.href).path;
-        return own === base ? path === own : [own, ...(item.also ?? [])].some(prefix => under(path, prefix));
+        return own === base ? path === own || (item.also ?? []).some(prefix => under(path, prefix)) : [own, ...(item.also ?? [])].some(prefix => under(path, prefix));
       })
       .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
   );

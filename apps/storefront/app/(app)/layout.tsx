@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { nameInitials } from "@bitocard/api-client/classifieds";
 import type { StoreApp } from "@bitocard/api-client/storefront";
 import { Brand } from "@bitocard/ui/brand";
 import { brand } from "@bitocard/ui/site";
@@ -12,10 +13,11 @@ import { SubRail } from "@/components/app/sub-rail";
 import { PublicSpinClaimDialog } from "@/components/app/public-spin-claim-dialog";
 import { StoreName } from "@/components/store/layout";
 import { storeApi } from "@/lib/api";
-import { currentCustomer, safeNext } from "@/lib/customer";
+import { currentCustomer, customerApi, safeNext } from "@/lib/customer";
 import { countryStoreFor, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
 import { pathHeader } from "@/lib/path-header";
+import { shopHref, shopMarketFor } from "@/lib/shop-server";
 import { storeShell } from "@/lib/store-theme";
 import { currentStore, storeCredit, storeSubdomain } from "@/lib/store";
 import { pendingPublicSpinClaim } from "@/lib/spin-actions";
@@ -32,9 +34,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * The customer account app (signed-in customers only): a header with the store's brand, search and menu; the four
- * tabs (Home, Catalog, Orders, Account) as a bottom bar on phones and tablets and, on desktop, a side rail or the same
- * bottom bar as the store (or BitoCard) chose; and a footer with only the copyright line.
+ * The customer account app (signed-in customers only): a header with the store's brand, search and menu; the tabs
+ * (Home, Catalog, Orders, Wallet, Crypto, then Account, or Shop where BitoCard Shop is open for the customer, Account
+ * then moving to the header) as a bottom bar on phones and tablets and, on desktop, a side rail or the same bottom bar
+ * as the store (or BitoCard) chose; and a footer with only the copyright line.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [{ store, missing }, customer] = await Promise.all([currentStore(), currentCustomer()]);
@@ -55,10 +58,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!customer.email_verified) redirect(`/account/verify?next=${next}`);
 
   // The store's choice (else BitoCard's default); the side rail if the API cannot be reached.
-  const [app, navigation, publicSpinClaim] = await Promise.all([
+  const [app, navigation, publicSpinClaim, shopMarket] = await Promise.all([
     store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
     storeNavigation(),
     pendingPublicSpinClaim(),
+    shopMarketFor(customer),
   ]);
   // On root, a customer whose fixed country now has its own live country store belongs there, same as the store pages
   // (docs/BITOCARD_COUNTRY_STORES_PLAN.md); their account is the same account, just served from its own address —
@@ -67,8 +71,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const subdomain = countryStoreFor(navigation.countries, customer.country);
     if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
   }
+  // BitoCard Shop open for the customer: the Shop tab, with its unread chat messages on its menu.
+  const unread = shopMarket ? await customerApi<{ unread: number }>("GET", "/v1/classifieds/conversations/unread") : null;
+  const shop = shopMarket ? { browse: shopHref(`/${shopMarket.country.toLowerCase()}`), unread: unread?.ok ? unread.data.unread : 0 } : null;
   // What the desktop sub rails list: the catalogue's groups on sale (as the Catalog page's chips) and the customer's wallets.
-  const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency };
+  const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency, shop };
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";
   const rail = desktopNav === "rail";
   // A market's own country store is BitoCard's own, just localised: it wears BitoCard's own brand, like root. Only a
@@ -87,6 +94,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ) : null}
       <AppHeader
         storeName={name}
+        shop={Boolean(shop)}
+        initials={nameInitials(customer.name)}
         brand={
           reseller ? (
             <StoreName store={store!} />
@@ -97,10 +106,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           )
         }
       />
-      <AppNav desktopNav={desktopNav} />
+      <AppNav desktopNav={desktopNav} shop={Boolean(shop)} />
       <div className="flex flex-1">
-        {rail ? <AppRail /> : null}
-        {/* Desktop: a tab's own places (Catalog, Orders, Wallet, Crypto, Account screens) as a second rail; pills elsewhere. */}
+        {rail ? <AppRail shop={Boolean(shop)} /> : null}
+        {/* Desktop: a tab's own places (Catalog, Orders, Wallet, Crypto, Shop, Account screens) as a second rail; pills elsewhere. */}
         <Suspense fallback={null}>
           <SubRail context={subMenus} />
         </Suspense>

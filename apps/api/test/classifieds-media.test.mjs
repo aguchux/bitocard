@@ -216,6 +216,46 @@ describe('the video', () => {
     assert.equal((await shopper.post(`/v1/classifieds/listings/${second.id}/submit`)).json.status, 'pending_review');
   });
 
+  test("sent by the seller's browser with an upload link: from any page, without cookies, only while the session lasts", async () => {
+    media.transcoder = { transcode: async () => ({ video: Buffer.from('re-encoded mp4'), poster: jpeg(), durationMs: 9000, width: 1280, height: 720 }) };
+    const shopper = await seller();
+    const listing = await completeDraft(shopper);
+    const link = await shopper.post(`/v1/classifieds/listings/${listing.id}/video-upload`);
+    assert.equal(link.status, 200, JSON.stringify(link.json));
+    assert.match(link.json.path, /^\/v1\/classifieds\/video-uploads\/bcv_up_[0-9a-f-]{36}\.[0-9a-f-]{36}\.\d{13}\.[\w-]+$/);
+    assert.ok(Date.parse(link.json.expires_at) - Date.now() > 14 * 60_000);
+    assert.equal((await storeServer().post(`/v1/classifieds/listings/${listing.id}/video-upload`)).status, 401, 'signed in only');
+    assert.equal((await (await seller()).post(`/v1/classifieds/listings/${listing.id}/video-upload`)).status, 404, "never for another's listing");
+
+    // The browser's preflight and upload, from the store's page: no cookies, no session header, no Idempotency-Key.
+    const preflight = await fetch(`${server.base}${link.json.path}`, { method: 'OPTIONS', headers: { origin: 'https://ng.bitocard.com', 'access-control-request-method': 'POST' } });
+    assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://ng.bitocard.com');
+    assert.equal(preflight.headers.get('access-control-allow-credentials'), null, 'never with cookies');
+    const send = (path, bytes = mp4()) => {
+      const form = new FormData();
+      form.set('file', new Blob([bytes], { type: 'video/mp4' }), 'clip.mp4');
+      return fetch(`${server.base}${path}`, { method: 'POST', headers: { origin: 'https://ng.bitocard.com' }, body: form });
+    };
+    const forged = await send(link.json.path.replace(/.$/, c => (c === 'A' ? 'B' : 'A')));
+    assert.deepEqual([forged.status, (await forged.json()).error.code], [401, 'upload_link_invalid']);
+    const sent = await send(link.json.path);
+    assert.equal(sent.status, 202);
+    assert.equal(sent.headers.get('access-control-allow-origin'), 'https://ng.bitocard.com');
+    assert.equal((await sent.json()).status, 'processing');
+    await waitFor(async () => (await shopper.get(`/v1/classifieds/me/listings/${listing.id}`)).json.video?.status === 'ready', 'the video');
+    assert.equal((await (await send(link.json.path)).json()).error.code, 'video_exists', 'one per listing');
+    assert.equal((await shopper.post(`/v1/classifieds/listings/${listing.id}/video-upload`)).json.error.code, 'video_exists');
+
+    // Signing out ends the link.
+    const other = await completeDraft(shopper);
+    const second = await shopper.post(`/v1/classifieds/listings/${other.id}/video-upload`);
+    assert.equal((await shopper.post('/v1/store/account/signout')).status, 200);
+    assert.equal((await (await send(second.json.path)).json()).error.code, 'upload_link_invalid');
+    // Other routes keep their own CORS rules.
+    const elsewhere = await fetch(`${server.base}/v1/classifieds/categories?country=NG`, { headers: { origin: 'https://ng.bitocard.com' } });
+    assert.equal(elsewhere.headers.get('access-control-allow-origin'), null);
+  });
+
   test('the job fails a video stuck processing (the server restarted mid-way)', async () => {
     media.transcoder = { transcode: () => new Promise(() => {}) };
     const shopper = await seller();

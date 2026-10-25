@@ -42,38 +42,52 @@ export async function shopperHeader(now = Date.now()): Promise<Record<string, st
 const idempotencyKeyPattern = /^[A-Za-z0-9_-]{8,128}$/;
 
 /**
- * Calls a customer endpoint with the signed-in customer's session. Never cached; never throws. Every POST carries a
- * fresh Idempotency-Key unless `idempotencyKey` names one (a form's nonce, so a double submit acts once).
+ * A request to a customer endpoint with the signed-in customer's session, the store and the shopper's signed address,
+ * as it came back (for files, which are not JSON). Never cached; null when the API cannot be reached. Every POST
+ * carries a fresh Idempotency-Key unless `idempotencyKey` names one (a form's nonce, so a double submit acts once). A
+ * `FormData` body is sent as multipart, anything else as JSON.
  */
-export async function customerApi<T>(
+export async function customerFetch(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
   options: { idempotencyKey?: string; headers?: Record<string, string> } = {},
-): Promise<CustomerResult<T>> {
+): Promise<Response | null> {
   const token = (await cookies()).get(customerCookie)?.value;
   const store = await storeSubdomain();
+  const form = body instanceof FormData;
   try {
-    const res = await fetch(apiUrl(path), {
+    return await fetch(apiUrl(path), {
       method,
       cache: "no-store",
       headers: {
         accept: "application/json",
-        ...(body !== undefined ? { "content-type": "application/json" } : {}),
+        ...(body !== undefined && !form ? { "content-type": "application/json" } : {}),
         ...(token ? { [sessionHeader]: token } : {}),
         ...(store ? { [storeHeader]: store } : {}),
         ...(await shopperHeader()),
         ...(method === "POST" ? { "idempotency-key": options.idempotencyKey && idempotencyKeyPattern.test(options.idempotencyKey) ? options.idempotencyKey : randomUUID() } : {}),
         ...options.headers,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     });
-    const json = (await res.json().catch(() => null)) as (T & { error?: { code?: string; message?: string; param?: string } }) | null;
-    if (res.ok) return { ok: true, data: json as T };
-    return { ok: false, status: res.status, code: json?.error?.code ?? null, message: json?.error?.message ?? "Something went wrong. Try again.", param: json?.error?.param ?? null };
   } catch {
-    return { ok: false, status: 0, code: null, message: "We could not reach the store. Try again shortly.", param: null };
+    return null;
   }
+}
+
+/** Calls a customer endpoint (see `customerFetch`) and reads its JSON. Never throws. */
+export async function customerApi<T>(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown,
+  options: { idempotencyKey?: string; headers?: Record<string, string> } = {},
+): Promise<CustomerResult<T>> {
+  const res = await customerFetch(method, path, body, options);
+  if (!res) return { ok: false, status: 0, code: null, message: "We could not reach the store. Try again shortly.", param: null };
+  const json = (await res.json().catch(() => null)) as (T & { error?: { code?: string; message?: string; param?: string } }) | null;
+  if (res.ok) return { ok: true, data: json as T };
+  return { ok: false, status: res.status, code: json?.error?.code ?? null, message: json?.error?.message ?? "Something went wrong. Try again.", param: json?.error?.param ?? null };
 }
 
 /** The signed-in customer, or null. Asked once per request. */

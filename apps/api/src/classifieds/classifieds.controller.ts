@@ -299,6 +299,26 @@ export class ClassifiedReferenceController {
   }
 }
 
+/**
+ * The seller's browser sending a listing's video with the link its store's server asked for (`listings/:id/video-upload`):
+ * the link is the credential (no cookie or session header), so any page may call it (CORS without credentials, set in
+ * `bootstrap.ts`), and repeating it is harmless (a listing has one video).
+ */
+@ApiExcludeController()
+@Public()
+@Controller('classifieds')
+export class ClassifiedVideoUploadsController {
+  constructor(private readonly media: ListingMediaService) {}
+
+  @Post('video-uploads/:token')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @SkipIdempotency()
+  @UseInterceptors(videoUpload)
+  upload(@Param('token') token: string, @UploadedFile() file?: MediaUpload) {
+    return this.media.addVideoWithToken(token, file);
+  }
+}
+
 /** A seller's own listings (bitocard.com customers, through the store's server). */
 @ApiExcludeController()
 @Public()
@@ -396,6 +416,13 @@ export class ClassifiedListingsController {
   @UseInterceptors(videoUpload)
   addVideo(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file?: MediaUpload) {
     return this.media.addVideo(caller.customer, id, file);
+  }
+
+  /** A 15-minute link for the browser to send the video to the API directly (`POST video-uploads/<token>`). */
+  @Post('listings/:id/video-upload')
+  @HttpCode(HttpStatus.OK)
+  videoUploadLink(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.media.videoUploadLink(caller.customer, caller.sessionId, id);
   }
 
   @Patch('listings/:id/photos')

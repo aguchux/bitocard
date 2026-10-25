@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LogOut, Menu, Search, Store, X } from "lucide-react";
 import { signOut } from "@/lib/account-actions";
-import { appTabs } from "./tabs";
+import { accountSections } from "./account-sections";
+import { tabsFor } from "./tabs";
 
 /** The search form: a plain GET to the catalogue, so it works before any script loads. */
 function SearchForm({ autoFocus = false, className = "" }: { autoFocus?: boolean; className?: string }) {
@@ -22,9 +23,13 @@ function SearchForm({ autoFocus = false, className = "" }: { autoFocus?: boolean
 
 /**
  * The account app's header: the store's brand, the search (a field between the brand and the menu from tablets up, a
- * search button opening a sheet on phones), and the menu drawer with the tabs, the full store and signing out.
+ * search button opening a sheet on phones), and the menu drawer with the tabs, the full store and signing out. Where
+ * the Shop tab takes Account's place (`shop`), the menu button is the customer's account button (their initials) and
+ * the drawer lists the Account screens too.
  */
-export function AppHeader({ brand, storeName }: { brand: React.ReactNode; storeName: string }) {
+export function AppHeader({ brand, storeName, shop = false, initials = "" }: { brand: React.ReactNode; storeName: string; shop?: boolean; initials?: string }) {
+  const tabs = tabsFor(shop);
+  const account = shop && initials;
   const [menu, setMenu] = useState(false);
   const sheet = useRef<HTMLDialogElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -70,9 +75,22 @@ export function AppHeader({ brand, storeName }: { brand: React.ReactNode; storeN
         <button type="button" aria-label="Search" onClick={() => sheet.current?.showModal()} className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 md:hidden">
           <Search className="size-6" aria-hidden="true" />
         </button>
-        <button ref={menuButton} type="button" aria-label="Open menu" aria-expanded={menu} onClick={() => setMenu(true)} className="-mr-2 grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50">
-          <Menu className="size-7" aria-hidden="true" />
-        </button>
+        {account ? (
+          <button
+            ref={menuButton}
+            type="button"
+            aria-label="Your account and menu: profile, security, identity check, help, sign out"
+            aria-expanded={menu}
+            onClick={() => setMenu(true)}
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-navy-900 text-[13px] font-bold text-white hover:bg-navy-700"
+          >
+            {initials}
+          </button>
+        ) : (
+          <button ref={menuButton} type="button" aria-label="Open menu" aria-expanded={menu} onClick={() => setMenu(true)} className="-mr-2 grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50">
+            <Menu className="size-7" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {/* Phones: the search opens as a sheet at the top of the screen. */}
@@ -102,12 +120,25 @@ export function AppHeader({ brand, storeName }: { brand: React.ReactNode; storeN
                   </button>
                 </div>
                 <nav aria-label="Menu" className="flex-1 overflow-y-auto px-3 py-3">
-                  {appTabs.map(tab => (
+                  {tabs.map(tab => (
                     <Link key={tab.href} href={tab.href} onClick={() => setMenu(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-3 font-semibold text-navy-900 hover:bg-slate-50">
                       <tab.icon className="size-5 text-slate-500" aria-hidden="true" />
                       {tab.label}
                     </Link>
                   ))}
+                  {shop ? (
+                    <>
+                      <p className="mt-3 border-t border-slate-100 px-3 pt-4 pb-1 text-xs font-bold tracking-[0.14em] text-slate-500 uppercase">Account</p>
+                      {accountSections
+                        .filter(section => !section.soon)
+                        .map(section => (
+                          <Link key={section.href} href={section.href} onClick={() => setMenu(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-3 font-semibold text-navy-900 hover:bg-slate-50">
+                            <section.icon className="size-5 text-slate-500" aria-hidden="true" />
+                            {section.label}
+                          </Link>
+                        ))}
+                    </>
+                  ) : null}
                   <Link href="/" onClick={() => setMenu(false)} className="mt-2 flex min-h-12 items-center gap-3 rounded-xl border-t border-slate-100 px-3 pt-2 font-semibold text-navy-900 hover:bg-slate-50">
                     <Store className="size-5 text-slate-500" aria-hidden="true" />
                     Shop the full store

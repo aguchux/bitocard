@@ -3,11 +3,13 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { IntegrationsService } from '../integrations/integrations.service.js';
 import { checkDocument, maxDocumentBytes, stripJpeg } from '../kyc/files.js';
 import { MediaStorage } from '../media/storage.js';
 import { ListingsService } from './listings.service.js';
 import { invalid } from './rules.js';
 import { FfmpegTranscoder, maxVideoBytes, type VideoTranscoder, VideoRefused, videoKind } from './video.js';
+import { readVideoUploadToken, videoUploadToken } from './video-upload.js';
 
 export type MediaUpload = { buffer: Buffer; mimetype: string; size: number; originalname?: string };
 
@@ -34,7 +36,14 @@ export class ListingMediaService {
     private readonly prisma: PrismaService,
     private readonly storage: MediaStorage,
     private readonly listings: ListingsService,
+    private readonly integrations: IntegrationsService,
   ) {}
+
+  private uploadKey() {
+    const key = this.integrations.env.ENCRYPTION_KEY;
+    if (!key) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'encryption_not_configured', 'Videos cannot be added yet. Try again later.');
+    return key;
+  }
 
   private requireStorage() {
     if (!this.storage.configured()) throw new ApiError(HttpStatus.SERVICE_UNAVAILABLE, 'api_error', 'storage_not_configured', 'Photos cannot be added yet. Try again later.');
@@ -96,6 +105,30 @@ export class ListingMediaService {
     }
     void this.process(media.id, listing, file.buffer);
     return this.present(media);
+  }
+
+  /**
+   * A link for the seller's browser to send the video to the API itself (`POST /v1/classifieds/video-uploads/<token>`),
+   * since a store's server cannot pass 50 MB on: the same checks as adding it, tied to this session for 15 minutes.
+   */
+  async videoUploadLink(customer: CustomerWithStore, sessionId: string, id: string) {
+    this.requireStorage();
+    const listing = await this.editableListing(customer, id);
+    if (listing.media.some(item => item.kind === 'video')) throw conflict('video_exists', 'This listing already has a video. Remove it first.');
+    const { token, expires_at } = videoUploadToken(this.uploadKey(), { listingId: listing.id, sessionId });
+    return { object: 'classified_video_upload' as const, listing_id: listing.id, path: `/v1/classifieds/video-uploads/${token}`, expires_at };
+  }
+
+  /** The video sent with an upload link: the session that asked must still be signed in, and the listing still theirs. */
+  async addVideoWithToken(token: string, file: MediaUpload | undefined) {
+    const claim = readVideoUploadToken(this.uploadKey(), token);
+    const session = claim
+      ? await this.prisma.customerSession.findUnique({ where: { id: claim.sessionId }, include: { customer: { include: { store: { include: { reseller: { select: { house: true } } } }, market: true } } } })
+      : null;
+    if (!claim || !session || session.revokedAt || session.expiresAt <= new Date() || session.customer.status !== 'active') {
+      throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'upload_link_invalid', 'This upload link has expired. Add the video again.');
+    }
+    return this.addVideo(session.customer, claim.listingId, file);
   }
 
   /** Re-encodes, publishes the video and its poster, and marks it ready; or failed, saying why. */

@@ -13,9 +13,18 @@ describe("proxy", () => {
     expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBe("/account/orders/abc?x=1");
   });
 
+  test("the Shop tab is part of the account app: signing in returns there too", () => {
+    for (const path of ["/shop", "/shop/orders/abc?x=1"]) {
+      const response = proxy(new NextRequest(`https://ng.bitocard.com${path}`, { headers: { [pathHeader]: "//evil.com" } }));
+      expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBe(path);
+    }
+  });
+
   test("leaves other pages’ headers alone", () => {
-    const response = proxy(new NextRequest("https://acme.bitocard.com/catalogs", { headers: { [pathHeader]: "//evil.com" } }));
-    expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBeNull();
+    for (const path of ["/catalogs", "/shopping", "/accounts"]) {
+      const response = proxy(new NextRequest(`https://acme.bitocard.com${path}`, { headers: { [pathHeader]: "//evil.com" } }));
+      expect(response.headers.get(`x-middleware-request-${pathHeader}`)).toBeNull();
+    }
   });
 
   test("runs on pages, never on files, _next or prefetches", () => {

@@ -244,6 +244,8 @@ export async function addCashOutAccount(_state: FormState, form: FormData): Prom
     return { error: result.message, field: result.param === "account_number" || result.param === "bank_code" ? result.param : null };
   }
   revalidatePath("/account/crypto/cash-out");
+  // The same accounts are BitoCard Shop's payout accounts for Safe pay sales (the Shop tab's Safe pay page adds them too).
+  revalidatePath("/shop/safe-pay");
   return { notice: `Added ${result.data.bank_name} ending ${result.data.account_number_last4} (${result.data.account_name}).` };
 }
 
