@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Flag as FlagIcon, Heart, MessageCircle, Phone, Share2, ShieldCheck, X } from "lucide-react";
 import { reportReasonLabels, type ShopChat, type ShopReportReason, type ShopViewer } from "@bitocard/api-client/classifieds";
 import { reportListing, saveListing, showPhone } from "@/lib/listing-actions";
+import { useAssistantDraft } from "./assistant";
 import { ChatPanel } from "./chat-panel";
 import { SignInHere } from "./sign-in-here";
 
@@ -79,6 +80,7 @@ export function SaveShare({ listing, viewer, signedIn }: { listing: Pick<Listing
  */
 export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }: { listing: Listing; viewer: ShopViewer | null; signedIn: boolean; chat: ShopChat | null; messagesHref: string | null }) {
   const [chatOpen, setChatOpen] = useState(Boolean(chat));
+  const draft = useAssistantDraft(listing.id, () => setChatOpen(true));
   const [phone, setPhone] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [reason, setReason] = useState<ShopReportReason>("scam");
@@ -141,7 +143,7 @@ export function ListingActions({ listing, viewer, signedIn, chat, messagesHref }
       ) : (
         <p className="rounded-2xl bg-navy-50 p-3.5 text-sm text-navy-700">You can contact sellers in your own country&apos;s Shop.</p>
       )}
-      {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} /> : null}
+      {chatOpen && signedIn && listing.chat && canContact ? <ChatPanel listingId={listing.id} currency={listing.currency} initial={chat} messagesHref={messagesHref} buyPath={listing.buyPath} draft={draft} /> : null}
       <div className="text-center">
         {signedIn ? (
           <button type="button" onClick={() => reportSheet.current?.showModal()} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-navy-600 hover:underline">

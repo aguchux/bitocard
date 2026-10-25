@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import type { ShopSuggestions } from "@bitocard/api-client/classifieds";
+import { useAssistant } from "./assistant";
 
 /**
  * The Shop's search: a GET form to the country's `/search` (it works without script), with suggestions as the buyer
- * types (categories, then titles of live listings like it), read from this site's own `/api/suggest`.
+ * types (categories, then titles of live listings like it), read from this site's own `/api/suggest`. Where the
+ * country's assistant answers, Ask hands what was typed to it ("Describe what you want").
  */
 export function SearchBar({ country, q = "", area, state, autoFocus }: { country: string; q?: string; area?: string | null; state?: string | null; autoFocus?: boolean }) {
   const cc = country.toLowerCase();
@@ -16,6 +18,7 @@ export function SearchBar({ country, q = "", area, state, autoFocus }: { country
   const [open, setOpen] = useState(false);
   const list = useId();
   const form = useRef<HTMLFormElement>(null);
+  const assistant = useAssistant();
 
   useEffect(() => {
     const words = value.trim();
@@ -64,6 +67,16 @@ export function SearchBar({ country, q = "", area, state, autoFocus }: { country
           autoFocus={autoFocus}
           className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-navy-900 outline-none placeholder:text-navy-500"
         />
+        {assistant.available ? (
+          <button
+            type="button"
+            onClick={() => assistant.open({ question: value.trim() || undefined })}
+            className="flex h-9 shrink-0 items-center gap-1 rounded-xl bg-navy-50 px-2.5 text-sm font-semibold text-navy-900 hover:bg-navy-100"
+            aria-label={`Describe what you want to ${assistant.name}`}
+          >
+            <Sparkles className="size-4 text-brand-700" aria-hidden="true" /> <span className="hidden sm:inline">Ask {assistant.name}</span>
+          </button>
+        ) : null}
       </label>
       {area ? <input type="hidden" name="area" value={area} /> : null}
       {state ? <input type="hidden" name="state" value={state} /> : null}

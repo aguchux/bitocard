@@ -19,7 +19,8 @@ export type MediaPurpose =
   | 'store_logo'
   | 'store_image'
   | 'bot_avatar'
-  | 'platform_bot_avatar';
+  | 'platform_bot_avatar'
+  | 'shop_bot_avatar';
 
 export type MediaAsset = {
   object: 'media_asset';

@@ -55,7 +55,7 @@ function OfferCard({ message, onAnswer, busy, buyPath }: { message: ShopMessage;
  * then it polls for new messages while open. Offers are sent and answered here; photos, blocking and reports are in the
  * Shop tab's Messages, where the chat continues.
  */
-export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath }: { listingId: string; currency: string; initial: ShopChat | null; messagesHref: string | null; buyPath: string }) {
+export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath, draft }: { listingId: string; currency: string; initial: ShopChat | null; messagesHref: string | null; buyPath: string; draft?: { text: string; at: number } | null }) {
   const [chat, setChat] = useState<ShopChat | null>(initial);
   const [messages, setMessages] = useState<ShopMessage[]>(initial?.messages ?? []);
   const [body, setBody] = useState(initial ? "" : quick[0]!);
@@ -64,6 +64,13 @@ export function ChatPanel({ listingId, currency, initial, messagesHref, buyPath 
   const [busy, setBusy] = useState(false);
   const list = useRef<HTMLOListElement>(null);
   const last = messages.at(-1)?.id;
+
+  // A first message the shop assistant drafted: the buyer edits it here and sends it themselves.
+  const [usedDraft, setUsedDraft] = useState<number | null>(null);
+  if (draft && draft.at !== usedDraft) {
+    setUsedDraft(draft.at);
+    setBody(draft.text);
+  }
 
   useEffect(() => {
     if (!chat) return;

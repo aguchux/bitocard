@@ -3,6 +3,23 @@ import { bitocardApi } from './base';
 /** Where the bots live: SHQ (`/v1/support/bots`, the reseller's) or admin (`/v1/admin/support/bots`, BitoCard's, and every one to suspend). */
 export type BotsBase = '/v1/support/bots' | '/v1/admin/support/bots';
 export type BotRole = 'chat' | 'tickets';
+/** A shop assistant's roles: buyers on shop.bitocard.com, sellers in the Shop tab, and questions about the Shop. */
+export type ShopBotRole = 'browse' | 'sell' | 'help';
+export type ShopBotLimits = { customer_daily: number; visitor_daily: number; photos_per_draft: number; monthly_budget_usd: number | null };
+
+/** What only shop assistants have: the default, languages and greetings, limits, countries and this month's use. */
+export type ShopBotDetails = {
+  default: boolean;
+  languages: Array<{ code: string; name: string }>;
+  greetings: Record<string, string>;
+  limits: ShopBotLimits;
+  assignments: Array<{ country: string; language: string | null; active: boolean }>;
+  countries: string[];
+  month: { calls: number; cost_usd: number; budget_usd: number | null };
+  ratings: { up: number; down: number };
+  reported: number;
+  last_eval: { id: string; model: string; passed: number; cases: number; created_at: string } | null;
+};
 export type BotTone = 'friendly' | 'formal' | 'brief';
 export type BotProvider = 'anthropic' | 'openai' | 'deepseek';
 export type ManagedSectionKey = 'store' | 'catalogue' | 'buying' | 'delivery' | 'refunds' | 'accounts';
@@ -10,10 +27,10 @@ export type ManagedSectionKey = 'store' | 'catalogue' | 'buying' | 'delivery' | 
 export type SupportBot = {
   object: 'support_bot';
   id: string;
-  scope: 'store' | 'platform';
+  scope: 'store' | 'platform' | 'shop';
   store_id: string | null;
   store_name: string | null;
-  roles: BotRole[];
+  roles: Array<BotRole | ShopBotRole>;
   ticket_reply_mode: 'auto' | 'draft';
   provider: BotProvider;
   model: string;
@@ -31,9 +48,17 @@ export type SupportBot = {
   created_at: string;
   updated_at: string;
   reseller_id?: string;
+  /** Shop assistants only. */
+  shop: ShopBotDetails | null;
 };
 
-export type BotInput = Partial<Pick<SupportBot, 'name' | 'roles' | 'provider' | 'model' | 'funding' | 'store_id' | 'greeting' | 'tone' | 'instructions' | 'ticket_reply_mode' | 'avatar_url' | 'auto_refresh'>> & { scope?: 'store' | 'platform' };
+export type BotInput = Partial<Pick<SupportBot, 'name' | 'roles' | 'provider' | 'model' | 'funding' | 'store_id' | 'greeting' | 'tone' | 'instructions' | 'ticket_reply_mode' | 'avatar_url' | 'auto_refresh'>> & {
+  scope?: SupportBot['scope'];
+  /** Shop assistants. */
+  languages?: string[];
+  greetings?: Record<string, string>;
+  limits?: Partial<ShopBotLimits>;
+};
 
 export type BotKnowledge = {
   object: 'support_bot_knowledge';
@@ -84,8 +109,9 @@ export const supportBotsApi = bitocardApi.injectEndpoints({
       query: ({ base, id, version }) => ({ url: `${base}/${id}/knowledge/restore`, method: 'POST', body: { version } }),
       invalidatesTags: (_result, _error, { id }) => [...one(id), knowledgeTag(id)],
     }),
-    testSupportBot: build.mutation<{ reply: string }, { base: BotsBase; id: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> }>({
-      query: ({ base, id, messages }) => ({ url: `${base}/${id}/test`, method: 'POST', body: { messages } }),
+    /** Shop assistants also take the market their tools read and the side to try it as, and return the cards. */
+    testSupportBot: build.mutation<{ reply: string; cards?: unknown[] }, { base: BotsBase; id: string; messages: Array<{ role: 'user' | 'assistant'; content: string }>; country?: string; surface?: ShopBotRole }>({
+      query: ({ base, id, messages, country, surface }) => ({ url: `${base}/${id}/test`, method: 'POST', body: { messages, ...(country ? { country } : {}), ...(surface ? { surface } : {}) } }),
     }),
     knowledgeTemplate: build.query<{ format: 'md' | 'csv'; filename: string; content: string }, { admin: boolean; format: 'md' | 'csv' }>({
       query: ({ admin, format }) => `${admin ? '/v1/admin/support' : '/v1/support'}/knowledge-template?format=${format}`,

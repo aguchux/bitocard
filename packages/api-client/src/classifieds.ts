@@ -476,3 +476,104 @@ export function descriptionBlocks(text: string | null): DescriptionBlock[] {
   flush();
   return blocks;
 }
+
+// ---- Shop assistants (Anjio) ----
+
+export type ShopAssistantSurface = 'browse' | 'sell' | 'help';
+
+/** What the assistant shows beside its words: always drawn from its tools' results, never from the model's text. */
+export type ShopAssistantCard =
+  | { type: 'listings'; items: ShopListingCard[] }
+  | { type: 'compare'; items: ShopListingCard[] }
+  | { type: 'price_range'; category: string; currency: string; low: number; median: number; high: number; count: number }
+  | { type: 'safe_pay'; currency: string; price: number; fee: number; total: number; listing_id: string | null }
+  | { type: 'checklist'; category: string | null; items: string[] }
+  | { type: 'orders'; items: Array<{ order_id: string; number: string; listing: string | null; side: 'buyer' | 'seller'; status: string; price: string; fulfilment: string; next: string | null }> }
+  | { type: 'my_listings'; items: Array<{ listing_id: string; title: string; status: string; price: string | null; views: number; leads: number; expires: string | null }> }
+  | { type: 'message_draft'; listing_id: string; title: string; url: string; text: string }
+  | { type: 'person'; reason: string }
+  | ({ type: 'suggestion'; kind: 'draft' | 'improve' | 'reply' } & Record<string, unknown>);
+
+export type ShopAssistantProfile = {
+  object: 'shop_assistant';
+  assistant: { id: string; name: string; avatar_url: string | null; label: string; language: string; greeting: string | null; roles: ShopAssistantSurface[]; suggestions: string[] } | null;
+  languages: Array<{ code: string; name: string }>;
+};
+
+export type ShopAssistantMessage = { object: 'assistant_message'; id: string; role: 'user' | 'assistant'; body: string; cards: ShopAssistantCard[]; rating: 1 | -1 | null; reported: boolean; created_at: string };
+
+export type ShopAssistantThread = {
+  object: 'assistant_thread';
+  id: string;
+  country: string;
+  language: string;
+  surface: ShopAssistantSurface;
+  listing_id: string | null;
+  conversation_id: string | null;
+  chat_id: string | null;
+  assistant: { name: string; avatar_url: string | null; label: string; greeting: string | null } | null;
+  messages: ShopAssistantMessage[];
+  created_at: string;
+  /** A visitor's first thread only: the token their site's server keeps for them. */
+  visitor_token?: string;
+};
+
+/** A streamed answer's events, in order: `status` as each tool runs, `cards` as they return, then `message` (or `error`). */
+export type ShopAssistantEvent = { event: 'status'; data: { tool: string } } | { event: 'cards'; data: { cards: ShopAssistantCard[] } } | { event: 'message'; data: ShopAssistantMessage } | { event: 'error'; data: { code: string; message: string } };
+
+export type ShopDraftSuggestion = {
+  title: string | null;
+  category: { id: string; slug: string; name: string } | null;
+  condition: ShopCondition | null;
+  features: Array<{ key: string; name: string; value: string | number | boolean | null }>;
+  description: string | null;
+};
+export type ShopImproveSuggestion = { tips: string[]; missing_features: Array<{ key: string; name: string }>; title: string | null };
+export type ShopPriceSuggestion = Extract<ShopAssistantCard, { type: 'price_range' }>;
+
+export type ShopSuggestion =
+  | { object: 'assistant_suggestion'; kind: 'draft'; message_id: string; suggestion: ShopDraftSuggestion | null }
+  | { object: 'assistant_suggestion'; kind: 'improve'; message_id: string; suggestion: ShopImproveSuggestion | null }
+  | { object: 'assistant_suggestion'; kind: 'reply'; message_id: string; suggestion: { text: string } | null }
+  | { object: 'assistant_suggestion'; kind: 'price'; suggestion: ShopPriceSuggestion | null; note: string };
+
+/** Each tool's name as people read it while it runs ("Searching listings…"). */
+export const assistantToolLabels: Record<string, string> = {
+  search_listings: 'Searching listings',
+  get_listing: 'Reading the listing',
+  compare_listings: 'Comparing listings',
+  price_range: 'Checking prices',
+  safe_pay_quote: 'Working out the Safe pay total',
+  safety_checklist: 'Finding the safety checks',
+  categories: 'Looking at categories',
+  search_features: 'Looking up features',
+  draft_message: 'Drafting a message',
+  my_listings: 'Reading your listings',
+  my_orders: 'Reading your orders',
+  my_conversations: 'Reading your chats',
+  my_listing: 'Reading your listing',
+  chat_messages: 'Reading the chat',
+  offer_person: 'Finding you a person',
+};
+
+/** Reads a server-sent event stream (`event:` and `data:` lines, blank-line separated) into events as they arrive. */
+export function parseAssistantEvents(buffer: string): { events: ShopAssistantEvent[]; rest: string } {
+  const blocks = buffer.split(/\r?\n\r?\n/);
+  const rest = blocks.pop() ?? '';
+  const events: ShopAssistantEvent[] = [];
+  for (const block of blocks) {
+    let event = '';
+    let data = '';
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data += line.slice(5).trim();
+    }
+    if (!event || !data) continue;
+    try {
+      events.push({ event, data: JSON.parse(data) } as ShopAssistantEvent);
+    } catch {
+      // A broken event is skipped; the final message still arrives.
+    }
+  }
+  return { events, rest };
+}

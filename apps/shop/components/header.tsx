@@ -6,6 +6,7 @@ import { nameInitials } from "@bitocard/api-client/classifieds";
 import { signOut } from "@/lib/account-actions";
 import type { Customer } from "@/lib/customer";
 import { myShopHref } from "@/lib/handoff";
+import { AskButton } from "./assistant";
 import { Flag } from "./flag";
 import { SignInHere } from "./sign-in-here";
 
@@ -33,6 +34,7 @@ export function ShopHeader({ market, customer, showcase }: { market: ShopMarket 
     <div className="flex items-center justify-between gap-2">
       <ShopWordmark href={home} />
       <div className="flex items-center gap-2">
+        {market ? <AskButton /> : null}
         {market ? (
           showcase ? (
             <Link href="/" className="flex h-9 items-center gap-1.5 rounded-full border border-navy-700 bg-navy-800 px-2.5 text-sm font-semibold text-white" aria-label={`Country: ${market.name}. Change`}>

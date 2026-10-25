@@ -24,6 +24,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { Gallery } from "@/components/gallery";
 import { ShopIcon } from "@/components/icon";
 import { JsonLd } from "@/components/json-ld";
+import { AskAboutListing } from "@/components/assistant";
 import { ListingActions, SaveShare } from "@/components/listing-actions";
 import { ListingGrid } from "@/components/listing-card";
 import { marketFor, shopApi } from "@/lib/api";
@@ -201,6 +202,7 @@ export default async function ListingPage({ params }: Props) {
               messagesHref={customer?.country && viewer?.conversation_id ? myShopHref(customer.country, `/shop/messages/${viewer.conversation_id}`) : customer?.country ? myShopHref(customer.country, "/shop/messages") : null}
             />
           )}
+          {sold ? null : <AskAboutListing listingId={listing.id} title={listing.title} />}
           <section aria-label="The seller" className="grid gap-3 rounded-2xl border border-navy-200 bg-white p-4">
             <div className="flex items-center gap-3">
               <span className="grid size-11 shrink-0 place-items-center rounded-full bg-navy-900 font-bold text-white" aria-hidden="true">

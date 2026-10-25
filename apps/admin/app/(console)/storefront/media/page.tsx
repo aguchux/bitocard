@@ -22,6 +22,7 @@ const purposeLabels: Record<MediaPurpose, string> = {
   store_image: "Reseller store images",
   bot_avatar: "Store assistant avatar",
   platform_bot_avatar: "BitoCard assistant avatar",
+  shop_bot_avatar: "Shop assistant avatar",
 };
 
 function AssetCard({ asset, editable, onDelete }: { asset: MediaAsset; editable: boolean; onDelete: (asset: MediaAsset) => void }) {
