@@ -12,7 +12,8 @@ import { ProviderError } from '../../payments/provider-error.js';
 import { aiCostMicros, aiProvider, type AiProvider, type AiProviderName, aiProviderLabels, aiProviders, type AiReply, type AiRequest, parseAiPrices, parseModelList } from './providers.js';
 
 export type AiFunding = 'bitocard' | 'own';
-export type AiKind = 'chat' | 'ticket' | 'generate' | 'test';
+/** chat and ticket replies count towards a store's allowance; shop is BitoCard Shop's assistants (BitoCard's own cost). */
+export type AiKind = 'chat' | 'ticket' | 'generate' | 'test' | 'shop';
 export type AiCall = { funding: AiFunding; provider: AiProviderName; model: string; resellerId: string; storeId: string | null; botId: string | null; mode: LedgerMode; kind: AiKind };
 
 const keys: Record<AiProviderName, { key: keyof AppConfig; url: keyof AppConfig; prices: keyof AppConfig }> = {
@@ -150,7 +151,7 @@ export class AiService {
    * replies, the store must have allowance left (`ai_allowance_reached`). A key the provider refuses stops being used
    * (`failed_at`) until it is replaced.
    */
-  async reply(call: AiCall, request: Omit<AiRequest, 'model'>): Promise<AiReply> {
+  async reply(call: AiCall, request: Omit<AiRequest, 'model'>): Promise<AiReply & { costMicros: bigint }> {
     let client: AiProvider | null;
     // Beyond the month's allowance a store may pay as it goes (`stores.ai_overage`): each reply billed at cost plus margin.
     let overage = false;
@@ -204,7 +205,7 @@ export class AiService {
         .chargeUsdUsage({ resellerId: call.resellerId, storeId: call.storeId, micros: costMicros, description: `AI reply beyond this month’s allowance (${call.model})`, reference: `usage:ai:${usage.id}` })
         .catch(error => this.logger.error({ err: error, usageId: usage.id }, 'Could not bill an AI reply'));
     }
-    return reply;
+    return { ...reply, costMicros };
   }
 
   /** What the reseller sees: providers, their keys, the models on BitoCard's AI, and this month's use per store. */

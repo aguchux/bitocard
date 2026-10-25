@@ -13,8 +13,11 @@ export const aiProviderLabels: Record<AiProviderName, string> = { anthropic: 'An
 /** A tool the model may call: its JSON Schema parameters. BitoCard runs it (scoped server-side) and returns the result. */
 export type AiTool = { name: string; description: string; parameters: Record<string, unknown> };
 export type AiToolCall = { id: string; name: string; arguments: Record<string, unknown> };
+/** A photo for a model that reads images (Anthropic, OpenAI): base64 bytes and their type. */
+export type AiImage = { mediaType: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+
 export type AiTurn =
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string; images?: AiImage[] }
   | { role: 'assistant'; content: string | null; toolCalls?: AiToolCall[] }
   | { role: 'tool'; toolCallId: string; name: string; content: string };
 
@@ -102,7 +105,8 @@ export class AnthropicProvider implements AiProvider {
     const system = [{ type: 'text', text: request.system }, ...(request.context ? [{ type: 'text', text: request.context, cache_control: { type: 'ephemeral' } }] : []), ...(request.about ? [{ type: 'text', text: request.about }] : [])];
     const messages: Array<{ role: 'user' | 'assistant'; content: unknown }> = [];
     for (const turn of request.messages) {
-      if (turn.role === 'user') messages.push({ role: 'user', content: turn.content });
+      if (turn.role === 'user')
+        messages.push({ role: 'user', content: turn.images?.length ? [...turn.images.map(image => ({ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } })), { type: 'text', text: turn.content }] : turn.content });
       else if (turn.role === 'assistant') {
         messages.push({ role: 'assistant', content: [...(turn.content ? [{ type: 'text', text: turn.content }] : []), ...(turn.toolCalls ?? []).map(callItem => ({ type: 'tool_use', id: callItem.id, name: callItem.name, input: callItem.arguments }))] });
       } else {
@@ -172,7 +176,8 @@ export class OpenAiCompatibleProvider implements AiProvider {
     const system = [request.context, request.system, request.about].filter(Boolean).join('\n\n');
     const messages: unknown[] = [{ role: 'system', content: system }];
     for (const turn of request.messages) {
-      if (turn.role === 'user') messages.push({ role: 'user', content: turn.content });
+      if (turn.role === 'user')
+        messages.push({ role: 'user', content: turn.images?.length ? [{ type: 'text', text: turn.content }, ...turn.images.map(image => ({ type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.data}` } }))] : turn.content });
       else if (turn.role === 'assistant') {
         messages.push({
           role: 'assistant',
@@ -207,6 +212,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
     return (models.data ?? []).map(model => model.id);
   }
 }
+
+/** Providers whose models read photos (DeepSeek's API takes text only). */
+export const visionProviders: readonly AiProviderName[] = ['anthropic', 'openai'];
 
 export function aiProvider(name: AiProviderName, options: { apiKey: string; baseUrl: string }): AiProvider {
   return name === 'anthropic' ? new AnthropicProvider(options) : new OpenAiCompatibleProvider(name, options);

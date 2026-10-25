@@ -24,18 +24,28 @@ export class CustomerGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<CustomerRequest>();
-    const token = req.get(customerSessionHeader);
-    const session = token ? await this.customers.resolve(token) : null;
-    const requested = storeKey(req) ?? houseSubdomain;
+    const session = await customerFor(this.customers, req);
     if (!session) throw customerSignInRequired();
-    if (session.customer.store.subdomain !== requested) {
-      const country = session.customer.store.subdomain === houseSubdomain ? await this.customers.countryStore(requested) : null;
-      if (!country) throw customerSignInRequired();
-      session.customer = { ...session.customer, store: country };
-    }
     req.customer = session;
     return true;
   }
+}
+
+/**
+ * The customer a request's session belongs to at the store it names (see `CustomerGuard`), or null: for routes that
+ * serve signed-out people too.
+ */
+export async function customerFor(customers: CustomersService, req: Request): Promise<CustomerCaller | null> {
+  const token = req.get(customerSessionHeader);
+  const session = token ? await customers.resolve(token) : null;
+  if (!session) return null;
+  const requested = storeKey(req) ?? houseSubdomain;
+  if (session.customer.store.subdomain !== requested) {
+    const country = session.customer.store.subdomain === houseSubdomain ? await customers.countryStore(requested) : null;
+    if (!country) return null;
+    session.customer = { ...session.customer, store: country };
+  }
+  return session;
 }
 
 /** The signed-in customer (routes behind `CustomerGuard`). */

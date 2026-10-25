@@ -41,6 +41,7 @@ import { ApiExceptionFilter } from './common/errors/api-exception.filter.js';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor.js';
 import { SupportModule } from './support/support.module.js';
 import { ClassifiedsModule } from './classifieds/classifieds.module.js';
+import { ShopAssistantModule } from './classifieds/assistant/assistant.module.js';
 import { DisputesModule } from './disputes/disputes.module.js';
 import { CryptoModule } from './crypto/crypto.module.js';
 import { ManualTopUpsModule } from './top-ups/manual-top-ups.module.js';
@@ -107,6 +108,7 @@ export class AppModule {
         DisputesModule,
         SupportModule,
         ClassifiedsModule,
+        ShopAssistantModule,
         CryptoModule,
         NumbersModule,
         EsimsModule,

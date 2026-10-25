@@ -155,8 +155,9 @@ describe('chats with an assistant', () => {
     await shopper.post('/v1/store/support/chat/messages', { body: 'I want my money back.' });
     const waiting = await until(async () => (await prisma.supportConversation.findUniqueOrThrow({ where: { id: chat.id } })).status === 'waiting');
     assert.ok(waiting);
-    const notice = await prisma.notification.findFirst({ where: { type: 'support.chat_waiting', resellerId: store.resellerId } });
-    assert.match(notice.body, /Wants a refund/);
+    // Staff are paged just after the chat starts waiting.
+    const notice = await until(() => prisma.notification.findFirst({ where: { type: 'support.chat_waiting', resellerId: store.resellerId } }));
+    assert.match(notice?.body ?? '', /Wants a refund/);
     const calls = ai.state.calls.length;
     await shopper.post('/v1/store/support/chat/messages', { body: 'Hello?' });
     await new Promise(resolve => setTimeout(resolve, 300));

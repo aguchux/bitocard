@@ -1306,10 +1306,13 @@ export async function fakeRemita() {
 
 /**
  * Anthropic's Messages API, OpenAI's and DeepSeek's Chat Completions, and their model lists, on one address. Keys that
- * start with `good` are accepted. `state.next` is the next reply's text, or `state.tool` a tool call to make once.
+ * start with `good` are accepted. `state.next` is the next reply's text, or `state.tool` a tool call to make once. For
+ * longer conversations set `state.script` (replies taken in turn, each `{ tool: { name, arguments } }`, `{ text }` or
+ * `{ status }` for a failure), or
+ * `state.respond(body)`, which returns the reply for each request.
  */
 export async function fakeAi() {
-  const state = { next: 'Hello from the assistant.', tool: null, calls: [] };
+  const state = { next: 'Hello from the assistant.', tool: null, calls: [], script: null, respond: null };
   const service = await fakeService(({ method, url, headers, body }) => {
     const path = url.split('?')[0];
     const anthropic = path.startsWith('/v1/messages') || (path === '/v1/models' && headers['x-api-key']);
@@ -1319,12 +1322,15 @@ export async function fakeAi() {
       return { body: { data: anthropic ? [{ id: 'claude-haiku-5-5' }, { id: 'claude-sonnet-5-5' }] : path === '/models' ? [{ id: 'deepseek-chat' }] : [{ id: 'gpt-5-mini' }] } };
     }
     state.calls.push({ path, headers, body });
-    const tool = state.tool;
-    state.tool = null;
+    const scripted = typeof state.respond === 'function' ? state.respond(body) : state.script?.length ? state.script.shift() : null;
+    const tool = scripted ? (scripted.tool ?? null) : state.tool;
+    if (!scripted) state.tool = null;
+    const next = scripted?.text ?? state.next;
+    if (scripted?.status) return { status: scripted.status, body: { error: { type: 'overloaded_error', message: 'Overloaded' } } };
     if (method === 'POST' && path === '/v1/messages') {
       return {
         body: {
-          content: tool ? [{ type: 'text', text: 'Let me check.' }, { type: 'tool_use', id: 'toolu_1', name: tool.name, input: tool.arguments }] : [{ type: 'text', text: state.next }],
+          content: tool ? [{ type: 'text', text: 'Let me check.' }, { type: 'tool_use', id: `toolu_${state.calls.length}`, name: tool.name, input: tool.arguments }] : [{ type: 'text', text: next }],
           stop_reason: tool ? 'tool_use' : 'end_turn',
           usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 900, cache_creation_input_tokens: 0 },
         },
@@ -1333,7 +1339,7 @@ export async function fakeAi() {
     if (method === 'POST' && (path === '/v1/chat/completions' || path === '/chat/completions')) {
       return {
         body: {
-          choices: [{ message: { content: tool ? null : state.next, ...(tool ? { tool_calls: [{ id: 'call_1', type: 'function', function: { name: tool.name, arguments: JSON.stringify(tool.arguments) } }] } : {}) }, finish_reason: tool ? 'tool_calls' : 'stop' }],
+          choices: [{ message: { content: tool ? null : next, ...(tool ? { tool_calls: [{ id: 'call_1', type: 'function', function: { name: tool.name, arguments: JSON.stringify(tool.arguments) } }] } : {}) }, finish_reason: tool ? 'tool_calls' : 'stop' }],
           usage: path === '/chat/completions' ? { prompt_tokens: 1000, completion_tokens: 30, prompt_cache_hit_tokens: 800 } : { prompt_tokens: 1000, completion_tokens: 30, prompt_tokens_details: { cached_tokens: 700 } },
         },
       };

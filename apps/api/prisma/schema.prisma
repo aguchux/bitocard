@@ -2546,6 +2546,7 @@ model Customer {
   classifiedOrdersSold      ClassifiedOrder[]         @relation("ClassifiedOrdersSold")
   classifiedFeatureSuggestions ClassifiedFeatureSuggestion[]
   handoffs                  CustomerHandoff[]
+  assistantThreads          AssistantThread[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4053,7 +4054,7 @@ model AiUsage {
 model SupportBot {
   id               String                @id @default(uuid()) @db.Uuid
   resellerId       String                @map("reseller_id") @db.Uuid
-  /// store (a store's customers) or platform (BitoCard's assistant for resellers in SHQ).
+  /// store (a store's customers), platform (BitoCard's assistant for resellers in SHQ) or shop (BitoCard Shop).
   scope            String                @default("store")
   storeId          String?               @unique @map("store_id") @db.Uuid
   /// chat and/or tickets.
@@ -4080,9 +4081,20 @@ model SupportBot {
   /// When the store's data first differed from the knowledge in use.
   knowledgeStaleAt DateTime?             @map("knowledge_stale_at")
   createdById      String?               @map("created_by_id") @db.Uuid
+  /// Shop assistants: the default (Anjio), answering in every country without its own (exactly one; partial unique index).
+  shopDefault      Boolean               @default(false) @map("shop_default")
+  /// Shop assistants: BCP 47 codes it speaks, its main one first.
+  languages        String[]              @default([])
+  /// Shop assistants: the greeting per language.
+  greetings        Json                  @default("{}")
+  /// Shop assistants: customer_daily, visitor_daily, photos_per_draft, monthly_budget_usd.
+  limits           Json                  @default("{}")
   createdAt        DateTime              @default(now()) @map("created_at")
   updatedAt        DateTime              @updatedAt @map("updated_at")
   knowledge        SupportBotKnowledge[]
+  assignments      ShopBotAssignment[]
+  threads          AssistantThread[]
+  evals            ShopBotEval[]
 
   @@index([resellerId])
   @@index([status])
@@ -4104,12 +4116,104 @@ model SupportBotKnowledge {
   dataHash        String?    @map("data_hash")
   /// Each BitoCard section's hash as BitoCard wrote it, to tell when the owner edited one.
   managedSections Json       @default("{}") @map("managed_sections")
+  /// A shop assistant's BitoCard sections for one country; null for the shared document.
+  country         String?    @db.Char(2)
   createdById     String?    @map("created_by_id") @db.Uuid
   createdAt       DateTime   @default(now()) @map("created_at")
   bot             SupportBot @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   @@unique([botId, version])
+  @@index([botId, country, version])
   @@map("support_bot_knowledge")
+}
+
+/// A shop assistant answering in a country, for one language or (null) all of its own. At most one active assistant per
+/// country and language slot (a partial unique index on country and coalesce(language, '') where active); `active`
+/// follows the bot's status.
+model ShopBotAssignment {
+  id        String     @id @default(uuid()) @db.Uuid
+  botId     String     @map("bot_id") @db.Uuid
+  country   String     @db.Char(2)
+  language  String?
+  active    Boolean    @default(false)
+  createdAt DateTime   @default(now()) @map("created_at")
+  bot       SupportBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([country])
+  @@map("shop_bot_assignments")
+}
+
+/// A conversation with a shop assistant: a customer's, or a signed-out visitor's (only the hash of their token). Kept 30
+/// days after its last message.
+model AssistantThread {
+  id             String             @id @default(uuid()) @db.Uuid
+  botId          String             @map("bot_id") @db.Uuid
+  customerId     String?            @map("customer_id") @db.Uuid
+  visitorHash    String?            @map("visitor_hash") @db.Char(64)
+  country        String             @db.Char(2)
+  language       String
+  /// browse, sell or help.
+  surface        String
+  listingId      String?            @map("listing_id") @db.Uuid
+  conversationId String?            @map("conversation_id") @db.Uuid
+  /// The support chat with BitoCard opened from it (Talk to a person).
+  chatId         String?            @map("chat_id") @db.Uuid
+  lastMessageAt  DateTime           @default(now()) @map("last_message_at")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  bot            SupportBot         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  customer       Customer?          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages       AssistantMessage[]
+
+  @@index([botId, lastMessageAt])
+  @@index([customerId])
+  @@index([visitorHash])
+  @@index([lastMessageAt])
+  @@map("assistant_threads")
+}
+
+/// One turn: the person's words or the assistant's answer (redacted), the cards drawn from tool results, the tools it
+/// called (for review), the person's rating or report, and the answer's usage.
+model AssistantMessage {
+  id           String          @id @default(uuid()) @db.Uuid
+  threadId     String          @map("thread_id") @db.Uuid
+  /// user or assistant.
+  role         String
+  body         String
+  cards        Json            @default("[]")
+  toolCalls    Json            @default("[]") @map("tool_calls")
+  /// 1 (helpful) or -1.
+  rating       Int?            @db.SmallInt
+  reportedAt   DateTime?       @map("reported_at")
+  reportReason String?         @map("report_reason")
+  /// A visitor's address, as an HMAC that changes each UTC day: only for the daily limit.
+  addressHash  String?         @map("address_hash") @db.Char(64)
+  inputTokens  Int             @default(0) @map("input_tokens")
+  outputTokens Int             @default(0) @map("output_tokens")
+  costMicros   BigInt          @default(0) @map("cost_micros")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  thread       AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([addressHash, createdAt])
+  @@index([reportedAt])
+  @@map("assistant_messages")
+}
+
+/// A run of the eval set against a shop assistant's model: each case scored pass or fail.
+model ShopBotEval {
+  id          String     @id @default(uuid()) @db.Uuid
+  botId       String     @map("bot_id") @db.Uuid
+  provider    String
+  model       String
+  cases       Int
+  passed      Int
+  results     Json       @default("[]")
+  createdById String?    @map("created_by_id") @db.Uuid
+  createdAt   DateTime   @default(now()) @map("created_at")
+  bot         SupportBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId, createdAt])
+  @@map("shop_bot_evals")
 }
 
 /// A month's bill: per store (and one for the account's own usage), per currency, live only. Each line was taken from

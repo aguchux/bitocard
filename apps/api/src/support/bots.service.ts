@@ -6,12 +6,36 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, SupportBot, SupportBotKnowledge } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { AiService } from './ai/ai.service.js';
-import { type AiProviderName, aiProviders, type AiTurn } from './ai/providers.js';
+import { type AiProviderName, aiProviders, type AiTurn, visionProviders } from './ai/providers.js';
 import { csvToMarkdown, managedKeys, type ManagedKey, managedSections, managedTitles, maxKnowledgeChars, mergeSections, sectionHashes, StoreKnowledgeService } from './knowledge.js';
 import { knowledgeContext, systemPrompt, type Tone, tones } from './prompt.js';
 
 export const botRoles = ['chat', 'tickets'] as const;
 export type BotRole = (typeof botRoles)[number];
+/** A shop assistant's roles: buyers on shop.bitocard.com, sellers in the Shop tab, and questions about the Shop. */
+export const shopRoles = ['browse', 'sell', 'help'] as const;
+export type ShopRole = (typeof shopRoles)[number];
+export const botScopes = ['store', 'platform', 'shop'] as const;
+export type BotScope = (typeof botScopes)[number];
+
+/** A shop assistant's limits; missing ones take these defaults. */
+export type ShopLimits = { customer_daily: number; visitor_daily: number; photos_per_draft: number; monthly_budget_usd: number | null };
+export const defaultShopLimits: ShopLimits = { customer_daily: 50, visitor_daily: 10, photos_per_draft: 8, monthly_budget_usd: null };
+export const shopLimitsOf = (bot: Pick<SupportBot, 'limits'>): ShopLimits => ({ ...defaultShopLimits, ...((bot.limits ?? {}) as Partial<ShopLimits>) });
+
+/**
+ * What only BitoCard Shop knows about its assistants (countries, knowledge per country, tools), registered by the shop
+ * assistant module so this service stays free of the marketplace.
+ */
+export interface ShopBotHooks {
+  missing(bot: SupportBot): Promise<string[]>;
+  /** In the activation's transaction: the bot's assignments become active, replacing whoever held those slots. */
+  activated(tx: Prisma.TransactionClient, bot: SupportBot, actorId: string | null): Promise<void>;
+  deactivated(botId: string): Promise<void>;
+  generate(bot: SupportBot): Promise<{ content: string }>;
+  test(bot: SupportBot, messages: Array<{ role: 'user' | 'assistant'; content: string }>, options: { country?: string; surface?: ShopRole }): Promise<{ reply: string; cards: unknown[]; usage: unknown }>;
+  present(bot: SupportBot): Promise<Record<string, unknown>>;
+}
 export const botFundings = ['bitocard', 'own'] as const;
 export type BotFunding = (typeof botFundings)[number];
 
@@ -20,13 +44,16 @@ export type BotOwner = { kind: 'reseller'; resellerId: string; userId: string | 
 
 export type BotInput = {
   name?: string;
-  roles?: BotRole[];
+  roles?: Array<BotRole | ShopRole>;
   provider?: AiProviderName;
   model?: string;
   funding?: BotFunding;
   store_id?: string | null;
-  scope?: 'store' | 'platform';
+  scope?: BotScope;
   greeting?: string | null;
+  languages?: string[];
+  greetings?: Record<string, string>;
+  limits?: Partial<ShopLimits>;
   tone?: Tone;
   instructions?: string | null;
   ticket_reply_mode?: 'auto' | 'draft';
@@ -34,7 +61,7 @@ export type BotInput = {
   auto_refresh?: boolean;
 };
 
-type BotWithKnowledge = SupportBot & { current?: SupportBotKnowledge | null; storeName?: string | null };
+type BotWithKnowledge = SupportBot & { current?: SupportBotKnowledge | null; storeName?: string | null; shop?: Record<string, unknown> | null };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such assistant.');
 const invalid = (code: string, message: string, param?: string) => new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', code, message, param);
@@ -44,10 +71,10 @@ export function presentBot(bot: BotWithKnowledge, audience: 'reseller' | 'admin'
   return {
     object: 'support_bot' as const,
     id: bot.id,
-    scope: bot.scope as 'store' | 'platform',
+    scope: bot.scope as BotScope,
     store_id: bot.storeId,
     store_name: bot.storeName ?? null,
-    roles: bot.roles as BotRole[],
+    roles: bot.roles as Array<BotRole | ShopRole>,
     ticket_reply_mode: bot.ticketReplyMode as 'auto' | 'draft',
     provider: bot.provider as AiProviderName,
     model: bot.model,
@@ -65,6 +92,8 @@ export function presentBot(bot: BotWithKnowledge, audience: 'reseller' | 'admin'
     created_at: bot.createdAt.toISOString(),
     updated_at: bot.updatedAt.toISOString(),
     ...(audience === 'admin' ? { reseller_id: bot.resellerId } : {}),
+    /** Shop assistants only: the default, languages and greetings, limits, countries, and this month's use. */
+    shop: bot.scope === 'shop' ? (bot.shop ?? null) : null,
   };
 }
 
@@ -80,6 +109,7 @@ export type SectionChange = { key: ManagedKey; title: string; state: 'unchanged'
 @Injectable()
 export class BotsService {
   private readonly logger = new Logger('SupportBots');
+  private shopHooks: ShopBotHooks | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -89,12 +119,23 @@ export class BotsService {
     private readonly audit: AuditService,
   ) {}
 
+  /** The shop assistant module registers what only it knows. */
+  useShop(hooks: ShopBotHooks) {
+    this.shopHooks = hooks;
+  }
+
+  private shop() {
+    if (!this.shopHooks) throw new Error('Shop assistants are not set up');
+    return this.shopHooks;
+  }
+
   private async withKnowledge(bot: SupportBot): Promise<BotWithKnowledge> {
-    const [current, store] = await Promise.all([
+    const [current, store, shop] = await Promise.all([
       bot.knowledgeId ? this.prisma.supportBotKnowledge.findUnique({ where: { id: bot.knowledgeId } }) : null,
       bot.storeId ? this.prisma.store.findUnique({ where: { id: bot.storeId }, select: { name: true } }) : null,
+      bot.scope === 'shop' ? this.shop().present(bot) : null,
     ]);
-    return { ...bot, current, storeName: store?.name ?? (bot.scope === 'platform' ? 'SHQ (resellers)' : null) };
+    return { ...bot, current, shop, storeName: store?.name ?? (bot.scope === 'platform' ? 'SHQ (resellers)' : bot.scope === 'shop' ? 'BitoCard Shop' : null) };
   }
 
   private audience(owner: BotOwner) {
@@ -106,6 +147,7 @@ export class BotsService {
     const bot = await this.prisma.supportBot.findUnique({ where: { id } });
     if (!bot) throw notFound();
     if (owner.kind === 'reseller' && bot.resellerId !== owner.resellerId) throw notFound();
+    if (owner.kind === 'reseller' && bot.scope === 'shop') throw notFound();
     if (owner.kind === 'admin' && bot.scope !== 'platform' && bot.resellerId !== houseRootId) {
       // Admins see every bot (to suspend one) but edit only BitoCard's own (any house store's, or the platform one).
       const store = bot.storeId ? await this.prisma.store.findUnique({ where: { id: bot.storeId }, select: { reseller: { select: { house: true } } } }) : null;
@@ -115,7 +157,7 @@ export class BotsService {
   }
 
   async list(owner: BotOwner) {
-    const rows = await this.prisma.supportBot.findMany({ where: owner.kind === 'reseller' ? { resellerId: owner.resellerId } : {}, orderBy: { createdAt: 'asc' } });
+    const rows = await this.prisma.supportBot.findMany({ where: owner.kind === 'reseller' ? { resellerId: owner.resellerId, scope: { not: 'shop' } } : {}, orderBy: [{ shopDefault: 'desc' }, { createdAt: 'asc' }] });
     return { object: 'list' as const, data: await Promise.all(rows.map(async row => presentBot(await this.withKnowledge(row), this.audience(owner)))), has_more: false };
   }
 
@@ -133,25 +175,57 @@ export class BotsService {
     return store;
   }
 
-  private checkModel(input: { provider: AiProviderName; model: string; funding: BotFunding }) {
+  private checkModel(input: { provider: AiProviderName; model: string; funding: BotFunding }, scope: BotScope = 'store', roles: string[] = []) {
     if (!(aiProviders as readonly string[]).includes(input.provider)) throw invalid('parameter_invalid', 'Choose Anthropic, OpenAI or DeepSeek.', 'provider');
+    if (scope === 'shop') {
+      // DeepSeek processes data in China: not offered for shop assistants until lawyers clear it.
+      if (input.provider === 'deepseek') throw invalid('ai_model_unavailable', 'Shop assistants run on Anthropic or OpenAI.', 'provider');
+      if (input.funding !== 'bitocard') throw invalid('parameter_invalid', 'Shop assistants run on BitoCard’s AI.', 'funding');
+      if (roles.includes('sell') && !visionProviders.includes(input.provider)) throw invalid('model_no_vision', 'Helping sellers reads their photos: choose a model that reads images.', 'model');
+    }
     if (input.funding === 'bitocard' && !this.ai.bitocardModels().some(item => item.provider === input.provider && item.model === input.model)) {
       throw invalid('ai_model_unavailable', 'This model is not offered on BitoCard’s AI. Choose another, or use your own key.', 'model');
     }
   }
 
+  /** A bot's roles must be its scope's: chats and tickets for support, browse, sell and help for the Shop. */
+  private checkRoles(scope: BotScope, roles: string[]) {
+    const allowed: readonly string[] = scope === 'shop' ? shopRoles : botRoles;
+    if (roles.some(role => !allowed.includes(role))) throw invalid('parameter_invalid', scope === 'shop' ? 'A shop assistant’s roles are browse, sell and help.' : 'An assistant’s roles are chat and tickets.', 'roles');
+  }
+
+  /** Languages, greetings and limits, checked: a greeting only for a language it speaks. */
+  private shopProfile(input: BotInput, current?: SupportBot) {
+    const languages = input.languages ? [...new Set(input.languages.map(code => code.trim()))] : undefined;
+    const spoken = languages ?? current?.languages ?? [];
+    if (input.greetings && Object.values(input.greetings).some(text => typeof text !== 'string' || text.length > 300)) throw invalid('parameter_invalid', 'Each greeting is text of at most 300 characters.', 'greetings');
+    const greetings = input.greetings ? Object.fromEntries(Object.entries(input.greetings).map(([code, text]) => [code, text.trim()]).filter(([, text]) => text)) : undefined;
+    if (greetings && Object.keys(greetings).some(code => !spoken.includes(code))) throw invalid('parameter_invalid', 'Write greetings only for the languages it speaks.', 'greetings');
+    const limits = input.limits ? { ...shopLimitsOf(current ?? { limits: {} }), ...input.limits } : undefined;
+    const kept = languages && current && !greetings ? Object.fromEntries(Object.entries((current.greetings ?? {}) as Record<string, string>).filter(([code]) => languages.includes(code))) : undefined;
+    return {
+      ...(languages ? { languages } : {}),
+      ...(greetings ? { greetings } : kept ? { greetings: kept } : {}),
+      ...(limits ? { limits } : {}),
+    };
+  }
+
   async create(owner: BotOwner, input: Required<Pick<BotInput, 'name' | 'roles' | 'provider' | 'model' | 'funding'>> & BotInput) {
     const platform = owner.kind === 'admin' && input.scope === 'platform';
-    if (input.scope === 'platform' && owner.kind !== 'admin') throw invalid('parameter_invalid', 'Only BitoCard runs the assistant for resellers.', 'scope');
-    this.checkModel(input);
-    const store = !platform && input.store_id ? await this.checkStore(owner, input.store_id) : null;
+    const shop = input.scope === 'shop';
+    if ((input.scope === 'platform' || shop) && owner.kind !== 'admin') throw invalid('parameter_invalid', shop ? 'Only BitoCard runs shop assistants.' : 'Only BitoCard runs the assistant for resellers.', 'scope');
+    this.checkRoles(input.scope ?? 'store', input.roles);
+    this.checkModel(input, input.scope ?? 'store', input.roles);
+    const store = !platform && !shop && input.store_id ? await this.checkStore(owner, input.store_id) : null;
     const resellerId = owner.kind === 'reseller' ? owner.resellerId : (store?.resellerId ?? houseRootId);
+    const profile = shop ? this.shopProfile({ languages: ['en'], limits: {}, ...input }) : {};
     try {
       const bot = await this.prisma.supportBot.create({
         data: {
           resellerId,
-          scope: platform ? 'platform' : 'store',
-          storeId: platform ? null : (store?.id ?? null),
+          scope: platform ? 'platform' : shop ? 'shop' : 'store',
+          storeId: platform || shop ? null : (store?.id ?? null),
+          ...profile,
           roles: [...new Set(input.roles)],
           ticketReplyMode: input.ticket_reply_mode ?? 'draft',
           provider: input.provider,
@@ -176,9 +250,12 @@ export class BotsService {
 
   async update(owner: BotOwner, id: string, input: BotInput) {
     const bot = await this.owned(owner, id);
+    const scope = bot.scope as BotScope;
     const next = { provider: input.provider ?? (bot.provider as AiProviderName), model: input.model ?? bot.model, funding: input.funding ?? (bot.funding as BotFunding) };
-    if (input.provider || input.model || input.funding) this.checkModel(next);
-    const store = input.store_id ? await this.checkStore(owner, input.store_id) : null;
+    if (input.roles) this.checkRoles(scope, input.roles);
+    if (input.provider || input.model || input.funding || (scope === 'shop' && input.roles)) this.checkModel(next, scope, input.roles ?? bot.roles);
+    const store = input.store_id && scope === 'store' ? await this.checkStore(owner, input.store_id) : null;
+    const profile = scope === 'shop' ? this.shopProfile(input, bot) : {};
     try {
       const updated = await this.prisma.supportBot.update({
         where: { id },
@@ -193,12 +270,16 @@ export class BotsService {
           ...(input.instructions !== undefined ? { instructions: input.instructions?.trim() || null } : {}),
           ...(input.avatar_url !== undefined ? { avatarUrl: input.avatar_url } : {}),
           ...(input.auto_refresh !== undefined ? { autoRefresh: input.auto_refresh } : {}),
+          ...profile,
         },
       });
       // An active bot must stay complete: a change that breaks it pauses it, with why.
       if (updated.status === 'active') {
         const missing = await this.missing(updated);
-        if (missing.length) await this.prisma.supportBot.update({ where: { id }, data: { status: 'paused' } });
+        if (missing.length) {
+          await this.prisma.supportBot.update({ where: { id }, data: { status: 'paused' } });
+          if (scope === 'shop') await this.shop().deactivated(id);
+        }
       }
       return presentBot(await this.withKnowledge((await this.prisma.supportBot.findUnique({ where: { id } }))!), this.audience(owner));
     } catch (error) {
@@ -209,12 +290,19 @@ export class BotsService {
 
   async remove(owner: BotOwner, id: string) {
     const bot = await this.owned(owner, id);
+    if (bot.shopDefault) throw conflict('default_assistant', 'The default shop assistant cannot be deleted: pause it, or make another the default first.');
     await this.prisma.supportBot.delete({ where: { id } });
     await this.audit.record({ actorId: owner.userId, action: 'support_bot.deleted', targetType: 'support_bot', targetId: id, before: { name: bot.name, store_id: bot.storeId }, after: null });
   }
 
   /** What a bot still needs before it can answer anyone. */
   async missing(bot: SupportBot) {
+    if (bot.scope === 'shop') {
+      const missing: string[] = [];
+      if (!bot.roles.length) missing.push('Choose what it does: browse, sell, help or several.');
+      if (!this.ai.bitocardModels().some(item => item.provider === bot.provider && item.model === bot.model)) missing.push('Its model is not offered on BitoCard’s AI: choose another.');
+      return [...missing, ...(await this.shop().missing(bot))];
+    }
     const missing: string[] = [];
     if (!bot.roles.length) missing.push('Choose what it answers: chats, tickets or both.');
     if (bot.scope === 'store' && !bot.storeId) missing.push('Assign it to a store.');
@@ -236,7 +324,11 @@ export class BotsService {
     if (bot.status === 'suspended') throw conflict('assistant_suspended', `BitoCard suspended this assistant${bot.suspendedReason ? `: ${bot.suspendedReason}` : '.'}`);
     const missing = await this.missing(bot);
     if (missing.length) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'assistant_incomplete', missing.join(' '));
-    const updated = await this.prisma.supportBot.update({ where: { id }, data: { status: 'active' } });
+    const updated = await this.prisma.$transaction(async tx => {
+      const row = await tx.supportBot.update({ where: { id }, data: { status: 'active' } });
+      if (row.scope === 'shop') await this.shop().activated(tx, row, owner.userId);
+      return row;
+    });
     await this.audit.record({ actorId: owner.userId, action: 'support_bot.activated', targetType: 'support_bot', targetId: id, before: { status: bot.status }, after: { status: 'active' } });
     return presentBot(await this.withKnowledge(updated), this.audience(owner));
   }
@@ -245,6 +337,10 @@ export class BotsService {
     const bot = await this.owned(owner, id);
     if (bot.status === 'suspended') throw conflict('assistant_suspended', 'BitoCard suspended this assistant.');
     const updated = await this.prisma.supportBot.update({ where: { id }, data: { status: 'paused' } });
+    if (bot.scope === 'shop') {
+      await this.shop().deactivated(id);
+      await this.audit.record({ actorId: owner.userId, action: 'support_bot.paused', targetType: 'support_bot', targetId: id, before: { status: bot.status }, after: { status: 'paused' } });
+    }
     return presentBot(await this.withKnowledge(updated), this.audience(owner));
   }
 
@@ -253,6 +349,7 @@ export class BotsService {
     const bot = await this.prisma.supportBot.findUnique({ where: { id } });
     if (!bot) throw notFound();
     const updated = await this.prisma.supportBot.update({ where: { id }, data: { status: 'suspended', suspendedReason: reason.trim() } });
+    if (bot.scope === 'shop') await this.shop().deactivated(id);
     await this.audit.record({ actorId, action: 'support_bot.suspended', targetType: 'support_bot', targetId: id, before: { status: bot.status }, after: { status: 'suspended', reason } });
     await this.inbox.reseller(bot.resellerId, 'support.bot_paused', { subject: `${id}:suspended:${Date.now()}`, title: `BitoCard suspended your assistant ${bot.name}`, body: reason, link: `/support/assistants/${id}` });
     return presentBot(await this.withKnowledge(updated), 'admin');
@@ -271,7 +368,7 @@ export class BotsService {
 
   async knowledgeOf(owner: BotOwner, id: string) {
     const bot = await this.owned(owner, id);
-    const versions = await this.prisma.supportBotKnowledge.findMany({ where: { botId: id }, orderBy: { version: 'desc' }, take: 50 });
+    const versions = await this.prisma.supportBotKnowledge.findMany({ where: { botId: id, country: null }, orderBy: { version: 'desc' }, take: 50 });
     const current = versions.find(item => item.id === bot.knowledgeId) ?? null;
     return {
       object: 'support_bot_knowledge' as const,
@@ -327,6 +424,8 @@ export class BotsService {
   /** A fresh document generated from the store's data, for the owner to read and edit before applying. */
   async generate(owner: BotOwner, id: string) {
     const bot = await this.owned(owner, id);
+    // A shop assistant's shared document is the admin's own sections; BitoCard's are generated per country.
+    if (bot.scope === 'shop') return { object: 'support_bot_knowledge_draft' as const, content: (await this.shop().generate(bot)).content, data_hash: null };
     if (!bot.storeId) throw conflict('assistant_without_store', 'Assign the assistant to a store first: BitoCard generates the document from the store.');
     const data = await this.knowledge.gather(bot.storeId);
     return { object: 'support_bot_knowledge_draft' as const, content: this.knowledge.render(data), data_hash: this.knowledge.hash(data) };
@@ -385,7 +484,7 @@ export class BotsService {
   async restore(owner: BotOwner, id: string, version: number) {
     const bot = await this.owned(owner, id);
     const row = await this.prisma.supportBotKnowledge.findUnique({ where: { botId_version: { botId: id, version } } });
-    if (!row) throw invalid('parameter_invalid', 'No such version.', 'version');
+    if (!row || row.country) throw invalid('parameter_invalid', 'No such version.', 'version');
     await this.prisma.supportBot.update({ where: { id: bot.id }, data: { knowledgeId: row.id } });
     return this.knowledgeOf(owner, id);
   }
@@ -393,8 +492,9 @@ export class BotsService {
   // -- Playground --------------------------------------------------------------------------------------------------
 
   /** A test conversation with the bot as it is now (its draft knowledge too). Nothing is kept but the usage. */
-  async test(owner: BotOwner, id: string, messages: Array<{ role: 'user' | 'assistant'; content: string }>) {
+  async test(owner: BotOwner, id: string, messages: Array<{ role: 'user' | 'assistant'; content: string }>, options: { country?: string; surface?: ShopRole } = {}) {
     const bot = await this.owned(owner, id);
+    if (bot.scope === 'shop') return { object: 'support_bot_test' as const, ...(await this.shop().test(bot, messages, options)) };
     const current = bot.knowledgeId ? await this.prisma.supportBotKnowledge.findUnique({ where: { id: bot.knowledgeId } }) : null;
     const store = bot.storeId ? await this.prisma.store.findUnique({ where: { id: bot.storeId }, select: { name: true } }) : null;
     const audience = bot.scope === 'platform' ? ({ kind: 'reseller' } as const) : ({ kind: 'customer', store: store?.name ?? 'the store' } as const);
@@ -413,7 +513,7 @@ export class BotsService {
    * once (and tell the owner), or with automatic updates apply BitoCard's sections the owner has not edited.
    */
   async checkStale(limit = 100) {
-    const bots = await this.prisma.supportBot.findMany({ where: { storeId: { not: null }, knowledgeId: { not: null }, status: { not: 'suspended' } }, orderBy: { updatedAt: 'asc' }, take: limit });
+    const bots = await this.prisma.supportBot.findMany({ where: { storeId: { not: null }, scope: 'store', knowledgeId: { not: null }, status: { not: 'suspended' } }, orderBy: { updatedAt: 'asc' }, take: limit });
     let flagged = 0;
     let refreshed = 0;
     for (const bot of bots) {

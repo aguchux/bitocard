@@ -1,20 +1,49 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, resellerOf, Roles, SessionOnly } from '../auth/caller.js';
 import { adminId } from '../countries/countries.controller.js';
 import { type AiProviderName, aiProviders } from './ai/providers.js';
-import { type BotFunding, botFundings, type BotOwner, type BotRole, botRoles, BotsService } from './bots.service.js';
+import { type BotFunding, botFundings, type BotOwner, type BotRole, botRoles, type BotScope, botScopes, BotsService, type ShopRole, shopRoles } from './bots.service.js';
 import { knowledgeTemplate, managedKeys, type ManagedKey, maxKnowledgeChars } from './knowledge.js';
 import { type Tone, tones } from './prompt.js';
+
+const allRoles = [...botRoles, ...shopRoles];
+
+/** A shop assistant's limits (each optional): daily messages, photos read per draft, and a monthly cap in US dollars. */
+class ShopLimitsDto {
+  @IsOptional() @IsInt() @Min(1) @Max(1000)
+  customer_daily?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(500)
+  visitor_daily?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(12)
+  photos_per_draft?: number;
+
+  @IsOptional() @ValidateIf((_object, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000)
+  monthly_budget_usd?: number | null;
+}
 
 class BotProfileDto {
   @IsOptional() @IsString() @Length(2, 40)
   name?: string;
 
-  @IsOptional() @IsArray() @ArrayMinSize(1) @IsIn(botRoles, { each: true })
-  roles?: BotRole[];
+  /** chat and tickets for support assistants; browse, sell and help for shop assistants. */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @IsIn(allRoles, { each: true })
+  roles?: Array<BotRole | ShopRole>;
+
+  /** Shop assistants: BCP 47 codes (en, yo, ha, ig, pcm, fr, sw, tw…), the main one first. */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(12) @Matches(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/, { each: true, message: 'each language must be a code such as en, yo or pcm' })
+  languages?: string[];
+
+  /** Shop assistants: the greeting per language. */
+  @IsOptional() @IsObject()
+  greetings?: Record<string, string>;
+
+  @IsOptional() @ValidateNested() @Type(() => ShopLimitsDto)
+  limits?: ShopLimitsDto;
 
   @IsOptional() @IsIn(aiProviders)
   provider?: AiProviderName;
@@ -51,8 +80,8 @@ class CreateBotDto extends BotProfileDto {
   @IsString() @Length(2, 40)
   declare name: string;
 
-  @IsArray() @ArrayMinSize(1) @IsIn(botRoles, { each: true })
-  declare roles: BotRole[];
+  @IsArray() @ArrayMinSize(1) @IsIn(allRoles, { each: true })
+  declare roles: Array<BotRole | ShopRole>;
 
   @IsIn(aiProviders)
   declare provider: AiProviderName;
@@ -63,8 +92,8 @@ class CreateBotDto extends BotProfileDto {
   @IsIn(botFundings)
   declare funding: BotFunding;
 
-  @IsOptional() @IsIn(['store', 'platform'])
-  scope?: 'store' | 'platform';
+  @IsOptional() @IsIn(botScopes)
+  scope?: BotScope;
 }
 
 class KnowledgeDto {
@@ -99,6 +128,13 @@ class TestMessageDto {
 class TestDto {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => TestMessageDto)
   messages: TestMessageDto[];
+
+  /** Shop assistants: the market its tools read (read only), and which side to try it as. */
+  @IsOptional() @Matches(/^[A-Z]{2}$/)
+  country?: string;
+
+  @IsOptional() @IsIn(shopRoles)
+  surface?: ShopRole;
 }
 
 class TemplateDto {
@@ -191,7 +227,7 @@ function botRoutes(owner: (caller: Caller) => BotOwner) {
     @Post(':id/test')
     @HttpCode(HttpStatus.OK)
     test(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: TestDto) {
-      return this.bots.test(owner(caller), id, body.messages);
+      return this.bots.test(owner(caller), id, body.messages, { country: body.country, surface: body.surface });
     }
   }
   return Routes;
