@@ -27,6 +27,7 @@ import {
   ListOrdered,
   MessageSquareWarning,
   Package,
+  ShoppingBag,
   Percent,
   Phone,
   PieChart,
@@ -130,6 +131,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
     items: [
       { label: "Browse", href: "/resale", icon: Repeat },
       { label: "Your listings", href: "/resale/listings", icon: ListOrdered },
+      { label: "Orders", href: "/resale/orders", icon: ShoppingBag },
       { label: "Rules", href: "/resale/rules", icon: SlidersHorizontal },
       { label: "Suppliers", href: "/resale/suppliers", icon: Truck },
     ],

@@ -27,10 +27,11 @@ function Orders() {
   const [status, setStatus] = useState<ClassifiedOrderStatus | "">("");
   const [review, setReview] = useState<ClassifiedPayoutReview | "">(linked ?? "");
   const [country, setCountry] = useState("");
+  const [kind, setKind] = useState<"" | "direct" | "resale">("");
   const [words, setWords] = useState("");
   const [offset, setOffset] = useState(0);
   const q = useDebouncedValue(words.trim());
-  const orders = useClassifiedOrdersQuery({ status: status || undefined, payout_review: review || undefined, country: country || undefined, q: q || undefined, offset });
+  const orders = useClassifiedOrdersQuery({ status: status || undefined, payout_review: review || undefined, kind: kind || undefined, country: country || undefined, q: q || undefined, offset });
   const total = orders.data?.total ?? 0;
   const reset = () => setOffset(0);
 
@@ -47,6 +48,7 @@ function Orders() {
             {formatDateTime(item.timeline.requested_at)} · {item.fulfilment === "meet_up" ? "Meet-up" : "Delivery"}
             {item.mode === "test" ? " · test" : ""}
           </span>
+          {item.kind === "resale" && item.store ? <span className="block text-xs font-semibold text-violet-700">Resale · {item.store.name}</span> : null}
         </span>
       ),
     },
@@ -60,7 +62,7 @@ function Orders() {
       cell: item => (
         <span className="block whitespace-nowrap">
           <span className="block font-semibold text-ink">{formatMoney(item.price, item.currency)}</span>
-          <span className="block text-xs text-muted">fees {formatMoney(item.buyer_fee + item.seller_fee, item.currency)}</span>
+          <span className="block text-xs text-muted">fees {formatMoney(item.buyer_fee + item.seller_fee + (item.resale?.reseller_fee ?? 0), item.currency)}</span>
         </span>
       ),
     },
@@ -103,6 +105,20 @@ function Orders() {
             { value: "pending", label: "Held for review" },
             { value: "approved", label: "Approved" },
             { value: "rejected", label: "Kept held" },
+          ]}
+        />
+        <FilterSelect
+          id="orders-kind"
+          label="Sold on"
+          value={kind}
+          onChange={value => {
+            setKind(value as "" | "direct" | "resale");
+            reset();
+          }}
+          options={[
+            { value: "", label: "Anywhere" },
+            { value: "direct", label: "BitoCard Shop" },
+            { value: "resale", label: "Resellers’ stores" },
           ]}
         />
         <MarketFilter

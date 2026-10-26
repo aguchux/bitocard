@@ -31,7 +31,7 @@ export function activeTab(pathname: string, tabs: AppTab[] = appTabs) {
     if (pathname === "/account") return "/account";
     if (pathname.startsWith("/account/p/")) return "/account/catalog";
     if (pathname.startsWith("/account/verification")) return "/account/profile";
-    if (pathname.startsWith("/account/disputes")) return "/account/orders";
+    if (pathname.startsWith("/account/disputes") || pathname.startsWith("/account/purchases")) return "/account/orders";
     if (pathname.startsWith("/account/support")) return "/account/profile";
     if (under(pathname, "/shop")) return "/shop";
     return appTabs.find(tab => tab.href !== "/account" && pathname.startsWith(tab.href))?.href ?? null;

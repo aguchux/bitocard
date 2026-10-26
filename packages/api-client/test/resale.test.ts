@@ -47,6 +47,22 @@ describe('resale for resellers', () => {
     ]);
   });
 
+  test('resale orders: the list filters, the thread asked for, cancelling with the reason and writing in a thread', async () => {
+    const store = makeStore();
+    const run = (endpoint: keyof typeof resaleApi.endpoints, arg: unknown) => store.dispatch((resaleApi.endpoints[endpoint] as unknown as { initiate: (arg: unknown) => Parameters<typeof store.dispatch>[0] }).initiate(arg));
+    await run('resaleOrders', { status: 'locked', store_id: 's1' });
+    await run('resaleOrderMessages', { id: 'o1', thread: 'trade' });
+    await run('cancelResaleOrder', { id: 'o1', reason: 'The customer asked' });
+    await run('sendResaleOrderMessage', { id: 'o1', thread: 'order', body: 'Thank you' });
+    // The two reads, then each refetched by the changes (cancelling refreshes the order, its list and its threads).
+    expect(calls.filter(call => call.method === 'GET').map(path).slice(0, 2)).toEqual(['/v1/resale/orders?status=locked&store_id=s1', '/v1/resale/orders/o1/messages?thread=trade']);
+    expect(calls.filter(call => call.method === 'GET').map(path).slice(2)).toEqual(expect.arrayContaining(['/v1/resale/orders?status=locked&store_id=s1', '/v1/resale/orders/o1/messages?thread=trade']));
+    expect(sent()).toEqual([
+      ['POST', '/v1/resale/orders/o1/cancel', { reason: 'The customer asked' }],
+      ['POST', '/v1/resale/orders/o1/messages', { thread: 'order', body: 'Thank you' }],
+    ]);
+  });
+
   test('the catalogue sends only the filters given; previews send one way of pricing', async () => {
     const store = makeStore();
     await store.dispatch(resaleApi.endpoints.resaleCatalogue.initiate({ q: 'tv', sort: 'price_asc', offset: 0, limit: 24, store_id: undefined }));

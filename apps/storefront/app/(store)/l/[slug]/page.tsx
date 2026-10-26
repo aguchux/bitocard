@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
+import { ResaleBuy } from "@/components/store/resale-buy";
 import { ResaleListingDetail } from "@/components/store/resale-detail";
+import { currentCustomer } from "@/lib/customer";
 import { resaleListing, resaleStore } from "@/lib/resale";
 import { listingRef, resaleListingPath } from "@/lib/resale-links";
 
@@ -29,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /** A Resale shop's listing (`/l/<ref>-<slug>`): an old or missing slug goes to its current address for good. */
 export default async function ResaleListingPage({ params }: Props) {
   const { slug } = await params;
-  const [item, store] = await Promise.all([load(slug), resaleStore()]);
+  const [item, store, customer] = await Promise.all([load(slug), resaleStore(), currentCustomer()]);
   if (!item || !store) notFound();
   if (slug !== `${item.ref}-${item.slug}`) permanentRedirect(resaleListingPath(item));
   return (
@@ -37,7 +39,11 @@ export default async function ResaleListingPage({ params }: Props) {
       <Link href="/listings" className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-slate-600 hover:text-navy-900">
         <ChevronLeft className="size-4" aria-hidden="true" /> All items
       </Link>
-      <ResaleListingDetail item={item} storeName={store.name} />
+      <ResaleListingDetail
+        item={item}
+        storeName={store.name}
+        buy={<ResaleBuy item={item} signedIn={Boolean(customer)} signInHref={`/signin?next=${encodeURIComponent(resaleListingPath(item))}`} stateName={item.area?.state ?? null} />}
+      />
     </div>
   );
 }

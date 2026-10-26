@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
-import { amountToMinor, Badge, bpsToPercent, Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, PageHeader, percentToBps, QueryView, Skeleton } from "@bitocard/admin-ui";
+import { amountToMinor, Badge, bpsToPercent, Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, PageHeader, percentToBps, QueryView, Skeleton, Textarea } from "@bitocard/admin-ui";
 import { AdminShell, AppLink, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { type ClassifiedSafePaySettings, type ClassifiedSafePaySettingsInput, safePayFee, useClassifiedSafePaySettingsQuery, useCountriesQuery, useUpdateClassifiedSafePaySettingsMutation } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
@@ -111,6 +111,8 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
     handover_days: String(saved.handover_days),
     confirm_days: String(saved.confirm_days),
     strike_limit: String(saved.strike_limit),
+    transit_days: String(saved.transit_days),
+    couriers: saved.couriers.map(courier => (courier.tracking_url ? `${courier.name} | ${courier.tracking_url}` : courier.name)).join("\n"),
   });
   const [update, updating] = useUpdateClassifiedSafePaySettingsMutation();
   const [done, setDone] = useState(false);
@@ -134,7 +136,7 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
     if (minor === null) problems.push(`${label}: an amount in ${currency}.`);
     else if (minor !== saved[key]) next[key] = minor;
   };
-  const count = (value: string, key: "accept_hours" | "pay_hours" | "handover_days" | "confirm_days" | "strike_limit", label: string, min: number, max: number) => {
+  const count = (value: string, key: "accept_hours" | "pay_hours" | "handover_days" | "confirm_days" | "strike_limit" | "transit_days", label: string, min: number, max: number) => {
     const number = whole(value);
     if (number === null || number < min || number > max) problems.push(`${label}: a whole number from ${min} to ${max}.`);
     else if (number !== saved[key]) next[key] = number;
@@ -155,6 +157,20 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
   count(form.handover_days, "handover_days", "Days to hand over", 1, 30);
   count(form.confirm_days, "confirm_days", "Days to confirm", 1, 30);
   count(form.strike_limit, "strike_limit", "Strike limit", 1, 20);
+  count(form.transit_days, "transit_days", "Longest transit time", 1, 60);
+  // One courier a line: its name, then optionally " | " and its tracking link with {tracking} where the number goes.
+  const couriers = form.couriers
+    .split("\n")
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const [name, link] = line.split("|").map(part => part.trim());
+      return { name: name ?? "", tracking_url: link || null };
+    });
+  for (const courier of couriers) {
+    if (courier.tracking_url && (!courier.tracking_url.startsWith("https://") || !courier.tracking_url.includes("{tracking}"))) problems.push(`${courier.name}: the tracking link is an https address with {tracking} where the number goes.`);
+  }
+  if (JSON.stringify(couriers) !== JSON.stringify(saved.couriers)) next.couriers = couriers;
   const changed = Object.keys(next).length > 0;
 
   const submit = async (event: FormEvent) => {
@@ -194,7 +210,16 @@ function SettingsForm({ saved, currency, changes }: { saved: ClassifiedSafePaySe
           {input("accept_hours", "Hours for the seller to accept", "Then the request lapses.")}
           {input("pay_hours", "Hours for the buyer to pay", "After the seller accepts.")}
           {input("handover_days", "Days to hand over", "After payment; then the buyer is refunded in full.")}
-          {input("confirm_days", "Days for the buyer to confirm a delivery", "After it is sent; then the money is released.")}
+          {input("confirm_days", "Days for the buyer to confirm a delivery", "After it is reported delivered; then the money is released.")}
+          {input("transit_days", "Longest transit time (days)", "A parcel not delivered by then can be disputed; without a delivery report the confirm days start after it.")}
+        </div>
+      </Card>
+      <Card>
+        <CardHeader title="Couriers" description="Sellers choose one when marking an order shipped (or name another). One a line: the name, then optionally | and its tracking link with {tracking} where the number goes." />
+        <div className="px-5 pb-5 sm:px-6">
+          <Field label="Couriers" htmlFor={`${id}-couriers`}>
+            <Textarea id={`${id}-couriers`} rows={5} disabled={!changes} value={form.couriers} onChange={set("couriers")} placeholder={"GIG Logistics | https://giglogistics.com/track/{tracking}\nDHL"} />
+          </Field>
         </div>
       </Card>
       </div>

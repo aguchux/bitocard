@@ -24,6 +24,7 @@ import {
   StatusBadge,
 } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin, AppLink } from "@bitocard/admin-ui/shell";
+import { ResaleStandingCard } from "@/components/resale-standing";
 import { ResellerSwitchesCard } from "@/components/reseller-switches";
 import { ResellerWalletsCard } from "@/components/reseller-wallets";
 import { StartupAllowanceCard } from "@/components/startup-allowance";
@@ -246,6 +247,7 @@ export default function ResellerPage() {
           <StartupAllowanceCard resellerId={reseller.id} verified={Boolean(reseller.verified_at)} switchedOn={Boolean(reseller.features.startup_allowance)} />
 
           <ResellerSwitchesCard resellerId={reseller.id} features={reseller.features} />
+          {reseller.country ? <ResaleStandingCard resellerId={reseller.id} /> : null}
 
           <Card>
             <CardHeader title="History" description="Admin changes to this reseller." />

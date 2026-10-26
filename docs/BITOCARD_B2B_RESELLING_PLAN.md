@@ -1,6 +1,6 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 3 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 4 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; stage 4 and 4b: buying, shipping and payouts; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
@@ -135,12 +135,15 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 - The store's free-text sections are checked when saved for claims of owning, making or stocking the items (admin word list; refused or sent to review).
 - The store's wallets must be on and collected by BitoCard (`payment_collector` cannot be `own` on a Resale shop).
 
-### Stage 4: buying, fulfilment and payouts
+### Stage 4: buying, fulfilment and payouts: built 26 October 2026
+
+**As built:** see `AGENTS.md`, B2B reselling, Stage 4 and Stage 4b. Where it differs from the plan below: the buyer's details are shown to the supplier, the reseller and BitoCard from acceptance until 30 days after the order ends, every view logged (as planned), but the buyer's phone is the confirmed one on their store account when they buy; quantity is capped at 10 per order; a reseller strike is any resale order their store cancels (upheld disputes because of a note or claims, and upheld reports, come with stage 5); the order threads take text only (photos in them, as in Shop chats, come later); auto-accept is a supplier's setting for all their resale orders (not per listing). Couriers' own tracking updates (`CourierAdapter`) wait until couriers are confirmed per country; sellers update the timeline by hand.
+
 - Safe pay orders gain `kind` (`direct` | `resale`), `store_id`, `reseller_id`, the price figures, the deal used and `quantity`; the buyer of a resale order may be any store's customer. New status `locked`; new ledger account `customer_wallet_locked` (a customer account, never below zero).
 - Lock, accept, then debit (above); auto-accept; fulfilment as in stage 4b; the buyer's details to the supplier from acceptance (logged views, 30 days after the order); the three-way release entry; partial refunds split in proportion; the three-way same-person check; reseller strikes.
 - Two threads per order: the **order chat** (the buyer and the store: supplier and reseller both write, every store message shown to the buyer as the store's; both see everything, with who wrote each; links and payment details refused) and the **trade thread** (supplier and reseller; never shown to the buyer). Both kept like Shop chats (12 months after their last message), read by BitoCard's support and dispute staff, with photos as in Shop chats.
 
-### Stage 4b: shipping and tracking (every Safe pay order, BitoCard Shop's too)
+### Stage 4b: shipping and tracking (every Safe pay order, BitoCard Shop's too): built 26 October 2026
 - Listing: the ways it is fulfilled (`shipping`, `pickup`, one or both) and the delivery fee (free, within the supplier's state, nationwide; proposal D). Checkout: the buyer chooses one, gives a delivery address for shipping and a confirmed phone number.
 - Order: `shipment` (courier, tracking number, tracking link, shipped, delivered), **dispatch photos** required before marking shipped (at least two, kept private like dispute photos), and `classified_shipment_events` (shipped, in transit, out for delivery, delivered, failed attempt, returned; who or what reported each). The confirm window starts at delivered; a parcel not delivered within the country's longest transit time opens the way to a dispute.
 - Admin per country: the couriers offered (name, tracking link pattern), the longest transit time, the confirm window after delivery.

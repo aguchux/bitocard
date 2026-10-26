@@ -6,8 +6,10 @@ import { Badge, Button, Field, Input, Notice, Select, errorMessage, formatBps, f
 import {
   type ResaleAccount,
   type ResaleListing,
+  type ResaleOrderStatus,
   type ResalePrice,
   type ResaleState,
+  resaleOrderStatusText,
   resaleStateText,
   useResalePricePreviewQuery,
   useSetResaleNoteMutation,
@@ -27,6 +29,23 @@ const stateTones: Record<ResaleState, Tone> = {
 
 export function ResaleStateBadge({ state }: { state: ResaleState }) {
   return <Badge tone={stateTones[state]}>{resaleStateText[state]}</Badge>;
+}
+
+const orderTones: Record<ResaleOrderStatus, Tone> = {
+  locked: "amber",
+  paid: "blue",
+  sent: "blue",
+  disputed: "red",
+  released: "green",
+  refunded: "grey",
+  partly_refunded: "grey",
+  declined: "grey",
+  cancelled: "grey",
+  lapsed: "grey",
+};
+
+export function ResaleOrderBadge({ status }: { status: ResaleOrderStatus }) {
+  return <Badge tone={orderTones[status]}>{resaleOrderStatusText[status]}</Badge>;
 }
 
 const gateText: Record<NonNullable<ResaleAccount["reason"]>, string> = {

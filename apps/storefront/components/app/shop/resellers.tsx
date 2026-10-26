@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { resaleDealText, type ShopReseller, type ShopResaleDeal, type ShopResaleMessage } from "@bitocard/api-client/classifieds";
-import { decideResaleNote, endResaleDeal, loadResaleMessages, offerResaleDeal, sendResaleMessage, setResellerStopped } from "@/lib/shop-actions";
+import { decideResaleNote, endResaleDeal, loadResaleMessages, offerResaleDeal, sendResaleMessage, setAutoAccept, setResellerStopped } from "@/lib/shop-actions";
 
 const pollMs = 4000;
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
@@ -279,5 +279,39 @@ export function StopReselling({ reseller }: { reseller: ShopReseller }) {
       )}
       {error ? <p className="text-sm text-brand-700">{error}</p> : null}
     </div>
+  );
+}
+
+/**
+ * Auto-accept: new resale orders are accepted by themselves while the listing has stock (and the supplier can accept:
+ * identity checked, payout account, not limited). Off by default; the supplier still hands over or ships each one.
+ */
+export function AutoAccept({ enabled: initial }: { enabled: boolean }) {
+  const [enabled, setEnabled] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toggle = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await setAutoAccept(!enabled);
+    if (result.ok) setEnabled(result.data.enabled);
+    else setError(result.message);
+    setBusy(false);
+  };
+  return (
+    <section aria-labelledby="auto-accept" className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <span className="grid gap-1">
+          <h2 id="auto-accept" className="font-bold">
+            Accept resale orders automatically
+          </h2>
+          <span className="text-sm text-slate-600">Orders from resellers’ stores are accepted as soon as a buyer pays, while you have stock. You must then hand over or ship each one in time, or the buyer is refunded and it counts against you.</span>
+        </span>
+        <button type="button" role="switch" aria-checked={enabled} aria-labelledby="auto-accept" disabled={busy} onClick={() => void toggle()} className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${enabled ? "bg-emerald-700" : "bg-slate-300"} disabled:opacity-60`}>
+          <span className={`absolute top-1 size-5 rounded-full bg-white shadow transition-[left] ${enabled ? "left-6" : "left-1"}`} />
+        </button>
+      </div>
+      {error ? <p className="text-sm text-brand-700">{error}</p> : null}
+    </section>
   );
 }

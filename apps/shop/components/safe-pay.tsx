@@ -9,11 +9,17 @@ import { acceptShopTerms, cancelSafePay, paySafePay, requestSafePay, shopTerms }
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
 
-/** The buyer's request: meet-up or delivery (with the address), then sent to the seller, who has the accept time to answer. */
-export function SafePayRequest({ quote, sellerName, acceptHours }: { quote: ShopSafePayQuote; sellerName: string; acceptHours: number | null }) {
+/**
+ * The buyer's request: meet-up or delivery (where it goes, with its delivery charge, and the address), then sent to the
+ * seller, who has the accept time to answer.
+ */
+export function SafePayRequest({ quote, sellerName, acceptHours, stateName }: { quote: ShopSafePayQuote; sellerName: string; acceptHours: number | null; stateName?: string | null }) {
   const router = useRouter();
   const [fulfilment, setFulfilment] = useState<"meet_up" | "delivery">(quote.fulfilment[0] ?? "meet_up");
   const [address, setAddress] = useState("");
+  const charges = quote.delivery;
+  const [zone, setZone] = useState<"state" | "elsewhere">("state");
+  const charge = !charges ? 0 : zone === "elsewhere" && charges.nationwide !== null ? charges.nationwide : charges.within_state;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState(nonce);
@@ -22,7 +28,7 @@ export function SafePayRequest({ quote, sellerName, acceptHours }: { quote: Shop
   const send = async (attempt: string) => {
     setBusy(true);
     setError(null);
-    const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, nonce: attempt });
+    const result = await requestSafePay({ listingId: quote.listing_id, offerId: quote.offer_id, fulfilment, address, stateId: fulfilment === "delivery" && zone === "state" ? (charges?.state_id ?? undefined) : undefined, nonce: attempt });
     if (result.ok) return router.refresh();
     setBusy(false);
     // Safe pay needs the BitoCard Shop terms accepted: ask, then send again (a refused request is final, so a new key).
@@ -44,23 +50,47 @@ export function SafePayRequest({ quote, sellerName, acceptHours }: { quote: Shop
     <form onSubmit={submit} className="grid gap-4">
       <fieldset className="grid gap-2.5">
         <legend className="mb-1 text-base font-bold">How will you get it?</legend>
-        <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
-          <input type="radio" name="fulfilment" value="meet_up" checked={fulfilment === "meet_up"} onChange={() => setFulfilment("meet_up")} className="mt-1 size-4 accent-navy-900" />
-          <span className="grid gap-0.5">
-            <strong>Meet in person</strong>
-            <span className="text-sm text-navy-600">Inspect it, then give the seller your 6-digit release code.</span>
-          </span>
-        </label>
+        {quote.fulfilment.includes("meet_up") ? (
+          <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
+            <input type="radio" name="fulfilment" value="meet_up" checked={fulfilment === "meet_up"} onChange={() => setFulfilment("meet_up")} className="mt-1 size-4 accent-navy-900" />
+            <span className="grid gap-0.5">
+              <strong>Meet in person</strong>
+              <span className="text-sm text-navy-600">Inspect it, then give the seller your 6-digit release code.</span>
+            </span>
+          </label>
+        ) : null}
         {quote.fulfilment.includes("delivery") ? (
           <label className="flex gap-3 rounded-2xl border border-navy-200 bg-white p-3.5 has-checked:border-2 has-checked:border-navy-900">
             <input type="radio" name="fulfilment" value="delivery" checked={fulfilment === "delivery"} onChange={() => setFulfilment("delivery")} className="mt-1 size-4 accent-navy-900" />
             <span className="grid gap-0.5">
-              <strong>Delivery</strong>
-              <span className="text-sm text-navy-600">The seller sends it; confirm when it arrives.</span>
+              <strong>Delivery with tracking</strong>
+              <span className="text-sm text-navy-600">The seller ships it with a courier; confirm when it arrives in good condition.</span>
             </span>
           </label>
         ) : null}
       </fieldset>
+      {fulfilment === "delivery" && charges ? (
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm font-semibold">Where it goes</legend>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-navy-200 bg-white px-3 py-2.5 text-sm has-checked:border-2 has-checked:border-navy-900">
+            <span className="flex items-center gap-2.5">
+              <input type="radio" name="zone" checked={zone === "state"} onChange={() => setZone("state")} className="size-4 accent-navy-900" />
+              {stateName ? `In ${stateName}` : "In the seller’s state"}
+            </span>
+            <strong>{charges.within_state ? shopMoney(charges.within_state, quote.currency) : "Free"}</strong>
+          </label>
+          {charges.nationwide !== null ? (
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-navy-200 bg-white px-3 py-2.5 text-sm has-checked:border-2 has-checked:border-navy-900">
+              <span className="flex items-center gap-2.5">
+                <input type="radio" name="zone" checked={zone === "elsewhere"} onChange={() => setZone("elsewhere")} className="size-4 accent-navy-900" />
+                Elsewhere in the country
+              </span>
+              <strong>{charges.nationwide ? shopMoney(charges.nationwide, quote.currency) : "Free"}</strong>
+            </label>
+          ) : null}
+          {charge ? <span className="text-xs text-navy-600">The delivery charge is added to the total and goes to the seller once you have it; it is refunded if it never arrives.</span> : null}
+        </fieldset>
+      ) : null}
       {fulfilment === "delivery" ? (
         <label className="grid gap-1.5 text-sm font-semibold">
           Delivery address

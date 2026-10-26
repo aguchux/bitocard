@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Store } from "lucide-react";
 import type { ShopReseller } from "@bitocard/api-client/classifieds";
+import { AutoAccept } from "@/components/app/shop/resellers";
 import { customerApi } from "@/lib/customer";
 import { requireShop } from "@/lib/shop-server";
 
@@ -13,7 +14,7 @@ export const metadata: Metadata = { title: "My Resellers" };
  */
 export default async function ResellersPage() {
   await requireShop("/shop/resellers");
-  const result = await customerApi<{ data: ShopReseller[] }>("GET", "/v1/classifieds/me/resellers");
+  const [result, auto] = await Promise.all([customerApi<{ data: ShopReseller[] }>("GET", "/v1/classifieds/me/resellers"), customerApi<{ enabled: boolean }>("GET", "/v1/classifieds/me/resale/auto-accept")]);
   const rows = result.ok ? result.data.data : [];
 
   return (
@@ -23,6 +24,7 @@ export default async function ResellersPage() {
         <p className="text-sm text-slate-600">Resellers selling your listings on their stores. Their stores show your listing exactly as you wrote it, with your name; you approve anything they add.</p>
       </header>
       {!result.ok ? <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-900">{result.message}</p> : null}
+      {auto.ok ? <AutoAccept enabled={auto.data.enabled} /> : null}
       {rows.length ? (
         <ul className="grid gap-2">
           {rows.map(row => {

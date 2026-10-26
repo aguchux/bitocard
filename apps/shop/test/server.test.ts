@@ -148,10 +148,16 @@ describe("listing actions", () => {
     reply = () => Response.json({ object: "classified_order" }, { status: 201 });
     await requestSafePay({ listingId: listing, fulfilment: "meet_up", address: "ignored" });
     await requestSafePay({ listingId: listing, offerId: listing, fulfilment: "delivery", address: " 12 Allen Avenue, Ikeja " });
+    // Within the seller's state: its id decides the delivery charge (only for deliveries).
+    await requestSafePay({ listingId: listing, fulfilment: "delivery", address: "12 Allen Avenue, Ikeja", stateId: listing });
+    await requestSafePay({ listingId: listing, fulfilment: "meet_up", stateId: listing });
     expect(calls.map(call => call.body)).toEqual([
       { listing_id: listing, fulfilment: "meet_up" },
       { listing_id: listing, offer_id: listing, fulfilment: "delivery", delivery_address: "12 Allen Avenue, Ikeja" },
+      { listing_id: listing, fulfilment: "delivery", delivery_address: "12 Allen Avenue, Ikeja", delivery_state_id: listing },
+      { listing_id: listing, fulfilment: "meet_up" },
     ]);
+    expect(await requestSafePay({ listingId: listing, fulfilment: "delivery", stateId: "../x" })).toMatchObject({ ok: false });
   });
 
   test("the BitoCard Shop terms: read, then accepted by the version shown; a refused request says why", async () => {

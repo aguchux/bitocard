@@ -196,6 +196,7 @@ export const tagTypes = [
   'ResaleListing',
   'ResaleRule',
   'ResaleSupplier',
+  'ResaleOrder',
 ] as const;
 
 /**

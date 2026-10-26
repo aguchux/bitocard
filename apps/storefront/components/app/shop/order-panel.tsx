@@ -3,12 +3,12 @@
 /* eslint-disable @next/next/no-img-element -- dispute photos are private: read through this site with the customer's session. */
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Camera, Check, LoaderCircle, ShieldCheck } from "lucide-react";
-import { disputeReasonLabels, shopMoney, type ShopDispute, type ShopDisputeMessage, type ShopDisputeReason, type ShopOrder, type ShopReadiness } from "@bitocard/api-client/classifieds";
+import { Camera, Check, LoaderCircle, ShieldCheck, Truck } from "lucide-react";
+import { disputeReasonLabels, shopMoney, type ShopCourier, type ShopDispute, type ShopDisputeMessage, type ShopDisputeReason, type ShopOrder, type ShopReadiness, type ShopShipmentStatus, shipmentLabels } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
 import { localPhotoUrl, type OrderAction } from "@/lib/shop";
 import { ShopTermsAccept, shopTermsCode } from "@bitocard/ui/shop-terms";
-import { acceptShopTerms, disputeMessage, enterReleaseCode, openDispute, orderStep, releaseCode, shopTerms } from "@/lib/shop-actions";
+import { acceptShopTerms, disputeMessage, enterReleaseCode, openDispute, orderStep, releaseCode, shipmentUpdate, shopTerms } from "@/lib/shop-actions";
 
 const nonce = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`.replace(/\./g, ""));
 const primary = "flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-navy-900 px-5 font-bold text-white hover:bg-navy-700 disabled:opacity-60";
@@ -28,6 +28,7 @@ export function OrderPanel({
   balance,
   addFundsHref,
   chatHref,
+  couriers = [],
 }: {
   order: ShopOrder;
   actions: OrderAction[];
@@ -35,13 +36,14 @@ export function OrderPanel({
   balance: number | null;
   addFundsHref: string;
   chatHref: string | null;
+  /** The couriers offered in the seller's country, for shipping. */
+  couriers?: ShopCourier[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [code, setCode] = useState<{ value: string; tries: number } | null>(null);
   const [entered, setEntered] = useState("");
-  const [note, setNote] = useState("");
   const [disputing, setDisputing] = useState(false);
   const [reason, setReason] = useState<ShopDisputeReason>("not_as_described");
   const [details, setDetails] = useState("");
@@ -66,8 +68,9 @@ export function OrderPanel({
       {has("accept") ? (
         <section aria-labelledby="answer" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
           <h2 id="answer" className="font-bold">
-            Answer the request
+            {order.kind === "resale" ? `New order through ${order.store?.name ?? "a reseller’s store"}` : "Answer the request"}
           </h2>
+          {order.kind === "resale" ? <p className="text-sm text-slate-600">The buyer has paid: their money is locked until you accept, then held by BitoCard until they have the item. Accept only if you can hand it over or ship it in time.</p> : null}
           {readiness && !readiness.ready ? (
             <div className="grid gap-2">
               <p className="text-sm text-slate-600">{readiness.limited ? `You cannot take Safe pay orders right now (${readiness.strikes} of ${readiness.strike_limit} strikes in 90 days). You can still chat and sell directly.` : "First Safe pay sale: two quick steps."}</p>
@@ -84,7 +87,7 @@ export function OrderPanel({
               type="button"
               disabled={pending}
               onClick={() => {
-                const why = window.prompt("Decline the request? You can say why (optional).");
+                const why = window.prompt(order.kind === "resale" ? "Decline the order? The buyer gets their money back. You can say why (optional)." : "Decline the request? You can say why (optional).");
                 if (why !== null) step("decline", { reason: why });
               }}
               className={secondary}
@@ -181,23 +184,31 @@ export function OrderPanel({
         </section>
       ) : null}
 
-      {has("sent") ? (
-        <section aria-labelledby="send" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 id="send" className="font-bold">
-            Send it
+      {has("sent") ? <ShipForm order={order} couriers={couriers} pending={pending} onShip={input => step("sent", input)} /> : null}
+
+      {has("shipment") ? (
+        <section aria-labelledby="tracking" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 id="tracking" className="font-bold">
+            Where is the parcel?
           </h2>
-          {order.delivery_address ? (
-            <p className="rounded-xl bg-slate-50 p-3 text-sm whitespace-pre-line">
-              <strong className="block text-xs text-slate-500">Deliver to</strong>
-              {order.delivery_address}
-            </p>
-          ) : null}
-          <label className="grid gap-1.5 text-sm font-semibold">
-            Tracking or delivery note <span className="font-normal text-slate-500">(optional)</span>
-            <textarea value={note} onChange={event => setNote(event.target.value)} rows={2} maxLength={500} className="rounded-xl border border-slate-300 px-3 py-2 font-normal" />
-          </label>
-          <button type="button" disabled={pending} onClick={() => step("sent", { tracking_note: note })} className={primary}>
-            Mark as sent
+          <p className="text-sm text-slate-600">Update the buyer as it moves. Once it is delivered they have a few days to confirm it arrived in good condition, or it is released to you.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["in_transit", "out_for_delivery", "failed_attempt", "returned"] as ShopShipmentStatus[]).map(status => (
+              <button key={status} type="button" disabled={pending} onClick={() => run(() => shipmentUpdate(order.id, status).then(result => (result.ok ? result : { ok: false, message: result.message })))} className={secondary}>
+                {shipmentLabels[status]}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              if (window.confirm("Mark it delivered? Only once the courier has handed it to the buyer.")) run(() => shipmentUpdate(order.id, "delivered").then(result => (result.ok ? result : { ok: false, message: result.message })));
+            }}
+            className={green}
+          >
+            <Check className="size-5" aria-hidden="true" />
+            Delivered
           </button>
         </section>
       ) : null}
@@ -257,7 +268,14 @@ export function OrderPanel({
           type="button"
           disabled={pending}
           onClick={() => {
-            const question = order.status === "paid" ? (order.role === "buyer" ? "Cancel the order? You are refunded in full, fee included." : "Cancel the order? The buyer is refunded in full, and it counts against you.") : "Cancel this request?";
+            const question =
+              order.status === "paid"
+                ? order.role === "buyer"
+                  ? "Cancel the order? You are refunded in full, fee included."
+                  : "Cancel the order? The buyer is refunded in full, and it counts against you."
+                : order.status === "locked"
+                  ? "Cancel the order? Your money is unlocked straight away."
+                  : "Cancel this request?";
             if (window.confirm(question)) step("cancel");
           }}
           className="justify-self-start text-sm font-semibold text-slate-600 hover:text-navy-900 hover:underline"
@@ -284,6 +302,127 @@ export function OrderPanel({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Shipping a paid delivery: at least two dispatch photos (the item, the parcel sealed), the courier (the country's, or
+ * another by name) and its tracking number, then Mark as shipped. Photos go up through this site to the order.
+ */
+function ShipForm({ order, couriers, pending, onShip }: { order: ShopOrder; couriers: ShopCourier[]; pending: boolean; onShip: (input: { courier: string; tracking_number: string; tracking_url?: string; tracking_note?: string }) => void }) {
+  const router = useRouter();
+  const [courier, setCourier] = useState(couriers[0]?.name ?? "");
+  const [other, setOther] = useState("");
+  const [number, setNumber] = useState("");
+  const [link, setLink] = useState("");
+  const [note, setNote] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const photos = order.shipment?.dispatch_photos ?? [];
+  const listed = couriers.find(item => item.name === courier);
+  const name = courier === "other" || !couriers.length ? other.trim() : courier;
+  const ready = photos.length >= 2 && name.length >= 2 && number.trim().length >= 3;
+  const upload = async (files: File[]) => {
+    if (!files.length) return;
+    setUploading(true);
+    setError(null);
+    for (const file of files.slice(0, 8 - photos.length)) {
+      try {
+        const form = new FormData();
+        form.set("file", await compressImage(file, undefined, type => type.startsWith("image/")), "dispatch.jpg");
+        const res = await fetch(`/api/shop/orders/${order.id}/dispatch-photos`, { method: "POST", body: form });
+        const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        if (!res.ok) setError(json?.error?.message ?? "This photo could not be added.");
+      } catch {
+        setError("This photo could not be added. Try again.");
+      }
+    }
+    setUploading(false);
+    router.refresh();
+  };
+  return (
+    <section aria-labelledby="ship" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+      <h2 id="ship" className="flex items-center gap-2 font-bold">
+        <Truck className="size-5" aria-hidden="true" /> Ship it with tracking
+      </h2>
+      {order.delivery_address || order.buyer_details?.address ? (
+        <p className="rounded-xl bg-slate-50 p-3 text-sm whitespace-pre-line">
+          <strong className="block text-xs text-slate-500">Deliver to</strong>
+          {order.buyer_details?.address ?? order.delivery_address}
+        </p>
+      ) : null}
+      <div className="grid gap-2">
+        <p className="text-sm font-semibold">1. Photos before you send it</p>
+        <p className="text-xs text-slate-600">At least two: the item itself, and the parcel sealed for shipping. They settle any question of damage.</p>
+        <ul className="flex flex-wrap gap-2">
+          {photos.map(photo =>
+            localPhotoUrl(photo.url) ? (
+              <li key={photo.id} className="size-16 overflow-hidden rounded-xl bg-slate-100">
+                <img src={localPhotoUrl(photo.url)!} alt="Dispatch photo" className="size-full object-cover" loading="lazy" />
+              </li>
+            ) : null,
+          )}
+          {photos.length < 8 ? (
+            <li>
+              <label className="grid size-16 cursor-pointer place-items-center rounded-xl border-2 border-dashed border-slate-300 text-slate-500 hover:border-slate-400">
+                {uploading ? <LoaderCircle className="size-5 animate-spin" aria-label="Adding" /> : <Camera className="size-5" aria-label="Add photos" />}
+                <input type="file" accept="image/*" multiple className="sr-only" disabled={uploading} onChange={event => {
+                    const files = Array.from(event.target.files ?? []);
+                    event.target.value = "";
+                    void upload(files);
+                  }}
+                />
+              </label>
+            </li>
+          ) : null}
+        </ul>
+        <span className="text-xs text-slate-500">{photos.length} of at least 2</span>
+      </div>
+      <div className="grid gap-2">
+        <p className="text-sm font-semibold">2. The courier and tracking number</p>
+        {couriers.length ? (
+          <label className="grid gap-1.5 text-sm">
+            Courier
+            <select value={courier} onChange={event => setCourier(event.target.value)} className="h-11 rounded-xl border border-slate-300 bg-white px-3">
+              {couriers.map(item => (
+                <option key={item.name} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+              <option value="other">Another courier</option>
+            </select>
+          </label>
+        ) : null}
+        {courier === "other" || !couriers.length ? (
+          <label className="grid gap-1.5 text-sm">
+            Courier’s name
+            <input value={other} onChange={event => setOther(event.target.value)} maxLength={60} className="h-11 rounded-xl border border-slate-300 px-3" />
+          </label>
+        ) : null}
+        <label className="grid gap-1.5 text-sm">
+          Tracking number
+          <input value={number} onChange={event => setNumber(event.target.value)} maxLength={60} autoComplete="off" className="h-11 rounded-xl border border-slate-300 px-3" />
+        </label>
+        {!listed?.tracking_url ? (
+          <label className="grid gap-1.5 text-sm">
+            Tracking link <span className="text-slate-500">(optional, https)</span>
+            <input value={link} onChange={event => setLink(event.target.value)} inputMode="url" maxLength={500} className="h-11 rounded-xl border border-slate-300 px-3" />
+          </label>
+        ) : null}
+        <label className="grid gap-1.5 text-sm">
+          Note for the buyer <span className="text-slate-500">(optional)</span>
+          <input value={note} onChange={event => setNote(event.target.value)} maxLength={300} className="h-11 rounded-xl border border-slate-300 px-3" />
+        </label>
+      </div>
+      <button type="button" disabled={pending || uploading || !ready} onClick={() => onShip({ courier: name, tracking_number: number, tracking_url: link || undefined, tracking_note: note || undefined })} className={primary}>
+        Mark as shipped
+      </button>
+      {error ? (
+        <p role="alert" className="text-sm font-semibold text-brand-700">
+          {error}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

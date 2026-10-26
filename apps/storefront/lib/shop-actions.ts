@@ -13,12 +13,14 @@ import type {
   ShopMessage,
   ShopMyListing,
   ShopOrder,
+  ShopOrderMessage,
   ShopPriceKind,
   ShopReleaseCode,
   ShopReportReason,
   ShopResaleDeal,
   ShopResaleMessage,
   ShopReseller,
+  ShopShipmentStatus,
   ShopSuggestion,
   ShopVideoUpload,
 } from "@bitocard/api-client/classifieds";
@@ -66,6 +68,11 @@ export type ListingFields = Partial<{
   price: string;
   condition: ShopCondition | null;
   delivery: ShopDelivery;
+  /** Handed over in person, with the buyer's release code (at least one of this and delivery). */
+  pickup: boolean;
+  /** The delivery charge within the seller's state and elsewhere, as typed ("2,000"); empty is free. */
+  delivery_fee_state: string;
+  delivery_fee_nationwide: string;
   contact: ShopContact;
   features: Array<{ key: string; value: string | number | boolean | null }>;
   /** Where it is sold: BitoCard Shop, resellers' stores, or both. */
@@ -91,6 +98,14 @@ function body(fields: ListingFields): { body: Record<string, unknown> } | { prob
       out.price = minor;
     }
   }
+  for (const key of ["delivery_fee_state", "delivery_fee_nationwide"] as const) {
+    const typed = fields[key];
+    if (typed === undefined) continue;
+    const minor = typed.trim() ? toMinor(typed) : 0;
+    if (minor === null) return { problem: refused("Give the delivery charge as an amount, such as 2,000 (or leave it empty for free).", key) };
+    out[key] = minor;
+  }
+  if (fields.pickup !== undefined) out.pickup = fields.pickup;
   if (fields.features) out.features = fields.features.filter(item => item.value !== null && item.value !== "");
   for (const key of ["on_shop", "resale", "resale_discount_bps", "resale_markup_max_bps", "stock"] as const) if (fields[key] !== undefined) out[key] = fields[key];
   return { body: out };
@@ -210,13 +225,47 @@ export async function reportChat(chatId: string, reason: ShopReportReason, detai
 type OrderStep = "accept" | "decline" | "pay" | "sent" | "received" | "cancel";
 
 /** A step on an order: the seller accepts or declines, the buyer pays or confirms it arrived, the seller marks it sent, either side cancels. */
-export async function orderStep(orderId: string, step: OrderStep, input: { reason?: string; tracking_note?: string; nonce?: string } = {}): Promise<ShopResult<ShopOrder>> {
+export async function orderStep(orderId: string, step: OrderStep, input: { reason?: string; tracking_note?: string; courier?: string; tracking_number?: string; tracking_url?: string; nonce?: string } = {}): Promise<ShopResult<ShopOrder>> {
   if (!id(orderId) || !["accept", "decline", "pay", "sent", "received", "cancel"].includes(step)) return refused("No such order.");
   const sent: Record<string, string> = {};
-  if ((step === "decline" || step === "cancel") && input.reason?.trim()) sent.reason = input.reason.trim().slice(0, 500);
-  if (step === "sent" && input.tracking_note?.trim()) sent.tracking_note = input.tracking_note.trim().slice(0, 500);
+  if ((step === "decline" || step === "cancel") && input.reason?.trim()) sent.reason = input.reason.trim().slice(0, 300);
+  if (step === "sent") {
+    if (!input.courier?.trim()) return refused("Choose the courier.", "courier");
+    if (!input.tracking_number?.trim()) return refused("Enter the tracking number.", "tracking_number");
+    sent.courier = input.courier.trim().slice(0, 60);
+    sent.tracking_number = input.tracking_number.trim().slice(0, 60);
+    if (input.tracking_url?.trim()) sent.tracking_url = input.tracking_url.trim().slice(0, 500);
+    if (input.tracking_note?.trim()) sent.tracking_note = input.tracking_note.trim().slice(0, 300);
+  }
   const result = answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/${step}`, sent, { idempotencyKey: input.nonce }));
   if (result.ok) revalidatePath(`/shop/orders/${orderId}`);
+  return result;
+}
+
+/** The seller reports where a shipped parcel is (in transit, out for delivery, delivered, a failed attempt, returned). */
+export async function shipmentUpdate(orderId: string, status: ShopShipmentStatus, note?: string): Promise<ShopResult<ShopOrder>> {
+  if (!id(orderId) || !["in_transit", "out_for_delivery", "delivered", "failed_attempt", "returned"].includes(status)) return refused("No such order.");
+  const result = answer(await customerApi<ShopOrder>("POST", `/v1/classifieds/orders/${orderId}/shipment`, { status, ...(note?.trim() ? { note: note.trim().slice(0, 300) } : {}) }));
+  if (result.ok) revalidatePath(`/shop/orders/${orderId}`);
+  return result;
+}
+
+/** A resale order's thread, for its supplier: the order chat with the buyer, or the trade thread with the reseller. */
+export async function loadOrderMessages(orderId: string, thread: "order" | "trade", after?: string): Promise<ShopResult<{ data: ShopOrderMessage[] }>> {
+  if (!id(orderId) || (after && !id(after))) return refused("No such order.");
+  return answer(await customerApi<{ data: ShopOrderMessage[] }>("GET", `/v1/classifieds/orders/${orderId}/messages?thread=${thread}${after ? `&after=${after}` : ""}`));
+}
+
+export async function sendOrderMessage(orderId: string, thread: "order" | "trade", text: string): Promise<ShopResult<ShopOrderMessage>> {
+  if (!id(orderId)) return refused("No such order.");
+  if (!text.trim()) return refused("Write a message.", "body");
+  return answer(await customerApi<ShopOrderMessage>("POST", `/v1/classifieds/orders/${orderId}/messages`, { thread, body: text.trim().slice(0, 2000) }));
+}
+
+/** Whether new resale orders are accepted by themselves (the supplier's choice). */
+export async function setAutoAccept(enabled: boolean): Promise<ShopResult<{ enabled: boolean }>> {
+  const result = answer(await customerApi<{ enabled: boolean }>("PUT", "/v1/classifieds/me/resale/auto-accept", { enabled }));
+  if (result.ok) revalidatePath("/shop/resellers");
   return result;
 }
 

@@ -80,14 +80,19 @@ export async function answerOffer(offerId: string, action: "accept" | "decline" 
 }
 
 /** Asks to buy with Safe pay: the listed price or an accepted offer, a meet-up or a delivery. */
-export async function requestSafePay(input: { listingId: string; offerId?: string | null; fulfilment: "meet_up" | "delivery"; address?: string; nonce?: string }): Promise<ActionResult<ShopOrder>> {
-  if (!uuid.test(input.listingId) || (input.offerId && !uuid.test(input.offerId))) return refused("No such listing.");
+export async function requestSafePay(input: { listingId: string; offerId?: string | null; fulfilment: "meet_up" | "delivery"; address?: string; stateId?: string; nonce?: string }): Promise<ActionResult<ShopOrder>> {
+  if (!uuid.test(input.listingId) || (input.offerId && !uuid.test(input.offerId)) || (input.stateId && !uuid.test(input.stateId))) return refused("No such listing.");
   if (!["meet_up", "delivery"].includes(input.fulfilment)) return refused("Choose how you will get it.");
   return answer(
     await customerApi<ShopOrder>(
       "POST",
       "/v1/classifieds/orders",
-      { listing_id: input.listingId, ...(input.offerId ? { offer_id: input.offerId } : {}), fulfilment: input.fulfilment, ...(input.fulfilment === "delivery" ? { delivery_address: (input.address ?? "").trim() } : {}) },
+      {
+        listing_id: input.listingId,
+        ...(input.offerId ? { offer_id: input.offerId } : {}),
+        fulfilment: input.fulfilment,
+        ...(input.fulfilment === "delivery" ? { delivery_address: (input.address ?? "").trim(), ...(input.stateId ? { delivery_state_id: input.stateId } : {}) } : {}),
+      },
       { idempotencyKey: input.nonce },
     ),
   );

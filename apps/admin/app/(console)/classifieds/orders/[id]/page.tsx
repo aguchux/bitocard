@@ -45,7 +45,7 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
     <>
       <PageHeader
         title={order.number}
-        description={`${order.country} · ${order.fulfilment === "meet_up" ? "Meet-up" : "Delivery"}${order.mode === "test" ? " · test" : ""}`}
+        description={`${order.country} · ${order.fulfilment === "meet_up" ? "Meet-up" : "Delivery"}${order.quantity > 1 ? ` · ${order.quantity} units` : ""}${order.kind === "resale" && order.store ? ` · resale on ${order.store.name}` : ""}${order.mode === "test" ? " · test" : ""}`}
         actions={
           <span className="flex flex-wrap gap-2">
             {reviewable && finance ? (
@@ -79,11 +79,22 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
             <div className="px-5 pb-5 sm:px-6">
               <KeyValue
                 items={[
-                  { label: "Price", value: money(order.price) },
+                  { label: order.resale ? "Store's price" : "Price", value: money(order.price) },
+                  ...(order.delivery_fee ? [{ label: "Delivery (to the seller)", value: money(order.delivery_fee) }] : []),
                   { label: "Buyer's fee", value: money(order.buyer_fee) },
                   { label: "Buyer paid", value: money(order.total) },
-                  { label: "Seller's fee", value: money(order.seller_fee) },
-                  { label: "Seller's payout", value: money(order.payout) },
+                  ...(order.resale
+                    ? [
+                        { label: "Supplier's price", value: money(order.resale.supplier_price) },
+                        { label: "Reseller's discount", value: `${order.resale.discount_bps / 100}%${order.resale.deal_id ? " (a deal)" : ""}` },
+                        { label: "Supplier's net", value: money(order.resale.supplier_net) },
+                        { label: "Reseller's margin", value: money(order.resale.margin) },
+                        { label: "Reseller's fee", value: money(order.resale.reseller_fee) },
+                        { label: "Reseller's earnings", value: money(order.resale.earnings) },
+                      ]
+                    : []),
+                  { label: order.resale ? "Supplier's fee" : "Seller's fee", value: money(order.seller_fee) },
+                  { label: order.resale ? "Supplier's payout" : "Seller's payout", value: money(order.payout) },
                   { label: "Refunded", value: order.refund === null ? "—" : money(order.refund) },
                 ]}
               />
@@ -95,7 +106,7 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
             <div className="grid gap-6 px-5 pb-5 sm:grid-cols-2 sm:px-6">
               <KeyValue
                 items={[
-                  { label: "Asked", value: formatDateTime(order.timeline.requested_at) },
+                  { label: order.kind === "resale" ? "Bought (locked)" : "Asked", value: formatDateTime(order.timeline.requested_at) },
                   { label: "Accepted", value: formatDateTime(order.timeline.accepted_at) },
                   { label: "Paid", value: formatDateTime(order.timeline.paid_at) },
                   { label: "Sent", value: formatDateTime(order.timeline.sent_at) },
@@ -133,9 +144,23 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
                 <PersonCell person={order.buyer} />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Seller</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">{order.kind === "resale" ? "Supplier (the seller)" : "Seller"}</p>
                 <PersonCell person={order.seller} />
               </div>
+              {order.store ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Bought on</p>
+                  <p className="font-semibold text-ink">{order.store.name}</p>
+                  <p className="text-xs text-muted">{order.store.subdomain}.bitocard.com</p>
+                </div>
+              ) : null}
+              {order.buyer_details ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Buyer’s details (this view is logged)</p>
+                  <p className="text-ink">{order.buyer_details.phone ?? "No phone"}</p>
+                  {order.buyer_details.address ? <p className="text-muted">{order.buyer_details.address}</p> : null}
+                </div>
+              ) : null}
             </div>
           </Card>
           <Card>
@@ -143,11 +168,34 @@ function Order({ order }: { order: AdminClassifiedOrderDetail }) {
             <div className="px-5 pb-5 text-sm sm:px-6">
               <KeyValue
                 items={[
-                  { label: "Delivery address", value: order.delivery_address ?? "—" },
-                  { label: "Tracking", value: order.tracking_note ?? "—" },
+                  { label: "Delivery address", value: order.delivery_address ?? order.buyer_details?.address ?? "—" },
+                  { label: "Courier", value: order.shipment?.courier ? `${order.shipment.courier} ${order.shipment.tracking_number ?? ""}` : "—" },
+                  { label: "Delivered", value: formatDateTime(order.shipment?.delivered_at ?? null) },
+                  { label: "Note", value: order.tracking_note ?? "—" },
                   { label: "Release code tries left", value: order.release_tries_left === null ? "—" : String(order.release_tries_left) },
                 ]}
               />
+              {order.shipment?.tracking_url ? (
+                <a href={order.shipment.tracking_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-semibold text-brand-600 hover:underline">
+                  Track the parcel
+                </a>
+              ) : null}
+              {order.shipment?.events.length ? (
+                <ol className="mt-3 space-y-1 border-l border-line pl-3">
+                  {order.shipment.events.map(event => (
+                    <li key={`${event.status}-${event.at}`}>
+                      <span className="font-semibold text-ink">{event.status.replace(/_/g, " ")}</span> <span className="text-muted">{formatDateTime(event.at)}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+              {order.shipment?.dispatch_photos.length ? (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {order.shipment.dispatch_photos.map(photo => (
+                    <PrivatePhoto key={photo.id} path={photo.url} alt="Dispatch photo" />
+                  ))}
+                </div>
+              ) : null}
             </div>
           </Card>
         </div>

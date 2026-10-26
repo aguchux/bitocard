@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- suppliers' photos from BitoCard Shop's storage */
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { BadgeCheck, ShieldCheck } from "lucide-react";
 import { descriptionBlocks, type DescriptionSpan, shopMoney } from "@bitocard/api-client/classifieds";
@@ -88,10 +89,10 @@ export function Gallery({ photos, title }: { photos: ResalePhoto[]; title: strin
 
 /**
  * One listing on a Resale shop: the supplier's photos, words and features, the store's price and approved note, the
- * supplier (named, linking to their page here with this listing as they wrote it), how the item reaches the buyer, and
- * how their payment is protected. Buying opens with the next stage of reselling.
+ * supplier (named, linking to their page here with this listing as they wrote it), how the item reaches the buyer, how
+ * their payment is protected, and buying (`buy`, the page's form).
  */
-export function ResaleListingDetail({ item, storeName }: { item: ResaleStoreListingDetail; storeName: string }) {
+export function ResaleListingDetail({ item, storeName, buy }: { item: ResaleStoreListingDetail; storeName: string; buy?: ReactNode }) {
   const condition = resaleCondition(item.condition);
   return (
     // Phones: the photos, then the title, price and how to buy, then the details. Desktops: the side panel beside both.
@@ -141,7 +142,7 @@ export function ResaleListingDetail({ item, storeName }: { item: ResaleStoreList
           <p>You pay from your wallet; the money is held, never sent to anyone, until you confirm you have the item. If it does not arrive or is not as described, you get it back.</p>
           {item.buyer_fee ? <p className="text-xs opacity-80">A Safe pay fee of {shopMoney(item.buyer_fee, item.currency)} is added at checkout.</p> : null}
         </div>
-        <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm text-slate-700">Buying online here opens soon.</p>
+        {buy}
         {item.safety_checklist.length ? (
           <section aria-labelledby="checks" className="grid gap-2">
             <h2 id="checks" className="text-sm font-bold text-navy-900">

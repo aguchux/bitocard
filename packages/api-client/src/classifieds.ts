@@ -12,7 +12,7 @@ export type ShopSort = 'relevant' | 'newest' | 'price_asc' | 'price_desc';
 export type ShopBadge = 'phone_confirmed' | 'id_checked';
 export type ShopTier = 'area' | 'nearby' | 'state' | 'country';
 export type ShopReportReason = 'scam' | 'prohibited' | 'wrong_category' | 'duplicate' | 'sold' | 'offensive' | 'other';
-export type ShopOrderStatus = 'requested' | 'declined' | 'lapsed' | 'awaiting_payment' | 'cancelled' | 'paid' | 'sent' | 'disputed' | 'released' | 'refunded' | 'partly_refunded';
+export type ShopOrderStatus = 'requested' | 'declined' | 'lapsed' | 'awaiting_payment' | 'cancelled' | 'locked' | 'paid' | 'sent' | 'disputed' | 'released' | 'refunded' | 'partly_refunded';
 export type ShopFeatureType = 'text' | 'number' | 'choice' | 'boolean';
 
 export type ShopPrice = { kind: ShopPriceKind; amount: number | null; currency: string };
@@ -200,11 +200,48 @@ export type ShopSafePayQuote = {
   buyer_fee: number;
   total: number;
   fulfilment: Array<'meet_up' | 'delivery'>;
+  /** The delivery charge on top: within the seller's state, and elsewhere (null where they do not deliver). */
+  delivery: ShopDeliveryCharges | null;
   reserved: boolean;
   accept_hours: number;
   pay_hours: number;
   covers: string[];
 };
+
+export type ShopDeliveryCharges = { state_id: string | null; within_state: number; nationwide: number | null };
+
+/** What a seller reports about a parcel after shipping it. */
+export type ShopShipmentStatus = 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'returned';
+export type ShopShipment = {
+  courier: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  delivered_at: string | null;
+  events: Array<{ status: ShopShipmentStatus; note: string | null; reported_by: 'seller' | 'courier' | 'bitocard'; at: string }>;
+  dispatch_photos: Array<{ id: string; url: string; content_type: string; width: number | null; height: number | null }>;
+};
+export const shipmentLabels: Record<ShopShipmentStatus, string> = {
+  shipped: 'Shipped',
+  in_transit: 'In transit',
+  out_for_delivery: 'Out for delivery',
+  delivered: 'Delivered',
+  failed_attempt: 'Delivery attempt failed',
+  returned: 'Returned to the seller',
+};
+export type ShopCourier = { name: string; tracking_url: string | null };
+/** A message in a resale order's threads, as one side reads it (the buyer sees the store's side as the store). */
+export type ShopOrderMessage = {
+  object: 'resale_order_message';
+  id: string;
+  thread: 'order' | 'trade';
+  from: 'me' | 'store' | 'buyer' | 'supplier' | 'reseller' | 'bitocard';
+  name: string;
+  body: string;
+  created_at: string;
+};
+
+/** A resale buyer's details, for the supplier and the reseller once the order is accepted. */
+export type ShopBuyerDetails = { name: string; email: string; phone: string | null; address: string | null };
 
 /** A Safe pay order as one side sees it: the buyer their fee and total, the seller their fee and payout, never the other's. */
 export type ShopOrder = {
@@ -212,23 +249,38 @@ export type ShopOrder = {
   id: string;
   number: string;
   role: 'buyer' | 'seller';
+  /** `direct` (BitoCard Shop) or `resale` (bought on a reseller's Resale shop). */
+  kind: 'direct' | 'resale';
+  quantity: number;
   status: ShopOrderStatus;
   listing: { id: string; ref: number; title: string | null; slug: string | null; cover_url: string | null };
+  /** The other side: on a resale order, the buyer sees the store. */
   with: { name: string };
+  /** Resale: the store it was bought on. */
+  store: { id: string; name: string; subdomain: string; logo_url: string | null } | null;
+  /** Resale, to the buyer: the supplier (the seller of record). */
+  supplier: { name: string } | null;
   fulfilment: 'meet_up' | 'delivery';
   currency: string;
+  /** The price: on a resale order, the supplier sees their own price, never the store's. */
   price: number;
+  delivery_fee: number;
   buyer_fee?: number;
   total?: number;
   seller_fee?: number;
   payout?: number;
+  /** Resale, to the supplier: their price, the reseller's discount and their net before the fee. */
+  resale?: { supplier_price: number; discount_bps: number; supplier_net: number; deal_id: string | null } | null;
   refund: number | null;
   delivery_address: string | null;
+  /** Resale, to the supplier once accepted: the buyer's details (every view logged). */
+  buyer_details?: ShopBuyerDetails | null;
   tracking_note: string | null;
+  shipment: ShopShipment | null;
   deadlines: { accept_by: string; pay_by: string | null; handover_by: string | null; confirm_by: string | null };
   /** Meet-ups, to the seller: tries left at the buyer's release code. */
   release_tries_left?: number | null;
-  timeline?: { requested_at: string; accepted_at: string | null; paid_at: string | null; sent_at: string | null; released_at: string | null; refunded_at: string | null; closed_at: string | null };
+  timeline?: { requested_at: string; locked_at: string | null; accepted_at: string | null; paid_at: string | null; sent_at: string | null; released_at: string | null; refunded_at: string | null; closed_at: string | null };
   ended_by: string | null;
   end_reason: string | null;
   /** The seller's only: a release waiting for BitoCard's check before it can be cashed out. */
@@ -361,6 +413,10 @@ export type ShopMyListing = {
   photos: Array<{ id: string; url: string; width: number | null; height: number | null; status: string }>;
   video: { id: string; url: string | null; poster_url: string | null; duration_ms: number | null; status: 'processing' | 'ready' | 'failed'; failure_reason: string | null } | null;
   delivery: ShopDelivery;
+  /** Handed over in person (with the buyer's release code); at least one of this and delivery. */
+  pickup: boolean;
+  /** The delivery charge within the seller's state and elsewhere, in minor units (0: free). */
+  delivery_fees: { within_state: number; nationwide: number };
   contact: ShopContact;
   views: number;
   leads: number;
@@ -421,6 +477,7 @@ export const buyerOrderLabels: Record<ShopOrderStatus, string> = {
   lapsed: 'Closed: not answered or paid in time',
   awaiting_payment: 'Accepted: pay to reserve it',
   cancelled: 'Cancelled',
+  locked: 'Paid: waiting for the store to confirm',
   paid: 'Paid: BitoCard holds the money',
   sent: 'Sent: confirm when it arrives',
   disputed: 'In dispute',
@@ -436,7 +493,8 @@ export const sellerOrderLabels: Record<ShopOrderStatus, string> = {
   lapsed: 'Closed: not answered or paid in time',
   awaiting_payment: 'Accepted: waiting for payment',
   cancelled: 'Cancelled',
-  paid: 'Paid: hand it over',
+  locked: 'Paid and locked: accept or decline',
+  paid: 'Paid: hand it over or ship it',
   sent: 'Sent: waiting for the buyer',
   disputed: 'In dispute',
   released: 'Paid to you',

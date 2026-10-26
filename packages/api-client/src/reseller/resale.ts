@@ -181,6 +181,87 @@ export type ResaleMessage = {
 
 const listingTags = (id: string) => [{ type: 'ResaleListing' as const, id }, { type: 'ResaleListing' as const, id: 'LIST' }];
 
+export type ResaleOrderStatus = 'locked' | 'paid' | 'sent' | 'disputed' | 'released' | 'refunded' | 'partly_refunded' | 'declined' | 'cancelled' | 'lapsed';
+
+/** An order on the reseller's Resale shops, without the buyer's details (as lists and webhook events carry it). */
+export type ResaleOrder = {
+  object: 'resale_order';
+  id: string;
+  number: string;
+  mode: 'test' | 'live';
+  store_id: string;
+  status: ResaleOrderStatus;
+  listing: { id: string; ref: number; title: string };
+  quantity: number;
+  currency: string;
+  price: number;
+  delivery_fee: number;
+  buyer_fee: number;
+  total: number;
+  supplier_net: number;
+  margin: number;
+  reseller_fee: number | null;
+  earnings: number | null;
+  refund: number | null;
+  deal_id: string | null;
+  fulfilment: 'meet_up' | 'delivery';
+  courier: string | null;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  delivered_at: string | null;
+  accept_by: string;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResaleShipmentStatus = 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'returned';
+
+/** One order with the buyer's details once the supplier accepts (every view logged), its shipment and timeline. */
+export type ResaleOrderDetail = ResaleOrder & {
+  supplier: { name: string };
+  buyer: { name: string; email: string; phone: string | null; address: string | null } | null;
+  note_shown: string | null;
+  shipment: {
+    courier: string | null;
+    tracking_number: string | null;
+    tracking_url: string | null;
+    delivered_at: string | null;
+    events: Array<{ status: ResaleShipmentStatus; note: string | null; reported_by: 'seller' | 'courier' | 'bitocard'; at: string }>;
+    dispatch_photos: Array<{ id: string; url: string; content_type: string; width: number | null; height: number | null }>;
+  } | null;
+  deadlines: { accept_by: string; pay_by: string | null; handover_by: string | null; confirm_by: string | null };
+  timeline: { requested_at: string; locked_at: string | null; accepted_at: string | null; paid_at: string | null; sent_at: string | null; released_at: string | null; refunded_at: string | null; closed_at: string | null };
+  ended_by: 'buyer' | 'seller' | 'reseller' | 'bitocard' | null;
+  end_reason: string | null;
+  dispute: { id: string; status: 'open' | 'decided'; reason: 'not_received' | 'not_as_described' | 'damaged' | 'other'; decision: 'refund' | 'partial' | 'release' | null } | null;
+};
+
+export type ResaleOrderThread = 'order' | 'trade';
+export type ResaleOrderMessage = {
+  object: 'resale_order_message';
+  id: string;
+  thread: ResaleOrderThread;
+  /** `me` (your team), `buyer`, `supplier` or `bitocard`. */
+  from: 'me' | 'buyer' | 'supplier' | 'reseller' | 'bitocard';
+  name: string;
+  body: string;
+  created_at: string;
+};
+
+export const resaleOrderStatusText: Record<ResaleOrderStatus, string> = {
+  locked: 'Waiting for the supplier',
+  paid: 'Accepted: to hand over',
+  sent: 'Shipped',
+  disputed: 'In dispute',
+  released: 'Completed',
+  refunded: 'Refunded',
+  partly_refunded: 'Partly refunded',
+  declined: 'Declined by the supplier',
+  cancelled: 'Cancelled',
+  lapsed: 'Not accepted in time',
+};
+
 export const resaleApi = bitocardApi.injectEndpoints({
   endpoints: build => ({
     /** BitoCard Shop's categories in a country (public), for rules and filters. */
@@ -249,6 +330,23 @@ export const resaleApi = bitocardApi.injectEndpoints({
       query: ({ id, closed }) => ({ url: `/v1/resale/suppliers/${id}/${closed ? 'close' : 'reopen'}`, method: 'POST' }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ResaleSupplier', id }, { type: 'ResaleSupplier', id: 'LIST' }, { type: 'ResaleSupplier', id: `MESSAGES:${id}` }],
     }),
+    resaleOrders: build.query<List<ResaleOrder> & { total: number }, { status?: ResaleOrderStatus; store_id?: string; offset?: number; limit?: number } | void>({
+      query: filter => ({ url: '/v1/resale/orders', params: params(filter ?? {}) }),
+      providesTags: [{ type: 'ResaleOrder', id: 'LIST' }],
+    }),
+    resaleOrder: build.query<ResaleOrderDetail, string>({ query: id => `/v1/resale/orders/${id}`, providesTags: (_result, _error, id) => [{ type: 'ResaleOrder', id }] }),
+    cancelResaleOrder: build.mutation<ResaleOrderDetail, { id: string; reason?: string }>({
+      query: ({ id, reason }) => ({ url: `/v1/resale/orders/${id}/cancel`, method: 'POST', body: reason ? { reason } : {} }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'ResaleOrder', id }, { type: 'ResaleOrder', id: 'LIST' }, { type: 'ResaleOrder', id: `MESSAGES:${id}` }],
+    }),
+    resaleOrderMessages: build.query<List<ResaleOrderMessage> & { thread: ResaleOrderThread }, { id: string; thread: ResaleOrderThread }>({
+      query: ({ id, thread }) => `/v1/resale/orders/${id}/messages?thread=${thread}`,
+      providesTags: (_result, _error, { id }) => [{ type: 'ResaleOrder', id: `MESSAGES:${id}` }],
+    }),
+    sendResaleOrderMessage: build.mutation<ResaleOrderMessage, { id: string; thread: ResaleOrderThread; body: string }>({
+      query: ({ id, thread, body }) => ({ url: `/v1/resale/orders/${id}/messages`, method: 'POST', body: { thread, body } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'ResaleOrder', id: `MESSAGES:${id}` }],
+    }),
     answerResaleDeal: build.mutation<ResaleDeal, { id: string; supplierId: string; answer: 'accept' | 'decline' | 'end' }>({
       query: ({ id, answer }) => ({ url: `/v1/resale/deals/${id}/${answer}`, method: 'POST' }),
       invalidatesTags: (_result, _error, { supplierId }) => [
@@ -286,6 +384,11 @@ export const {
   useSendResaleMessageMutation,
   useSetResaleChatClosedMutation,
   useAnswerResaleDealMutation,
+  useResaleOrdersQuery,
+  useResaleOrderQuery,
+  useCancelResaleOrderMutation,
+  useResaleOrderMessagesQuery,
+  useSendResaleOrderMessageMutation,
 } = resaleApi;
 
 /** What a state means for the reseller, in a few words. */

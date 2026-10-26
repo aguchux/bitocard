@@ -80,6 +80,8 @@ describe("amounts and the description's toolbar", () => {
   test("private photos are read through this site, never straight from the API", () => {
     expect(localPhotoUrl(`/v1/classifieds/conversations/${listing}/photos/${order}`)).toBe(`/api/shop/chats/${listing}/photos/${order}`);
     expect(localPhotoUrl(`/v1/classifieds/orders/${order}/dispute/photos/${listing}`)).toBe(`/api/shop/orders/${order}/dispute/photos/${listing}`);
+    expect(localPhotoUrl(`/v1/classifieds/orders/${order}/dispatch-photos/${listing}`)).toBe(`/api/shop/orders/${order}/dispatch-photos/${listing}`);
+    expect(localPhotoUrl(`/v1/store/resale/orders/${order}/dispatch-photos/${listing}`)).toBe(`/api/purchases/${order}/dispatch-photos/${listing}`);
     expect(localPhotoUrl("https://evil.example/x.jpg")).toBeNull();
     expect(localPhotoUrl(`/v1/classifieds/conversations/../photos/${order}`)).toBeNull();
   });
@@ -126,7 +128,11 @@ describe("listings and orders", () => {
     expect(orderActions(make({ status: "paid", role: "seller" }))).toEqual(["enter_code", "cancel"]);
     expect(orderActions(make({ status: "paid", fulfilment: "delivery", role: "seller" }))).toEqual(["sent", "cancel"]);
     expect(orderActions(make({ status: "sent", fulfilment: "delivery" }))).toEqual(["received", "dispute"]);
-    expect(orderActions(make({ status: "sent", fulfilment: "delivery", role: "seller" }))).toEqual([]);
+    expect(orderActions(make({ status: "sent", fulfilment: "delivery", role: "seller" }))).toEqual(["shipment"]);
+    expect(orderActions(make({ status: "sent", fulfilment: "delivery", role: "seller", shipment: { courier: "GIG", tracking_number: "1", tracking_url: null, delivered_at: "x", events: [], dispatch_photos: [] } }))).toEqual([]);
+    // A resale order starts paid and locked: the supplier answers, the buyer may cancel.
+    expect(orderActions(make({ status: "locked", kind: "resale" }))).toEqual(["cancel"]);
+    expect(orderActions(make({ status: "locked", kind: "resale", role: "seller" }))).toEqual(["accept", "decline"]);
     for (const status of ["released", "refunded", "disputed", "cancelled"] as const) expect(orderActions(make({ status }))).toEqual([]);
   });
 
@@ -134,10 +140,18 @@ describe("listings and orders", () => {
     expect(orderNext(make({ status: "paid" }))).toBe("Meet Kemi A., check it, then give your release code.");
     expect(orderNext(make({ status: "paid", role: "seller" }))).toBe("Meet Kemi A. and enter their release code.");
     expect(orderNext(make({ status: "refunded" }))).toBe("Refunded to your wallet.");
-    const steps = orderSteps(make({ status: "awaiting_payment", timeline: { requested_at: "a", accepted_at: "b", paid_at: null, sent_at: null, released_at: null, refunded_at: null, closed_at: null } }));
+    const steps = orderSteps(make({ status: "awaiting_payment", timeline: { requested_at: "a", locked_at: null, accepted_at: "b", paid_at: null, sent_at: null, released_at: null, refunded_at: null, closed_at: null } }));
     expect(steps.map(step => step.state)).toEqual(["done", "done", "now", "later", "later"]);
     expect(orderSteps(make({ status: "cancelled" })).map(step => step.state)).toEqual(["done", "later", "later", "later", "later"]);
-    expect(orderSteps(make({ fulfilment: "delivery" })).map(step => step.title)).toContain("Sent");
+    expect(orderSteps(make({ fulfilment: "delivery" })).map(step => step.title)).toEqual(["Requested", "Accepted by Kemi A.", "Paid: BitoCard is holding it", "Shipped", "Delivered", "Released to the seller"]);
+    const resale = make({ kind: "resale", role: "seller", status: "locked", store: { id: "s", name: "Gadget Hub", subdomain: "gadgets", logo_url: null }, timeline: { requested_at: "a", locked_at: "a", accepted_at: null, paid_at: null, sent_at: null, released_at: null, refunded_at: null, closed_at: null } });
+    expect(orderSteps(resale).map(step => [step.title, step.state])).toEqual([
+      ["Bought on Gadget Hub", "done"],
+      ["You accepted: BitoCard is holding it", "now"],
+      ["Met and checked", "later"],
+      ["Paid to you", "later"],
+    ]);
+    expect(orderNext(resale)).toMatch(/^Paid and waiting: accept or decline by /);
   });
 });
 
@@ -229,6 +243,16 @@ describe("Shop actions", () => {
     expect(JSON.parse(String(call[1].body))).toEqual({ on_shop: false, resale: true, resale_discount_bps: 1000, resale_markup_max_bps: 3000, stock: 4 });
   });
 
+  test("delivery charges go in minor units (empty is free), with pickup; a charge that is not an amount stays here", async () => {
+    const fetch = vi.fn(async () => reply({ object: "classified_listing", id: listing }));
+    vi.stubGlobal("fetch", fetch);
+    await actions.updateListing(listing, { delivery: "nationwide", delivery_fee_state: "2,000", delivery_fee_nationwide: "", pickup: false });
+    const [call] = fetch.mock.calls as unknown as Call[];
+    expect(JSON.parse(String(call[1].body))).toEqual({ delivery: "nationwide", delivery_fee_state: 200000, delivery_fee_nationwide: 0, pickup: false });
+    expect(await actions.updateListing(listing, { delivery_fee_state: "a lot" })).toMatchObject({ ok: false, param: "delivery_fee_state" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   test("the video link points at the API itself; an ended session asks to sign in again", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => reply({ object: "classified_video_upload", listing_id: listing, path: `/v1/classifieds/video-uploads/bcv_up_x`, expires_at: "" })));
     expect(await actions.videoUploadUrl(listing)).toEqual({ ok: true, data: { url: "http://api.test/v1/classifieds/video-uploads/bcv_up_x" } });
@@ -239,11 +263,14 @@ describe("Shop actions", () => {
   test("order steps carry only their own fields; the release code is six digits", async () => {
     const fetch = vi.fn(async () => reply({ object: "classified_order", id: order }));
     vi.stubGlobal("fetch", fetch);
-    await actions.orderStep(order, "sent", { tracking_note: " GIG Logistics ", reason: "ignored" });
+    // Shipping names the courier and tracking number; neither missing is sent.
+    expect(await actions.orderStep(order, "sent", { tracking_number: "GIG1" })).toMatchObject({ ok: false, param: "courier" });
+    expect(await actions.orderStep(order, "sent", { courier: "GIG Logistics" })).toMatchObject({ ok: false, param: "tracking_number" });
+    await actions.orderStep(order, "sent", { courier: " GIG Logistics ", tracking_number: " GIG1 ", tracking_note: " Waybill ", reason: "ignored" });
     await actions.orderStep(order, "pay", { nonce: "pay-nonce-1234" });
     const calls = fetch.mock.calls as unknown as Call[];
     expect(calls.map(call => [call[0], JSON.parse(String(call[1].body))])).toEqual([
-      [`http://api.test/v1/classifieds/orders/${order}/sent`, { tracking_note: "GIG Logistics" }],
+      [`http://api.test/v1/classifieds/orders/${order}/sent`, { courier: "GIG Logistics", tracking_number: "GIG1", tracking_note: "Waybill" }],
       [`http://api.test/v1/classifieds/orders/${order}/pay`, {}],
     ]);
     expect(calls[1]![1].headers["idempotency-key"]).toBe("pay-nonce-1234");

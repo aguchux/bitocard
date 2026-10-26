@@ -45,6 +45,8 @@ describe("dispute labels", () => {
     expect(["completed", "failed", "refunded", "paid"].map(canDispute)).toEqual([true, true, true, true]);
     expect(canDispute("awaiting_payment")).toBe(false);
     expect(activeTab("/account/disputes/abc")).toBe("/account/orders");
+    // A Resale shop's orders are the customer's purchases, under the same tab.
+    expect(activeTab("/account/purchases/abc")).toBe("/account/orders");
   });
 });
 

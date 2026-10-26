@@ -111,6 +111,11 @@ export function localPhotoUrl(url: string | null | undefined) {
   if (chat) return `/api/shop/chats/${chat[1]}/photos/${chat[2]}`;
   const dispute = /^\/v1\/classifieds\/orders\/([0-9a-f-]{36})\/dispute\/photos\/([0-9a-f-]{36})$/.exec(url);
   if (dispute) return `/api/shop/orders/${dispute[1]}/dispute/photos/${dispute[2]}`;
+  const dispatch = /^\/v1\/classifieds\/orders\/([0-9a-f-]{36})\/dispatch-photos\/([0-9a-f-]{36})$/.exec(url);
+  if (dispatch) return `/api/shop/orders/${dispatch[1]}/dispatch-photos/${dispatch[2]}`;
+  // A Resale shop's buyer reads their order's dispatch photos through their store's own address.
+  const purchase = /^\/v1\/store\/resale\/orders\/([0-9a-f-]{36})\/dispatch-photos\/([0-9a-f-]{36})$/.exec(url);
+  if (purchase) return `/api/purchases/${purchase[1]}/dispatch-photos/${purchase[2]}`;
   return null;
 }
 
@@ -162,13 +167,15 @@ export function orderNext(order: Pick<ShopOrder, "role" | "status" | "fulfilment
   switch (order.status) {
     case "requested":
       return buyer ? `Waiting for ${order.with.name} to accept, by ${when(order.deadlines.accept_by)}.` : `Accept or decline by ${when(order.deadlines.accept_by)}, or it lapses.`;
+    case "locked":
+      return buyer ? `Paid: your money is locked until ${order.with.name} confirms, by ${when(order.deadlines.accept_by)}.` : `Paid and waiting: accept or decline by ${when(order.deadlines.accept_by)}. Letting it lapse counts against you.`;
     case "awaiting_payment":
       return buyer ? `Accepted. Pay from your wallet${order.deadlines.pay_by ? ` by ${when(order.deadlines.pay_by)}` : ""}.` : `Waiting for ${order.with.name} to pay.`;
     case "paid":
       if (order.fulfilment === "meet_up") return buyer ? `Meet ${order.with.name}, check it, then give your release code.` : `Meet ${order.with.name} and enter their release code.`;
-      return buyer ? `Paid. ${order.with.name} sends it${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""}.` : `Send it${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""} and mark it sent.`;
+      return buyer ? `Paid. ${order.with.name} ships it${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""}.` : `Photograph it and the sealed parcel, ship it with tracking${order.deadlines.handover_by ? ` by ${when(order.deadlines.handover_by)}` : ""}, and mark it shipped.`;
     case "sent":
-      return buyer ? `On its way. Confirm when it arrives${order.deadlines.confirm_by ? `, or it releases on ${when(order.deadlines.confirm_by)}` : ""}.` : `Sent. Paid to you once ${order.with.name} confirms${order.deadlines.confirm_by ? `, or on ${when(order.deadlines.confirm_by)}` : ""}.`;
+      return buyer ? `On its way. Confirm when it arrives in good condition${order.deadlines.confirm_by ? `, or it releases on ${when(order.deadlines.confirm_by)}` : ""}.` : `Shipped. Keep the tracking up to date; you are paid once ${order.with.name} confirms${order.deadlines.confirm_by ? `, or on ${when(order.deadlines.confirm_by)}` : ""}.`;
     case "disputed":
       return "BitoCard is looking at both sides and will decide.";
     case "released":
@@ -190,18 +197,22 @@ export function orderNext(order: Pick<ShopOrder, "role" | "status" | "fulfilment
 export function orderTone(status: ShopOrder["status"]) {
   if (status === "released") return "bg-emerald-700 text-white";
   if (["paid", "sent"].includes(status)) return "bg-emerald-50 text-emerald-800";
-  if (["requested", "awaiting_payment"].includes(status)) return "bg-amber-50 text-amber-800";
+  if (["requested", "awaiting_payment", "locked"].includes(status)) return "bg-amber-50 text-amber-800";
   if (status === "disputed") return "bg-brand-50 text-brand-700";
   return "bg-slate-100 text-slate-700";
 }
 
-export type OrderAction = "accept" | "decline" | "pay" | "release_code" | "enter_code" | "sent" | "received" | "cancel" | "dispute";
+export type OrderAction = "accept" | "decline" | "pay" | "release_code" | "enter_code" | "sent" | "shipment" | "received" | "cancel" | "dispute";
 
-/** What the reader of an order can do now (the API checks again). */
-export function orderActions(order: Pick<ShopOrder, "role" | "status" | "fulfilment" | "dispute">): OrderAction[] {
+/**
+ * What the reader of an order can do now (the API checks again). A resale order starts `locked` (paid, waiting for the
+ * supplier); a shipped one takes the supplier's tracking updates until it is marked delivered.
+ */
+export function orderActions(order: Pick<ShopOrder, "role" | "status" | "fulfilment" | "dispute"> & { shipment?: ShopOrder["shipment"] }): OrderAction[] {
   const buyer = order.role === "buyer";
   switch (order.status) {
     case "requested":
+    case "locked":
       return buyer ? ["cancel"] : ["accept", "decline"];
     case "awaiting_payment":
       return buyer ? ["pay", "cancel"] : ["cancel"];
@@ -209,22 +220,35 @@ export function orderActions(order: Pick<ShopOrder, "role" | "status" | "fulfilm
       if (order.fulfilment === "meet_up") return buyer ? ["release_code", "cancel", "dispute"] : ["enter_code", "cancel"];
       return buyer ? ["cancel", "dispute"] : ["sent", "cancel"];
     case "sent":
-      return buyer ? ["received", "dispute"] : [];
+      return buyer ? ["received", "dispute"] : order.shipment?.delivered_at ? [] : ["shipment"];
     default:
       return [];
   }
 }
 
 /** The order's steps for its progress list: done, now or later, with when each happened. */
-export function orderSteps(order: Pick<ShopOrder, "status" | "fulfilment" | "timeline" | "with" | "role">) {
+export function orderSteps(order: Pick<ShopOrder, "status" | "fulfilment" | "timeline" | "with" | "role"> & { kind?: ShopOrder["kind"]; store?: ShopOrder["store"]; shipment?: ShopOrder["shipment"] }) {
   const t = order.timeline;
   const ended = ["declined", "lapsed", "cancelled", "refunded", "partly_refunded"].includes(order.status);
+  const resale = order.kind === "resale";
   const steps = [
-    { title: "Requested", at: t?.requested_at ?? null },
-    { title: order.role === "buyer" ? `Accepted by ${order.with.name}` : "You accepted", at: t?.accepted_at ?? null },
-    { title: "Paid: BitoCard is holding it", at: t?.paid_at ?? null },
-    ...(order.fulfilment === "delivery" ? [{ title: "Sent", at: t?.sent_at ?? null }] : [{ title: "Met and checked", at: t?.released_at ?? null }]),
-    { title: order.role === "buyer" ? "Released to the seller" : "Paid to you", at: t?.released_at ?? null },
+    ...(resale
+      ? [
+          { title: order.role === "buyer" ? "Paid: locked in your wallet" : `Bought on ${order.store?.name ?? "a reseller’s store"}`, at: t?.locked_at ?? t?.requested_at ?? null },
+          { title: order.role === "buyer" ? "Confirmed: BitoCard is holding it" : "You accepted: BitoCard is holding it", at: t?.accepted_at ?? null },
+        ]
+      : [
+          { title: "Requested", at: t?.requested_at ?? null },
+          { title: order.role === "buyer" ? `Accepted by ${order.with.name}` : "You accepted", at: t?.accepted_at ?? null },
+          { title: "Paid: BitoCard is holding it", at: t?.paid_at ?? null },
+        ]),
+    ...(order.fulfilment === "delivery"
+      ? [
+          { title: "Shipped", at: t?.sent_at ?? null },
+          { title: "Delivered", at: order.shipment?.delivered_at ?? null },
+        ]
+      : [{ title: "Met and checked", at: t?.released_at ?? null }]),
+    { title: order.role === "buyer" ? (resale ? "Complete" : "Released to the seller") : "Paid to you", at: t?.released_at ?? null },
   ];
   const now = steps.findIndex(step => !step.at);
   return steps.map((step, index) => ({ ...step, state: step.at ? ("done" as const) : !ended && index === now ? ("now" as const) : ("later" as const) }));

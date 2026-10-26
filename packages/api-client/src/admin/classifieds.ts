@@ -193,7 +193,7 @@ export type ClassifiedConversationReview = {
   created_at: string;
 };
 
-export const classifiedOrderStatuses = ['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded'] as const;
+export const classifiedOrderStatuses = ['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'locked', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded'] as const;
 export type ClassifiedOrderStatus = (typeof classifiedOrderStatuses)[number];
 export type ClassifiedPayoutReview = 'pending' | 'approved' | 'rejected';
 export type ClassifiedDisputeDecision = 'refund' | 'partial' | 'release';
@@ -203,28 +203,46 @@ export type AdminClassifiedOrder = {
   id: string;
   number: string;
   role: 'admin';
+  /** `direct` (BitoCard Shop) or `resale` (bought on a reseller's Resale shop: the seller is the supplier). */
+  kind: 'direct' | 'resale';
+  quantity: number;
   status: ClassifiedOrderStatus;
   listing: { id: string; ref: number; title: string | null; slug: string | null; cover_url: string | null };
   buyer: { id: string; name: string; email: string };
   seller: { id: string; name: string; email: string };
+  /** Resale: the store it was bought on. */
+  store: { id: string; name: string; subdomain: string; logo_url: string | null } | null;
   mode: 'live' | 'test';
   country: string;
-  /** Each side's rate and cap, fixed when the buyer asked. */
-  rates: { buyer_fee_bps: number; buyer_fee_cap: number; seller_fee_bps: number; seller_fee_cap: number };
+  /** Each side's rate and cap, fixed when the buyer asked (and the reseller's, on a resale order). */
+  rates: { buyer_fee_bps: number; buyer_fee_cap: number; seller_fee_bps: number; seller_fee_cap: number; reseller_fee_bps?: number | null; reseller_fee_cap?: number };
   fulfilment: 'meet_up' | 'delivery';
   currency: string;
   price: number;
+  delivery_fee: number;
   buyer_fee: number;
   total: number;
   seller_fee: number;
   payout: number;
+  /** Resale: the supplier's price, the discount, their net, and the reseller's margin, fee and earnings. */
+  resale: { supplier_price: number; discount_bps: number; supplier_net: number; deal_id: string | null; margin: number; reseller_fee: number; earnings: number } | null;
   refund: number | null;
   delivery_address: string | null;
+  /** Resale, once accepted: the buyer's details (each view is logged). */
+  buyer_details?: { name: string; email: string; phone: string | null; address: string | null } | null;
   tracking_note: string | null;
+  shipment: {
+    courier: string | null;
+    tracking_number: string | null;
+    tracking_url: string | null;
+    delivered_at: string | null;
+    events: Array<{ status: 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'failed_attempt' | 'returned'; note: string | null; reported_by: 'seller' | 'courier' | 'bitocard'; at: string }>;
+    dispatch_photos: Array<{ id: string; url: string; content_type: string; width: number | null; height: number | null }>;
+  } | null;
   release_tries_left: number | null;
   deadlines: { accept_by: string; pay_by: string | null; handover_by: string | null; confirm_by: string | null };
-  timeline: { requested_at: string; accepted_at: string | null; paid_at: string | null; sent_at: string | null; released_at: string | null; refunded_at: string | null; closed_at: string | null };
-  ended_by: 'buyer' | 'seller' | 'bitocard' | null;
+  timeline: { requested_at: string; locked_at: string | null; accepted_at: string | null; paid_at: string | null; sent_at: string | null; released_at: string | null; refunded_at: string | null; closed_at: string | null };
+  ended_by: 'buyer' | 'seller' | 'reseller' | 'bitocard' | null;
   end_reason: string | null;
   payout_review: ClassifiedPayoutReview | null;
   dispute: { id: string; status: 'open' | 'decided'; reason: string; decision: ClassifiedDisputeDecision | null } | null;
@@ -253,7 +271,13 @@ export type ClassifiedDisputeMessage = {
 
 export type AdminClassifiedOrderDetail = Omit<AdminClassifiedOrder, 'dispute'> & { dispute: (ClassifiedDispute & { messages: ClassifiedDisputeMessage[] }) | null };
 export type AdminClassifiedDisputeRow = ClassifiedDispute & { order: AdminClassifiedOrder };
-export type AdminClassifiedOrderFilter = { status?: ClassifiedOrderStatus; country?: string; q?: string; payout_review?: ClassifiedPayoutReview; offset?: number };
+export type AdminClassifiedOrderFilter = { status?: ClassifiedOrderStatus; country?: string; q?: string; payout_review?: ClassifiedPayoutReview; kind?: 'direct' | 'resale'; offset?: number };
+
+/** A courier offered when marking a Safe pay order shipped: its tracking link has `{tracking}` where the number goes. */
+export type ClassifiedCourier = { name: string; tracking_url: string | null };
+
+/** A reseller's resale strikes (orders their stores cancelled in 90 days) against the country's limit. */
+export type ResaleStanding = { object: 'resale_standing'; reseller_id: string; strikes: number; strike_limit: number; limited: boolean; cancelled_by_store: number; cleared_at: string | null };
 
 export type ClassifiedSafePaySettings = {
   object: 'classified_safe_pay_settings';
@@ -268,6 +292,10 @@ export type ClassifiedSafePaySettings = {
   handover_days: number;
   confirm_days: number;
   strike_limit: number;
+  /** The longest a parcel may take once shipped. */
+  transit_days: number;
+  /** The couriers sellers choose from when marking an order shipped. */
+  couriers: ClassifiedCourier[];
   /** Both fees (rate and cap) set: Safe pay can open where its switch is on. */
   ready: boolean;
 };
@@ -501,6 +529,14 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: id => ({ url: `/v1/admin/classifieds/resale-claim-phrases/${id}`, method: 'DELETE' }),
       invalidatesTags: [{ type: 'ClassifiedSettings', id: 'RESALE_PHRASES' }, 'Activity'],
     }),
+    resaleStanding: build.query<ResaleStanding, string>({
+      query: resellerId => `/v1/admin/classifieds/resellers/${encodeURIComponent(resellerId)}/resale-standing`,
+      providesTags: (_result, _error, resellerId) => [{ type: 'ClassifiedSettings', id: `RESALE_STANDING:${resellerId}` }],
+    }),
+    clearResaleStrikes: build.mutation<ResaleStanding, { resellerId: string; reason: string }>({
+      query: ({ resellerId, reason }) => ({ url: `/v1/admin/classifieds/resellers/${encodeURIComponent(resellerId)}/resale-standing/clear`, method: 'POST', body: { reason } }),
+      invalidatesTags: (_result, _error, { resellerId }) => [{ type: 'ClassifiedSettings', id: `RESALE_STANDING:${resellerId}` }, 'Activity'],
+    }),
   }),
 });
 
@@ -545,6 +581,8 @@ export const {
   useResaleClaimPhrasesQuery,
   useAddResaleClaimPhraseMutation,
   useRemoveResaleClaimPhraseMutation,
+  useResaleStandingQuery,
+  useClearResaleStrikesMutation,
 } = adminClassifiedsApi;
  type ResaleClaimPhrase = { object: 'resale_claim_phrase'; id: string; phrase: string; created_at: string };
 

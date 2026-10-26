@@ -122,6 +122,9 @@ export function ListingForm({
   const [price, setPrice] = useState(fromMinor(listing?.price.amount ?? null));
   const [condition, setCondition] = useState<ShopCondition | null>(listing?.condition ?? null);
   const [delivery, setDelivery] = useState<ShopDelivery>(listing?.delivery ?? "none");
+  const [pickup, setPickup] = useState(listing?.pickup ?? true);
+  const [feeState, setFeeState] = useState(listing?.delivery_fees.within_state ? fromMinor(listing.delivery_fees.within_state) : "");
+  const [feeNation, setFeeNation] = useState(listing?.delivery_fees.nationwide ? fromMinor(listing.delivery_fees.nationwide) : "");
   const [contact, setContact] = useState<ShopContact>(listing?.contact ?? "chat");
   const [stateSlug, setStateSlug] = useState<string>(listing?.area?.state?.slug ?? "");
   const [areaId, setAreaId] = useState<string | null>(listing?.area?.id ?? null);
@@ -667,16 +670,49 @@ export function ListingForm({
         <Chips
           label="Delivery"
           options={[
-            { value: "none" as const, label: "Meet-up only" },
+            { value: "none" as const, label: "No delivery" },
             { value: "state" as const, label: state ? `Delivers in ${state.name}` : "Delivers in my state" },
             { value: "nationwide" as const, label: "Nationwide" },
           ]}
           value={delivery}
           onChange={value => {
             setDelivery(value);
-            save({ delivery: value });
+            // Without delivery, it must be handed over in person.
+            if (value === "none" && !pickup) setPickup(true);
+            save({ delivery: value, ...(value === "none" && !pickup ? { pickup: true } : {}) });
           }}
         />
+        {delivery !== "none" ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-semibold">
+              {state ? `Delivery charge in ${state.name}` : "Delivery charge in your state"}
+              <input value={feeState} onChange={event => setFeeState(event.target.value)} onBlur={() => save({ delivery_fee_state: feeState })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_state")}`} />
+            </label>
+            {delivery === "nationwide" ? (
+              <label className="grid gap-1.5 text-sm font-semibold">
+                Delivery charge elsewhere
+                <input value={feeNation} onChange={event => setFeeNation(event.target.value)} onBlur={() => save({ delivery_fee_nationwide: feeNation })} inputMode="decimal" placeholder="Free" className={`h-12 rounded-xl border bg-white px-3 text-base font-normal ${marks("delivery_fee_nationwide")}`} />
+              </label>
+            ) : null}
+            <p className="text-xs text-slate-600 sm:col-span-2">The buyer pays it on top and it is yours in full once they have the item; it is refunded if it never arrives. You ship with a courier and tracking number, after photographing the item and the sealed parcel.</p>
+          </div>
+        ) : null}
+        <label className="flex items-start gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            checked={pickup}
+            disabled={delivery === "none"}
+            onChange={event => {
+              setPickup(event.target.checked);
+              save({ pickup: event.target.checked });
+            }}
+            className="mt-1 size-4 accent-navy-900"
+          />
+          <span>
+            <strong className="block">Hand it over in person</strong>
+            <span className="text-slate-600">You meet the buyer; they check it and give you their release code.{delivery === "none" ? " Needed without delivery." : ""}</span>
+          </span>
+        </label>
         <div className="grid gap-2">
           <Chips
             label="How buyers reach you"

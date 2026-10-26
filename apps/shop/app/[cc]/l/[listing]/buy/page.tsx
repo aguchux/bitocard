@@ -83,7 +83,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
             {order.data.status === "requested" ? <p className="text-sm text-navy-600">We will tell you when {order.data.with.name} answers, by {new Date(order.data.deadlines.accept_by).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })}.</p> : null}
             {order.data.status === "awaiting_payment" && order.data.deadlines.pay_by ? <p className="text-sm text-navy-600">Pay by {new Date(order.data.deadlines.pay_by).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })} to reserve it for you.</p> : null}
           </div>
-          <Money price={order.data.price} fee={order.data.buyer_fee ?? 0} total={total} currency={currency} />
+          <Money price={order.data.price} delivery={order.data.delivery_fee} fee={order.data.buyer_fee ?? 0} total={total} currency={currency} />
           {order.data.status === "awaiting_payment" ? <WalletLine balance={balance} total={total} currency={currency} addFunds={addFunds} /> : null}
           <SafePayOrderActions orderId={order.data.id} canPay={order.data.status === "awaiting_payment"} canCancel={["requested", "awaiting_payment"].includes(order.data.status)} addFundsHref={addFunds} total={total} currency={currency} />
           {myOrder && !["requested", "awaiting_payment"].includes(order.data.status) ? (
@@ -109,7 +109,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
           </section>
           <Money price={quote.data.price} fee={quote.data.buyer_fee} total={quote.data.total} currency={currency} note="The fee comes back to you if the item does not change hands." />
           <WalletLine balance={balance} total={quote.data.total} currency={currency} addFunds={addFunds} />
-          {quote.data.reserved ? <p className="rounded-2xl bg-navy-50 p-3.5 text-sm">{unavailable.listing_reserved}</p> : <SafePayRequest quote={quote.data} sellerName={listing.seller.name} acceptHours={quote.data.accept_hours} />}
+          {quote.data.reserved ? <p className="rounded-2xl bg-navy-50 p-3.5 text-sm">{unavailable.listing_reserved}</p> : <SafePayRequest quote={quote.data} sellerName={listing.seller.name} acceptHours={quote.data.accept_hours} stateName={listing.area.state.name} />}
           <details className="text-sm text-navy-700">
             <summary className="cursor-pointer font-semibold">What Safe pay covers</summary>
             <ul className="mt-2 list-disc space-y-1 pl-5">
@@ -134,13 +134,19 @@ export default async function BuyPage({ params, searchParams }: Props) {
   );
 }
 
-function Money({ price, fee, total, currency, note }: { price: number; fee: number; total: number; currency: string; note?: string }) {
+function Money({ price, delivery = 0, fee, total, currency, note }: { price: number; delivery?: number; fee: number; total: number; currency: string; note?: string }) {
   return (
     <section aria-label="What you pay" className="grid gap-2 rounded-2xl border border-navy-200 bg-white p-4 text-sm">
       <div className="flex justify-between">
         <span>Item price</span>
         <span className="font-semibold">{shopMoney(price, currency)}</span>
       </div>
+      {delivery ? (
+        <div className="flex justify-between">
+          <span>Delivery</span>
+          <span className="font-semibold">{shopMoney(delivery, currency)}</span>
+        </div>
+      ) : null}
       <div className="flex justify-between">
         <span>Safe pay fee</span>
         <span className="font-semibold">{shopMoney(fee, currency)}</span>
