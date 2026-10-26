@@ -491,6 +491,16 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ country, ...body }) => ({ url: `/v1/admin/classifieds/resale-settings/${country}`, method: 'PUT', body }),
       invalidatesTags: (_result, _error, { country }) => [{ type: 'ClassifiedSettings', id: `RESALE:${country}` }, 'Activity'],
     }),
+    /** Words a Resale shop's own text may not use (claims of owning, making or stocking what it resells). */
+    resaleClaimPhrases: build.query<{ object: 'list'; data: ResaleClaimPhrase[] }, void>({ query: () => '/v1/admin/classifieds/resale-claim-phrases', providesTags: [{ type: 'ClassifiedSettings', id: 'RESALE_PHRASES' }] }),
+    addResaleClaimPhrase: build.mutation<ResaleClaimPhrase, string>({
+      query: phrase => ({ url: '/v1/admin/classifieds/resale-claim-phrases', method: 'POST', body: { phrase } }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'RESALE_PHRASES' }, 'Activity'],
+    }),
+    removeResaleClaimPhrase: build.mutation<{ id: string; deleted: true }, string>({
+      query: id => ({ url: `/v1/admin/classifieds/resale-claim-phrases/${id}`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'ClassifiedSettings', id: 'RESALE_PHRASES' }, 'Activity'],
+    }),
   }),
 });
 
@@ -532,7 +542,11 @@ export const {
   useUpdateClassifiedSafePaySettingsMutation,
   useClassifiedResaleSettingsQuery,
   useUpdateClassifiedResaleSettingsMutation,
+  useResaleClaimPhrasesQuery,
+  useAddResaleClaimPhraseMutation,
+  useRemoveResaleClaimPhraseMutation,
 } = adminClassifiedsApi;
+ type ResaleClaimPhrase = { object: 'resale_claim_phrase'; id: string; phrase: string; created_at: string };
 
 /** Changes one category (top or sub) in a market's cached list. */
 function patchCategory(dispatch: (action: unknown) => unknown, country: string, id: string, change: (category: AdminClassifiedCategory) => void): Patch {

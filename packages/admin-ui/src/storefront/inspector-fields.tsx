@@ -25,6 +25,8 @@ export type EditorSources = {
   categories?: ProductCategory[];
   /** Coins the crypto sections can offer (codes). */
   coins?: string[];
+  /** BitoCard Shop categories a Resale shop's listing sections can show (slug and name). */
+  resaleCategories?: Array<{ slug: string; name: string }>;
 };
 
 const SourcesContext = createContext<EditorSources | null>(null);

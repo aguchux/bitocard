@@ -158,13 +158,69 @@ export type P2pMarketSection = SectionBase & { type: 'p2p_market'; title: string
 export type ProductSpotlightSection = SectionBase & { type: 'product_spotlight'; title: string; subtitle: string; productKey: string; bullets: string[]; imageUrl?: string };
 export type FeaturesSection = SectionBase & { type: 'features'; title: string; subtitle: string; items: Array<{ icon: TrustIcon; title: string; body: string }> };
 export type FaqSection = SectionBase & { type: 'faq'; title: string; items: Array<{ question: string; answer: string }> };
-export type StoreSection = Section | QuickBuySection | CryptoQuoteSection | P2pMarketSection | ProductSpotlightSection | FeaturesSection | FaqSection;
+// Resale shops (B2B reselling): BitoCard Shop suppliers' listings sold at the store's prices.
+export type ListingRailSection = SectionBase & { type: 'listing_rail'; title: string; subtitle: string; source: 'newest' | 'price_low' | 'category'; category?: string; limit: number; viewAllHref?: string };
+export type ListingGridSection = SectionBase & { type: 'listing_grid'; title: string; subtitle: string; category?: string; sort: 'newest' | 'price_asc' | 'price_desc'; limit: number };
+export type ResaleCategoriesSection = SectionBase & { type: 'resale_categories'; title: string; subtitle: string; limit: number };
+export type StoreSection = Section | QuickBuySection | CryptoQuoteSection | P2pMarketSection | ProductSpotlightSection | FeaturesSection | FaqSection | ListingRailSection | ListingGridSection | ResaleCategoriesSection;
+
+export type ResalePhoto = { url: string; width: number | null; height: number | null };
+/** Who supplies a resale listing: always shown with it, linking to their page on the store (`/suppliers/<id>`). */
+export type ResaleSupplierLine = { id: string; name: string; member_since: string; badges: Array<'phone_confirmed' | 'id_checked'> };
+/** A resale listing on sale on a Resale shop: the supplier's words and photos, the store's price, an approved note. */
+export type ResaleStoreListing = {
+  object: 'resale_store_listing';
+  id: string;
+  ref: number;
+  slug: string;
+  title: string;
+  cover: ResalePhoto | null;
+  photo_count: number;
+  currency: string;
+  price: number;
+  condition: 'new' | 'used' | 'untested' | 'parts' | null;
+  category: { slug: string; name: string } | null;
+  area: { name: string; state: string | null } | null;
+  delivery: 'none' | 'state' | 'nationwide';
+  available: number;
+  note: string | null;
+  supplier: ResaleSupplierLine;
+};
+export type ResaleFeature = { key: string; name: string; unit: string | null; value: string | number | boolean | null };
+export type ResaleStoreListingDetail = Omit<ResaleStoreListing, 'object'> & {
+  object: 'resale_store_listing_detail';
+  description: string | null;
+  features: ResaleFeature[];
+  photos: ResalePhoto[];
+  video: { url: string; poster_url: string | null; duration_ms: number | null } | null;
+  safety_checklist: string[];
+  buyer_fee: number;
+};
+/** A supplier's page on a Resale shop: who they are and, when asked, one listing exactly as they wrote it (no price). */
+export type ResaleStoreSupplier = ResaleSupplierLine & {
+  object: 'resale_store_supplier';
+  area: { name: string; state: string | null } | null;
+  completed_sales: number;
+  listings_here: number;
+  listing: {
+    ref: number;
+    title: string;
+    description: string | null;
+    condition: string | null;
+    category: { slug: string; name: string } | null;
+    area: { name: string; state: string | null } | null;
+    features: ResaleFeature[];
+    photos: ResalePhoto[];
+  } | null;
+};
+export type ResaleCategoryTile = { slug: string; name: string; count: number; cover: ResalePhoto | null };
+export type ResaleStoreListingPage = { object: 'list'; data: ResaleStoreListing[]; total: number; offset: number; limit: number };
 export type StoreSectionType = StoreSection['type'];
 export type CryptoAssetRef = { code: string; name: string };
 
 /** A section as the home page returns it: with what it shows. */
 export type ResolvedSection =
-  | (HeroSection & { data: { featured: StoreBrand[] } })
+  | (HeroSection & { data: { featured: StoreBrand[]; listings?: ResaleStoreListing[]; categories?: ResaleCategoryTile[] } })
   | (ProductRailSection & { data: { products: StoreProduct[] } })
   | (CategoryGridSection & { data: { categories: StoreCategory[] } })
   | (BrandGridSection & { data: { brands: StoreBrand[] } })
@@ -175,15 +231,18 @@ export type ResolvedSection =
   | (P2pMarketSection & { data: { asset: CryptoAssetRef | null } })
   | (ProductSpotlightSection & { data: { product: StoreProductDetail | null } })
   | (FeaturesSection & { data: null })
-  | (FaqSection & { data: null });
+  | (FaqSection & { data: null })
+  | (ListingRailSection & { data: { listings: ResaleStoreListing[]; total: number } })
+  | (ListingGridSection & { data: { listings: ResaleStoreListing[]; total: number } })
+  | (ResaleCategoriesSection & { data: { categories: ResaleCategoryTile[] } });
 
 // -- Store templates: how a reseller's store looks (`GET /v1/storefronts/:subdomain` `design`) ----------------------
 
-export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop';
+export type StoreTemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop' | 'resale_shop';
 export type StoreThemeColors = { primary: string; accent: string; background: string; surface: string; ink: string; muted: string; heroFrom: string; heroTo: string; heroInk: string };
 export type StoreVariantStyle = {
   mode: 'light' | 'dark';
-  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint';
+  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint' | 'showroom' | 'shelf' | 'aisle';
   corners: 'sharp' | 'soft' | 'round';
   cards: 'flat' | 'raised' | 'outline' | 'glass';
   font: 'sans' | 'display' | 'mono' | 'serif';

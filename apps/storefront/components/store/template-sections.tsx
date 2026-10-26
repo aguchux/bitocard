@@ -9,6 +9,7 @@ import { SearchForm } from "./layout";
 import { GroupIcon } from "./category-icon";
 import { trustIcon } from "./theme";
 import { isServiceHero, ServiceHero } from "./service-heroes";
+import { isResaleHero, ResaleHero } from "./resale";
 
 /**
  * Reseller store templates' sections, drawn in the store's variant (`design.style`) with its theme's colours (the
@@ -79,6 +80,7 @@ export function VariantHero({ section, style, groups, countries, bleed }: { sect
   ) : null;
 
   if (isServiceHero(style.hero)) return <ServiceHero kind={style.hero} section={section} id={id} frame={frame} inner={bleed ? inner : "px-6"} />;
+  if (isResaleHero(style.hero)) return <ResaleHero section={section} style={style} frame={frame} inner={bleed ? inner : "px-6"} />;
 
   switch (style.hero) {
     case "minimal":

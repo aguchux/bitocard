@@ -23,6 +23,9 @@ export const sectionIcons: Record<SectionType, LucideIcon> = {
   product_spotlight: Sparkles,
   features: ListChecks,
   faq: HelpCircle,
+  listing_rail: Rows2,
+  listing_grid: Grid2x2,
+  resale_categories: LayoutPanelTop,
 };
 
 export type CanvasActions = {

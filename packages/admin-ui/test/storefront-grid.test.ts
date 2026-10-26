@@ -121,7 +121,7 @@ describe('hiding, duplicating and removing', () => {
 
 describe('new sections', () => {
   test('every type has a valid default matching the API', () => {
-    expect(sectionTypes.map(item => item.type)).toEqual(['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq']);
+    expect(sectionTypes.map(item => item.type)).toEqual(['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq', 'listing_rail', 'listing_grid', 'resale_categories']);
     expect(bitocardSectionTypes).toEqual(['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar']);
     for (const { type } of sectionTypes) {
       const section = newSection(type, 'n');
@@ -137,6 +137,9 @@ describe('new sections', () => {
     expect(newSection('brand_grid', 'n')).toMatchObject({ tag: '', limit: 12 });
     expect(newSection('quick_buy', 'n')).toMatchObject({ categories: ['airtime', 'data'] });
     expect(newSection('p2p_market', 'n')).toMatchObject({ asset: 'USDT', span: { lg: 6 } });
+    expect(newSection('listing_rail', 'n')).toMatchObject({ source: 'newest', limit: 8 });
+    expect(newSection('listing_grid', 'n')).toMatchObject({ sort: 'newest', limit: 12 });
+    expect(sectionSummary(newSection('listing_grid', 'n'))).toBe('Every category · newest · up to 12');
     expect(sectionSummary(newSection('product_spotlight', 'n'))).toBe('The store’s product');
     expect(sectionTitle(newSection('product_spotlight', 'n'))).toBe('Product spotlight');
     expect(newSection('promo', 'n')).toMatchObject({ theme: 'pink', illustration: 'none', bullets: [], span: { lg: 4, md: 3 } });

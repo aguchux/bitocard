@@ -73,5 +73,6 @@ describe("quick links", () => {
     expect(quickLinksFor([group("gift_cards", true)], "gift_cards")).toEqual([]);
     expect(quickLinksFor([group("virtual_numbers", true), group("rdp", false), group("vpn", true), group("virtual_cards", true)], "all_in_one")).toEqual(["/catalogs/virtual_numbers", "/catalogs/vpn"]);
     expect(quickLinksFor([], "crypto_desk")).toEqual(["/account/crypto"]);
+    expect(quickLinksFor([], "resale_shop")).toEqual(["/listings"]);
   });
 });

@@ -15,6 +15,7 @@ export const quickLinks: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/catalogs/rdp", label: "RDP", icon: MonitorSmartphone },
   { href: "/catalogs/vpn", label: "VPN", icon: ShieldCheck },
   { href: "/account/crypto", label: "Crypto", icon: Coins },
+  { href: "/listings", label: "Shop everything", icon: ShoppingBag },
   { href: "/spin", label: "Spin & win", icon: Sparkles },
 ];
 

@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import { amountToMinor, Badge, bpsToPercent, Button, Card, CardHeader, errorMessage, Field, formatMoney, Input, Notice, PageHeader, percentToBps, QueryView, Skeleton } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
-import { type ClassifiedResaleSettings, type ClassifiedResaleSettingsInput, safePayFee, useClassifiedResaleSettingsQuery, useCountriesQuery, useUpdateClassifiedResaleSettingsMutation } from "@bitocard/api-client/admin";
+import { type ClassifiedResaleSettings, type ClassifiedResaleSettingsInput, safePayFee, useAddResaleClaimPhraseMutation, useClassifiedResaleSettingsQuery, useCountriesQuery, useRemoveResaleClaimPhraseMutation, useResaleClaimPhrasesQuery, useUpdateClassifiedResaleSettingsMutation } from "@bitocard/api-client/admin";
 import { MarketFilter } from "@/components/classifieds";
 
 /** Example prices, in whole units of the market's currency. */
@@ -39,7 +39,68 @@ export default function ClassifiedResalePage() {
           {data => <SettingsForm key={JSON.stringify(data)} saved={data} currency={currency} changes={can(admin, "finance")} />}
         </QueryView>
       </div>
+      <div className="mt-6">
+        <ClaimPhrases changes={can(admin, "operations")} />
+      </div>
     </AdminShell>
+  );
+}
+
+/**
+ * Words a Resale shop's own text may not use, in every market: claims of owning, making or stocking the items it resells.
+ * Its home page cannot be saved or published while one appears (whole words, any case). Operations keep the list.
+ */
+function ClaimPhrases({ changes }: { changes: boolean }) {
+  const id = useId();
+  const phrases = useResaleClaimPhrasesQuery();
+  const [add, adding] = useAddResaleClaimPhraseMutation();
+  const [remove] = useRemoveResaleClaimPhraseMutation();
+  const [phrase, setPhrase] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (phrase.trim().length < 3) return;
+    const result = await add(phrase.trim());
+    if ("data" in result) setPhrase("");
+  };
+  return (
+    <Card>
+      <CardHeader title="Ownership claims refused on Resale shops" description="A reseller's store never owns, makes or stocks what it resells. Its words cannot use these phrases (whole words, any case)." />
+      <div className="space-y-4 px-5 pb-5 sm:px-6">
+        <QueryView query={phrases} loading={<Skeleton className="h-16 w-full" />}>
+          {data =>
+            data.data.length ? (
+              <ul className="flex flex-wrap gap-2">
+                {data.data.map(row => (
+                  <li key={row.id} className="inline-flex items-center gap-1 rounded-full bg-canvas px-3 py-1 text-sm ring-1 ring-line">
+                    {row.phrase}
+                    {changes ? (
+                      <button type="button" aria-label={`Remove ${row.phrase}`} className="ml-1 rounded-full px-1 text-muted hover:text-red-600" onClick={() => void remove(row.id)}>
+                        ×
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">No phrases yet.</p>
+            )
+          }
+        </QueryView>
+        {changes ? (
+          <form className="flex flex-wrap items-end gap-3" onSubmit={submit}>
+            <div className="min-w-56 flex-1">
+              <Field label="Add a phrase" htmlFor={`${id}-phrase`}>
+                <Input id={`${id}-phrase`} value={phrase} maxLength={120} placeholder="our own brand" onChange={event => setPhrase(event.target.value)} />
+              </Field>
+            </div>
+            <Button type="submit" loading={adding.isLoading} disabled={phrase.trim().length < 3}>
+              Add
+            </Button>
+          </form>
+        ) : null}
+        {adding.error ? <Notice tone="red">{errorMessage(adding.error)}</Notice> : null}
+      </div>
+    </Card>
   );
 }
 

@@ -62,6 +62,8 @@ export type StoreTemplate = {
   categories: string[] | null;
   single_product: boolean;
   crypto: boolean;
+  /** The Resale shop: sells BitoCard Shop suppliers' resale listings, never catalogue products. */
+  resale?: boolean;
   sections: StoreSectionType[];
   available: boolean;
   reason: string | null;

@@ -9,6 +9,7 @@ import { SearchForm } from "./layout";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 import { groupInk, trustIcon } from "./theme";
 import { CryptoQuote, Faq, Features, P2pMarket, ProductSpotlight, QuickBuy, VariantHero } from "./template-sections";
+import { ListingGrid, ListingRail, ResaleCategories } from "./resale";
 
 // Literal class names, so Tailwind generates them.
 const lgSpan = { 3: "lg:col-span-3", 4: "lg:col-span-4", 6: "lg:col-span-6", 8: "lg:col-span-8", 9: "lg:col-span-9", 12: "lg:col-span-12" } as const;
@@ -354,6 +355,11 @@ function isEmpty(section: ResolvedSection) {
       return !section.data.categories.some(tab => tab.products.length);
     case "crypto_quote":
       return section.data.assets.length === 0;
+    case "listing_rail":
+    case "listing_grid":
+      return section.data.listings.length === 0;
+    case "resale_categories":
+      return section.data.categories.length === 0;
     default:
       return false;
   }
@@ -392,6 +398,9 @@ export function HomeSections({ sections, groups, countries, design, afterHero }:
           {section.type === "product_spotlight" && style ? <ProductSpotlight section={section} style={style} /> : null}
           {section.type === "features" ? <Features section={section} /> : null}
           {section.type === "faq" ? <Faq section={section} /> : null}
+          {section.type === "listing_rail" ? <ListingRail section={section} /> : null}
+          {section.type === "listing_grid" ? <ListingGrid section={section} /> : null}
+          {section.type === "resale_categories" ? <ResaleCategories section={section} /> : null}
         </div>
       ))}
     </div>

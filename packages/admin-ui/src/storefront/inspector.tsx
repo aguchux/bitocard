@@ -7,7 +7,7 @@ import { sectionTypeLabel } from "./grid";
 import { type FormProps } from "./inspector-fields";
 import { HeroForm, ProductRailForm, CategoryGridForm, BrandGridForm, ProductSpotlightForm } from "./catalogue-forms";
 import { PromoForm, TrustBarForm, FeaturesForm, FaqForm } from "./content-forms";
-import { QuickBuyForm, CryptoQuoteForm, P2pMarketForm } from "./template-forms";
+import { QuickBuyForm, CryptoQuoteForm, P2pMarketForm, ListingRailForm, ListingGridForm, ResaleCategoriesForm } from "./template-forms";
 
 export { EditorSourcesProvider, type EditorProduct, type EditorSources } from "./inspector-fields";
 
@@ -37,6 +37,12 @@ function SectionForm({ section, onChange }: FormProps<Section>) {
       return <FeaturesForm section={section} onChange={onChange} />;
     case "faq":
       return <FaqForm section={section} onChange={onChange} />;
+    case "listing_rail":
+      return <ListingRailForm section={section} onChange={onChange} />;
+    case "listing_grid":
+      return <ListingGridForm section={section} onChange={onChange} />;
+    case "resale_categories":
+      return <ResaleCategoriesForm section={section} onChange={onChange} />;
   }
 }
 

@@ -1,6 +1,6 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 and 2 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132` and the Shop tab after them; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 3 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
@@ -124,7 +124,10 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 - Supplier endpoints and the Shop tab's **My Resellers** (each reseller and store carrying their listings, their sales, the chat with phone numbers, deals offered and running, notes waiting for approval with Approve, Refuse and Withdraw, and Stop this store reselling my listings).
 - Gates: switch `reseller_resale` (global, country, reseller), a verified (KYB) reseller with a Resale shop store. Every plan, Startup included; the existing plan features and limits (stores, domains, custom domains, AI and the rest) apply as they do today.
 
-### Stage 3: the Resale shop template and its storefront
+### Stage 3: the Resale shop template and its storefront: built 26 October 2026
+
+**As built:** template `resale_shop` (Showroom, Shelf, Aisle; three themes each; no catalogue categories), offered where `reseller_resale` is on and the reseller verified, with `store_template_resale_shop`. Sections `listing_rail`, `listing_grid`, `resale_categories` (the plan's `features` and `faq` are the existing ones), filled by `ResaleShopService` through a hook on the storefront service, so the storefront module needs no import of resale. Public store reads `/v1/store/resale/...` (left out of the OpenAPI document, like the store's customer endpoints); only listings on sale. The supplier's page uses the relationship's ID, never the supplier's account, and shows no price (proposal B). Ownership claims are refused outright when the page is saved or published (`store_text_refused`), from an admin phrase list (seeded with 18), rather than sent to review: a page refused shows the field to change, as layout errors do. Buying is not open yet: the listing page says so (stage 4). The rule that a Resale shop's payments are collected by BitoCard moves to stage 4, where its checkout is built. Tests: `apps/api/test/resale-shop.test.mjs` (PGlite and Docker), `apps/storefront/test/resale.test.ts` (every design names the supplier on every listing), `packages/admin-ui/test/storefront-grid.test.ts`.
+
 - Template `resale_shop` (three variants and their themes, `store_template_resale_shop` switch) selling resale listings instead of catalogue products: `StorefrontService.availability` and checkout learn a second kind of item.
 - New sections: `listing_rail`, `listing_grid`, `resale_categories`, plus `features` and `faq`; the home editor, starter pages and previews as for every template.
 - Pages on the reseller's store: category, search, listing (`/l/<ref>-<slug>`: the supplier's photos and facts, the reseller's price and approved note, "Supplied by <supplier>", how payment is protected, delivery or meet-up area), and the **supplier's page** (`/suppliers/<id>`: the supplier and this listing exactly as they wrote it), with the store's own SEO.

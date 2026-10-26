@@ -29,6 +29,9 @@ export const sectionTypes: ReadonlyArray<{ type: SectionType; label: string; des
   { type: 'product_spotlight', label: 'Product spotlight', description: 'One product in full, with its buy form.' },
   { type: 'features', label: 'Features', description: 'Up to six features or steps, each with an icon.' },
   { type: 'faq', label: 'Questions', description: 'Questions and answers that open one at a time.' },
+  { type: 'listing_rail', label: 'Listing rail', description: 'A row of your resale listings: newest, lowest price first, or one category.' },
+  { type: 'listing_grid', label: 'Listing grid', description: 'A grid of your resale listings, optionally one category.' },
+  { type: 'resale_categories', label: 'Categories', description: 'The categories you have listings in, each with a photo.' },
 ];
 
 /** The sections bitocard.com's Storefront Manager offers (the others are reseller store templates'). */
@@ -136,6 +139,12 @@ export function newSection(type: SectionType, id: string): Section {
       return { id, type, span: full, hidden: false, title: 'Why buy here', subtitle: '', items: [{ icon: 'bolt', title: 'Fast', body: 'Delivered in minutes.' }] };
     case 'faq':
       return { id, type, span: full, hidden: false, title: 'Questions', items: [{ question: 'How do I receive it?', answer: 'Right after payment, on your order page.' }] };
+    case 'listing_rail':
+      return { id, type, span: full, hidden: false, title: 'Just in', subtitle: '', source: 'newest', limit: 8 };
+    case 'listing_grid':
+      return { id, type, span: full, hidden: false, title: 'Everything in store', subtitle: '', sort: 'newest', limit: 12 };
+    case 'resale_categories':
+      return { id, type, span: full, hidden: false, title: 'Shop by category', subtitle: '', limit: 8 };
   }
 }
 
@@ -203,6 +212,12 @@ export function sectionSummary(section: Section): string {
       return `${section.asset} · up to ${section.limit} offers`;
     case 'product_spotlight':
       return section.productKey || 'The store’s product';
+    case 'listing_rail':
+      return [section.source === 'category' ? `Category: ${section.category ?? '—'}` : section.source === 'price_low' ? 'Lowest price first' : 'Newest', `up to ${section.limit}`].join(' · ');
+    case 'listing_grid':
+      return [section.category ? `Category: ${section.category}` : 'Every category', section.sort === 'newest' ? 'newest' : section.sort === 'price_asc' ? 'price low to high' : 'price high to low', `up to ${section.limit}`].join(' · ');
+    case 'resale_categories':
+      return `Up to ${section.limit} categories`;
   }
 }
 
