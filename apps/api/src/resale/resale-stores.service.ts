@@ -112,6 +112,36 @@ export class ResaleStoresService {
     return { reason, country: reseller.country, name: reseller.name };
   }
 
+  /** Whether the reseller can resell now (their store sells nothing otherwise). */
+  async canResell(resellerId: string) {
+    const { reason, country } = await this.gate(resellerId);
+    return reason ? null : country;
+  }
+
+  /**
+   * A store's listings on sale now (state `selling`): its active store listings whose supplier still offers them, with
+   * stock left and the price inside the limits, newest first. At most 1,000, for the store's own pages.
+   */
+  async onSale(storeId: string, country: string, filter: { categoryIds?: string[]; q?: string; listingRef?: bigint } = {}) {
+    const rows = await this.prisma.resaleListing.findMany({
+      where: {
+        storeId,
+        status: 'active',
+        relationship: { supplierBlockedAt: null },
+        listing: {
+          ...resaleWhere(country),
+          ...(filter.categoryIds ? { categoryId: { in: filter.categoryIds } } : {}),
+          ...(filter.q ? { title: { contains: filter.q.trim().slice(0, 100), mode: 'insensitive' } } : {}),
+          ...(filter.listingRef !== undefined ? { ref: filter.listingRef } : {}),
+        },
+      },
+      include: this.storeListingInclude,
+      orderBy: [{ listing: { publishedAt: 'desc' } }, { id: 'asc' }],
+      take: 1000,
+    });
+    return (await this.evaluate(rows)).filter(item => item.state === 'selling');
+  }
+
   /** The reseller's country, or `resale_unavailable` saying why they cannot resell. */
   async requireReseller(resellerId: string) {
     const { reason, country } = await this.gate(resellerId);
@@ -181,7 +211,7 @@ export class ResaleStoresService {
 
   // ---- The catalogue ----
 
-  private supplier(customer: ListingRow['customer'], checked: Set<string>) {
+  supplier(customer: ListingRow['customer'], checked: Set<string>) {
     return {
       id: customer.id,
       name: publicName(customer.name),
@@ -190,7 +220,7 @@ export class ResaleStoresService {
     };
   }
 
-  private async idChecked(customerIds: string[]) {
+  async idChecked(customerIds: string[]) {
     if (!customerIds.length) return new Set<string>();
     const rows = await this.prisma.identityVerification.findMany({ where: { subject: 'customer', mode: 'live', status: 'approved', customerReference: { in: [...new Set(customerIds)] } }, select: { customerReference: true } });
     return new Set(rows.map(row => row.customerReference!));
@@ -339,14 +369,14 @@ export class ResaleStoresService {
 
   // ---- Store listings ----
 
-  private readonly storeListingInclude = {
+  readonly storeListingInclude = {
     listing: { select: listingSelect },
     relationship: { select: { supplierBlockedAt: true } },
     store: { select: { name: true, subdomain: true } },
   } satisfies Prisma.ResaleListingInclude;
 
   /** What a store listing can do now, and its price. */
-  private async evaluate(rows: Prisma.ResaleListingGetPayload<{ include: ResaleStoresService['storeListingInclude'] }>[]) {
+  async evaluate(rows: Prisma.ResaleListingGetPayload<{ include: ResaleStoresService['storeListingInclude'] }>[]) {
     if (!rows.length) return [];
     const available = await this.available(rows.map(row => row.listing));
     const dealsByReseller = new Map<string, Map<string, Deal[]>>();

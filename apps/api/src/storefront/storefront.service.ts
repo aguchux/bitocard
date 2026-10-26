@@ -83,6 +83,17 @@ type StoreScope = {
 };
 type Scope = { market: string | null; store?: StoreScope; prices?: Prices };
 
+/** The store a Resale shop's sections are filled for. */
+export type ResaleStoreRef = { id: string; resellerId: string; country: string };
+/**
+ * B2B reselling's Resale shop sections (`listing_rail`, `listing_grid`, `resale_categories`) and its hero's listings and
+ * categories, filled by the resale module (registered with `useResale`), so the storefront needs no import of it.
+ */
+export type ResaleFiller = {
+  section(store: ResaleStoreRef, item: Section): Promise<unknown>;
+  hero(store: ResaleStoreRef): Promise<{ listings: unknown[]; categories: unknown[] }>;
+};
+
 /**
  * BitoCard's own storefront (bitocard.com), read by anyone: the published home page with its sections filled in, the
  * catalogue, search across brands, companies, products, categories and countries, and product pages. Shows face
@@ -92,6 +103,12 @@ type Scope = { market: string | null; store?: StoreScope; prices?: Prices };
 export class StorefrontService {
   /** The request in progress: the shopper's market (`inMarket`, null for the whole store), and a reseller's store (`inStore`). */
   private readonly scope = new AsyncLocalStorage<Scope>();
+  private resale: ResaleFiller | null = null;
+
+  /** The resale module fills Resale shops' sections (see `ResaleFiller`). */
+  useResale(filler: ResaleFiller) {
+    this.resale = filler;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -682,6 +699,12 @@ export class StorefrontService {
       visible.map(async item => {
         switch (item.type) {
           case 'hero': {
+            const store = this.scope.getStore()?.store;
+            // A Resale shop's hero shows its own listings and categories, never catalogue brands.
+            if (store && templateFor(store.template)?.resale) {
+              const resale = this.resale ? await this.resale.hero(store) : { listings: [], categories: [] };
+              return { ...item, data: { featured: [], ...resale } };
+            }
             // Brands with a logo first, so the floating cards show logos rather than initials.
             const brands = await this.brands({ limit: 24 });
             return { ...item, data: { featured: [...brands.filter(brand => brand.logo_url), ...brands.filter(brand => !brand.logo_url)].slice(0, 6) } };
@@ -742,6 +765,13 @@ export class StorefrontService {
             if (!key && only?.length === 1) key = (await this.products({ category: only[0], limit: 1 })).data[0]?.key ?? '';
             const product = key ? await this.product(key).catch(() => null) : null;
             return { ...item, data: { product } };
+          }
+          case 'listing_rail':
+          case 'listing_grid':
+          case 'resale_categories': {
+            const store = this.scope.getStore()?.store;
+            const empty = item.type === 'resale_categories' ? { categories: [] } : { listings: [], total: 0 };
+            return { ...item, data: store && this.resale && templateFor(store.template)?.resale ? await this.resale.section(store, item) : empty };
           }
           default:
             return { ...item, data: null };

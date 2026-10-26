@@ -34,7 +34,7 @@ export type StoreTheme = { key: string; name: string; colors: ThemeColors };
 export type VariantStyle = {
   mode: 'light' | 'dark';
   /** The hero's layout. */
-  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint';
+  hero: 'search' | 'gradient' | 'minimal' | 'quick_buy' | 'networks' | 'billers' | 'card_wall' | 'boutique' | 'neon' | 'terminal' | 'market' | 'swap' | 'spotlight' | 'split' | 'story' | 'shield' | 'devices' | 'tunnel' | 'desktop' | 'rack' | 'blueprint' | 'showroom' | 'shelf' | 'aisle';
   corners: 'sharp' | 'soft' | 'round';
   cards: 'flat' | 'raised' | 'outline' | 'glass';
   font: 'sans' | 'display' | 'mono' | 'serif';
@@ -44,7 +44,7 @@ export type VariantStyle = {
 
 export type TemplateVariant = { key: string; name: string; description: string; style: VariantStyle; themes: StoreTheme[]; starter: () => unknown[] };
 
-export type TemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop';
+export type TemplateKey = 'all_in_one' | 'topups' | 'gift_cards' | 'crypto_desk' | 'single_product' | 'vpn_shop' | 'rdp_shop' | 'resale_shop';
 
 export type StoreTemplate = {
   key: TemplateKey;
@@ -57,6 +57,8 @@ export type StoreTemplate = {
   single: boolean;
   /** The store is the crypto desk: offered only where the reseller's exchange or P2P is switched on. */
   crypto: boolean;
+  /** The store sells BitoCard Shop suppliers' resale listings, never catalogue products (B2B reselling). */
+  resale?: boolean;
   /** Sections its editor offers. */
   sections: SectionType[];
   variants: TemplateVariant[];
@@ -702,7 +704,94 @@ const rdpShop: StoreTemplate = {
   ],
 };
 
-export const storeTemplates: StoreTemplate[] = [allInOne, topups, giftCards, cryptoDesk, singleProduct, vpnShop, rdpShop];
+// -- 8. Resale shop (B2B reselling: BitoCard Shop suppliers' listings) -------------------------------------------------
+
+const resaleTrust = trust([
+  ['shield', 'Payment protected', 'Your money is held until you have the item.'],
+  ['star', 'Checked sellers', 'Every item comes from a named, checked supplier.'],
+  ['card', 'Pay from your wallet', 'No card details shared with anyone.'],
+  ['support', 'Help when you need it', 'We are here if anything goes wrong.'],
+]);
+const resaleFaq = {
+  id: id(),
+  type: 'faq',
+  span: full,
+  title: 'Questions',
+  items: [
+    { question: 'Who sends me the item?', answer: 'The supplier named on each listing. They hand it over at a meet-up or send it to you.' },
+    { question: 'When does the seller get paid?', answer: 'Only once you have the item. Your money is held safely until then.' },
+    { question: 'What if something goes wrong?', answer: 'Tell us before you confirm you have the item. Your money stays held while it is sorted out.' },
+  ],
+};
+
+const resaleShop: StoreTemplate = {
+  key: 'resale_shop',
+  name: 'Resale shop',
+  tagline: 'Sell checked suppliers’ products under your brand.',
+  description: 'Phones, electronics, fashion and more from BitoCard Shop suppliers in your country, at your prices. Every listing shows its supplier, and buyers’ money is held until they have the item.',
+  categories: [],
+  single: false,
+  crypto: false,
+  resale: true,
+  sections: ['hero', 'listing_rail', 'listing_grid', 'resale_categories', 'promo', 'features', 'faq', 'trust_bar'],
+  variants: [
+    {
+      key: 'showroom',
+      name: 'Showroom',
+      description: 'A mosaic of your listings’ photos beside the headline, then the newest arrivals and categories.',
+      style: { mode: 'light', hero: 'showroom', corners: 'round', cards: 'raised', font: 'display', density: 'comfortable' },
+      themes: [
+        theme('ink_coral', 'Ink and coral', { primary: '#e11d48', accent: '#070f4c', background: '#fafafa', surface: '#ffffff', ink: '#111827', muted: '#6b7280', heroFrom: '#111827', heroTo: '#1f2937', heroInk: '#ffffff' }),
+        theme('ocean', 'Ocean', { primary: '#0369a1', accent: '#f59e0b', background: '#f5f9fc', surface: '#ffffff', ink: '#0b2133', muted: '#58707f', heroFrom: '#0c4a6e', heroTo: '#0369a1', heroInk: '#ffffff' }),
+        theme('forest', 'Forest', { primary: '#15803d', accent: '#c2410c', background: '#f6faf6', surface: '#ffffff', ink: '#0d2614', muted: '#4f6b57', heroFrom: '#14532d', heroTo: '#15803d', heroInk: '#ffffff' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Quality items,', accent: 'checked sellers.', subtitle: 'Shop products from verified suppliers. Your payment is held until you have your item.', search: true, categoryChips: false },
+        { id: id(), type: 'listing_rail', span: full, title: 'Just in', source: 'newest', limit: 8, viewAllHref: '/listings' },
+        { id: id(), type: 'resale_categories', span: full, title: 'Shop by category' },
+        { id: id(), type: 'listing_grid', span: full, title: 'Everything in store', sort: 'newest', limit: 12 },
+        resaleFaq,
+        resaleTrust,
+      ],
+    },
+    {
+      key: 'shelf',
+      name: 'Shelf',
+      description: 'Warm and calm: the headline over a shelf of your listings, then categories and the full range.',
+      style: { mode: 'light', hero: 'shelf', corners: 'soft', cards: 'outline', font: 'serif', density: 'airy' },
+      themes: [
+        theme('linen', 'Linen', { primary: '#9a3412', accent: '#0f766e', background: '#fffaf5', surface: '#ffffff', ink: '#2a1206', muted: '#7d6152', heroFrom: '#ffedd5', heroTo: '#fffaf5', heroInk: '#2a1206' }),
+        theme('sage', 'Sage', { primary: '#3f6212', accent: '#9d174d', background: '#f8faf3', surface: '#ffffff', ink: '#1a2410', muted: '#606b52', heroFrom: '#ecfccb', heroTo: '#f8faf3', heroInk: '#1a2410' }),
+        theme('blush', 'Blush', { primary: '#be185d', accent: '#1e3a8a', background: '#fff7fa', surface: '#ffffff', ink: '#2a0a18', muted: '#7d5c6a', heroFrom: '#fce7f3', heroTo: '#fff7fa', heroInk: '#2a0a18' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Good things,', accent: 'from people we trust.', subtitle: 'Every item comes from a named supplier. Pay safely and only release the money once it is yours.', search: false, categoryChips: false },
+        { id: id(), type: 'resale_categories', span: full, title: 'Browse' },
+        { id: id(), type: 'listing_grid', span: full, title: 'The collection', sort: 'newest', limit: 12 },
+        resaleTrust,
+        resaleFaq,
+      ],
+    },
+    {
+      key: 'aisle',
+      name: 'Aisle',
+      description: 'Bold and quick to search: a dark search band with category shortcuts, then deals by price.',
+      style: { mode: 'dark', hero: 'aisle', corners: 'sharp', cards: 'flat', font: 'sans', density: 'compact' },
+      themes: [
+        theme('night_market', 'Night market', { primary: '#f59e0b', accent: '#22c55e', background: '#0b0f17', surface: '#151b26', ink: '#f1f5f9', muted: '#94a3b8', heroFrom: '#0b0f17', heroTo: '#1e293b', heroInk: '#ffffff' }),
+        theme('electric', 'Electric', { primary: '#38bdf8', accent: '#f472b6', background: '#070b14', surface: '#111827', ink: '#e5edf8', muted: '#8b9bb0', heroFrom: '#070b14', heroTo: '#172554', heroInk: '#ffffff' }),
+        theme('ember', 'Ember', { primary: '#f97316', accent: '#facc15', background: '#0f0a07', surface: '#1c140e', ink: '#fbf3e4', muted: '#a99e88', heroFrom: '#0f0a07', heroTo: '#3b1d0b', heroInk: '#ffffff' }),
+      ],
+      starter: () => [
+        { id: id(), type: 'hero', span: full, title: 'Find it,', accent: 'buy it safely.', subtitle: 'Search everything in store.', search: true, categoryChips: true },
+        { id: id(), type: 'listing_rail', span: full, title: 'Lowest prices', source: 'price_low', limit: 8, viewAllHref: '/listings?sort=price_asc' },
+        { id: id(), type: 'listing_grid', span: full, title: 'Newest', sort: 'newest', limit: 12 },
+        resaleTrust,
+      ],
+    },
+  ],
+};
+export const storeTemplates: StoreTemplate[] = [allInOne, topups, giftCards, cryptoDesk, singleProduct, vpnShop, rdpShop, resaleShop];
 export const templateKeys = storeTemplates.map(template => template.key) as [TemplateKey, ...TemplateKey[]];
 
 export function templateFor(key: string) {
@@ -725,6 +814,8 @@ export function starterHome(templateKey: string, variantKey?: string | null): Se
 /** Whether a store's template sells a product: in its categories (all for null), or its focus product for a single product store. */
 export function templateSells(store: { template: string; focus: string | null }, product: { key: string; category: ProductCategory }) {
   const template = templateFor(store.template) ?? allInOne;
+  // A Resale shop sells suppliers' resale listings, never catalogue products.
+  if (template.resale) return false;
   if (template.single) return product.key === store.focus;
   return template.categories === null || template.categories.includes(product.category);
 }

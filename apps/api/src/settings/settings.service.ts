@@ -97,6 +97,11 @@ export const switchDefinitions = {
     default: true,
     description: 'Resellers can choose the VPN shop store template (it sells only once VPN is on sale in their market). Stores already using it keep it. On unless switched off.',
   },
+  store_template_resale_shop: {
+    scopes: ['global', 'country', 'reseller'],
+    default: true,
+    description: "Resellers can choose the Resale shop store template (also needs the reseller's reseller_resale switch on and a verified account). Stores already using it keep it. On unless switched off.",
+  },
   store_template_rdp_shop: {
     scopes: ['global', 'country', 'reseller'],
     default: true,

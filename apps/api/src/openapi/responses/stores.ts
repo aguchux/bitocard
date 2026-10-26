@@ -113,7 +113,7 @@ const themeColors = shape(
 const variantStyle = shape(
   {
     mode: oneOf('Light or dark pages.', ['light', 'dark']),
-    hero: oneOf('The hero’s layout.', ['search', 'gradient', 'minimal', 'quick_buy', 'networks', 'billers', 'card_wall', 'boutique', 'neon', 'terminal', 'market', 'swap', 'spotlight', 'split', 'story', 'shield', 'devices', 'tunnel', 'desktop', 'rack', 'blueprint']),
+    hero: oneOf('The hero’s layout.', ['search', 'gradient', 'minimal', 'quick_buy', 'networks', 'billers', 'card_wall', 'boutique', 'neon', 'terminal', 'market', 'swap', 'spotlight', 'split', 'story', 'shield', 'devices', 'tunnel', 'desktop', 'rack', 'blueprint', 'showroom', 'shelf', 'aisle']),
     corners: oneOf('Corner style.', ['sharp', 'soft', 'round']),
     cards: oneOf('Card style.', ['flat', 'raised', 'outline', 'glass']),
     font: oneOf('Type style.', ['sans', 'display', 'mono', 'serif']),
@@ -132,7 +132,7 @@ const storeDesign = objectSchema(
   },
   'How a store looks: its template, the variant’s style and the theme’s colours (the store’s own primary and accent colours win).',
 );
-const sectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq'];
+const sectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar', 'quick_buy', 'crypto_quote', 'p2p_market', 'product_spotlight', 'features', 'faq', 'listing_rail', 'listing_grid', 'resale_categories'];
 const storeTemplate = objectSchema(
   'Store template',
   {
@@ -144,6 +144,7 @@ const storeTemplate = objectSchema(
     categories: { type: ['array', 'null'], items: category(), description: 'The categories the store sells; null for every category, empty for none (the crypto desk sells crypto, not catalogue products).' },
     single_product: bool('The store sells one product, chosen as its `focus`.'),
     crypto: bool('The crypto desk: offered where crypto trading is switched on for you.'),
+    resale: bool('The Resale shop: sells BitoCard Shop suppliers’ resale listings (offered where reselling is open to you), never catalogue products.'),
     sections: array(str('A section type.', { enum: sectionTypes }), 'Sections the store’s editor offers.'),
     available: bool('Whether you can use it now.'),
     reason: nullableStr('Why not, when it is not available.'),
@@ -640,6 +641,7 @@ const templateExamples = storeTemplates.slice(0, 1).map(template => ({
   categories: template.categories,
   single_product: template.single,
   crypto: template.crypto,
+  resale: Boolean(template.resale),
   sections: template.sections,
   available: true,
   reason: null,

@@ -5074,3 +5074,14 @@ model ResaleDeal {
   @@index([relationshipId, status])
   @@map("resale_deals")
 }
+
+/// Words a Resale shop's own text may not use: claims of owning, making or stocking the items it resells (B2B
+/// reselling). Checked when the store's home page is saved or published; admins keep the list.
+model ResaleClaimPhrase {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// Lower case, single spaces.
+  phrase    String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("resale_claim_phrases")
+}

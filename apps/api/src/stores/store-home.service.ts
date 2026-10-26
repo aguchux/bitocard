@@ -37,10 +37,21 @@ export function storeLayout(store: Pick<Store, 'template' | 'variant' | 'homeDra
  */
 @Injectable()
 export class StoreHomeService {
+  /** Checks a template's own words before they are saved (the resale module refuses ownership claims on Resale shops). */
+  private textChecks: Array<(template: string, sections: Sections) => Promise<void>> = [];
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
   ) {}
+
+  useTextCheck(check: (template: string, sections: Sections) => Promise<void>) {
+    this.textChecks.push(check);
+  }
+
+  private async checkText(template: string, sections: Sections) {
+    for (const check of this.textChecks) await check(template, sections);
+  }
 
   private async store(resellerId: string, storeId: string) {
     const store = await this.prisma.store.findFirst({ where: { id: storeId, resellerId } });
@@ -77,6 +88,7 @@ export class StoreHomeService {
     const store = await this.store(resellerId, storeId);
     const parsed = parseLayout(sections, designFor(store.template, store.variant).template.sections);
     if (!parsed.success) throw invalidLayout(parsed.error.issues);
+    await this.checkText(store.template, parsed.data);
     return this.present(await this.prisma.store.update({ where: { id: store.id }, data: { homeDraft: parsed.data as Prisma.InputJsonValue } }));
   }
 
@@ -84,6 +96,7 @@ export class StoreHomeService {
   async publish(resellerId: string, storeId: string, userId: string | null) {
     const store = await this.store(resellerId, storeId);
     const layout = storeLayout(store, true);
+    await this.checkText(store.template, layout);
     const updated = await this.prisma.$transaction(async tx => {
       // Locked, so two people publishing at once get consecutive versions.
       await tx.$queryRaw`SELECT id FROM stores WHERE id = ${store.id}::uuid FOR UPDATE`;

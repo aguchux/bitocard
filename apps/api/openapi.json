@@ -1713,6 +1713,7 @@
                     "store_template_single_product": true,
                     "store_template_vpn_shop": true,
                     "store_template_rdp_shop": true,
+                    "store_template_resale_shop": true,
                     "reseller_two_step": false,
                     "manual_reseller_approval": false,
                     "country_stores": true,
@@ -7920,6 +7921,7 @@
                       "categories": null,
                       "single_product": false,
                       "crypto": false,
+                      "resale": false,
                       "sections": [
                         "hero",
                         "product_rail",
@@ -43768,7 +43770,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "variant": {
@@ -43854,7 +43857,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "variant": {
@@ -49080,6 +49084,7 @@
               "store_template_crypto_desk",
               "store_template_single_product",
               "store_template_vpn_shop",
+              "store_template_resale_shop",
               "store_template_rdp_shop",
               "reseller_two_step",
               "shq_install_prompt",
@@ -49174,6 +49179,10 @@
               "store_template_vpn_shop": {
                 "type": "boolean",
                 "description": "Resellers can choose the VPN shop store template (it sells only once VPN is on sale in their market). Stores already using it keep it. On unless switched off."
+              },
+              "store_template_resale_shop": {
+                "type": "boolean",
+                "description": "Resellers can choose the Resale shop store template (also needs the reseller's reseller_resale switch on and a verified account). Stores already using it keep it. On unless switched off."
               },
               "store_template_rdp_shop": {
                 "type": "boolean",
@@ -53970,7 +53979,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "variant": {
@@ -56882,7 +56892,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "variant": {
@@ -56938,7 +56949,10 @@
                   "tunnel",
                   "desktop",
                   "rack",
-                  "blueprint"
+                  "blueprint",
+                  "showroom",
+                  "shelf",
+                  "aisle"
                 ]
               },
               "corners": {
@@ -57059,6 +57073,7 @@
           "categories",
           "single_product",
           "crypto",
+          "resale",
           "sections",
           "available",
           "reason",
@@ -57081,7 +57096,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "name": {
@@ -57129,6 +57145,10 @@
             "type": "boolean",
             "description": "The crypto desk: offered where crypto trading is switched on for you."
           },
+          "resale": {
+            "type": "boolean",
+            "description": "The Resale shop: sells BitoCard Shop suppliers’ resale listings (offered where reselling is open to you), never catalogue products."
+          },
           "sections": {
             "type": "array",
             "items": {
@@ -57146,7 +57166,10 @@
                 "p2p_market",
                 "product_spotlight",
                 "features",
-                "faq"
+                "faq",
+                "listing_rail",
+                "listing_grid",
+                "resale_categories"
               ]
             },
             "description": "Sections the store’s editor offers."
@@ -57232,7 +57255,10 @@
                         "tunnel",
                         "desktop",
                         "rack",
-                        "blueprint"
+                        "blueprint",
+                        "showroom",
+                        "shelf",
+                        "aisle"
                       ]
                     },
                     "corners": {
@@ -57405,7 +57431,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "variant": {
@@ -57429,7 +57456,10 @@
                 "p2p_market",
                 "product_spotlight",
                 "features",
-                "faq"
+                "faq",
+                "listing_rail",
+                "listing_grid",
+                "resale_categories"
               ]
             },
             "description": "Section types the store’s template offers."
@@ -57466,7 +57496,10 @@
                     "p2p_market",
                     "product_spotlight",
                     "features",
-                    "faq"
+                    "faq",
+                    "listing_rail",
+                    "listing_grid",
+                    "resale_categories"
                   ]
                 },
                 "span": {
@@ -57539,7 +57572,8 @@
               "crypto_desk",
               "single_product",
               "vpn_shop",
-              "rdp_shop"
+              "rdp_shop",
+              "resale_shop"
             ]
           },
           "variant": {

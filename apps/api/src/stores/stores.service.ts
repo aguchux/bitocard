@@ -311,10 +311,17 @@ export class StoresService {
 
   /**
    * Whether a template is open to the reseller, and why not: its admin switch (`store_template_<key>`, on by default),
-   * and for the crypto desk their exchange or P2P switched on.
+   * for the crypto desk their exchange or P2P switched on, and for the Resale shop
+   * their `reseller_resale` switch and a verified account.
    */
   async templateAvailability(resellerId: string, template: StoreTemplate) {
     if (!(await this.settings.isOn(`store_template_${template.key}`, resellerId))) return { available: false, reason: 'BitoCard does not offer this template for your stores at the moment.' };
+    if (template.resale) {
+      // B2B reselling: the reseller's own switch and a verified account (the resale catalogue checks the rest).
+      if (!(await this.settings.isOn('reseller_resale', resellerId))) return { available: false, reason: 'Reselling BitoCard Shop listings is not open to your account yet.' };
+      const reseller = await this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { status: true } });
+      return reseller?.status === 'active' ? { available: true, reason: null } : { available: false, reason: 'Finish your identity check to open a Resale shop.' };
+    }
     if (!template.crypto) return { available: true, reason: null };
     const on = (await this.settings.isOn('crypto_exchange', resellerId)) || (await this.settings.isOn('p2p_trading', resellerId));
     return on ? { available: true, reason: null } : { available: false, reason: 'Crypto trading is not switched on for your stores yet.' };
@@ -334,6 +341,7 @@ export class StoresService {
           categories: template.categories,
           single_product: template.single,
           crypto: template.crypto,
+          resale: Boolean(template.resale),
           sections: template.sections,
           ...(await this.templateAvailability(resellerId, template)),
           variants: template.variants.map(variant => ({

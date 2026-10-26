@@ -222,7 +222,46 @@ const faq = z.object({
   items: z.array(z.object({ question: text(160).min(1), answer: text(800).min(1) })).min(1).max(12),
 });
 
-export const section = z.discriminatedUnion('type', [hero, productRail, categoryGrid, brandGrid, promo, trustBar, quickBuy, cryptoQuote, p2pMarket, productSpotlight, features, faq]);
+/** A BitoCard Shop category slug (B2B reselling sections). */
+const shopCategory = text(80).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'Choose a category.');
+
+/** Resale shops: a row of the store's resale listings (newest, lowest price first, or one category). */
+const listingRail = z
+  .object({
+    ...base,
+    type: z.literal('listing_rail'),
+    title: text(80).min(1),
+    subtitle: text(200).default(''),
+    source: z.enum(['newest', 'price_low', 'category']).default('newest'),
+    category: shopCategory.optional(),
+    limit: z.number().int().min(1).max(24).default(8),
+    viewAllHref: href.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.source === 'category' && !value.category) ctx.addIssue({ code: 'custom', message: 'Choose a category.', path: ['category'] });
+  });
+
+/** Resale shops: a grid of the store's resale listings, optionally one category, with a link to see them all. */
+const listingGrid = z.object({
+  ...base,
+  type: z.literal('listing_grid'),
+  title: text(80).min(1),
+  subtitle: text(200).default(''),
+  category: shopCategory.optional(),
+  sort: z.enum(['newest', 'price_asc', 'price_desc']).default('newest'),
+  limit: z.number().int().min(1).max(48).default(12),
+});
+
+/** Resale shops: the categories the store has listings in, each with a photo of one of them. */
+const resaleCategories = z.object({
+  ...base,
+  type: z.literal('resale_categories'),
+  title: text(80).min(1),
+  subtitle: text(200).default(''),
+  limit: z.number().int().min(1).max(12).default(8),
+});
+
+export const section = z.discriminatedUnion('type', [hero, productRail, categoryGrid, brandGrid, promo, trustBar, quickBuy, cryptoQuote, p2pMarket, productSpotlight, features, faq, listingRail, listingGrid, resaleCategories]);
 /** Sections for bitocard.com's Storefront Manager (the others are reseller store templates'). */
 export const bitocardSectionTypes = ['hero', 'product_rail', 'category_grid', 'brand_grid', 'promo', 'trust_bar'] as const;
 export const sections = z
