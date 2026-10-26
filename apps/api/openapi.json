@@ -1718,7 +1718,8 @@
                     "country_stores": true,
                     "classifieds": false,
                     "classifieds_safe_pay": false,
-                    "classifieds_assistant": false
+                    "classifieds_assistant": false,
+                    "classifieds_install_prompt": false
                   }
                 }
               }
@@ -44738,7 +44739,8 @@
               "country_stores",
               "classifieds",
               "classifieds_safe_pay",
-              "classifieds_assistant"
+              "classifieds_assistant",
+              "classifieds_install_prompt"
             ],
             "additionalProperties": false,
             "properties": {
@@ -44849,6 +44851,10 @@
               "classifieds_assistant": {
                 "type": "boolean",
                 "description": "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market."
+              },
+              "classifieds_install_prompt": {
+                "type": "boolean",
+                "description": "BitoCard Shop asks visitors in this market to install shop.bitocard.com as an app (home screen, full screen): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too."
               }
             }
           }

@@ -16,7 +16,7 @@ type Call = [string, RequestInit & { headers: Record<string, string> }];
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const listing = "0b7c2a1e-4d5f-4a6b-8c9d-0e1f2a3b4c5d";
 const order = "6f7a8b9c-0d1e-4f2a-8b3c-4d5e6f7a8b9c";
-const nigeria = { object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 12, safe_pay: true };
+const nigeria = { object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 12, safe_pay: true, install_prompt: false };
 
 beforeEach(() => {
   vi.stubEnv("API_URL", "http://api.test");

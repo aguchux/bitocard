@@ -3,7 +3,7 @@ import type { ShopListingPage, ShopMarket, ShopSitemap } from "@bitocard/api-cli
 import { breadcrumbJsonLd, jsonLdText, listingJsonLd, regionalAlternates } from "@/lib/seo";
 import { countryEntries, sitemapIndex, urlset } from "@/lib/sitemap";
 
-const market = (country: string, name: string): ShopMarket => ({ object: "classified_market", country, name, currency: "NGN", listings: 1, safe_pay: false });
+const market = (country: string, name: string): ShopMarket => ({ object: "classified_market", country, name, currency: "NGN", listings: 1, safe_pay: false, install_prompt: false });
 
 const listing: ShopListingPage = {
   object: "classified_listing_page",

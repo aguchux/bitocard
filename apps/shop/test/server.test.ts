@@ -66,7 +66,7 @@ describe("the customer's session", () => {
   });
 
   test("only open markets, by lower-case codes", async () => {
-    reply = url => (url.endsWith("/v1/classifieds/markets") ? Response.json({ object: "list", data: [{ object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 3, safe_pay: false }], showcase: false }) : null);
+    reply = url => (url.endsWith("/v1/classifieds/markets") ? Response.json({ object: "list", data: [{ object: "classified_market", country: "NG", name: "Nigeria", currency: "NGN", listings: 3, safe_pay: false, install_prompt: false }], showcase: false }) : null);
     expect((await marketFor("ng"))?.name).toBe("Nigeria");
     expect(await marketFor("NG")).toBeNull();
     expect(await marketFor("gh")).toBeNull();

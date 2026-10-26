@@ -128,6 +128,11 @@ export const switchDefinitions = {
     scopes: ['global', 'country'],
     description: "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
   },
+  classifieds_install_prompt: {
+    scopes: ['global', 'country'],
+    description:
+      "BitoCard Shop asks visitors in this market to install shop.bitocard.com as an app (home screen, full screen): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too.",
+  },
 } as const;
 
 export type OptionKey = keyof typeof optionDefinitions;

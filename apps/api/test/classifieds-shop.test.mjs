@@ -122,6 +122,10 @@ describe('markets and the global showcase', () => {
     assert.equal((await get('/v1/classifieds/markets')).json.data.find(row => row.country === 'NG').safe_pay, false, 'nor until both fees are set');
     await prisma.classifiedSafePaySettings.update({ where: { country: 'NG' }, data: { buyerFeeBps: 150, buyerFeeCapMinor: 100000n, sellerFeeBps: 200, sellerFeeCapMinor: 500000n } });
     assert.equal((await get('/v1/classifieds/markets')).json.data.find(row => row.country === 'NG').safe_pay, true);
+    assert.equal(ng.install_prompt, false, 'the install prompt is off until an admin switches it on');
+    assert.equal((await admin.put('/v1/admin/switches/classifieds_install_prompt', { country_code: 'NG', enabled: true })).status, 200);
+    assert.equal((await get('/v1/classifieds/markets')).json.data.find(row => row.country === 'NG').install_prompt, true);
+    assert.equal((await admin.put('/v1/admin/switches/classifieds_install_prompt', { country_code: 'NG', enabled: false })).status, 200);
     assert.ok(ng.listings >= 2);
     assert.equal(markets.json.showcase, markets.json.data.length >= 2);
     if (!markets.json.showcase) assert.equal((await get('/v1/classifieds/showcase')).json.error.code, 'showcase_unavailable');

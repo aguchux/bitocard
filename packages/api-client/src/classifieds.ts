@@ -18,8 +18,11 @@ export type ShopFeatureType = 'text' | 'number' | 'choice' | 'boolean';
 export type ShopPrice = { kind: ShopPriceKind; amount: number | null; currency: string };
 export type ShopPlace = { slug: string; name: string; state: { slug: string; name: string } };
 
-/** `safe_pay`: open there (its switch on and both fees set); a buyer's own wallet is checked when they ask. */
-export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean };
+/**
+ * `safe_pay`: open there (its switch on and both fees set); a buyer's own wallet is checked when they ask.
+ * `install_prompt`: the site asks visitors there to install it as an app (an admin switch).
+ */
+export type ShopMarket = { object: 'classified_market'; country: string; name: string; currency: string; listings: number; safe_pay: boolean; install_prompt: boolean };
 export type ShopMarkets = { object: 'list'; data: ShopMarket[]; showcase: boolean };
 
 export type ShopFeature = {

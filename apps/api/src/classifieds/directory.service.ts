@@ -32,16 +32,18 @@ export class ShopDirectoryService {
   ) {}
 
   /**
-   * Countries where BitoCard Shop is open, by name, with their live listings, and whether Safe pay is open there (its
-   * switch on and finance having set both fees; buyers' wallets are checked when they ask).
+   * Countries where BitoCard Shop is open, by name, with their live listings, whether Safe pay is open there (its
+   * switch on and finance having set both fees; buyers' wallets are checked when they ask) and whether the site asks
+   * visitors to install it as an app (`classifieds_install_prompt`).
    */
   async markets() {
     const countries = await this.prisma.country.findMany({ orderBy: { name: 'asc' } });
     const open = (await Promise.all(countries.map(async country => ((await this.settings.isOnForCountry('classifieds', country.code)) ? country : null)))).filter(country => country !== null);
     const codes = open.map(country => country.code);
-    const [counts, safePay, fees] = await Promise.all([
+    const [counts, safePay, installPrompt, fees] = await Promise.all([
       codes.length ? this.prisma.classifiedListing.groupBy({ by: ['country'], where: { country: { in: codes }, status: 'active' }, _count: { _all: true } }) : [],
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_safe_pay', code))),
+      Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_install_prompt', code))),
       this.prisma.classifiedSafePaySettings.findMany({ where: { country: { in: codes } } }),
     ]);
     const feesSet = (code: string) => {
@@ -57,6 +59,7 @@ export class ShopDirectoryService {
         currency: country.currency,
         listings: counts.find(row => row.country === country.code)?._count._all ?? 0,
         safe_pay: safePay[index]! && feesSet(country.code),
+        install_prompt: installPrompt[index]!,
       })),
       showcase: open.length >= showcaseFrom,
     };

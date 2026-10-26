@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { colors } from "@bitocard/ui/tokens";
+import { InstallSupport } from "@/components/install-app";
+import { installCaptureScript } from "@/lib/install";
 import "./globals.css";
 
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.
@@ -29,7 +31,13 @@ export const viewport: Viewport = { themeColor: colors.navy900 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-GB" className={inter.variable}>
-      <body className="min-h-dvh overflow-x-clip font-sans">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
+      </head>
+      <body className="min-h-dvh overflow-x-clip font-sans">
+        {children}
+        <InstallSupport />
+      </body>
     </html>
   );
 }
