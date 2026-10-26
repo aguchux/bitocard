@@ -15,15 +15,17 @@ import {
   type ShopFeature,
   type ShopMyListing,
   type ShopPriceKind,
+  type ShopResaleAvailability,
   type ShopState,
   type ShopTopCategory,
 } from "@bitocard/api-client/classifieds";
 import { compressImage } from "@bitocard/ui/image";
-import { featureValue, fromMinor, toggleList, wrapSelection } from "@/lib/shop";
+import { featureValue, fromMinor, toMinor, toggleList, wrapSelection } from "@/lib/shop";
 import { ShopTermsAccept } from "@bitocard/ui/shop-terms";
 import { acceptShopTerms, createListing, type ListingFields, loadListing, removeMedia, reorderPhotos, searchFeatures, shopTerms, submitListing, suggestFeature, updateListing, videoUploadUrl } from "@/lib/shop-actions";
 import { type DraftPick, FillFromPhotos, ImproveListing, SuggestPrice } from "./assistant-help";
 import { ShopIcon } from "./icon";
+import { ResaleFields, resaleChanges, type SellWhere, sellWhereFrom } from "./resale-fields";
 
 const maxPhotos = 12;
 const maxVideoBytes = 50 * 1024 * 1024;
@@ -99,6 +101,7 @@ export function ListingForm({
   phoneConfirmed,
   minPhotos,
   assistant = null,
+  resale = null,
 }: {
   listing: ShopMyListing | null;
   categories: ShopTopCategory[];
@@ -107,6 +110,8 @@ export function ListingForm({
   phoneConfirmed: boolean;
   minPhotos: number;
   assistant?: { name: string } | null;
+  /** Whether the seller can open listings to resellers, and BitoCard's limits (null: not known). */
+  resale?: ShopResaleAvailability | null;
 }) {
   const router = useRouter();
   const [id, setId] = useState<string | null>(listing?.id ?? null);
@@ -121,6 +126,7 @@ export function ListingForm({
   const [stateSlug, setStateSlug] = useState<string>(listing?.area?.state?.slug ?? "");
   const [areaId, setAreaId] = useState<string | null>(listing?.area?.id ?? null);
   const [description, setDescription] = useState(listing?.description ?? "");
+  const [sellWhere, setSellWhere] = useState<SellWhere>(() => sellWhereFrom(listing, resale));
   const found = findCategory(categories, categoryId);
   const suggested = useMemo<FeatureDef[]>(() => found?.category.features ?? [], [found?.category.features]);
   const [features, setFeatures] = useState<FeatureRow[]>(() => (listing?.features ?? []).map(feature => ({ ...defFor(feature, findCategory(categories, listing?.category?.id ?? null)?.category.features ?? []), value: rawValue(feature.value) })));
@@ -597,6 +603,23 @@ export function ListingForm({
         onChange={value => {
           setDescription(value);
           save({ description: value });
+        }}
+      />
+
+      <ResaleFields
+        value={sellWhere}
+        availability={resale}
+        priceMinor={toMinor(price)}
+        priceOnRequest={priceKind === "on_request"}
+        currency={currency}
+        invalid={param => Boolean(problem?.param?.startsWith(param))}
+        onChange={(next, keys) => {
+          setSellWhere(next);
+          const changes: ListingFields = {};
+          if (keys.includes("on_shop")) changes.on_shop = next.onShop;
+          if (keys.includes("stock")) changes.stock = next.stock;
+          if (keys.includes("resale")) Object.assign(changes, resaleChanges(next));
+          if (Object.keys(changes).length) save(changes);
         }}
       />
 

@@ -24,6 +24,26 @@ export function fromMinor(minor: number | null) {
 }
 
 /** The listing statuses the Shop tab's My listings shows apart, in order (`?status=`). */
+/**
+ * What a supplier's resale terms mean at their price (minor units), rounded as the API rounds: what they receive from a
+ * reseller's sale before BitoCard's fees (the price less the reseller's discount), and the most a reseller may sell at.
+ */
+export function resaleSums(priceMinor: number | null, discountBps: number, markupMaxBps: number) {
+  if (priceMinor === null || priceMinor <= 0) return null;
+  return { net: priceMinor - Math.floor((priceMinor * discountBps) / 10000), top: priceMinor + Math.floor((priceMinor * markupMaxBps) / 10000) };
+}
+
+/** My listings' tags for where a listing is sold and what is left: "Resellers", "Resellers only", paused, "3 left". */
+export function listingChannelTags(listing: Pick<ShopMyListing, "on_shop" | "resale" | "stock" | "status">) {
+  const tags: string[] = [];
+  if (listing.resale.enabled) tags.push(listing.resale.paused ? "Resellers paused" : listing.on_shop ? "Resellers" : "Resellers only");
+  if (listing.stock > 1 && !["sold", "removed"].includes(listing.status)) tags.push(`${listing.stock.toLocaleString("en-GB")} left`);
+  return tags;
+}
+
+/** A rate in basis points as people read it ("12.5%"). */
+export const bpsText = (bps: number) => `${Number((bps / 100).toFixed(2))}%`;
+
 export const listingFilters: Array<{ status: ShopListingStatus | null; label: string }> = [
   { status: null, label: "All" },
   { status: "active", label: "Active" },

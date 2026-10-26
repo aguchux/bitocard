@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import type { ShopAssistantProfile, ShopCategoryCovers, ShopMarkets, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
+import type { ShopAssistantProfile, ShopCategoryCovers, ShopMarkets, ShopResaleAvailability, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
 import { appUrl } from "@bitocard/ui/site";
 import { apiUrl } from "./api";
 import { currentCustomer, customerApi } from "./customer";
@@ -107,6 +107,12 @@ export const shopAssistant = cache(async (country: string): Promise<{ name: stri
   const assistant = result.ok ? result.data.assistant : null;
   return assistant?.roles.includes("sell") ? { name: assistant.name } : null;
 });
+
+/** Whether the signed-in seller can open listings to resellers, and BitoCard's limits there (null: not known). */
+export async function shopResale(): Promise<ShopResaleAvailability | null> {
+  const result = await customerApi<ShopResaleAvailability>("GET", "/v1/classifieds/me/resale");
+  return result.ok ? result.data : null;
+}
 
 async function publicList<T>(path: string): Promise<T[]> {
   try {

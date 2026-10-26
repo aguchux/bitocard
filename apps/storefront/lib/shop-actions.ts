@@ -65,6 +65,14 @@ export type ListingFields = Partial<{
   delivery: ShopDelivery;
   contact: ShopContact;
   features: Array<{ key: string; value: string | number | boolean | null }>;
+  /** Where it is sold: BitoCard Shop, resellers' stores, or both. */
+  on_shop: boolean;
+  resale: boolean;
+  /** Resellers' discount and how far above the price they may sell, in basis points. */
+  resale_discount_bps: number;
+  resale_markup_max_bps: number;
+  /** Units to sell, shared by every channel. */
+  stock: number;
 }>;
 
 function body(fields: ListingFields): { body: Record<string, unknown> } | { problem: ShopResult<never> } {
@@ -81,6 +89,7 @@ function body(fields: ListingFields): { body: Record<string, unknown> } | { prob
     }
   }
   if (fields.features) out.features = fields.features.filter(item => item.value !== null && item.value !== "");
+  for (const key of ["on_shop", "resale", "resale_discount_bps", "resale_markup_max_bps", "stock"] as const) if (fields[key] !== undefined) out[key] = fields[key];
   return { body: out };
 }
 

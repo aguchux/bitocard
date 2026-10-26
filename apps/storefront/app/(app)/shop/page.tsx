@@ -5,7 +5,7 @@ import { ListingButtons } from "@/components/app/shop/listing-buttons";
 import { ShopPills, ShopTitle } from "@/components/app/shop/shop-nav";
 import { Thumb } from "@/components/app/shop/thumb";
 import { customerApi } from "@/lib/customer";
-import { listingActions, listingFilters, listingMeta, listingTones } from "@/lib/shop";
+import { listingActions, listingChannelTags, listingFilters, listingMeta, listingTones } from "@/lib/shop";
 import { requireShop, shopAssistant, shopListingHref } from "@/lib/shop-server";
 
 export const metadata: Metadata = { title: "Shop" };
@@ -92,7 +92,14 @@ export default async function ShopHome({ searchParams }: Props) {
                   <Link href={`/shop/listings/${listing.id}`} className="flex gap-3">
                     <Thumb url={listing.photos[0]?.url} />
                     <span className="grid min-w-0 content-start gap-1">
-                      <span className={`justify-self-start rounded-full px-2 py-0.5 text-[11px] font-bold ${listingTones[listing.status]}`}>{listingStatusLabels[listing.status]}</span>
+                      <span className="flex flex-wrap gap-1">
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${listingTones[listing.status]}`}>{listingStatusLabels[listing.status]}</span>
+                        {listingChannelTags(listing).map(tag => (
+                          <span key={tag} className="rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-bold text-navy-700">
+                            {tag}
+                          </span>
+                        ))}
+                      </span>
                       <strong className="truncate text-sm leading-snug">{listing.title || "Untitled draft"}</strong>
                       <span className="text-[13px] font-bold">{listing.price.amount === null && listing.price.kind !== "on_request" ? "No price yet" : shopPriceText(listing.price)}</span>
                       <span className="text-xs text-slate-600">{listingMeta(listing)}</span>

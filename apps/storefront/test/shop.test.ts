@@ -5,7 +5,7 @@ import { setRequest } from "./request";
 const revalidatePath = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: (path: string) => revalidatePath(path) }));
 
-const { featureValue, fromMinor, listingActions, listingMeta, localPhotoUrl, orderActions, orderNext, orderSteps, toggleList, toMinor, wrapSelection } = await import("@/lib/shop");
+const { bpsText, featureValue, fromMinor, listingActions, listingChannelTags, listingMeta, localPhotoUrl, orderActions, orderNext, orderSteps, resaleSums, toggleList, toMinor, wrapSelection } = await import("@/lib/shop");
 const { activeTab, appTabs, tabsFor } = await import("@/components/app/tabs");
 const { subMenuFor, subMenusFor } = await import("@/components/app/sub-menus");
 const { shopHref, shopListingHref, shopMarketFor } = await import("@/lib/shop-server");
@@ -28,6 +28,23 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+});
+
+describe("selling through resellers", () => {
+  test("what a supplier receives and the most a reseller may sell at, rounded as the API rounds", () => {
+    expect(resaleSums(10_000_000, 1000, 3000)).toEqual({ net: 9_000_000, top: 13_000_000 });
+    expect(resaleSums(999, 1050, 1550)).toEqual({ net: 999 - 104, top: 999 + 154 });
+    expect(resaleSums(null, 1000, 3000)).toBeNull();
+    expect([bpsText(1000), bpsText(1250), bpsText(50)]).toEqual(["10%", "12.5%", "0.5%"]);
+  });
+
+  test("My listings tags where a listing is sold and how many are left", () => {
+    const base = { on_shop: true, resale: { enabled: false, discount_bps: null, markup_max_bps: null, paused: false }, stock: 1, status: "active" as const };
+    expect(listingChannelTags(base)).toEqual([]);
+    expect(listingChannelTags({ ...base, resale: { ...base.resale, enabled: true }, stock: 3 })).toEqual(["Resellers", "3 left"]);
+    expect(listingChannelTags({ ...base, on_shop: false, resale: { ...base.resale, enabled: true } })).toEqual(["Resellers only"]);
+    expect(listingChannelTags({ ...base, resale: { ...base.resale, enabled: true, paused: true }, stock: 2, status: "sold" })).toEqual(["Resellers paused"]);
+  });
 });
 
 describe("amounts and the description's toolbar", () => {
@@ -191,6 +208,14 @@ describe("Shop actions", () => {
     expect(await actions.updateListing(listing, { price: "lots" })).toMatchObject({ ok: false, param: "price" });
     expect(await actions.updateListing("../admin", { title: "x" })).toMatchObject({ ok: false });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("where it is sold, its resale terms and stock go to the API as given (B2B reselling)", async () => {
+    const fetch = vi.fn(async () => reply({ object: "classified_listing", id: listing }));
+    vi.stubGlobal("fetch", fetch);
+    await actions.updateListing(listing, { on_shop: false, resale: true, resale_discount_bps: 1000, resale_markup_max_bps: 3000, stock: 4 });
+    const [call] = fetch.mock.calls as unknown as Call[];
+    expect(JSON.parse(String(call[1].body))).toEqual({ on_shop: false, resale: true, resale_discount_bps: 1000, resale_markup_max_bps: 3000, stock: 4 });
   });
 
   test("the video link points at the API itself; an ended session asks to sign in again", async () => {
