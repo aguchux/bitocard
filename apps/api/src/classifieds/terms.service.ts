@@ -6,7 +6,7 @@ import { PrismaService } from '../database/prisma.service.js';
  * The BitoCard Shop terms' version: their date on the legals site (`/documents/shop-terms`). Bump it when the terms change
  * in a way people must accept again; everyone is then asked once more before they next post or use Safe pay.
  */
-export const shopTermsVersion = '2026-10-25';
+export const shopTermsVersion = '2026-10-26';
 /** Their path on the legals site (apps use `appUrl("legals", path)`). */
 export const shopTermsPath = '/documents/shop-terms';
 

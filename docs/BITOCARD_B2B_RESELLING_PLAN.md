@@ -1,6 +1,6 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules (see Decisions). Nothing built. Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stage 1 built 26 October 2026** (commits `354016c`, `3bddb55` and the terms and docs after them; see its section). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
@@ -86,7 +86,10 @@ The order records every figure when the buyer buys (S, P, D or the deal, the sup
 
 Each stage ships behind switches that are off by default, with its tests (PGlite and Docker), docs and `AGENTS.md` lines in the same change.
 
-### Stage 1: resale listings (API and the Shop tab)
+### Stage 1: resale listings (API and the Shop tab): built 26 October 2026
+
+**As built:** listing fields `on_shop`, `resale`, `resale_discount_bps`, `resale_markup_max_bps`, `resale_paused_at` and `stock` (migration `20270120000000_classified_resale_listings`: at least one channel, terms present when resale is on, stock 0 to 100,000, the one-holding-order index dropped); `ClassifiedResaleSettings` per country, defaults where unset (discount 5% to 50%, markup limit 30% never above the market's markup cap, reseller fee and cap unset, accept 24 hours, reseller strikes 3); `ResaleService` (`src/classifieds/resale.service.ts`: limits, availability, terms, supplier readiness); `GET /v1/classifieds/me/resale`; admin `GET/PUT /v1/admin/classifieds/resale-settings/:country` (finance, step-up, audited `classifieds.resale_settings_changed`) and Shop > Resale settings; `onShopWhere`/`isOnShop` in `rules.ts` on every Shop surface; Safe pay pays by locking the listing, claiming the order, then counting other paid orders against stock, and each release takes one unit (the last sells it); the Shop tab's Where to sell (`components/app/shop/resale-fields.tsx`) and My listings tags; the Shop terms section 9, Selling through resellers, with their version raised to 2026-10-26. Per-category limits are left for later. Tests: `apps/api/test/classifieds-resale.test.mjs` (PGlite and Docker's Postgres), `apps/storefront/test/shop.test.ts`.
+
 - Listing fields: `channels` (`shop`, `resale`, or both), `resale_discount_bps`, `resale_markup_max_bps`, `resale_paused_at`, and `stock` (units; 1 for today's listings). A resale-only listing is never shown on BitoCard Shop: search, category pages, sitemap, showcase, category covers, the assistant's tools and Show phone leave it out. A listing on both sells from one stock.
 - Stock for Shop orders too: the one-holding-order index becomes "held units never exceed stock" (checked with the listing row locked), and release marks the listing sold only when none is left.
 - Guards: `ClassifiedResaleSettings` per country (discount min and max, markup max, reseller fee and cap, accept window, reseller strike limit), optional per category; admin endpoints and Shop > Settings > Resale.
@@ -141,10 +144,10 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 10. **Security first**: resellers may pose as the real owners, so nothing a reseller writes reaches a listing except the note the supplier approves; the supplier's own page can be opened right on the reseller's store.
 11. **Order conversations**: the buyer talks to the reseller; the supplier reads all of it but cannot write to the buyer; supplier and reseller talk in the order's trade thread.
 
-Proposed here, not yet decided:
+Proposed here and accepted by the owner (26 October 2026):
 - **A. Auto-accept** for suppliers (off by default).
 - **B. The supplier's page on the store shows no price**: who the supplier is and the listing as they wrote it, but not their price (the store's price is the reseller's business; a listing also on BitoCard Shop shows its price there anyway).
-- **C. Delivery contact**: for delivery the supplier gets a phone number for the courier only, on the courier booking, never in a thread; or none, the courier calling the store.
+- **C. Delivery contact**: for delivery the supplier gets a phone number for the courier only, on the courier booking, never in a thread.
 
 ## Not in this plan
 

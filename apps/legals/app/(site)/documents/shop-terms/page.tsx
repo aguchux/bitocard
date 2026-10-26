@@ -5,7 +5,7 @@ import { pageMetadata } from "@/components/seo";
 
 const seo = {
   title: "BitoCard Shop terms",
-  description: "The terms for buying and selling on BitoCard Shop: listings and what may be sold, chats and offers, Safe pay (fees, holding, release codes, deadlines, refunds and disputes), paying directly, and the shop assistants.",
+  description: "The terms for buying and selling on BitoCard Shop: listings and what may be sold, chats and offers, Safe pay (fees, holding, release codes, deadlines, refunds and disputes), selling through resellers, paying directly, and the shop assistants.",
   path: "/documents/shop-terms",
 };
 
@@ -33,7 +33,7 @@ export default function ShopTerms() {
           <li><strong>We host listings and chats.</strong> Sellers post listings and buyers contact them. We check listings, keep the marketplace safe and offer Safe pay (section 8).</li>
           <li><strong>We are not the seller or the buyer.</strong> A sale is between the buyer and the seller. We do not own, inspect, store, value or deliver the items, and we do not promise that an item is as described, that a seller will sell or that a buyer will pay.</li>
           <li><strong>Safe pay is the one exception.</strong> When a buyer pays with Safe pay, we hold the money and pay it to the seller, or back to the buyer, as section 8 says. We still do not become the seller or inspect the item.</li>
-          <li><strong>Paying directly is at your own risk.</strong> If you pay or are paid outside Safe pay (in cash, by transfer or any other way), we take no part in that payment and cannot get the money back. Section 9 sets out how to trade safely.</li>
+          <li><strong>Paying directly is at your own risk.</strong> If you pay or are paid outside Safe pay (in cash, by transfer or any other way), we take no part in that payment and cannot get the money back. Section 10 sets out how to trade safely.</li>
         </ul>
       </Section>
 
@@ -156,7 +156,33 @@ export default function ShopTerms() {
         </ul>
       </Section>
 
-      <Section id="safe-trade" title="9. Safe Trade Policy: paying directly">
+      <Section id="resellers" title="9. Selling through resellers">
+        <p>Where we offer it in your country, you can let resellers sell your listing on their own BitoCard stores, as well as on BitoCard Shop or instead of it. It is not open in any country yet.</p>
+        <h3 id="resellers-opening">Opening a listing to resellers</h3>
+        <ul>
+          <li>You choose, for each listing, whether it is sold on BitoCard Shop, through resellers, or both, and how many you have: every sale takes one, wherever it is made. A listing sold only through resellers does not appear on BitoCard Shop.</li>
+          <li>You set the discount resellers earn off your price and how far above your price they may sell, within the limits we set for your country (shown when you post). Resellers never sell below your price unless you agree a better deal with a reseller through BitoCard.</li>
+          <li>To open listings to resellers you need a passed identity check and a payout bank account in your verified name. You can pause reselling, or stop it, at any time; orders already paid continue.</li>
+        </ul>
+        <h3 id="resellers-what-they-show">What resellers can and cannot do</h3>
+        <ul>
+          <li>Resellers&apos; stores show your listing exactly as you wrote it: your title, photos, description, features and condition, with your name, and a link to your page on their store. Resellers cannot change any of it.</li>
+          <li>A reseller may add a short note to your listing on their store, but it shows only once you approve it, and you can withdraw your approval at any time.</li>
+          <li>A reseller must never present themselves as the owner or maker of your item. Tell us if one does.</li>
+        </ul>
+        <h3 id="resellers-sales">When a reseller sells your item</h3>
+        <ul>
+          <li><strong>You are the seller of the item.</strong> The reseller&apos;s store is where it was bought; BitoCard holds the money, as for Safe pay (section 8).</li>
+          <li>The buyer pays from their store wallet. The money is locked until you accept the order within the time shown, then held by us; if you decline or do not answer in time, it goes back to the buyer.</li>
+          <li>You hand the item to the buyer yourself, by meeting them (they give you their release code) or by delivery, using the hand-over details you set on the order. You talk to the reseller about the order, not to the buyer: you can read the buyer&apos;s messages to the reseller, and the reseller passes on anything you need to tell the buyer.</li>
+          <li>Once released, you receive your price less the reseller&apos;s discount (or a deal you agreed), less our Safe pay seller&apos;s fee; the reseller receives the rest of what the buyer paid, less our fee on it. If a dispute ends in a part refund, what remains is shared between you and the reseller in proportion to what each would have received.</li>
+          <li>Disputes are decided by BitoCard as in section 8, and the same strikes apply to you as for any Safe pay sale.</li>
+        </ul>
+        <h3 id="resellers-contact">You and your resellers</h3>
+        <p>You can see which resellers carry your listings, and chat with them on BitoCard. You and a reseller you work with can see each other&apos;s confirmed phone numbers. Keep payments for your items inside BitoCard: never let a reseller or their buyer pay you directly for a sale made through their store.</p>
+      </Section>
+
+      <Section id="safe-trade" title="10. Safe Trade Policy: paying directly">
         <p>Many people meet, look at the item and pay directly. We take no part in those payments and cannot recover money paid outside Safe pay. Our <a href={appUrl("shop", "/safe-trade")}>Safe Trade Guide</a> gives each category&apos;s checks. In short:</p>
         <ul>
           <li>meet in a busy public place in daylight, and bring someone if you can;</li>
@@ -169,7 +195,7 @@ export default function ShopTerms() {
         <p>The guide gives advice; it is not a guarantee that a trade will be safe, and following it does not make BitoCard part of the sale.</p>
       </Section>
 
-      <Section id="assistants" title="10. Shop assistants">
+      <Section id="assistants" title="11. Shop assistants">
         <ul>
           <li><strong>An AI assistant,</strong> Anjio (or another named assistant in your country), can answer questions about BitoCard Shop, find and compare listings, and help sellers write listings, price them and reply to buyers. It always says it is an AI assistant.</li>
           <li><strong>It can be wrong.</strong> Check what it says against the listing and the seller. Price ranges come from similar listings on BitoCard Shop; they are not valuations, offers or guarantees.</li>
@@ -179,7 +205,7 @@ export default function ShopTerms() {
         </ul>
       </Section>
 
-      <Section id="law" title="11. Consumer rights and the law">
+      <Section id="law" title="12. Consumer rights and the law">
         <ul>
           <li>If you buy from someone selling as a business, you have the rights consumer law gives you against them. These terms do not take away any right the law gives you.</li>
           <li>Sellers who sell as a business must say so in their listings and follow consumer law, including on prices, discounts and returns.</li>
@@ -187,11 +213,11 @@ export default function ShopTerms() {
         </ul>
       </Section>
 
-      <Section id="changes" title="12. Changes">
+      <Section id="changes" title="13. Changes">
         <p>We may change these terms, for example when we open BitoCard Shop in a new country or add a feature. We will tell you before a change that affects you takes effect. Changes never apply to a Safe pay order already requested: it follows the terms and fees shown when the buyer asked.</p>
       </Section>
 
-      <Section id="contact" title="13. Contact us">
+      <Section id="contact" title="14. Contact us">
         <p>Ask for help from your BitoCard account, or email <ContactEmail />.</p>
       </Section>
     </LegalPage>
