@@ -106,7 +106,8 @@ describe('vercel.json', () => {
     const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
     // Vercel refuses a missing or empty output folder, and the signer has no other static files.
     assert.equal(config.outputDirectory, 'public');
-    assert.equal(await readFile(new URL('../public/robots.txt', import.meta.url), 'utf8'), 'User-agent: *\nDisallow: /\n');
+    const robots = await readFile(new URL('../public/robots.txt', import.meta.url), 'utf8');
+    assert.equal(robots.replace(/\r\n/g, '\n'), 'User-agent: *\nDisallow: /\n');
     assert.equal(config.buildCommand, 'cd ../.. && npx turbo run build --filter=@bitocard/signer');
     assert.deepEqual(Object.keys(config.functions).sort(), ['api/index.mjs', 'api/worker.mjs']);
     assert.deepEqual(config.rewrites, [{ source: '/((?!api/worker).*)', destination: '/api/index' }]);
