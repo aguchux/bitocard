@@ -159,6 +159,44 @@ describe('session', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull());
   });
 
+  test('the main menu scrolls under the logo, with arrows only where there is more', async () => {
+    vi.stubGlobal('fetch', async () => Response.json({ object: 'admin_session', admin: { object: 'admin', id: 'a1', name: 'Alex Admin', email: 'alex@bitocard.com', roles: ['operations'] } }));
+    render(
+      <AdminProviders>
+        <AdminGate>
+          <AdminShell section="settings" current="/settings" crumbs={[{ label: 'Settings' }]}>
+            <Name />
+          </AdminShell>
+        </AdminGate>
+      </AdminProviders>,
+    );
+    await screen.findByText('Signed in as Alex Admin');
+    const main = screen.getByRole('navigation', { name: 'Main' });
+    const list = main.querySelector<HTMLElement>('[data-rail-list]')!;
+    expect(list.className).toContain('overflow-y-auto');
+    expect(within(list).getByText('Orders').closest('a')).toBeTruthy();
+    expect(main.querySelector('img')!.closest('[data-rail-list]'), 'the logo stays put').toBeNull();
+    const up = within(main).getByRole('button', { name: 'Scroll the menu up', hidden: true });
+    const down = within(main).getByRole('button', { name: 'Scroll the menu down', hidden: true });
+    expect([up.className, down.className].every(name => name.includes('opacity-0')), 'nothing hidden yet, no arrows').toBe(true);
+
+    // A short screen: 900px of sections in a 400px rail, scrolled a little.
+    Object.defineProperties(list, { scrollHeight: { configurable: true, value: 900 }, clientHeight: { configurable: true, value: 400 } });
+    list.scrollTop = 100;
+    fireEvent.scroll(list);
+    await waitFor(() => expect(down.className).toContain('opacity-100'));
+    expect(up.className).toContain('opacity-100');
+    const scrollBy = vi.fn();
+    list.scrollBy = scrollBy;
+    fireEvent.click(down);
+    expect(scrollBy).toHaveBeenCalledWith({ top: 200, behavior: 'smooth' });
+    fireEvent.click(up);
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: -200, behavior: 'smooth' });
+    list.scrollTop = 500;
+    fireEvent.scroll(list);
+    await waitFor(() => expect(down.className).toContain('opacity-0'), { timeout: 2000 });
+  });
+
   test('roles: super admins can do everything', () => {
     expect(can({ object: 'admin', id: '1', name: 'A', email: 'a@bitocard.com', roles: ['super_admin'] }, 'finance')).toBe(true);
     expect(can({ object: 'admin', id: '1', name: 'A', email: 'a@bitocard.com', roles: ['support'] }, 'finance', 'operations')).toBe(false);

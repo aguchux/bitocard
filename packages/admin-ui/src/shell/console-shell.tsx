@@ -1,40 +1,96 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight, LogOut, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, LogOut, Menu, X } from 'lucide-react';
 import { cn } from '../format';
 import type { NavItem, SubNavItem } from './nav';
 import { AppLink } from './session';
 
 export type Crumb = { label: string; href?: string };
 
+/** How far one press of the rail's arrows moves it: about three sections. */
+const railStep = 200;
+
+/**
+ * The navy rail: the logo stays put and the sections scroll under it, smoothly and without a scroll bar, so every one
+ * can be reached on short screens. Soft fades with arrows show there is more above or below (the arrows are for mice;
+ * wheels, trackpads and fingers scroll it directly, and keyboard focus brings a section into view). The current
+ * section is brought into view when the rail appears.
+ */
 function Rail({ brand, sections, active, onNavigate }: { brand: string; sections: NavItem<string>[]; active: string; onNavigate?: () => void }) {
+  const list = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ up: false, down: false });
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const measure = () => setMore({ up: el.scrollTop > 2, down: el.scrollTop + el.clientHeight < el.scrollHeight - 2 });
+    // At once, not smoothly: the rail opens showing the current section.
+    el.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
+    measure();
+    el.addEventListener('scroll', measure, { passive: true });
+    const resized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    resized?.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      el.removeEventListener('scroll', measure);
+      resized?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [active]);
+  const scroll = (direction: 1 | -1) => list.current?.scrollBy({ top: direction * railStep, behavior: 'smooth' });
+  const arrow = 'absolute inset-x-0 z-10 flex h-10 justify-center from-navy-900 via-navy-900/80 to-transparent text-white/80 transition-opacity duration-200 hover:text-white';
   return (
-    <nav aria-label="Main" className="flex h-full flex-col items-stretch gap-1 bg-navy-900 px-2 py-4 text-white">
-      <AppLink href="/" className="mb-4 flex flex-col items-center gap-1 px-1 py-1 text-center" onClick={onNavigate}>
+    <nav aria-label="Main" className="flex h-full flex-col bg-navy-900 text-white">
+      <AppLink href="/" className="flex shrink-0 flex-col items-center gap-1 px-3 pt-4 pb-3 text-center" onClick={onNavigate}>
         {/* eslint-disable-next-line @next/next/no-img-element -- the light "b" mark for the navy rail, from the app's public folder */}
         <img src="/bitocard-mark-light.png" alt="" className="h-9 w-auto" />
         <span className="text-sm font-extrabold tracking-tight">{brand}</span>
       </AppLink>
-      {sections.map(section => {
-        const selected = section.key === active;
-        const Icon = section.icon;
-        return (
-          <AppLink
-            key={section.key}
-            href={section.href}
-            onClick={onNavigate}
-            aria-current={selected ? 'page' : undefined}
-            className={cn(
-              'flex flex-col items-center gap-1 rounded-2xl px-1 py-2.5 text-xs font-medium transition-colors',
-              selected ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30' : 'text-white/75 hover:bg-white/10 hover:text-white',
-            )}
-          >
-            <Icon className="size-5" aria-hidden />
-            {section.label}
-          </AppLink>
-        );
-      })}
+      <div className="relative min-h-0 flex-1">
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Scroll the menu up"
+          onClick={() => scroll(-1)}
+          className={cn(arrow, 'top-0 items-start bg-gradient-to-b pt-1', more.up ? 'opacity-100' : 'pointer-events-none opacity-0')}
+        >
+          <ChevronUp className="size-5" aria-hidden />
+        </button>
+        <div
+          ref={list}
+          data-rail-list
+          className="flex h-full flex-col items-stretch gap-1 overflow-y-auto overscroll-contain px-2 pt-1 pb-4 [scrollbar-width:none] motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden"
+        >
+          {sections.map(section => {
+            const selected = section.key === active;
+            const Icon = section.icon;
+            return (
+              <AppLink
+                key={section.key}
+                href={section.href}
+                onClick={onNavigate}
+                aria-current={selected ? 'page' : undefined}
+                className={cn(
+                  'flex shrink-0 flex-col items-center gap-1 rounded-2xl px-1 py-2.5 text-xs font-medium transition-colors',
+                  selected ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30' : 'text-white/75 hover:bg-white/10 hover:text-white',
+                )}
+              >
+                <Icon className="size-5" aria-hidden />
+                {section.label}
+              </AppLink>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Scroll the menu down"
+          onClick={() => scroll(1)}
+          className={cn(arrow, 'bottom-0 items-end bg-gradient-to-t pb-1', more.down ? 'opacity-100' : 'pointer-events-none opacity-0')}
+        >
+          <ChevronDown className="size-5" aria-hidden />
+        </button>
+      </div>
     </nav>
   );
 }
@@ -179,7 +235,7 @@ export function ConsoleShell<K extends string>({ brand, sections, menus, section
 
       {drawer ? (
         <div className="fixed inset-0 z-40 flex xl:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="w-24 shrink-0">
+          <div className="h-dvh w-24 shrink-0">
             <Rail brand={brand} sections={sections} active={section} onNavigate={() => setDrawer(false)} />
           </div>
           <div className="w-64 max-w-[calc(100vw-6rem)] overflow-y-auto bg-white">
