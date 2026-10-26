@@ -219,7 +219,13 @@ live stores and a `testnet` one for sandbox stores. Settings are environment var
 4. **Nodes.** One HTTPS endpoint per chain the signer sends on (they can be the same providers as the API's), and
    `SIGNER_BLOCKCYPHER_TOKEN` for Dogecoin's main network.
 5. **Limits** for every coin and token, then deploy: a Vercel project (Root Directory `apps/signer`) in its own team
-   with a Neon database and the settings as encrypted environment variables, plus `CRON_SECRET`.
+   with a Neon database and the settings as encrypted environment variables, plus `CRON_SECRET` (at least 16
+   characters; Vercel Cron sends it). The team needs a plan whose cron jobs may run every minute (Pro): Hobby allows
+   one a day. The signer has no static files, so its build publishes an empty `public` folder (`vercel.json`). Give the
+   project its own address on a custom domain, for example `signer.bitocard.com` (Cloudflare: a DNS-only CNAME to
+   `cname.vercel-dns.com`, plus the TXT record Vercel asks for to verify `bitocard.com` in this team): Vercel
+   Authentication covers its `*.vercel.app` addresses, so the API reaches only the custom domain. Every request and
+   reply is signed, so the address being public is safe.
 6. **The admin app.** Settings > Integrations > Blockchain > Crypto signer: the address and the same secret, the
    Sandbox switch on for the `testnet` signer. Test connection shows its hot wallets: fund them, starting small.
 7. **Test networks first.** Run a `testnet` signer (`SIGNER_VAULT=local` is fine there) against Sepolia, Nile and the

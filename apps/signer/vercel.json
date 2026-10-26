@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "cd ../.. && npm ci",
-  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/signer",
+  "buildCommand": "cd ../.. && npx turbo run build --filter=@bitocard/signer && mkdir -p apps/signer/public",
+  "outputDirectory": "public",
   "ignoreCommand": "npx turbo-ignore",
   "functions": {
     "api/index.mjs": { "maxDuration": 60 },
