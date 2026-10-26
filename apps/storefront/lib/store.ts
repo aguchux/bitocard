@@ -28,7 +28,7 @@ export type HostedStore = {
   /** The store's plan has Your brand only: its pages leave BitoCard's name out (the terms of sale still name the seller). */
   white_label?: boolean;
   /** The customer account app: its menu on desktop (the store's choice, else BitoCard's default). */
-  app?: { desktop_nav: "rail" | "bottom" };
+  app?: { desktop_nav: "rail" | "bottom"; install_prompt?: boolean };
   /** The store's own main domain while it works, else null. */
   domain?: string | null;
   /** Its template, variant and colour theme: how it looks (`lib/store-theme.ts`). */

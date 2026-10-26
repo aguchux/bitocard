@@ -525,7 +525,11 @@ describe('the customer account app', () => {
       assert.deepEqual([chosen.status, chosen.json.desktop_nav], [200, 'rail']);
       assert.equal(await appFor(subdomain), 'rail', 'the reseller overrides BitoCard');
       const lookup = await fetch(`${server.base}/v1/storefronts/${subdomain}`).then(res => res.json());
-      assert.deepEqual(lookup.app, { desktop_nav: 'rail' });
+      assert.deepEqual(lookup.app, { desktop_nav: 'rail', install_prompt: false });
+      assert.equal((await admin.put('/v1/admin/switches/storefront_install_prompt', { enabled: true })).status, 200);
+      const asked = await fetch(`${server.base}/v1/store/app?store=${subdomain}`).then(res => res.json());
+      await admin.put('/v1/admin/switches/storefront_install_prompt', { enabled: null });
+      assert.equal(asked.install_prompt, false, "a reseller's store never asks shoppers to install bitocard.com");
       assert.equal((await browser.patch(`/v1/stores/${storeId}`, { desktop_nav: null })).json.desktop_nav, null);
       assert.equal(await appFor(subdomain), 'bottom', 'null follows BitoCard again');
       assert.equal((await admin.put('/v1/admin/switches/customer_app_bottom_bar_desktop', { reseller_id: resellerId, enabled: false })).status, 200);

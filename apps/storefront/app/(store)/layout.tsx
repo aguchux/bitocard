@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import type { StoreApp } from "@bitocard/api-client/storefront";
+import { InstallPrompt } from "@bitocard/ui/install-ui";
 import { ChatWidget } from "@/components/app/chat-widget";
 import { StoreFooter, StoreHeader } from "@/components/store/layout";
+import { storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
 import { countryStoreFor, currentMarket, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
@@ -49,7 +52,13 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       </div>
     );
   }
-  const [{ groups, countries }, market, customer, global] = await Promise.all([storeNavigation(), currentMarket(), currentCustomer(), marketIsGlobal()]);
+  const [{ groups, countries }, market, customer, global, app] = await Promise.all([
+    storeNavigation(),
+    currentMarket(),
+    currentCustomer(),
+    marketIsGlobal(),
+    store ? store.app : storeApi<StoreApp>("/v1/store/app").then(result => (result.ok ? result.data : undefined)),
+  ]);
   // On root (no store context at all), a signed-in customer whose fixed country now has its own live country store
   // belongs there: send them, rather than serving their market from root (docs/BITOCARD_COUNTRY_STORES_PLAN.md) —
   // unless they explicitly chose to stay global (the market dialog's "Stay global"), which is a standing choice,
@@ -78,6 +87,8 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       <Suspense fallback={null}>
         <ChatWidget store={store && !store.house ? store.name : "BitoCard"} />
       </Suspense>
+      {/* bitocard.com and its country stores ask to be installed as an app where an admin switched it on; resellers' stores never. */}
+      <InstallPrompt enabled={app?.install_prompt === true} appName="BitoCard" />
     </div>
   );
 }

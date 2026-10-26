@@ -1719,7 +1719,9 @@
                     "classifieds": false,
                     "classifieds_safe_pay": false,
                     "classifieds_assistant": false,
-                    "classifieds_install_prompt": false
+                    "classifieds_install_prompt": false,
+                    "shq_install_prompt": false,
+                    "storefront_install_prompt": false
                   }
                 }
               }
@@ -7802,7 +7804,8 @@
                   "house": false,
                   "white_label": true,
                   "app": {
-                    "desktop_nav": "rail"
+                    "desktop_nav": "rail",
+                    "install_prompt": false
                   },
                   "domain": "adadigital.com"
                 }
@@ -44735,6 +44738,8 @@
               "store_template_vpn_shop",
               "store_template_rdp_shop",
               "reseller_two_step",
+              "shq_install_prompt",
+              "storefront_install_prompt",
               "manual_reseller_approval",
               "country_stores",
               "classifieds",
@@ -44831,6 +44836,14 @@
               "reseller_two_step": {
                 "type": "boolean",
                 "description": "Every member of the reseller's team must use two-step sign-in in SHQ (an authenticator app, an emailed code or a text message, from the methods their market allows), setting it up at their next sign-in. Off: two-step is each person's choice."
+              },
+              "shq_install_prompt": {
+                "type": "boolean",
+                "description": "SHQ asks the reseller's team to install it as an app (home screen, full screen; iPhones need it for push notifications): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too."
+              },
+              "storefront_install_prompt": {
+                "type": "boolean",
+                "description": "bitocard.com asks shoppers to install it as an app (home screen, full screen), on root bitocard.com (the global setting) and on this market's country store: at most three times, on separate visits at least an hour apart, never once installed. Never on resellers' stores. Off: no prompt, and the browser's own install bar is held back too."
               },
               "manual_reseller_approval": {
                 "type": "boolean",
@@ -49830,7 +49843,8 @@
             "type": "object",
             "description": "How the customer account app looks.",
             "required": [
-              "desktop_nav"
+              "desktop_nav",
+              "install_prompt"
             ],
             "additionalProperties": false,
             "properties": {
@@ -49841,6 +49855,10 @@
                   "rail",
                   "bottom"
                 ]
+              },
+              "install_prompt": {
+                "type": "boolean",
+                "description": "Whether the store asks shoppers to install it as an app: only BitoCard’s own stores, where an admin switched it on; always false on resellers’ stores."
               }
             }
           },

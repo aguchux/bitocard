@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { nameInitials } from "@bitocard/api-client/classifieds";
 import type { StoreApp } from "@bitocard/api-client/storefront";
 import { Brand } from "@bitocard/ui/brand";
+import { InstallPrompt } from "@bitocard/ui/install-ui";
 import { brand } from "@bitocard/ui/site";
 import { AppHeader } from "@/components/app/app-header";
 import { AppNav, AppRail } from "@/components/app/app-nav";
@@ -128,6 +129,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ChatWidget store={name} aboveNav />
       </Suspense>
       <PublicSpinClaimDialog initial={publicSpinClaim} />
+      {/* bitocard.com and its country stores ask to be installed as an app where an admin switched it on; resellers' stores never. */}
+      <InstallPrompt enabled={app?.install_prompt === true} appName={brand.name} />
     </div>
   );
 }

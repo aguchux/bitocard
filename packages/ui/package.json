@@ -22,7 +22,10 @@
     "./handoff": "./src/handoff.ts",
     "./handoff-ui": "./src/handoff-ui.tsx",
     "./shop-terms": "./src/shop-terms.tsx",
-    "./image": "./src/image.ts"
+    "./image": "./src/image.ts",
+    "./install": "./src/install.ts",
+    "./install-ui": "./src/install-ui.tsx",
+    "./offline-worker": "./src/offline-worker.ts"
   },
   "scripts": {
     "lint": "eslint .",

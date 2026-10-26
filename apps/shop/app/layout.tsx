@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { colors } from "@bitocard/ui/tokens";
-import { InstallSupport } from "@/components/install-app";
-import { installCaptureScript } from "@/lib/install";
+import { InstallSupport } from "@bitocard/ui/install-ui";
+import { installCaptureScript } from "@bitocard/ui/install";
 import "./globals.css";
 
 // Loaded once, on <html>: `font-sans` and `font-display` (the shared tokens) read it as --font-inter.

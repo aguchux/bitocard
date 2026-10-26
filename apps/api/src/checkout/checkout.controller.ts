@@ -13,7 +13,7 @@ import { IdentityService } from '../identity/identity.service.js';
 import { PageDto } from '../ledger/wallet.controller.js';
 import { paymentGateways } from '../payments/payment-providers.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { desktopNavFor } from '../stores/stores.service.js';
+import { desktopNavFor, installPromptFor } from '../stores/stores.service.js';
 import { type CheckoutGroup, checkoutGroups, CheckoutService } from './checkout.service.js';
 import { EsimsService } from '../esims/esims.service.js';
 import { StoreSellers } from './store-sellers.js';
@@ -395,12 +395,12 @@ export class CheckoutController {
     return this.esims.customerCancel(await this.orderOf(caller, id), esim);
   }
 
-  /** How the store's customer account app looks (bitocard.com, or the store named): its desktop menu. */
+  /** How the store's customer account app looks (bitocard.com, or the store named): its desktop menu, and whether it asks shoppers to install the site as an app. */
   @Get('app')
   @Header('Cache-Control', 'public, max-age=60')
   async app(@StoreKey() key: string | null) {
     const store = await this.stores.resolve(key);
-    return { object: 'store_app' as const, desktop_nav: await desktopNavFor(this.settings, store) };
+    return { object: 'store_app' as const, desktop_nav: await desktopNavFor(this.settings, store), install_prompt: await installPromptFor(this.settings, store) };
   }
 
   /** The customer's figures for their account home: what they spent, their orders, and deliveries this month. */

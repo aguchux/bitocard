@@ -1,11 +1,11 @@
 /**
- * When BitoCard Shop asks a visitor to install it as an app (its market's `install_prompt` switch on): at most
- * `remindersAtMost` times, once a visit at most, each at least `reminderGapMs` after the last, never once it is installed
- * or the visitor installed it from our prompt. Kept on the visitor's own device (local storage), never sent to us.
+ * Installing BitoCard's sites as apps (BitoCard Shop, bitocard.com and its country stores, SHQ), each asked where an
+ * admin switched it on: at most `remindersAtMost` times, once a visit at most, each at least `reminderGapMs` after the
+ * last, never once installed. Kept on the visitor's own device (local storage, per site), never sent to us.
  */
-export const installStateKey = "bc_shop_install";
-/** Set in session storage once a visit has been considered, so moving between pages never asks again. */
-export const installVisitKey = "bc_shop_install_visit";
+export const installStateKey = "bc_install";
+/** Set in session storage once a visit has been asked, so moving between pages never asks again. */
+export const installVisitKey = "bc_install_visit";
 export const remindersAtMost = 3;
 export const reminderGapMs = 60 * 60 * 1000;
 /** How long after a page opens the prompt waits, so the visitor sees the page first. */

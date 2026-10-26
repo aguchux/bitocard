@@ -3,8 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
-import { InstallSheet } from "@/components/install-app";
-import { installCaptureScript, installed, installRoute, readInstallState, reminded, reminderGapMs, remindersAtMost, shouldRemind } from "@/lib/install";
+import { InstallSheet } from "@bitocard/ui/install-ui";
+import { offlineWorker } from "@bitocard/ui/offline-worker";
+import { GET } from "@/app/sw.js/route";
+import { installCaptureScript, installed, installRoute, readInstallState, reminded, reminderGapMs, remindersAtMost, shouldRemind } from "@bitocard/ui/install";
 
 const hour = reminderGapMs;
 
@@ -63,9 +65,10 @@ describe("how a device installs", () => {
 });
 
 describe("the prompt", () => {
-  const sheet = (route: "prompt" | "ios") => renderToStaticMarkup(createElement(InstallSheet, { route, onInstall: () => undefined, onClose: () => undefined }));
+  const sheet = (route: "prompt" | "ios") => renderToStaticMarkup(createElement(InstallSheet, { route, appName: "BitoCard Shop", onInstall: () => undefined, onClose: () => undefined }));
 
-  it("offers Install where the browser can, and the two steps on iPhones and iPads", () => {
+  it("names the site, offers Install where the browser can, and the two steps on iPhones and iPads", () => {
+    expect(sheet("prompt")).toContain("Install BitoCard Shop");
     expect(sheet("prompt")).toContain(">Install<");
     expect(sheet("prompt")).toContain(">Not now<");
     expect(sheet("prompt")).not.toContain("Add to Home Screen");
@@ -76,21 +79,52 @@ describe("the prompt", () => {
 
   it("is flat: no rounded corners or shadows anywhere", () => {
     for (const route of ["prompt", "ios"] as const) expect(sheet(route)).not.toMatch(/\b(rounded|shadow)(-[a-z0-9]+)?\b/);
-    const source = readFileSync(new URL("../components/install-app.tsx", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../../../packages/ui/src/install-ui.tsx", import.meta.url), "utf8");
     const dialogClass = /<dialog[\s\S]*?className="([^"]+)"/.exec(source)?.[1] ?? "";
     expect(dialogClass.split(" ")).toContain("rounded-none");
     expect(dialogClass).not.toMatch(/\brounded-(?!none)|\bshadow/);
   });
 });
 
+type Listener = (event: Record<string, unknown>) => void;
+
+/** Runs a service worker's source in a stand-in for its scope and returns what it listens for. */
+function runWorker(source: string, fetchImpl: () => Promise<Response>) {
+  const listeners: Record<string, Listener> = {};
+  const self = { addEventListener: (type: string, listener: Listener) => (listeners[type] = listener), skipWaiting: () => undefined, clients: { claim: async () => undefined }, registration: {} };
+  new Function("self", "fetch", "Response", source)(self, fetchImpl, Response);
+  return listeners;
+}
+
+/** A page load (or another request) through the worker: the response it gave, or null when it left it to the network. */
+async function load(listeners: Record<string, Listener>, mode: string, preloadResponse?: Promise<Response | undefined>) {
+  const given: { answer?: Promise<Response> } = {};
+  listeners.fetch!({ request: { mode }, preloadResponse, respondWith: (response: Promise<Response>) => (given.answer = response) });
+  return given.answer ? await given.answer : null;
+}
+
 describe("the app", () => {
-  it("is installable: a standalone manifest with its icons, and a service worker that answers page loads", () => {
+  it("is installable: a standalone manifest with its icons, and its service worker at /sw.js", async () => {
     const app = manifest();
     expect([app.display, app.start_url, app.scope, app.id]).toEqual(["standalone", "/", "/", "/"]);
     expect(app.icons?.some(icon => icon.sizes === "512x512")).toBe(true);
-    const worker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
-    expect(worker).toContain('addEventListener("fetch"');
-    expect(worker).toContain('"/offline.html"');
-    expect(readFileSync(new URL("../public/offline.html", import.meta.url), "utf8")).toContain('name="robots" content="noindex"');
+    const res = GET();
+    expect(res.headers.get("content-type")).toContain("javascript");
+    expect(res.headers.get("cache-control")).toContain("no-cache");
+    expect(await res.text()).toBe(offlineWorker("BitoCard Shop"));
+  });
+
+  it("the worker serves pages from the network, and its own page only when there is no connection", async () => {
+    const online = runWorker(offlineWorker("BitoCard Shop"), async () => new Response("from the network"));
+    expect(await (await load(online, "navigate"))!.text()).toBe("from the network");
+    expect(await (await load(online, "navigate", Promise.resolve(new Response("preloaded"))))!.text()).toBe("preloaded");
+    expect(await load(online, "cors"), "images, scripts and API calls never go through it").toBeNull();
+    const offline = runWorker(offlineWorker('Shop <"&">'), () => Promise.reject(new TypeError("Failed to fetch")));
+    const page = (await load(offline, "navigate"))!;
+    expect(page.status).toBe(503);
+    const html = await page.text();
+    expect(html).toContain("You are offline");
+    expect(html).toContain("Shop &#60;&#34;&#38;&#34;&#62; needs a connection");
+    expect(html).toContain('name="robots" content="noindex"');
   });
 });

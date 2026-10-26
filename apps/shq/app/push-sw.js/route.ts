@@ -1,10 +1,14 @@
 import { pushServiceWorker } from "@bitocard/admin-ui/push-worker";
+import { offlineWorker } from "@bitocard/ui/offline-worker";
 
 export const dynamic = "force-static";
 
-/** The push service worker (shared with the other console app), served from this app's own origin. */
+/**
+ * SHQ's one service worker, served from this app's own origin: push notifications (shared with the other console
+ * app), plus what makes SHQ installable as an app and its own page when there is no connection.
+ */
 export function GET() {
-  return new Response(pushServiceWorker, {
+  return new Response(`${pushServiceWorker}\n${offlineWorker("BitoCard SHQ")}`, {
     headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", "service-worker-allowed": "/" },
   });
 }

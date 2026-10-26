@@ -235,6 +235,20 @@ describe('country stores: storefront routing and the root redirect (Stage 4)', (
     assert.equal((await fetch(`${server.base}/v1/store/products?store=n`)).status, 400, 'one letter is still not a store');
   });
 
+  test('the install prompt: root follows the global switch, a country store its market’s; off by default', async () => {
+    const prompt = async store => (await (await fetch(`${server.base}/v1/store/app${store ? `?store=${store}` : ''}`)).json()).install_prompt;
+    assert.deepEqual([await prompt(null), await prompt('ng')], [false, false]);
+    try {
+      assert.equal((await admin.put('/v1/admin/switches/storefront_install_prompt', { enabled: true })).status, 200);
+      assert.deepEqual([await prompt(null), await prompt('ng')], [true, true]);
+      assert.equal((await admin.put('/v1/admin/switches/storefront_install_prompt', { country_code: 'NG', enabled: false })).status, 200);
+      assert.deepEqual([await prompt(null), await prompt('ng')], [true, false], 'a market switched off keeps its country store quiet');
+    } finally {
+      await admin.put('/v1/admin/switches/storefront_install_prompt', { country_code: 'NG', enabled: null });
+      await admin.put('/v1/admin/switches/storefront_install_prompt', { enabled: null });
+    }
+  });
+
   test('root offers a market’s live, ready country store; a market with no switch or no ready store stays null', async () => {
     const gh = await house.storeFor('GH');
     // GH's store exists (as NG's did before its switch and ready host were set) but is not yet switched on or ready.

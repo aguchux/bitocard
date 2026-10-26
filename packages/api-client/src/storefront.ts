@@ -391,7 +391,8 @@ export type StoreCustomerSummary = {
 };
 
 /** How the store's customer account app looks (`/v1/store/app`): its menu on desktop. */
-export type StoreApp = { object: 'store_app'; desktop_nav: 'rail' | 'bottom' };
+/** install_prompt: the store asks shoppers to install it as an app (BitoCard's own stores only, an admin switch). */
+export type StoreApp = { object: 'store_app'; desktop_nav: 'rail' | 'bottom'; install_prompt: boolean };
 
 /** Money in minor units (two decimal places) in a currency, for prices customers pay. */
 export function formatPrice(minor: number, currency: string) {

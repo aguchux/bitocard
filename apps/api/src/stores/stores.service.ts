@@ -5,7 +5,7 @@ import { CountriesService } from '../countries/countries.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { bankAccountCoolingOffMs } from '../payouts/payouts.service.js';
-import { type LedgerMode, Prisma, type Store } from '../generated/prisma/client.js';
+import { type LedgerMode, Prisma, type Reseller, type Store } from '../generated/prisma/client.js';
 import { reservedSubdomains } from './reserved.js';
 import { StoreHostsService } from './store-hosts.service.js';
 import { designFor, storeTemplates, templateFor, type StoreTemplate } from './templates.js';
@@ -97,6 +97,15 @@ export type DesktopNav = 'rail' | 'bottom';
 export async function desktopNavFor(settings: SettingsService, store: Pick<Store, 'desktopNav' | 'resellerId'>): Promise<DesktopNav> {
   if (store.desktopNav === 'rail' || store.desktopNav === 'bottom') return store.desktopNav;
   return (await settings.isOn('customer_app_bottom_bar_desktop', store.resellerId)) ? 'bottom' : 'rail';
+}
+
+/**
+ * Whether a store asks shoppers to install bitocard.com as an app: only BitoCard's own stores (root bitocard.com and
+ * each market's country store, whose house account resolves the market's `storefront_install_prompt`, root's the
+ * global one), never a reseller's, whose site is installed under BitoCard's name.
+ */
+export async function installPromptFor(settings: SettingsService, store: Pick<Store, 'resellerId'> & { reseller: Pick<Reseller, 'house'> }): Promise<boolean> {
+  return store.reseller.house && (await settings.isOn('storefront_install_prompt', store.resellerId));
 }
 
 /** Hosted storefronts on <subdomain>.bitocard.com, and the reseller's business details. */
@@ -286,7 +295,7 @@ export class StoresService {
       house: store.reseller.house,
       /** The store's plan has Your brand only: its pages leave BitoCard's name out. */
       white_label: await this.planAccess.storeHas(store.id, 'white_label'),
-      app: { desktop_nav: await desktopNavFor(this.settings, store) },
+      app: { desktop_nav: await desktopNavFor(this.settings, store), install_prompt: await installPromptFor(this.settings, store) },
       domain: (await this.prisma.storeDomain.findFirst({ where: { storeId: store.id, status: 'active', primary: true }, select: { name: true } }))?.name ?? null,
     };
   }

@@ -3,3 +3,4 @@
 @import "@bitocard/admin-ui/styles.css";
 /* Shared components styled with Tailwind utilities. */
 @source "../../../packages/ui/src/phone-input.tsx";
+@source "../../../packages/ui/src/install-ui.tsx";

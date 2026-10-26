@@ -107,6 +107,16 @@ export const switchDefinitions = {
     description:
       "Every member of the reseller's team must use two-step sign-in in SHQ (an authenticator app, an emailed code or a text message, from the methods their market allows), setting it up at their next sign-in. Off: two-step is each person's choice.",
   },
+  shq_install_prompt: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "SHQ asks the reseller's team to install it as an app (home screen, full screen; iPhones need it for push notifications): at most three times, on separate visits at least an hour apart, never once installed. Off: no prompt, and the browser's own install bar is held back too.",
+  },
+  storefront_install_prompt: {
+    scopes: ['global', 'country'],
+    description:
+      "bitocard.com asks shoppers to install it as an app (home screen, full screen), on root bitocard.com (the global setting) and on this market's country store: at most three times, on separate visits at least an hour apart, never once installed. Never on resellers' stores. Off: no prompt, and the browser's own install bar is held back too.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

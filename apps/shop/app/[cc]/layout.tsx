@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { ShopFooter } from "@/components/footer";
 import { AssistantProvider } from "@/components/assistant";
 import { SellButton, ShopHeader } from "@/components/header";
-import { InstallPrompt } from "@/components/install-app";
+import { InstallPrompt } from "@bitocard/ui/install-ui";
 import { assistantFor } from "@/lib/assistant";
 import { marketFor, markets } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
@@ -23,7 +23,7 @@ export default async function CountryLayout({ children, params }: { children: Re
       <main>{children}</main>
       <ShopFooter country={{ code: market.country, name: market.name }} />
       <SellButton customer={customer} />
-      <InstallPrompt enabled={market.install_prompt} />
+      <InstallPrompt enabled={market.install_prompt} appName="BitoCard Shop" />
     </AssistantProvider>
   );
 }

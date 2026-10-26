@@ -51,7 +51,7 @@ describe('legal documents', () => {
     assert.match(privacy, /When you buy and sell on BitoCard Shop/);
     assert.match(privacy, /Anthropic or OpenAI/);
     // Every cookie BitoCard's sites set is in the cookie notice.
-    for (const name of ['bc_market', 'bc_customer', 'bc_signed_in', 'bc_access', 'bc_chat', 'bc_assistant', 'bc_kyc', 'bc_session', 'bc_admin_session', 'bc_shop_install', 'bc_shop_install_visit']) assert.match(cookies, new RegExp(`<strong>${name}</strong>`), name);
+    for (const name of ['bc_market', 'bc_customer', 'bc_signed_in', 'bc_access', 'bc_chat', 'bc_assistant', 'bc_kyc', 'bc_session', 'bc_admin_session', 'bc_install', 'bc_install_visit']) assert.match(cookies, new RegExp(`<strong>${name}</strong>`), name);
   });
 
   test('VPN access has its terms of sale and its privacy entry, and is never sold on renewal', () => {

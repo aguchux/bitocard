@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { brand, siteUrl } from "@bitocard/ui/site";
 import { colors } from "@bitocard/ui/tokens";
+import { installCaptureScript } from "@bitocard/ui/install";
+import { InstallSupport } from "@bitocard/ui/install-ui";
 import "@bitocard/ui/styles/brand-lockup.css";
 import "./globals.css";
 
@@ -30,7 +32,13 @@ export const viewport: Viewport = { themeColor: colors.page };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-GB" className={inter.variable}>
-      <body>{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
+      </head>
+      <body>
+        {children}
+        <InstallSupport />
+      </body>
     </html>
   );
 }

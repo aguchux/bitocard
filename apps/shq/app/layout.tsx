@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { installCaptureScript } from "@bitocard/ui/install";
+import { InstallSupport } from "@bitocard/ui/install-ui";
 import { siteUrl } from "@bitocard/ui/site";
 import { Providers } from "@/components/providers";
 import "./globals.css";
@@ -18,9 +20,14 @@ export const viewport: Viewport = { themeColor: "#070f4c", width: "device-width"
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en-GB" className={inter.variable}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: installCaptureScript }} />
+      </head>
       {/* Browser extensions (e.g. ColorZilla) add attributes to <body> before React loads. */}
       <body className="min-h-svh antialiased" suppressHydrationWarning>
         <Providers>{children}</Providers>
+        {/* SHQ's one service worker is its push worker, which also makes it installable. */}
+        <InstallSupport worker="/push-sw.js" />
       </body>
     </html>
   );
