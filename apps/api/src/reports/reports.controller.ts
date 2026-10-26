@@ -7,6 +7,7 @@ import { toCsv } from '../common/csv.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { maxDailyRangeDays, reportRange } from './range.js';
 import { type ReportMetric, ReportsService } from './reports.service.js';
+import { ResaleReportsService } from './resale-reports.service.js';
 import { pnlTotals, statementPdf } from './statement-pdf.js';
 
 /** A PDF of more lines than this is refused (download the CSV, or choose a shorter period). */
@@ -24,6 +25,11 @@ class RangeDto {
 
   @IsOptional() @Matches(/^[A-Z]{3}$/)
   currency?: string;
+}
+
+class ResaleFeesDto extends RangeDto {
+  @IsOptional() @Matches(/^[A-Z]{2}$/)
+  country?: string;
 }
 
 class GrowthDto extends RangeDto {
@@ -50,7 +56,16 @@ function sendFile(res: Response, contentType: string, name: string, body: string
 @AdminRoles('finance', 'operations')
 @Controller('admin/reports')
 export class AdminReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly resale: ResaleReportsService,
+  ) {}
+
+  /** Safe pay's fees by market and kind (BitoCard Shop's own sales and resale), each side's fee apart. */
+  @Get('resale')
+  resaleFees(@Query() query: ResaleFeesDto) {
+    return this.resale.platform({ mode: query.mode, ...reportRange(query.from, query.to), country: query.country });
+  }
 
   @Get('pnl')
   pnl(@Query() query: RangeDto) {

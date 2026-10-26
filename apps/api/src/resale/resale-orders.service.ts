@@ -92,6 +92,9 @@ export class ResaleOrdersService implements OnModuleInit {
 
   onModuleInit() {
     this.safePay.useResaleEvents({ changed: (tx, id) => this.recordEvent(tx, id, 'resale_order.updated'), committed: () => this.events.committed() });
+    this.safePay.useResellerStrikes(async (resellerId, country) => {
+      await this.afterStrike(resellerId, country);
+    });
   }
 
   private encryption() {
@@ -346,13 +349,32 @@ export class ResaleOrdersService implements OnModuleInit {
 
   // ---- Reseller strikes ----
 
-  /** Orders the reseller's stores cancelled in the last 90 days (since an admin last lifted it), against the country's limit. */
+  /**
+   * A reseller's strikes in the last 90 days (since an admin last lifted them) against the country's limit: resale
+   * orders their stores cancelled, disputes lost because of their store (BitoCard's `fault: reseller`) and upheld
+   * reports of their stores.
+   */
   async standing(resellerId: string, country: string) {
     const [reseller, limits] = await Promise.all([this.prisma.reseller.findUnique({ where: { id: resellerId }, select: { resaleStrikesClearedAt: true } }), this.resale.limits(country)]);
     const window = new Date(Date.now() - resellerStrikeDays * dayMs);
     const since = reseller?.resaleStrikesClearedAt && reseller.resaleStrikesClearedAt > window ? reseller.resaleStrikesClearedAt : window;
-    const cancelled = await this.prisma.classifiedOrder.count({ where: { resellerId, endedBy: 'reseller', OR: [{ closedAt: { gt: since } }, { refundedAt: { gt: since } }] } });
-    return { strikes: cancelled, strike_limit: limits.resellerStrikeLimit, limited: cancelled >= limits.resellerStrikeLimit, cancelled_by_store: cancelled, cleared_at: reseller?.resaleStrikesClearedAt?.toISOString() ?? null };
+    const [cancelled, disputes, reports] = await Promise.all([
+      this.prisma.classifiedOrder.count({ where: { resellerId, endedBy: 'reseller', OR: [{ closedAt: { gt: since } }, { refundedAt: { gt: since } }] } }),
+      this.prisma.classifiedDispute.count({ where: { fault: 'reseller', decidedAt: { gt: since }, order: { resellerId } } }),
+      this.prisma.resaleStoreReport.count({ where: { resellerId, status: 'upheld', decidedAt: { gt: since } } }),
+    ]);
+    const strikes = cancelled + disputes + reports;
+    return { strikes, strike_limit: limits.resellerStrikeLimit, limited: strikes >= limits.resellerStrikeLimit, cancelled_by_store: cancelled, disputes_lost: disputes, reports_upheld: reports, cleared_at: reseller?.resaleStrikesClearedAt?.toISOString() ?? null };
+  }
+
+  /** After a strike: a reseller who has just reached the limit is told their checkout is paused, and so are admins (once until lifted). */
+  async afterStrike(resellerId: string, country: string) {
+    const standing = await this.standing(resellerId, country);
+    if (!standing.limited) return standing;
+    const subject = `${resellerId}:${standing.cleared_at ?? 'never'}`;
+    await this.inbox.reseller(resellerId, 'resale.order_updated', { subject: `limited:${subject}`, title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact BitoCard to have it reviewed.`, link: '/resale/orders' });
+    await this.inbox.admins('admin.classifieds.seller_limited', { subject: `reseller:${subject}`, title: 'A reseller reached the resale strike limit', body: `${standing.cancelled_by_store} orders cancelled, ${standing.disputes_lost} disputes lost and ${standing.reports_upheld} reports upheld in ${resellerStrikeDays} days.`, link: `/resellers/${resellerId}` });
+    return standing;
   }
 
   async clearStrikes(actorId: string | null, resellerId: string, reason: string) {
@@ -420,12 +442,7 @@ export class ResaleOrdersService implements OnModuleInit {
   async cancel(resellerId: string, id: string, reason: string | undefined, scope?: string) {
     const order = await this.resellerOrder(resellerId, id, scope);
     await this.safePay.cancelForStore(order.id, resellerId, reason ?? null);
-    const country = order.country;
-    const standing = await this.standing(resellerId, country);
-    if (standing.limited) {
-      await this.inbox.reseller(resellerId, 'resale.order_updated', { subject: `limited:${standing.cleared_at ?? 'never'}`, title: 'Your Resale shop checkout is paused', body: `Your stores cancelled ${standing.strikes} resale orders in ${resellerStrikeDays} days. Contact BitoCard to have it reviewed.`, link: '/resale/orders', mode: order.mode });
-      await this.inbox.admins('admin.classifieds.seller_limited', { subject: `reseller:${resellerId}:${standing.cleared_at ?? 'never'}`, title: 'A reseller reached the resale strike limit', body: `${standing.strikes} resale orders cancelled by their stores in ${resellerStrikeDays} days.`, link: `/resellers/${resellerId}` });
-    }
+    await this.afterStrike(resellerId, order.country);
     return this.detail(await this.resellerOrder(resellerId, id, scope), null);
   }
 

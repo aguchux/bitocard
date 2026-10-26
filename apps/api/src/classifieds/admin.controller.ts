@@ -15,7 +15,7 @@ import { ListingsService } from './listings.service.js';
 import { ModerationService } from './moderation.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { type ListingStatus, listingStatuses } from './rules.js';
-import { type DisputeDecision, disputeDecisions, SafePayService } from './safe-pay.service.js';
+import { type DisputeDecision, disputeDecisions, type DisputeFault, disputeFaults, SafePayService } from './safe-pay.service.js';
 import { ResaleService } from './resale.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
@@ -613,6 +613,10 @@ class DecideDto {
 
   @IsString() @Length(3, 500)
   note: string;
+
+  /** Whose strike an upheld dispute is: `supplier` (default), `reseller` (a resale order's store misled the buyer) or `none`. */
+  @IsOptional() @IsIn(disputeFaults)
+  fault?: DisputeFault;
 }
 
 class SafePaySettingsDto {

@@ -97,7 +97,8 @@ export class SafePayGuardsService {
     const [cancelled, notHandedOver, lost, notAccepted] = await Promise.all([
       this.prisma.classifiedOrder.count({ where: { sellerId, endedBy: 'seller', acceptedAt: { not: null }, status: { in: ['cancelled', 'refunded'] }, OR: [{ closedAt: { gt: since } }, { refundedAt: { gt: since } }] } }),
       this.prisma.classifiedOrder.count({ where: { sellerId, endReason: 'not_handed_over', refundedAt: { gt: since } } }),
-      this.prisma.classifiedDispute.count({ where: { order: { sellerId }, decision: { in: ['refund', 'partial'] }, decidedAt: { gt: since } } }),
+      // Lost disputes that were the seller's fault (before stage 5 of reselling every upheld one was).
+      this.prisma.classifiedDispute.count({ where: { order: { sellerId }, decision: { in: ['refund', 'partial'] }, OR: [{ fault: null }, { fault: 'supplier' }], decidedAt: { gt: since } } }),
       // Resale orders left to lapse: the buyer's money was locked for nothing.
       this.prisma.classifiedOrder.count({ where: { sellerId, kind: 'resale', status: 'lapsed', endReason: 'not_accepted_in_time', closedAt: { gt: since } } }),
     ]);

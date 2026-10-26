@@ -13,6 +13,7 @@ import { adminId } from '../countries/countries.controller.js';
 import { CurrentCustomer, type CustomerCaller, CustomerGuard } from '../customers/customer-session.js';
 import { maxDocumentBytes } from '../kyc/files.js';
 import { maxQuantity, type OrderThread, orderThreads, resaleOrderStatuses, ResaleOrdersService } from './resale-orders.service.js';
+import { type StoreReportDecision, storeReportDecisions, type StoreReportReason, storeReportReasons, ResaleStoreReportsService } from './resale-store-reports.service.js';
 
 class OrdersQueryDto {
   @ApiPropertyOptional({ enum: resaleOrderStatuses, description: 'Only orders in this status.' })
@@ -48,6 +49,12 @@ class ThreadQueryDto {
   after?: string;
 }
 
+class DisputeNoteDto {
+  @ApiProperty({ description: 'What your store told the buyer, or evidence you hold.', maxLength: 2000 })
+  @IsString() @Length(1, 2000)
+  body: string;
+}
+
 class ThreadMessageDto {
   @ApiPropertyOptional({ enum: orderThreads, default: 'order', description: '`order` (the buyer reads it as from your store) or `trade` (the supplier only).' })
   @IsOptional() @IsIn(orderThreads)
@@ -68,7 +75,33 @@ class ThreadMessageDto {
 @ApiBearerAuth()
 @Controller('resale/orders')
 export class ResaleOrdersController {
-  constructor(private readonly orders: ResaleOrdersService) {}
+  constructor(
+    private readonly orders: ResaleOrdersService,
+    private readonly safePay: SafePayService,
+  ) {}
+
+  @ApiOperation({ summary: 'Get an order’s dispute', description: 'The buyer’s dispute on one of your resale orders: its reason, state and BitoCard’s decision, and every message from the buyer, the supplier, you and BitoCard, oldest first. BitoCard decides it; add your side while it is open.' })
+  @Scopes('resale:read')
+  @Get(':id/dispute')
+  dispute(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.resellerDisputeThread(resellerOf(caller), id, storeScopeOf(caller));
+  }
+
+  @ApiOperation({ summary: 'Add to an order’s dispute', description: 'Your side while the dispute is open: what your store told the buyer, or evidence you hold. The buyer reads it as from your store; the supplier and BitoCard see it too.' })
+  @Roles('admin', 'support')
+  @Scopes('resale:write')
+  @Post(':id/dispute/messages')
+  disputeNote(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DisputeNoteDto) {
+    return this.safePay.resellerDisputeMessage(resellerOf(caller), caller.kind === 'session' ? caller.userId : null, id, body.body, storeScopeOf(caller));
+  }
+
+  /** A photo on an order's dispute, the image itself. */
+  @ApiExcludeEndpoint()
+  @Scopes('resale:read')
+  @Get(':id/dispute/photos/:message')
+  async disputePhoto(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('message', ParseUUIDPipe) message: string, @Res() res: Response) {
+    sendPhoto(res, await this.safePay.resellerDisputePhoto(resellerOf(caller), id, message, storeScopeOf(caller)));
+  }
 
   @ApiOperation({ summary: 'List resale orders', description: 'Orders on your Resale shops, newest first, without the buyer’s details.' })
   @Scopes('resale:read')
@@ -138,13 +171,38 @@ class AutoAcceptDto {
   enabled: boolean;
 }
 
+class SupplierReportDto {
+  @IsUUID()
+  store_id: string;
+
+  @IsIn(storeReportReasons)
+  reason: StoreReportReason;
+
+  @IsString() @Length(10, 2000)
+  details: string;
+}
+
 /** The supplier's side of resale orders in the Shop tab: the order's threads and auto-accept (Safe pay's own routes do the rest). */
 @ApiExcludeController()
 @Public()
 @UseGuards(CustomerGuard)
 @Controller('classifieds')
 export class SupplierResaleOrdersController {
-  constructor(private readonly orders: ResaleOrdersService) {}
+  constructor(
+    private readonly orders: ResaleOrdersService,
+    private readonly reports: ResaleStoreReportsService,
+  ) {}
+
+  /** The supplier reports one of a reseller's stores (claims, misleading words, payment outside BitoCard). */
+  @Post('me/resellers/:id/report')
+  report(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SupplierReportDto) {
+    return this.reports.reportBySupplier(caller.customer, id, body);
+  }
+
+  @Get('me/resale/reports')
+  myReports(@CurrentCustomer() caller: CustomerCaller) {
+    return this.reports.mine(caller.customer);
+  }
 
   @Get('orders/:id/messages')
   messages(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Query() query: SupplierThreadQueryDto) {
@@ -319,6 +377,84 @@ export class StoreResaleOrdersController {
   @SkipIdempotency()
   write(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: BuyerMessageDto) {
     return this.orders.buyerWrites(caller.customer, id, body.body);
+  }
+}
+
+class BuyerReportDto {
+  @IsIn(storeReportReasons)
+  reason: StoreReportReason;
+
+  @IsString() @Length(10, 2000)
+  details: string;
+
+  @IsOptional() @IsUUID()
+  order_id?: string;
+}
+
+/** A Resale shop's customer reports the store to BitoCard. */
+@ApiExcludeController()
+@Public()
+@UseGuards(CustomerGuard)
+@Controller('store/resale/reports')
+export class StoreResaleReportsController {
+  constructor(private readonly reports: ResaleStoreReportsService) {}
+
+  @Post()
+  report(@CurrentCustomer() caller: CustomerCaller, @Body() body: BuyerReportDto) {
+    return this.reports.reportByBuyer(caller.customer, body);
+  }
+
+  @Get()
+  mine(@CurrentCustomer() caller: CustomerCaller) {
+    return this.reports.mine(caller.customer);
+  }
+}
+
+class ReportsQueryDto {
+  @IsOptional() @IsIn(['open', ...storeReportDecisions])
+  status?: string;
+
+  @IsOptional() @IsUUID()
+  reseller_id?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset?: number;
+}
+
+class DecideReportDto {
+  @IsIn(storeReportDecisions)
+  decision: StoreReportDecision;
+
+  @IsString() @Length(3, 500)
+  note: string;
+}
+
+/** Reports of Resale shops: support reads them, operations uphold (a strike for the reseller) or dismiss them. */
+@ApiExcludeController()
+@RealmOnly('admin')
+@AdminRoles('support', 'operations')
+@Controller('admin/classifieds/resale-reports')
+export class AdminResaleReportsController {
+  constructor(private readonly reports: ResaleStoreReportsService) {}
+
+  @Get()
+  list(@Query() query: ReportsQueryDto) {
+    return this.reports.list(query);
+  }
+
+  @Get(':id')
+  get(@Param('id', ParseUUIDPipe) id: string) {
+    return this.reports.get(id);
+  }
+
+  @Post(':id/decide')
+  @HttpCode(HttpStatus.OK)
+  @AdminRoles('operations')
+  decide(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Body() body: DecideReportDto) {
+    return this.reports.decide(adminId(caller), id, body);
   }
 }
 

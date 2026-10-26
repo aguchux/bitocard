@@ -32632,6 +32632,332 @@
         "x-bitocard-auth": "api_key"
       }
     },
+    "/v1/resale/orders/{id}/dispute": {
+      "get": {
+        "description": "The buyer’s dispute on one of your resale orders: its reason, state and BitoCard’s decision, and every message from the buyer, the supplier, you and BitoCard, oldest first. BitoCard decides it; add your side while it is open.",
+        "operationId": "ResaleOrdersController_dispute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The dispute and its messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResaleOrderDispute"
+                },
+                "example": {
+                  "object": "classified_dispute",
+                  "id": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+                  "order_id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
+                  "reason": "damaged",
+                  "status": "open",
+                  "decision": null,
+                  "fault": null,
+                  "refund": null,
+                  "note": null,
+                  "decided_at": null,
+                  "created_at": "2026-10-29T09:00:00.000Z",
+                  "messages": [
+                    {
+                      "object": "classified_dispute_message",
+                      "id": "7f8a9b0c-1d2e-4f3a-9b4c-6d7e8f9a0b1c",
+                      "from": "them",
+                      "name": "Amaka E.",
+                      "body": "The screen arrived cracked in one corner.",
+                      "photo": {
+                        "url": "/v1/resale/orders/7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d/dispute/photos/7f8a9b0c-1d2e-4f3a-9b4c-6d7e8f9a0b1c",
+                        "content_type": "image/jpeg",
+                        "size": 182044,
+                        "width": 1600,
+                        "height": 1200
+                      },
+                      "created_at": "2026-10-29T09:00:00.000Z"
+                    },
+                    {
+                      "object": "classified_dispute_message",
+                      "id": "6e7f8a9b-0c1d-4e2f-8a3b-5c6d7e8f9a0b",
+                      "from": "me",
+                      "name": "Gadget Hub",
+                      "body": "The listing showed the corner crack in photo 4; we pointed the buyer to it before they bought.",
+                      "photo": null,
+                      "created_at": "2026-10-29T10:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get an order’s dispute",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-scopes": [
+          "resale:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/resale/orders/{id}/dispute/messages": {
+      "post": {
+        "description": "Your side while the dispute is open: what your store told the buyer, or evidence you hold. The buyer reads it as from your store; the supplier and BitoCard see it too.",
+        "operationId": "ResaleOrdersController_disputeNote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeNoteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your message on the dispute.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResaleDisputeMessage"
+                },
+                "example": {
+                  "object": "classified_dispute_message",
+                  "id": "6e7f8a9b-0c1d-4e2f-8a3b-5c6d7e8f9a0b",
+                  "from": "me",
+                  "name": "Gadget Hub",
+                  "body": "The listing showed the corner crack in photo 4; we pointed the buyer to it before they bought.",
+                  "photo": null,
+                  "created_at": "2026-10-29T10:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add to an order’s dispute",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "resale:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
     "/v1/resale/orders": {
       "get": {
         "description": "Orders on your Resale shops, newest first, without the buyer’s details.",
@@ -46184,6 +46510,19 @@
             "nullable": true
           }
         }
+      },
+      "DisputeNoteDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "What your store told the buyer, or evidence you hold.",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "body"
+        ]
       },
       "CancelDto": {
         "type": "object",
@@ -65076,6 +65415,227 @@
             "type": "string",
             "description": "When it was written.",
             "format": "date-time"
+          }
+        }
+      },
+      "ResaleDisputeMessage": {
+        "type": "object",
+        "title": "ResaleDisputeMessage",
+        "required": [
+          "object",
+          "id",
+          "from",
+          "name",
+          "body",
+          "photo",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `classified_dispute_message`.",
+            "const": "classified_dispute_message"
+          },
+          "id": {
+            "type": "string",
+            "description": "Message ID.",
+            "format": "uuid"
+          },
+          "from": {
+            "type": "string",
+            "description": "`me` (your team), `them` (the buyer or the supplier) or `bitocard`.",
+            "enum": [
+              "me",
+              "them",
+              "bitocard"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Who wrote it: the buyer’s or supplier’s first name and initial, your store’s name, or BitoCard."
+          },
+          "body": {
+            "type": "string",
+            "description": "The message (may be empty beside a photo)."
+          },
+          "photo": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "url",
+                  "content_type",
+                  "size",
+                  "width",
+                  "height"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "The photo itself (JPEG or PNG), read with your API key or session."
+                  },
+                  "content_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Its type."
+                  },
+                  "size": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "Bytes."
+                  },
+                  "width": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "Width in pixels."
+                  },
+                  "height": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "Height in pixels."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was written.",
+            "format": "date-time"
+          }
+        }
+      },
+      "ResaleOrderDispute": {
+        "type": "object",
+        "title": "ResaleOrderDispute",
+        "description": "A buyer’s dispute on one of your resale orders, with its messages.",
+        "required": [
+          "object",
+          "id",
+          "order_id",
+          "reason",
+          "status",
+          "decision",
+          "fault",
+          "refund",
+          "note",
+          "decided_at",
+          "created_at",
+          "messages"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `classified_dispute`.",
+            "const": "classified_dispute"
+          },
+          "id": {
+            "type": "string",
+            "description": "Dispute ID.",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "description": "The resale order.",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "description": "The buyer’s reason.",
+            "enum": [
+              "not_received",
+              "not_as_described",
+              "damaged",
+              "other"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` (BitoCard is deciding; the money stays held) or `decided`.",
+            "enum": [
+              "open",
+              "decided"
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "`refund` (all back to the buyer), `partial` (part back, the rest split between you and the supplier in proportion) or `release` (paid as normal).",
+                "enum": [
+                  "refund",
+                  "partial",
+                  "release"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fault": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Whose strike an upheld dispute is: `supplier`, `reseller` (your store’s note or claims misled the buyer) or `none`.",
+                "enum": [
+                  "supplier",
+                  "reseller",
+                  "none"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refund": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "What a part refund gave back of the price, in minor units."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "BitoCard’s note on its decision."
+          },
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When BitoCard decided.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the buyer opened it.",
+            "format": "date-time"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResaleDisputeMessage"
+            },
+            "description": "Every message, oldest first."
           }
         }
       }

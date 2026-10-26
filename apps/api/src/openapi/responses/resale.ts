@@ -356,6 +356,51 @@ const orderMessage = objectSchema('ResaleOrderMessage', {
   body: str('The message.'),
   created_at: time('When it was written.'),
 });
+const disputeMessage = objectSchema('ResaleDisputeMessage', {
+  object: constant('classified_dispute_message'),
+  id: uuid('Message ID.'),
+  from: oneOf('`me` (your team), `them` (the buyer or the supplier) or `bitocard`.', ['me', 'them', 'bitocard']),
+  name: str('Who wrote it: the buyer’s or supplier’s first name and initial, your store’s name, or BitoCard.'),
+  body: str('The message (may be empty beside a photo).'),
+  photo: nullable(shape({ url: str('The photo itself (JPEG or PNG), read with your API key or session.'), content_type: nullableStr('Its type.'), size: nullableInt('Bytes.'), width: nullableInt('Width in pixels.'), height: nullableInt('Height in pixels.') })),
+  created_at: time('When it was written.'),
+});
+const dispute = objectSchema(
+  'ResaleOrderDispute',
+  {
+    object: constant('classified_dispute'),
+    id: uuid('Dispute ID.'),
+    order_id: uuid('The resale order.'),
+    reason: oneOf('The buyer’s reason.', ['not_received', 'not_as_described', 'damaged', 'other']),
+    status: oneOf('`open` (BitoCard is deciding; the money stays held) or `decided`.', ['open', 'decided']),
+    decision: nullable(oneOf('`refund` (all back to the buyer), `partial` (part back, the rest split between you and the supplier in proportion) or `release` (paid as normal).', ['refund', 'partial', 'release'])),
+    fault: nullable(oneOf('Whose strike an upheld dispute is: `supplier`, `reseller` (your store’s note or claims misled the buyer) or `none`.', ['supplier', 'reseller', 'none'])),
+    refund: nullableInt('What a part refund gave back of the price, in minor units.'),
+    note: nullableStr('BitoCard’s note on its decision.'),
+    decided_at: nullableTime('When BitoCard decided.'),
+    created_at: time('When the buyer opened it.'),
+    messages: array(ref('ResaleDisputeMessage'), 'Every message, oldest first.'),
+  },
+  'A buyer’s dispute on one of your resale orders, with its messages.',
+);
+const disputeMessageExample = { object: 'classified_dispute_message', id: '6e7f8a9b-0c1d-4e2f-8a3b-5c6d7e8f9a0b', from: 'me', name: 'Gadget Hub', body: 'The listing showed the corner crack in photo 4; we pointed the buyer to it before they bought.', photo: null, created_at: '2026-10-29T10:00:00.000Z' };
+const disputeExample = {
+  object: 'classified_dispute',
+  id: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d',
+  order_id: '7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d',
+  reason: 'damaged',
+  status: 'open',
+  decision: null,
+  fault: null,
+  refund: null,
+  note: null,
+  decided_at: null,
+  created_at: '2026-10-29T09:00:00.000Z',
+  messages: [
+    { ...disputeMessageExample, id: '7f8a9b0c-1d2e-4f3a-9b4c-6d7e8f9a0b1c', from: 'them', name: 'Amaka E.', body: 'The screen arrived cracked in one corner.', photo: { url: '/v1/resale/orders/7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d/dispute/photos/7f8a9b0c-1d2e-4f3a-9b4c-6d7e8f9a0b1c', content_type: 'image/jpeg', size: 182044, width: 1600, height: 1200 }, created_at: '2026-10-29T09:00:00.000Z' },
+    disputeMessageExample,
+  ],
+};
 const orderDetailExample = {
   ...exampleResaleOrder({ status: 'sent', accepted_at: '2026-10-26T10:02:00.000Z', courier: 'GIG Logistics', tracking_number: 'GIG123456789', tracking_url: 'https://giglogistics.com/track/GIG123456789', updated_at: '2026-10-27T08:30:00.000Z' }),
   supplier: { name: 'Chinedu O.' },
@@ -393,6 +438,8 @@ export const resaleDocs: DocsArea = {
     ResaleMessage: message,
     ResaleOrderDetail: orderDetail,
     ResaleOrderMessage: orderMessage,
+    ResaleDisputeMessage: disputeMessage,
+    ResaleOrderDispute: dispute,
   },
   responses: {
     'GET /v1/resale/orders': {
@@ -414,6 +461,8 @@ export const resaleDocs: DocsArea = {
       schema: shape({ object: constant('list'), thread: oneOf('The thread.', ['order', 'trade']), data: array(ref('ResaleOrderMessage')) }),
       example: { object: 'list', thread: 'order', data: [{ ...orderMessageExample, id: '5d6e7f8a-9b0c-4d1e-8f2a-4b5c6d7e8f9a', from: 'bitocard', name: 'BitoCard', body: 'Your order is placed. Your payment is locked in your wallet until the supplier confirms it; never pay anyone outside BitoCard.', created_at: '2026-10-26T09:12:00.000Z' }, orderMessageExample] },
     },
+    'GET /v1/resale/orders/{id}/dispute': { status: 200, description: 'The dispute and its messages.', schema: 'ResaleOrderDispute', example: disputeExample },
+    'POST /v1/resale/orders/{id}/dispute/messages': { status: 201, description: 'Your message on the dispute.', schema: 'ResaleDisputeMessage', example: disputeMessageExample },
     'POST /v1/resale/orders/{id}/messages': { status: 201, description: 'Your message.', schema: 'ResaleOrderMessage', example: { ...orderMessageExample, from: 'me', name: 'Gadget Hub', body: 'Yes: the supplier ships it today.' } },
     'GET /v1/resale': {
       status: 200,

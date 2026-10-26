@@ -135,6 +135,7 @@ export const notificationTypes = {
   'admin.classifieds.dispute_message': { realm: 'admin', roles: ['support', 'operations', 'finance'], severity: 'info', label: 'New message on a BitoCard Shop dispute' },
   'admin.classifieds.same_person': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'Safe pay refused: one person on both sides' },
   'admin.classifieds.seller_limited': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'BitoCard Shop seller reached the Safe pay strike limit' },
+  'admin.classifieds.resale_store_report': { realm: 'admin', roles: ['support', 'operations'], severity: 'warning', label: 'A Resale shop was reported' },
   'admin.classifieds.payout_review': { realm: 'admin', roles: ['finance'], severity: 'warning', label: 'BitoCard Shop payout waiting for review' },
   'admin.dispute.updated': { realm: 'admin', roles: ['support', 'operations', 'finance'], severity: 'info', label: 'Dispute updated' },
   'admin.support.ticket_created': { realm: 'admin', roles: ['support', 'operations'], severity: 'info', label: 'New support ticket for BitoCard' },

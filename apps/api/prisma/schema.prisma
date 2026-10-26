@@ -516,6 +516,7 @@ model Reseller {
   resaleRules               ResaleRule[]
   resaleRelationships       ResaleRelationship[]
   resaleOrders              ClassifiedOrder[]
+  resaleStoreReports        ResaleStoreReport[]
   @@map("resellers")
   invoices              Invoice[]
 }
@@ -823,6 +824,7 @@ model Store {
   resaleListings        ResaleListing[]
   resaleRules           ResaleRule[]
   resaleOrders          ClassifiedOrder[]
+  resaleReports         ResaleStoreReport[]
 
   @@index([resellerId])
   @@index([hostStatus])
@@ -2590,6 +2592,7 @@ model Customer {
   @@unique([storeId, email])
   @@unique([storeId, phone])
   @@map("customers")
+  resaleStoreReports        ResaleStoreReport[]
 }
 
 /// A customer's sign-in. The store's server keeps the token in its own cookie; only its hash is stored here.
@@ -4976,6 +4979,9 @@ model ClassifiedDispute {
   status      String                     @default("open")
   /// refund, partial or release.
   decision    String?
+  /// Whose fault an upheld dispute was: supplier, reseller (the store's note or claims) or none. Null before stage 5 of
+  /// B2B reselling, read as the seller's.
+  fault       String?
   /// What a partial refund gave back of the price.
   refundMinor BigInt?                    @map("refund_minor")
   note        String?
@@ -4993,7 +4999,7 @@ model ClassifiedDispute {
 model ClassifiedDisputeMessage {
   id          String            @id @default(uuid()) @db.Uuid
   disputeId   String            @map("dispute_id") @db.Uuid
-  /// buyer, seller or bitocard.
+  /// buyer, seller, reseller (a resale order's store) or bitocard.
   author      String
   authorId    String?           @map("author_id") @db.Uuid
   body        String            @default("")
@@ -5220,4 +5226,34 @@ model ResaleBuyerDetailView {
 
   @@index([orderId, createdAt])
   @@map("resale_buyer_detail_views")
+}
+
+/// A buyer's or supplier's report of a Resale shop (claiming to own or make the items, misleading words, asking to be
+/// paid outside BitoCard, misusing a buyer's details). BitoCard upholds or dismisses it; an upheld report is a strike
+/// for the store's reseller.
+model ResaleStoreReport {
+  id           String    @id @default(uuid()) @db.Uuid
+  number       BigInt    @unique @default(autoincrement())
+  storeId      String    @map("store_id") @db.Uuid
+  resellerId   String    @map("reseller_id") @db.Uuid
+  reporterId   String    @map("reporter_id") @db.Uuid
+  /// buyer (a customer of the store) or supplier.
+  reporterKind String    @map("reporter_kind")
+  orderId      String?   @map("order_id") @db.Uuid
+  /// claims_ownership, misleading, pay_outside, misused_details or other.
+  reason       String
+  details      String
+  /// open, upheld or dismissed.
+  status       String    @default("open")
+  note         String?
+  decidedById  String?   @map("decided_by_id") @db.Uuid
+  decidedAt    DateTime? @map("decided_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  store        Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  reseller     Reseller  @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  reporter     Customer  @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([resellerId, status])
+  @@map("resale_store_reports")
 }

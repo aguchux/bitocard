@@ -383,3 +383,88 @@ describe('who talks, who buys', () => {
     assert.equal((await shopBuyer.get(`/v1/classifieds/orders/${order.id}`)).status, 404);
   });
 });
+
+describe('stage 5: disputes with both parties, reports of stores, strikes and reports', () => {
+  test('the reseller takes part in the dispute; a dispute lost because of the store is the reseller’s strike, not the supplier’s', async () => {
+    const seller = await supplier('Uche Nnamdi');
+    const item = await listing(seller, 'Sharp 43 inch TV');
+    const reseller = await shop(item, 'Uche Deals');
+    const person = await buyer(reseller.store, { funds: 30100000 });
+    const order = (await person.post('/v1/store/resale/orders', { ref: item.ref, fulfilment: 'meet_up', expected_total: 30100000 })).json;
+    await seller.post(`/v1/classifieds/orders/${order.id}/accept`);
+    assert.equal((await person.post(`/v1/store/resale/orders/${order.id}/dispute`, { reason: 'not_as_described', details: 'The store said it came with a wall bracket; it did not.' })).json.status, 'disputed');
+
+    const note = await reseller.api.post(`/v1/resale/orders/${order.id}/dispute/messages`, { body: 'We will send a bracket at our cost if the buyer keeps it.' });
+    assert.equal(note.status, 201, JSON.stringify(note.json));
+    check('POST /v1/resale/orders/{id}/dispute/messages', 201, note.json);
+    await seller.post(`/v1/classifieds/orders/${order.id}/dispute/messages`, { body: 'The bracket was never in my listing.' });
+    const thread = await reseller.api.get(`/v1/resale/orders/${order.id}/dispute`);
+    check('GET /v1/resale/orders/{id}/dispute', 200, thread.json);
+    assert.deepEqual(thread.json.messages.map(message => [message.from, message.name]), [['them', 'Amaka E.'], ['me', 'Uche Deals'], ['them', 'Uche N. (supplier)']]);
+    const buyerView = (await person.get(`/v1/store/resale/orders/${order.id}/dispute`)).json;
+    assert.deepEqual(buyerView.messages.map(message => message.name), ['Amaka E.', 'Uche Deals', 'Uche Deals'], 'the buyer reads the store’s side as the store’s');
+    assert.ok(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.classifieds.dispute_message' } }), 'the supplier hears of the reseller’s message');
+
+    const decided = await admin.post(`/v1/admin/classifieds/orders/${order.id}/dispute/decide`, { decision: 'partial', refund: 3000000, note: 'The store promised a bracket.', fault: 'reseller' });
+    assert.equal(decided.status, 200, JSON.stringify(decided.json));
+    assert.equal(decided.json.dispute.fault, 'reseller');
+    assert.equal((await safePay.sellerStanding(seller.id)).disputes_lost, 0, 'not the supplier’s strike');
+    assert.equal((await admin.get(`/v1/admin/classifieds/resellers/${reseller.resellerId}/resale-standing`)).json.disputes_lost, 1);
+  });
+
+  test('buyers and suppliers report a store; an upheld report is a strike; one open report each', async () => {
+    const seller = await supplier('Halima Musa');
+    const item = await listing(seller, 'Nexus 32 inch TV');
+    const reseller = await shop(item, 'Halima Store');
+    const person = await buyer(reseller.store);
+    const report = await person.post('/v1/store/resale/reports', { reason: 'claims_ownership', details: 'The home page says they make these TVs themselves.' });
+    assert.equal(report.status, 201, JSON.stringify(report.json));
+    assert.match(report.json.number, /^RR-\d{6}$/);
+    assert.equal((await person.post('/v1/store/resale/reports', { reason: 'other', details: 'And another thing about the store.' })).json.error.code, 'report_open');
+
+    const relationship = (await seller.get('/v1/classifieds/me/resellers')).json.data[0];
+    assert.equal((await seller.post(`/v1/classifieds/me/resellers/${relationship.id}/report`, { store_id: reseller.store.id, reason: 'pay_outside', details: 'Their staff asked my buyer to pay them by transfer.' })).status, 201);
+
+    const support = await adminClient(server, ['support']);
+    const open = (await support.get(`/v1/admin/classifieds/resale-reports?status=open&reseller_id=${reseller.resellerId}`)).json;
+    assert.equal(open.total, 2);
+    assert.equal((await support.post(`/v1/admin/classifieds/resale-reports/${report.json.id}/decide`, { decision: 'upheld', note: 'x x x' })).status, 403, 'operations decide');
+    const upheld = await admin.post(`/v1/admin/classifieds/resale-reports/${report.json.id}/decide`, { decision: 'upheld', note: 'The home page claimed the items as theirs.' });
+    assert.equal(upheld.json.status, 'upheld');
+    assert.equal((await admin.post(`/v1/admin/classifieds/resale-reports/${report.json.id}/decide`, { decision: 'dismissed', note: 'again' })).json.error.code, 'report_decided');
+    const standing = (await admin.get(`/v1/admin/classifieds/resellers/${reseller.resellerId}/resale-standing`)).json;
+    assert.deepEqual([standing.reports_upheld, standing.strikes], [1, 1]);
+    assert.ok(await prisma.notification.count({ where: { resellerId: reseller.resellerId, type: 'resale.order_updated', title: { contains: 'was upheld' } } }));
+    assert.ok(await prisma.auditLog.count({ where: { action: 'resale.store_report_upheld', targetId: reseller.resellerId } }));
+  });
+
+  test('reports: the reseller’s resale earnings in their P&L and resale report, the supplier’s sales by reseller, BitoCard’s fees', async () => {
+    const seller = await supplier('Femi Ade');
+    const item = await listing(seller, 'Toshiba 50 inch TV');
+    const reseller = await shop(item, 'Femi Gadgets');
+    const person = await buyer(reseller.store, { funds: 30100000 });
+    const order = (await person.post('/v1/store/resale/orders', { ref: item.ref, fulfilment: 'meet_up', expected_total: 30100000 })).json;
+    await seller.post(`/v1/classifieds/orders/${order.id}/accept`);
+    const code = (await person.get(`/v1/store/resale/orders/${order.id}/release-code`)).json.code;
+    assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/release`, { code })).json.status, 'released');
+
+    const range = `from=${new Date(Date.now() - 86_400_000).toISOString()}&to=${new Date(Date.now() + 60_000).toISOString()}`;
+    const sandbox = { 'bitocard-mode': 'test' };
+    const mine = (await reseller.api.get(`/v1/reports/resale?${range}`, sandbox)).json;
+    assert.deepEqual([mine.orders.completed, mine.totals[0].sales, mine.totals[0].margin, mine.totals[0].reseller_fees, mine.totals[0].earnings], [1, 30000000, 7500000, 225000, 7275000], JSON.stringify(mine));
+    assert.equal(mine.by_store[0].store.name, 'Femi Gadgets');
+    assert.equal(mine.top_listings[0].listing.title, 'Toshiba 50 inch TV');
+    const pnl = (await reseller.api.get(`/v1/reports/pnl?${range}&currency=NGN`, sandbox)).json;
+    assert.equal(pnl.breakdown.find(row => row.kind === 'resale')?.amount, 7275000, JSON.stringify(pnl));
+    const statement = (await reseller.api.get(`/v1/reports/statement?${range}&currency=NGN`, sandbox)).json;
+    assert.ok(statement.data.some(row => row.type === 'classified_release' && row.amount === 7275000), JSON.stringify(statement));
+
+    const row = (await seller.get('/v1/classifieds/me/resellers')).json.data.find(item => item.reseller.name === 'Femi Gadgets');
+    assert.deepEqual(row.sales, { open: 0, completed: 1, refunded: 0, paid_to_you: { currency: 'NGN', amount: 22050000 } });
+
+    const fees = (await admin.get(`/v1/admin/reports/resale?mode=test&${range}&country=NG`)).json;
+    const resale = fees.markets.find(market => market.kind === 'resale');
+    assert.ok(resale.reseller_fees >= 225000 && resale.fees === resale.buyer_fees + resale.seller_fees + resale.reseller_fees, JSON.stringify(fees));
+    assert.ok(fees.top_resellers.some(item => item.reseller.name === 'Femi Gadgets'));
+  });
+});

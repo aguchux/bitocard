@@ -315,7 +315,8 @@ export class ResaleTradeService {
 
   private async presentForSupplier(rows: RelationshipRow[], detail = false) {
     const ids = rows.map(row => row.id);
-    const [unread, deals, carried, pending] = await Promise.all([
+    const supplierId = rows[0]?.supplierId;
+    const [unread, deals, carried, pending, sales] = await Promise.all([
       this.unread(rows, 'supplier'),
       this.prisma.resaleDeal.findMany({ where: { relationshipId: { in: ids }, status: { in: ['offered', 'active'] } }, include: this.dealInclude, orderBy: { createdAt: 'desc' } }),
       this.prisma.resaleListing.findMany({
@@ -324,6 +325,10 @@ export class ResaleTradeService {
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.resaleListing.groupBy({ by: ['relationshipId'], where: { relationshipId: { in: ids }, noteStatus: 'pending', status: { not: 'removed' } }, _count: { _all: true } }),
+      // What each reseller has sold of the supplier's: orders by state and what the supplier was paid (B2B reselling stage 5).
+      supplierId
+        ? this.prisma.classifiedOrder.groupBy({ by: ['resellerId', 'status', 'currency'], where: { sellerId: supplierId, kind: 'resale', resellerId: { in: rows.map(row => row.resellerId) } }, _count: { _all: true }, _sum: { sellerPayoutMinor: true } })
+        : [],
     ]);
     return rows.map(row => {
       const mine = carried.filter(item => item.relationshipId === row.id);
@@ -341,6 +346,7 @@ export class ResaleTradeService {
         stopped: Boolean(row.supplierBlockedAt),
         closed_by_reseller: Boolean(row.resellerBlockedAt),
         listings_carried: mine.length,
+        sales: salesOf(sales.filter(item => item.resellerId === row.resellerId)),
         notes_pending: pending.find(item => item.relationshipId === row.id)?._count._all ?? 0,
         unread: unread.get(row.id) ?? 0,
         deals: deals.filter(deal => deal.relationshipId === row.id).map(deal => this.presentDeal(deal)),
@@ -468,4 +474,16 @@ export class ResaleTradeService {
     });
     return this.reseller(customer, row.relationshipId);
   }
+}
+
+/** A reseller's sales of one supplier's listings: orders open, completed and refunded, and what the supplier was paid. */
+function salesOf(rows: Array<{ status: string; currency: string; _count: { _all: number }; _sum: { sellerPayoutMinor: bigint | null } }>) {
+  const count = (statuses: string[]) => rows.filter(row => statuses.includes(row.status)).reduce((total, row) => total + row._count._all, 0);
+  const paid = rows.filter(row => row.status === 'released' || row.status === 'partly_refunded');
+  return {
+    open: count(['locked', 'paid', 'sent', 'disputed']),
+    completed: count(['released', 'partly_refunded']),
+    refunded: count(['refunded']),
+    paid_to_you: paid.length ? { currency: paid[0]!.currency, amount: paid.reduce((total, row) => total + Number(row._sum.sellerPayoutMinor ?? 0n), 0) } : null,
+  };
 }

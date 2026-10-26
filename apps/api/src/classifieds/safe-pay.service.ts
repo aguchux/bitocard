@@ -37,6 +37,8 @@ export const disputeReasons = ['not_received', 'not_as_described', 'damaged', 'o
 export type DisputeReason = (typeof disputeReasons)[number];
 export const disputeDecisions = ['refund', 'partial', 'release'] as const;
 export type DisputeDecision = (typeof disputeDecisions)[number];
+export const disputeFaults = ['supplier', 'reseller', 'none'] as const;
+export type DisputeFault = (typeof disputeFaults)[number];
 /** Dispatch photos one order can hold, and the fewest that mark it shipped. */
 export const maxDispatchPhotos = 8;
 export const minDispatchPhotos = 2;
@@ -137,6 +139,12 @@ export class SafePayService {
   }
 
   private resaleEvents: ResaleOrderEvents | null = null;
+  /** After a strike on a reseller (a dispute lost because of their store): the resale module tells them at the limit. */
+  private resellerStrike: ((resellerId: string, country: string) => Promise<void>) | null = null;
+
+  useResellerStrikes(after: (resellerId: string, country: string) => Promise<void>) {
+    this.resellerStrike = after;
+  }
 
   /** The resale module records resale orders' webhook events through this (it imports this module, not the other way). */
   useResaleEvents(events: ResaleOrderEvents) {
@@ -792,6 +800,7 @@ export class SafePayService {
     const photo = file ? await this.storeDisputePhoto(order.dispute.id, file) : {};
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: side, authorId: customer.id, body: text, ...photo } });
     await this.tell(order, side === 'buyer' ? 'seller' : 'buyer', 'customer.classifieds.dispute_message', `New message on the dispute for SP-${order.number}`, text.slice(0, 140) || 'A photo');
+    await this.tellReseller(order, `New message on the dispute for SP-${order.number}`, `From the ${side === 'buyer' ? 'buyer' : 'supplier'}: ${text.slice(0, 140) || 'a photo'}`);
     await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: `From the ${side}.`, link: `/classifieds/disputes/${order.dispute.id}` });
     return this.presentDisputeMessage(message, order, side);
   }
@@ -867,21 +876,59 @@ export class SafePayService {
     if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: 'bitocard', authorId: actorId, body: text } });
     for (const side of ['buyer', 'seller'] as const) await this.tell(order, side, 'customer.classifieds.dispute_message', `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140));
+    await this.tellReseller(order, `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140));
     return this.presentDisputeMessage(message, order, 'admin');
+  }
+
+  // ---- A resale order's dispute, for its reseller ----
+
+  /** The dispute of one of the reseller's resale orders: every message, as the reseller reads it. */
+  async resellerDisputeThread(resellerId: string, id: string, scope?: string) {
+    const order = await this.resellerOrder(resellerId, id, scope);
+    if (!order.dispute) throw notFound('dispute');
+    const messages = await this.prisma.classifiedDisputeMessage.findMany({ where: { disputeId: order.dispute.id }, orderBy: { createdAt: 'asc' } });
+    return { ...this.presentDispute(order.dispute), order_id: order.id, messages: messages.map(message => this.presentDisputeMessage(message, order, 'reseller')) };
+  }
+
+  /** The reseller adds their side to an open dispute (what their store told the buyer, evidence they hold). */
+  async resellerDisputeMessage(resellerId: string, userId: string | null, id: string, body: string, scope?: string) {
+    const order = await this.resellerOrder(resellerId, id, scope);
+    if (!order.dispute || order.dispute.status !== 'open') throw conflict('dispute_closed', 'This dispute is not open.');
+    const text = cleanMessage(body ?? '');
+    if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
+    const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: 'reseller', authorId: userId, body: text } });
+    for (const side of ['buyer', 'seller'] as const) await this.tell(order, side, 'customer.classifieds.dispute_message', `New message on the dispute for SP-${order.number}`, text.slice(0, 140));
+    await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: 'From the reseller.', link: `/classifieds/disputes/${order.dispute.id}` });
+    return this.presentDisputeMessage(message, order, 'reseller');
+  }
+
+  async resellerDisputePhoto(resellerId: string, id: string, messageId: string, scope?: string) {
+    const order = await this.resellerOrder(resellerId, id, scope);
+    if (!order.dispute) throw notFound('dispute');
+    return this.readDisputePhoto(order.dispute.id, messageId);
+  }
+
+  private async resellerOrder(resellerId: string, id: string, scope?: string) {
+    const order = await this.prisma.classifiedOrder.findUnique({ where: { id }, include: orderInclude });
+    if (!order || order.kind !== 'resale' || order.resellerId !== resellerId || (scope && order.storeId !== scope)) throw notFound();
+    return order;
   }
 
   /**
    * BitoCard decides an open dispute: `refund` (the price and the buyer's fee back), `partial` (part of the price back,
    * the rest to the seller less their fee on it, the buyer's fee kept) or `release` (to the seller, both fees kept).
-   * Refunds need finance.
+   * Refunds need finance. `fault` says whose strike an upheld dispute is: the supplier's (the default), the reseller's
+   * (on a resale order: the store's note or claims misled the buyer) or nobody's; a release is nobody's.
    */
-  async decide(actorId: string | null, roles: string[], orderId: string, input: { decision: DisputeDecision; refund?: number; note: string }) {
+  async decide(actorId: string | null, roles: string[], orderId: string, input: { decision: DisputeDecision; refund?: number; note: string; fault?: DisputeFault }) {
     const order = await this.prisma.classifiedOrder.findUnique({ where: { id: orderId }, include: orderInclude });
     if (!order?.dispute) throw notFound('dispute');
     if (order.dispute.status !== 'open' || order.status !== 'disputed') throw conflict('dispute_closed', 'This dispute was already decided.');
     if (input.decision !== 'release' && !roles.some(role => role === 'finance' || role === 'super_admin')) {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'finance_required', 'Refunds are decided by finance.');
     }
+    if (input.fault === 'reseller' && order.kind !== 'resale') throw invalid('parameter_invalid', 'Only a resale order has a reseller to blame.', 'fault');
+    const fault: DisputeFault = input.decision === 'release' ? 'none' : (input.fault ?? 'supplier');
     let decision: { kind: 'release' } | { kind: 'refund'; endedBy: string; reason: string } | { kind: 'partial'; refund: bigint };
     if (input.decision === 'partial') {
       const refund = BigInt(input.refund ?? 0);
@@ -892,12 +939,13 @@ export class SafePayService {
       decision = input.decision === 'refund' ? { kind: 'refund', endedBy: 'bitocard', reason: 'dispute' } : { kind: 'release' };
     }
     await this.settle(order, decision, ['disputed'], async tx => {
-      const claimed = await tx.classifiedDispute.updateMany({ where: { id: order.dispute!.id, status: 'open' }, data: { status: 'decided', decision: input.decision, refundMinor: decision.kind === 'partial' ? decision.refund : null, note: input.note, decidedById: actorId, decidedAt: new Date() } });
+      const claimed = await tx.classifiedDispute.updateMany({ where: { id: order.dispute!.id, status: 'open' }, data: { status: 'decided', decision: input.decision, fault, refundMinor: decision.kind === 'partial' ? decision.refund : null, note: input.note, decidedById: actorId, decidedAt: new Date() } });
       if (!claimed.count) throw conflict('dispute_closed', 'This dispute was already decided.');
     });
-    await this.audit.record({ actorId, action: 'classifieds.dispute_decided', targetType: 'classified_order', targetId: order.id, before: { status: 'disputed' }, after: { decision: input.decision, refund: decision.kind === 'partial' ? Number(decision.refund) : null, note: input.note } });
+    await this.audit.record({ actorId, action: 'classifieds.dispute_decided', targetType: 'classified_order', targetId: order.id, before: { status: 'disputed' }, after: { decision: input.decision, fault, refund: decision.kind === 'partial' ? Number(decision.refund) : null, note: input.note } });
     const decided = await this.reload(order.id);
-    if (input.decision !== 'release') await this.guards.afterStrike(decided.seller, decided.country);
+    if (fault === 'supplier') await this.guards.afterStrike(decided.seller, decided.country);
+    if (fault === 'reseller' && decided.resellerId) await this.resellerStrike?.(decided.resellerId, decided.country);
     const outcome = { release: 'the money was released to the seller', refund: 'the buyer was refunded in full', partial: `${priceText(decision.kind === 'partial' ? decision.refund : 0n, order.currency)} was refunded to the buyer and the rest released to the seller` }[input.decision];
     for (const side of ['buyer', 'seller'] as const) await this.tell(decided, side, 'customer.classifieds.dispute_decided', `The dispute on SP-${decided.number} is decided`, `BitoCard decided: ${outcome}. ${input.note}`.slice(0, 280));
     await this.tellReseller(decided, `The dispute on SP-${decided.number} is decided`, `BitoCard decided: ${outcome}.`);
@@ -1202,15 +1250,33 @@ export class SafePayService {
   }
 
   private presentDispute(dispute: NonNullable<OrderRow['dispute']>) {
-    return { object: 'classified_dispute' as const, id: dispute.id, reason: dispute.reason, status: dispute.status, decision: dispute.decision, refund: dispute.refundMinor === null ? null : Number(dispute.refundMinor), note: dispute.note, decided_at: dispute.decidedAt?.toISOString() ?? null, created_at: dispute.createdAt.toISOString() };
+    return { object: 'classified_dispute' as const, id: dispute.id, reason: dispute.reason, status: dispute.status, decision: dispute.decision, fault: dispute.fault, refund: dispute.refundMinor === null ? null : Number(dispute.refundMinor), note: dispute.note, decided_at: dispute.decidedAt?.toISOString() ?? null, created_at: dispute.createdAt.toISOString() };
   }
 
-  private presentDisputeMessage(message: { id: string; author: string; body: string; objectKey: string | null; contentType: string | null; size: number | null; width: number | null; height: number | null; createdAt: Date }, order: OrderRow, viewer: Side | 'admin') {
-    const base = viewer === 'admin' ? `/v1/admin/classifieds/orders/${order.id}/dispute/photos/${message.id}` : `/v1/classifieds/orders/${order.id}/dispute/photos/${message.id}`;
+  /**
+   * A dispute message for one reader: `from` is `me`, `them` (the other side), `bitocard`, or the author for BitoCard;
+   * `name` says who wrote it. A resale order's buyer reads the supplier's and the reseller's messages as the store's.
+   */
+  private presentDisputeMessage(message: { id: string; author: string; body: string; objectKey: string | null; contentType: string | null; size: number | null; width: number | null; height: number | null; createdAt: Date }, order: OrderRow, viewer: Side | 'admin' | 'reseller') {
+    const base = viewer === 'admin' ? `/v1/admin/classifieds/orders/${order.id}/dispute/photos/${message.id}` : viewer === 'reseller' ? `/v1/resale/orders/${order.id}/dispute/photos/${message.id}` : `/v1/classifieds/orders/${order.id}/dispute/photos/${message.id}`;
+    const store = order.store?.name ?? 'The store';
+    const name =
+      message.author === 'bitocard'
+        ? 'BitoCard'
+        : message.author === 'buyer'
+          ? publicName(order.buyer.name)
+          : order.kind === 'resale' && viewer === 'buyer'
+            ? store
+            : message.author === 'reseller'
+              ? store
+              : order.kind === 'resale'
+                ? `${publicName(order.seller.name)} (supplier)`
+                : publicName(order.seller.name);
     return {
       object: 'classified_dispute_message' as const,
       id: message.id,
       from: viewer === 'admin' || message.author === 'bitocard' ? message.author : message.author === viewer ? 'me' : 'them',
+      name,
       body: message.body,
       photo: message.objectKey ? { url: base, content_type: message.contentType, size: message.size, width: message.width, height: message.height } : null,
       created_at: message.createdAt.toISOString(),

@@ -7,8 +7,13 @@ import { buildTrend, dateKey } from './trend.js';
 
 export type ResellerReportMetric = 'earnings' | 'gross_sales' | 'orders';
 
+/** Ledger entries releasing a resale order's money: they carry the reseller's earnings (B2B reselling). */
+const resaleTypes = ['classified_release', 'classified_partial'];
+
 const typeLabels: Record<string, string> = {
   earnings: 'Earnings from a sale',
+  classified_release: 'Earnings from a resale order',
+  classified_partial: 'Earnings from a resale order (part refunded)',
   order_refund: 'Sale refunded',
   platform_fee: 'BitoCard fee',
   platform_fee_refund: 'BitoCard fee refunded',
@@ -52,7 +57,10 @@ export class ResellerReportsService {
     };
 
     // Earnings are credited (negative amount_minor); net revenue is the negated sum.
-    const revenue = minor(-(await sumOf(['earnings', 'order_refund'], ['reseller_earnings', 'reseller_earnings_held'])));
+    const sales = minor(-(await sumOf(['earnings', 'order_refund'], ['reseller_earnings', 'reseller_earnings_held'])));
+    // Resale orders on Resale shops add the margin less BitoCard's fee to held earnings when they are released.
+    const resale = minor(-(await sumOf(resaleTypes, ['reseller_earnings_held'])));
+    const revenue = sales + resale;
     // Fees are debited (positive); a refund credits part back.
     const platformFees = minor(await sumOf(['platform_fee', 'platform_fee_refund'], ['reseller_funding', 'reseller_earnings']));
     const usageCharges = minor(await sumOf(['usage_charge'], ['reseller_funding', 'reseller_earnings']));
@@ -73,7 +81,8 @@ export class ResellerReportsService {
       operating_expenses: expenses,
       net_profit: netProfit,
       breakdown: [
-        { kind: 'earnings', label: 'Earnings from sales', group: 'revenue' as const, amount: revenue },
+        { kind: 'earnings', label: 'Earnings from sales', group: 'revenue' as const, amount: sales },
+        { kind: 'resale', label: 'Earnings from resale orders', group: 'revenue' as const, amount: resale },
         { kind: 'platform_fee', label: 'BitoCard fees', group: 'expense' as const, amount: platformFees },
         { kind: 'subscription', label: 'Plan subscription', group: 'expense' as const, amount: subscription },
         { kind: 'domain', label: 'Domains', group: 'expense' as const, amount: domains },
@@ -132,7 +141,7 @@ export class ResellerReportsService {
         FROM ledger_postings p
         JOIN ledger_accounts a ON a.id = p.account_id
         JOIN journal_entries e ON e.id = p.entry_id
-        WHERE e.reseller_id = ${input.resellerId}::uuid AND e.mode = ${input.mode}::"LedgerMode" AND e.type IN ('earnings', 'order_refund')
+        WHERE e.reseller_id = ${input.resellerId}::uuid AND e.mode = ${input.mode}::"LedgerMode" AND e.type IN ('earnings', 'order_refund', 'classified_release', 'classified_partial')
           AND a.kind IN ('reseller_earnings', 'reseller_earnings_held') AND a.currency = ${currency}
           AND e.created_at >= ${from} AND e.created_at < ${input.to}
         GROUP BY 1`;
@@ -174,6 +183,7 @@ export class ResellerReportsService {
     const entriesOf = (types: string[]) => this.prisma.journalEntry.findMany({ where: { ...base, type: { in: types } }, include: { postings: { include: { account: true } } } });
 
     sign(await entriesOf(['earnings', 'order_refund']), ['reseller_earnings', 'reseller_earnings_held'], true);
+    sign(await entriesOf(resaleTypes), ['reseller_earnings_held'], true);
     sign(await entriesOf(['platform_fee', 'platform_fee_refund']), ['reseller_funding', 'reseller_earnings'], false);
     sign(await entriesOf(['usage_charge']), ['reseller_funding', 'reseller_earnings'], false);
     sign(await entriesOf(['adjustment']), ['reseller_funding', 'reseller_earnings'], true);

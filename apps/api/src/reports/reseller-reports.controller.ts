@@ -1,6 +1,6 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsOptional, Matches } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsUUID, Matches } from 'class-validator';
 import type { Response } from 'express';
 import { type Caller, CurrentCaller, resellerOf, Roles, SessionOnly } from '../auth/caller.js';
 import { toCsv } from '../common/csv.js';
@@ -8,6 +8,7 @@ import { Mode } from '../ledger/mode.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { maxDailyRangeDays, reportRange, statementTooLarge } from './range.js';
 import { type ResellerReportMetric, ResellerReportsService } from './reseller-reports.service.js';
+import { ResaleReportsService } from './resale-reports.service.js';
 import { statementPdf } from './statement-pdf.js';
 
 /** A PDF of more lines than this is refused (download the CSV, or choose a shorter period). */
@@ -22,6 +23,11 @@ class RangeDto {
 
   @IsOptional() @Matches(/^[A-Z]{3}$/i)
   currency?: string;
+}
+
+class ResaleDto extends RangeDto {
+  @IsOptional() @IsUUID()
+  store_id?: string;
 }
 
 class GrowthDto extends RangeDto {
@@ -52,7 +58,16 @@ function sendFile(res: Response, contentType: string, name: string, body: string
 @Roles('admin', 'finance', 'developer')
 @Controller('reports')
 export class ResellerReportsController {
-  constructor(private readonly reports: ResellerReportsService) {}
+  constructor(
+    private readonly reports: ResellerReportsService,
+    private readonly resale: ResaleReportsService,
+  ) {}
+
+  /** Resale orders on the reseller's Resale shops: by state, and the sales, margin, fee and earnings released in the period. */
+  @Get('resale')
+  resaleReport(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: ResaleDto) {
+    return this.resale.reseller({ resellerId: resellerOf(caller), mode, ...reportRange(query.from, query.to), storeId: query.store_id });
+  }
 
   @Get('pnl')
   pnl(@CurrentCaller() caller: Caller, @Mode() mode: LedgerMode, @Query() query: RangeDto) {
