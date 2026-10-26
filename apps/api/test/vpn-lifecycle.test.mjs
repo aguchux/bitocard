@@ -10,7 +10,8 @@ import { responseChecker } from './openapi-docs.mjs';
 
 /** A VPNresellers v4.1 double: accounts in project 7, check_username, the lifecycle calls and the profile's credit. */
 async function fakeVpnresellers() {
-  const state = { accounts: new Map(), next: 100, balance: '80.00', failPasswordOnce: false, calls: [] };
+  // Long account IDs, so a check that a response never carries one cannot match digits in a UUID or a time by chance.
+  const state = { accounts: new Map(), next: 7_300_418_100, balance: '80.00', failPasswordOnce: false, calls: [] };
   const show = account => ({ id: account.id, username: account.username, status: account.status, expired_at: account.expiry ? `${account.expiry}T00:00:00.000000Z` : null, wg_private_key: 'never-kept' });
   const reply = (res, status, body) => {
     res.statusCode = status;
