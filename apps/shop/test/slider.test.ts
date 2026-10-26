@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
-import { createElement } from "react";
+import { type ComponentProps, createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Slider } from "@/components/slider";
 
 describe("slider", () => {
   const items = [createElement("li", { key: "ng", className: "w-44" }, "Nigeria"), createElement("li", { key: "gh", className: "w-44" }, "Ghana")];
-  const html = renderToStaticMarkup(createElement(Slider, { label: "Countries", children: items }));
+  const html = renderToStaticMarkup(createElement(Slider, { label: "Countries" } as ComponentProps<typeof Slider>, items));
 
   it("one row sliding sideways on every screen, never a grid, never widening the page", () => {
     const row = /<ul [^>]*class="([^"]+)"/.exec(html)?.[1]?.replaceAll("&amp;", "&").replaceAll("&gt;", ">").split(" ") ?? [];
