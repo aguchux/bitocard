@@ -5,6 +5,7 @@ import type { ShopCategoryCover } from "@bitocard/api-client/classifieds";
 import { setRequest } from "./request";
 
 const { shopBandFor, shopHref, shopNavHref } = await import("@/lib/shop-server");
+const { currentMarket } = await import("@/lib/market");
 const { ShopBand } = await import("@/components/store/shop-band");
 
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -24,8 +25,11 @@ const covers = { object: "list", country: "NG", url: "https://shop.bitocard.com/
 const api = (markets = [nigeria], coversStatus = 200) =>
   vi.fn(async (url: string) => {
     if (url.includes("/v1/storefronts/acme")) return reply({ subdomain: "acme", name: "Acme", house: false });
+    if (url.includes("/v1/storefronts/ng")) return reply({ subdomain: "ng", name: "BitoCard NG", house: true, country: "NG", currency: "NGN" });
+    if (url.includes("/v1/storefronts/gh")) return reply({ subdomain: "gh", name: "BitoCard GH", house: true, country: "GH", currency: "GHS" });
     if (url.includes("/v1/classifieds/markets")) return reply({ object: "list", data: markets, showcase: false });
-    if (url.includes("/v1/classifieds/category-covers?country=NG")) return coversStatus === 200 ? reply(covers) : reply({ error: { code: "classifieds_unavailable" } }, coversStatus);
+    const asked = /category-covers\?country=([A-Z]{2})/.exec(url)?.[1];
+    if (asked) return coversStatus === 200 ? reply({ ...covers, country: asked }) : reply({ error: { code: "classifieds_unavailable" } }, coversStatus);
     return reply({ error: { code: "resource_missing" } }, 404);
   });
 
@@ -41,19 +45,22 @@ afterEach(() => {
 });
 
 describe("BitoCard Shop's band on the home page", () => {
-  test("the market's categories with their photos, where the Shop is open and has listings", async () => {
+  test("the market's categories with their photos, wherever the Shop is open", async () => {
     vi.stubGlobal("fetch", api());
     const band = await shopBandFor("NG");
     expect(band?.market.name).toBe("Nigeria");
     expect(band?.categories.map(category => category.slug)).toEqual(["vehicles", "jobs"]);
   });
 
-  test("nothing without a market, where the Shop is closed or empty, or the API cannot answer", async () => {
+  test("a market with no listings yet still gets it: its categories invite the first sellers", async () => {
+    vi.stubGlobal("fetch", api([{ ...nigeria, listings: 0 }]));
+    expect(await shopBandFor("NG")).not.toBeNull();
+  });
+
+  test("nothing without a market, where the Shop is closed, or the API cannot answer", async () => {
     vi.stubGlobal("fetch", api());
     expect(await shopBandFor(null)).toBeNull();
     expect(await shopBandFor("GH")).toBeNull();
-    vi.stubGlobal("fetch", api([{ ...nigeria, listings: 0 }]));
-    expect(await shopBandFor("NG")).toBeNull();
     vi.stubGlobal("fetch", api([nigeria], 503));
     expect(await shopBandFor("NG")).toBeNull();
   });
@@ -95,5 +102,34 @@ describe("BitoCard Shop in the header's menu", () => {
     setRequest({ host: "acme.bitocard.com" });
     vi.stubGlobal("fetch", api());
     expect(await shopNavHref("NG", false)).toBeNull();
+  });
+});
+
+describe("on a market's own country store (ng.bitocard.com)", () => {
+  test("its market is fixed, so its home page has the band and its menu the Shop, for that market", async () => {
+    setRequest({ host: "ng.bitocard.com" });
+    vi.stubGlobal("fetch", api());
+    const market = await currentMarket();
+    expect(market).toBe("NG");
+    expect((await shopBandFor(market))?.categories.map(category => category.slug)).toEqual(["vehicles", "jobs"]);
+    expect(await shopNavHref(market, false)).toBe("https://shop.bitocard.com/ng");
+    expect(await shopNavHref(market, true)).toBe(shopHref("/ng"));
+  });
+
+  test("every country store whose market has the Shop open gets both, before its first listing", async () => {
+    setRequest({ host: "gh.bitocard.com" });
+    vi.stubGlobal("fetch", api([nigeria, { ...nigeria, country: "GH", name: "Ghana", currency: "GHS", listings: 0, safe_pay: false }]));
+    const market = await currentMarket();
+    expect((await shopBandFor(market))?.market.name).toBe("Ghana");
+    expect(await shopNavHref(market, false)).toBe("https://shop.bitocard.com/gh");
+  });
+
+  test("a country store whose market has no Shop yet shows neither", async () => {
+    setRequest({ host: "gh.bitocard.com" });
+    vi.stubGlobal("fetch", api());
+    const market = await currentMarket();
+    expect(market).toBe("GH");
+    expect(await shopBandFor(market)).toBeNull();
+    expect(await shopNavHref(market, false)).toBeNull();
   });
 });

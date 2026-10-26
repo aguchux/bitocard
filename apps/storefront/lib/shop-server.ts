@@ -31,13 +31,14 @@ export async function shopMarketFor(customer: { country: string | null } | null)
 
 /**
  * BitoCard Shop's band on the home page: the market's categories, each with a random live listing's photo (a new pick
- * about every minute), on BitoCard's own sites only, where the Shop is open in the shopper's market and has listings.
- * Null otherwise, and while the API cannot be reached.
+ * about every minute), on BitoCard's own sites only (root and every country store), wherever the Shop is open in the
+ * shopper's market, listings or not (a category with none invites the first seller). Null otherwise, and while the API
+ * cannot be reached.
  */
 export async function shopBandFor(country: string | null) {
   if (!country || !(await onHouseSite())) return null;
   const market = (await shopMarkets()).find(item => item.country === country);
-  if (!market || market.listings === 0) return null;
+  if (!market) return null;
   try {
     const res = await fetch(apiUrl(`/v1/classifieds/category-covers?country=${encodeURIComponent(country)}`), { next: { revalidate: 60, tags: ["store"] } });
     if (!res.ok) return null;
