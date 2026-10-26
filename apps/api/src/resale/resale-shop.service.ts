@@ -11,8 +11,7 @@ import { ResaleStoresService } from './resale-stores.service.js';
 
 const unavailable = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'store_unavailable', 'This store is not open.');
 const notFound = (what: string) => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', `No such ${what}.`);
-const sorts = ['newest', 'price_asc', 'price_desc'] as const;
-type Sort = (typeof sorts)[number];
+type Sort = 'newest' | 'price_asc' | 'price_desc';
 type OnSale = Awaited<ReturnType<ResaleStoresService['onSale']>>[number];
 
 /** Lower case, letters and digits separated by single spaces, padded, so phrases match whole words. */

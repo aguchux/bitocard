@@ -45,7 +45,7 @@ const resellerKinds = new Set<AccountKind>([
   'reseller_crypto_withdrawing',
 ]);
 /** A store customer's own money and crypto: their wallets, P2P proceeds and what they have locked or an admin froze, never below zero. */
-const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards']);
+const customerKinds = new Set<AccountKind>(['customer_wallet', 'customer_wallet_locked', 'customer_withdrawable', 'p2p_fiat_locked', 'crypto_wallet', 'crypto_locked', 'crypto_frozen', 'crypto_withdrawing', 'customer_payouts_pending', 'crypto_spin_rewards']);
 
 export const insufficientFunds = () =>
   new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'insufficient_funds', 'The wallet balance is too low for this.');

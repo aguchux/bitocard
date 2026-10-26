@@ -200,8 +200,17 @@ describe('Safe pay', () => {
     assert.match((await seller.get(`/v1/classifieds/orders/${order.id}`)).json.delivery_address, /Wuse 2/);
     assert.equal((await buyer.get(`/v1/classifieds/orders/${order.id}/release-code`)).json.error.code, 'release_code_unavailable');
 
-    const sent = await seller.post(`/v1/classifieds/orders/${order.id}/sent`, { tracking_note: 'GIG Logistics, waybill 4471' });
-    assert.equal(sent.json.status, 'sent');
+    // Shipping needs a courier and tracking number, and at least two dispatch photos first.
+    const early = await seller.post(`/v1/classifieds/orders/${order.id}/sent`, { courier: 'GIG Logistics', tracking_number: 'GIG4471' });
+    assert.equal(early.json.error?.code, 'dispatch_photos_required', JSON.stringify(early.json));
+    await prisma.classifiedDispatchPhoto.createMany({ data: [0, 1].map(index => ({ orderId: order.id, objectKey: `test/dispatch/${order.id}/${index}`, contentType: 'image/jpeg', size: 1000 })) });
+    assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/sent`, { courier: 'GIG Logistics', tracking_number: 'GIG4471', tracking_url: 'http://example.com/x' })).json.error?.param, 'tracking_url', 'https only');
+    const sent = await seller.post(`/v1/classifieds/orders/${order.id}/sent`, { courier: 'GIG Logistics', tracking_number: 'GIG4471', tracking_note: 'Waybill 4471' });
+    assert.equal(sent.json.status, 'sent', JSON.stringify(sent.json));
+    assert.deepEqual([sent.json.shipment.courier, sent.json.shipment.tracking_number, sent.json.shipment.events.map(event => event.status), sent.json.shipment.dispatch_photos.length], ['GIG Logistics', 'GIG4471', ['shipped'], 2]);
+    const delivered = await seller.post(`/v1/classifieds/orders/${order.id}/shipment`, { status: 'delivered' });
+    assert.ok(delivered.json.shipment.delivered_at, JSON.stringify(delivered.json));
+    assert.ok(await prisma.notification.count({ where: { customerId: buyer.id, type: 'customer.classifieds.shipment' } }), 'the buyer is told it arrived');
     assert.equal((await buyer.post(`/v1/classifieds/orders/${order.id}/cancel`)).json.error.code, 'order_handed_over');
     await prisma.classifiedOrder.update({ where: { id: order.id }, data: { confirmBy: new Date(Date.now() - 1000) } });
     assert.ok((await services.safePay.runDue()).released >= 1);

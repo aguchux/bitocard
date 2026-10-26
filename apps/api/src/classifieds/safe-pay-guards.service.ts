@@ -94,14 +94,16 @@ export class SafePayGuardsService {
     ]);
     const window = new Date(Date.now() - strikeWindowDays * dayMs);
     const since = seller?.safePayClearedAt && seller.safePayClearedAt > window ? seller.safePayClearedAt : window;
-    const [cancelled, notHandedOver, lost] = await Promise.all([
+    const [cancelled, notHandedOver, lost, notAccepted] = await Promise.all([
       this.prisma.classifiedOrder.count({ where: { sellerId, endedBy: 'seller', acceptedAt: { not: null }, status: { in: ['cancelled', 'refunded'] }, OR: [{ closedAt: { gt: since } }, { refundedAt: { gt: since } }] } }),
       this.prisma.classifiedOrder.count({ where: { sellerId, endReason: 'not_handed_over', refundedAt: { gt: since } } }),
       this.prisma.classifiedDispute.count({ where: { order: { sellerId }, decision: { in: ['refund', 'partial'] }, decidedAt: { gt: since } } }),
+      // Resale orders left to lapse: the buyer's money was locked for nothing.
+      this.prisma.classifiedOrder.count({ where: { sellerId, kind: 'resale', status: 'lapsed', endReason: 'not_accepted_in_time', closedAt: { gt: since } } }),
     ]);
     const limit = settings?.strikeLimit ?? 3;
-    const strikes = cancelled + notHandedOver + lost;
-    return { strikes, strike_limit: limit, limited: strikes >= limit, cancelled_after_accepting: cancelled, not_handed_over: notHandedOver, disputes_lost: lost, cleared_at: seller?.safePayClearedAt?.toISOString() ?? null };
+    const strikes = cancelled + notHandedOver + lost + notAccepted;
+    return { strikes, strike_limit: limit, limited: strikes >= limit, cancelled_after_accepting: cancelled, not_handed_over: notHandedOver, disputes_lost: lost, resale_not_accepted: notAccepted, cleared_at: seller?.safePayClearedAt?.toISOString() ?? null };
   }
 
   /** After a strike: a seller who has just reached the limit is told, and so are admins (once until it is lifted). */
@@ -112,7 +114,7 @@ export class SafePayGuardsService {
     await this.inbox.customer({ customerId: seller.id, storeId: seller.storeId }, 'customer.classifieds.safe_pay_limited', {
       subject,
       title: 'You cannot take Safe pay orders for now',
-      body: `You cancelled, did not hand over or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact BitoCard to have it reviewed.`,
+      body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact BitoCard to have it reviewed.`,
       link: '/shop/orders',
     });
     await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A BitoCard Shop seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/storefront/customers/${seller.id}` });

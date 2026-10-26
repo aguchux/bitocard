@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
-import { conditions, featureValueOut, invalid, onShopWhere } from './rules.js';
+import { conditions, featureValueOut, heldUnits, invalid, onShopWhere } from './rules.js';
 
 /** Areas whose centres are this close count as nearby. */
 export const nearbyKm = 25;
@@ -272,7 +272,7 @@ export class ListingSearchService {
       this.idChecked([row.customerId]),
       this.prisma.classifiedListing.count({ where: { customerId: row.customerId, ...onShopWhere } }),
       this.leads.responseRate(row.customerId),
-      this.prisma.classifiedOrder.count({ where: { listingId: row.id, status: { in: ['paid', 'sent', 'disputed'] } } }),
+      heldUnits(this.prisma, row.id),
     ]);
     const order = new Map(row.category!.features.map(link => [link.featureId, link.position]));
     const photos = row.media.filter(item => item.kind === 'photo');

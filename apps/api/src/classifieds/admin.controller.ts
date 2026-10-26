@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Injectable, Param,
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { AuditService } from '../audit/audit.service.js';
 import { AdminRoles, type Caller, CurrentCaller, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -284,7 +284,7 @@ export class ClassifiedsAdminService {
     ]);
     return {
       ...this.presentSeller(row, stats),
-      safe_pay: { bought, ...(standing ?? { strikes: 0, strike_limit: null, limited: false, cancelled_after_accepting: 0, not_handed_over: 0, disputes_lost: 0, cleared_at: null }) },
+      safe_pay: { bought, ...(standing ?? { strikes: 0, strike_limit: null, limited: false, cancelled_after_accepting: 0, not_handed_over: 0, disputes_lost: 0, resale_not_accepted: 0, cleared_at: null }) },
       reports: reports.map(report => ({
         id: report.id,
         reason: report.reason,
@@ -562,7 +562,7 @@ export class AdminClassifiedsController {
 }
 
 class AdminOrdersDto {
-  @IsOptional() @IsIn(['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded'])
+  @IsOptional() @IsIn(['requested', 'declined', 'lapsed', 'awaiting_payment', 'cancelled', 'locked', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded'])
   status?: string;
 
   @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/)
@@ -575,6 +575,10 @@ class AdminOrdersDto {
   /** Sellers' payouts waiting for finance (`pending`), or decided. */
   @IsOptional() @IsIn(['pending', 'approved', 'rejected'])
   payout_review?: string;
+
+  /** BitoCard Shop's own sales (`direct`) or those on resellers' Resale shops (`resale`). */
+  @IsOptional() @IsIn(['direct', 'resale'])
+  kind?: string;
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   limit?: number;
@@ -641,6 +645,22 @@ class SafePaySettingsDto {
 
   @IsOptional() @IsInt() @Min(1) @Max(20)
   strike_limit?: number;
+
+  /** The longest a parcel may take once shipped. */
+  @IsOptional() @IsInt() @Min(1) @Max(60)
+  transit_days?: number;
+
+  /** The couriers offered (replacing the list): a name each and an https tracking link with `{tracking}`, or null. */
+  @IsOptional() @IsArray() @ArrayMaxSize(30) @ValidateNested({ each: true }) @Type(() => CourierDto)
+  couriers?: CourierDto[];
+}
+
+class CourierDto {
+  @IsString() @MaxLength(60)
+  name: string;
+
+  @IsOptional() @IsString() @MaxLength(300)
+  tracking_url: string | null;
 }
 
 class ResaleSettingsDto {
@@ -690,9 +710,15 @@ export class AdminSafePayController {
     return this.safePay.adminList(query);
   }
 
+  /** One order; a resale order's buyer details are shown, and the view logged. */
   @Get('orders/:id')
-  order(@Param('id', ParseUUIDPipe) id: string) {
-    return this.safePay.adminGet(id);
+  order(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string) {
+    return this.safePay.adminGet(id, adminId(caller));
+  }
+
+  @Get('orders/:id/dispatch-photos/:photo')
+  async dispatchPhoto(@CurrentCaller() caller: Caller, @Param('id', ParseUUIDPipe) id: string, @Param('photo', ParseUUIDPipe) photo: string, @Res() res: Response) {
+    sendPhoto(res, await this.safePay.adminDispatchPhoto(adminId(caller), id, photo));
   }
 
   @Get('disputes')

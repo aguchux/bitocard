@@ -250,7 +250,83 @@ export const eventObjectSchemas: Record<string, Schema> = {
     description: 'A support ticket, without its messages (read them with `GET /v1/support/tickets/{id}`).',
     additionalProperties: false,
   },
+  ResaleOrder: {
+    ...objectSchema('ResaleOrder', {
+      object: str('Always `resale_order`.', { const: 'resale_order' }),
+      id: str('Order ID.', { format: 'uuid' }),
+      number: str('The order number people quote, for example `SP-100042`.'),
+      mode,
+      store_id: str('The Resale shop it was bought on.', { format: 'uuid' }),
+      status: str(
+        '`locked` (the buyer paid; their money is locked until the supplier accepts), `paid` (accepted: BitoCard holds the money until the hand-over), `sent` (shipped), `disputed`, `released` (completed: everyone paid), `refunded`, `partly_refunded`, or ended before acceptance: `declined`, `cancelled` or `lapsed`.',
+        { enum: ['locked', 'paid', 'sent', 'disputed', 'released', 'refunded', 'partly_refunded', 'declined', 'cancelled', 'lapsed'] },
+      ),
+      listing: {
+        type: 'object',
+        description: 'The supplier’s listing it is for.',
+        required: ['id', 'ref', 'title'],
+        additionalProperties: false,
+        properties: { id: str('Listing ID.', { format: 'uuid' }), ref: int('The listing’s number.'), title: str('Its title.') },
+      },
+      quantity: int('Units bought (the amounts are for all of them).'),
+      currency: str('ISO 4217 currency of every amount.'),
+      price: money('Your price for the units'),
+      delivery_fee: money('The supplier’s delivery charge the buyer pays on top (0 for a hand-over in person)'),
+      buyer_fee: money('BitoCard’s Safe pay fee the buyer pays on top'),
+      total: money('What the buyer paid in all'),
+      supplier_net: money('What the supplier gets before their fee: their price less your discount'),
+      margin: money('Your margin before BitoCard’s fee: your price less the supplier’s net'),
+      reseller_fee: { type: ['integer', 'null'], description: 'BitoCard’s fee on your margin, in minor units, once the money is released (null before).' },
+      earnings: { type: ['integer', 'null'], description: 'What was added to your earnings when released, in minor units (null before).' },
+      refund: { type: ['integer', 'null'], description: 'What went back to the buyer, in minor units, if anything.' },
+      deal_id: nullableStr('The supplier deal whose terms it was bought on, if any.', { format: 'uuid' }),
+      fulfilment: str('`meet_up` (handed over in person with the buyer’s release code) or `delivery` (shipped with tracking).', { enum: ['meet_up', 'delivery'] }),
+      courier: nullableStr('The courier, once shipped.'),
+      tracking_number: nullableStr('The tracking number, once shipped.'),
+      tracking_url: nullableStr('The tracking page, if there is one.'),
+      delivered_at: nullableTime('When the supplier reported it delivered.'),
+      accept_by: time('When the supplier must accept by; after it the buyer’s money is unlocked.'),
+      accepted_at: nullableTime('When the supplier accepted it.'),
+      created_at: time('When the buyer bought it.'),
+      updated_at: time('When it last changed.'),
+    }),
+    description: 'An order on one of your Resale shops, without the buyer’s details (read them with `GET /v1/resale/orders/{id}`).',
+    additionalProperties: false,
+  },
 };
+
+/** A resale order as events and lists carry it. */
+export const exampleResaleOrder = (extra: Schema = {}) => ({
+  object: 'resale_order',
+  id: '7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d',
+  number: 'SP-100042',
+  mode: 'live',
+  store_id: '0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e',
+  status: 'locked',
+  listing: { id: '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a', ref: 100231, title: 'iPhone 13, 128GB, blue' },
+  quantity: 1,
+  currency: 'NGN',
+  price: 46000000,
+  delivery_fee: 300000,
+  buyer_fee: 230000,
+  total: 46530000,
+  supplier_net: 36000000,
+  margin: 10000000,
+  reseller_fee: null,
+  earnings: null,
+  refund: null,
+  deal_id: null,
+  fulfilment: 'delivery',
+  courier: null,
+  tracking_number: null,
+  tracking_url: null,
+  delivered_at: null,
+  accept_by: '2026-10-27T09:12:00.000Z',
+  accepted_at: null,
+  created_at: '2026-10-26T09:12:00.000Z',
+  updated_at: '2026-10-26T09:12:00.000Z',
+  ...extra,
+});
 
 /** A support ticket as events and lists carry it. */
 export const exampleTicket = (extra: Schema = {}) => ({
@@ -728,6 +804,26 @@ export const eventDocs: Record<EventType, EventDoc> = {
     ].join('\n\n'),
     example: exampleTicket({ last_message_at: '2026-10-19T10:05:00.000Z', updated_at: '2026-10-19T10:05:00.000Z' }),
   },
+  'resale_order.created': {
+    schema: 'ResaleOrder',
+    summary: 'A customer bought on your Resale shop',
+    description: [
+      'Fires once when a customer buys a resale listing on one of your stores: the total is locked in their store wallet (`status: locked`) and the supplier has until `accept_by` to accept. Nothing is in your earnings yet.',
+      'Does not fire for orders on BitoCard Shop itself, or for anything that only reaches the checkout.',
+      'Comes first. `resale_order.updated` follows for each change, often straight away when the supplier accepts orders automatically.',
+    ].join('\n\n'),
+    example: exampleResaleOrder(),
+  },
+  'resale_order.updated': {
+    schema: 'ResaleOrder',
+    summary: 'A resale order changed',
+    description: [
+      'Fires each time an order on your Resale shops changes: accepted (`paid`), declined, cancelled or not accepted in time (`lapsed`, the buyer’s money unlocked), shipped (`sent`, with the courier and tracking), reported delivered, disputed, completed (`released`, with `reseller_fee` and `earnings`), refunded or partly refunded.',
+      'Does not fire for messages in the order’s threads: read them with `GET /v1/resale/orders/{id}/messages`. The buyer’s details are never in the event.',
+      'Comes after `resale_order.created`, any number of times; compare `updated_at` (events can arrive out of order) and read the order to be sure.',
+    ].join('\n\n'),
+    example: exampleResaleOrder({ status: 'released', courier: 'GIG Logistics', tracking_number: 'GIG123456789', tracking_url: 'https://giglogistics.com/track/GIG123456789', delivered_at: '2026-10-28T15:30:00.000Z', reseller_fee: 500000, earnings: 9500000, accepted_at: '2026-10-26T10:02:00.000Z', updated_at: '2026-10-29T08:00:00.000Z' }),
+  },
 };
 
 const exampleEventIds: Record<EventType, string> = {
@@ -755,6 +851,8 @@ const exampleEventIds: Record<EventType, string> = {
   'support_ticket.created': '4bf2a3b4-c5d6-4e7f-8a8b-0c1d2e3f4a6c',
   'support_ticket.updated': '5c03b4c5-d6e7-4f8a-9b9c-1d2e3f4a5b7d',
   'support_ticket.message_received': '6d14c5d6-e7f8-4a9b-8cad-2e3f4a5b6c8e',
+  'resale_order.created': '7e25d6e7-f8a9-4b0c-9dbe-3f4a5b6c7d9f',
+  'resale_order.updated': '8f36e7f8-a9b0-4c1d-8ecf-4a5b6c7d8e0a',
 };
 
 const exampleTime = (object: object) => {

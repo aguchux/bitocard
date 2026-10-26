@@ -22808,7 +22808,9 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received"
+                "support_ticket.message_received",
+                "resale_order.created",
+                "resale_order.updated"
               ]
             }
           },
@@ -32626,6 +32628,1030 @@
         ],
         "x-bitocard-scopes": [
           "support:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/resale/orders": {
+      "get": {
+        "description": "Orders on your Resale shops, newest first, without the buyer’s details.",
+        "operationId": "ResaleOrdersController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Only orders in this status.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "locked",
+                "paid",
+                "sent",
+                "disputed",
+                "released",
+                "refunded",
+                "partly_refunded",
+                "declined",
+                "cancelled",
+                "lapsed"
+              ]
+            }
+          },
+          {
+            "name": "store_id",
+            "required": false,
+            "in": "query",
+            "description": "Only this store’s orders.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many to skip.",
+            "schema": {
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders on your Resale shops, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "data",
+                    "has_more",
+                    "total"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ResaleOrder"
+                      }
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more after these."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "How many match."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "data": [
+                    {
+                      "object": "resale_order",
+                      "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
+                      "number": "SP-100042",
+                      "mode": "live",
+                      "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                      "status": "locked",
+                      "listing": {
+                        "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                        "ref": 100231,
+                        "title": "iPhone 13, 128GB, blue"
+                      },
+                      "quantity": 1,
+                      "currency": "NGN",
+                      "price": 46000000,
+                      "delivery_fee": 300000,
+                      "buyer_fee": 230000,
+                      "total": 46530000,
+                      "supplier_net": 36000000,
+                      "margin": 10000000,
+                      "reseller_fee": null,
+                      "earnings": null,
+                      "refund": null,
+                      "deal_id": null,
+                      "fulfilment": "delivery",
+                      "courier": null,
+                      "tracking_number": null,
+                      "tracking_url": null,
+                      "delivered_at": null,
+                      "accept_by": "2026-10-27T09:12:00.000Z",
+                      "accepted_at": null,
+                      "created_at": "2026-10-26T09:12:00.000Z",
+                      "updated_at": "2026-10-26T09:12:00.000Z"
+                    }
+                  ],
+                  "has_more": false,
+                  "total": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List resale orders",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-scopes": [
+          "resale:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/resale/orders/{id}": {
+      "get": {
+        "description": "One order with the buyer’s name, phone, email and delivery address once the supplier accepts it (until 30 days after it ends; every view is logged), the supplier, the note the buyer saw and the shipment. Use the buyer’s details only for this order.",
+        "operationId": "ResaleOrdersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResaleOrderDetail"
+                },
+                "example": {
+                  "object": "resale_order",
+                  "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
+                  "number": "SP-100042",
+                  "mode": "live",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "status": "sent",
+                  "listing": {
+                    "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                    "ref": 100231,
+                    "title": "iPhone 13, 128GB, blue"
+                  },
+                  "quantity": 1,
+                  "currency": "NGN",
+                  "price": 46000000,
+                  "delivery_fee": 300000,
+                  "buyer_fee": 230000,
+                  "total": 46530000,
+                  "supplier_net": 36000000,
+                  "margin": 10000000,
+                  "reseller_fee": null,
+                  "earnings": null,
+                  "refund": null,
+                  "deal_id": null,
+                  "fulfilment": "delivery",
+                  "courier": "GIG Logistics",
+                  "tracking_number": "GIG123456789",
+                  "tracking_url": "https://giglogistics.com/track/GIG123456789",
+                  "delivered_at": null,
+                  "accept_by": "2026-10-27T09:12:00.000Z",
+                  "accepted_at": "2026-10-26T10:02:00.000Z",
+                  "created_at": "2026-10-26T09:12:00.000Z",
+                  "updated_at": "2026-10-27T08:30:00.000Z",
+                  "supplier": {
+                    "name": "Chinedu O."
+                  },
+                  "buyer": {
+                    "name": "Amaka Eze",
+                    "email": "amaka@example.com",
+                    "phone": "+2348031234567",
+                    "address": "12 Admiralty Way, Lekki Phase 1, Lagos"
+                  },
+                  "note_shown": "Free wall bracket with every order this month.",
+                  "shipment": {
+                    "courier": "GIG Logistics",
+                    "tracking_number": "GIG123456789",
+                    "tracking_url": "https://giglogistics.com/track/GIG123456789",
+                    "delivered_at": null,
+                    "events": [
+                      {
+                        "status": "shipped",
+                        "note": "GIG Logistics GIG123456789",
+                        "reported_by": "seller",
+                        "at": "2026-10-27T08:30:00.000Z"
+                      }
+                    ],
+                    "dispatch_photos": [
+                      {
+                        "id": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "url": "/v1/resale/orders/7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d/dispatch-photos/2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "content_type": "image/jpeg",
+                        "width": 1600,
+                        "height": 1200
+                      },
+                      {
+                        "id": "3b4c5d6e-7f8a-4b9c-8d1e-2f3a4b5c6d7e",
+                        "url": "/v1/resale/orders/7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d/dispatch-photos/3b4c5d6e-7f8a-4b9c-8d1e-2f3a4b5c6d7e",
+                        "content_type": "image/jpeg",
+                        "width": 1600,
+                        "height": 1200
+                      }
+                    ]
+                  },
+                  "deadlines": {
+                    "accept_by": "2026-10-27T09:12:00.000Z",
+                    "pay_by": null,
+                    "handover_by": "2026-10-31T10:02:00.000Z",
+                    "confirm_by": "2026-11-06T08:30:00.000Z"
+                  },
+                  "timeline": {
+                    "requested_at": "2026-10-26T09:12:00.000Z",
+                    "locked_at": "2026-10-26T09:12:00.000Z",
+                    "accepted_at": "2026-10-26T10:02:00.000Z",
+                    "paid_at": "2026-10-26T10:02:00.000Z",
+                    "sent_at": "2026-10-27T08:30:00.000Z",
+                    "released_at": null,
+                    "refunded_at": null,
+                    "closed_at": null
+                  },
+                  "ended_by": null,
+                  "end_reason": null,
+                  "dispute": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a resale order",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-scopes": [
+          "resale:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/resale/orders/{id}/cancel": {
+      "post": {
+        "description": "Before it is shipped or handed over: the buyer’s money is unlocked, or refunded in full once accepted. Each cancellation counts towards your strikes; too many pause your Resale shops’ checkout.",
+        "operationId": "ResaleOrdersController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The cancelled order: the buyer’s money unlocked, or refunded in full.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResaleOrderDetail"
+                },
+                "example": {
+                  "object": "resale_order",
+                  "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
+                  "number": "SP-100042",
+                  "mode": "live",
+                  "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                  "status": "cancelled",
+                  "listing": {
+                    "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                    "ref": 100231,
+                    "title": "iPhone 13, 128GB, blue"
+                  },
+                  "quantity": 1,
+                  "currency": "NGN",
+                  "price": 46000000,
+                  "delivery_fee": 300000,
+                  "buyer_fee": 230000,
+                  "total": 46530000,
+                  "supplier_net": 36000000,
+                  "margin": 10000000,
+                  "reseller_fee": null,
+                  "earnings": null,
+                  "refund": null,
+                  "deal_id": null,
+                  "fulfilment": "delivery",
+                  "courier": null,
+                  "tracking_number": null,
+                  "tracking_url": null,
+                  "delivered_at": null,
+                  "accept_by": "2026-10-27T09:12:00.000Z",
+                  "accepted_at": null,
+                  "created_at": "2026-10-26T09:12:00.000Z",
+                  "updated_at": "2026-10-27T08:30:00.000Z",
+                  "supplier": {
+                    "name": "Chinedu O."
+                  },
+                  "buyer": null,
+                  "note_shown": "Free wall bracket with every order this month.",
+                  "shipment": {
+                    "courier": null,
+                    "tracking_number": null,
+                    "tracking_url": null,
+                    "delivered_at": null,
+                    "events": [],
+                    "dispatch_photos": []
+                  },
+                  "deadlines": {
+                    "accept_by": "2026-10-27T09:12:00.000Z",
+                    "pay_by": null,
+                    "handover_by": "2026-10-31T10:02:00.000Z",
+                    "confirm_by": "2026-11-06T08:30:00.000Z"
+                  },
+                  "timeline": {
+                    "requested_at": "2026-10-26T09:12:00.000Z",
+                    "locked_at": "2026-10-26T09:12:00.000Z",
+                    "accepted_at": null,
+                    "paid_at": null,
+                    "sent_at": null,
+                    "released_at": null,
+                    "refunded_at": null,
+                    "closed_at": "2026-10-26T09:40:00.000Z"
+                  },
+                  "ended_by": "reseller",
+                  "end_reason": "The customer asked to cancel.",
+                  "dispute": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a resale order",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-roles": [
+          "admin"
+        ],
+        "x-bitocard-scopes": [
+          "resale:write"
+        ],
+        "x-bitocard-auth": "api_key"
+      }
+    },
+    "/v1/resale/orders/{id}/messages": {
+      "get": {
+        "description": "The order chat (`thread=order`) or the trade thread with the supplier (`thread=trade`), oldest first, each with who wrote it.",
+        "operationId": "ResaleOrdersController_messages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "thread",
+            "required": false,
+            "in": "query",
+            "description": "`order` (with the buyer) or `trade` (with the supplier).",
+            "schema": {
+              "default": "order",
+              "type": "string",
+              "enum": [
+                "order",
+                "trade"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "Only messages after this one (to poll for new ones).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The thread’s messages, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "thread",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `list`.",
+                      "const": "list"
+                    },
+                    "thread": {
+                      "type": "string",
+                      "description": "The thread.",
+                      "enum": [
+                        "order",
+                        "trade"
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ResaleOrderMessage"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "object": "list",
+                  "thread": "order",
+                  "data": [
+                    {
+                      "object": "resale_order_message",
+                      "id": "5d6e7f8a-9b0c-4d1e-8f2a-4b5c6d7e8f9a",
+                      "thread": "order",
+                      "from": "bitocard",
+                      "name": "BitoCard",
+                      "body": "Your order is placed. Your payment is locked in your wallet until the supplier confirms it; never pay anyone outside BitoCard.",
+                      "created_at": "2026-10-26T09:12:00.000Z"
+                    },
+                    {
+                      "object": "resale_order_message",
+                      "id": "4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f",
+                      "thread": "order",
+                      "from": "buyer",
+                      "name": "Amaka E.",
+                      "body": "Can it arrive before Friday?",
+                      "created_at": "2026-10-26T11:00:00.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List an order’s messages",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-scopes": [
+          "resale:read"
+        ],
+        "x-bitocard-auth": "api_key"
+      },
+      "post": {
+        "description": "In the order chat the buyer reads it as from your store, and the supplier sees it too; the trade thread is between you and the supplier.",
+        "operationId": "ResaleOrdersController_write",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThreadMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResaleOrderMessage"
+                },
+                "example": {
+                  "object": "resale_order_message",
+                  "id": "4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f",
+                  "thread": "order",
+                  "from": "me",
+                  "name": "Gadget Hub",
+                  "body": "Yes: the supplier ships it today.",
+                  "created_at": "2026-10-26T11:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID belongs to your account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "not_found_error",
+                    "code": "resource_missing",
+                    "message": "No such order.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write on an order",
+        "tags": [
+          "Resale"
+        ],
+        "x-bitocard-roles": [
+          "admin",
+          "support"
+        ],
+        "x-bitocard-scopes": [
+          "resale:write"
         ],
         "x-bitocard-auth": "api_key"
       }
@@ -44673,7 +45699,9 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received"
+                "support_ticket.message_received",
+                "resale_order.created",
+                "resale_order.updated"
               ]
             }
           },
@@ -44726,7 +45754,9 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received"
+                "support_ticket.message_received",
+                "resale_order.created",
+                "resale_order.updated"
               ]
             }
           },
@@ -45154,6 +46184,38 @@
             "nullable": true
           }
         }
+      },
+      "CancelDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why, told to the buyer and the supplier.",
+            "maxLength": 300
+          }
+        }
+      },
+      "ThreadMessageDto": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "type": "string",
+            "enum": [
+              "order",
+              "trade"
+            ],
+            "default": "order",
+            "description": "`order` (the buyer reads it as from your store) or `trade` (the supplier only)."
+          },
+          "body": {
+            "type": "string",
+            "description": "The message: no links, account or card numbers, or requests to pay outside BitoCard.",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "body"
+        ]
       },
       "AddListingDto": {
         "type": "object",
@@ -46921,6 +47983,233 @@
         "description": "A support ticket, without its messages (read them with `GET /v1/support/tickets/{id}`).",
         "additionalProperties": false
       },
+      "ResaleOrder": {
+        "type": "object",
+        "title": "ResaleOrder",
+        "required": [
+          "object",
+          "id",
+          "number",
+          "mode",
+          "store_id",
+          "status",
+          "listing",
+          "quantity",
+          "currency",
+          "price",
+          "delivery_fee",
+          "buyer_fee",
+          "total",
+          "supplier_net",
+          "margin",
+          "reseller_fee",
+          "earnings",
+          "refund",
+          "deal_id",
+          "fulfilment",
+          "courier",
+          "tracking_number",
+          "tracking_url",
+          "delivered_at",
+          "accept_by",
+          "accepted_at",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `resale_order`.",
+            "const": "resale_order"
+          },
+          "id": {
+            "type": "string",
+            "description": "Order ID.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "The order number people quote, for example `SP-100042`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The Resale shop it was bought on.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "`locked` (the buyer paid; their money is locked until the supplier accepts), `paid` (accepted: BitoCard holds the money until the hand-over), `sent` (shipped), `disputed`, `released` (completed: everyone paid), `refunded`, `partly_refunded`, or ended before acceptance: `declined`, `cancelled` or `lapsed`.",
+            "enum": [
+              "locked",
+              "paid",
+              "sent",
+              "disputed",
+              "released",
+              "refunded",
+              "partly_refunded",
+              "declined",
+              "cancelled",
+              "lapsed"
+            ]
+          },
+          "listing": {
+            "type": "object",
+            "description": "The supplier’s listing it is for.",
+            "required": [
+              "id",
+              "ref",
+              "title"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Listing ID.",
+                "format": "uuid"
+              },
+              "ref": {
+                "type": "integer",
+                "description": "The listing’s number."
+              },
+              "title": {
+                "type": "string",
+                "description": "Its title."
+              }
+            }
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Units bought (the amounts are for all of them)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency of every amount."
+          },
+          "price": {
+            "type": "integer",
+            "description": "Your price for the units, in minor units of `currency` (for example kobo)."
+          },
+          "delivery_fee": {
+            "type": "integer",
+            "description": "The supplier’s delivery charge the buyer pays on top (0 for a hand-over in person), in minor units of `currency` (for example kobo)."
+          },
+          "buyer_fee": {
+            "type": "integer",
+            "description": "BitoCard’s Safe pay fee the buyer pays on top, in minor units of `currency` (for example kobo)."
+          },
+          "total": {
+            "type": "integer",
+            "description": "What the buyer paid in all, in minor units of `currency` (for example kobo)."
+          },
+          "supplier_net": {
+            "type": "integer",
+            "description": "What the supplier gets before their fee: their price less your discount, in minor units of `currency` (for example kobo)."
+          },
+          "margin": {
+            "type": "integer",
+            "description": "Your margin before BitoCard’s fee: your price less the supplier’s net, in minor units of `currency` (for example kobo)."
+          },
+          "reseller_fee": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "BitoCard’s fee on your margin, in minor units, once the money is released (null before)."
+          },
+          "earnings": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "What was added to your earnings when released, in minor units (null before)."
+          },
+          "refund": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "What went back to the buyer, in minor units, if anything."
+          },
+          "deal_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The supplier deal whose terms it was bought on, if any.",
+            "format": "uuid"
+          },
+          "fulfilment": {
+            "type": "string",
+            "description": "`meet_up` (handed over in person with the buyer’s release code) or `delivery` (shipped with tracking).",
+            "enum": [
+              "meet_up",
+              "delivery"
+            ]
+          },
+          "courier": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The courier, once shipped."
+          },
+          "tracking_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tracking number, once shipped."
+          },
+          "tracking_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tracking page, if there is one."
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the supplier reported it delivered.",
+            "format": "date-time"
+          },
+          "accept_by": {
+            "type": "string",
+            "description": "When the supplier must accept by; after it the buyer’s money is unlocked.",
+            "format": "date-time"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the supplier accepted it.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the buyer bought it.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed.",
+            "format": "date-time"
+          }
+        },
+        "description": "An order on one of your Resale shops, without the buyer’s details (read them with `GET /v1/resale/orders/{id}`).",
+        "additionalProperties": false
+      },
       "OrderCompletedEvent": {
         "type": "object",
         "title": "order.completed event",
@@ -48332,6 +49621,124 @@
             "properties": {
               "object": {
                 "$ref": "#/components/schemas/SupportTicketSummary"
+              }
+            }
+          }
+        }
+      },
+      "ResaleOrderCreatedEvent": {
+        "type": "object",
+        "title": "resale_order.created event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "resale_order.created"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/ResaleOrder"
+              }
+            }
+          }
+        }
+      },
+      "ResaleOrderUpdatedEvent": {
+        "type": "object",
+        "title": "resale_order.updated event",
+        "required": [
+          "id",
+          "object",
+          "type",
+          "api_version",
+          "mode",
+          "created_at",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique event ID. Deliveries can repeat: ignore IDs you have already handled.",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "description": "Always `event`.",
+            "const": "event"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type.",
+            "const": "resale_order.updated"
+          },
+          "api_version": {
+            "type": "string",
+            "description": "Payload version. Adding fields keeps the version; removing or renaming one needs a new version.",
+            "const": "2026-10-01"
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the event happened.",
+            "format": "date-time"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "$ref": "#/components/schemas/ResaleOrder"
               }
             }
           }
@@ -53285,7 +54692,9 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received"
+                "support_ticket.message_received",
+                "resale_order.created",
+                "resale_order.updated"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -53419,7 +54828,9 @@
                 "dispute.resolved",
                 "support_ticket.created",
                 "support_ticket.updated",
-                "support_ticket.message_received"
+                "support_ticket.message_received",
+                "resale_order.created",
+                "resale_order.updated"
               ]
             },
             "description": "Event types sent to this endpoint. `[\"*\"]` means all of them."
@@ -53549,7 +54960,9 @@
                   "dispute.resolved",
                   "support_ticket.created",
                   "support_ticket.updated",
-                  "support_ticket.message_received"
+                  "support_ticket.message_received",
+                  "resale_order.created",
+                  "resale_order.updated"
                 ]
               },
               "created_at": {
@@ -53687,7 +55100,9 @@
                   "dispute.resolved",
                   "support_ticket.created",
                   "support_ticket.updated",
-                  "support_ticket.message_received"
+                  "support_ticket.message_received",
+                  "resale_order.created",
+                  "resale_order.updated"
                 ]
               },
               "created_at": {
@@ -53879,6 +55294,12 @@
           },
           {
             "$ref": "#/components/schemas/SupportTicketMessageReceivedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ResaleOrderCreatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ResaleOrderUpdatedEvent"
           }
         ]
       },
@@ -58222,6 +59643,9 @@
               "resale.note_decided",
               "resale.listing_unavailable",
               "resale.supplier_stopped",
+              "resale.order_new",
+              "resale.order_updated",
+              "resale.order_message",
               "chargeback.opened",
               "chargeback.closed",
               "plan.renewal_failed",
@@ -58434,6 +59858,9 @@
               "resale.note_decided",
               "resale.listing_unavailable",
               "resale.supplier_stopped",
+              "resale.order_new",
+              "resale.order_updated",
+              "resale.order_message",
               "chargeback.opened",
               "chargeback.closed",
               "plan.renewal_failed",
@@ -62951,6 +64378,706 @@
             "format": "date-time"
           }
         }
+      },
+      "ResaleOrderDetail": {
+        "type": "object",
+        "title": "ResaleOrderDetail",
+        "description": "A resale order with the buyer’s details (once accepted), its shipment and its timeline.",
+        "required": [
+          "object",
+          "id",
+          "number",
+          "mode",
+          "store_id",
+          "status",
+          "listing",
+          "quantity",
+          "currency",
+          "price",
+          "delivery_fee",
+          "buyer_fee",
+          "total",
+          "supplier_net",
+          "margin",
+          "reseller_fee",
+          "earnings",
+          "refund",
+          "deal_id",
+          "fulfilment",
+          "courier",
+          "tracking_number",
+          "tracking_url",
+          "delivered_at",
+          "accept_by",
+          "accepted_at",
+          "created_at",
+          "updated_at",
+          "supplier",
+          "buyer",
+          "note_shown",
+          "shipment",
+          "deadlines",
+          "timeline",
+          "ended_by",
+          "end_reason",
+          "dispute"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `resale_order`.",
+            "const": "resale_order"
+          },
+          "id": {
+            "type": "string",
+            "description": "Order ID.",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "description": "The order number people quote, for example `SP-100042`."
+          },
+          "mode": {
+            "type": "string",
+            "description": "`test` (sandbox) or `live`.",
+            "enum": [
+              "test",
+              "live"
+            ]
+          },
+          "store_id": {
+            "type": "string",
+            "description": "The Resale shop it was bought on.",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "`locked` (the buyer paid; their money is locked until the supplier accepts), `paid` (accepted: BitoCard holds the money until the hand-over), `sent` (shipped), `disputed`, `released` (completed: everyone paid), `refunded`, `partly_refunded`, or ended before acceptance: `declined`, `cancelled` or `lapsed`.",
+            "enum": [
+              "locked",
+              "paid",
+              "sent",
+              "disputed",
+              "released",
+              "refunded",
+              "partly_refunded",
+              "declined",
+              "cancelled",
+              "lapsed"
+            ]
+          },
+          "listing": {
+            "type": "object",
+            "description": "The supplier’s listing it is for.",
+            "required": [
+              "id",
+              "ref",
+              "title"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Listing ID.",
+                "format": "uuid"
+              },
+              "ref": {
+                "type": "integer",
+                "description": "The listing’s number."
+              },
+              "title": {
+                "type": "string",
+                "description": "Its title."
+              }
+            }
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Units bought (the amounts are for all of them)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 currency of every amount."
+          },
+          "price": {
+            "type": "integer",
+            "description": "Your price for the units, in minor units of `currency` (for example kobo)."
+          },
+          "delivery_fee": {
+            "type": "integer",
+            "description": "The supplier’s delivery charge the buyer pays on top (0 for a hand-over in person), in minor units of `currency` (for example kobo)."
+          },
+          "buyer_fee": {
+            "type": "integer",
+            "description": "BitoCard’s Safe pay fee the buyer pays on top, in minor units of `currency` (for example kobo)."
+          },
+          "total": {
+            "type": "integer",
+            "description": "What the buyer paid in all, in minor units of `currency` (for example kobo)."
+          },
+          "supplier_net": {
+            "type": "integer",
+            "description": "What the supplier gets before their fee: their price less your discount, in minor units of `currency` (for example kobo)."
+          },
+          "margin": {
+            "type": "integer",
+            "description": "Your margin before BitoCard’s fee: your price less the supplier’s net, in minor units of `currency` (for example kobo)."
+          },
+          "reseller_fee": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "BitoCard’s fee on your margin, in minor units, once the money is released (null before)."
+          },
+          "earnings": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "What was added to your earnings when released, in minor units (null before)."
+          },
+          "refund": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "What went back to the buyer, in minor units, if anything."
+          },
+          "deal_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The supplier deal whose terms it was bought on, if any.",
+            "format": "uuid"
+          },
+          "fulfilment": {
+            "type": "string",
+            "description": "`meet_up` (handed over in person with the buyer’s release code) or `delivery` (shipped with tracking).",
+            "enum": [
+              "meet_up",
+              "delivery"
+            ]
+          },
+          "courier": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The courier, once shipped."
+          },
+          "tracking_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tracking number, once shipped."
+          },
+          "tracking_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tracking page, if there is one."
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the supplier reported it delivered.",
+            "format": "date-time"
+          },
+          "accept_by": {
+            "type": "string",
+            "description": "When the supplier must accept by; after it the buyer’s money is unlocked.",
+            "format": "date-time"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When the supplier accepted it.",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When the buyer bought it.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "When it last changed.",
+            "format": "date-time"
+          },
+          "supplier": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The supplier, first name and initial: the seller of record."
+              }
+            }
+          },
+          "buyer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "The buyer’s details, from the supplier’s acceptance until 30 days after the order ends (null otherwise). Use them only for this order; every view is logged.",
+                "required": [
+                  "name",
+                  "email",
+                  "phone",
+                  "address"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The buyer’s name."
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "Their email address."
+                  },
+                  "phone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Their confirmed mobile number, E.164."
+                  },
+                  "address": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The delivery address, for a delivery."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note_shown": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your approved note as the buyer saw it when buying."
+          },
+          "shipment": {
+            "anyOf": [
+              {
+                "type": "object",
+                "description": "For a delivery: its courier, tracking and timeline (null for a hand-over in person).",
+                "required": [
+                  "courier",
+                  "tracking_number",
+                  "tracking_url",
+                  "delivered_at",
+                  "events",
+                  "dispatch_photos"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "courier": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The courier."
+                  },
+                  "tracking_number": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The tracking number."
+                  },
+                  "tracking_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The tracking page."
+                  },
+                  "delivered_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "When it was reported delivered.",
+                    "format": "date-time"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "status",
+                        "note",
+                        "reported_by",
+                        "at"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "description": "What happened.",
+                          "enum": [
+                            "shipped",
+                            "in_transit",
+                            "out_for_delivery",
+                            "delivered",
+                            "failed_attempt",
+                            "returned"
+                          ]
+                        },
+                        "note": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "A note with it."
+                        },
+                        "reported_by": {
+                          "type": "string",
+                          "description": "Who reported it.",
+                          "enum": [
+                            "seller",
+                            "courier",
+                            "bitocard"
+                          ]
+                        },
+                        "at": {
+                          "type": "string",
+                          "description": "When.",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "description": "The tracking timeline, oldest first."
+                  },
+                  "dispatch_photos": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "url",
+                        "content_type",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Photo ID.",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "The image itself (JPEG or PNG), read with your API key or session."
+                        },
+                        "content_type": {
+                          "type": "string",
+                          "description": "`image/jpeg` or `image/png`."
+                        },
+                        "width": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Width in pixels."
+                        },
+                        "height": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Height in pixels."
+                        }
+                      }
+                    },
+                    "description": "The supplier’s photos of the item and the sealed parcel before shipping."
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deadlines": {
+            "type": "object",
+            "required": [
+              "accept_by",
+              "pay_by",
+              "handover_by",
+              "confirm_by"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "accept_by": {
+                "type": "string",
+                "description": "The supplier accepts by then.",
+                "format": "date-time"
+              },
+              "pay_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Not used for resale orders (always null).",
+                "format": "date-time"
+              },
+              "handover_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The supplier hands it over or ships it by then.",
+                "format": "date-time"
+              },
+              "confirm_by": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Released by then unless the buyer confirms sooner or disputes it.",
+                "format": "date-time"
+              }
+            }
+          },
+          "timeline": {
+            "type": "object",
+            "required": [
+              "requested_at",
+              "locked_at",
+              "accepted_at",
+              "paid_at",
+              "sent_at",
+              "released_at",
+              "refunded_at",
+              "closed_at"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "requested_at": {
+                "type": "string",
+                "description": "When it was bought.",
+                "format": "date-time"
+              },
+              "locked_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the buyer’s money was locked.",
+                "format": "date-time"
+              },
+              "accepted_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the supplier accepted it.",
+                "format": "date-time"
+              },
+              "paid_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the money went to BitoCard’s hold (on acceptance).",
+                "format": "date-time"
+              },
+              "sent_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When it was shipped.",
+                "format": "date-time"
+              },
+              "released_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the money was released.",
+                "format": "date-time"
+              },
+              "refunded_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When the buyer was refunded.",
+                "format": "date-time"
+              },
+              "closed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "When it ended before acceptance.",
+                "format": "date-time"
+              }
+            }
+          },
+          "ended_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Who ended it early.",
+                "enum": [
+                  "buyer",
+                  "seller",
+                  "reseller",
+                  "bitocard"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why, when given."
+          },
+          "dispute": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "id",
+                  "status",
+                  "reason",
+                  "decision"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Dispute ID.",
+                    "format": "uuid"
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "`open` or `decided`.",
+                    "enum": [
+                      "open",
+                      "decided"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "The buyer’s reason.",
+                    "enum": [
+                      "not_received",
+                      "not_as_described",
+                      "damaged",
+                      "other"
+                    ]
+                  },
+                  "decision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "BitoCard’s decision.",
+                        "enum": [
+                          "refund",
+                          "partial",
+                          "release"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ResaleOrderMessage": {
+        "type": "object",
+        "title": "ResaleOrderMessage",
+        "required": [
+          "object",
+          "id",
+          "thread",
+          "from",
+          "name",
+          "body",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `resale_order_message`.",
+            "const": "resale_order_message"
+          },
+          "id": {
+            "type": "string",
+            "description": "Message ID.",
+            "format": "uuid"
+          },
+          "thread": {
+            "type": "string",
+            "description": "`order` (with the buyer) or `trade` (with the supplier).",
+            "enum": [
+              "order",
+              "trade"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "description": "`me` (your team), `buyer`, `supplier` or `bitocard`.",
+            "enum": [
+              "me",
+              "buyer",
+              "supplier",
+              "reseller",
+              "bitocard"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Who wrote it: the buyer’s or supplier’s first name and initial, your store’s name, or BitoCard."
+          },
+          "body": {
+            "type": "string",
+            "description": "The message."
+          },
+          "created_at": {
+            "type": "string",
+            "description": "When it was written.",
+            "format": "date-time"
+          }
+        }
       }
     }
   },
@@ -65301,6 +67428,228 @@
                     "last_message_at": "2026-10-19T10:05:00.000Z",
                     "created_at": "2026-10-19T09:12:00.000Z",
                     "updated_at": "2026-10-19T10:05:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "resale_order.created": {
+      "post": {
+        "operationId": "webhook_resale_order_created",
+        "summary": "A customer bought on your Resale shop",
+        "description": "Fires once when a customer buys a resale listing on one of your stores: the total is locked in their store wallet (`status: locked`) and the supplier has until `accept_by` to accept. Nothing is in your earnings yet.\n\nDoes not fire for orders on BitoCard Shop itself, or for anything that only reaches the checkout.\n\nComes first. `resale_order.updated` follows for each change, often straight away when the supplier accepts orders automatically.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResaleOrderCreatedEvent"
+              },
+              "example": {
+                "id": "7e25d6e7-f8a9-4b0c-9dbe-3f4a5b6c7d9f",
+                "object": "event",
+                "type": "resale_order.created",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-26T09:12:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "resale_order",
+                    "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
+                    "number": "SP-100042",
+                    "mode": "live",
+                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                    "status": "locked",
+                    "listing": {
+                      "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                      "ref": 100231,
+                      "title": "iPhone 13, 128GB, blue"
+                    },
+                    "quantity": 1,
+                    "currency": "NGN",
+                    "price": 46000000,
+                    "delivery_fee": 300000,
+                    "buyer_fee": 230000,
+                    "total": 46530000,
+                    "supplier_net": 36000000,
+                    "margin": 10000000,
+                    "reseller_fee": null,
+                    "earnings": null,
+                    "refund": null,
+                    "deal_id": null,
+                    "fulfilment": "delivery",
+                    "courier": null,
+                    "tracking_number": null,
+                    "tracking_url": null,
+                    "delivered_at": null,
+                    "accept_by": "2026-10-27T09:12:00.000Z",
+                    "accepted_at": null,
+                    "created_at": "2026-10-26T09:12:00.000Z",
+                    "updated_at": "2026-10-26T09:12:00.000Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "description": "Received. Reply within 10 seconds, before doing any slow work; anything else (including redirects) is retried."
+          }
+        }
+      }
+    },
+    "resale_order.updated": {
+      "post": {
+        "operationId": "webhook_resale_order_updated",
+        "summary": "A resale order changed",
+        "description": "Fires each time an order on your Resale shops changes: accepted (`paid`), declined, cancelled or not accepted in time (`lapsed`, the buyer’s money unlocked), shipped (`sent`, with the courier and tracking), reported delivered, disputed, completed (`released`, with `reseller_fee` and `earnings`), refunded or partly refunded.\n\nDoes not fire for messages in the order’s threads: read them with `GET /v1/resale/orders/{id}/messages`. The buyer’s details are never in the event.\n\nComes after `resale_order.created`, any number of times; compare `updated_at` (events can arrive out of order) and read the order to be sure.",
+        "tags": [
+          "Webhook events"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Signature",
+            "description": "`t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed with your endpoint secret>`. During a secret rotation there are two `v1` values; accept either. Reject timestamps more than 300 seconds from now.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "t=1790000000,v1=176911993deece29e405d1b9d8e596d8ecc3de54476ef03eba4e466088f27de7"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Id",
+            "description": "The event ID (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Event-Type",
+            "description": "The event type (also in the body).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "order.completed"
+          },
+          {
+            "in": "header",
+            "required": true,
+            "name": "BitoCard-Delivery-Attempt",
+            "description": "Which attempt this is for this endpoint, starting at 1.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResaleOrderUpdatedEvent"
+              },
+              "example": {
+                "id": "8f36e7f8-a9b0-4c1d-8ecf-4a5b6c7d8e0a",
+                "object": "event",
+                "type": "resale_order.updated",
+                "api_version": "2026-10-01",
+                "mode": "live",
+                "created_at": "2026-10-29T08:00:00.000Z",
+                "data": {
+                  "object": {
+                    "object": "resale_order",
+                    "id": "7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d",
+                    "number": "SP-100042",
+                    "mode": "live",
+                    "store_id": "0f1e2d3c-4b5a-4968-8778-695a4b3c2d1e",
+                    "status": "released",
+                    "listing": {
+                      "id": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+                      "ref": 100231,
+                      "title": "iPhone 13, 128GB, blue"
+                    },
+                    "quantity": 1,
+                    "currency": "NGN",
+                    "price": 46000000,
+                    "delivery_fee": 300000,
+                    "buyer_fee": 230000,
+                    "total": 46530000,
+                    "supplier_net": 36000000,
+                    "margin": 10000000,
+                    "reseller_fee": 500000,
+                    "earnings": 9500000,
+                    "refund": null,
+                    "deal_id": null,
+                    "fulfilment": "delivery",
+                    "courier": "GIG Logistics",
+                    "tracking_number": "GIG123456789",
+                    "tracking_url": "https://giglogistics.com/track/GIG123456789",
+                    "delivered_at": "2026-10-28T15:30:00.000Z",
+                    "accept_by": "2026-10-27T09:12:00.000Z",
+                    "accepted_at": "2026-10-26T10:02:00.000Z",
+                    "created_at": "2026-10-26T09:12:00.000Z",
+                    "updated_at": "2026-10-29T08:00:00.000Z"
                   }
                 }
               }

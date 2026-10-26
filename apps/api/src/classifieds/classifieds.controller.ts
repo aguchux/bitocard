@@ -13,7 +13,7 @@ import { sendPhoto } from './chat-files.js';
 import { ConversationsService, maxMessage } from './conversations.service.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
-import { type DisputeReason, disputeReasons, SafePayService } from './safe-pay.service.js';
+import { type DisputeReason, disputeReasons, SafePayService, type ShipmentUpdate, shipmentUpdates } from './safe-pay.service.js';
 import { FavouritesService } from './favourites.service.js';
 import { ListingMediaService, type MediaUpload } from './media.service.js';
 import { ModerationService, type ReportReason, reportReasons } from './moderation.service.js';
@@ -23,7 +23,7 @@ import { ShopDirectoryService } from './directory.service.js';
 import { ShopTermsService } from './terms.service.js';
 import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
-import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
+import { conditions, contacts, deliveries, invalid, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -129,6 +129,17 @@ class ListingDto {
 
   @IsOptional() @IsIn(deliveries)
   delivery?: (typeof deliveries)[number];
+
+  /** Handed over in person; at least one of this and `delivery`. */
+  @IsOptional() @IsBoolean()
+  pickup?: boolean;
+
+  /** The delivery charge within the seller's state and elsewhere, in minor units (0: free). */
+  @IsOptional() @IsInt() @Min(0)
+  delivery_fee_state?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  delivery_fee_nationwide?: number;
 
   @IsOptional() @IsIn(contacts)
   contact?: (typeof contacts)[number];
@@ -625,6 +636,10 @@ class SafePayRequestDto {
 
   @IsOptional() @IsString() @MaxLength(500)
   delivery_address?: string;
+
+  /** The state a delivery goes to (it decides the delivery charge). */
+  @IsOptional() @IsUUID()
+  delivery_state_id?: string;
 }
 
 class ReasonOptionalDto {
@@ -638,8 +653,27 @@ class ReleaseDto {
 }
 
 class SentDto {
+  /** The courier: one of the country's (`GET /v1/classifieds/safe-pay/couriers`) or another by name. */
+  @IsString() @MaxLength(60)
+  courier: string;
+
+  @IsString() @MaxLength(60)
+  tracking_number: string;
+
+  /** The parcel's tracking page (https); made from the courier's own link when left out. */
+  @IsOptional() @IsString() @MaxLength(500)
+  tracking_url?: string;
+
   @IsOptional() @IsString() @MaxLength(300)
   tracking_note?: string;
+}
+
+class ShipmentUpdateDto {
+  @IsIn(shipmentUpdates)
+  status: ShipmentUpdate;
+
+  @IsOptional() @IsString() @MaxLength(300)
+  note?: string;
 }
 
 class DisputeDto {
@@ -658,6 +692,10 @@ class DisputeMessageDto {
 class OrdersDto {
   @IsOptional() @IsIn(['buying', 'selling'])
   role?: 'buying' | 'selling';
+
+  /** BitoCard Shop's own sales (`direct`) or resale orders from resellers' stores (`resale`). */
+  @IsOptional() @IsIn(['direct', 'resale'])
+  kind?: 'direct' | 'resale';
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   limit?: number;
@@ -738,7 +776,34 @@ export class ClassifiedSafePayController {
   @Post('orders/:id/sent')
   @HttpCode(HttpStatus.OK)
   sent(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: SentDto) {
-    return this.safePay.markSent(caller.customer, id, body.tracking_note);
+    return this.safePay.markSent(caller.customer, id, { courier: body.courier, tracking_number: body.tracking_number, tracking_url: body.tracking_url, note: body.tracking_note });
+  }
+
+  /** Where a shipped parcel is (in transit, out for delivery, delivered, a failed attempt, returned). */
+  @Post('orders/:id/shipment')
+  @HttpCode(HttpStatus.OK)
+  shipment(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Body() body: ShipmentUpdateDto) {
+    return this.safePay.shipmentUpdate(caller.customer, id, body);
+  }
+
+  /** A dispatch photo before shipping (multipart `file`, JPEG or PNG up to 4 MB; at least two to mark it shipped). */
+  @Post('orders/:id/dispatch-photos')
+  @SkipIdempotency()
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: maxDocumentBytes + 1, files: 1, fields: 1 } }))
+  dispatchPhoto(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file?: MediaUpload) {
+    if (!file) throw invalid('parameter_missing', 'Attach the photo as `file`.', 'file');
+    return this.safePay.addDispatchPhoto(caller.customer, id, file);
+  }
+
+  @Get('orders/:id/dispatch-photos/:photo')
+  async readDispatchPhoto(@CurrentCustomer() caller: CustomerCaller, @Param('id', ParseUUIDPipe) id: string, @Param('photo', ParseUUIDPipe) photo: string, @Res() res: Response) {
+    sendPhoto(res, await this.safePay.partyDispatchPhoto(caller.customer, id, photo));
+  }
+
+  /** The couriers offered in the seller's country, for marking an order shipped. */
+  @Get('safe-pay/couriers')
+  couriers(@CurrentCustomer() caller: CustomerCaller) {
+    return this.safePay.courierList(caller.customer);
   }
 
   @Post('orders/:id/received')

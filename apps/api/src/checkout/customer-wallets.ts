@@ -88,10 +88,12 @@ export class CustomerWalletsService {
   /**
    * Whether customers buying from this seller must use their wallet. Never while the reseller's own gateway collects
    * their payments: wallet top-ups go through BitoCard's gateways, so customers pay at checkout instead (a balance
-   * they already hold can still be spent).
+   * they already hold can still be spent). A Resale shop is the exception: it sells only from the wallet, so BitoCard
+   * always collects its customers' top-ups, whoever collects the reseller's other stores' payments.
    */
-  async enabled(seller: Pick<Reseller, 'id'>, mode?: LedgerMode) {
+  async enabled(seller: Pick<Reseller, 'id'>, mode?: LedgerMode, store?: { template: string }) {
     if (!(await this.settings.isOn('customer_wallets', seller.id))) return false;
+    if (store?.template === 'resale_shop') return true;
     return !(mode && (await this.integrations.ownCollects(seller.id, mode)));
   }
 
@@ -138,7 +140,7 @@ export class CustomerWalletsService {
       country: market.code,
       currency,
       /** Wallets are on for this store: purchases are paid only from the wallet. */
-      enabled: await this.enabled(context.seller, context.mode),
+      enabled: await this.enabled(context.seller, context.mode, context.store),
       balance: minor(await this.balance(customer.id, mode, currency)),
       top_up_methods: await this.topUpMethods(context, currency),
       /** Transfers into these top the country wallet up (Flutterwave; where the market offers bank account numbers). */
@@ -160,7 +162,7 @@ export class CustomerWalletsService {
   }
 
   private async requireEnabled(context: WalletContext) {
-    if (!(await this.enabled(context.seller, context.mode))) {
+    if (!(await this.enabled(context.seller, context.mode, context.store))) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'wallets_not_enabled', 'This store does not use wallets: pay when you buy instead.');
     }
   }

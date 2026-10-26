@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
 import { ResaleService } from '../classifieds/resale.service.js';
-import { featureValueOut, invalid, linkPattern, maxPriceMinor } from '../classifieds/rules.js';
+import { featureValueOut, holdingStatuses, invalid, linkPattern, maxPriceMinor } from '../classifieds/rules.js';
 import { publicName } from '../classifieds/search.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { breakdown, type FeeRates, priceRange, resellerPrice, type ResaleTerms, termsWith } from './pricing.js';
@@ -13,7 +13,6 @@ import { ResaleTradeService } from './resale-trade.service.js';
 /** The store template that sells resale listings (stage 3 builds it; stage 2 already requires it). */
 export const resaleTemplate = 'resale_shop';
 export const maxNote = 140;
-const holding = ['paid', 'sent', 'disputed'];
 const maxRules = 20;
 const ruleBatch = 200;
 
@@ -185,8 +184,8 @@ export class ResaleStoresService {
   /** Units not yet held by paid orders, per listing. */
   private async available(listings: { id: string; stock: number }[]) {
     if (!listings.length) return new Map<string, number>();
-    const held = await this.prisma.classifiedOrder.groupBy({ by: ['listingId'], where: { listingId: { in: listings.map(row => row.id) }, status: { in: holding } }, _count: { _all: true } });
-    const counts = new Map(held.map(row => [row.listingId, row._count._all]));
+    const held = await this.prisma.classifiedOrder.groupBy({ by: ['listingId'], where: { listingId: { in: listings.map(row => row.id) }, status: { in: holdingStatuses } }, _sum: { quantity: true } });
+    const counts = new Map(held.map(row => [row.listingId, row._sum.quantity ?? 0]));
     return new Map(listings.map(row => [row.id, Math.max(row.stock - (counts.get(row.id) ?? 0), 0)]));
   }
 

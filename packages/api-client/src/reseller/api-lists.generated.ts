@@ -46,4 +46,6 @@ export const webhookEventTypes = [
   'support_ticket.created',
   'support_ticket.updated',
   'support_ticket.message_received',
+  'resale_order.created',
+  'resale_order.updated',
 ] as const;

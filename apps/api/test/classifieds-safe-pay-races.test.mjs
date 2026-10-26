@@ -115,7 +115,10 @@ async function paidOrder(title, { delivery = false } = {}) {
   const order = await acceptedOrder(seller, listing, buyer, delivery ? 'delivery' : 'meet_up');
   await fund(buyer, order.total);
   assert.equal((await buyer.post(`/v1/classifieds/orders/${order.id}/pay`)).json.status, 'paid');
-  if (delivery) assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/sent`, { tracking_note: 'GIG Logistics' })).json.status, 'sent');
+  if (delivery) {
+    await prisma.classifiedDispatchPhoto.createMany({ data: [0, 1].map(index => ({ orderId: order.id, objectKey: `test/dispatch/${order.id}/${index}`, contentType: 'image/jpeg', size: 1000 })) });
+    assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/sent`, { courier: 'GIG Logistics', tracking_number: 'GIG1001' })).json.status, 'sent');
+  }
   return { seller, buyer, listing, order };
 }
 

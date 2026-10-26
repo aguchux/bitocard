@@ -2,6 +2,7 @@ import { ListingsService } from '../classifieds/listings.service.js';
 import { ListingMediaService } from '../classifieds/media.service.js';
 import { ConversationsService } from '../classifieds/conversations.service.js';
 import { SafePayService } from '../classifieds/safe-pay.service.js';
+import { ResaleOrdersService } from '../resale/resale-orders.service.js';
 import { ResaleStoresService } from '../resale/resale-stores.service.js';
 import { InvoicesService } from '../billing/invoices.service.js';
 import { DomainsService } from '../domains/domains.service.js';
@@ -93,6 +94,7 @@ export class CronController {
     conversations: ConversationsService,
     safePay: SafePayService,
     resale: ResaleStoresService,
+    resaleOrders: ResaleOrdersService,
   ) {
     this.jobs = {
       /** Hourly. */
@@ -188,6 +190,7 @@ export class CronController {
         unread: await conversations.emailUnread(),
         old_chats: await conversations.purgeOld(),
         resale: await resale.job(),
+        old_resale_threads: await resaleOrders.purgeOldThreads(),
       }),
       /** Daily: remove uploads that were started but never completed. */
       'media-cleanup': () => media.purgeAbandoned(),

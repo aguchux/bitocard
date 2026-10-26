@@ -1,4 +1,5 @@
-import { array, bool, constant, int, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, objectSchema, oneOf, ref, shape, str, time, uuid } from '../schema.js';
+import { eventObjectSchemas, exampleResaleOrder } from '../../webhooks/openapi.js';
+import { array, bool, constant, int, nullable, nullableInt, nullableStr, nullableTime, nullableUuid, objectSchema, oneOf, ref, type Schema, shape, str, time, uuid } from '../schema.js';
 import type { DocsArea } from './index.js';
 
 /** B2B reselling for resellers (`/v1/resale`): the catalogue, store listings, notes, rules, suppliers and deals. */
@@ -302,6 +303,83 @@ const supplierRowExample = {
 };
 const messageExample = { object: 'resale_message', id: ids.message, author: 'reseller', author_name: 'Ada Obi', mine: true, body: 'Can you hold two units for a customer collecting on Friday?', deal: null, created_at: '2026-10-26T10:05:00.000Z' };
 
+/** A resale order's own fields: defined once with the webhook events (`ResaleOrder`), which carry the same object. */
+const orderFields = (eventObjectSchemas.ResaleOrder as { properties: Record<string, Schema> }).properties;
+const orderDetail = objectSchema(
+  'ResaleOrderDetail',
+  {
+    ...orderFields,
+    supplier: shape({ name: str('The supplier, first name and initial: the seller of record.') }),
+    buyer: nullable(
+      shape(
+        { name: str('The buyer’s name.'), email: str('Their email address.'), phone: nullableStr('Their confirmed mobile number, E.164.'), address: nullableStr('The delivery address, for a delivery.') },
+        'The buyer’s details, from the supplier’s acceptance until 30 days after the order ends (null otherwise). Use them only for this order; every view is logged.',
+      ),
+    ),
+    note_shown: nullableStr('Your approved note as the buyer saw it when buying.'),
+    shipment: nullable(
+      shape(
+        {
+          courier: nullableStr('The courier.'),
+          tracking_number: nullableStr('The tracking number.'),
+          tracking_url: nullableStr('The tracking page.'),
+          delivered_at: nullableTime('When it was reported delivered.'),
+          events: array(shape({ status: oneOf('What happened.', ['shipped', 'in_transit', 'out_for_delivery', 'delivered', 'failed_attempt', 'returned']), note: nullableStr('A note with it.'), reported_by: oneOf('Who reported it.', ['seller', 'courier', 'bitocard']), at: time('When.') }), 'The tracking timeline, oldest first.'),
+          dispatch_photos: array(shape({ id: uuid('Photo ID.'), url: str('The image itself (JPEG or PNG), read with your API key or session.'), content_type: str('`image/jpeg` or `image/png`.'), width: nullableInt('Width in pixels.'), height: nullableInt('Height in pixels.') }), 'The supplier’s photos of the item and the sealed parcel before shipping.'),
+        },
+        'For a delivery: its courier, tracking and timeline (null for a hand-over in person).',
+      ),
+    ),
+    deadlines: shape({ accept_by: time('The supplier accepts by then.'), pay_by: nullableTime('Not used for resale orders (always null).'), handover_by: nullableTime('The supplier hands it over or ships it by then.'), confirm_by: nullableTime('Released by then unless the buyer confirms sooner or disputes it.') }),
+    timeline: shape({
+      requested_at: time('When it was bought.'),
+      locked_at: nullableTime('When the buyer’s money was locked.'),
+      accepted_at: nullableTime('When the supplier accepted it.'),
+      paid_at: nullableTime('When the money went to BitoCard’s hold (on acceptance).'),
+      sent_at: nullableTime('When it was shipped.'),
+      released_at: nullableTime('When the money was released.'),
+      refunded_at: nullableTime('When the buyer was refunded.'),
+      closed_at: nullableTime('When it ended before acceptance.'),
+    }),
+    ended_by: nullable(oneOf('Who ended it early.', ['buyer', 'seller', 'reseller', 'bitocard'])),
+    end_reason: nullableStr('Why, when given.'),
+    dispute: nullable(shape({ id: uuid('Dispute ID.'), status: oneOf('`open` or `decided`.', ['open', 'decided']), reason: oneOf('The buyer’s reason.', ['not_received', 'not_as_described', 'damaged', 'other']), decision: nullable(oneOf('BitoCard’s decision.', ['refund', 'partial', 'release'])) })),
+  },
+  'A resale order with the buyer’s details (once accepted), its shipment and its timeline.',
+);
+const orderMessage = objectSchema('ResaleOrderMessage', {
+  object: constant('resale_order_message'),
+  id: uuid('Message ID.'),
+  thread: oneOf('`order` (with the buyer) or `trade` (with the supplier).', ['order', 'trade']),
+  from: oneOf('`me` (your team), `buyer`, `supplier` or `bitocard`.', ['me', 'buyer', 'supplier', 'reseller', 'bitocard']),
+  name: str('Who wrote it: the buyer’s or supplier’s first name and initial, your store’s name, or BitoCard.'),
+  body: str('The message.'),
+  created_at: time('When it was written.'),
+});
+const orderDetailExample = {
+  ...exampleResaleOrder({ status: 'sent', accepted_at: '2026-10-26T10:02:00.000Z', courier: 'GIG Logistics', tracking_number: 'GIG123456789', tracking_url: 'https://giglogistics.com/track/GIG123456789', updated_at: '2026-10-27T08:30:00.000Z' }),
+  supplier: { name: 'Chinedu O.' },
+  buyer: { name: 'Amaka Eze', email: 'amaka@example.com', phone: '+2348031234567', address: '12 Admiralty Way, Lekki Phase 1, Lagos' },
+  note_shown: 'Free wall bracket with every order this month.',
+  shipment: {
+    courier: 'GIG Logistics',
+    tracking_number: 'GIG123456789',
+    tracking_url: 'https://giglogistics.com/track/GIG123456789',
+    delivered_at: null,
+    events: [{ status: 'shipped', note: 'GIG Logistics GIG123456789', reported_by: 'seller', at: '2026-10-27T08:30:00.000Z' }],
+    dispatch_photos: [
+      { id: '2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d', url: '/v1/resale/orders/7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d/dispatch-photos/2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d', content_type: 'image/jpeg', width: 1600, height: 1200 },
+      { id: '3b4c5d6e-7f8a-4b9c-8d1e-2f3a4b5c6d7e', url: '/v1/resale/orders/7b6a5c4d-3e2f-4a1b-9c0d-8e7f6a5b4c3d/dispatch-photos/3b4c5d6e-7f8a-4b9c-8d1e-2f3a4b5c6d7e', content_type: 'image/jpeg', width: 1600, height: 1200 },
+    ],
+  },
+  deadlines: { accept_by: '2026-10-27T09:12:00.000Z', pay_by: null, handover_by: '2026-10-31T10:02:00.000Z', confirm_by: '2026-11-06T08:30:00.000Z' },
+  timeline: { requested_at: '2026-10-26T09:12:00.000Z', locked_at: '2026-10-26T09:12:00.000Z', accepted_at: '2026-10-26T10:02:00.000Z', paid_at: '2026-10-26T10:02:00.000Z', sent_at: '2026-10-27T08:30:00.000Z', released_at: null, refunded_at: null, closed_at: null },
+  ended_by: null,
+  end_reason: null,
+  dispute: null,
+};
+const orderMessageExample = { object: 'resale_order_message', id: '4c5d6e7f-8a9b-4c0d-9e1f-3a4b5c6d7e8f', thread: 'order', from: 'buyer', name: 'Amaka E.', body: 'Can it arrive before Friday?', created_at: '2026-10-26T11:00:00.000Z' };
+
 export const resaleDocs: DocsArea = {
   schemas: {
     ResaleAccount: account,
@@ -313,8 +391,30 @@ export const resaleDocs: DocsArea = {
     ResaleDeal: deal,
     ResaleSupplier: supplierRow,
     ResaleMessage: message,
+    ResaleOrderDetail: orderDetail,
+    ResaleOrderMessage: orderMessage,
   },
   responses: {
+    'GET /v1/resale/orders': {
+      status: 200,
+      description: 'Orders on your Resale shops, newest first.',
+      schema: shape({ object: constant('list'), data: array(ref('ResaleOrder')), has_more: bool('Whether there are more after these.'), total: int('How many match.') }),
+      example: { object: 'list', data: [exampleResaleOrder()], has_more: false, total: 1 },
+    },
+    'GET /v1/resale/orders/{id}': { status: 200, description: 'The order.', schema: 'ResaleOrderDetail', example: orderDetailExample },
+    'POST /v1/resale/orders/{id}/cancel': {
+      status: 200,
+      description: 'The cancelled order: the buyer’s money unlocked, or refunded in full.',
+      schema: 'ResaleOrderDetail',
+      example: { ...orderDetailExample, status: 'cancelled', buyer: null, shipment: { ...orderDetailExample.shipment, courier: null, tracking_number: null, tracking_url: null, events: [], dispatch_photos: [] }, courier: null, tracking_number: null, tracking_url: null, accepted_at: null, ended_by: 'reseller', end_reason: 'The customer asked to cancel.', timeline: { ...orderDetailExample.timeline, accepted_at: null, paid_at: null, sent_at: null, closed_at: '2026-10-26T09:40:00.000Z' } },
+    },
+    'GET /v1/resale/orders/{id}/messages': {
+      status: 200,
+      description: 'The thread’s messages, oldest first.',
+      schema: shape({ object: constant('list'), thread: oneOf('The thread.', ['order', 'trade']), data: array(ref('ResaleOrderMessage')) }),
+      example: { object: 'list', thread: 'order', data: [{ ...orderMessageExample, id: '5d6e7f8a-9b0c-4d1e-8f2a-4b5c6d7e8f9a', from: 'bitocard', name: 'BitoCard', body: 'Your order is placed. Your payment is locked in your wallet until the supplier confirms it; never pay anyone outside BitoCard.', created_at: '2026-10-26T09:12:00.000Z' }, orderMessageExample] },
+    },
+    'POST /v1/resale/orders/{id}/messages': { status: 201, description: 'Your message.', schema: 'ResaleOrderMessage', example: { ...orderMessageExample, from: 'me', name: 'Gadget Hub', body: 'Yes: the supplier ships it today.' } },
     'GET /v1/resale': {
       status: 200,
       description: 'Your reselling status.',

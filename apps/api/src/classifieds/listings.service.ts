@@ -16,6 +16,7 @@ import {
   type contacts,
   type deliveries,
   featureValueOut,
+  heldUnits,
   invalid,
   type ListingStatus,
   maxFeatures,
@@ -34,6 +35,11 @@ export type ListingInput = {
   price?: number | null;
   condition?: (typeof conditions)[number] | null;
   delivery?: (typeof deliveries)[number];
+  /** Handed over in person (with the buyer's release code). At least one of pickup and delivery. */
+  pickup?: boolean;
+  /** The delivery charge within the seller's state and elsewhere, in minor units (0: free). */
+  delivery_fee_state?: number;
+  delivery_fee_nationwide?: number;
   contact?: (typeof contacts)[number];
   features?: { key: string; value: unknown }[];
   /** Sold on BitoCard Shop itself (default), and/or open to resellers' stores: at least one. */
@@ -69,6 +75,9 @@ type ListingFields = {
   description?: string | null;
   condition?: string | null;
   delivery?: string;
+  pickup?: boolean;
+  deliveryFeeStateMinor?: bigint;
+  deliveryFeeNationwideMinor?: bigint;
   contact?: string;
   categoryId?: string | null;
   areaId?: string | null;
@@ -187,7 +196,7 @@ export class ListingsService {
       if (data.fields.stock !== undefined && listing.status !== 'draft') {
         // Units paid for and waiting to be handed over stay: stock cannot go below them (the row locked against a payment).
         await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ${id}::uuid FOR UPDATE`;
-        const held = await tx.classifiedOrder.count({ where: { listingId: id, status: { in: ['paid', 'sent', 'disputed'] } } });
+        const held = await heldUnits(tx, id);
         if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are paid for and waiting to be handed over: stock cannot go below that.`);
       }
       await tx.classifiedListing.update({ where: { id }, data: data.fields });
@@ -350,6 +359,16 @@ export class ListingsService {
     if (input.description !== undefined) fields.description = input.description === null ? null : checkDescription(input.description);
     if (input.condition !== undefined) fields.condition = input.condition;
     if (input.delivery !== undefined) fields.delivery = input.delivery;
+    if (input.pickup !== undefined) fields.pickup = input.pickup;
+    for (const [key, field] of [['delivery_fee_state', 'deliveryFeeStateMinor'], ['delivery_fee_nationwide', 'deliveryFeeNationwideMinor']] as const) {
+      const value = input[key];
+      if (value === undefined) continue;
+      if (!Number.isInteger(value) || value < 0 || BigInt(value) > maxPriceMinor) throw invalid('parameter_invalid', 'A delivery charge is 0 (free) or more, in minor units.', key);
+      fields[field] = BigInt(value);
+    }
+    if ((fields.pickup ?? current?.pickup ?? true) === false && (fields.delivery ?? current?.delivery ?? 'none') === 'none') {
+      throw invalid('fulfilment_required', 'Offer the hand-over in person, delivery, or both.', 'pickup');
+    }
     if (input.contact !== undefined) fields.contact = input.contact;
     if (input.category_id !== undefined) {
       if (input.category_id === null) fields.categoryId = null;
@@ -439,6 +458,8 @@ export class ListingsService {
       photos: photos.map(item => ({ id: item.id, url: item.url, width: item.width, height: item.height, status: item.status })),
       video: video ? { id: video.id, url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, status: video.status, failure_reason: video.failureReason } : null,
       delivery: listing.delivery,
+      pickup: listing.pickup,
+      delivery_fees: { within_state: Number(listing.deliveryFeeStateMinor), nationwide: Number(listing.deliveryFeeNationwideMinor) },
       contact: listing.contact,
       views: listing.views,
       leads: listing.leads,

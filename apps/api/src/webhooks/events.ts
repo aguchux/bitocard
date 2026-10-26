@@ -27,6 +27,8 @@ export const eventTypes = [
   'support_ticket.created',
   'support_ticket.updated',
   'support_ticket.message_received',
+  'resale_order.created',
+  'resale_order.updated',
 ] as const;
 
 export type EventType = (typeof eventTypes)[number];

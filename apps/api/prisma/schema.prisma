@@ -504,6 +504,8 @@ model Reseller {
   /// BitoCard's own store (bitocard.com): one house account per market sells to its retail customers, and one with no
   /// country owns the store itself. Never a real reseller.
   house                     Boolean                   @default(false)
+  /// Resale strikes before this no longer count (an admin lifted the reseller's limit).
+  resaleStrikesClearedAt    DateTime?                 @map("resale_strikes_cleared_at")
   checkouts                 Checkout[]
   manualTopUps              ManualTopUp[]
   cryptoAddresses           CryptoAddress[]
@@ -513,6 +515,7 @@ model Reseller {
   resaleListings            ResaleListing[]
   resaleRules               ResaleRule[]
   resaleRelationships       ResaleRelationship[]
+  resaleOrders              ClassifiedOrder[]
   @@map("resellers")
   invoices              Invoice[]
 }
@@ -819,6 +822,7 @@ model Store {
   publicSpinClaims      PublicSpinClaim[]
   resaleListings        ResaleListing[]
   resaleRules           ResaleRule[]
+  resaleOrders          ClassifiedOrder[]
 
   @@index([resellerId])
   @@index([hostStatus])
@@ -971,6 +975,9 @@ enum AccountKind {
   classified_escrow
   /// BitoCard Shop's fees: both sides' Safe pay fees (later promotions and shop plans). Revenue.
   classifieds_revenue
+  /// A store customer's wallet money locked by a resale order until the supplier accepts it (then it goes to
+  /// `classified_escrow`) or it ends (back to `customer_wallet`). Still the customer's; never below zero.
+  customer_wallet_locked
 }
 
 /// Each time BitoCard asks a provider to open reserved accounts: written (and claimed) before the call, so a reply that
@@ -4466,6 +4473,11 @@ model ClassifiedSafePaySettings {
   confirmDays              Int      @default(3) @map("confirm_days")
   /// Strikes in 90 days (cancelling after accepting, not handing over, disputes lost) that stop a seller taking Safe pay orders.
   strikeLimit              Int      @default(3) @map("strike_limit")
+  /// The longest a parcel may take to arrive once shipped; after it the buyer can dispute a parcel not delivered, and
+  /// without a delivery the confirm time starts from it.
+  transitDays              Int      @default(7) @map("transit_days")
+  /// The couriers offered when marking an order shipped: [{ name, tracking_url }] (the link with {tracking} in it).
+  couriers                 Json     @default("[]")
   updatedAt                DateTime @updatedAt @map("updated_at")
 
   @@map("classified_safe_pay_settings")
@@ -4532,6 +4544,13 @@ model ClassifiedListing {
   condition    String?
   /// none (its area and state only), state or nationwide.
   delivery     String                     @default("none")
+  /// The supplier hands it over in person (meet-up, with the buyer's release code). At least one of pickup and
+  /// delivery (a database check).
+  pickup       Boolean                    @default(true)
+  /// The delivery charge within the seller's state and elsewhere in the country, in minor units (0: free). Paid by the
+  /// buyer on top, to the seller in full on release, refunded with the order.
+  deliveryFeeStateMinor      BigInt       @default(0) @map("delivery_fee_state_minor")
+  deliveryFeeNationwideMinor BigInt       @default(0) @map("delivery_fee_nationwide_minor")
   /// chat, phone or both.
   contact      String                     @default("chat")
   /// draft, pending_review, active, sold, expired, rejected, removed (by BitoCard) or deleted (by the seller).
@@ -4707,6 +4726,8 @@ model ClassifiedSeller {
   suspendedById   String?   @map("suspended_by_id") @db.Uuid
   /// Safe pay strikes before this no longer count (an admin lifted the seller's limit).
   safePayClearedAt DateTime? @map("safe_pay_cleared_at")
+  /// Accept resale orders by themselves while the listing has stock (the supplier's choice, off by default).
+  resaleAutoAccept Boolean   @default(false) @map("resale_auto_accept")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -4852,12 +4873,49 @@ model ClassifiedOrder {
   sellerFeeCapMinor        BigInt             @map("seller_fee_cap_minor")
   /// Taken at release, on what is released.
   sellerFeeMinor           BigInt?            @map("seller_fee_minor")
+  /// direct (a BitoCard Shop sale) or resale (bought on a reseller's Resale shop).
+  kind                     String             @default("direct")
+  /// Units bought (the prices below are for all of them).
+  quantity                 Int                @default(1)
+  /// Resale: the store it was bought on and its reseller.
+  storeId                  String?            @map("store_id") @db.Uuid
+  resellerId               String?            @map("reseller_id") @db.Uuid
+  resaleListingId          String?            @map("resale_listing_id") @db.Uuid
+  /// Resale: the deal whose terms it was bought on, if any.
+  dealId                   String?            @map("deal_id") @db.Uuid
+  /// Resale: the supplier's price (P) for every unit, the discount the reseller earned, what the supplier gets before
+  /// their fee, the reseller's margin before theirs, and BitoCard's reseller fee rate and cap, fixed at buying.
+  supplierPriceMinor       BigInt?            @map("supplier_price_minor")
+  discountBps              Int?               @map("discount_bps")
+  supplierNetMinor         BigInt?            @map("supplier_net_minor")
+  resellerMarginMinor      BigInt?            @map("reseller_margin_minor")
+  resellerFeeBps           Int?               @map("reseller_fee_bps")
+  resellerFeeCapMinor      BigInt?            @map("reseller_fee_cap_minor")
+  /// Taken at release, on the margin released.
+  resellerFeeMinor         BigInt?            @map("reseller_fee_minor")
+  resellerPayoutMinor      BigInt?            @map("reseller_payout_minor")
+  /// The delivery charge the buyer pays on top (the seller's in full on release).
+  deliveryFeeMinor         BigInt             @default(0) @map("delivery_fee_minor")
+  /// The state the delivery goes to (it decides the delivery charge).
+  deliveryStateId          String?            @map("delivery_state_id") @db.Uuid
+  /// Resale: the buyer's confirmed phone number at buying, encrypted (the supplier's to call them).
+  buyerPhone               String?            @map("buyer_phone")
+  /// Resale: the listing and the store's note as the buyer saw them.
+  snapshot                 Json?
+  /// Resale: when the buyer's money was locked.
+  lockedAt                 DateTime?          @map("locked_at")
+  /// Shipping: the courier, its tracking number and link, and when it was delivered.
+  courier                  String?
+  trackingNumber           String?            @map("tracking_number")
+  trackingUrl              String?            @map("tracking_url")
+  deliveredAt              DateTime?          @map("delivered_at")
   /// meet_up or delivery.
   fulfilment               String
   /// Encrypted; shown to the seller only once paid, and only for delivery.
   deliveryAddress          String?            @map("delivery_address")
   trackingNote             String?            @map("tracking_note")
-  /// requested, declined, lapsed, awaiting_payment, cancelled, paid, sent, disputed, released, refunded or partly_refunded.
+  /// requested, declined, lapsed, awaiting_payment, cancelled, locked (resale: the buyer's money locked until the supplier
+  /// accepts), paid, sent, disputed, released, refunded or partly_refunded.
   status                   String             @default("requested")
   /// Encrypted 6-digit code the buyer gives at a meet-up; never shown to the seller.
   releaseCode              String?            @map("release_code")
@@ -4891,8 +4949,15 @@ model ClassifiedOrder {
   listing                  ClassifiedListing  @relation(fields: [listingId], references: [id], onDelete: Restrict)
   buyer                    Customer           @relation("ClassifiedOrdersBought", fields: [buyerId], references: [id], onDelete: Restrict)
   seller                   Customer           @relation("ClassifiedOrdersSold", fields: [sellerId], references: [id], onDelete: Restrict)
+  store                    Store?             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  reseller                 Reseller?          @relation(fields: [resellerId], references: [id], onDelete: Restrict)
   dispute                  ClassifiedDispute?
+  shipmentEvents           ClassifiedShipmentEvent[]
+  dispatchPhotos           ClassifiedDispatchPhoto[]
+  resaleMessages           ResaleOrderMessage[]
+  buyerDetailViews         ResaleBuyerDetailView[]
 
+  @@index([resellerId, createdAt])
   @@index([buyerId, createdAt])
   @@index([sellerId, createdAt])
   @@index([listingId, status])
@@ -4968,7 +5033,7 @@ model ResaleListing {
   noteReason      String?            @map("note_reason")
   noteSubmittedAt DateTime?          @map("note_submitted_at")
   noteDecidedAt   DateTime?          @map("note_decided_at")
-  /// What it could last do (selling, sold_out, price_out_of_rangeâ€¦) as told to the reseller, so each change is told once.
+  /// What it could last do (selling, sold_out, price_out_of_range...) as told to the reseller, so each change is told once.
   notifiedState   String?            @map("notified_state")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
@@ -5084,4 +5149,75 @@ model ResaleClaimPhrase {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("resale_claim_phrases")
+}
+
+/// A Safe pay order's shipment timeline: shipped, in transit, out for delivery, delivered, a failed attempt or returned,
+/// each with who reported it (the seller by hand, a courier's update, or BitoCard).
+model ClassifiedShipmentEvent {
+  id         String          @id @default(uuid()) @db.Uuid
+  orderId    String          @map("order_id") @db.Uuid
+  status     String
+  note       String?
+  /// seller, courier or bitocard.
+  reportedBy String          @map("reported_by")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  order      ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("classified_shipment_events")
+}
+
+/// The seller's photos of the item and the sealed parcel before shipping (at least two to mark it shipped), sealed in
+/// the private bucket like dispute photos; seen by the order's parties and BitoCard.
+model ClassifiedDispatchPhoto {
+  id          String          @id @default(uuid()) @db.Uuid
+  orderId     String          @map("order_id") @db.Uuid
+  objectKey   String          @map("object_key")
+  contentType String          @map("content_type")
+  size        Int
+  width       Int?
+  height      Int?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  order       ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("classified_dispatch_photos")
+}
+
+/// A resale order's two threads: `order` (the buyer and the store, where the supplier and the reseller both write and
+/// the buyer sees every store message as the store's) and `trade` (the supplier and the reseller; never the buyer's).
+model ResaleOrderMessage {
+  id          String          @id @default(uuid()) @db.Uuid
+  orderId     String          @map("order_id") @db.Uuid
+  /// order or trade.
+  thread      String
+  /// buyer, supplier, reseller or bitocard.
+  author      String
+  /// The customer, or the reseller's team member, who wrote it.
+  authorId    String?         @map("author_id") @db.Uuid
+  body        String          @default("")
+  objectKey   String?         @map("object_key")
+  contentType String?         @map("content_type")
+  size        Int?
+  width       Int?
+  height      Int?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  order       ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, thread, createdAt])
+  @@map("resale_order_messages")
+}
+
+/// Every time the supplier, the reseller or BitoCard opened a resale buyer's details (name, phone, email, address).
+model ResaleBuyerDetailView {
+  id        String          @id @default(uuid()) @db.Uuid
+  orderId   String          @map("order_id") @db.Uuid
+  /// supplier, reseller or admin.
+  viewer    String
+  viewerId  String?         @map("viewer_id") @db.Uuid
+  createdAt DateTime        @default(now()) @map("created_at")
+  order     ClassifiedOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("resale_buyer_detail_views")
 }

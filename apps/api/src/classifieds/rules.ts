@@ -20,6 +20,17 @@ export const contacts = ['chat', 'phone', 'both'] as const;
  */
 export const onShopWhere = { status: 'active', onShop: true } as const;
 export const isOnShop = (listing: { status: string; onShop: boolean }) => listing.status === 'active' && listing.onShop;
+/** Statuses in which an order holds units of its listing: a resale order's locked money, and paid orders not yet released. */
+export const holdingStatuses = ['locked', 'paid', 'sent', 'disputed'];
+
+type OrderCounter = { classifiedOrder: { aggregate(args: { where: { listingId: string; status: { in: string[] }; id?: { not: string } }; _sum: { quantity: true } }): Promise<{ _sum: { quantity: number | null } }> } };
+
+/** Units of a listing held by orders (`holdingStatuses`), less one order's own when given. */
+export async function heldUnits(db: OrderCounter, listingId: string, exceptOrderId?: string) {
+  const result = await db.classifiedOrder.aggregate({ where: { listingId, status: { in: holdingStatuses }, ...(exceptOrderId ? { id: { not: exceptOrderId } } : {}) }, _sum: { quantity: true } });
+  return result._sum.quantity ?? 0;
+}
+
 /** Most units one listing can hold (its stock). */
 export const maxStock = 100_000;
 
