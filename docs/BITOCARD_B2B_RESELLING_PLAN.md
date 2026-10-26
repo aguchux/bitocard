@@ -1,6 +1,6 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 5 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; stage 4 and 4b: buying, shipping and payouts; stage 5: disputes, reports and strikes; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 6 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; stage 4 and 4b: buying, shipping and payouts; stage 5: disputes, reports and strikes; stage 6: emails and reminders; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
@@ -158,10 +158,14 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 - Disputes with supplier and reseller both taking part, decided by BitoCard; reseller and supplier strikes; reports (reseller: resale sales and margin in Reports; supplier: sales by reseller; BitoCard: resale fees).
 - Legal (below), lawyers' review, then switches on market by market, starting with one pilot market.
 
+### Stage 6: emails and reminders: built 26 October 2026
+
+**As built:** see `AGENTS.md`, B2B reselling, Stage 6. "Everyone is told" (Autopilot) now includes email, beside the inbox and push: every Safe pay order step (BitoCard Shop's own and resale) to its buyer, seller and reseller, the supplier and reseller's work together (notes, deals, chat, stopping), a listing that stopped selling, strike limits, store report outcomes and Shop listing outcomes. A Resale shop's buyer hears from the store; the buyer is also told when a resale order completes. Messages are emailed without their text, at most every 10 minutes per conversation and person. New reminders before each deadline (accept, pay, hand over, confirm), once each. Emails never carry release codes, anyone's contact details or what they wrote.
+
 ## Legal owed before any switch goes on live
 
 - **The supplier is the seller of record**: the reseller is the store that sold it (paid a margin) and BitoCard holds the money. Lawyers to confirm per country (consumer law, Nigeria's FCCPA), whether the reseller acts as the supplier's agent, and what the receipt says.
-- **Safe pay licensing** is still owed for BitoCard Shop (holding buyers' money; CBN in Nigeria). Resale adds locking store-wallet money and holding money owed to two parties.
+- **Safe pay licensing**: Safe pay collects, holds and refunds through licensed payment partners (Paystack and Flutterwave), the owner's position on 26 October 2026 being that BitoCard then needs no licence of its own to hold the money; lawyers to confirm it per country, since the balances sit in BitoCard's merchant accounts and BitoCard decides who is paid (CBN in Nigeria). Resale adds locking store-wallet money and holding money owed to two parties.
 - **Terms**: the Shop terms (suppliers opting in, stock, discounts, deals, approving notes, accepting and handing over to resellers' buyers, phone numbers shared with resellers), the reseller terms (resale stores, price limits, deals, notes, strikes, first-line support, earnings), customer terms on resale stores (who the seller is, locked funds, acceptance), and the privacy notice (the supplier writes in and reads the buyer's chat with the store, which shows their messages as the store's, and sees the buyer's name, phone number, email and delivery address; dispatch and delivery photos; couriers receiving the delivery address and phone; supplier and reseller see each other's phone numbers; the store shows the supplier's public profile). The reseller terms must forbid posing as the owner or maker of the items, with strikes and suspension for it; the Shop terms must forbid suppliers using buyers' details for anything but the order, and set out shipping (who pays, packing, the supplier's responsibility until delivery, damage and loss in transit, dispatch photos, confirming on delivery). Whether a buyer must be told that someone other than the store may write to them as the store is for lawyers to confirm (consumer and data protection law).
 - **Tax** on the reseller's margin and BitoCard's fees.
 
