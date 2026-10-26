@@ -40,6 +40,7 @@ export function StoreHeader({
   marketLocked = false,
   signedIn,
   store = null,
+  shop = null,
 }: {
   groups: StoreNavigationGroup[];
   countries: StoreCountry[];
@@ -48,6 +49,8 @@ export function StoreHeader({
   marketLocked?: boolean;
   signedIn: boolean;
   store?: HostedStore | null;
+  /** BitoCard Shop's address for the menu (`shopNavHref`), or null where it is not offered. */
+  shop?: string | null;
 }) {
   const reseller = Boolean(store) && !store!.house;
   const baseLinks = quickLinksFor(groups, store?.design?.template);
@@ -64,7 +67,7 @@ export function StoreHeader({
             <Brand />
           </Link>
         )}
-        <DesktopNav groups={groups} links={links} />
+        <DesktopNav groups={groups} links={links} shop={reseller ? null : shop} />
         <div className="-mr-2 ml-auto flex items-center gap-1 sm:mr-0 sm:gap-3">
           <Link href="/search" aria-label="Search" className="grid size-11 place-items-center rounded-xl text-navy-900 hover:bg-slate-50 xl:hidden">
             <Search className="size-5" aria-hidden="true" />
@@ -100,7 +103,7 @@ export function StoreHeader({
               Start Reselling
             </Link>
           ) : null}
-          <MobileMenu groups={groups} signedIn={signedIn} reseller={reseller} links={links} />
+          <MobileMenu groups={groups} signedIn={signedIn} reseller={reseller} links={links} shop={reseller ? null : shop} />
         </div>
       </div>
     </header>

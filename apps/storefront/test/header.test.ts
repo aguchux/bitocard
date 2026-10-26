@@ -48,4 +48,15 @@ describe("store header", () => {
     expect(html).not.toContain("Start Reselling");
     expect(html).not.toContain("Shop globally");
   });
+
+  test("BitoCard Shop leads the menu's quick links, never on a reseller's store", () => {
+    const shop = "/handoff/go?to=https%3A%2F%2Fshop.bitocard.com&next=%2Fng";
+    const html = renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: "NG", signedIn: true, store: null, shop }));
+    const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)</g)].map(match => [match[1]!.replaceAll("&amp;", "&"), match[2]]);
+    const quick = links.filter(([href]) => href === shop || href!.startsWith("/catalogs/") || href === "/account/crypto");
+    expect(quick[0]).toEqual([shop, "Shop"]);
+    expect(quick.map(([, label]) => label)).toEqual(["Shop", "Virtual numbers", "RDP", "VPN", "Crypto"]);
+    expect(render(null)).not.toContain(">Shop<");
+    expect(renderToStaticMarkup(createElement(StoreHeader, { groups, countries, market: "NG", signedIn: false, store: store(false), shop }))).not.toContain(shop.replaceAll("&", "&amp;"));
+  });
 });

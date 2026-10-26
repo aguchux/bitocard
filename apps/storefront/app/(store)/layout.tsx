@@ -9,6 +9,7 @@ import { storeApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
 import { countryStoreFor, currentMarket, marketIsGlobal } from "@/lib/market";
 import { storeNavigation } from "@/lib/navigation";
+import { shopNavHref } from "@/lib/shop-server";
 import { currentStore, storeSubdomain } from "@/lib/store";
 import { storeShell } from "@/lib/store-theme";
 
@@ -78,7 +79,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           Test store: orders are simulated and no money is taken.
         </p>
       ) : null}
-      <StoreHeader groups={groups} countries={countries} market={market} signedIn={Boolean(customer)} store={store} />
+      <StoreHeader groups={groups} countries={countries} market={market} signedIn={Boolean(customer)} store={store} shop={await shopNavHref(market, Boolean(customer))} />
       <main id="main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 sm:px-6 lg:px-8">
         {children}
       </main>

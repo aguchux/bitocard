@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { ShopCategoryCover } from "@bitocard/api-client/classifieds";
 import { setRequest } from "./request";
 
-const { shopBandFor } = await import("@/lib/shop-server");
+const { shopBandFor, shopHref, shopNavHref } = await import("@/lib/shop-server");
 const { ShopBand } = await import("@/components/store/shop-band");
 
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -76,5 +76,24 @@ describe("BitoCard Shop's band on the home page", () => {
     expect(html).toContain("1,204 ads");
     expect(html).toContain("Be the first to sell");
     expect(html.match(/<img /g)).toHaveLength(1);
+  });
+});
+
+describe("BitoCard Shop in the header's menu", () => {
+  test("the shopper's market where the Shop is open, the Shop's home without one, through the handoff when signed in", async () => {
+    vi.stubGlobal("fetch", api());
+    expect(await shopNavHref("NG", false)).toBe("https://shop.bitocard.com/ng");
+    expect(await shopNavHref("NG", true)).toBe(shopHref("/ng"));
+    expect(await shopNavHref(null, false)).toBe("https://shop.bitocard.com/");
+  });
+
+  test("nothing where the shopper's market has no Shop, none is open, or on a reseller's store", async () => {
+    vi.stubGlobal("fetch", api());
+    expect(await shopNavHref("GH", false)).toBeNull();
+    vi.stubGlobal("fetch", api([]));
+    expect(await shopNavHref(null, false)).toBeNull();
+    setRequest({ host: "acme.bitocard.com" });
+    vi.stubGlobal("fetch", api());
+    expect(await shopNavHref("NG", false)).toBeNull();
   });
 });

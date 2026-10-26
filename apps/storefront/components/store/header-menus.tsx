@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, Coins, LayoutGrid, Menu, MonitorSmartphone, Phone, ShieldCheck, Sparkles, Store, X, type LucideIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Coins, LayoutGrid, Menu, MonitorSmartphone, Phone, ShieldCheck, ShoppingBag, Sparkles, Store, X, type LucideIcon } from "lucide-react";
 import type { StoreNavigationGroup } from "@bitocard/api-client/storefront";
 import { CategoryIcon, GroupIcon } from "./category-icon";
 
@@ -132,17 +132,36 @@ function CatalogMenu({ groups }: { groups: StoreNavigationGroup[] }) {
   );
 }
 
-/** `links`: the quick links this store shows (`quickLinksFor`); every one when not given. */
-export function DesktopNav({ groups, links }: { groups: StoreNavigationGroup[]; links?: string[] }) {
+type QuickLink = { href: string; label: string; icon: LucideIcon; external?: boolean };
+
+/**
+ * The quick links shown, BitoCard Shop's first where it is given (`shop`: its address, from `shopNavHref`). The Shop is
+ * another site, reached through the sign-in handoff when signed in, so it is a plain link: a prefetch of the handoff
+ * would make a sign-in code nobody asked for.
+ */
+function linksShown(links: string[] | undefined, shop: string | null | undefined): QuickLink[] {
   const shown = links ? quickLinks.filter(link => links.includes(link.href)) : quickLinks;
+  return shop ? [{ href: shop, label: "Shop", icon: ShoppingBag, external: true }, ...shown] : shown;
+}
+
+/** `links`: the quick links this store shows (`quickLinksFor`); every one when not given. `shop`: BitoCard Shop's address. */
+export function DesktopNav({ groups, links, shop }: { groups: StoreNavigationGroup[]; links?: string[]; shop?: string | null }) {
+  const shown = linksShown(links, shop);
+  const style = "flex min-h-11 items-center rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-navy-900 hover:bg-slate-50";
   return (
     <nav aria-label="Categories" className="hidden items-center gap-0.5 xl:flex">
       {groups.length ? <CatalogMenu groups={groups} /> : null}
-      {shown.map(link => (
-        <Link key={link.href} href={link.href} className="flex min-h-11 items-center rounded-lg px-2.5 text-[15px] font-medium whitespace-nowrap text-navy-900 hover:bg-slate-50">
-          {link.label}
-        </Link>
-      ))}
+      {shown.map(link =>
+        link.external ? (
+          <a key={link.href} href={link.href} className={style}>
+            {link.label}
+          </a>
+        ) : (
+          <Link key={link.href} href={link.href} className={style}>
+            {link.label}
+          </Link>
+        ),
+      )}
     </nav>
   );
 }
@@ -151,8 +170,8 @@ export function DesktopNav({ groups, links }: { groups: StoreNavigationGroup[]; 
  * Phones and tablets: the menu in a drawer, rendered into <body>: the sticky header's backdrop blur makes the header
  * the containing block of fixed elements inside it, which clipped the drawer to the header's height.
  */
-export function MobileMenu({ groups, signedIn = false, reseller = true, links }: { groups: StoreNavigationGroup[]; signedIn?: boolean; reseller?: boolean; links?: string[] }) {
-  const shown = links ? quickLinks.filter(link => links.includes(link.href)) : quickLinks;
+export function MobileMenu({ groups, signedIn = false, reseller = true, links, shop }: { groups: StoreNavigationGroup[]; signedIn?: boolean; reseller?: boolean; links?: string[]; shop?: string | null }) {
+  const shown = linksShown(links, shop);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -189,14 +208,28 @@ export function MobileMenu({ groups, signedIn = false, reseller = true, links }:
                 <nav aria-label="Categories" className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-5 py-4">
                   {shown.length ? (
                   <ul className="grid grid-cols-3 gap-2 border-b border-slate-100 pb-4">
-                    {shown.map(link => (
-                      <li key={link.href}>
-                        <Link href={link.href} onClick={() => setOpen(false)} className="flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 text-center text-xs font-semibold text-navy-900 hover:bg-slate-100">
+                    {shown.map(link => {
+                      const tile = "flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl bg-slate-50 px-1 text-center text-xs font-semibold text-navy-900 hover:bg-slate-100";
+                      const inner = (
+                        <>
                           <link.icon className="size-5 text-brand-500" aria-hidden="true" />
                           {link.label}
-                        </Link>
-                      </li>
-                    ))}
+                        </>
+                      );
+                      return (
+                        <li key={link.href}>
+                          {link.external ? (
+                            <a href={link.href} className={tile}>
+                              {inner}
+                            </a>
+                          ) : (
+                            <Link href={link.href} onClick={() => setOpen(false)} className={tile}>
+                              {inner}
+                            </Link>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                   ) : null}
                   {groups.length ? <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Products</p> : null}

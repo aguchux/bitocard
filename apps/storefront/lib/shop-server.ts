@@ -48,6 +48,21 @@ export async function shopBandFor(country: string | null) {
   }
 }
 
+/**
+ * BitoCard Shop in the header's menu: on BitoCard's own sites, while the Shop is open somewhere. It opens the shopper's
+ * market where the Shop is open there, BitoCard Shop's home when they have not chosen one, and nothing where their
+ * market has no Shop yet. Signed in, through the sign-in handoff; signed out, straight there.
+ */
+export async function shopNavHref(market: string | null, signedIn: boolean) {
+  if (!(await onHouseSite())) return null;
+  const markets = await shopMarkets();
+  if (!markets.length) return null;
+  const open = market ? markets.find(item => item.country === market) : null;
+  if (market && !open) return null;
+  const path = open ? `/${open.country.toLowerCase()}` : "/";
+  return signedIn ? shopHref(path) : `${shopOrigin()}${path}`;
+}
+
 /** A page on shop.bitocard.com, reached through the sign-in handoff so the customer arrives signed in there too. */
 export function shopHref(path: string) {
   return `/handoff/go?to=${encodeURIComponent(shopOrigin())}&next=${encodeURIComponent(path)}`;
