@@ -1,21 +1,65 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { ArrowRight, CheckCircle2, Circle, Clock, ReceiptText, Store as StoreIcon, Wallet as WalletIcon, PiggyBank } from "lucide-react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { ArrowRight, CheckCircle2, Circle, Clock, ReceiptText, Store as StoreIcon, Wallet as WalletIcon, PiggyBank, X } from "lucide-react";
 import { useAccountVerificationQuery, useResellerOrdersInfiniteQuery, useStoresQuery, useWalletQuery } from "@bitocard/api-client/reseller";
-import { Card, CardHeader, DataTable, errorMessage, formatMoney, formatRelative, PageHeader, StatCard, StatusBadge } from "@bitocard/admin-ui";
+import { Button, Card, CardHeader, DataTable, errorMessage, formatMoney, formatRelative, PageHeader, StatCard, StatusBadge } from "@bitocard/admin-ui";
 import { AppLink } from "@bitocard/admin-ui/shell";
 import { ShqShell } from "@/components/shq-shell";
 import { can, useReseller } from "@/components/reseller";
 
-type Step = { done: boolean; title: string; detail: string; href: string; action: string };
+type Step = { id: string; done: boolean; title: string; detail: string; href: string; action: string };
 
-function Checklist({ steps }: { steps: Step[] }) {
-  const remaining = steps.filter(step => !step.done).length;
-  if (!remaining) return null;
+const dismissKey = (resellerId: string) => `shq.checklist.dismissed.${resellerId}`;
+const dismissedHere = (resellerId: string) => {
+  try {
+    return window.localStorage.getItem(dismissKey(resellerId)) === "1";
+  } catch {
+    return false;
+  }
+};
+// Another tab dismissing it hides it here too.
+const onStorage = (changed: () => void) => {
+  window.addEventListener("storage", changed);
+  return () => window.removeEventListener("storage", changed);
+};
+
+/**
+ * What is left to set up. Once funding the wallet is the only step left, the reseller may hide the list: it is
+ * remembered in this browser for the account, and comes back if another step needs doing again.
+ */
+function Checklist({ steps, resellerId }: { steps: Step[]; resellerId: string }) {
+  const left = steps.filter(step => !step.done);
+  const onlyFunding = left.length === 1 && left[0].id === "fund";
+  // Null on the server, so a list this browser hid never flashes before the choice is read.
+  const remembered = useSyncExternalStore(
+    onStorage,
+    () => dismissedHere(resellerId),
+    () => null,
+  );
+  const [hidden, setHidden] = useState(false);
+  if (!left.length || (onlyFunding && (hidden || remembered !== false))) return null;
+  const dismiss = () => {
+    try {
+      window.localStorage.setItem(dismissKey(resellerId), "1");
+    } catch {
+      /* hidden for this visit only */
+    }
+    setHidden(true);
+  };
   return (
     <Card>
-      <CardHeader title="Get set up" description={`${steps.length - remaining} of ${steps.length} done. Store setup takes about five minutes; verification and funding can take longer.`} />
+      <CardHeader
+        title="Get set up"
+        description={`${steps.length - left.length} of ${steps.length} done. Store setup takes about five minutes; verification and funding can take longer.`}
+        actions={
+          onlyFunding ? (
+            <Button variant="ghost" size="sm" icon={<X className="size-4" aria-hidden />} onClick={dismiss} aria-label="Dismiss the set-up checklist">
+              Dismiss
+            </Button>
+          ) : null
+        }
+      />
       <ol className="divide-y divide-line">
         {steps.map(step => (
           <li key={step.title} className="flex flex-wrap items-center gap-3 px-5 py-4 sm:flex-nowrap">
@@ -59,18 +103,19 @@ export default function HomePage() {
     // Accounts opened before onboarding asked for the country (sign-up and onboarding ask for it now).
     ...(membership.reseller.country
       ? []
-      : [{ done: false, title: "Choose your business country", detail: "You sell in its currency. It is needed before anything else.", href: "/settings", action: "Choose" }]),
+      : [{ id: "country", done: false, title: "Choose your business country", detail: "You sell in its currency. It is needed before anything else.", href: "/settings", action: "Choose" }]),
     {
+      id: "verify",
       done: membership.reseller.status === "active" || Boolean(verification.data?.verified),
       title: "Verify your identity",
       detail: "A quick ID and face check. Live orders and the startup allowance need it.",
       href: "/settings/verification",
       action: "Start",
     },
-    { done: Boolean(store), title: "Create your store", detail: "Choose a template, its design and colours, and your bitocard.com address.", href: store ? "/store" : "/store/new", action: "Create" },
-    { done: store?.status === "published", title: "Publish your store", detail: "Customers can find it once it is published.", href: store ? `/store/${store.id}` : "/store", action: "Publish" },
+    { id: "store", done: Boolean(store), title: "Create your store", detail: "Choose a template, its design and colours, and your bitocard.com address.", href: store ? "/store" : "/store/new", action: "Create" },
+    { id: "publish", done: store?.status === "published", title: "Publish your store", detail: "Customers can find it once it is published.", href: store ? `/store/${store.id}` : "/store", action: "Publish" },
     ...(seesWallet
-      ? [{ done: Boolean(wallet.data && (wallet.data.available > 0 || wallet.data.reserved > 0)), title: "Fund your wallet", detail: "Your wallet pays BitoCard's wholesale cost for each order.", href: "/wallet/top-ups", action: "Top up" }]
+      ? [{ id: "fund", done: Boolean(wallet.data && (wallet.data.available > 0 || wallet.data.reserved > 0)), title: "Fund your wallet", detail: "Your wallet pays BitoCard's wholesale cost for each order.", href: "/wallet/top-ups", action: "Top up" }]
       : []),
   ];
 
@@ -81,7 +126,7 @@ export default function HomePage() {
         description={`${membership.reseller.name}${mode === "test" ? " · Sandbox figures" : ""}`}
       />
 
-      {verification.isLoading || stores.isLoading ? null : <Checklist steps={steps} />}
+      {verification.isLoading || stores.isLoading ? null : <Checklist steps={steps} resellerId={membership.reseller.id} />}
 
       {seesWallet ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

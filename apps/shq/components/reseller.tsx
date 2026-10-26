@@ -17,6 +17,7 @@ import {
   useVerifyEmailMutation,
 } from "@bitocard/api-client/reseller";
 import { Button, Card, CodeInput, ErrorState, errorMessage, Field, Input, Notice, Select, Skeleton } from "@bitocard/admin-ui";
+import { PhoneInput } from "@bitocard/ui/phone-input";
 import { TwoStepSignIn } from "./two-step";
 
 const resellerKey = "shq-reseller";
@@ -155,11 +156,15 @@ function Onboarding({ user }: { user: User }) {
   const open = countries.data?.data.filter(item => item.reseller_signup) ?? [];
   const [business, setBusiness] = useState("");
   const [country, setCountry] = useState("");
+  // The owner's mobile number in E.164 (null until valid for the country); kept unconfirmed for BitoCard's operations.
+  const [phone, setPhone] = useState<string | null>(null);
   const [create, state] = useCreateResellerAccountMutation();
   const submit = (event: FormEvent) => {
     event.preventDefault();
     // The session refetches and the gate opens the new account.
-    void create({ business_name: business.trim(), country }).unwrap().catch(() => null);
+    void create({ business_name: business.trim(), country, ...(phone ? { phone } : {}) })
+      .unwrap()
+      .catch(() => null);
   };
   return (
     <Centered>
@@ -170,7 +175,7 @@ function Onboarding({ user }: { user: User }) {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink">Set up your business</h1>
           <p className="mt-1 text-sm text-muted">
-            Welcome, {user.name.trim().split(/\s+/)[0]}. Name your business and choose its country to open your reseller account.
+            Welcome, {user.name.trim().split(/\s+/)[0]}. Name your business, choose its country and give us your mobile number to open your reseller account.
           </p>
         </div>
         {state.error ? <Notice tone="red">{errorMessage(state.error)}</Notice> : null}
@@ -182,7 +187,16 @@ function Onboarding({ user }: { user: User }) {
             {countries.isLoading ? (
               <Skeleton className="h-11 w-full" />
             ) : (
-              <Select id="new-country" required value={country} onChange={event => setCountry(event.target.value)}>
+              <Select
+                id="new-country"
+                required
+                value={country}
+                onChange={event => {
+                  setCountry(event.target.value);
+                  // A number is checked against its country, so a new country starts it again.
+                  setPhone(null);
+                }}
+              >
                 <option value="" disabled>
                   Choose a country
                 </option>
@@ -194,8 +208,23 @@ function Onboarding({ user }: { user: User }) {
               </Select>
             )}
           </Field>
+          {country ? (
+            <div>
+              <PhoneInput
+                key={country}
+                country={country}
+                label="Your mobile number"
+                onChange={setPhone}
+                required
+                className="text-ink"
+                inputClassName="min-h-11 border border-line bg-white px-3 text-sm text-ink focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none aria-[invalid=true]:border-red-400"
+                errorClassName="text-red-700"
+              />
+              <p className="mt-1.5 text-xs text-muted">So our team can reach you about your account. It is not texted a code now.</p>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" loading={state.isLoading} disabled={!country || business.trim().length < 2}>
+            <Button type="submit" loading={state.isLoading} disabled={!country || business.trim().length < 2 || !phone}>
               Open my reseller account
             </Button>
             <Button type="button" variant="secondary" loading={signingOut} onClick={signOut}>

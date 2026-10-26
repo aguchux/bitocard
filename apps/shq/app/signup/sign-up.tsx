@@ -12,6 +12,7 @@ import {
   useVerifySignupEmailMutation,
 } from "@bitocard/api-client/reseller";
 import { AppLink } from "@bitocard/admin-ui/shell";
+import { PhoneInput } from "@bitocard/ui/phone-input";
 import { Button, CodeInput, cn, errorMessage, Notice, PasswordToggleButton, Select, Skeleton, Wordmark } from "@bitocard/admin-ui";
 import { continueWithGoogle, goNext, googleErrors, GoogleMark, IconInput, safeNext } from "../signin/sign-in";
 
@@ -58,7 +59,7 @@ function Progress({ steps, current }: { steps: Step[]; current: Step }) {
 
 /**
  * Reseller sign-up, one step at a time: (1) first name, last name and email; (2) the code emailed to confirm it, before
- * any account exists; (3) business name and country; (4) password, then the account is created already confirmed.
+ * any account exists; (3) business name, country and the owner's mobile number (kept unconfirmed); (4) password, then the account is created already confirmed.
  * With `?invitation=` it is details then password, and the account joins the inviting team (the link proves the
  * email). bitocard.com stays for retail customers, so resellers sign up only here.
  *
@@ -88,6 +89,8 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
   const [confirmed, setConfirmed] = useState<{ email: string; token: string } | null>(null);
   const [business, setBusiness] = useState("");
   const [country, setCountry] = useState("");
+  // The owner's mobile number in E.164 (null until valid for the country); kept unconfirmed for BitoCard's operations.
+  const [phone, setPhone] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [startEmail, startState] = useStartSignupEmailMutation();
@@ -145,7 +148,7 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
     const person = { name: `${firstName.trim()} ${lastName.trim()}`, email: cleanEmail, password };
     const input: SignUpInput = invitation
       ? { ...person, invitation_token: invitation }
-      : { ...person, country, business_name: business.trim(), ...(confirmed ? { signup_token: confirmed.token } : {}) };
+      : { ...person, country, business_name: business.trim(), ...(phone ? { phone } : {}), ...(confirmed ? { signup_token: confirmed.token } : {}) };
     const done = await signUp(input)
       .unwrap()
       .catch((error: unknown) => {
@@ -154,7 +157,7 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
         if (errorCode === "signup_token_invalid") {
           setConfirmed(null);
           go("details", "Your email confirmation expired. Continue to get a new code.");
-        } else if (param === "country" || param === "business_name") go("business");
+        } else if (param === "country" || param === "business_name" || param === "phone") go("business");
         else if (param === "email" || param === "name") go("details");
         return null;
       });
@@ -309,7 +312,17 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
               ) : countries.error ? (
                 <Notice tone="red">{errorMessage(countries.error, "Could not load countries. Reload the page to try again.")}</Notice>
               ) : (
-                <Select id="country" required value={country} onChange={event => setCountry(event.target.value)} className="min-h-14 rounded-lg text-base">
+                <Select
+                  id="country"
+                  required
+                  value={country}
+                  onChange={event => {
+                    setCountry(event.target.value);
+                    // A number is checked against its country, so a new country starts it again.
+                    setPhone(null);
+                  }}
+                  className="min-h-14 rounded-lg text-base"
+                >
                   <option value="" disabled>
                     Choose a country
                   </option>
@@ -322,7 +335,23 @@ export function SignUp({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl:
               )}
               <p className="mt-1.5 text-xs text-muted">You sell in its currency. Sign-up is open in these countries for now.</p>
             </div>
-            <Button type="submit" className="min-h-12 w-full text-base" disabled={business.trim().length < 2 || !country}>
+            {country ? (
+              <div>
+                <PhoneInput
+                  key={country}
+                  country={country}
+                  label="Your mobile number"
+                  defaultValue={phone ?? ""}
+                  onChange={setPhone}
+                  required
+                  className="text-ink"
+                  inputClassName="min-h-14 border border-line bg-white px-3 text-base text-ink focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none aria-[invalid=true]:border-red-400"
+                  errorClassName="text-red-700"
+                />
+                <p className="mt-1.5 text-xs text-muted">So our team can reach you about your account. We do not text it a code now; add sign-in numbers later in Settings.</p>
+              </div>
+            ) : null}
+            <Button type="submit" className="min-h-12 w-full text-base" disabled={business.trim().length < 2 || !country || !phone}>
               Continue
             </Button>
             {back("details")}

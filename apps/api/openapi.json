@@ -45308,6 +45308,13 @@
             "type": "string",
             "description": "From `POST /v1/auth/signup/email/verify`: the email is already confirmed, so no code is emailed afterwards. Must belong to `email`; used once."
           },
+          "phone": {
+            "type": "string",
+            "description": "The owner's mobile number, from the business country (with or without its country code). Kept for BitoCard's operations to reach you; it is not confirmed and does not sign in (add sign-in numbers in Settings > Profile). Ignored with an invitation.",
+            "minLength": 5,
+            "maxLength": 20,
+            "example": "+2348031234567"
+          },
           "invitation_token": {
             "type": "string",
             "description": "Join a reseller's team from an invitation link, instead of creating a reseller account."
@@ -45334,6 +45341,13 @@
             "description": "Country the business operates in (ISO 3166-1 alpha-2). During the pilot: NG, GH or KE.",
             "pattern": "^[A-Z]{2}$",
             "example": "NG"
+          },
+          "phone": {
+            "type": "string",
+            "description": "The owner's mobile number, from the business country (with or without its country code). Kept for BitoCard's operations to reach you; it is not confirmed and does not sign in (add sign-in numbers in Settings > Profile). Ignored with an invitation.",
+            "minLength": 5,
+            "maxLength": 20,
+            "example": "+2348031234567"
           }
         },
         "required": [

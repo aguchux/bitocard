@@ -138,11 +138,13 @@ export type ResellerDetail = {
   status: ResellerStatus;
   verified_at: string | null;
   verified_name: string | null;
+  /** The mobile number the owner gave when opening the account (E.164), never confirmed; null when none. Missing on older API versions. */
+  signup_phone?: string | null;
   /** An admin let the reseller go live without the identity check: who, when and why. */
   identity_waiver: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
   plan: Plan;
-  /** `two_step`: the member's two-step sign-in method, or null when off. Missing on older API versions. */
-  members: Array<{ user_id: string; name: string; email: string | null; role: string; two_step?: TwoStepMethod | null }>;
+  /** `two_step`: the member's two-step sign-in method, or null when off; `phone`: their confirmed primary mobile number. Missing on older API versions. */
+  members: Array<{ user_id: string; name: string; email: string | null; role: string; two_step?: TwoStepMethod | null; phone?: string | null }>;
   stores: Array<{ id: string; name: string; subdomain: string; status: string }>;
   options: Record<string, { value: string; allowed: string[] } | unknown>;
   features: Record<string, boolean>;

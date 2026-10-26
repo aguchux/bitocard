@@ -166,6 +166,19 @@ export default function ResellerPage() {
                       ),
                     },
                     { label: "Country", value: reseller.country ?? "—" },
+                    {
+                      label: "Phone at sign-up",
+                      value: reseller.signup_phone ? (
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          <a href={`tel:${reseller.signup_phone}`} className="font-medium text-blue-600 hover:underline">
+                            {reseller.signup_phone}
+                          </a>
+                          <Badge tone="grey">Not confirmed</Badge>
+                        </span>
+                      ) : (
+                        "—"
+                      ),
+                    },
                     { label: "Reseller ID", value: <code className="font-mono text-xs">{reseller.id}</code> },
                   ]}
                 />
@@ -212,6 +225,7 @@ export default function ResellerPage() {
                     <div className="min-w-0">
                       <p className="truncate font-medium">{member.name}</p>
                       <p className="truncate text-xs text-muted">{member.email ?? "—"}</p>
+                      {member.phone ? <p className="truncate text-xs text-muted">{member.phone}</p> : null}
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                       {member.two_step !== undefined ? <Badge tone={member.two_step ? "green" : "grey"}>{member.two_step ? `Two-step: ${twoStepNames[member.two_step]}` : "Two-step off"}</Badge> : null}

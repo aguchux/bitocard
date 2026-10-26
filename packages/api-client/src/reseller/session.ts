@@ -57,9 +57,12 @@ export type Notice = { object: 'notice'; message: string };
 /** One of a person's email addresses. Exactly one is primary: it signs in and gets notices, and cannot be removed. */
 export type UserEmail = { object: 'user_email'; email: string; primary: boolean; verified: boolean; added_at: string };
 export type UserPhone = { object: 'user_phone'; phone: string; primary: boolean; verified: boolean; added_at: string };
-/** `country` and `business_name` open a reseller account; `invitation_token` joins the inviting team instead. */
+/**
+ * `country` and `business_name` open a reseller account (with the owner's `phone`, a mobile number of that country, kept
+ * unconfirmed); `invitation_token` joins the inviting team instead.
+ */
 export type SignUpInput = { name: string; email: string; password: string } & (
-  | { country: string; business_name?: string; signup_token?: string }
+  | { country: string; business_name?: string; phone?: string; signup_token?: string }
   | { invitation_token: string }
 );
 /** From confirming the sign-up code: pass `signup_token` to sign-up with the same email (one hour, once). */
@@ -76,7 +79,7 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     /** Creates the person and, without an invitation, their reseller account (they own it); signs them in. A code is emailed to confirm the address. */
     signUp: build.mutation<Session, SignUpInput>({ query: body => ({ url: '/v1/auth/signup', method: 'POST', body }), invalidatesTags: ['Session'] }),
     /** A signed-in person with a confirmed email opens their own reseller account (one owned account each). */
-    createResellerAccount: build.mutation<Session, { business_name: string; country: string }>({
+    createResellerAccount: build.mutation<Session, { business_name: string; country: string; phone?: string }>({
       query: body => ({ url: '/v1/auth/reseller-account', method: 'POST', body }),
       invalidatesTags: ['Session'],
     }),

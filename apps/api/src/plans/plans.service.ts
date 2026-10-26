@@ -334,13 +334,15 @@ export class PlansService {
       status: reseller.status,
       verified_at: reseller.verifiedAt?.toISOString() ?? null,
       verified_name: reseller.verifiedName,
+      /** The mobile number the owner gave when opening the account (E.164), never confirmed. Null when none was given. */
+      signup_phone: reseller.signupPhone,
       /** An admin let the reseller go live without the identity check: who, when and why. Null when not waived. */
       identity_waiver: reseller.identityWaivedAt
         ? { waived_at: reseller.identityWaivedAt.toISOString(), waived_by: waivedBy ? { id: waivedBy.id, name: waivedBy.name } : null, reason: reseller.identityWaiverReason }
         : null,
       plan: presentPlan(reseller.plan),
-      /** `two_step`: the member's two-step sign-in method, or null when it is off. */
-      members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role, two_step: m.user.mfaMethod })),
+      /** `two_step`: the member's two-step sign-in method, or null when it is off. `phone`: their confirmed primary mobile number, or null. */
+      members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role, two_step: m.user.mfaMethod, phone: m.user.phoneVerifiedAt ? m.user.phone : null })),
       stores: reseller.stores.map(s => ({ id: s.id, name: s.name, subdomain: s.subdomain, status: s.status })),
       options: await this.settings.effectiveOptions(reseller.id),
       features: await this.settings.switchesFor(reseller.id),

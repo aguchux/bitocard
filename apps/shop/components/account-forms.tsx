@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { type FormState, resendCode, signIn, verifyEmail } from "@/lib/account-actions";
 
 const empty: FormState = {};
@@ -32,14 +33,33 @@ export function SignInForm({ next }: { next: string }) {
         Email
         <input name="email" type="email" autoComplete="email" required aria-invalid={state.field === "email" || undefined} className={field} />
       </label>
-      <label className="grid gap-1.5 text-sm font-semibold">
-        Password
-        <input name="password" type="password" autoComplete="current-password" required aria-invalid={state.field === "password" || undefined} className={field} />
-      </label>
+      <PasswordField invalid={state.field === "password"} />
       <button type="submit" disabled={pending} className="h-12 rounded-2xl bg-navy-900 font-bold text-white hover:bg-navy-800 disabled:opacity-60">
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>
+  );
+}
+
+/** The password, with a button to show or hide what was typed. */
+function PasswordField({ invalid }: { invalid: boolean }) {
+  const [show, setShow] = useState(false);
+  return (
+    <label className="grid gap-1.5 text-sm font-semibold">
+      Password
+      <span className="relative">
+        <input name="password" type={show ? "text" : "password"} autoComplete="current-password" required aria-invalid={invalid || undefined} className={`${field} pr-12`} />
+        <button
+          type="button"
+          onClick={() => setShow(value => !value)}
+          aria-label={show ? "Hide password" : "Show password"}
+          aria-pressed={show}
+          className="absolute top-1/2 right-1 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-navy-400 hover:bg-navy-50 hover:text-navy-900"
+        >
+          {show ? <EyeOff className="size-5" aria-hidden="true" /> : <Eye className="size-5" aria-hidden="true" />}
+        </button>
+      </span>
+    </label>
   );
 }
 

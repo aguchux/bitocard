@@ -13,6 +13,13 @@ const passwordDoc = {
   maxLength: passwordLength.max,
   example: 'correct horse battery',
 };
+const signupPhoneDoc = {
+  description:
+    "The owner's mobile number, from the business country (with or without its country code). Kept for BitoCard's operations to reach you; it is not confirmed and does not sign in (add sign-in numbers in Settings > Profile). Ignored with an invitation.",
+  minLength: 5,
+  maxLength: 20,
+  example: '+2348031234567',
+};
 const codeDoc = { description: 'The 6-digit code that was sent to you.', pattern: '^\\d{6}$', example: '482913' };
 
 export class SignUpDto {
@@ -59,6 +66,13 @@ export class SignUpDto {
   @Length(20, 100)
   signup_token?: string;
 
+  @ApiPropertyOptional(signupPhoneDoc)
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(5, 20)
+  phone?: string;
+
   @ApiPropertyOptional({ description: "Join a reseller's team from an invitation link, instead of creating a reseller account." })
   @IsOptional()
   @IsString()
@@ -79,6 +93,13 @@ export class CreateResellerAccountDto {
   @IsString()
   @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter country code' })
   country: string;
+
+  @ApiPropertyOptional(signupPhoneDoc)
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Length(5, 20)
+  phone?: string;
 }
 
 export class SignInDto {

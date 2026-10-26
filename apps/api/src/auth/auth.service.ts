@@ -86,6 +86,8 @@ export class AuthService {
   async signUp(input: SignUpDto, req: Request, res: Response) {
     const invitation = input.invitation_token ? await this.team.findValid(input.invitation_token, input.email) : null;
     if (!invitation) await this.countries.assertSignupOpen(input.country ?? '');
+    // The owner's mobile number, from the business country; kept unconfirmed for BitoCard's operations (never signs in).
+    const signupPhone = !invitation && input.phone ? normalisePhone(input.phone, input.country ?? null) : null;
     await this.passwords.assertAcceptable(input.password);
     if (await this.emailTaken(input.email)) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'email_in_use', 'An account already uses this email. Sign in instead.', 'email');
@@ -108,7 +110,7 @@ export class AuthService {
         const created = await tx.user.create({
           data: { realm: 'reseller', email: input.email, name: input.name, passwordHash, emailVerifiedAt: input.signup_token ? new Date() : null },
         });
-        const reseller = await tx.reseller.create({ data: { name: input.business_name ?? input.name, country: input.country } });
+        const reseller = await tx.reseller.create({ data: { name: input.business_name ?? input.name, country: input.country, signupPhone } });
         await tx.resellerMember.create({ data: { resellerId: reseller.id, userId: created.id, role: 'owner' } });
         openedReseller = reseller;
         return created;
@@ -142,13 +144,14 @@ export class AuthService {
       throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'email_unverified', 'Confirm your email before opening a reseller account.');
     }
     await this.countries.assertSignupOpen(input.country);
+    const signupPhone = input.phone ? normalisePhone(input.phone, input.country) : null;
     const opened = await this.prisma.$transaction(async tx => {
       // Locks the person's row, so two requests at once cannot both open an account.
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
       if (await tx.resellerMember.findFirst({ where: { userId, role: 'owner' } })) {
         throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_owner', 'You already own a reseller account.');
       }
-      const reseller = await tx.reseller.create({ data: { name: input.business_name, country: input.country } });
+      const reseller = await tx.reseller.create({ data: { name: input.business_name, country: input.country, signupPhone } });
       await tx.resellerMember.create({ data: { resellerId: reseller.id, userId, role: 'owner' } });
       return reseller;
     });
