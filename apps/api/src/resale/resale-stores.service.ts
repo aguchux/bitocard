@@ -404,6 +404,8 @@ export class ResaleStoresService {
       price: Number(price),
       price_range: { min: Number(sums.range.min), max: Number(sums.range.max) },
       discount_bps: terms.discountBps,
+      floor_bps: terms.floorBps,
+      markup_max_bps: terms.markupMaxBps,
       deal_id: deal?.id ?? null,
       margin: Number(sums.margin),
       reseller_fee: Number(sums.resellerFee),

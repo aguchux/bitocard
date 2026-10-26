@@ -33493,6 +33493,8 @@
                         "max": 32500000
                       },
                       "discount_bps": 1000,
+                      "floor_bps": 0,
+                      "markup_max_bps": 3000,
                       "deal_id": null,
                       "margin": 6250000,
                       "reseller_fee": 187500,
@@ -33654,6 +33656,8 @@
                     "max": 32500000
                   },
                   "discount_bps": 1000,
+                  "floor_bps": 0,
+                  "markup_max_bps": 3000,
                   "deal_id": null,
                   "margin": 6250000,
                   "reseller_fee": 187500,
@@ -33813,6 +33817,8 @@
                     "max": 32500000
                   },
                   "discount_bps": 1000,
+                  "floor_bps": 0,
+                  "markup_max_bps": 3000,
                   "deal_id": null,
                   "margin": 6250000,
                   "reseller_fee": 187500,
@@ -33996,6 +34002,8 @@
                     "max": 32500000
                   },
                   "discount_bps": 1000,
+                  "floor_bps": 0,
+                  "markup_max_bps": 3000,
                   "deal_id": null,
                   "margin": 7500000,
                   "reseller_fee": 225000,
@@ -34346,6 +34354,8 @@
                     "max": 32500000
                   },
                   "discount_bps": 1000,
+                  "floor_bps": 0,
+                  "markup_max_bps": 3000,
                   "deal_id": null,
                   "margin": 6250000,
                   "reseller_fee": 187500,
@@ -34527,6 +34537,8 @@
                     "max": 32500000
                   },
                   "discount_bps": 1000,
+                  "floor_bps": 0,
+                  "markup_max_bps": 3000,
                   "deal_id": null,
                   "margin": 6250000,
                   "reseller_fee": 187500,
@@ -62222,6 +62234,8 @@
           "price",
           "price_range",
           "discount_bps",
+          "floor_bps",
+          "markup_max_bps",
           "deal_id",
           "margin",
           "reseller_fee",
@@ -62374,6 +62388,14 @@
           "discount_bps": {
             "type": "integer",
             "description": "Your discount off the supplier’s price, in basis points (100 = 1%)."
+          },
+          "floor_bps": {
+            "type": "integer",
+            "description": "How far below the supplier’s price your deal lets you sell (0 without one), in basis points (100 = 1%)."
+          },
+          "markup_max_bps": {
+            "type": "integer",
+            "description": "How far above the supplier’s price you may sell, in basis points (100 = 1%)."
           },
           "deal_id": {
             "type": [

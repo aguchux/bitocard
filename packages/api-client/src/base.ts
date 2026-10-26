@@ -193,6 +193,9 @@ export const tagTypes = [
   'ClassifiedCategory',
   'ClassifiedOrder',
   'ClassifiedSettings',
+  'ResaleListing',
+  'ResaleRule',
+  'ResaleSupplier',
 ] as const;
 
 /**
