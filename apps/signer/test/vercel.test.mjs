@@ -101,12 +101,13 @@ describe('several instances at once (Postgres)', { skip: !database && 'set SIGNE
 });
 
 describe('vercel.json', () => {
-  test('publishes an empty folder (functions only), routes everything to the request function, runs the worker each minute', async () => {
+  test('publishes only robots.txt (functions only), routes everything to the request function, runs the worker each minute', async () => {
     const { readFile } = await import('node:fs/promises');
     const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-    // Vercel needs an output folder after the build; the signer has no static files, so the build makes an empty one.
+    // Vercel refuses a missing or empty output folder, and the signer has no other static files.
     assert.equal(config.outputDirectory, 'public');
-    assert.match(config.buildCommand, /&& mkdir -p apps\/signer\/public$/);
+    assert.equal(await readFile(new URL('../public/robots.txt', import.meta.url), 'utf8'), 'User-agent: *\nDisallow: /\n');
+    assert.equal(config.buildCommand, 'cd ../.. && npx turbo run build --filter=@bitocard/signer');
     assert.deepEqual(Object.keys(config.functions).sort(), ['api/index.mjs', 'api/worker.mjs']);
     assert.deepEqual(config.rewrites, [{ source: '/((?!api/worker).*)', destination: '/api/index' }]);
     assert.deepEqual(config.crons, [{ path: '/api/worker', schedule: '* * * * *' }]);

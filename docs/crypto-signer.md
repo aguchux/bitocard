@@ -221,7 +221,8 @@ live stores and a `testnet` one for sandbox stores. Settings are environment var
 5. **Limits** for every coin and token, then deploy: a Vercel project (Root Directory `apps/signer`) in its own team
    with a Neon database and the settings as encrypted environment variables, plus `CRON_SECRET` (at least 16
    characters; Vercel Cron sends it). The team needs a plan whose cron jobs may run every minute (Pro): Hobby allows
-   one a day. The signer has no static files, so its build publishes an empty `public` folder (`vercel.json`). Give the
+   one a day. The signer has no static files, and Vercel refuses a missing or empty output folder, so `public` holds only a
+   `robots.txt` refusing crawlers (`vercel.json`). Give the
    project its own address on a custom domain, for example `signer.bitocard.com` (Cloudflare: a DNS-only CNAME to
    `cname.vercel-dns.com`, plus the TXT record Vercel asks for to verify `bitocard.com` in this team): Vercel
    Authentication covers its `*.vercel.app` addresses, so the API reaches only the custom domain. Every request and
