@@ -16,6 +16,7 @@ import { SessionsService } from './sessions.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
 import type { CreateResellerAccountDto, SignUpDto } from './auth.dto.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { TwoStepService } from './two-step.service.js';
 
 export const lockout = { maxFailures: 5, durationMs: 15 * 60 * 1000 };
 
@@ -79,6 +80,7 @@ export class AuthService {
     private readonly countries: CountriesService,
     private readonly signupVerification: SignupVerificationService,
     private readonly inbox: InboxService,
+    private readonly twoStep: TwoStepService,
   ) {}
 
   async signUp(input: SignUpDto, req: Request, res: Response) {
@@ -129,8 +131,8 @@ export class AuthService {
     if (openedReseller) await this.newReseller(openedReseller);
     // A delivery problem must not lose the new account: the person can ask for another code.
     if (!user.emailVerifiedAt) await this.sendVerification(user).catch(error => this.logger.error({ err: error }, 'Could not send the sign-up confirmation code'));
-    await this.sessions.create(user.id, 'reseller', req, res);
-    return this.describe(user.id);
+    const session = await this.sessions.create(user.id, 'reseller', req, res);
+    return this.describe(user.id, session.id);
   }
 
   /** A signed-in person with a confirmed email opens their own reseller account; one owned account per person. */
@@ -185,16 +187,19 @@ export class AuthService {
     }
 
     await this.prisma.user.update({ where: { id: user.id }, data: { failedSignIns: 0, lockedUntil: null, lastSignInAt: new Date() } });
-    await this.sessions.create(user.id, 'reseller', req, res);
-    return this.describe(user.id);
+    // With two-step sign-in on (or required), the session waits for the second step (`two_step.pending`).
+    const session = await this.sessions.create(user.id, 'reseller', req, res);
+    return this.describe(user.id, session.id);
   }
 
-  async describe(userId: string) {
+  /** The person and their accounts; with the session, whether it still has to finish two-step sign-in. */
+  async describe(userId: string, sessionId: string | null = null) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: { memberships: { include: { reseller: true }, orderBy: { createdAt: 'asc' } } },
     });
-    return { object: 'session' as const, user: presentUser(user), memberships: user.memberships.map(presentMembership) };
+    const { pending, setup_required, method } = await this.twoStep.state(userId, sessionId);
+    return { object: 'session' as const, user: presentUser(user), memberships: user.memberships.map(presentMembership), two_step: { pending, setup_required, method } };
   }
 
   async resellerCountry(resellerId: string) {

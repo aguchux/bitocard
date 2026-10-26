@@ -12,6 +12,7 @@ import type {
   Country,
   FeatureRule,
   IdentityProvider,
+  TwoStepMethod,
   Integration,
   IntegrationTest,
   List,
@@ -116,6 +117,11 @@ export const adminApi = bitocardApi.injectEndpoints({
     unsuspendReseller: build.mutation<ResellerDetail, { id: string; reason: string }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/resellers/${id}/unsuspend`, method: 'POST', body }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, { type: 'Reseller', id: 'LIST' }, 'Overview', 'Activity'],
+    }),
+    /** Operations: turns a team member's two-step sign-in off and signs them out everywhere (a lost phone). Audited with the reason. */
+    resetMemberTwoStep: build.mutation<{ object: 'two_step_reset'; user_id: string }, { id: string; user: string; reason: string }>({
+      query: ({ id, user, ...body }) => ({ url: `/v1/admin/resellers/${id}/members/${user}/two-step/reset`, method: 'POST', body }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Reseller', id }, 'Activity'],
     }),
     resellerWallet: build.query<ResellerWallet, string>({ query: id => `/v1/admin/resellers/${id}/wallet`, providesTags: (_result, _error, id) => [{ type: 'Reseller', id }] }),
     /** Finance: grants the startup allowance (verified reseller, switch on, once only). */
@@ -332,7 +338,7 @@ export const adminApi = bitocardApi.injectEndpoints({
     /** Country-wide settings, such as who runs its identity checks (`identity_provider`). */
     updateCountry: build.mutation<
       Country,
-      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; public_spins_enabled?: boolean; public_spin_limit?: number; exchange_markup_cap_bps?: number; exchange_reserve_alert_minor?: number | null }
+      { code: string; identity_provider?: IdentityProvider; sms_provider?: 'termii' | 'africas_talking' | null; spin_daily_limit?: number; public_spins_enabled?: boolean; public_spin_limit?: number; exchange_markup_cap_bps?: number; exchange_reserve_alert_minor?: number | null; reseller_two_step_methods?: TwoStepMethod[] }
     >({
       query: ({ code, ...body }) => ({ url: `/v1/admin/countries/${code}`, method: 'PATCH', body }),
       invalidatesTags: ['Country', 'Activity'],
@@ -431,6 +437,7 @@ export const {
   useWaiveResellerIdentityMutation,
   useRemoveResellerIdentityWaiverMutation,
   useUnsuspendResellerMutation,
+  useResetMemberTwoStepMutation,
   usePlansQuery,
   usePlanSettingsQuery,
   useUpdatePlanMutation,

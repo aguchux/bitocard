@@ -133,6 +133,8 @@ Every supplier and vendor below gets a base adapter behind the interface for its
 | Exchange rates | Open Exchange Rates (reference rates), checked against Flutterwave's rates | MVP |
 | File storage (logos, icons, images) | DigitalOcean Spaces (US region, CDN), S3-compatible | MVP: built; needs the bucket, keys and its CORS rule |
 
+Reseller two-step sign-in (decided and built 26 October 2026 at the owner's request): every reseller person can turn on a second step after their password: an authenticator app, an emailed code or a texted code (their choice), with recovery codes. Admins can require it with the `reseller_two_step` feature switch (globally, per market or per reseller), choose per market which methods resellers there may use, and reset a team member who lost their method. Until the second step is done, a session can do nothing else.
+
 Profile phone numbers: each storefront customer can keep one verified mobile number; replacing it requires confirming the new number first. Reseller users can keep up to five verified mobile numbers, sign in with any of them, choose a primary number and remove secondary numbers. An admin chooses Termii, Africa's Talking or disabled for each country. New numbers join the profile and become usable for sign-in only after confirmation.
 
 **Pilot sourcing paths**

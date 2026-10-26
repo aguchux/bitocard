@@ -159,6 +159,7 @@ export const menus: Record<ShqSection, { title: string; items: ShqSubNavItem[] }
       { label: "Preferences", href: "/settings/preferences", icon: Bell },
       { label: "Notifications", href: "/settings/notifications", icon: BellRing },
       { label: "Your profile", href: "/settings/profile", icon: UserCog },
+      { label: "Security", href: "/settings/security", icon: KeyRound },
     ],
   },
 };

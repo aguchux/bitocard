@@ -13,11 +13,13 @@ import { GoogleService } from './google.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
 import { SessionsService } from './sessions.service.js';
+import { AdminTwoStepController, TwoStepController } from './two-step.controller.js';
+import { TwoStepService } from './two-step.service.js';
 
 @Module({
   imports: [TeamModule, CountriesModule],
-  controllers: [AuthController, GoogleController, AdminAuthController],
-  providers: [AuthService, AdminAuthService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService],
+  controllers: [AuthController, GoogleController, AdminAuthController, TwoStepController, AdminTwoStepController],
+  providers: [AuthService, AdminAuthService, GoogleService, CodesService, SignupVerificationService, PasswordsService, SessionsService, AuthGuard, DocsTokensService, TwoStepService],
   exports: [AdminAuthService, AuthGuard, SessionsService, PasswordsService, CodesService],
 })
 export class AuthModule {}

@@ -18,6 +18,8 @@ export type Caller =
       adminRoles: string[];
       /** Admin sessions: sensitive actions are allowed until then (after the authenticator code), else null. */
       stepUpUntil: Date | null;
+      /** Reseller sessions still waiting for two-step sign-in: they may only finish it (or sign out). */
+      twoStepPending?: boolean;
     }
   | {
       kind: 'api_key';
@@ -47,6 +49,7 @@ export const ROUTE_SESSION_ONLY = 'auth:session-only';
 export const ROUTE_ADMIN_ROLES = 'auth:admin-roles';
 export const ROUTE_CRON = 'auth:cron';
 export const ROUTE_STEP_UP = 'auth:step-up';
+export const ROUTE_TWO_STEP_PENDING = 'auth:two-step-pending';
 
 /** How long an admin's authenticator code opens sensitive actions for, on that session. */
 export const stepUpWindowMs = 5 * 60_000;
@@ -88,6 +91,12 @@ export function requireStepUp(caller: Caller) {
   if (caller.kind === 'session' && caller.realm === 'admin' && caller.stepUpUntil && caller.stepUpUntil > new Date()) return;
   throw new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'step_up_required', 'Enter the code from your authenticator app to continue.');
 }
+
+/**
+ * A route a reseller session may call before it finishes two-step sign-in (reading the session, signing out, the two-step
+ * steps themselves). Every other route answers `mfa_required` (401) until then.
+ */
+export const AllowTwoStepPending = () => SetMetadata(ROUTE_TWO_STEP_PENDING, true);
 
 /** API key scopes required to call the route (API keys). */
 export const Scopes = (...scopes: string[]) => applyDecorators(SetMetadata(ROUTE_SCOPES, scopes), ApiExtension('x-bitocard-scopes', scopes));

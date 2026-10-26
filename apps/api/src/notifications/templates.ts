@@ -94,6 +94,39 @@ export function passwordChangedEmail(to: string): EmailMessage {
   };
 }
 
+/** A reseller's two-step code: signing in (or confirming a change), or setting up email as their method. */
+export function twoStepCodeEmail(to: string, code: string, purpose: 'sign_in' | 'setup'): EmailMessage {
+  return {
+    to,
+    subject: `${code} is your BitoCard ${purpose === 'setup' ? 'two-step set-up' : 'sign-in'} code`,
+    ...layout(
+      purpose === 'setup' ? 'Turn on two-step sign-in' : 'Your sign-in code',
+      [
+        purpose === 'setup'
+          ? 'Enter this code in SHQ to use emailed codes for two-step sign-in. It expires in 10 minutes.'
+          : 'Enter this code in SHQ to finish signing in. It expires in 10 minutes.',
+        'Never share it. BitoCard will never ask you for it. If you did not just sign in, change your password.',
+      ],
+      code,
+    ),
+  };
+}
+
+/** Sent when a person's two-step sign-in is turned on, changed, turned off or reset by BitoCard. */
+export function twoStepChangedEmail(to: string, change: 'enabled' | 'changed' | 'disabled' | 'reset', method: string | null): EmailMessage {
+  const lines = {
+    enabled: `Two-step sign-in is now on for your BitoCard account (${method}). You will be asked for a code each time you sign in.`,
+    changed: `Your two-step sign-in method was changed to ${method}.`,
+    disabled: 'Two-step sign-in was turned off for your BitoCard account.',
+    reset: 'BitoCard support reset your two-step sign-in and signed you out everywhere. Set it up again at your next sign-in.',
+  } as const;
+  return {
+    to,
+    subject: change === 'disabled' ? 'Two-step sign-in was turned off' : change === 'reset' ? 'Your two-step sign-in was reset' : 'Two-step sign-in is on',
+    ...layout('Two-step sign-in', [lines[change], 'If this was not you, change your password and contact support@bitocard.com.']),
+  };
+}
+
 /** A set-password link for an admin (from the admin sign-in page: a first visit, or Forgot password). */
 export function adminPasswordLinkEmail(to: string, input: { name: string; kind: 'create' | 'reset'; link: string; hours: number }): EmailMessage {
   const created = input.kind === 'create';

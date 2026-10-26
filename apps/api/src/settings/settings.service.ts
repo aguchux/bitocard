@@ -102,6 +102,11 @@ export const switchDefinitions = {
     default: true,
     description: 'Resellers can choose the RDP shop store template (it sells only once RDP is on sale in their market). Stores already using it keep it. On unless switched off.',
   },
+  reseller_two_step: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "Every member of the reseller's team must use two-step sign-in in SHQ (an authenticator app, an emailed code or a text message, from the methods their market allows), setting it up at their next sign-in. Off: two-step is each person's choice.",
+  },
   manual_reseller_approval: {
     scopes: ['global', 'country'],
     description: 'Resellers who pass the identity check wait for an admin to activate them, instead of going live at once.',

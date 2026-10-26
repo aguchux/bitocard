@@ -14,7 +14,26 @@ export type User = {
 };
 export type ResellerRef = { object: 'reseller'; id: string; name: string; country: string | null; status: ResellerStatus };
 export type Membership = { object: 'membership'; role: ResellerRole; reseller: ResellerRef };
-export type Session = { object: 'session'; user: User; memberships: Membership[] };
+export type TwoStepMethod = 'authenticator' | 'email' | 'sms';
+/** Whether this session still has to finish two-step sign-in (`setup_required`: set a method up first). */
+export type SessionTwoStep = { pending: boolean; setup_required: boolean; method: TwoStepMethod | null };
+export type Session = { object: 'session'; user: User; memberships: Membership[]; two_step: SessionTwoStep };
+/** The person's two-step sign-in settings (`/v1/auth/two-step`). */
+export type TwoStepSettings = {
+  object: 'two_step';
+  method: TwoStepMethod | null;
+  enabled_at: string | null;
+  /** One of their reseller accounts requires it: it cannot be turned off. */
+  required: boolean;
+  pending: boolean;
+  setup_required: boolean;
+  /** Where emailed or texted codes go, masked. */
+  sent_to: string | null;
+  recovery_codes_left: number;
+  methods: Array<{ method: TwoStepMethod; available: boolean; reason: 'not_allowed' | 'phone_required' | 'sms_unavailable' | null }>;
+};
+export type TwoStepSetup = { object: 'two_step_setup'; method: TwoStepMethod; secret: string | null; otpauth_uri: string | null; sent_to: string | null };
+export type TwoStepChallenge = { object: 'two_step_challenge'; method: TwoStepMethod; sent: boolean; sent_to: string | null };
 export type Plan = { object: 'plan'; code: string; name: string; price: { amount: number; currency: string; interval: 'month' }; features: string[] };
 /** A plan as listed (`/v1/plans`) and on your subscription: its description, features in words and price in your currency. */
 export type PlanDetail = Plan & {
@@ -91,6 +110,22 @@ export const resellerSessionApi = bitocardApi.injectEndpoints({
     /** Removes another address; the primary one cannot be removed. */
     removeEmail: build.mutation<{ object: 'list'; data: UserEmail[] }, string>({ query: email => ({ url: `/v1/auth/emails/${encodeURIComponent(email)}`, method: 'DELETE' }), invalidatesTags: ['Email'] }),
     account: build.query<Account, void>({ query: () => '/v1/account', providesTags: ['Account'] }),
+    /** Two-step sign-in: settings, setting a method up, the code step when signing in, turning it off. */
+    twoStep: build.query<TwoStepSettings, void>({ query: () => '/v1/auth/two-step', providesTags: ['Session'] }),
+    startTwoStepSetup: build.mutation<TwoStepSetup, { method: TwoStepMethod; current_code?: string }>({ query: body => ({ url: '/v1/auth/two-step/setup', method: 'POST', body }) }),
+    confirmTwoStepSetup: build.mutation<{ object: 'two_step_enabled'; method: TwoStepMethod; recovery_codes: string[] }, { code: string }>({
+      query: body => ({ url: '/v1/auth/two-step/setup/confirm', method: 'POST', body }),
+    }),
+    sendTwoStepCode: build.mutation<TwoStepChallenge, void>({ query: () => ({ url: '/v1/auth/two-step/challenge', method: 'POST' }) }),
+    verifyTwoStep: build.mutation<{ object: 'two_step_verified'; method: TwoStepMethod; used: 'code' | 'recovery' }, { code: string }>({
+      query: body => ({ url: '/v1/auth/two-step/verify', method: 'POST', body }),
+      invalidatesTags: ['Session'],
+    }),
+    disableTwoStep: build.mutation<{ object: 'two_step_disabled' }, { code: string }>({ query: body => ({ url: '/v1/auth/two-step/disable', method: 'POST', body }), invalidatesTags: ['Session'] }),
+    newRecoveryCodes: build.mutation<{ object: 'two_step_recovery_codes'; recovery_codes: string[] }, { code: string }>({
+      query: body => ({ url: '/v1/auth/two-step/recovery-codes', method: 'POST', body }),
+      invalidatesTags: ['Session'],
+    }),
   }),
 });
 
@@ -121,4 +156,11 @@ export const {
   useConfirmEmailMutation,
   useMakePrimaryEmailMutation,
   useRemoveEmailMutation,
+  useTwoStepQuery,
+  useStartTwoStepSetupMutation,
+  useConfirmTwoStepSetupMutation,
+  useSendTwoStepCodeMutation,
+  useVerifyTwoStepMutation,
+  useDisableTwoStepMutation,
+  useNewRecoveryCodesMutation,
 } = resellerSessionApi;

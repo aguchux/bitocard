@@ -17,6 +17,7 @@ import {
   useVerifyEmailMutation,
 } from "@bitocard/api-client/reseller";
 import { Button, Card, CodeInput, ErrorState, errorMessage, Field, Input, Notice, Select, Skeleton } from "@bitocard/admin-ui";
+import { TwoStepSignIn } from "./two-step";
 
 const resellerKey = "shq-reseller";
 const modeKey = "shq-mode";
@@ -78,6 +79,19 @@ export function useSignOut() {
 
 function Centered({ children }: { children: ReactNode }) {
   return <main className="flex min-h-svh items-center justify-center bg-canvas px-4 py-10">{children}</main>;
+}
+
+/** Signed in with a password (or Google) but not yet with the second step: the code, or setting a method up. */
+function TwoStepStep() {
+  const [signOut, signingOut] = useSignOut();
+  return (
+    <Centered>
+      <Card className="w-full max-w-md p-6 sm:p-8">
+        {/* Finishing refetches the session, and the gate opens. */}
+        <TwoStepSignIn onDone={() => undefined} onSignOut={signOut} signingOut={signingOut} />
+      </Card>
+    </Centered>
+  );
 }
 
 /** A new account confirms its email before anything else (the code was emailed at sign-up). */
@@ -198,8 +212,8 @@ function Onboarding({ user }: { user: User }) {
 }
 
 /**
- * Renders its children only for a signed-in person with a confirmed email and a reseller account; otherwise sign-in,
- * email confirmation or onboarding. Chooses the reseller account (remembered in this browser) and live or
+ * Renders its children only for a signed-in person who has finished two-step sign-in (where it is on), with a confirmed
+ * email and a reseller account; otherwise sign-in, the two-step code, email confirmation or onboarding. Chooses the reseller account (remembered in this browser) and live or
  * sandbox mode, and sends both with every API request.
  */
 export function ResellerGate({ children }: { children: ReactNode }) {
@@ -268,6 +282,7 @@ export function ResellerGate({ children }: { children: ReactNode }) {
   }
   // A failed background refresh keeps the app on screen (and anything typed into it); only a first failure blocks it.
   if (!data) return <ErrorState message={errorMessage(error, "Could not check your session.")} onRetry={refetch} />;
+  if (data.two_step?.pending) return <TwoStepStep />;
   if (!data.user.email_verified) return <VerifyEmail user={data.user} />;
   if (!value) return <Onboarding user={data.user} />;
   return <ResellerContext.Provider value={value}>{children}</ResellerContext.Provider>;

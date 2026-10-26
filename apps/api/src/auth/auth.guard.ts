@@ -5,7 +5,8 @@ import { PrismaService } from '../database/prisma.service.js';
 import { sha256 } from '../common/crypto.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { Realm, ResellerRole } from '../generated/prisma/client.js';
-import { type Caller, type CallerRequest, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, requireStepUp } from './caller.js';
+import { type Caller, type CallerRequest, PUBLIC_ROUTE, ROUTE_ADMIN_ROLES, ROUTE_CRON, ROUTE_REALM, ROUTE_ROLES, ROUTE_SCOPES, ROUTE_SESSION_ONLY, ROUTE_STEP_UP, ROUTE_TWO_STEP_PENDING, requireStepUp } from './caller.js';
+import { twoStepPending } from './mfa-policy.js';
 import { freePlanCode } from '../plans/features.js';
 import { docsTokenPattern, docsTokenScopes, docsWriteRoles, readDocsToken } from './docs-tokens.js';
 import { reservedSubdomains } from '../stores/reserved.js';
@@ -66,6 +67,16 @@ export class AuthGuard implements CanActivate {
       if (!origin || !originAllowed(origin, this.config.ALLOWED_ORIGINS)) {
         throw forbidden('This request must come from a BitoCard app.');
       }
+    }
+
+    // Signed in with a password (or Google) but not yet with the second step: only finishing it is allowed. Public routes
+    // treat the session as signed out.
+    if (caller?.kind === 'session' && caller.twoStepPending && !meta<boolean>(ROUTE_TWO_STEP_PENDING)) {
+      if (isPublic) {
+        req.caller = undefined;
+        return true;
+      }
+      throw new ApiError(HttpStatus.UNAUTHORIZED, 'authentication_error', 'mfa_required', 'Finish signing in with your two-step code.');
     }
 
     if (isPublic) return true;
@@ -134,6 +145,7 @@ export class AuthGuard implements CanActivate {
       role,
       adminRoles: session.user.adminRoles,
       stepUpUntil: realm === 'admin' ? session.stepUpUntil : null,
+      twoStepPending: realm === 'reseller' && Boolean(await twoStepPending(this.prisma, session)),
     };
   }
 
@@ -147,6 +159,8 @@ export class AuthGuard implements CanActivate {
     if (!claims) throw unauthenticated();
     const session = await this.prisma.session.findUnique({ where: { id: claims.sid }, include: { user: true } });
     if (!session || session.realm !== 'reseller' || session.revokedAt || session.expiresAt <= new Date() || session.user.status !== 'active') throw unauthenticated();
+    // Its session must have finished two-step sign-in (once it is on, or required, for the person).
+    if (await twoStepPending(this.prisma, session)) throw unauthenticated();
     const member = await this.prisma.resellerMember.findFirst({ where: { userId: session.userId, resellerId: claims.rid }, include: { reseller: { include: { plan: true } } } });
     if (!member || member.reseller.status === 'suspended' || (claims.mode === 'live' && member.reseller.status !== 'active')) throw unauthenticated();
     const readOnly = claims.ro || !docsWriteRoles.includes(member.role);

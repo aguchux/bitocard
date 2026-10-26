@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftRight, CreditCard, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeftRight, CreditCard, KeyRound, LayoutGrid, Receipt, ShieldCheck, Smartphone } from "lucide-react";
 import { Card, categoryName, PanelNav, SettingsPanel, ErrorState, errorMessage, formatMoney, Notice, RefreshFailed, Select, Skeleton, Toggle } from "@bitocard/admin-ui";
 import { AdminShell, can, useAdmin } from "@bitocard/admin-ui/shell";
 import { useCountriesQuery, useTaxRatesQuery, useUpdateCountryCategoryMutation } from "@bitocard/api-client/admin";
@@ -11,6 +11,7 @@ import { IdentityProvider } from "./identity-provider";
 import { SmsProvider } from "./sms-provider";
 import { PaymentMethods } from "./payment-methods";
 import { TaxRateCard } from "./tax-rate";
+import { TwoStepSignIn } from "./two-step";
 
 
 const fields = [
@@ -27,6 +28,7 @@ const panels = [
   { id: "payments", label: "Payment methods", icon: CreditCard },
   { id: "tax", label: "Tax", icon: Receipt },
   { id: "exchange", label: "Exchange", icon: ArrowLeftRight },
+  { id: "two-step", label: "Two-step sign-in", icon: KeyRound },
 ];
 
 /** Markets: what each country sells and where customers must verify their identity. */
@@ -199,6 +201,9 @@ function Markets() {
                 alertMinor={country.exchange_reserve_alert_minor}
                 editable={editable}
               />
+            </SettingsPanel>
+            <SettingsPanel id="two-step" icon={KeyRound} title="Two-step sign-in" description={`Whether resellers in ${country.name} must use it in SHQ, and how.`}>
+              <TwoStepSignIn key={country.code} code={country.code} country={country.name} allowed={country.reseller_two_step_methods} smsProvider={country.sms_provider ?? null} editable={editable} />
             </SettingsPanel>
           </div>
         </div>

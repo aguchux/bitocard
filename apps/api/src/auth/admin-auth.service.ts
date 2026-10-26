@@ -1,6 +1,5 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { Secret, TOTP } from 'otpauth';
 import { APP_CONFIG, type AppConfig } from '../config/config.js';
 import { stepUpWindowMs } from './caller.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -14,6 +13,7 @@ import { adminPasswordLinkEmail, passwordChangedEmail } from '../notifications/t
 import { recordFailedSignIn } from './auth.service.js';
 import { PasswordsService } from './passwords.service.js';
 import { SessionsService } from './sessions.service.js';
+import { claimTotpStep, newTotpSecret, totpFor, totpStep } from './totp.js';
 
 const challengeLifetimeMs = 5 * 60 * 1000;
 const maxChallengeAttempts = 5;
@@ -236,13 +236,13 @@ export class AdminAuthService {
     if (user.totp?.confirmedAt) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'mfa_already_set_up', 'Your authenticator is already set up.');
     }
-    const secret = new Secret({ size: 20 });
+    const secret = newTotpSecret();
     await this.prisma.totpCredential.upsert({
       where: { userId: user.id },
-      create: { userId: user.id, secretEncrypted: this.encryption().encrypt(secret.base32) },
-      update: { secretEncrypted: this.encryption().encrypt(secret.base32), lastUsedStep: null },
+      create: { userId: user.id, secretEncrypted: this.encryption().encrypt(secret) },
+      update: { secretEncrypted: this.encryption().encrypt(secret), lastUsedStep: null },
     });
-    return { object: 'mfa_setup' as const, secret: secret.base32, otpauth_uri: this.totp(user.email, secret.base32).toString() };
+    return { object: 'mfa_setup' as const, secret, otpauth_uri: this.totp(user.email, secret).toString() };
   }
 
   /** Step 2: authenticator code (or a recovery code). Starts the admin session. */
@@ -329,17 +329,9 @@ export class AdminAuthService {
 
   /** Accepts the current code or one either side (clock drift), and never the same time step twice. */
   private async useTotp(user: User, credential: { secretEncrypted: string; lastUsedStep: bigint | null }, code: string) {
-    if (!/^\d{6}$/.test(code)) return false;
-    const delta = this.totp(user.email, this.encryption().decrypt(credential.secretEncrypted)).validate({ token: code, window: 1 });
-    if (delta === null) return false;
-    const step = BigInt(Math.floor(Date.now() / 30_000) + delta);
-    if (credential.lastUsedStep !== null && step <= credential.lastUsedStep) return false;
-    // Conditional update, so two simultaneous requests cannot both use the same code.
-    const updated = await this.prisma.totpCredential.updateMany({
-      where: { userId: user.id, OR: [{ lastUsedStep: null }, { lastUsedStep: { lt: step } }] },
-      data: { lastUsedStep: step },
-    });
-    return updated.count === 1;
+    const step = totpStep(this.totp(user.email, this.encryption().decrypt(credential.secretEncrypted)), code);
+    if (step === null || (credential.lastUsedStep !== null && step <= credential.lastUsedStep)) return false;
+    return claimTotpStep(this.prisma, user.id, step);
   }
 
   private async useRecoveryCode(userId: string, hashes: string[], code: string) {
@@ -364,7 +356,7 @@ export class AdminAuthService {
   }
 
   private totp(label: string, base32: string) {
-    return new TOTP({ issuer: 'BitoCard Admin', label, algorithm: 'SHA1', digits: 6, period: 30, secret: Secret.fromBase32(base32) });
+    return totpFor('BitoCard Admin', label, base32);
   }
 
   private encryption() {

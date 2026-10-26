@@ -17,7 +17,8 @@ const digest = (userId: string, purpose: CodePurpose, code: string) => sha256(`$
 export class CodesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async issue(userId: string, purpose: CodePurpose, target: string) {
+  /** `lifetime` shortens how long the code works (30 minutes by default; two-step sign-in codes 10). */
+  async issue(userId: string, purpose: CodePurpose, target: string, lifetime = lifetimeMs) {
     const latest = await this.prisma.verificationCode.findFirst({
       where: { userId, purpose, consumedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -34,7 +35,7 @@ export class CodesService {
     await this.prisma.$transaction([
       this.prisma.verificationCode.updateMany({ where: { userId, purpose, consumedAt: null }, data: { consumedAt: new Date() } }),
       this.prisma.verificationCode.create({
-        data: { userId, purpose, target, codeHash: digest(userId, purpose, code), expiresAt: new Date(Date.now() + lifetimeMs) },
+        data: { userId, purpose, target, codeHash: digest(userId, purpose, code), expiresAt: new Date(Date.now() + lifetime) },
       }),
     ]);
     return code;

@@ -56,6 +56,7 @@ const protectedRoutes = [
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/identity-waiver/remove`, { reason: 'x' }],
   ['post', `/v1/admin/resellers/${randomId}/unsuspend`, { reason: 'x' }],
+  ['post', `/v1/admin/resellers/${randomId}/members/${randomId}/two-step/reset`, { reason: 'x' }],
   ['post', '/v1/admin/countries', {}],
   ['patch', '/v1/admin/countries/NG', {}],
   ['put', '/v1/admin/countries/NG/categories/airtime', {}],

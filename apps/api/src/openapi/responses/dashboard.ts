@@ -63,7 +63,24 @@ const membershipExample = {
   reseller: { object: 'reseller', id: resellerId, name: 'Ada Digital', country: 'NG', status: 'active' },
 };
 
-const sessionExample = { object: 'session', user: userExample, memberships: [membershipExample] };
+const sessionExample = { object: 'session', user: userExample, memberships: [membershipExample], two_step: { pending: false, setup_required: false, method: 'authenticator' } };
+const twoStepMethod = (description: string) => ({ type: ['string', 'null'], enum: ['authenticator', 'email', 'sms', null], description });
+const recoveryCodesExample = ['k3v9-x2qa', '8hdm-4tpz', 'q7rn-c5wb', 'z2xk-9fme', 'p4ty-h8ja', 'm6cs-2vqd', 'b9wn-7lrx', 'e3gh-5kpu', 'r8fj-6nys', 't2qb-4dvc'];
+const twoStepExample = {
+  object: 'two_step',
+  method: 'email',
+  enabled_at: '2026-10-26T08:14:02.000Z',
+  required: true,
+  pending: false,
+  setup_required: false,
+  sent_to: 'a•••@adadigital.ng',
+  recovery_codes_left: 10,
+  methods: [
+    { method: 'authenticator', available: true, reason: null },
+    { method: 'email', available: true, reason: null },
+    { method: 'sms', available: false, reason: 'phone_required' },
+  ],
+};
 
 const notice = (message: string) => ({ object: 'notice', message });
 
@@ -238,8 +255,39 @@ const schemas = {
       object: constant('session'),
       user: ref('User'),
       memberships: array(ref('Membership'), 'The reseller accounts they belong to, oldest first. Empty for a person who has not opened or joined one yet (they go to onboarding).'),
+      two_step: shape(
+        {
+          pending: bool('True while this session still has to finish two-step sign-in: until then every other endpoint answers `mfa_required` (401).'),
+          setup_required: bool('True when the person must set a method up to finish signing in (their reseller account requires two-step sign-in and they have none yet).'),
+          method: twoStepMethod('Their two-step method, or null when it is off.'),
+        },
+        "This session's two-step sign-in.",
+      ),
     },
     'The signed-in person and the reseller accounts they belong to. The session itself is the `bc_session` cookie, which is set or kept by the response.',
+  ),
+
+  TwoStep: objectSchema(
+    'TwoStep',
+    {
+      object: constant('two_step'),
+      method: twoStepMethod('How you do the second step, or null when two-step sign-in is off.'),
+      enabled_at: nullableTime('When you set up your current method.'),
+      required: bool('Whether one of your reseller accounts requires two-step sign-in (then it cannot be turned off).'),
+      pending: bool('Whether this session still has to finish two-step sign-in.'),
+      setup_required: bool('Whether you must set a method up to finish signing in.'),
+      sent_to: nullableStr('Where emailed or texted codes go, masked; null for an authenticator app or when off.'),
+      recovery_codes_left: int('How many of your one-time recovery codes are unused.'),
+      methods: array(
+        shape({
+          method: oneOf('The method.', ['authenticator', 'email', 'sms']),
+          available: bool('Whether you can choose it.'),
+          reason: { type: ['string', 'null'], enum: ['not_allowed', 'phone_required', 'sms_unavailable', null], description: 'Why not: `not_allowed` in your market, `phone_required` (confirm a mobile number first) or `sms_unavailable` for your number; null when available.' },
+        }),
+        'Every method, and whether you can choose it.',
+      ),
+    },
+    'Your two-step sign-in settings.',
   ),
 
   SignupVerification: objectSchema(
@@ -589,6 +637,57 @@ export const dashboardDocs: DocsArea = {
     'DELETE /v1/auth/phones/{phone}': { status: 200, description: 'The number is removed; your numbers now.', schema: phoneList, example: { object: 'list', data: [phonesExample.data[0]] } },
     'POST /v1/auth/password/forgot': notice202('Always reported, whether or not the account exists.', 'If an account uses this email, a reset code is on its way.'),
     'POST /v1/auth/password/reset': { status: 200, description: 'The password is changed and every session signed out.', schema: 'Notice', example: notice('Your password has been changed. Sign in with it now.') },
+    'GET /v1/auth/two-step': { status: 200, description: 'Your two-step sign-in settings.', schema: 'TwoStep', example: twoStepExample },
+    'POST /v1/auth/two-step/setup': {
+      status: 200,
+      description: 'The method waits for its first code: scan the secret (an authenticator app), or enter the code just sent.',
+      schema: shape({
+        object: constant('two_step_setup'),
+        method: oneOf('The method being set up.', ['authenticator', 'email', 'sms']),
+        secret: nullableStr('An authenticator app: the secret to type in, if you cannot scan `otpauth_uri`. Shown only here.'),
+        otpauth_uri: nullableStr('An authenticator app: the `otpauth://` address to show as a QR code.'),
+        sent_to: nullableStr('Email or SMS: where the code went, masked.'),
+      }),
+      example: { object: 'two_step_setup', method: 'authenticator', secret: 'EXAMPLEONLYNOTAREALSECRETXX', otpauth_uri: 'otpauth://totp/BitoCard:ada%40adadigital.ng?issuer=BitoCard&secret=EXAMPLEONLYNOTAREALSECRETXX&algorithm=SHA1&digits=6&period=30', sent_to: null },
+    },
+    'POST /v1/auth/two-step/setup/confirm': {
+      status: 200,
+      description: 'Two-step sign-in is on with the method; the recovery codes are shown only now.',
+      schema: shape({
+        object: constant('two_step_enabled'),
+        method: oneOf('Your method now.', ['authenticator', 'email', 'sms']),
+        recovery_codes: array(str('A one-time recovery code.'), 'Ten one-time codes for when your method is not to hand. Keep them safe; they are shown only this once.'),
+      }),
+      example: { object: 'two_step_enabled', method: 'authenticator', recovery_codes: recoveryCodesExample },
+    },
+    'POST /v1/auth/two-step/challenge': {
+      status: 200,
+      description: 'The code is on its way (or was sent in the last minute and still works).',
+      schema: shape({
+        object: constant('two_step_challenge'),
+        method: oneOf('Your method.', ['authenticator', 'email', 'sms']),
+        sent: bool('Whether a new code was sent now: false for an authenticator app, or when one was sent in the last minute.'),
+        sent_to: nullableStr('Where the code went, masked; null for an authenticator app.'),
+      }),
+      example: { object: 'two_step_challenge', method: 'email', sent: true, sent_to: 'a•••@adadigital.ng' },
+    },
+    'POST /v1/auth/two-step/verify': {
+      status: 200,
+      description: 'This session has finished signing in.',
+      schema: shape({
+        object: constant('two_step_verified'),
+        method: oneOf('Your method.', ['authenticator', 'email', 'sms']),
+        used: oneOf('`code` (from your method) or `recovery` (a recovery code, now used up).', ['code', 'recovery']),
+      }),
+      example: { object: 'two_step_verified', method: 'email', used: 'code' },
+    },
+    'POST /v1/auth/two-step/disable': { status: 200, description: 'Two-step sign-in is off.', schema: shape({ object: constant('two_step_disabled') }), example: { object: 'two_step_disabled' } },
+    'POST /v1/auth/two-step/recovery-codes': {
+      status: 200,
+      description: 'New recovery codes, shown only now; the old ones no longer work.',
+      schema: shape({ object: constant('two_step_recovery_codes'), recovery_codes: array(str('A one-time recovery code.'), 'Ten new one-time codes.') }),
+      example: { object: 'two_step_recovery_codes', recovery_codes: recoveryCodesExample },
+    },
     'GET /v1/auth/google/start': { status: 302, description: 'Redirects the browser to Google.' },
     'GET /v1/auth/google/callback': { status: 302, description: 'Redirects the browser back to the BitoCard app it came from, signed in, or with `?auth_error=<code>`.' },
 

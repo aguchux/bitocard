@@ -141,7 +141,8 @@ export type ResellerDetail = {
   /** An admin let the reseller go live without the identity check: who, when and why. */
   identity_waiver: { waived_at: string; waived_by: { id: string; name: string } | null; reason: string | null } | null;
   plan: Plan;
-  members: Array<{ user_id: string; name: string; email: string | null; role: string }>;
+  /** `two_step`: the member's two-step sign-in method, or null when off. Missing on older API versions. */
+  members: Array<{ user_id: string; name: string; email: string | null; role: string; two_step?: TwoStepMethod | null }>;
   stores: Array<{ id: string; name: string; subdomain: string; status: string }>;
   options: Record<string, { value: string; allowed: string[] } | unknown>;
   features: Record<string, boolean>;
@@ -430,8 +431,12 @@ export type Country = {
   exchange_markup_cap_bps?: number;
   /** Admins are told when BitoCard's money exchange reserve here falls below this (minor units); null: never. */
   exchange_reserve_alert_minor?: number | null;
+  /** The two-step sign-in methods resellers based here may choose. Missing on older API versions. */
+  reseller_two_step_methods?: TwoStepMethod[];
   categories: Array<{ category: ProductCategory; enabled: boolean; customer_verification: boolean; taxable: boolean }>;
 };
+
+export type TwoStepMethod = 'authenticator' | 'email' | 'sms';
 
 export type IdentityProvider = 'bitocard' | 'didit';
 

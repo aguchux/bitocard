@@ -15,6 +15,7 @@ import {
   formatDateTime,
   humanise,
   KeyValue,
+  Badge,
   Notice,
   PageHeader,
   RefreshFailed,
@@ -31,12 +32,15 @@ import {
   usePlansQuery,
   useRemoveResellerIdentityWaiverMutation,
   useUnsuspendResellerMutation,
+  useResetMemberTwoStepMutation,
   useResellerHistoryQuery,
   useResellerQuery,
   useUpdateResellerMutation,
   useVerificationsInfiniteQuery,
   useWaiveResellerIdentityMutation,
 } from "@bitocard/api-client/admin";
+
+const twoStepNames = { authenticator: "app", email: "email", sms: "SMS" } as const;
 
 export default function ResellerPage() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +57,8 @@ export default function ResellerPage() {
   const [removeWaiver] = useRemoveResellerIdentityWaiverMutation();
   const [unsuspend] = useUnsuspendResellerMutation();
   const [lifting, setLifting] = useState(false);
+  const [resetting, setResetting] = useState<{ user_id: string; name: string } | null>(null);
+  const [resetTwoStep] = useResetMemberTwoStepMutation();
   const operator = can(admin, "operations");
 
   const latestCheck = checks.data?.pages[0]?.data[0];
@@ -206,7 +212,15 @@ export default function ResellerPage() {
                       <p className="truncate font-medium">{member.name}</p>
                       <p className="truncate text-xs text-muted">{member.email ?? "—"}</p>
                     </div>
-                    <span className="text-sm text-muted">{humanise(member.role)}</span>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      {member.two_step !== undefined ? <Badge tone={member.two_step ? "green" : "grey"}>{member.two_step ? `Two-step: ${twoStepNames[member.two_step]}` : "Two-step off"}</Badge> : null}
+                      <span className="text-sm text-muted">{humanise(member.role)}</span>
+                      {operator && member.two_step ? (
+                        <Button variant="ghost" size="sm" onClick={() => setResetting({ user_id: member.user_id, name: member.name })}>
+                          Reset two-step
+                        </Button>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -263,6 +277,16 @@ export default function ResellerPage() {
             tone={action === "suspended" ? "danger" : "primary"}
             requireReason={false}
             onConfirm={() => update({ id: reseller.id, status: action! }).unwrap()}
+          />
+
+          <ActionDialog
+            open={resetting !== null}
+            onClose={() => setResetting(null)}
+            title={`Reset ${resetting?.name ?? "this person"}'s two-step sign-in?`}
+            description="For someone who lost their phone or email access, once you are sure it is them. Two-step sign-in is turned off and they are signed out everywhere; where their account requires it, they set it up again at their next sign-in. They are emailed, and your reason is kept in the audit log."
+            confirmLabel="Reset two-step"
+            tone="danger"
+            onConfirm={reason => resetTwoStep({ id: reseller.id, user: resetting!.user_id, reason }).unwrap()}
           />
 
           <ActionDialog

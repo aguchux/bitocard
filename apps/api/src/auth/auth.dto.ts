@@ -222,3 +222,36 @@ export class DocsTokenDto {
   @IsUUID()
   store_id?: string;
 }
+
+const twoStepCodeDoc = {
+  description: 'The 6-digit code from your two-step method, or one of your recovery codes (`abcd-1234`).',
+  example: '123456',
+  maxLength: 9,
+};
+const twoStepCode = /^(\d{6}|[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4})$/;
+
+export class TwoStepCodeDto {
+  @ApiProperty(twoStepCodeDoc)
+  @Transform(trim)
+  @Matches(twoStepCode, { message: 'code must be 6 digits or a recovery code' })
+  code: string;
+}
+
+export class TwoStepSetupDto {
+  @ApiProperty({ description: 'How you will do the second step: an authenticator app, a code emailed to your primary address, or one texted to your primary mobile number.', enum: ['authenticator', 'email', 'sms'] })
+  @IsIn(['authenticator', 'email', 'sms'])
+  method: 'authenticator' | 'email' | 'sms';
+
+  @ApiPropertyOptional({ ...twoStepCodeDoc, description: 'Changing an existing method: a code from it (or a recovery code).' })
+  @IsOptional()
+  @Transform(trim)
+  @Matches(twoStepCode, { message: 'current_code must be 6 digits or a recovery code' })
+  current_code?: string;
+}
+
+export class TwoStepConfirmDto {
+  @ApiProperty({ description: 'The first 6-digit code from the method being set up.', example: '123456' })
+  @Transform(trim)
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code: string;
+}

@@ -73,6 +73,15 @@ model User {
   failedSignIns   Int         @default(0) @map("failed_sign_ins")
   lockedUntil     DateTime?   @map("locked_until")
   lastSignInAt    DateTime?   @map("last_sign_in_at")
+  /// Resellers' two-step sign-in: how the second step is done (null: off). Admins always use their authenticator.
+  mfaMethod                 MfaMethod? @map("mfa_method")
+  mfaEnabledAt              DateTime?  @map("mfa_enabled_at")
+  /// SHA-256 hashes of the one-time recovery codes (resellers; admins keep theirs on totp_credentials). Used ones are removed.
+  mfaRecoveryCodeHashes     String[]   @default([]) @map("mfa_recovery_code_hashes")
+  /// A method being set up, waiting for its first code: the method, and an authenticator's new secret (encrypted).
+  mfaSetupMethod            MfaMethod? @map("mfa_setup_method")
+  mfaSetupSecretEncrypted   String?    @map("mfa_setup_secret_encrypted")
+  mfaSetupAt                DateTime?  @map("mfa_setup_at")
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
@@ -138,6 +147,9 @@ model Session {
   /// Admin sessions: sensitive and money actions are allowed until then (5 minutes after the admin entered their
   /// authenticator code). Fixed, never extended by use, and gone with the session.
   stepUpUntil DateTime? @map("step_up_until")
+  /// Reseller sessions: when the person completed two-step sign-in on it. Until then a session of someone with two-step
+  /// on (or required) can only finish signing in.
+  mfaVerifiedAt DateTime? @map("mfa_verified_at")
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -160,6 +172,17 @@ enum CodePurpose {
   admin_mfa_challenge
   /// A set-password link emailed to an admin from the sign-in page (first visit or Forgot password).
   admin_password_link
+  /// Resellers' two-step sign-in: the code that confirms a new email or SMS method.
+  mfa_setup
+  /// Resellers' two-step sign-in: the emailed or texted code for signing in (or confirming a change).
+  mfa_sign_in
+}
+
+/// How a reseller person does the second step of signing in.
+enum MfaMethod {
+  authenticator
+  email
+  sms
 }
 
 /// Single-use codes sent by email or SMS, and short-lived admin sign-in challenges. Only the hash is stored.
@@ -595,6 +618,8 @@ model Country {
   exchangeMarkupCapBps      Int               @default(500) @map("exchange_markup_cap_bps")
   /// Admins are told when BitoCard's fiat exchange reserve in this market falls below this (minor units); null: never.
   exchangeReserveAlertMinor BigInt?           @map("exchange_reserve_alert_minor")
+  /// The two-step sign-in methods resellers based here may choose (SMS also needs the market's SMS provider).
+  resellerMfaMethods        MfaMethod[]       @default([authenticator, email, sms]) @map("reseller_mfa_methods")
   createdAt                 DateTime          @default(now()) @map("created_at")
   updatedAt                 DateTime          @updatedAt @map("updated_at")
   categories                CountryCategory[]

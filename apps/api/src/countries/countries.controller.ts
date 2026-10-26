@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpStatus, Param, Patch, type PipeTransform, Post, Put } from '@nestjs/common';
 import { ApiExcludeController, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
+import { ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min, ValidateIf } from 'class-validator';
 import { AdminRoles, type Caller, CurrentCaller, Public, RealmOnly, StepUp } from '../auth/caller.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { ProductCategory } from '../generated/prisma/client.js';
@@ -45,6 +45,8 @@ class UpdateCountryDto {
   /** Exchange: admins are told when BitoCard's fiat reserve here falls below this (minor units); null: never. */
   @ValidateIf((_object, value) => value !== null) @IsOptional() @IsInt() @Min(0) exchange_reserve_alert_minor?: number | null;
   @IsOptional() @IsInt() @Min(0) min_withdrawal_minor?: number;
+  /** Two-step sign-in: the methods resellers based here may choose (at least one). */
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayUnique() @IsIn(['authenticator', 'email', 'sms'], { each: true }) reseller_two_step_methods?: Array<'authenticator' | 'email' | 'sms'>;
 }
 
 class UpdateCategoryDto {

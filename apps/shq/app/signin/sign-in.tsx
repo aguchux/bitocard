@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail } from "lucide-react";
 import { apiBaseUrl } from "@bitocard/api-client";
 import { useSessionQuery, useSignInMutation } from "@bitocard/api-client/reseller";
+import { TwoStepSignIn } from "@/components/two-step";
+import { useSignOut } from "@/components/reseller";
 import { AppLink, goNext, safeNext } from "@bitocard/admin-ui/shell";
 import { Button, cn, errorMessage, Input, Notice, PasswordToggleButton, Wordmark } from "@bitocard/admin-ui";
 
@@ -67,16 +69,22 @@ export function SignIn() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [signIn, signInState] = useSignInMutation();
+  const [signOut, signingOut] = useSignOut();
+  // Signed in, but the second step is still to do: it is asked here, before going on (so the docs, which send people
+  // here with `next`, get a finished session back).
+  const twoStepPending = Boolean(session.data?.two_step?.pending);
 
   useEffect(() => {
-    if (session.data) goNext(next, router);
+    if (session.data && !session.data.two_step?.pending) goNext(next, router);
   }, [session.data, next, router]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const done = await signIn({ identifier: identifier.trim(), password }).unwrap().catch(() => null);
-    if (done) goNext(next, router);
+    if (done && !done.two_step?.pending) goNext(next, router);
   }
+
+  if (twoStepPending) return <TwoStepSignIn onDone={() => goNext(next, router)} onSignOut={signOut} signingOut={signingOut} />;
 
   return (
     <div className="w-full max-w-md">

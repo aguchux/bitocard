@@ -95,6 +95,11 @@ export function ReviewShell({ children }: { children: ReactNode }) {
         }
         return { phase: "error", message: session.message };
       }
+      // Two-step sign-in not finished yet: SHQ's sign-in page asks for the code, then comes back.
+      if (session.data.two_step?.pending) {
+        window.location.assign(signInUrl(shqBase(), window.location.href));
+        return null;
+      }
       const reseller = pickAccount(session.data.memberships, account ?? remembered());
       if (!reseller) return { phase: "no_account" };
       const eligibility = await reviewRequest<KycReviewEligibility>("/v1/kyc/reviews/eligibility", { reseller });

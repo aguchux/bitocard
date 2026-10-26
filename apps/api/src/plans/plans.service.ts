@@ -339,7 +339,8 @@ export class PlansService {
         ? { waived_at: reseller.identityWaivedAt.toISOString(), waived_by: waivedBy ? { id: waivedBy.id, name: waivedBy.name } : null, reason: reseller.identityWaiverReason }
         : null,
       plan: presentPlan(reseller.plan),
-      members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role })),
+      /** `two_step`: the member's two-step sign-in method, or null when it is off. */
+      members: reseller.members.map(m => ({ user_id: m.userId, name: m.user.name, email: m.user.email, role: m.role, two_step: m.user.mfaMethod })),
       stores: reseller.stores.map(s => ({ id: s.id, name: s.name, subdomain: s.subdomain, status: s.status })),
       options: await this.settings.effectiveOptions(reseller.id),
       features: await this.settings.switchesFor(reseller.id),

@@ -3,6 +3,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import { AuditService } from '../audit/audit.service.js';
+import { mfaMethods } from '../auth/mfa-policy.js';
 import { type Country, type CountryCategory, ProductCategory } from '../generated/prisma/client.js';
 
 export const productCategories = Object.values(ProductCategory);
@@ -40,6 +41,8 @@ export function presentCountryAdmin(country: CountryWithCategories) {
     sms_provider: country.smsProvider as 'termii' | 'africas_talking' | null,
     exchange_markup_cap_bps: country.exchangeMarkupCapBps,
     exchange_reserve_alert_minor: country.exchangeReserveAlertMinor === null ? null : Number(country.exchangeReserveAlertMinor),
+    /** The two-step sign-in methods resellers based here may choose. */
+    reseller_two_step_methods: country.resellerMfaMethods,
     categories: country.categories
       .sort((a, b) => productCategories.indexOf(a.category) - productCategories.indexOf(b.category))
       .map(c => ({ category: c.category, enabled: c.enabled, customer_verification: c.customerVerification, taxable: c.taxable })),
@@ -60,6 +63,7 @@ export type CountryUpdate = Partial<{
   public_spin_limit: number;
   exchange_markup_cap_bps: number;
   exchange_reserve_alert_minor: number | null;
+  reseller_two_step_methods: Array<'authenticator' | 'email' | 'sms'>;
 }>;
 
 /** Markets: which countries are open, their currency, money rules and the product categories sold there. */
@@ -137,6 +141,8 @@ export class CountriesService {
         exchangeMarkupCapBps: input.exchange_markup_cap_bps,
         exchangeReserveAlertMinor: input.exchange_reserve_alert_minor === undefined ? undefined : input.exchange_reserve_alert_minor === null ? null : BigInt(input.exchange_reserve_alert_minor),
         minWithdrawalMinor: input.min_withdrawal_minor === undefined ? undefined : BigInt(input.min_withdrawal_minor),
+        // Kept in a fixed order, whatever order they were sent in.
+        resellerMfaMethods: input.reseller_two_step_methods ? mfaMethods.filter(method => input.reseller_two_step_methods!.includes(method)) : undefined,
       },
       include: { categories: true },
     });

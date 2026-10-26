@@ -1713,8 +1713,9 @@
                     "store_template_single_product": true,
                     "store_template_vpn_shop": true,
                     "store_template_rdp_shop": true,
+                    "reseller_two_step": false,
                     "manual_reseller_approval": false,
-                    "country_stores": false,
+                    "country_stores": true,
                     "classifieds": false,
                     "classifieds_safe_pay": false,
                     "classifieds_assistant": false
@@ -8417,7 +8418,12 @@
                         "status": "pending"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -8515,7 +8521,12 @@
                         "status": "pending"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -8648,7 +8659,12 @@
                         "status": "active"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -8770,6 +8786,7 @@
     },
     "/v1/auth/session": {
       "get": {
+        "description": "Also on a session still waiting for two-step sign-in: `two_step.pending` then says so (and `setup_required` that a method must be set up first).",
         "operationId": "AuthController_session",
         "parameters": [],
         "responses": {
@@ -8805,7 +8822,12 @@
                         "status": "active"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -9057,7 +9079,12 @@
                         "status": "active"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -9271,7 +9298,12 @@
                         "status": "active"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -10315,7 +10347,12 @@
                         "status": "active"
                       }
                     }
-                  ]
+                  ],
+                  "two_step": {
+                    "pending": false,
+                    "setup_required": false,
+                    "method": "authenticator"
+                  }
                 }
               }
             }
@@ -11474,6 +11511,946 @@
           "Authentication"
         ],
         "x-bitocard-auth": "public"
+      }
+    },
+    "/v1/auth/two-step": {
+      "get": {
+        "description": "Your method, whether your account requires two-step sign-in, whether this session still has to finish it, and the methods you can choose.",
+        "operationId": "TwoStepController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Your two-step sign-in settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoStep"
+                },
+                "example": {
+                  "object": "two_step",
+                  "method": "email",
+                  "enabled_at": "2026-10-26T08:14:02.000Z",
+                  "required": true,
+                  "pending": false,
+                  "setup_required": false,
+                  "sent_to": "a•••@adadigital.ng",
+                  "recovery_codes_left": 10,
+                  "methods": [
+                    {
+                      "method": "authenticator",
+                      "available": true,
+                      "reason": null
+                    },
+                    {
+                      "method": "email",
+                      "available": true,
+                      "reason": null
+                    },
+                    {
+                      "method": "sms",
+                      "available": false,
+                      "reason": "phone_required"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Your two-step sign-in settings",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/two-step/setup": {
+      "post": {
+        "description": "An authenticator app gets a new secret to scan (`otpauth_uri`); email and SMS get a 6-digit code sent to your primary address or confirmed mobile number (10 minutes). Changing an existing method needs a code from it (`current_code`). Confirm with `POST /v1/auth/two-step/setup/confirm`.",
+        "operationId": "TwoStepController_setup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoStepSetupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The method waits for its first code: scan the secret (an authenticator app), or enter the code just sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "method",
+                    "secret",
+                    "otpauth_uri",
+                    "sent_to"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `two_step_setup`.",
+                      "const": "two_step_setup"
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "The method being set up.",
+                      "enum": [
+                        "authenticator",
+                        "email",
+                        "sms"
+                      ]
+                    },
+                    "secret": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "An authenticator app: the secret to type in, if you cannot scan `otpauth_uri`. Shown only here."
+                    },
+                    "otpauth_uri": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "An authenticator app: the `otpauth://` address to show as a QR code."
+                    },
+                    "sent_to": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Email or SMS: where the code went, masked."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "two_step_setup",
+                  "method": "authenticator",
+                  "secret": "EXAMPLEONLYNOTAREALSECRETXX",
+                  "otpauth_uri": "otpauth://totp/BitoCard:ada%40adadigital.ng?issuer=BitoCard&secret=EXAMPLEONLYNOTAREALSECRETXX&algorithm=SHA1&digits=6&period=30",
+                  "sent_to": null
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start setting up a two-step method",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/two-step/setup/confirm": {
+      "post": {
+        "description": "With its first code. Returns 10 recovery codes, shown only this once; this session counts as signed in with the new method.",
+        "operationId": "TwoStepController_confirm",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoStepConfirmDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Two-step sign-in is on with the method; the recovery codes are shown only now.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "method",
+                    "recovery_codes"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `two_step_enabled`.",
+                      "const": "two_step_enabled"
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "Your method now.",
+                      "enum": [
+                        "authenticator",
+                        "email",
+                        "sms"
+                      ]
+                    },
+                    "recovery_codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A one-time recovery code."
+                      },
+                      "description": "Ten one-time codes for when your method is not to hand. Keep them safe; they are shown only this once."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "two_step_enabled",
+                  "method": "authenticator",
+                  "recovery_codes": [
+                    "k3v9-x2qa",
+                    "8hdm-4tpz",
+                    "q7rn-c5wb",
+                    "z2xk-9fme",
+                    "p4ty-h8ja",
+                    "m6cs-2vqd",
+                    "b9wn-7lrx",
+                    "e3gh-5kpu",
+                    "r8fj-6nys",
+                    "t2qb-4dvc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm the two-step method being set up",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/two-step/challenge": {
+      "post": {
+        "description": "To finish signing in, or to confirm a change. At most one a minute (`sent: false` sooner: the last code still works). Authenticator apps need nothing sent.",
+        "operationId": "TwoStepController_challenge",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The code is on its way (or was sent in the last minute and still works).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "method",
+                    "sent",
+                    "sent_to"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `two_step_challenge`.",
+                      "const": "two_step_challenge"
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "Your method.",
+                      "enum": [
+                        "authenticator",
+                        "email",
+                        "sms"
+                      ]
+                    },
+                    "sent": {
+                      "type": "boolean",
+                      "description": "Whether a new code was sent now: false for an authenticator app, or when one was sent in the last minute."
+                    },
+                    "sent_to": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Where the code went, masked; null for an authenticator app."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "two_step_challenge",
+                  "method": "email",
+                  "sent": true,
+                  "sent_to": "a•••@adadigital.ng"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send your emailed or texted two-step code",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/two-step/verify": {
+      "post": {
+        "description": "The code from your method, or a recovery code (each works once). Five wrong codes lock the account for 15 minutes, as wrong passwords do.",
+        "operationId": "TwoStepController_verify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoStepCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "This session has finished signing in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "method",
+                    "used"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `two_step_verified`.",
+                      "const": "two_step_verified"
+                    },
+                    "method": {
+                      "type": "string",
+                      "description": "Your method.",
+                      "enum": [
+                        "authenticator",
+                        "email",
+                        "sms"
+                      ]
+                    },
+                    "used": {
+                      "type": "string",
+                      "description": "`code` (from your method) or `recovery` (a recovery code, now used up).",
+                      "enum": [
+                        "code",
+                        "recovery"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "object": "two_step_verified",
+                  "method": "email",
+                  "used": "code"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Finish signing in with your two-step code",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/two-step/disable": {
+      "post": {
+        "description": "Needs a current code. Refused (`two_step_enforced`) while your reseller account requires two-step sign-in.",
+        "operationId": "TwoStepController_disable",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoStepCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Two-step sign-in is off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `two_step_disabled`.",
+                      "const": "two_step_disabled"
+                    }
+                  }
+                },
+                "example": {
+                  "object": "two_step_disabled"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Turn two-step sign-in off",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
+      }
+    },
+    "/v1/auth/two-step/recovery-codes": {
+      "post": {
+        "description": "Needs a current code. Returns 10 new recovery codes, shown only this once; the old ones stop working.",
+        "operationId": "TwoStepController_recoveryCodes",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoStepCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New recovery codes, shown only now; the old ones no longer work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "object",
+                    "recovery_codes"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "description": "Always `two_step_recovery_codes`.",
+                      "const": "two_step_recovery_codes"
+                    },
+                    "recovery_codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "A one-time recovery code."
+                      },
+                      "description": "Ten new one-time codes."
+                    }
+                  }
+                },
+                "example": {
+                  "object": "two_step_recovery_codes",
+                  "recovery_codes": [
+                    "k3v9-x2qa",
+                    "8hdm-4tpz",
+                    "q7rn-c5wb",
+                    "z2xk-9fme",
+                    "p4ty-h8ja",
+                    "m6cs-2vqd",
+                    "b9wn-7lrx",
+                    "e3gh-5kpu",
+                    "r8fj-6nys",
+                    "t2qb-4dvc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid: a field is missing, malformed or not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "invalid_request_error",
+                    "code": "parameter_invalid",
+                    "message": "quantity must not be greater than 10",
+                    "param": "quantity",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid API key or session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "authentication_error",
+                    "code": "not_authenticated",
+                    "message": "Sign in, or send a valid API key as a Bearer token.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authenticated, but not allowed: a missing API key scope, a plan restriction, or a dashboard-only endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "permission_error",
+                    "code": "not_permitted",
+                    "message": "This API key is missing the scope orders:write.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests. Wait for the number of seconds in `Retry-After`, then retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "type": "rate_limit_error",
+                    "code": "rate_limited",
+                    "message": "Too many requests. Try again shortly.",
+                    "request_id": "req_8f2c1a7d4e6b"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replace your recovery codes",
+        "tags": [
+          "Authentication"
+        ],
+        "x-bitocard-auth": "session"
       }
     },
     "/v1/api-keys": {
@@ -38991,6 +39968,56 @@
           "password"
         ]
       },
+      "TwoStepSetupDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "description": "How you will do the second step: an authenticator app, a code emailed to your primary address, or one texted to your primary mobile number.",
+            "enum": [
+              "authenticator",
+              "email",
+              "sms"
+            ]
+          },
+          "current_code": {
+            "type": "string",
+            "description": "Changing an existing method: a code from it (or a recovery code).",
+            "example": "123456",
+            "maxLength": 9
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "TwoStepConfirmDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The first 6-digit code from the method being set up.",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "TwoStepCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The 6-digit code from your two-step method, or one of your recovery codes (`abcd-1234`).",
+            "example": "123456",
+            "maxLength": 9
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
       "CreateApiKeyDto": {
         "type": "object",
         "properties": {
@@ -43706,6 +44733,7 @@
               "store_template_single_product",
               "store_template_vpn_shop",
               "store_template_rdp_shop",
+              "reseller_two_step",
               "manual_reseller_approval",
               "country_stores",
               "classifieds",
@@ -43797,6 +44825,10 @@
               "store_template_rdp_shop": {
                 "type": "boolean",
                 "description": "Resellers can choose the RDP shop store template (it sells only once RDP is on sale in their market). Stores already using it keep it. On unless switched off."
+              },
+              "reseller_two_step": {
+                "type": "boolean",
+                "description": "Every member of the reseller's team must use two-step sign-in in SHQ (an authenticator app, an emailed code or a text message, from the methods their market allows), setting it up at their next sign-in. Off: two-step is each person's choice."
               },
               "manual_reseller_approval": {
                 "type": "boolean",
@@ -52342,7 +53374,8 @@
         "required": [
           "object",
           "user",
-          "memberships"
+          "memberships",
+          "two_step"
         ],
         "additionalProperties": false,
         "properties": {
@@ -52360,6 +53393,148 @@
               "$ref": "#/components/schemas/Membership"
             },
             "description": "The reseller accounts they belong to, oldest first. Empty for a person who has not opened or joined one yet (they go to onboarding)."
+          },
+          "two_step": {
+            "type": "object",
+            "description": "This session's two-step sign-in.",
+            "required": [
+              "pending",
+              "setup_required",
+              "method"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "pending": {
+                "type": "boolean",
+                "description": "True while this session still has to finish two-step sign-in: until then every other endpoint answers `mfa_required` (401)."
+              },
+              "setup_required": {
+                "type": "boolean",
+                "description": "True when the person must set a method up to finish signing in (their reseller account requires two-step sign-in and they have none yet)."
+              },
+              "method": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "authenticator",
+                  "email",
+                  "sms",
+                  null
+                ],
+                "description": "Their two-step method, or null when it is off."
+              }
+            }
+          }
+        }
+      },
+      "TwoStep": {
+        "type": "object",
+        "title": "TwoStep",
+        "description": "Your two-step sign-in settings.",
+        "required": [
+          "object",
+          "method",
+          "enabled_at",
+          "required",
+          "pending",
+          "setup_required",
+          "sent_to",
+          "recovery_codes_left",
+          "methods"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "type": "string",
+            "description": "Always `two_step`.",
+            "const": "two_step"
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "authenticator",
+              "email",
+              "sms",
+              null
+            ],
+            "description": "How you do the second step, or null when two-step sign-in is off."
+          },
+          "enabled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "When you set up your current method.",
+            "format": "date-time"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether one of your reseller accounts requires two-step sign-in (then it cannot be turned off)."
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "Whether this session still has to finish two-step sign-in."
+          },
+          "setup_required": {
+            "type": "boolean",
+            "description": "Whether you must set a method up to finish signing in."
+          },
+          "sent_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where emailed or texted codes go, masked; null for an authenticator app or when off."
+          },
+          "recovery_codes_left": {
+            "type": "integer",
+            "description": "How many of your one-time recovery codes are unused."
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "method",
+                "available",
+                "reason"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "description": "The method.",
+                  "enum": [
+                    "authenticator",
+                    "email",
+                    "sms"
+                  ]
+                },
+                "available": {
+                  "type": "boolean",
+                  "description": "Whether you can choose it."
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "not_allowed",
+                    "phone_required",
+                    "sms_unavailable",
+                    null
+                  ],
+                  "description": "Why not: `not_allowed` in your market, `phone_required` (confirm a mobile number first) or `sms_unavailable` for your number; null when available."
+                }
+              }
+            },
+            "description": "Every method, and whether you can choose it."
           }
         }
       },
@@ -52641,7 +53816,8 @@
               "security.password_changed",
               "security.email_changed",
               "security.email_added",
-              "security.phone_added"
+              "security.phone_added",
+              "security.two_step_changed"
             ]
           },
           "severity": {
@@ -52846,7 +54022,8 @@
               "security.password_changed",
               "security.email_changed",
               "security.email_added",
-              "security.phone_added"
+              "security.phone_added",
+              "security.two_step_changed"
             ]
           },
           "label": {

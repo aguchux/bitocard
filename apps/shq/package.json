@@ -17,6 +17,7 @@
     "country-flag-icons": "^1.6.20",
     "lucide-react": "^1.50.0",
     "next": "16.3.6",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-redux": "^9.3.0"
@@ -26,6 +27,7 @@
     "@bitocard/typescript-config": "*",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

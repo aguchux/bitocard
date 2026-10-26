@@ -552,3 +552,26 @@ describe('media uploads', () => {
     expect(sent.map(call => call.url)).toEqual(['http://api.test/v1/media/uploads', created.upload.url]);
   });
 });
+
+describe('two-step sign-in', () => {
+  test('finishing the second step refetches the session; confirming a set-up does not, so its recovery codes stay on screen', async () => {
+    const store = makeStore();
+    reply = call =>
+      call.url.endsWith('/v1/auth/session')
+        ? Response.json({ object: 'session', user: { id: 'u' }, memberships: [], two_step: { pending: true, setup_required: false, method: 'email' } })
+        : Response.json({ object: 'ok', recovery_codes: ['abcd-1234'] });
+    const session = store.dispatch(resellerSessionApi.endpoints.session.initiate());
+    await session;
+    const sessionReads = () => calls.filter(call => call.method === 'GET' && call.url.endsWith('/v1/auth/session')).length;
+    expect(sessionReads()).toBe(1);
+
+    await store.dispatch(resellerSessionApi.endpoints.confirmTwoStepSetup.initiate({ code: '123456' }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(sessionReads()).toBe(1);
+
+    await store.dispatch(resellerSessionApi.endpoints.verifyTwoStep.initiate({ code: '123456' }));
+    await vi.waitFor(() => expect(sessionReads()).toBe(2));
+    expect(calls.find(call => call.url.endsWith('/v1/auth/two-step/verify'))?.body).toBe(JSON.stringify({ code: '123456' }));
+    session.unsubscribe();
+  });
+});

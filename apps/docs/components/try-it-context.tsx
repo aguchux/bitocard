@@ -13,7 +13,7 @@ export function shqSignInUrl() {
 
 export type Mode = "test" | "live";
 type Membership = { role: string; reseller: { id: string; name: string; status: string } };
-type Session = { user: { name: string; email: string }; memberships: Membership[] };
+type Session = { user: { name: string; email: string }; memberships: Membership[]; two_step?: { pending: boolean } };
 type Token = { token: string; expires: number; readOnly: boolean };
 
 type State = {
@@ -65,6 +65,12 @@ export function TryItProvider({ children }: { children: ReactNode }) {
         }
         if (!response.ok) throw new Error(String(response.status));
         const body = (await response.json()) as Session;
+        // Signed in with a password but not yet with the two-step code: signing in at SHQ finishes it.
+        if (body.two_step?.pending) {
+          setStatus("signed_out");
+          setSession(null);
+          return;
+        }
         setSession(body);
         setResellerId(current => current ?? body.memberships[0]?.reseller.id ?? null);
         setStatus("signed_in");

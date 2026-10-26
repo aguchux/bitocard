@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { AddEmailDto, ChangePasswordDto, CodeDto, CreateResellerAccountDto, DocsTokenDto, ForgotPasswordDto, SignupEmailDto, SignupEmailVerifyDto, PhoneDto, PrimaryEmailDto, PrimaryPhoneDto, ProfileDto, ResetPasswordDto, SignInDto, SignUpDto } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
-import { type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
+import { AllowTwoStepPending, type Caller, CurrentCaller, Public, SessionOnly } from './caller.js';
 import { DocsTokensService } from './docs-tokens.service.js';
 import { SessionsService } from './sessions.service.js';
 import { SignupVerificationService } from './signup-verification.service.js';
@@ -83,6 +83,7 @@ export class AuthController {
   /** End the current session. */
   @ApiOperation({ summary: 'End the current session' })
   @SessionOnly()
+  @AllowTwoStepPending()
   @Post('signout')
   @HttpCode(HttpStatus.NO_CONTENT)
   async signOut(@CurrentCaller() caller: Caller, @Res({ passthrough: true }) res: Response) {
@@ -91,11 +92,15 @@ export class AuthController {
   }
 
   /** The signed-in person and the reseller accounts they belong to. */
-  @ApiOperation({ summary: 'The signed-in person and the reseller accounts they belong to' })
+  @ApiOperation({
+    summary: 'The signed-in person and the reseller accounts they belong to',
+    description: 'Also on a session still waiting for two-step sign-in: `two_step.pending` then says so (and `setup_required` that a method must be set up first).',
+  })
   @SessionOnly()
+  @AllowTwoStepPending()
   @Get('session')
   session(@CurrentCaller() caller: Caller) {
-    return this.auth.describe(caller.kind === 'session' ? caller.userId : '');
+    return this.auth.describe(caller.kind === 'session' ? caller.userId : '', caller.kind === 'session' ? caller.sessionId : null);
   }
 
   /** A short-lived token for trying the API from the documentation. */
