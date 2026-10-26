@@ -1,10 +1,12 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day (see Decisions). Nothing built. Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules (see Decisions). Nothing built. Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
 A BitoCard Shop seller (a bitocard.com customer) can open a listing to resellers, on BitoCard Shop as well or not, as they choose: they set their price, the discount resellers earn and how far above their price a reseller may sell, inside limits BitoCard sets. A reseller opens a store on the new **Resale shop** template, browses the resale listings of suppliers in their own country, adds the ones they want at their own price and sells them on their store, with its own domain, design and home page. Suppliers and resellers know each other: the supplier's **My Resellers** tab lists every reseller carrying their listings, with a chat and open phone numbers between them, and the special deals they agree there. A store customer buys from their store wallet: the money is locked, the supplier accepts, then it goes to BitoCard's Safe pay escrow, never to the reseller; the supplier hands the item to the buyer directly (meet-up with a release code, or delivery); once released, the supplier, the reseller and BitoCard are each paid automatically.
+
+**Security first.** A reseller can never pose as the item's owner: nothing they write reaches a listing unless the supplier approves it, every listing on their store names its supplier, and the buyer can open the supplier's own page right on the reseller's store. During an order the buyer talks to the reseller only; the supplier reads that conversation but cannot write to the buyer, and talks to the reseller in the order's trade thread, which the buyer does not see.
 
 ## What exists today (facts this plan builds on)
 
@@ -18,9 +20,9 @@ A BitoCard Shop seller (a bitocard.com customer) can open a listing to resellers
 
 | Party | Account | Does | Gets |
 |---|---|---|---|
-| **Supplier** (seller of record) | bitocard.com customer, identity checked, payout account set | Opens a listing to resellers (Shop too or not); sets price, reseller discount and markup limit; agrees deals with resellers; approves resellers' notes; accepts orders; hands the item to the buyer; enters the release code or marks it sent | Their price less the reseller's discount, less BitoCard's supplier fee, into `customer_withdrawable` (withdrawable after the payout hold) |
-| **Reseller** | SHQ reseller, verified (KYB), on a store with the Resale shop template, any plan | Picks listings, sets their price within the limits, runs the store (design, domain, marketing, first-line support) | Their price less the supplier's net, less BitoCard's capped reseller fee, into `reseller_earnings_held` → `reseller_earnings` after the payout hold |
-| **Buyer** | Customer of the reseller's store | Buys from their store wallet, meets the supplier or receives the delivery, releases | The item, or their money back to their store wallet |
+| **Supplier** (seller of record) | bitocard.com customer, identity checked, payout account set | Opens a listing to resellers (Shop too or not); sets price, reseller discount and markup limit; agrees deals with resellers; approves resellers' notes; accepts orders; sets the hand-over details; hands the item to the buyer; enters the release code or marks it sent; reads the buyer's chat with the reseller, talks only to the reseller | Their price less the reseller's discount, less BitoCard's supplier fee, into `customer_withdrawable` (withdrawable after the payout hold) |
+| **Reseller** | SHQ reseller, verified (KYB), on a store with the Resale shop template, any plan | Picks listings, sets their price within the limits, runs the store (design, domain, marketing, first-line support), is the buyer's only contact during an order and relays between buyer and supplier | Their price less the supplier's net, less BitoCard's capped reseller fee, into `reseller_earnings_held` → `reseller_earnings` after the payout hold |
+| **Buyer** | Customer of the reseller's store | Buys from their store wallet, can open the supplier's page before buying, talks to the reseller, meets the supplier or receives the delivery, releases | The item, or their money back to their store wallet |
 | **BitoCard** | Payment holder | Locks and holds the money, enforces the rules, runs deadlines, decides disputes | Buyer fee, supplier fee and reseller fee (each capped) into `classifieds_revenue` |
 
 ## Prices
@@ -41,25 +43,35 @@ Resale orders are paid only from the buyer's store wallet (topped up through Bit
 | Step | Status | Money (ledger reference `classified_order:<id>:<step>`) |
 |---|---|---|
 | Buyer buys (instant: no request or negotiation) | `locked` | `customer_wallet` → `customer_wallet_locked` (still the buyer's, shown as locked in their wallet): S + buyer fee. Stock is held. |
-| Supplier accepts (within the accept window) | `paid` | `customer_wallet_locked` → `classified_escrow`; the hand-over deadline starts; for a meet-up the buyer gets the release code |
+| Supplier accepts (within the accept window) and sets the hand-over details | `paid` | `customer_wallet_locked` → `classified_escrow`; the hand-over deadline starts; for a meet-up the buyer gets the release code |
 | Supplier declines, or the accept window passes | `declined` / `lapsed` | locked → back to `customer_wallet`; stock freed; a lapse counts towards the supplier's strikes |
 | Buyer cancels before acceptance | `cancelled` | locked → back to `customer_wallet` |
 | Released (code, received, or the confirm window passes) | `released` | escrow → supplier's `customer_withdrawable` (net − supplier fee), reseller's `reseller_earnings_held` (margin − reseller fee, an earnings lot), `classifieds_revenue` (all fees) |
 | Refunded (not handed over in time, cancelled after acceptance, dispute) | `refunded` | escrow → `customer_wallet`, everything |
 | Partly refunded (dispute) | `partly_refunded` | the refund to the buyer first; the rest split between supplier and reseller in proportion to their shares, each paying their fee on what they receive |
 
+**Hand-over without the supplier and buyer talking.** On accepting, the supplier sets the hand-over details in the order itself, not in a chat: for a meet-up, the area (from the country's areas), a public meeting point and the times they can meet, the buyer choosing one of those times on their order page; for delivery, the courier and, once sent, the tracking note. The buyer sees them on their order page; any change goes through the reseller (trade thread, then the order chat) and is recorded on the order. At a meet-up the buyer gives the release code to the supplier in person, as in Safe pay today. The supplier sees the buyer's first name and, for delivery, the delivery address and a phone number for the courier only (proposal C below); never their email.
+
 The order records every figure when the buyer buys (S, P, D or the deal, the supplier's net, the reseller's margin, each fee, its rate and cap), so later price, deal or rule changes never alter it. **Auto-accept** (proposed): a supplier may choose to accept resale orders automatically while the listing has stock, for a business on full autopilot; off by default.
 
-## Trust and safety ("the reseller cannot defraud the buyer")
+## Trust and safety: security first
 
-1. **The reseller never holds the buyer's money.** It is locked in the buyer's wallet, then held by BitoCard; the reseller is paid only on release.
-2. **The reseller cannot change what is sold.** Title, photos, video, condition, features and description come from the supplier's listing as they are. The reseller's only words are an optional short **note** ("Free delivery in Lekki"), shown as the store's only once the supplier approves it; a misleading note counts against the reseller in disputes. Each order keeps a snapshot of what the buyer saw.
-3. **Nothing sells that is not there.** Stock is shared by Shop and every reseller store; a listing that sells out, expires, is paused or removed leaves every store at once.
-4. **BitoCard decides disputes**, not the reseller (the money is in escrow); supplier and reseller both add notes and evidence.
-5. **Three-way same-person check**: supplier, reseller (its owner and team) and buyer must all be different people (KYC fingerprint, name and birth date, bank accounts), so nobody farms margins or fees with their own accounts.
-6. **Strikes for resellers too**: disputes upheld because of the store's note, and resale orders the reseller's store cancels, count towards a reseller strike limit; reaching it pauses the store's resale checkout until operations clear it.
-7. **Contact.** Between supplier and reseller it is open: chat in My Resellers and phone numbers shown to each other (both are verified businesses or people working together). Between buyer and supplier it stays inside BitoCard: the order's chat (the reseller can read it), under the Shop's chat rules, with the meet-up details shared once accepted; the supplier sees the buyer's first name and, for delivery, the address, never their email or phone.
-8. **Existing guards carry over**: the new-seller order limit, the payout review of reversible top-ups, the payout hold, the supplier's strikes and readiness (identity and payout account) before their listings can be resold.
+**The threat:** a reseller posing as the real owner or maker of the products, saying things about them the supplier never said, or taking the buyer off the platform. Every rule below is enforced by the API (never only hidden in an app), tested, and audited.
+
+1. **The reseller never holds the buyer's money.** It is locked in the buyer's wallet, then held by BitoCard; the reseller is paid only on release. Resale orders are paid only from the store wallet; there is no other way to pay on a Resale shop.
+2. **Nothing the reseller writes reaches a listing unless the supplier approves it.** There is no API or screen through which a reseller can set or change a listing's title, photos, video, condition, features, description, category, stock, location or delivery: a store listing has no such fields, and the store pages read them from the supplier's listing every time. The reseller's only words on a listing are one short **note** (at most 140 characters, plain text, no phone numbers, links or contact details, checked as Shop's listing text is): it shows only once the supplier approves that exact text; any edit goes back to the supplier; the supplier can withdraw an approval at any time. Each order keeps a snapshot of the listing and note the buyer saw.
+3. **Every listing names its supplier, and the supplier's page is on the reseller's store.** Each listing card and page on a Resale shop carries "Supplied by <supplier>" (first name and initial, or their verified business name, with their badges), which no template, design, section or plan (white label included) can remove or restyle out of view. It links to the **supplier's page on the reseller's own store** (`/suppliers/<id>` there, rendered by the store, not a redirect): who the supplier is (verified identity or business, area, member since, completed sales, ratings, strikes standing), and this listing exactly as the supplier wrote it, so the buyer can check the reseller added nothing. The receipt and order pages name the supplier as the seller and the store as where it was bought.
+4. **The store cannot claim the products as its own.** The Resale shop's free-text sections (about, features, FAQ, promos) are the reseller's own words about their store; the reseller terms forbid claiming to own, make or stock the items, and those texts are checked when saved for claims of ownership (an admin word list, as for Shop's prohibited words), refused or sent to review. Buyers and suppliers can report a store; an upheld report is a strike.
+5. **Who talks to whom during an order.** Two threads per order, kept inside BitoCard, with the Shop's chat rules (no phone numbers, links or payment details):
+   - **Order chat**, buyer and reseller. The supplier **reads every message but cannot write** (the API refuses it; their screen has no box). The buyer is told the supplier can read it.
+   - **Trade thread**, supplier and reseller, about that order. The buyer does not see it.
+   - The supplier never writes to the buyer and the buyer never to the supplier; hand-over details travel on the order itself (above). BitoCard's support and dispute staff read both threads.
+6. **Nothing sells that is not there.** Stock is shared by Shop and every reseller store; a listing that sells out, expires, is paused or removed leaves every store at once.
+7. **BitoCard decides disputes**, not the reseller (the money is in escrow); supplier and reseller both add notes and evidence, and BitoCard reads both threads and the order's snapshot.
+8. **Three-way same-person check**: supplier, reseller (its owner and team) and buyer must all be different people (KYC fingerprint, name and birth date, bank accounts), so nobody farms margins or fees with their own accounts.
+9. **Strikes for resellers too**: disputes upheld because of the store's note or its claims, upheld reports, and resale orders the reseller's store cancels count towards a reseller strike limit; reaching it pauses the store's resale checkout until operations clear it.
+10. **Supplier and reseller outside orders**: open, as decided: the My Resellers chat and each other's phone numbers, shown through the platform (both are verified and work together). This never extends to the buyer.
+11. **Existing guards carry over**: the new-seller order limit, the payout review of reversible top-ups, the payout hold, the supplier's strikes and readiness (identity and payout account) before their listings can be resold.
 
 ## Autopilot
 
@@ -67,7 +79,7 @@ The order records every figure when the buyer buys (S, P, D or the deal, the sup
 - **Deadlines and payments** run in the existing `classifieds` job: accept windows, hand-over and confirm deadlines, automatic refunds and strikes; earnings released after the hold by the existing `earnings` job.
 - **Auto-listing rules** for resellers: "add every resale listing in Phones from verified suppliers at +15%", applied as new listings open; resellers can exclude suppliers or listings.
 - **Auto-accept** for suppliers who want it (above).
-- **Everyone is told**: supplier (new order to accept, hand-over due, released, paid out, a reseller's note to approve, a deal offered), reseller (sale, accepted, released, dispute, listing gone or paused, deal offered or ended), buyer (locked, accepted with the code, sent, released, refunded), by inbox, push and email.
+- **Everyone is told**: supplier (new order to accept, hand-over due, a message in the trade thread, released, paid out, a reseller's note to approve, a deal offered), reseller (sale, accepted, a message from the buyer or the supplier, released, dispute, listing gone or paused, note approved or refused, deal offered or ended), buyer (locked, accepted with the code and hand-over details, a message from the store, sent, released, refunded), by inbox, push and email.
 - **API-first**: resellers can do all of it from their own systems (`/v1/resale/...`: browse, add and price, notes, deals, orders, webhooks `resale_order.*`), in the public OpenAPI document.
 
 ## Stages
@@ -82,22 +94,25 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 - Shop tab, Post an ad: "Sell on BitoCard Shop" and "Let resellers sell this", stock, the discount and markup limit (within the country's limits, with the worked sum shown live); My listings shows how many stores carry each listing and their sales.
 
 ### Stage 2: resellers, suppliers and My Resellers
-- `ResaleListing` (store, listing, markup bps or fixed price, note, note status `pending` | `approved` | `refused`, status `active` | `paused` | `gone`), per store; `ResaleRule` for auto-listing.
+- `ResaleListing` (store, listing, markup bps or fixed price, status `active` | `paused` | `gone`), per store, with no field for anything about the item itself; `ResaleNote` (the store listing's one note: text, status `pending` | `approved` | `refused` | `withdrawn`, who decided and when; only an approved note is ever served); `ResaleRule` for auto-listing.
 - `ResaleRelationship` (supplier, reseller): made when a reseller first adds one of the supplier's listings; carries the chat (`ResaleMessage`: text, photos, deal offers) and each side's phone, shown to the other; either side can block.
 - `ResaleDeal` (above): offered in the chat by the supplier, accepted by the reseller, ended by either.
 - Reseller endpoints `/v1/resale/catalogue` (resale listings of verified suppliers in their country: category, words, price, supplier rating, condition, delivery), `/v1/resale/listings` (add, price, note, pause, remove), `/v1/resale/rules`, `/v1/resale/suppliers` (chat, deals); SHQ **Resale** section (Browse, My listings, Rules, Suppliers with their chats and deals, a price preview showing the margin).
-- Supplier endpoints and the Shop tab's **My Resellers** (each reseller and store carrying their listings, their sales, the chat with phone numbers, deals offered and running, notes waiting for approval).
+- Supplier endpoints and the Shop tab's **My Resellers** (each reseller and store carrying their listings, their sales, the chat with phone numbers, deals offered and running, notes waiting for approval with Approve, Refuse and Withdraw, and Stop this store reselling my listings).
 - Gates: switch `reseller_resale` (global, country, reseller), a verified (KYB) reseller with a Resale shop store. Every plan, Startup included; the existing plan features and limits (stores, domains, custom domains, AI and the rest) apply as they do today.
 
 ### Stage 3: the Resale shop template and its storefront
 - Template `resale_shop` (three variants and their themes, `store_template_resale_shop` switch) selling resale listings instead of catalogue products: `StorefrontService.availability` and checkout learn a second kind of item.
 - New sections: `listing_rail`, `listing_grid`, `resale_categories`, plus `features` and `faq`; the home editor, starter pages and previews as for every template.
-- Pages on the reseller's store: category, search, listing (`/l/<ref>-<slug>`: the supplier's photos and facts, the reseller's price and approved note, how payment is protected, delivery or meet-up area), with the store's own SEO.
+- Pages on the reseller's store: category, search, listing (`/l/<ref>-<slug>`: the supplier's photos and facts, the reseller's price and approved note, "Supplied by <supplier>", how payment is protected, delivery or meet-up area), and the **supplier's page** (`/suppliers/<id>`: the supplier and this listing exactly as they wrote it), with the store's own SEO.
+- The supplier line is part of the listing component itself, not a section: no template, variant, theme, home page layout or plan (white label included) can hide it; a test renders every variant and checks it.
+- The store's free-text sections are checked when saved for claims of owning, making or stocking the items (admin word list; refused or sent to review).
 - The store's wallets must be on and collected by BitoCard (`payment_collector` cannot be `own` on a Resale shop).
 
 ### Stage 4: buying, fulfilment and payouts
 - Safe pay orders gain `kind` (`direct` | `resale`), `store_id`, `reseller_id`, the price figures, the deal used and `quantity`; the buyer of a resale order may be any store's customer. New status `locked`; new ledger account `customer_wallet_locked` (a customer account, never below zero).
-- Lock, accept, then debit (above); auto-accept; the order chat (supplier, buyer, the reseller reading); release code and delivery as today; the three-way release entry; partial refunds split in proportion; the three-way same-person check; reseller strikes.
+- Lock, accept, then debit (above); auto-accept; the hand-over details on the order (meeting point and times, or courier and tracking); release code and delivery as today; the three-way release entry; partial refunds split in proportion; the three-way same-person check; reseller strikes.
+- Two threads per order: the **order chat** (buyer and reseller write; the supplier reads only, refused by the API if they try to write) and the **trade thread** (supplier and reseller; never shown to the buyer). Both kept like Shop chats (12 months after their last message), read by BitoCard's support and dispute staff, with photos as in Shop chats.
 - Order pages: the buyer's in the store's account app; the supplier's in the Shop tab (Orders, marked "Resale through <store>"); the reseller's in SHQ (Resale > Orders) and the API; admin Shop > Safe pay orders with a Resale filter.
 
 ### Stage 5: disputes, reports and launch
@@ -108,7 +123,7 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 
 - **The supplier is the seller of record**: the reseller is the store that sold it (paid a margin) and BitoCard holds the money. Lawyers to confirm per country (consumer law, Nigeria's FCCPA), whether the reseller acts as the supplier's agent, and what the receipt says.
 - **Safe pay licensing** is still owed for BitoCard Shop (holding buyers' money; CBN in Nigeria). Resale adds locking store-wallet money and holding money owed to two parties.
-- **Terms**: the Shop terms (suppliers opting in, stock, discounts, deals, approving notes, accepting and handing over to resellers' buyers, phone numbers shared with resellers), the reseller terms (resale stores, price limits, deals, notes, strikes, first-line support, earnings), customer terms on resale stores (who the seller is, locked funds, acceptance), and the privacy notice (the supplier sees the buyer's first name and address; supplier and reseller see each other's phone numbers; the reseller reads the order chat).
+- **Terms**: the Shop terms (suppliers opting in, stock, discounts, deals, approving notes, accepting and handing over to resellers' buyers, phone numbers shared with resellers), the reseller terms (resale stores, price limits, deals, notes, strikes, first-line support, earnings), customer terms on resale stores (who the seller is, locked funds, acceptance), and the privacy notice (the supplier reads the buyer's chat with the store and sees their first name and delivery address; supplier and reseller see each other's phone numbers; the store shows the supplier's public profile). The reseller terms must forbid posing as the owner or maker of the items, with strikes and suspension for it.
 - **Tax** on the reseller's margin and BitoCard's fees.
 
 ## Decisions (owner, 26 October 2026)
@@ -123,7 +138,13 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 8. **Plans**: every plan, Startup included; existing plan features and limits apply as usual.
 9. **Cross-border**: no; supplier, store and buyer in the same country.
 
-Proposed here, not yet decided: **auto-accept** for suppliers (off by default).
+10. **Security first**: resellers may pose as the real owners, so nothing a reseller writes reaches a listing except the note the supplier approves; the supplier's own page can be opened right on the reseller's store.
+11. **Order conversations**: the buyer talks to the reseller; the supplier reads all of it but cannot write to the buyer; supplier and reseller talk in the order's trade thread.
+
+Proposed here, not yet decided:
+- **A. Auto-accept** for suppliers (off by default).
+- **B. The supplier's page on the store shows no price**: who the supplier is and the listing as they wrote it, but not their price (the store's price is the reseller's business; a listing also on BitoCard Shop shows its price there anyway).
+- **C. Delivery contact**: for delivery the supplier gets a phone number for the courier only, on the courier booking, never in a thread; or none, the courier calling the store.
 
 ## Not in this plan
 
