@@ -44,6 +44,7 @@ export default async function ResellersPage() {
                     <span className="truncate text-sm text-slate-600">
                       {row.listings_carried} {row.listings_carried === 1 ? "listing" : "listings"}
                       {row.stores.length ? ` on ${row.stores.map(store => store.name).join(", ")}` : ""}
+                      {row.sales.completed ? ` · ${row.sales.completed} sold` : ""}
                     </span>
                     <span className="flex flex-wrap gap-1.5 text-[11px] font-bold">
                       {row.notes_pending ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-900">{row.notes_pending} {row.notes_pending === 1 ? "note" : "notes"} to approve</span> : null}

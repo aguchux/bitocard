@@ -13,7 +13,14 @@ const decisions: Array<{ value: ClassifiedDisputeDecision; title: string; detail
   { value: "release", title: "Release to the seller", detail: "Seller paid less their fee. Both fees kept." },
 ];
 
-const authorLabels = { buyer: "Buyer", seller: "Seller", bitocard: "BitoCard" } as const;
+const authorLabels = { buyer: "Buyer", seller: "Seller", reseller: "Store", bitocard: "BitoCard" } as const;
+
+/** On a resale order, whose strike an upheld dispute is: the supplier's, or the store's when its note or claims misled the buyer. */
+const faults = [
+  { value: "supplier", title: "The supplier", detail: "The item or its delivery was not as the supplier’s listing said." },
+  { value: "reseller", title: "The store", detail: "The store’s note, pages or messages misled the buyer." },
+  { value: "none", title: "Nobody", detail: "No strike for either." },
+] as const;
 
 /**
  * One Safe pay order: the money each side sees, the people, the deadlines and what happened, and its dispute. Support,
@@ -245,13 +252,14 @@ function Dispute({ order }: { order: AdminClassifiedOrderDetail }) {
           <Notice tone="blue" title={`Decided ${formatDateTime(dispute.decided_at)}`}>
             {dispute.decision === "partial" && dispute.refund !== null ? `${formatMoney(dispute.refund, order.currency)} refunded. ` : ""}
             {dispute.note}
+            {dispute.fault && dispute.fault !== "none" ? ` A strike for ${dispute.fault === "reseller" ? "the store" : "the seller"}.` : ""}
           </Notice>
         ) : null}
         <ol className="space-y-3">
           {dispute.messages.map(message => (
             <li key={message.id} className={cn("rounded-xl border px-4 py-3 text-sm", message.from === "bitocard" ? "border-brand-200 bg-brand-50" : "border-line bg-white")}>
               <p className="text-xs font-semibold text-muted">
-                {authorLabels[message.from]} · {formatDateTime(message.created_at)}
+                {authorLabels[message.from]}{message.name && message.from !== "bitocard" ? ` (${message.name})` : ""} · {formatDateTime(message.created_at)}
               </p>
               {message.body ? <p className="mt-1 whitespace-pre-line text-ink">{message.body}</p> : null}
               {message.photo ? (
@@ -295,8 +303,10 @@ function Decision({ order, finance }: { order: AdminClassifiedOrderDetail; finan
   const [decision, setDecision] = useState<ClassifiedDisputeDecision>(finance ? "partial" : "release");
   const [refund, setRefund] = useState("");
   const [note, setNote] = useState("");
+  const [fault, setFault] = useState<(typeof faults)[number]["value"]>("supplier");
   const [confirming, setConfirming] = useState(false);
   const [decide] = useDecideClassifiedDisputeMutation();
+  const resale = order.kind === "resale";
   const money = (minor: number) => formatMoney(minor, order.currency);
   const refundMinor = amountToMinor(refund);
   const refundProblem = decision === "partial" && (refundMinor === null || refundMinor <= 0 || refundMinor >= order.price) ? `More than nothing and less than ${money(order.price)}.` : null;
@@ -345,6 +355,20 @@ function Decision({ order, finance }: { order: AdminClassifiedOrderDetail; finan
             <dd>{money(outcome.buyer_fee_kept)}</dd>
           </div>
         </dl>
+        {resale && decision !== "release" ? (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-semibold text-ink">Whose strike is it?</legend>
+            {faults.map(option => (
+              <label key={option.value} className={cn("flex gap-3 rounded-xl border p-3", fault === option.value ? "border-2 border-ink" : "border-line")}>
+                <input type="radio" name={`${id}-fault`} value={option.value} checked={fault === option.value} onChange={() => setFault(option.value)} className="mt-1 size-4 accent-ink" />
+                <span>
+                  <span className="block text-sm font-semibold text-ink">{option.title}</span>
+                  <span className="block text-xs text-muted">{option.detail}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        ) : null}
         <Field label="Reason, shown to both" htmlFor={`${id}-note`} hint="At least 5 characters. Recorded in the activity log.">
           <Textarea id={`${id}-note`} rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} />
         </Field>
@@ -361,7 +385,7 @@ function Decision({ order, finance }: { order: AdminClassifiedOrderDetail; finan
           description={`The buyer gets back ${money(outcome.buyer_gets)} and the seller is paid ${money(outcome.seller_gets)}, at once. Both sides are told your reason.`}
           confirmLabel="Decide"
           tone={decision === "release" ? "primary" : "danger"}
-          onConfirm={() => decide({ id: order.id, decision, note: note.trim(), ...(decision === "partial" && refundMinor !== null ? { refund: refundMinor } : {}) }).unwrap()}
+          onConfirm={() => decide({ id: order.id, decision, note: note.trim(), ...(decision === "partial" && refundMinor !== null ? { refund: refundMinor } : {}), ...(resale && decision !== "release" ? { fault } : {}) }).unwrap()}
         />
       ) : null}
     </Card>

@@ -123,6 +123,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'Limits and words', href: '/classifieds/rules', icon: SlidersHorizontal },
       { label: 'Safe pay settings', href: '/classifieds/safe-pay', icon: Percent },
       { label: 'Resale settings', href: '/classifieds/resale', icon: Repeat },
+      { label: 'Store reports', href: '/classifieds/resale-reports', icon: Flag },
     ],
   },
   reports: {
@@ -131,6 +132,7 @@ export const menus: Record<SectionKey, { title: string; items: SubNavItem[] }> =
       { label: 'P&L', href: '/reports', icon: ChartNoAxesColumn },
       { label: 'Growth', href: '/reports/growth', icon: TrendingUp },
       { label: 'Supplier funding', href: '/reports/suppliers', icon: Wallet },
+      { label: 'Safe pay and resale', href: '/reports/resale', icon: HandCoins },
       { label: 'Statements', href: '/reports/statements', icon: ReceiptText },
     ],
   },

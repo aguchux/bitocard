@@ -8,9 +8,11 @@ import {
   type ResaleOrderDetail,
   type ResaleOrderThread,
   useCancelResaleOrderMutation,
+  useResaleOrderDisputeQuery,
   useResaleOrderMessagesQuery,
   useResaleOrderQuery,
   useSendResaleOrderMessageMutation,
+  useWriteResaleDisputeMutation,
 } from "@bitocard/api-client/reseller";
 import { shipmentLabels } from "@bitocard/api-client/classifieds";
 import { ShqShell } from "@/components/shq-shell";
@@ -55,6 +57,47 @@ function Thread({ order, thread, canWrite }: { order: ResaleOrderDetail; thread:
       placeholder={thread === "order" ? "Write to the buyer (they see your store’s name)" : "Write to the supplier"}
       onSend={async body => "data" in (await send({ id: order.id, thread, body }))}
     />
+  );
+}
+
+const faultText = { supplier: "the supplier", reseller: "your store", none: "nobody" } as const;
+
+/** The buyer's dispute: the buyer, the supplier and your team all write to BitoCard here, which decides. */
+function Dispute({ order, canWrite }: { order: ResaleOrderDetail; canWrite: boolean }) {
+  const dispute = useResaleOrderDisputeQuery(order.id, { pollingInterval: 10_000, skipPollingIfUnfocused: true });
+  const [write, writing] = useWriteResaleDisputeMutation();
+  const decided = dispute.data?.status === "decided";
+  return (
+    <Card>
+      <CardHeader
+        title="Dispute"
+        description={
+          decided && dispute.data
+            ? `BitoCard decided: ${dispute.data.note ?? ""}${dispute.data.fault ? ` It counted against ${faultText[dispute.data.fault]}.` : ""}`
+            : "Tell BitoCard what you know: what your store’s note and pages said, and anything the buyer was told. A dispute lost because of your store counts towards your strikes."
+        }
+      />
+      <div className="p-5">
+        <QueryView query={dispute} loading={<Skeleton className="h-48" />}>
+          {data => (
+            <ChatPanel
+              side="reseller"
+              messages={data.messages.map(message => ({
+                id: message.id,
+                author: message.from === "me" ? "reseller" : message.from === "bitocard" ? "bitocard" : "customer",
+                author_name: message.name,
+                body: message.body || (message.photo ? "(sent a photo)" : ""),
+                created_at: message.created_at,
+              }))}
+              disabled={!canWrite || decided}
+              error={writing.error ? errorMessage(writing.error) : null}
+              placeholder="Write to BitoCard (the buyer and the supplier see it too)"
+              onSend={async body => "data" in (await write({ id: order.id, body }))}
+            />
+          )}
+        </QueryView>
+      </div>
+    </Card>
   );
 }
 
@@ -108,6 +151,7 @@ export default function ResaleOrderPage() {
                     <Thread key={thread} order={order} thread={thread} canWrite={canWrite} />
                   </div>
                 </Card>
+                {order.dispute ? <Dispute order={order} canWrite={canWrite} /> : null}
               </div>
               <div className="space-y-6">
                 <Card>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardHeader, DataTable, DateRangePicker, defaultDateRange, errorMessage, PageHeader, StatCard, type Column, type DateRange } from "@bitocard/admin-ui";
-import { type ResellerPnlReport, useResellerPnlQuery } from "@bitocard/api-client/reseller";
+import { type ResellerPnlReport, useResellerPnlQuery, useResaleReportQuery } from "@bitocard/api-client/reseller";
 import { ReportDownloads } from "@/components/report-downloads";
 import { ShqShell } from "@/components/shq-shell";
 
@@ -26,6 +26,7 @@ export default function ResellerPnlPage() {
   const [range, setRange] = useState<DateRange>(defaultDateRange());
   const query = { from: range.from, to: range.to };
   const pnl = useResellerPnlQuery(query);
+  const resale = useResaleReportQuery(query);
   const data = pnl.data;
 
   return (
@@ -52,6 +53,28 @@ export default function ResellerPnlPage() {
         <CardHeader title="Breakdown" description="Every item behind the totals above, for this range." />
         <DataTable columns={columnsFor(data?.currency ?? "")} rows={data?.breakdown} rowKey={row => row.kind} loading={pnl.isLoading} error={pnl.error ? errorMessage(pnl.error) : null} onRetry={pnl.refetch} empty="No activity in this range." />
       </Card>
+
+      {resale.data && resale.data.orders.placed + resale.data.totals.length > 0 ? (
+        <Card>
+          <CardHeader
+            title="Resale orders"
+            description={`BitoCard Shop listings sold on your Resale shops: ${resale.data.orders.placed} placed, ${resale.data.orders.completed} completed, ${resale.data.orders.open} open, ${resale.data.orders.refunded} refunded and ${resale.data.orders.not_accepted} not accepted in this range. Money below is for orders released in the range.`}
+          />
+          <DataTable
+            columns={[
+              { key: "currency", header: "Currency", cell: row => row.currency },
+              { key: "orders", header: "Orders", align: "right", cell: row => row.orders },
+              { key: "sales", header: "Sales", align: "right", cell: row => money(row.sales, row.currency) },
+              { key: "margin", header: "Your margin", align: "right", hideOnMobile: true, cell: row => money(row.margin, row.currency) },
+              { key: "fees", header: "BitoCard’s fee", align: "right", hideOnMobile: true, cell: row => money(row.reseller_fees, row.currency) },
+              { key: "earnings", header: "Earnings", align: "right", cell: row => <span className="font-semibold tabular-nums">{money(row.earnings, row.currency)}</span> },
+            ]}
+            rows={resale.data.totals}
+            rowKey={row => row.currency}
+            empty="No resale orders released in this range."
+          />
+        </Card>
+      ) : null}
     </ShqShell>
   );
 }

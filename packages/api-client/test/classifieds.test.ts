@@ -105,4 +105,18 @@ describe('admin classifieds', () => {
     expect(disputeOutcome(order, 'partial', 12_000_000)).toEqual({ buyer_gets: 12_000_000, seller_gets: 34_920_000, seller_fee: 1_080_000, buyer_fee_kept: 960_000 });
     expect(disputeOutcome(order, 'release')).toEqual({ buyer_gets: 0, seller_gets: 46_560_000, seller_fee: 1_440_000, buyer_fee_kept: 960_000 });
   });
+
+  test('resale stage 5: store reports filtered and decided, a dispute fault, the fees report', async () => {
+    const store = makeStore();
+    await store.dispatch(adminClassifiedsApi.endpoints.resaleStoreReports.initiate({ status: 'open', reseller_id: 'r1' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.decideResaleStoreReport.initiate({ id: 'rr1', decision: 'upheld', note: 'Claimed the items.' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.decideClassifiedDispute.initiate({ id: 'o1', decision: 'partial', refund: 3000, note: 'The store promised it.', fault: 'reseller' }));
+    await store.dispatch(adminClassifiedsApi.endpoints.resaleFeesReport.initiate({ mode: 'live', from: '2026-10-01', to: '2026-10-31', country: 'NG' }));
+    expect(calls[0]!.url).toBe('http://api.test/v1/admin/classifieds/resale-reports?limit=50&status=open&reseller_id=r1');
+    expect(sent()).toEqual([
+      ['POST', 'http://api.test/v1/admin/classifieds/resale-reports/rr1/decide', { decision: 'upheld', note: 'Claimed the items.' }],
+      ['POST', 'http://api.test/v1/admin/classifieds/orders/o1/dispute/decide', { decision: 'partial', refund: 3000, note: 'The store promised it.', fault: 'reseller' }],
+    ]);
+    expect(calls.map(call => call.url)).toContain('http://api.test/v1/admin/reports/resale?mode=live&from=2026-10-01&to=2026-10-31&country=NG');
+  });
 });

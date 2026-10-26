@@ -254,6 +254,8 @@ export type ClassifiedDispute = {
   reason: 'not_received' | 'not_as_described' | 'damaged' | 'other';
   status: 'open' | 'decided';
   decision: ClassifiedDisputeDecision | null;
+  /** Whose strike an upheld dispute was (a resale order's store's when its note or claims misled the buyer). */
+  fault: 'supplier' | 'reseller' | 'none' | null;
   refund: number | null;
   note: string | null;
   decided_at: string | null;
@@ -263,7 +265,10 @@ export type ClassifiedDispute = {
 export type ClassifiedDisputeMessage = {
   object: 'classified_dispute_message';
   id: string;
-  from: 'buyer' | 'seller' | 'bitocard';
+  /** `reseller`: the Resale shop's team, on a resale order. */
+  from: 'buyer' | 'seller' | 'reseller' | 'bitocard';
+  /** Who wrote it: a first name and initial, the store's name, or BitoCard. */
+  name: string;
   body: string;
   photo: { url: string; content_type: string | null; size: number | null; width: number | null; height: number | null } | null;
   created_at: string;
@@ -276,8 +281,37 @@ export type AdminClassifiedOrderFilter = { status?: ClassifiedOrderStatus; count
 /** A courier offered when marking a Safe pay order shipped: its tracking link has `{tracking}` where the number goes. */
 export type ClassifiedCourier = { name: string; tracking_url: string | null };
 
-/** A reseller's resale strikes (orders their stores cancelled in 90 days) against the country's limit. */
-export type ResaleStanding = { object: 'resale_standing'; reseller_id: string; strikes: number; strike_limit: number; limited: boolean; cancelled_by_store: number; cleared_at: string | null };
+/** A reseller's resale strikes in 90 days (orders their stores cancelled, disputes lost because of a store, reports upheld) against the country's limit. */
+export type ResaleStanding = { object: 'resale_standing'; reseller_id: string; strikes: number; strike_limit: number; limited: boolean; cancelled_by_store: number; disputes_lost: number; reports_upheld: number; cleared_at: string | null };
+
+export type ResaleStoreReportReason = 'claims_ownership' | 'misleading' | 'pay_outside' | 'misused_details' | 'other';
+/** A buyer's or supplier's report of a Resale shop, for BitoCard to uphold (a strike for the reseller) or dismiss. */
+export type AdminResaleStoreReport = {
+  object: 'resale_store_report';
+  id: string;
+  number: string;
+  store: { id: string; name: string; subdomain: string };
+  reseller: { id: string; name: string };
+  reporter: { id: string; name: string; email: string; kind: 'buyer' | 'supplier' };
+  reason: ResaleStoreReportReason;
+  details: string;
+  order_id: string | null;
+  status: 'open' | 'upheld' | 'dismissed';
+  note: string | null;
+  decided_at: string | null;
+  created_at: string;
+};
+
+/** Safe pay's fees in a period by market and kind (BitoCard Shop's own sales, resale). */
+export type ResaleFeesReport = {
+  object: 'resale_fees_report';
+  mode: 'test' | 'live';
+  from: string;
+  to: string;
+  markets: Array<{ country: string; currency: string; kind: 'direct' | 'resale'; orders: number; sales: number; delivery: number; part_refunds: number; buyer_fees: number; seller_fees: number; reseller_fees: number; fees: number }>;
+  refunded: Array<{ country: string; currency: string; kind: 'direct' | 'resale'; orders: number; sales: number }>;
+  top_resellers: Array<{ reseller: { id: string; name: string }; currency: string; orders: number; sales: number; reseller_fees: number }>;
+};
 
 export type ClassifiedSafePaySettings = {
   object: 'classified_safe_pay_settings';
@@ -494,7 +528,7 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ id, body }) => ({ url: `/v1/admin/classifieds/orders/${encodeURIComponent(id)}/dispute/messages`, method: 'POST', body: { body } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ClassifiedOrder', id }],
     }),
-    decideClassifiedDispute: build.mutation<AdminClassifiedOrderDetail, { id: string; decision: ClassifiedDisputeDecision; refund?: number; note: string }>({
+    decideClassifiedDispute: build.mutation<AdminClassifiedOrderDetail, { id: string; decision: ClassifiedDisputeDecision; refund?: number; note: string; fault?: 'supplier' | 'reseller' | 'none' }>({
       query: ({ id, ...body }) => ({ url: `/v1/admin/classifieds/orders/${encodeURIComponent(id)}/dispute/decide`, method: 'POST', body }),
       // A refund or release moves money and may limit the seller.
       invalidatesTags: (_result, _error, { id }) => [...orderTags(id), 'ClassifiedSeller', 'Report'],
@@ -528,6 +562,19 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
     removeResaleClaimPhrase: build.mutation<{ id: string; deleted: true }, string>({
       query: id => ({ url: `/v1/admin/classifieds/resale-claim-phrases/${id}`, method: 'DELETE' }),
       invalidatesTags: [{ type: 'ClassifiedSettings', id: 'RESALE_PHRASES' }, 'Activity'],
+    }),
+    resaleStoreReports: build.query<Paged<AdminResaleStoreReport>, { status?: 'open' | 'upheld' | 'dismissed'; reseller_id?: string; offset?: number }>({
+      query: filter => ({ url: '/v1/admin/classifieds/resale-reports', params: params({ limit: 50, ...filter }) }),
+      providesTags: [{ type: 'Report', id: 'RESALE' }],
+    }),
+    resaleStoreReport: build.query<AdminResaleStoreReport, string>({ query: id => `/v1/admin/classifieds/resale-reports/${encodeURIComponent(id)}`, providesTags: (_result, _error, id) => [{ type: 'Report', id }] }),
+    decideResaleStoreReport: build.mutation<AdminResaleStoreReport, { id: string; decision: 'upheld' | 'dismissed'; note: string }>({
+      query: ({ id, ...body }) => ({ url: `/v1/admin/classifieds/resale-reports/${encodeURIComponent(id)}/decide`, method: 'POST', body }),
+      // An upheld report is a strike: the reseller's standing changes too.
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'Report', id }, { type: 'Report', id: 'RESALE' }, 'ClassifiedSettings', 'Activity'],
+    }),
+    resaleFeesReport: build.query<ResaleFeesReport, { mode: 'test' | 'live'; from: string; to: string; country?: string }>({
+      query: filter => ({ url: '/v1/admin/reports/resale', params: params(filter) }),
     }),
     resaleStanding: build.query<ResaleStanding, string>({
       query: resellerId => `/v1/admin/classifieds/resellers/${encodeURIComponent(resellerId)}/resale-standing`,
@@ -583,6 +630,10 @@ export const {
   useRemoveResaleClaimPhraseMutation,
   useResaleStandingQuery,
   useClearResaleStrikesMutation,
+  useResaleStoreReportsQuery,
+  useResaleStoreReportQuery,
+  useDecideResaleStoreReportMutation,
+  useResaleFeesReportQuery,
 } = adminClassifiedsApi;
  type ResaleClaimPhrase = { object: 'resale_claim_phrase'; id: string; phrase: string; created_at: string };
 

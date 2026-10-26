@@ -294,6 +294,8 @@ export type ShopDisputeMessage = {
   object: 'classified_dispute_message';
   id: string;
   from: 'me' | 'them' | 'bitocard';
+  /** Who wrote it (a resale order's buyer reads the supplier's and the store's messages as the store's). */
+  name?: string;
   body: string;
   photo: { url: string; content_type: string | null; size: number | null; width: number | null; height: number | null } | null;
   created_at: string;
@@ -305,11 +307,36 @@ export type ShopDispute = {
   reason: ShopDisputeReason;
   status: 'open' | 'decided';
   decision: 'refund' | 'partial' | 'release' | null;
+  /** Whose strike an upheld dispute was: the supplier's, the reseller's (a resale order's store) or nobody's. */
+  fault?: 'supplier' | 'reseller' | 'none' | null;
   refund: number | null;
   note: string | null;
   decided_at: string | null;
   created_at: string;
   messages: ShopDisputeMessage[];
+};
+
+/** Reporting a Resale shop to BitoCard: what it did. */
+export type ShopStoreReportReason = 'claims_ownership' | 'misleading' | 'pay_outside' | 'misused_details' | 'other';
+export const storeReportReasonLabels: Record<ShopStoreReportReason, string> = {
+  claims_ownership: 'Claims to own or make the items',
+  misleading: 'Says things about an item the supplier did not',
+  pay_outside: 'Asked to be paid outside BitoCard',
+  misused_details: 'Used a buyer’s details for something else',
+  other: 'Something else',
+};
+export type ShopStoreReport = {
+  object: 'resale_store_report';
+  id: string;
+  number: string;
+  store: { id: string; name: string; subdomain: string };
+  reason: ShopStoreReportReason;
+  details: string;
+  order_id: string | null;
+  status: 'open' | 'upheld' | 'dismissed';
+  note: string | null;
+  decided_at: string | null;
+  created_at: string;
 };
 export type ShopReleaseCode = { object: 'classified_release_code'; order_id: string; code: string; tries_left: number };
 /** What a seller still needs before accepting Safe pay orders. */
@@ -359,6 +386,8 @@ export type ShopReseller = {
   stopped: boolean;
   closed_by_reseller: boolean;
   listings_carried: number;
+  /** What this reseller has sold of the supplier's: orders by state and what the supplier was paid. */
+  sales: { open: number; completed: number; refunded: number; paid_to_you: { currency: string; amount: number } | null };
   notes_pending: number;
   unread: number;
   deals: ShopResaleDeal[];

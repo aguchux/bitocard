@@ -491,7 +491,7 @@ export function DisputeThread({ dispute }: { dispute: ShopDispute }) {
       <ol className="grid gap-2">
         {messages.map(message => (
           <li key={message.id} className={`grid max-w-md gap-1 rounded-2xl px-3 py-2 text-sm ${message.from === "me" ? "justify-self-end bg-navy-900 text-white" : message.from === "bitocard" ? "justify-self-center bg-amber-50 text-amber-950" : "justify-self-start bg-slate-100"}`}>
-            <span className="text-[11px] font-semibold opacity-70">{message.from === "me" ? "You" : message.from === "bitocard" ? "BitoCard" : "The other side"}</span>
+            <span className="text-[11px] font-semibold opacity-70">{message.from === "me" ? "You" : message.from === "bitocard" ? "BitoCard" : (message.name ?? "The other side")}</span>
             {message.photo && localPhotoUrl(message.photo.url) ? (
               <a href={localPhotoUrl(message.photo.url)!} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl">
                 <img src={localPhotoUrl(message.photo.url)!} alt={message.body || "A photo"} className="max-h-56 w-full object-cover" loading="lazy" />

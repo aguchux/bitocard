@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ExternalLink, Phone } from "lucide-react";
-import type { ShopReseller, ShopResaleMessage } from "@bitocard/api-client/classifieds";
+import { shopMoney, type ShopReseller, type ShopResaleMessage } from "@bitocard/api-client/classifieds";
 import { NoteDecision, ResellerChat, ResellerDeals, StopReselling } from "@/components/app/shop/resellers";
+import { ReportStore } from "@/components/app/shop/report-store";
 import { customerApi } from "@/lib/customer";
 import { uuidPattern } from "@/lib/shop";
 import { requireShop } from "@/lib/shop-server";
@@ -63,6 +64,12 @@ export default async function ResellerPage({ params }: Props) {
         <p className="text-sm text-slate-600">
           {reseller.listings_carried} of your {reseller.listings_carried === 1 ? "listing" : "listings"} on their stores.
         </p>
+        {reseller.sales.completed + reseller.sales.open + reseller.sales.refunded ? (
+          <p className="text-sm text-slate-600">
+            {reseller.sales.completed} sold, {reseller.sales.open} on the way, {reseller.sales.refunded} refunded
+            {reseller.sales.paid_to_you ? `; ${shopMoney(reseller.sales.paid_to_you.amount, reseller.sales.paid_to_you.currency)} paid to you` : ""}.
+          </p>
+        ) : null}
       </section>
 
       {pending.length ? (
@@ -97,6 +104,7 @@ export default async function ResellerPage({ params }: Props) {
 
       <section className="grid gap-2 border-t border-slate-200 pt-4">
         <StopReselling reseller={reseller} />
+        {reseller.stores.length ? <ReportStore target={{ kind: "reseller", relationshipId: reseller.id, stores: reseller.stores }} /> : null}
       </section>
     </div>
   );

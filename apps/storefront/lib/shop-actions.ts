@@ -21,6 +21,8 @@ import type {
   ShopResaleMessage,
   ShopReseller,
   ShopShipmentStatus,
+  ShopStoreReport,
+  ShopStoreReportReason,
   ShopSuggestion,
   ShopVideoUpload,
 } from "@bitocard/api-client/classifieds";
@@ -377,6 +379,14 @@ export async function decideResaleNote(relationshipId: string, storeListingId: s
   const result = await customerApi<ShopReseller>("POST", `/v1/classifieds/me/resale-notes/${storeListingId}/${decision}`, body);
   revalidatePath(`/shop/resellers/${relationshipId}`);
   return answer(result);
+}
+
+/** Reports one of this reseller's stores to BitoCard (B2B reselling, stage 5); an upheld report is a strike for them. */
+export async function reportResellerStore(relationshipId: string, storeId: string, reason: ShopStoreReportReason, details: string): Promise<ShopResult<ShopStoreReport>> {
+  if (!id(relationshipId) || !id(storeId)) return refused("Choose one of their stores.", "store_id");
+  const text = details.trim();
+  if (text.length < 10) return refused("Say what happened, in at least 10 characters.", "details");
+  return answer(await customerApi<ShopStoreReport>("POST", `/v1/classifieds/me/resellers/${relationshipId}/report`, { store_id: storeId, reason, details: text.slice(0, 2000) }));
 }
 
 /** Stops this reseller selling the supplier's listings (every store of theirs), or lets them again. */

@@ -1,6 +1,6 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 4 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; stage 4 and 4b: buying, shipping and payouts; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 to 5 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132`, `b43b428`; stage 3: `df418e3` and the storefront after it; stage 4 and 4b: buying, shipping and payouts; stage 5: disputes, reports and strikes; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
@@ -151,7 +151,10 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 - Pickup and hand delivery keep the release code: the buyer gives it only once they have checked the item.
 - Order pages: the buyer's in the store's account app; the supplier's in the Shop tab (Orders, marked "Resale through <store>"); the reseller's in SHQ (Resale > Orders) and the API; admin Shop > Safe pay orders with a Resale filter.
 
-### Stage 5: disputes, reports and launch
+### Stage 5: disputes, reports and launch: built 26 October 2026 (launch still owed)
+
+**As built:** see `AGENTS.md`, B2B reselling, Stage 5. The reseller takes part in disputes; BitoCard's decision names whose fault it was (`supplier`, `reseller`, `none`), and only that party gets the strike. Buyers and suppliers report a store (`resale_store_reports`); operations uphold or dismiss, and an upheld report is a strike. Reseller strikes (cancellations, disputes lost because of a store, upheld reports, 90 days) pause the reseller's Resale shops at the country's limit. Reports for resellers (`/v1/reports/resale` and the P&L), suppliers (sales per reseller) and BitoCard (`/v1/admin/reports/resale`). The terms and privacy notice are drafted; lawyers' review and the pilot market remain.
+
 - Disputes with supplier and reseller both taking part, decided by BitoCard; reseller and supplier strikes; reports (reseller: resale sales and margin in Reports; supplier: sales by reseller; BitoCard: resale fees).
 - Legal (below), lawyers' review, then switches on market by market, starting with one pilot market.
 

@@ -249,6 +249,44 @@ export type ResaleOrderMessage = {
   created_at: string;
 };
 
+export type ResaleDisputeMessage = {
+  object: 'classified_dispute_message';
+  id: string;
+  from: 'me' | 'them' | 'bitocard';
+  name: string;
+  body: string;
+  photo: { url: string; content_type: string | null; size: number | null; width: number | null; height: number | null } | null;
+  created_at: string;
+};
+export type ResaleOrderDispute = {
+  object: 'classified_dispute';
+  id: string;
+  order_id: string;
+  reason: 'not_received' | 'not_as_described' | 'damaged' | 'other';
+  status: 'open' | 'decided';
+  decision: 'refund' | 'partial' | 'release' | null;
+  fault: 'supplier' | 'reseller' | 'none' | null;
+  refund: number | null;
+  note: string | null;
+  decided_at: string | null;
+  created_at: string;
+  messages: ResaleDisputeMessage[];
+};
+
+/** The reseller's own resale report: orders by state, and sales, margin, BitoCard's fee and earnings released in the period. */
+export type ResaleReport = {
+  object: 'reseller_resale_report';
+  mode: 'test' | 'live';
+  from: string;
+  to: string;
+  store_id: string | null;
+  orders: { placed: number; open: number; completed: number; refunded: number; not_accepted: number };
+  totals: Array<{ currency: string; orders: number; sales: number; margin: number; reseller_fees: number; earnings: number; part_refunds: number }>;
+  refunded: Array<{ currency: string; orders: number; sales: number }>;
+  by_store: Array<{ store: { id: string; name: string }; currency: string; orders: number; sales: number; earnings: number }>;
+  top_listings: Array<{ listing: { id: string; ref: number | null; title: string }; currency: string; orders: number; sales: number; earnings: number }>;
+};
+
 export const resaleOrderStatusText: Record<ResaleOrderStatus, string> = {
   locked: 'Waiting for the supplier',
   paid: 'Accepted: to hand over',
@@ -347,6 +385,15 @@ export const resaleApi = bitocardApi.injectEndpoints({
       query: ({ id, thread, body }) => ({ url: `/v1/resale/orders/${id}/messages`, method: 'POST', body: { thread, body } }),
       invalidatesTags: (_result, _error, { id }) => [{ type: 'ResaleOrder', id: `MESSAGES:${id}` }],
     }),
+    resaleOrderDispute: build.query<ResaleOrderDispute, string>({ query: id => `/v1/resale/orders/${id}/dispute`, providesTags: (_result, _error, id) => [{ type: 'ResaleOrder', id: `DISPUTE:${id}` }] }),
+    writeResaleDispute: build.mutation<ResaleDisputeMessage, { id: string; body: string }>({
+      query: ({ id, body }) => ({ url: `/v1/resale/orders/${id}/dispute/messages`, method: 'POST', body: { body } }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: 'ResaleOrder', id: `DISPUTE:${id}` }],
+    }),
+    resaleReport: build.query<ResaleReport, { from: string; to: string; store_id?: string }>({
+      query: filter => ({ url: '/v1/reports/resale', params: params(filter) }),
+      providesTags: [{ type: 'ResaleOrder', id: 'REPORT' }],
+    }),
     answerResaleDeal: build.mutation<ResaleDeal, { id: string; supplierId: string; answer: 'accept' | 'decline' | 'end' }>({
       query: ({ id, answer }) => ({ url: `/v1/resale/deals/${id}/${answer}`, method: 'POST' }),
       invalidatesTags: (_result, _error, { supplierId }) => [
@@ -389,6 +436,9 @@ export const {
   useCancelResaleOrderMutation,
   useResaleOrderMessagesQuery,
   useSendResaleOrderMessageMutation,
+  useResaleOrderDisputeQuery,
+  useWriteResaleDisputeMutation,
+  useResaleReportQuery,
 } = resaleApi;
 
 /** What a state means for the reseller, in a few words. */

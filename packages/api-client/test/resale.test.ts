@@ -79,6 +79,17 @@ describe('resale for resellers', () => {
     await vi.waitFor(() => expect(calls.slice(before).filter(call => call.method === 'GET').map(path)).toContain('/v1/resale/listings?limit=100&store_id=s1'));
   });
 
+  test('stage 5: the dispute thread, writing in it, and the resale report', async () => {
+    const store = makeStore();
+    await store.dispatch(resaleApi.endpoints.resaleOrderDispute.initiate('o1'));
+    await store.dispatch(resaleApi.endpoints.writeResaleDispute.initiate({ id: 'o1', body: 'We never promised a bracket.' }));
+    await store.dispatch(resaleApi.endpoints.resaleReport.initiate({ from: '2026-10-01', to: '2026-10-31', store_id: undefined }));
+    expect(sent()).toEqual([['POST', '/v1/resale/orders/o1/dispute/messages', { body: 'We never promised a bracket.' }]]);
+    expect(calls.map(path)).toContain('/v1/reports/resale?from=2026-10-01&to=2026-10-31');
+    // Writing refreshes the thread.
+    await vi.waitFor(() => expect(calls.filter(call => path(call) === '/v1/resale/orders/o1/dispute')).toHaveLength(2));
+  });
+
   test('labels', () => {
     expect(bpsPercent(1500)).toBe('15%');
     expect(bpsPercent(250)).toBe('2.5%');

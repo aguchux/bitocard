@@ -5,6 +5,7 @@ import { buyerOrderLabels, sellerOrderLabels, shipmentLabels, shopMoney, type Sh
 import { localPhotoUrl, type OrderAction, orderSteps, orderTone } from "@/lib/shop";
 import { DisputeThread, OrderPanel } from "./order-panel";
 import { OrderThread } from "./order-thread";
+import { ReportStore } from "./report-store";
 import { Thumb } from "./thumb";
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -203,6 +204,8 @@ export function OrderDetail({
           </p>
         ) : null}
       </section>
+
+      {resale && buyer && order.store ? <ReportStore target={{ kind: "order", orderId: order.id, storeName: order.store.name }} /> : null}
 
       {chatHref ? (
         <Link href={chatHref} className="flex h-12 items-center justify-center rounded-2xl border border-slate-300 bg-white font-bold hover:border-slate-400">

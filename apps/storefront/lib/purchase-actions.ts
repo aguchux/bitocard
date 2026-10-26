@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { ShopOrder, ShopOrderMessage } from "@bitocard/api-client/classifieds";
+import { type ShopOrder, type ShopOrderMessage, type ShopStoreReport, type ShopStoreReportReason, storeReportReasonLabels } from "@bitocard/api-client/classifieds";
 import { type CustomerResult, customerApi } from "./customer";
 import type { ShopResult } from "./shop-actions";
 import { uuidPattern } from "./shop";
@@ -79,4 +79,16 @@ export async function sendPurchaseMessage(orderId: string, text: string): Promis
   if (!uuidPattern.test(orderId)) return refused("No such order.");
   if (!text.trim()) return refused("Write a message.", "body");
   return answer(await customerApi<ShopOrderMessage>("POST", `/v1/store/resale/orders/${orderId}/messages`, { body: text.trim().slice(0, 2000) }));
+}
+
+/**
+ * Reports this Resale shop to BitoCard (B2B reselling, stage 5): claiming to own the items, saying what the supplier
+ * did not, asking for payment outside BitoCard or misusing the buyer's details. One open report per store.
+ */
+export async function reportStore(reason: ShopStoreReportReason, details: string, orderId?: string): Promise<ShopResult<ShopStoreReport>> {
+  if (!(reason in storeReportReasonLabels)) return refused("Choose what the store did.", "reason");
+  const text = details.trim();
+  if (text.length < 10) return refused("Say what happened, in at least 10 characters.", "details");
+  if (orderId && !uuidPattern.test(orderId)) return refused("No such order.");
+  return answer(await customerApi<ShopStoreReport>("POST", "/v1/store/resale/reports", { reason, details: text.slice(0, 2000), ...(orderId ? { order_id: orderId } : {}) }));
 }

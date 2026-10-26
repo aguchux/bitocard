@@ -50,3 +50,25 @@ describe("buying on a Resale shop", () => {
     expect(await actions.buyResale({ ref: 1, quantity: 1, fulfilment: "meet_up" }, 100, "form-nonce-1234")).toEqual({ ok: false, message: "The total is now ₦310,000.", code: "price_changed", param: "expected_total", signIn: false });
   });
 });
+
+describe("reporting a store", () => {
+  test("a buyer reports this Resale shop with their order; a supplier reports one of a reseller's stores; nonsense never reaches the API", async () => {
+    const fetch = vi.fn(async () => reply({ object: "resale_store_report", id: order, number: "RR-000001" }, 201));
+    vi.stubGlobal("fetch", fetch);
+    expect(await actions.reportStore("claims_ownership", "short", order)).toMatchObject({ ok: false, param: "details" });
+    expect(await actions.reportStore("nonsense" as never, "The home page says they make the TVs.", order)).toMatchObject({ ok: false, param: "reason" });
+    expect(await actions.reportStore("claims_ownership", "The home page says they make the TVs.", "not-an-id")).toMatchObject({ ok: false });
+    const shop = await import("@/lib/shop-actions");
+    expect(await shop.reportResellerStore("not-an-id", state, "pay_outside", "Asked my buyer to pay by transfer.")).toMatchObject({ ok: false });
+    expect(fetch).not.toHaveBeenCalled();
+
+    expect(await actions.reportStore("claims_ownership", "  The home page says they make the TVs.  ", order)).toMatchObject({ ok: true, data: { number: "RR-000001" } });
+    expect(await shop.reportResellerStore(order, state, "pay_outside", "Asked my buyer to pay by transfer.")).toMatchObject({ ok: true });
+    const calls = fetch.mock.calls as unknown as Call[];
+    expect(calls.map(call => [call[0], JSON.parse(String(call[1].body))])).toEqual([
+      ["http://api.test/v1/store/resale/reports", { reason: "claims_ownership", details: "The home page says they make the TVs.", order_id: order }],
+      [`http://api.test/v1/classifieds/me/resellers/${order}/report`, { store_id: state, reason: "pay_outside", details: "Asked my buyer to pay by transfer." }],
+    ]);
+    expect(calls[0]![1].headers["bitocard-store"]).toBe("gadgets");
+  });
+});
