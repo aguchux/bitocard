@@ -94,8 +94,8 @@ export async function requireShop(path: string) {
   if (!customer.email_verified) redirect(`/account/verify?next=${encodeURIComponent(path)}`);
   const market = await shopMarketFor(customer);
   if (!market) notFound();
-  const unread = await customerApi<{ unread: number }>("GET", "/v1/classifieds/conversations/unread");
-  return { customer, market, shop: { browse: shopHref(`/${market.country.toLowerCase()}`), unread: unread.ok ? unread.data.unread : 0 } };
+  const unread = await customerApi<{ unread: number; resellers?: number; resellers_waiting?: number }>("GET", "/v1/classifieds/conversations/unread");
+  return { customer, market, shop: { browse: shopHref(`/${market.country.toLowerCase()}`), unread: unread.ok ? unread.data.unread : 0, resellers: unread.ok ? { count: unread.data.resellers ?? 0, waiting: unread.data.resellers_waiting ?? 0 } : undefined } };
 }
 
 /**

@@ -181,7 +181,7 @@ export default function ShopTerms() {
           <li>Disputes are decided by BitoCard as in section 8, and the same strikes apply to you as for any Safe pay sale.</li>
         </ul>
         <h3 id="resellers-contact">You and your resellers</h3>
-        <p>You can see which resellers carry your listings, and chat with them on BitoCard. You and a reseller you work with can see each other&apos;s confirmed phone numbers. Keep payments for your items inside BitoCard: never let a reseller or their buyer pay you directly for a sale made through their store.</p>
+        <p>You can see which resellers carry your listings, and chat with them on BitoCard. You and a reseller you work with can see each other&apos;s confirmed phone numbers. You can offer a reseller a better deal in that chat (a bigger discount, and how far below your price they may sell), which applies once they accept it, to new orders only; either of you can end it. You can stop any reseller selling your listings, on all their stores, at any time. Keep payments for your items inside BitoCard: never let a reseller or their buyer pay you directly for a sale made through their store.</p>
       </Section>
 
       <Section id="safe-trade" title="10. Safe Trade Policy: paying directly">

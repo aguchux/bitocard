@@ -1,6 +1,6 @@
 # B2B reselling: plan
 
-**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stage 1 built 26 October 2026** (commits `354016c`, `3bddb55` and the terms and docs after them; see its section). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
+**Status:** plan, 26 October 2026; the owner's decisions recorded the same day, including the security rules and proposals A, B and C (see Decisions). **Stages 1 and 2 built 26 October 2026** (stage 1: `354016c`, `3bddb55` and the terms and docs after them; stage 2: `881a365`, `f7fc132` and the Shop tab after them; see their sections). Where this plan and `AGENTS.md` differ, `AGENTS.md` wins until this plan is built and merged back into it.
 
 ## The idea in one paragraph
 
@@ -113,7 +113,10 @@ Each stage ships behind switches that are off by default, with its tests (PGlite
 - Who can open listings to resellers: switch `classifieds_resale` (global, country), identity-checked suppliers with a payout account, the Shop terms' new resale section accepted.
 - Shop tab, Post an ad: "Sell on BitoCard Shop" and "Let resellers sell this", stock, the discount and markup limit (within the country's limits, with the worked sum shown live); My listings shows how many stores carry each listing and their sales.
 
-### Stage 2: resellers, suppliers and My Resellers
+### Stage 2: resellers, suppliers and My Resellers: built 26 October 2026
+
+**As built:** `src/resale` (`ResaleStoresService`, `ResaleTradeService`, `pricing.ts`), migration `20270121000000_resale_stores` (`resale_listings`, `resale_rules`, `resale_relationships`, `resale_messages`, `resale_deals`, with checks: one price kind, a note of at most 140 characters only with its status, a deal's floor up to its discount, one running deal per listing or per all), switch `reseller_resale` (global, country, reseller). The note is a field of the store listing rather than its own table (one note per store listing), and its approval names the exact text (`note_changed` when the reseller edited it meanwhile). A store listing's state is worked out on every read, never stored, so it follows the supplier at once; the `classifieds` job only remembers what it last told the reseller. Deals take the larger of the listing's discount and the deal's. A supplier's stop covers every store of the reseller (not one store). Chat photos and the per-category limits are left for later. Public API `/v1/resale` with response docs (Resale tag, scopes `resale:read` and `resale:write`); supplier endpoints under `/v1/classifieds/me`; SHQ Resale (Browse, each catalogue listing, Your listings, each listing with reprice, pause, remove and the note, Rules, Suppliers with chat and deals); the Shop tab's My Resellers, shown once a reseller carries the supplier's listings (`resellers` and `resellers_waiting` on the unread count). Tests: `apps/api/test/resale-stores.test.mjs` (PGlite and Docker), `packages/api-client/test/resale.test.ts`, `apps/storefront/test/shop.test.ts`.
+
 - `ResaleListing` (store, listing, markup bps or fixed price, status `active` | `paused` | `gone`), per store, with no field for anything about the item itself; `ResaleNote` (the store listing's one note: text, status `pending` | `approved` | `refused` | `withdrawn`, who decided and when; only an approved note is ever served); `ResaleRule` for auto-listing.
 - `ResaleRelationship` (supplier, reseller): made when a reseller first adds one of the supplier's listings; carries the chat (`ResaleMessage`: text, photos, deal offers) and each side's phone, shown to the other; either side can block.
 - `ResaleDeal` (above): offered in the chat by the supplier, accepted by the reseller, ended by either.
@@ -176,7 +179,7 @@ Proposed here and accepted by the owner (26 October 2026):
 - **B. The supplier's page on the store shows no price**: who the supplier is and the listing as they wrote it, but not their price (the store's price is the reseller's business; a listing also on BitoCard Shop shows its price there anyway).
 - ~~C. Delivery contact: a phone number for the courier only~~: replaced by decision 13 (the supplier has the buyer's details).
 
-Proposed, not yet decided:
+Proposed here and accepted by the owner (26 October 2026, with stage 2):
 - **D. Delivery fee**: the supplier sets their shipping charge per listing (free, within their state, nationwide); the buyer pays it on top, it goes to the supplier in full on release (outside any reseller discount or margin), and it is refunded with the order if the item is not delivered.
 - **E. Dispatch photos are required** before an order can be marked shipped (the item and the sealed parcel), so damage claims can be decided.
 

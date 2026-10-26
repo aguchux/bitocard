@@ -16,6 +16,9 @@ import type {
   ShopPriceKind,
   ShopReleaseCode,
   ShopReportReason,
+  ShopResaleDeal,
+  ShopResaleMessage,
+  ShopReseller,
   ShopSuggestion,
   ShopVideoUpload,
 } from "@bitocard/api-client/classifieds";
@@ -276,4 +279,62 @@ export async function assistantSuggestion(kind: ShopSuggestion["kind"], input: {
   if (input.conversationId && !id(input.conversationId)) return refused("No such chat.");
   if (kind === "reply" ? !input.conversationId : !input.listingId) return refused(kind === "reply" ? "Open a chat first." : "Save the ad first.");
   return answer(await customerApi<ShopSuggestion>("POST", "/v1/classifieds/assistant/suggestions", { kind, ...(input.listingId ? { listing_id: input.listingId } : {}), ...(input.conversationId ? { conversation_id: input.conversationId } : {}) }));
+}
+
+// ---- My Resellers (B2B reselling: the supplier's side) ----
+
+export async function loadResaleMessages(relationshipId: string, after?: string): Promise<ShopResult<{ data: ShopResaleMessage[]; closed: boolean }>> {
+  if (!id(relationshipId) || (after && !id(after))) return refused("No such reseller.");
+  return answer(await customerApi<{ data: ShopResaleMessage[]; closed: boolean }>("GET", `/v1/classifieds/me/resellers/${relationshipId}/messages${after ? `?after=${after}` : ""}`));
+}
+
+export async function sendResaleMessage(relationshipId: string, text: string, nonce?: string): Promise<ShopResult<ShopResaleMessage>> {
+  if (!id(relationshipId)) return refused("No such reseller.");
+  if (!text.trim()) return refused("Write a message.");
+  return answer(await customerApi<ShopResaleMessage>("POST", `/v1/classifieds/me/resellers/${relationshipId}/messages`, { body: text.trim().slice(0, 2000) }, { idempotencyKey: nonce }));
+}
+
+/** Offers a reseller better terms: a discount (percent) and how far below the price they may sell, on one listing or all. */
+export async function offerResaleDeal(relationshipId: string, input: { listingId: string | null; discount: string; floor: string; endsOn: string }, nonce?: string): Promise<ShopResult<ShopResaleDeal>> {
+  if (!id(relationshipId) || (input.listingId && !id(input.listingId))) return refused("No such reseller.");
+  const percent = (text: string) => (/^\s*\d{1,3}(\.\d{1,2})?\s*$/.test(text) ? Math.round(Number(text) * 100) : null);
+  const discount = percent(input.discount);
+  const floor = input.floor.trim() ? percent(input.floor) : 0;
+  if (discount === null || discount < 1) return refused("Give the discount as a percentage.", "discount_bps");
+  if (floor === null) return refused("Give the floor as a percentage.", "floor_bps");
+  if (input.endsOn && !/^\d{4}-\d{2}-\d{2}$/.test(input.endsOn)) return refused("Choose an end date.", "ends_at");
+  const result = await customerApi<ShopResaleDeal>(
+    "POST",
+    `/v1/classifieds/me/resellers/${relationshipId}/deals`,
+    { listing_id: input.listingId, discount_bps: discount, floor_bps: floor, ends_at: input.endsOn ? `${input.endsOn}T23:59:59.000Z` : null },
+    { idempotencyKey: nonce },
+  );
+  revalidatePath(`/shop/resellers/${relationshipId}`);
+  return answer(result);
+}
+
+/** Withdraws an offered deal, or ends a running one. */
+export async function endResaleDeal(relationshipId: string, dealId: string): Promise<ShopResult<ShopResaleDeal>> {
+  if (!id(relationshipId) || !id(dealId)) return refused("No such deal.");
+  const result = await customerApi<ShopResaleDeal>("POST", `/v1/classifieds/me/resale-deals/${dealId}/end`, {});
+  revalidatePath(`/shop/resellers/${relationshipId}`);
+  return answer(result);
+}
+
+/** Approves a reseller's note exactly as shown, refuses it, or withdraws an approval. */
+export async function decideResaleNote(relationshipId: string, storeListingId: string, decision: "approve" | "refuse" | "withdraw", input: { note?: string; reason?: string }): Promise<ShopResult<ShopReseller>> {
+  if (!id(relationshipId) || !id(storeListingId) || !["approve", "refuse", "withdraw"].includes(decision)) return refused("No such note.");
+  const body = decision === "approve" ? { note: input.note ?? "" } : input.reason?.trim() ? { reason: input.reason.trim().slice(0, 300) } : {};
+  const result = await customerApi<ShopReseller>("POST", `/v1/classifieds/me/resale-notes/${storeListingId}/${decision}`, body);
+  revalidatePath(`/shop/resellers/${relationshipId}`);
+  return answer(result);
+}
+
+/** Stops this reseller selling the supplier's listings (every store of theirs), or lets them again. */
+export async function setResellerStopped(relationshipId: string, stopped: boolean): Promise<ShopResult<ShopReseller>> {
+  if (!id(relationshipId)) return refused("No such reseller.");
+  const result = await customerApi<ShopReseller>("POST", `/v1/classifieds/me/resellers/${relationshipId}/${stopped ? "stop" : "resume"}`, {});
+  revalidatePath(`/shop/resellers/${relationshipId}`);
+  revalidatePath("/shop/resellers");
+  return answer(result);
 }

@@ -19,6 +19,7 @@ import {
   ReceiptText,
   RotateCcw,
   ShieldCheck,
+  Store,
   SquarePlus,
   Truck,
   Wallet,
@@ -60,9 +61,9 @@ export type SubMenu = {
 /**
  * What the rails need from the signed-in customer and the store: the catalogue's groups, the customer's wallet
  * currency, and the Shop tab where BitoCard Shop is open for them (`browse`: their market on shop.bitocard.com through
- * the handoff; `unread`: chat messages waiting).
+ * the handoff; `unread`: chat messages waiting; `resellers`: My Resellers, with what waits there).
  */
-export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null; shop?: { browse: string; unread: number } | null };
+export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null; shop?: { browse: string; unread: number; resellers?: { count: number; waiting: number } } | null };
 
 /** The Shop tab's places (the design canvas's ShopTab board): pills on phones and tablets, the sub rail on desktop. */
 export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenuItem[] => [
@@ -72,6 +73,8 @@ export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenu
   { href: "/shop/messages", label: "Messages", icon: MessagesSquare, ...(shop.unread ? { badge: shop.unread } : {}) },
   { href: "/shop/orders", label: "Orders", icon: ReceiptText },
   { href: "/shop/favourites", label: "Favourites", icon: Heart },
+  // B2B reselling: suppliers whose listings resellers carry.
+  ...(shop.resellers?.count ? [{ href: "/shop/resellers", label: "My Resellers", icon: Store, ...(shop.resellers.waiting ? { badge: shop.resellers.waiting } : {}) }] : []),
   { href: "/shop/safe-pay", label: "Safe pay", icon: ShieldCheck },
 ];
 

@@ -168,6 +168,18 @@ export default function ResellerTerms() {
         </ul>
       </Section>
 
+      <Section id="resale" title="12b. Reselling BitoCard Shop listings">
+        <p>This section applies where we open reselling to your account: you sell listings that BitoCard Shop sellers (suppliers) open to resellers, on your stores using the Resale shop template. It is not open in any country yet.</p>
+        <ul>
+          <li><strong>The supplier owns and sells the item.</strong> The supplier is the seller of the item and delivers it to your buyer; your store is where it was bought, and you earn the difference between your price and what the supplier receives, less our fee on it. You never own or hold the item, and never hold your buyer&apos;s money: it is held by us until the buyer has the item.</li>
+          <li><strong>Never present yourself as the owner or maker.</strong> Your store shows each listing exactly as its supplier wrote it, with the supplier&apos;s name and a link to their page, and you cannot change it. Do not claim, anywhere on your store or to buyers, to own, make or stock the items, or say anything about them the supplier did not say. Breaking this is a strike, and repeated, we suspend your reselling or your account.</li>
+          <li><strong>Your one note per listing</strong> shows only once the supplier approves its exact words, and they can take that approval back. It must be plain words with no links, phone numbers, email addresses or handles.</li>
+          <li><strong>Prices inside the supplier&apos;s limits.</strong> You sell from the supplier&apos;s price (or a lower floor they agree in a deal) up to their markup limit, and never above our markup cap for your country. A price set as a markup follows the supplier&apos;s price; a fixed price that falls outside the limits after a change stops selling until you reprice it.</li>
+          <li><strong>Deals and the supplier&apos;s choices.</strong> A deal a supplier offers in your chat applies once you accept it, to new orders only, and either of you can end it. A supplier can pause a listing, end its resale or stop you reselling their listings at any time; they then leave your stores at once.</li>
+          <li><strong>Working with suppliers.</strong> Your chat with a supplier stays on BitoCard and you see each other&apos;s confirmed phone numbers. Use them only for your work together; never ask a supplier, or let a buyer, pay outside BitoCard for an item sold through your store.</li>
+        </ul>
+      </Section>
+
       <Section id="integrations" title="13. Your own suppliers and payment gateways">
         <p>This section applies once we allow you to connect your own supplier or payment gateway accounts.</p>
         <ul>

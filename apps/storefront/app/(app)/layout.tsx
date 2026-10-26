@@ -73,8 +73,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (subdomain) redirect(`https://${subdomain}.bitocard.com`);
   }
   // BitoCard Shop open for the customer: the Shop tab, with its unread chat messages on its menu.
-  const unread = shopMarket ? await customerApi<{ unread: number }>("GET", "/v1/classifieds/conversations/unread") : null;
-  const shop = shopMarket ? { browse: shopHref(`/${shopMarket.country.toLowerCase()}`), unread: unread?.ok ? unread.data.unread : 0 } : null;
+  const unread = shopMarket ? await customerApi<{ unread: number; resellers?: number; resellers_waiting?: number }>("GET", "/v1/classifieds/conversations/unread") : null;
+  const shop = shopMarket ? { browse: shopHref(`/${shopMarket.country.toLowerCase()}`), unread: unread?.ok ? unread.data.unread : 0, resellers: unread?.ok ? { count: unread.data.resellers ?? 0, waiting: unread.data.resellers_waiting ?? 0 } : undefined } : null;
   // What the desktop sub rails list: the catalogue's groups on sale (as the Catalog page's chips) and the customer's wallets.
   const subMenus = { groups: navigation.groups.filter(group => group.on_sale).map(({ key, label }) => ({ key, label })), currency: customer.currency, shop };
   const desktopNav: "rail" | "bottom" = app?.desktop_nav === "bottom" ? "bottom" : "rail";

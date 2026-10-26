@@ -128,7 +128,14 @@ export class ConversationsService {
       SELECT count(*) AS n FROM "classified_messages" m JOIN "classified_conversations" c ON c."id" = m."conversation_id"
       WHERE (c."buyer_id" = ${customer.id}::uuid AND m."sender_id" = c."seller_id" AND m."created_at" > coalesce(c."buyer_read_at", 'epoch'))
          OR (c."seller_id" = ${customer.id}::uuid AND m."sender_id" = c."buyer_id" AND m."created_at" > coalesce(c."seller_read_at", 'epoch'))`;
-    return { object: 'classified_unread' as const, unread: Number(row?.n ?? 0) };
+    // B2B reselling: the resellers carrying this supplier's listings (My Resellers), and what waits for them there.
+    const [resale] = await this.prisma.$queryRaw<{ resellers: bigint; waiting: bigint }[]>`
+      SELECT (SELECT count(*) FROM "resale_relationships" r WHERE r."supplier_id" = ${customer.id}::uuid) AS resellers,
+        (SELECT count(*) FROM "resale_messages" m JOIN "resale_relationships" r ON r."id" = m."relationship_id"
+          WHERE r."supplier_id" = ${customer.id}::uuid AND m."author" <> 'supplier' AND m."created_at" > coalesce(r."supplier_read_at", 'epoch'))
+        + (SELECT count(*) FROM "resale_listings" l JOIN "resale_relationships" r ON r."id" = l."relationship_id"
+          WHERE r."supplier_id" = ${customer.id}::uuid AND l."note_status" = 'pending' AND l."status" <> 'removed') AS waiting`;
+    return { object: 'classified_unread' as const, unread: Number(row?.n ?? 0), resellers: Number(resale?.resellers ?? 0), resellers_waiting: Number(resale?.waiting ?? 0) };
   }
 
   /**

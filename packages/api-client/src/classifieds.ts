@@ -280,6 +280,66 @@ export type ShopResaleAvailability = {
   markup_max_bps: number;
 };
 
+/** A deal a supplier offers one reseller (B2B reselling): a bigger discount, and a floor below the supplier's price. */
+export type ShopResaleDeal = {
+  object: 'resale_deal';
+  id: string;
+  supplier_relationship_id: string;
+  listing: { id: string; title: string } | null;
+  discount_bps: number;
+  floor_bps: number;
+  status: 'offered' | 'active' | 'declined' | 'withdrawn' | 'ended';
+  ends_at: string | null;
+  responded_at: string | null;
+  ended_at: string | null;
+  ended_by: string | null;
+  created_at: string;
+};
+
+export type ShopResaleNote = { text: string; status: 'pending' | 'approved' | 'refused' | 'withdrawn'; reason: string | null; submitted_at: string | null };
+
+/** A reseller carrying the supplier's listings (My Resellers); `listings` only on one reseller's page. */
+export type ShopReseller = {
+  object: 'resale_reseller';
+  id: string;
+  reseller: { id: string; name: string; verified: boolean; phone: string | null };
+  stores: Array<{ id: string; name: string; url: string }>;
+  stopped: boolean;
+  closed_by_reseller: boolean;
+  listings_carried: number;
+  notes_pending: number;
+  unread: number;
+  deals: ShopResaleDeal[];
+  listings?: Array<{ id: string; store_id: string; listing: { id: string; title: string }; status: 'active' | 'paused' | 'removed'; note: ShopResaleNote | null }>;
+  last_message_at: string | null;
+  created_at: string;
+};
+
+export type ShopResaleMessage = {
+  object: 'resale_message';
+  id: string;
+  author: 'supplier' | 'reseller' | 'system';
+  author_name: string;
+  mine: boolean;
+  body: string;
+  deal: ShopResaleDeal | null;
+  created_at: string;
+};
+
+/** "15%" from basis points. */
+export const bpsText = (bps: number) => `${(bps / 100).toLocaleString('en-GB', { maximumFractionDigits: 2 })}%`;
+
+/** A deal in a few words: "15% off every listing, selling from 5% below your price, until 30 Nov 2026". */
+export function resaleDealText(deal: Pick<ShopResaleDeal, 'discount_bps' | 'floor_bps' | 'listing' | 'ends_at'>) {
+  return [
+    `${bpsText(deal.discount_bps)} off ${deal.listing ? `“${deal.listing.title}”` : 'every listing'}`,
+    deal.floor_bps ? `selling from ${bpsText(deal.floor_bps)} below your price` : null,
+    deal.ends_at ? `until ${new Date(deal.ends_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
 export type ShopListingStatus = 'draft' | 'pending_review' | 'active' | 'sold' | 'expired' | 'rejected' | 'removed';
 export type ShopContact = 'chat' | 'phone' | 'both';
 /** A seller's own listing, as the Shop tab edits it. */

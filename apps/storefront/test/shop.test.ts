@@ -167,6 +167,17 @@ describe("the Shop tab and Account in the header", () => {
     expect(active(`/shop/orders/${order}`)).toBe("/shop/orders");
     expect(menu.items.some(item => item.external && active(item.href) === item.href)).toBe(false);
   });
+
+  test("My Resellers shows once resellers carry the supplier's listings, badged with what waits there", () => {
+    const base = { browse: "/handoff/go?to=x&next=%2Fng", unread: 0 };
+    const labels = (shop: typeof base & { resellers?: { count: number; waiting: number } }) => subMenusFor({ groups: [], currency: "NGN", shop }).find(item => item.key === "shop")!.items;
+    expect(labels({ ...base, resellers: { count: 0, waiting: 0 } }).map(item => item.label)).not.toContain("My Resellers");
+    const items = labels({ ...base, resellers: { count: 2, waiting: 3 } });
+    expect(items.map(item => item.label)).toEqual(["Browse", "Post an ad", "My listings", "Messages", "Orders", "Favourites", "My Resellers", "Safe pay"]);
+    expect(items.find(item => item.label === "My Resellers")?.badge).toBe(3);
+    const context = { groups: [], currency: "NGN", shop: { ...base, resellers: { count: 2, waiting: 0 } } };
+    expect(subMenuFor(`/shop/resellers/${listing}`, "", context)?.active).toBe("/shop/resellers");
+  });
 });
 
 describe("BitoCard Shop's links and markets", () => {

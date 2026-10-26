@@ -212,6 +212,8 @@ describe('notes', () => {
     check('PUT /v1/resale/listings/{id}/note', 200, noted.json);
     assert.deepEqual([noted.json.note.text, noted.json.note.status], ['Free wall bracket with every order this month.', 'pending']);
     assert.ok(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.resale.note_pending' } }));
+    const counts = (await seller.get('/v1/classifieds/conversations/unread')).json;
+    assert.deepEqual([counts.resellers, counts.resellers_waiting], [1, 1], 'My Resellers: one reseller, one note waiting');
 
     const relationship = (await seller.get('/v1/classifieds/me/resellers')).json.data[0];
     const detail = (await seller.get(`/v1/classifieds/me/resellers/${relationship.id}`)).json;
