@@ -5,6 +5,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
+import { onShopWhere } from './rules.js';
 import { ListingSearchService, soldVisibleMs } from './search.service.js';
 
 /** The global showcase opens with the second market (owner's decision: Nigeria first, without it). */
@@ -41,7 +42,7 @@ export class ShopDirectoryService {
     const open = (await Promise.all(countries.map(async country => ((await this.settings.isOnForCountry('classifieds', country.code)) ? country : null)))).filter(country => country !== null);
     const codes = open.map(country => country.code);
     const [counts, safePay, installPrompt, fees] = await Promise.all([
-      codes.length ? this.prisma.classifiedListing.groupBy({ by: ['country'], where: { country: { in: codes }, status: 'active' }, _count: { _all: true } }) : [],
+      codes.length ? this.prisma.classifiedListing.groupBy({ by: ['country'], where: { country: { in: codes }, ...onShopWhere }, _count: { _all: true } }) : [],
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_safe_pay', code))),
       Promise.all(codes.map(code => this.settings.isOnForCountry('classifieds_install_prompt', code))),
       this.prisma.classifiedSafePaySettings.findMany({ where: { country: { in: codes } } }),
@@ -82,7 +83,7 @@ export class ShopDirectoryService {
       WITH live AS (
         SELECT l."id", l."title", COALESCE(c."parent_id", c."id") AS top
         FROM "classified_listings" l JOIN "classified_categories" c ON c."id" = l."category_id"
-        WHERE l."country" = ${country} AND l."status" = 'active'
+        WHERE l."country" = ${country} AND l."status" = 'active' AND l."on_shop"
       )
       SELECT counts.top, counts.listings, pick.url, pick.width, pick.height, pick.title
       FROM (SELECT top, count(*) AS listings FROM live GROUP BY top) counts
@@ -135,14 +136,14 @@ export class ShopDirectoryService {
     const chosen = category ? categories.find(row => row.slug === category) : undefined;
     if (category && !chosen) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such category.');
 
-    const live = await this.prisma.classifiedListing.groupBy({ by: ['country', 'categoryId'], where: { country: { in: codes }, status: 'active' }, _count: { _all: true } });
+    const live = await this.prisma.classifiedListing.groupBy({ by: ['country', 'categoryId'], where: { country: { in: codes }, ...onShopWhere }, _count: { _all: true } });
     const countIn = (row: (typeof categories)[number], country: string) => {
       const ids = new Set([row.id, ...row.children.map(child => child.id)]);
       return live.filter(item => item.country === country && item.categoryId && ids.has(item.categoryId)).reduce((sum, item) => sum + item._count._all, 0);
     };
 
     const where = (country?: string) => ({
-      status: 'active' as const,
+      ...onShopWhere,
       country: country ? country : { in: codes },
       ...(chosen ? { categoryId: { in: [chosen.id, ...chosen.children.map(child => child.id)] } } : {}),
     });
@@ -197,11 +198,11 @@ export class ShopDirectoryService {
     await this.listings.requireOpen(code);
     const [categories, byCategory, byPlace, areas, rows] = await Promise.all([
       this.prisma.classifiedCategory.findMany({ where: { enabled: true, countries: { some: { country: code, enabled: true } } }, select: { id: true, slug: true, parentId: true } }),
-      this.prisma.classifiedListing.groupBy({ by: ['categoryId'], where: { country: code, status: 'active' }, _count: { _all: true } }),
-      this.prisma.classifiedListing.groupBy({ by: ['stateId', 'areaId'], where: { country: code, status: 'active' }, _count: { _all: true } }),
+      this.prisma.classifiedListing.groupBy({ by: ['categoryId'], where: { country: code, ...onShopWhere }, _count: { _all: true } }),
+      this.prisma.classifiedListing.groupBy({ by: ['stateId', 'areaId'], where: { country: code, ...onShopWhere }, _count: { _all: true } }),
       this.prisma.classifiedArea.findMany({ where: { country: code, enabled: true }, select: { id: true, slug: true } }),
       this.prisma.classifiedListing.findMany({
-        where: { country: code, ref: { gt: BigInt(after) }, OR: [{ status: 'active' }, { status: 'sold', soldAt: { gt: new Date(Date.now() - soldVisibleMs) } }] },
+        where: { country: code, onShop: true, ref: { gt: BigInt(after) }, OR: [{ status: 'active' }, { status: 'sold', soldAt: { gt: new Date(Date.now() - soldVisibleMs) } }] },
         select: { ref: true, slug: true, updatedAt: true },
         orderBy: { ref: 'asc' },
         take: sitemapPage + 1,
@@ -239,8 +240,8 @@ export class ShopDirectoryService {
    * Safe pay request or order, and whether they can contact the seller at all (live, and in their own country).
    */
   async viewer(customer: CustomerWithStore, listingId: string) {
-    const listing = await this.prisma.classifiedListing.findUnique({ where: { id: listingId }, select: { id: true, customerId: true, country: true, status: true } });
-    if (!listing || ['draft', 'pending_review', 'deleted'].includes(listing.status)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
+    const listing = await this.prisma.classifiedListing.findUnique({ where: { id: listingId }, select: { id: true, customerId: true, country: true, status: true, onShop: true } });
+    if (!listing || !listing.onShop || ['draft', 'pending_review', 'deleted'].includes(listing.status)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
     const own = listing.customerId === customer.id;
     const [favourite, chat, order] = await Promise.all([
       this.prisma.classifiedFavourite.findUnique({ where: { customerId_listingId: { customerId: customer.id, listingId } }, select: { listingId: true } }),

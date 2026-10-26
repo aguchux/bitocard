@@ -19,7 +19,7 @@ import { cleanMessage } from './conversations.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { ListingsService } from './listings.service.js';
 import type { MediaUpload } from './media.service.js';
-import { invalid, priceText } from './rules.js';
+import { invalid, isOnShop, priceText } from './rules.js';
 import { publicName } from './search.service.js';
 import { ShopTermsService } from './terms.service.js';
 
@@ -56,7 +56,7 @@ export function safePayFee(amount: bigint, bps: number, cap: bigint) {
 }
 
 const orderInclude = {
-  listing: { select: { id: true, ref: true, title: true, slug: true, status: true, delivery: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { url: true } } } },
+  listing: { select: { id: true, ref: true, title: true, slug: true, status: true, onShop: true, delivery: true, media: { where: { kind: 'photo', status: 'ready' }, orderBy: { position: 'asc' }, take: 1, select: { url: true } } } },
   buyer: { select: { id: true, name: true, email: true, storeId: true } },
   seller: { select: { id: true, name: true, email: true, storeId: true } },
   dispute: true,
@@ -137,7 +137,7 @@ export class SafePayService {
   /** The price a buyer would pay: the listing's, or an offer they agreed in the last 7 days. */
   private async priceFor(customer: CustomerWithStore, country: string, listingId: string, offerId?: string) {
     const listing = await this.prisma.classifiedListing.findUnique({ where: { id: listingId } });
-    if (!listing || listing.status !== 'active' || listing.country !== country) throw notFound('listing');
+    if (!listing || !isOnShop(listing) || listing.country !== country) throw notFound('listing');
     if (listing.customerId === customer.id) throw invalid('parameter_invalid', 'This is your own listing.', 'listing_id');
     if (offerId) {
       const offer = await this.prisma.classifiedOffer.findUnique({ where: { id: offerId }, include: { conversation: true } });
@@ -160,7 +160,7 @@ export class SafePayService {
     const { country, settings } = await this.open(customer);
     const { listing, price, offerId: offer } = await this.priceFor(customer, country, listingId, offerId);
     const fee = safePayFee(price, settings.buyerFeeBps, settings.buyerFeeCapMinor);
-    const reserved = (await this.prisma.classifiedOrder.count({ where: { listingId: listing.id, status: { in: holding } } })) > 0;
+    const available = Math.max(listing.stock - (await this.held(listing.id)), 0);
     return {
       object: 'classified_safe_pay_quote' as const,
       listing_id: listing.id,
@@ -170,7 +170,10 @@ export class SafePayService {
       buyer_fee: Number(fee),
       total: Number(price + fee),
       fulfilment: listing.delivery === 'none' ? ['meet_up'] : ['meet_up', 'delivery'],
-      reserved,
+      /** Every unit is paid for and waiting to be handed over. */
+      reserved: available === 0,
+      /** Units still to be had (its stock less those held by paid orders). */
+      available,
       /** How long the seller has to accept, then the buyer to pay. */
       accept_hours: settings.acceptHours,
       pay_hours: settings.payHours,
@@ -188,7 +191,7 @@ export class SafePayService {
     if (input.fulfilment === 'delivery' && listing.delivery === 'none') throw invalid('parameter_invalid', 'This seller does not deliver: choose to meet in person.', 'fulfilment');
     const address = input.fulfilment === 'delivery' ? (input.delivery_address ?? '').trim() : '';
     if (input.fulfilment === 'delivery' && (address.length < 10 || address.length > 500)) throw invalid('parameter_invalid', 'Give the full delivery address (10 to 500 characters).', 'delivery_address');
-    if (await this.prisma.classifiedOrder.count({ where: { listingId: listing.id, status: { in: holding } } })) throw conflict('listing_reserved', 'Someone has already paid for this with Safe pay.');
+    if ((await this.held(listing.id)) >= listing.stock) throw this.reserved(listing.stock);
     if (settings.newSellerOrderLimitMinor !== null && price > settings.newSellerOrderLimitMinor) {
       const sales = await this.prisma.classifiedOrder.count({ where: { sellerId: listing.customerId, status: 'released' } });
       if (sales < newSellerSales) throw conflict('new_seller_limit', `This seller is new to Safe pay: their orders can be at most ${priceText(settings.newSellerOrderLimitMinor, listing.currency)} for now.`);
@@ -232,7 +235,7 @@ export class SafePayService {
     const order = await this.mine(customer, id, 'buyer');
     const now = new Date();
     if (order.status !== 'awaiting_payment' || !order.payBy || order.payBy <= now) throw this.wrongStatus(order, 'paid');
-    if (order.listing.status !== 'active') throw conflict('listing_unavailable', 'This listing is no longer live.');
+    if (!isOnShop(order.listing)) throw conflict('listing_unavailable', 'This listing is no longer live.');
     await this.guards.requireDifferentPeople(customer.id, order.sellerId);
     const total = order.priceMinor + order.buyerFeeMinor;
     const balance = await this.wallets.balance(customer.id, order.mode, order.currency);
@@ -251,11 +254,15 @@ export class SafePayService {
     const code = order.fulfilment === 'meet_up' ? String(randomInt(0, 1_000_000)).padStart(6, '0') : null;
     try {
       await this.prisma.$transaction(async tx => {
+        // One payment at a time per listing (its row locked): each holds one unit, never more than its stock. The order is
+        // claimed first, so paying it twice at once is `order_changed`, and only other buyers' paid orders use up stock.
+        const [row] = await tx.$queryRaw<{ stock: number }[]>`SELECT "stock" FROM "classified_listings" WHERE "id" = ${order.listingId}::uuid FOR UPDATE`;
         const claimed = await tx.classifiedOrder.updateMany({
           where: { id: order.id, status: 'awaiting_payment', payBy: { gt: now } },
           data: { status: 'paid', paidAt: now, handoverBy: new Date(now.getTime() + settings.handoverDays * dayMs), releaseCode: code ? this.encryption().encrypt(code) : null },
         });
         if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
+        if (!row || (await tx.classifiedOrder.count({ where: { listingId: order.listingId, id: { not: order.id }, status: { in: holding } } })) >= row.stock) throw conflict('listing_reserved', 'Someone else has just paid for this with Safe pay.');
         await this.ledger.write(tx, entry);
       });
     } catch (error) {
@@ -263,8 +270,9 @@ export class SafePayService {
       if (error instanceof ApiError && error.code === 'insufficient_funds') throw this.walletLow(total, order.currency);
       throw error;
     }
-    // Anyone else's requests on it end: the listing is reserved for this buyer.
-    const others = await this.prisma.classifiedOrder.findMany({ where: { listingId: order.listingId, id: { not: order.id }, status: { in: ['requested', 'awaiting_payment'] } }, include: orderInclude });
+    // Once every unit is paid for, anyone else's requests on it end.
+    const { stock } = await this.prisma.classifiedListing.findUniqueOrThrow({ where: { id: order.listingId }, select: { stock: true } });
+    const others = (await this.held(order.listingId)) < stock ? [] : await this.prisma.classifiedOrder.findMany({ where: { listingId: order.listingId, id: { not: order.id }, status: { in: ['requested', 'awaiting_payment'] } }, include: orderInclude });
     for (const other of others) {
       const ended = await this.prisma.classifiedOrder.updateMany({ where: { id: other.id, status: other.status }, data: { status: 'cancelled', closedAt: now, endedBy: 'bitocard', endReason: 'reserved_for_another_buyer' } });
       if (ended.count) await this.tell(other, 'buyer', 'customer.classifieds.order_cancelled', `"${other.listing.title}" is no longer available`, 'Another buyer paid for it with Safe pay first.');
@@ -717,8 +725,16 @@ export class SafePayService {
       if (!claimed.count) throw conflict('order_changed', 'This order changed: refresh and try again.');
       await extra?.(tx);
       await this.ledger.write(tx, entry);
-      // Released (wholly or in part): the item is sold.
-      if (status !== 'refunded') await tx.classifiedListing.updateMany({ where: { id: order.listingId, status: 'active' }, data: { status: 'sold', soldAt: now } });
+      // Released (wholly or in part): one unit is sold; with none left, the listing is.
+      if (status !== 'refunded') {
+        await tx.$executeRaw`
+          UPDATE "classified_listings" SET
+            "stock" = GREATEST("stock" - 1, 0),
+            "status" = CASE WHEN "stock" <= 1 AND "status" = 'active' THEN 'sold' ELSE "status" END,
+            "sold_at" = CASE WHEN "stock" <= 1 AND "status" = 'active' THEN ${now} ELSE "sold_at" END,
+            "updated_at" = ${now}
+          WHERE "id" = ${order.listingId}::uuid`;
+      }
     });
     const done = await this.reload(order.id);
     if (status !== 'refunded') {
@@ -738,6 +754,15 @@ export class SafePayService {
   }
 
   // ---- Helpers ----
+
+  /** Units of a listing held by paid orders not yet released or refunded. */
+  private held(listingId: string) {
+    return this.prisma.classifiedOrder.count({ where: { listingId, status: { in: holding } } });
+  }
+
+  private reserved(stock: number) {
+    return conflict('listing_reserved', stock === 1 ? 'Someone has already paid for this with Safe pay.' : 'Every one of these is already paid for with Safe pay.');
+  }
 
   private walletLow(short: bigint, currency: string) {
     return new ApiError(HttpStatus.PAYMENT_REQUIRED, 'invalid_request_error', 'wallet_balance_low', `Add ${priceText(short, currency)} to your wallet to pay.`, 'amount');

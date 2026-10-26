@@ -4,7 +4,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { ListingsService } from './listings.service.js';
-import { invalid } from './rules.js';
+import { invalid, isOnShop } from './rules.js';
 
 /** A buyer may reveal the phones of this many different listings in an hour (showing one again is free). */
 export const phoneRevealsPerHour = 5;
@@ -28,7 +28,7 @@ export class LeadsService {
   async revealPhone(customer: CustomerWithStore, listingId: string) {
     const country = await this.listings.sellerCountry(customer);
     const listing = await this.prisma.classifiedListing.findUnique({ where: { id: listingId }, include: { customer: { select: { phone: true, phoneVerifiedAt: true } } } });
-    if (!listing || listing.status !== 'active' || listing.country !== country) throw notFound();
+    if (!listing || !isOnShop(listing) || listing.country !== country) throw notFound();
     if (listing.customerId === customer.id) throw invalid('parameter_invalid', 'This is your own listing.', 'listing_id');
     if (listing.contact === 'chat' || !listing.customer.phone || !listing.customer.phoneVerifiedAt) {
       throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'phone_not_offered', 'This seller takes messages only: chat with them here.');

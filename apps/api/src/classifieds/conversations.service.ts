@@ -15,7 +15,7 @@ import { redact } from '../support/redact.js';
 import { addLead } from './leads.service.js';
 import { ListingsService } from './listings.service.js';
 import { type ReportReason } from './moderation.service.js';
-import { invalid, maxPriceMinor, priceText } from './rules.js';
+import { invalid, isOnShop, maxPriceMinor, priceText } from './rules.js';
 import { publicName } from './search.service.js';
 import type { MediaUpload } from './media.service.js';
 
@@ -62,6 +62,7 @@ const listingSummary = {
     title: true,
     slug: true,
     status: true,
+    onShop: true,
     country: true,
     currency: true,
     priceKind: true,
@@ -175,7 +176,7 @@ export class ConversationsService {
   async start(customer: CustomerWithStore, input: { listing_id: string; body: string }) {
     const country = await this.listings.sellerCountry(customer);
     const listing = await this.prisma.classifiedListing.findUnique({ where: { id: input.listing_id } });
-    if (!listing || listing.status !== 'active' || listing.country !== country) throw notFound('listing');
+    if (!listing || !isOnShop(listing) || listing.country !== country) throw notFound('listing');
     if (listing.customerId === customer.id) throw invalid('parameter_invalid', 'This is your own listing.', 'listing_id');
     const existing = await this.prisma.classifiedConversation.findUnique({ where: { listingId_buyerId: { listingId: listing.id, buyerId: customer.id } } });
     if (existing) {
@@ -278,7 +279,7 @@ export class ConversationsService {
     await this.listings.sellerCountry(customer);
     const chat = await this.chatFor(customer, id);
     const side = this.requireWritable(chat, customer.id);
-    if (chat.listing.status !== 'active') throw conflict('listing_unavailable', 'This listing is no longer live, so offers cannot be made.');
+    if (!isOnShop(chat.listing)) throw conflict('listing_unavailable', 'This listing is no longer live, so offers cannot be made.');
     if (!Number.isSafeInteger(price) || price <= 0 || price > Number(maxPriceMinor)) throw invalid('parameter_invalid', 'Offer a price above zero.', 'price');
     await this.requirePace(chat.id, customer.id);
     const now = new Date();
@@ -336,7 +337,7 @@ export class ConversationsService {
     if (outcome !== 'withdrawn') this.requireWritable(chat, customer.id);
     const now = new Date();
     if (offer.status !== 'open' || offer.expiresAt <= now) throw conflict('offer_closed', offer.status === 'open' || offer.status === 'expired' ? 'This offer has expired.' : `This offer was already ${offer.status}.`);
-    if (outcome === 'accepted' && chat.listing.status !== 'active') throw conflict('listing_unavailable', 'This listing is no longer live, so the offer cannot be accepted.');
+    if (outcome === 'accepted' && !isOnShop(chat.listing)) throw conflict('listing_unavailable', 'This listing is no longer live, so the offer cannot be accepted.');
     const verb = { accepted: 'accepted', declined: 'declined', withdrawn: 'withdrew' }[outcome];
     const amount = priceText(offer.priceMinor, offer.currency);
     const decided = await this.prisma.$transaction(async tx => {

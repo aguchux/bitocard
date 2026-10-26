@@ -273,6 +273,28 @@ export type ClassifiedSafePaySettings = {
 };
 export type ClassifiedSafePaySettingsInput = Partial<Omit<ClassifiedSafePaySettings, 'object' | 'country' | 'ready'>>;
 
+/** BitoCard's resale limits in a country (B2B reselling), in basis points and the country's minor units. */
+export type ClassifiedResaleSettings = {
+  object: 'classified_resale_settings';
+  country: string;
+  discount_min_bps: number;
+  discount_max_bps: number;
+  markup_max_bps: number;
+  /** The country's markup cap (Markup Protection Scheme): the markup limit is never above it. */
+  markup_cap_bps: number;
+  reseller_fee_bps: number | null;
+  reseller_fee_cap: number | null;
+  accept_hours: number;
+  reseller_strike_limit: number;
+  updated_at: string | null;
+  /** The `classifieds_resale` switch on and the reseller fee set: suppliers can open listings to resellers. */
+  open: boolean;
+};
+export type ClassifiedResaleSettingsInput = Partial<Pick<ClassifiedResaleSettings, 'discount_min_bps' | 'discount_max_bps' | 'markup_max_bps' | 'accept_hours' | 'reseller_strike_limit'>> & {
+  reseller_fee_bps?: number;
+  reseller_fee_cap?: number;
+};
+
 /** The fee on a price in minor units: its rate of the price, rounded down, or the cap when that is lower (as the API). */
 export const safePayFee = (price: number, bps: number, cap: number) => Math.min(Math.floor((price * bps) / 10000), cap);
 
@@ -461,6 +483,14 @@ export const adminClassifiedsApi = bitocardApi.injectEndpoints({
       query: ({ country, ...body }) => ({ url: `/v1/admin/classifieds/safe-pay-settings/${country}`, method: 'PUT', body }),
       invalidatesTags: (_result, _error, { country }) => [{ type: 'ClassifiedSettings', id: `SAFE_PAY:${country}` }, 'Activity'],
     }),
+    classifiedResaleSettings: build.query<ClassifiedResaleSettings, string>({
+      query: country => `/v1/admin/classifieds/resale-settings/${country}`,
+      providesTags: (_result, _error, country) => [{ type: 'ClassifiedSettings', id: `RESALE:${country}` }],
+    }),
+    updateClassifiedResaleSettings: build.mutation<ClassifiedResaleSettings, ClassifiedResaleSettingsInput & { country: string }>({
+      query: ({ country, ...body }) => ({ url: `/v1/admin/classifieds/resale-settings/${country}`, method: 'PUT', body }),
+      invalidatesTags: (_result, _error, { country }) => [{ type: 'ClassifiedSettings', id: `RESALE:${country}` }, 'Activity'],
+    }),
   }),
 });
 
@@ -500,6 +530,8 @@ export const {
   useDecideClassifiedPayoutReviewMutation,
   useClassifiedSafePaySettingsQuery,
   useUpdateClassifiedSafePaySettingsMutation,
+  useClassifiedResaleSettingsQuery,
+  useUpdateClassifiedResaleSettingsMutation,
 } = adminClassifiedsApi;
 
 /** Changes one category (top or sub) in a market's cached list. */

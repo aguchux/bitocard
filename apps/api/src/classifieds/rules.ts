@@ -14,6 +14,15 @@ export const priceKinds = ['fixed', 'negotiable', 'on_request'] as const;
 export const deliveries = ['none', 'state', 'nationwide'] as const;
 export const contacts = ['chat', 'phone', 'both'] as const;
 
+/**
+ * Live on BitoCard Shop itself: active and sold there (`onShop`). A listing open to resellers only is never shown on the
+ * Shop, in search, on its pages, in its chats or Safe pay, its sitemaps, showcase or assistant (B2B reselling plan).
+ */
+export const onShopWhere = { status: 'active', onShop: true } as const;
+export const isOnShop = (listing: { status: string; onShop: boolean }) => listing.status === 'active' && listing.onShop;
+/** Most units one listing can hold (its stock). */
+export const maxStock = 100_000;
+
 export const maxTitle = 90;
 export const minTitle = 5;
 export const maxDescription = 5000;

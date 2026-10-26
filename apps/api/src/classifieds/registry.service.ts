@@ -11,7 +11,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { ClassifiedFeature, Prisma } from '../generated/prisma/client.js';
 import { ListingsService } from './listings.service.js';
 import { presentFeature } from './reference.service.js';
-import { checkFeatureValue, invalid, linkPattern, slugify } from './rules.js';
+import { checkFeatureValue, invalid, linkPattern, onShopWhere, slugify } from './rules.js';
 
 const dataTypes = ['text', 'number', 'choice', 'boolean'] as const;
 type DataType = (typeof dataTypes)[number];
@@ -299,8 +299,8 @@ export class ClassifiedRegistryService {
     if (!(await this.prisma.country.findUnique({ where: { code: country } }))) throw notFound('country');
     const [rows, inAreas, inStates] = await Promise.all([
       this.prisma.classifiedArea.findMany({ where: { country }, orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
-      this.prisma.classifiedListing.groupBy({ by: ['areaId'], where: { country, status: 'active' }, _count: { _all: true } }),
-      this.prisma.classifiedListing.groupBy({ by: ['stateId'], where: { country, status: 'active' }, _count: { _all: true } }),
+      this.prisma.classifiedListing.groupBy({ by: ['areaId'], where: { country, ...onShopWhere }, _count: { _all: true } }),
+      this.prisma.classifiedListing.groupBy({ by: ['stateId'], where: { country, ...onShopWhere }, _count: { _all: true } }),
     ]);
     const areaCounts = new Map(inAreas.map(row => [row.areaId, row._count._all]));
     const stateCounts = new Map(inStates.map(row => [row.stateId, row._count._all]));

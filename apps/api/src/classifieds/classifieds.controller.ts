@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Transform, Type } from 'class-transformer';
-import { Allow, ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsPositive, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Allow, ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsPositive, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { SkipIdempotency } from '../common/idempotency/idempotency.interceptor.js';
 import { maxDocumentBytes } from '../kyc/files.js';
 import { Public } from '../auth/caller.js';
@@ -21,8 +21,9 @@ import { maxVideoBytes } from './video.js';
 import { ClassifiedReferenceService } from './reference.service.js';
 import { ShopDirectoryService } from './directory.service.js';
 import { ShopTermsService } from './terms.service.js';
+import { ResaleService } from './resale.service.js';
 import { ListingSearchService, maxOffset, maxResults, type SearchSort, searchSorts } from './search.service.js';
-import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, priceKinds } from './rules.js';
+import { conditions, contacts, deliveries, type ListingStatus, listingStatuses, maxDescription, maxFeatures, maxStock, priceKinds } from './rules.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -134,6 +135,27 @@ class ListingDto {
 
   @IsOptional() @IsArray() @ArrayMaxSize(maxFeatures + 5) @ValidateNested({ each: true }) @Type(() => FeatureValueDto)
   features?: FeatureValueDto[];
+
+  /** Sold on BitoCard Shop itself (the default); with `resale`, it can be both. */
+  @IsOptional() @IsBoolean()
+  on_shop?: boolean;
+
+  /** Open to resellers' stores, at the discount and markup limit below (within the country's limits). */
+  @IsOptional() @IsBoolean()
+  resale?: boolean;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  resale_discount_bps?: number | null;
+
+  @IsOptional() @IsInt() @Min(0) @Max(20000)
+  resale_markup_max_bps?: number | null;
+
+  @IsOptional() @IsBoolean()
+  resale_paused?: boolean;
+
+  /** Units to sell, shared by BitoCard Shop and resellers' stores. */
+  @IsOptional() @IsInt() @Min(1) @Max(maxStock)
+  stock?: number;
 }
 
 class PhotoOrderDto {
@@ -345,6 +367,7 @@ export class ClassifiedListingsController {
     private readonly media: ListingMediaService,
     private readonly moderation: ModerationService,
     private readonly favourites: FavouritesService,
+    private readonly resale: ResaleService,
   ) {}
 
   /** The BitoCard Shop terms' current version and whether the customer has accepted it (needed to post or use Safe pay). */
@@ -382,6 +405,12 @@ export class ClassifiedListingsController {
   async report(@CurrentCustomer() caller: CustomerCaller, @Body() body: ReportDto) {
     await this.listings.sellerCountry(caller.customer);
     return this.moderation.report(caller.customer, body);
+  }
+
+  /** Whether the customer can open listings to resellers, BitoCard's limits in their country, and what is missing. */
+  @Get('me/resale')
+  async resaleAvailability(@CurrentCustomer() caller: CustomerCaller) {
+    return this.resale.forSupplier(caller.customer, await this.listings.sellerCountry(caller.customer));
   }
 
   @Get('me/listings')

@@ -263,6 +263,23 @@ export type ShopReleaseCode = { object: 'classified_release_code'; order_id: str
 /** What a seller still needs before accepting Safe pay orders. */
 export type ShopReadiness = { object: 'classified_safe_pay_readiness'; identity_checked: boolean; payout_account: boolean; ready: boolean; limited: boolean; strikes: number; strike_limit: number };
 
+/**
+ * Whether the customer can open listings to resellers (B2B reselling): resale open in their country (`reason` when not:
+ * `switch_off` or `not_set_up`), their identity check and payout account, and BitoCard's limits there in basis points.
+ */
+export type ShopResaleAvailability = {
+  object: 'classified_resale_availability';
+  country: string;
+  open: boolean;
+  reason: 'switch_off' | 'not_set_up' | null;
+  identity_checked: boolean;
+  payout_account: boolean;
+  ready: boolean;
+  discount_min_bps: number;
+  discount_max_bps: number;
+  markup_max_bps: number;
+};
+
 export type ShopListingStatus = 'draft' | 'pending_review' | 'active' | 'sold' | 'expired' | 'rejected' | 'removed';
 export type ShopContact = 'chat' | 'phone' | 'both';
 /** A seller's own listing, as the Shop tab edits it. */
@@ -287,7 +304,13 @@ export type ShopMyListing = {
   contact: ShopContact;
   views: number;
   leads: number;
-  /** Its public page on shop.bitocard.com, while live or recently sold. */
+  /** Sold on BitoCard Shop itself; with resale enabled it can be both, or resellers only. */
+  on_shop: boolean;
+  /** Open to resellers' stores, with the discount they earn and how far above the price they may sell (basis points). */
+  resale: { enabled: boolean; discount_bps: number | null; markup_max_bps: number | null; paused: boolean };
+  /** Units left to sell, shared by every channel. */
+  stock: number;
+  /** Its public page on shop.bitocard.com, while live or recently sold (none for a resale-only listing). */
   url: string | null;
   created_at: string;
   updated_at: string;

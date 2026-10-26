@@ -4464,6 +4464,28 @@ model ClassifiedSafePaySettings {
   @@map("classified_safe_pay_settings")
 }
 
+/// BitoCard's limits on resale per country (`docs/BITOCARD_B2B_RESELLING_PLAN.md`): what suppliers may offer resellers,
+/// BitoCard's capped fee on a reseller's margin, and resale's time and strike limits. Resale opens in a country once the
+/// `classifieds_resale` switch is on and the reseller fee is set. No row: the defaults.
+model ClassifiedResaleSettings {
+  country             String   @id @db.Char(2)
+  /// The smallest and largest discount a supplier may give resellers, in basis points of their price.
+  discountMinBps      Int      @default(500) @map("discount_min_bps")
+  discountMaxBps      Int      @default(5000) @map("discount_max_bps")
+  /// The highest markup limit a supplier may set, in basis points (never above the country's markup cap).
+  markupMaxBps        Int      @default(3000) @map("markup_max_bps")
+  /// BitoCard's fee on a reseller's margin, in basis points, and its cap in the country's minor units (null: not set).
+  resellerFeeBps      Int?     @map("reseller_fee_bps")
+  resellerFeeCapMinor BigInt?  @map("reseller_fee_cap_minor")
+  /// Hours a supplier has to accept a resale order before the buyer's money is unlocked.
+  acceptHours         Int      @default(24) @map("accept_hours")
+  /// Strikes in 90 days that pause a reseller's resale checkout.
+  resellerStrikeLimit Int      @default(3) @map("reseller_strike_limit")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("classified_resale_settings")
+}
+
 /// BitoCard Shop's rules per country: how long a listing lasts, how many a seller may post, and which go to review.
 model ClassifiedMarketSettings {
   country               String   @id @db.Char(2)
@@ -4519,6 +4541,19 @@ model ClassifiedListing {
   closedAt     DateTime?                  @map("closed_at")
   views        Int                        @default(0)
   leads        Int                        @default(0)
+  /// Sold on BitoCard Shop itself (its pages, search, chats, Safe pay). At least one of onShop and resale (a database check).
+  onShop       Boolean                    @default(true) @map("on_shop")
+  /// Open to resellers' stores (`docs/BITOCARD_B2B_RESELLING_PLAN.md`), with the discount and markup limit below.
+  resale       Boolean                    @default(false)
+  /// What resellers earn off the price, in basis points, within the country's limits (`ClassifiedResaleSettings`).
+  resaleDiscountBps    Int?               @map("resale_discount_bps")
+  /// How far above the price a reseller may sell, in basis points, within the country's limit.
+  resaleMarkupMaxBps   Int?               @map("resale_markup_max_bps")
+  /// The supplier paused reselling (stores stop selling it; it stays on BitoCard Shop if it is there too).
+  resalePausedAt       DateTime?          @map("resale_paused_at")
+  /// Units left to sell, shared by BitoCard Shop and resellers' stores; Safe pay orders holding it take one each, and a
+  /// release takes one away (sold at none).
+  stock        Int                        @default(1)
   /// Full-text search over the title, features, category and description, kept by the API (GIN index in SQL).
   search       Unsupported("tsvector")?
   createdAt    DateTime                   @default(now()) @map("created_at")

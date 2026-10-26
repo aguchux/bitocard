@@ -16,6 +16,7 @@ import { ModerationService } from './moderation.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
 import { type ListingStatus, listingStatuses } from './rules.js';
 import { type DisputeDecision, disputeDecisions, SafePayService } from './safe-pay.service.js';
+import { ResaleService } from './resale.service.js';
 
 const upper = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.toUpperCase() : value);
 
@@ -642,6 +643,29 @@ class SafePaySettingsDto {
   strike_limit?: number;
 }
 
+class ResaleSettingsDto {
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  discount_min_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(10000)
+  discount_max_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(20000)
+  markup_max_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0) @Max(5000)
+  reseller_fee_bps?: number;
+
+  @IsOptional() @IsInt() @Min(0)
+  reseller_fee_cap?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(168)
+  accept_hours?: number;
+
+  @IsOptional() @IsInt() @Min(1) @Max(20)
+  reseller_strike_limit?: number;
+}
+
 class PayoutReviewDto {
   @IsIn(['approve', 'reject'])
   decision: 'approve' | 'reject';
@@ -656,7 +680,10 @@ class PayoutReviewDto {
 @AdminRoles('support', 'operations', 'finance')
 @Controller('admin/classifieds')
 export class AdminSafePayController {
-  constructor(private readonly safePay: SafePayService) {}
+  constructor(
+    private readonly safePay: SafePayService,
+    private readonly resale: ResaleService,
+  ) {}
 
   @Get('orders')
   orders(@Query() query: AdminOrdersDto) {
@@ -727,5 +754,19 @@ export class AdminSafePayController {
   @StepUp()
   updateSettings(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: SafePaySettingsDto) {
     return this.safePay.updateSettings(adminId(caller), country.toUpperCase(), body);
+  }
+
+  /** BitoCard's resale limits in a country (B2B reselling), and whether resale is open there. */
+  @Get('resale-settings/:country')
+  resaleSettings(@Param('country') country: string) {
+    return this.resale.adminSettings(country.toUpperCase());
+  }
+
+  /** What suppliers may offer resellers, BitoCard's capped fee on resellers' margins, and resale's limits. */
+  @Put('resale-settings/:country')
+  @AdminRoles('finance')
+  @StepUp()
+  updateResaleSettings(@CurrentCaller() caller: Caller, @Param('country') country: string, @Body() body: ResaleSettingsDto) {
+    return this.resale.updateSettings(adminId(caller), country.toUpperCase(), body);
   }
 }

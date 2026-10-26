@@ -138,6 +138,11 @@ export const switchDefinitions = {
     scopes: ['global', 'country'],
     description: "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market.",
   },
+  classifieds_resale: {
+    scopes: ['global', 'country'],
+    description:
+      "B2B reselling: BitoCard Shop sellers can open their listings to resellers' stores (docs/BITOCARD_B2B_RESELLING_PLAN.md), with the discount and markup limit they choose inside BitoCard's limits (Shop > Settings > Resale). Needs classifieds on and the reseller fee set there. Off until holding money for two parties is cleared.",
+  },
   classifieds_install_prompt: {
     scopes: ['global', 'country'],
     description:

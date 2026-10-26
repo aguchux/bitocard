@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { LeadsService } from './leads.service.js';
 import { ListingsService, shopOrigin } from './listings.service.js';
-import { conditions, featureValueOut, invalid } from './rules.js';
+import { conditions, featureValueOut, invalid, onShopWhere } from './rules.js';
 
 /** Areas whose centres are this close count as nearby. */
 export const nearbyKm = 25;
@@ -140,7 +140,7 @@ export class ListingSearchService {
     }
     const [place, featureFilters] = await Promise.all([this.place(country, input), this.features(input.f)]);
 
-    const where: Prisma.Sql[] = [Prisma.sql`l."country" = ${country}`, Prisma.sql`l."status" = 'active'`];
+    const where: Prisma.Sql[] = [Prisma.sql`l."country" = ${country}`, Prisma.sql`l."status" = 'active'`, Prisma.sql`l."on_shop"`];
     if (categoryIds) where.push(Prisma.sql`l."category_id" IN (${Prisma.join(categoryIds.map(id => Prisma.sql`${id}::uuid`))})`);
     if (input.price_min !== undefined) where.push(Prisma.sql`l."price_minor" >= ${BigInt(input.price_min)}`);
     if (input.price_max !== undefined) where.push(Prisma.sql`l."price_minor" <= ${BigInt(input.price_max)}`);
@@ -265,11 +265,12 @@ export class ListingSearchService {
         media: { where: { status: 'ready' }, orderBy: [{ kind: 'asc' }, { position: 'asc' }] },
       },
     });
-    if (!row || row.country !== code || ['draft', 'pending_review'].includes(row.status)) throw notFound();
+    // A listing sold only through resellers' stores has no page on BitoCard Shop.
+    if (!row || row.country !== code || !row.onShop || ['draft', 'pending_review'].includes(row.status)) throw notFound();
     if (row.status === 'sold' ? !row.soldAt || Date.now() - row.soldAt.getTime() > soldVisibleMs : row.status !== 'active') throw gone();
     const [checked, active, responseRate, holding] = await Promise.all([
       this.idChecked([row.customerId]),
-      this.prisma.classifiedListing.count({ where: { customerId: row.customerId, status: 'active' } }),
+      this.prisma.classifiedListing.count({ where: { customerId: row.customerId, ...onShopWhere } }),
       this.leads.responseRate(row.customerId),
       this.prisma.classifiedOrder.count({ where: { listingId: row.id, status: { in: ['paid', 'sent', 'disputed'] } } }),
     ]);
@@ -302,7 +303,9 @@ export class ListingSearchService {
       video: video ? { url: video.url, poster_url: video.posterUrl, duration_ms: video.durationMs, width: video.width, height: video.height } : null,
       delivery: row.delivery,
       /** Paid for with Safe pay and waiting for the hand-over. */
-      reserved: holding > 0,
+      reserved: holding >= row.stock,
+      /** Units still to be had: its stock less those paid for and waiting to be handed over. */
+      available: Math.max(row.stock - holding, 0),
       contact: { chat: row.contact !== 'phone', phone: row.contact !== 'chat' && Boolean(row.customer.phoneVerifiedAt && row.customer.phone) },
       seller: { name: publicName(row.customer.name), member_since: row.customer.createdAt.toISOString(), badges: this.badges(row.customer, checked), active_listings: active, response_rate: responseRate },
       published_at: row.publishedAt?.toISOString() ?? null,
@@ -327,7 +330,7 @@ export class ListingSearchService {
         SELECT t."title" FROM (
           SELECT DISTINCT ON (lower(l."title")) l."title", word_similarity(${words}, lower(l."title")) AS score
           FROM "classified_listings" l
-          WHERE l."country" = ${code} AND l."status" = 'active' AND (lower(l."title") LIKE ${`%${words.replace(/[%_\\]/g, '\\$&')}%`} OR word_similarity(${words}, lower(l."title")) >= 0.45)
+          WHERE l."country" = ${code} AND l."status" = 'active' AND l."on_shop" AND (lower(l."title") LIKE ${`%${words.replace(/[%_\\]/g, '\\$&')}%`} OR word_similarity(${words}, lower(l."title")) >= 0.45)
           ORDER BY lower(l."title"), score DESC
         ) t ORDER BY t."score" DESC, t."title" LIMIT 6`,
     ]);

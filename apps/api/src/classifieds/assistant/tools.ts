@@ -8,7 +8,7 @@ import type { AiTool } from '../../support/ai/providers.js';
 import type { ShopRole } from '../../support/bots.service.js';
 import { cleanMessage } from '../conversations.service.js';
 import { minComparable } from '../moderation.service.js';
-import { conditions, featureValueOut, linkPattern, priceText } from '../rules.js';
+import { conditions, featureValueOut, linkPattern, onShopWhere, priceText } from '../rules.js';
 import { safePayFee } from '../safe-pay.service.js';
 import { ListingSearchService, type SearchSort, searchSorts } from '../search.service.js';
 import { quoted } from './sanitise.js';
@@ -181,7 +181,7 @@ export class ShopAssistantTools {
   }
 
   private active(scope: ToolScope) {
-    return { country: scope.country, status: 'active' } as const;
+    return { country: scope.country, ...onShopWhere } as const;
   }
 
   private async searchListings(scope: ToolScope, args: Record<string, unknown>): Promise<ToolOutcome> {

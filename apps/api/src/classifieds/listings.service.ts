@@ -6,6 +6,7 @@ import { MediaStorage } from '../media/storage.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ModerationService, type ReviewFlag } from './moderation.service.js';
+import { ResaleService } from './resale.service.js';
 import { ShopTermsService } from './terms.service.js';
 import {
   checkDescription,
@@ -19,6 +20,7 @@ import {
   type ListingStatus,
   maxFeatures,
   maxPriceMinor,
+  maxStock,
   type priceKinds,
   slugify,
 } from './rules.js';
@@ -34,6 +36,15 @@ export type ListingInput = {
   delivery?: (typeof deliveries)[number];
   contact?: (typeof contacts)[number];
   features?: { key: string; value: unknown }[];
+  /** Sold on BitoCard Shop itself (default), and/or open to resellers' stores: at least one. */
+  on_shop?: boolean;
+  resale?: boolean;
+  resale_discount_bps?: number | null;
+  resale_markup_max_bps?: number | null;
+  /** Pause or resume reselling (stores stop selling it while paused). */
+  resale_paused?: boolean;
+  /** Units to sell, shared by every channel. */
+  stock?: number;
 };
 
 const dayMs = 86_400_000;
@@ -64,6 +75,12 @@ type ListingFields = {
   stateId?: string | null;
   priceKind?: string;
   priceMinor?: bigint | null;
+  onShop?: boolean;
+  resale?: boolean;
+  resaleDiscountBps?: number | null;
+  resaleMarkupMaxBps?: number | null;
+  resalePausedAt?: Date | null;
+  stock?: number;
 };
 
 const notFound = () => new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such listing.');
@@ -86,6 +103,7 @@ export class ListingsService {
     private readonly storage: MediaStorage,
     private readonly moderation: ModerationService,
     private readonly terms: ShopTermsService,
+    private readonly resale: ResaleService,
   ) {}
 
   /** The seller's country, once they may sell there. */
@@ -157,8 +175,21 @@ export class ListingsService {
     const listing = await this.own(customer, id);
     if (!['draft', 'pending_review', 'active', 'rejected'].includes(listing.status)) throw conflict('listing_closed', 'This listing can no longer be changed.');
     const data = await this.changes(country, input, listing);
-    if (listing.status !== 'draft') this.requireComplete({ ...listing, ...data.fields });
+    if (listing.status !== 'draft') {
+      this.requireComplete({ ...listing, ...data.fields });
+      // Opening a submitted listing to resellers needs what submitting one does.
+      if (data.fields.resale && !listing.resale) {
+        await this.terms.require(customer.id);
+        await this.resale.requireSupplier(customer, country);
+      }
+    }
     await this.prisma.$transaction(async tx => {
+      if (data.fields.stock !== undefined && listing.status !== 'draft') {
+        // Units paid for and waiting to be handed over stay: stock cannot go below them (the row locked against a payment).
+        await tx.$queryRaw`SELECT 1 FROM "classified_listings" WHERE "id" = ${id}::uuid FOR UPDATE`;
+        const held = await tx.classifiedOrder.count({ where: { listingId: id, status: { in: ['paid', 'sent', 'disputed'] } } });
+        if (data.fields.stock < held) throw conflict('stock_below_held', `${held} of these are paid for and waiting to be handed over: stock cannot go below that.`);
+      }
       await tx.classifiedListing.update({ where: { id }, data: data.fields });
       if (data.features) {
         await tx.classifiedListingFeature.deleteMany({ where: { listingId: id } });
@@ -218,6 +249,7 @@ export class ListingsService {
     if (!['draft', 'rejected'].includes(listing.status)) throw conflict('listing_not_draft', 'Only drafts and rejected listings are submitted.');
     await this.terms.require(customer.id);
     this.requireComplete(listing);
+    if (listing.resale) await this.resale.requireSupplier(customer, country);
     const photos = listing.media.filter(item => item.kind === 'photo' && item.status === 'ready').length;
     if (photos < settings.minPhotos) throw invalid('photos_required', `Add at least ${settings.minPhotos} photos.`, 'photos');
     if (listing.media.some(item => item.status === 'failed')) throw invalid('media_failed', 'Remove the photo or video that could not be used, or add it again.', 'photos');
@@ -360,6 +392,26 @@ export class ListingsService {
         return { featureId: feature.id, ...checkFeatureValue(feature, item.value, `features[${index}].value`) };
       });
     }
+
+    // Where it is sold (BitoCard Shop, resellers' stores or both), its resale terms and its stock.
+    if (input.on_shop !== undefined) fields.onShop = input.on_shop;
+    if (input.resale !== undefined) fields.resale = input.resale;
+    if (input.resale_discount_bps !== undefined) fields.resaleDiscountBps = input.resale_discount_bps;
+    if (input.resale_markup_max_bps !== undefined) fields.resaleMarkupMaxBps = input.resale_markup_max_bps;
+    if (input.resale_paused !== undefined) fields.resalePausedAt = input.resale_paused ? (current?.resalePausedAt ?? new Date()) : null;
+    if (input.stock !== undefined) {
+      if (!Number.isInteger(input.stock) || input.stock < 1 || input.stock > maxStock) throw invalid('parameter_invalid', `Stock is a whole number from 1 to ${maxStock.toLocaleString('en-GB')}.`, 'stock');
+      fields.stock = input.stock;
+    }
+    const onShop = fields.onShop ?? current?.onShop ?? true;
+    const resale = fields.resale ?? current?.resale ?? false;
+    if (!onShop && !resale) throw invalid('channel_required', 'Sell it on BitoCard Shop, through resellers, or both.', 'on_shop');
+    if (resale && ['resale', 'resaleDiscountBps', 'resaleMarkupMaxBps', 'priceKind'].some(key => key in fields)) {
+      if (priceKind === 'on_request') throw invalid('resale_price_required', 'Resellers sell at a price: give one to let them sell it.', 'price_kind');
+      const discount = 'resaleDiscountBps' in fields ? fields.resaleDiscountBps! : (current?.resaleDiscountBps ?? null);
+      const markup = 'resaleMarkupMaxBps' in fields ? fields.resaleMarkupMaxBps! : (current?.resaleMarkupMaxBps ?? null);
+      this.resale.checkTerms(await this.resale.limits(country), discount, markup);
+    }
     return { fields, features };
   }
 
@@ -390,7 +442,16 @@ export class ListingsService {
       contact: listing.contact,
       views: listing.views,
       leads: listing.leads,
-      url: ['active', 'sold'].includes(listing.status) && listing.slug ? `${shopOrigin}/${listing.country.toLowerCase()}/l/${listing.ref}-${listing.slug}` : null,
+      /** Sold on BitoCard Shop itself; a resale-only listing has no Shop address. */
+      on_shop: listing.onShop,
+      resale: {
+        enabled: listing.resale,
+        discount_bps: listing.resaleDiscountBps,
+        markup_max_bps: listing.resaleMarkupMaxBps,
+        paused: listing.resalePausedAt !== null,
+      },
+      stock: listing.stock,
+      url: listing.onShop && ['active', 'sold'].includes(listing.status) && listing.slug ? `${shopOrigin}/${listing.country.toLowerCase()}/l/${listing.ref}-${listing.slug}` : null,
       created_at: listing.createdAt.toISOString(),
       updated_at: listing.updatedAt.toISOString(),
       submitted_at: listing.submittedAt?.toISOString() ?? null,

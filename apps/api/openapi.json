@@ -1720,6 +1720,7 @@
                     "classifieds_safe_pay": false,
                     "classifieds_assistant": false,
                     "classifieds_install_prompt": false,
+                    "classifieds_resale": false,
                     "shq_install_prompt": false,
                     "storefront_install_prompt": false
                   }
@@ -44745,6 +44746,7 @@
               "classifieds",
               "classifieds_safe_pay",
               "classifieds_assistant",
+              "classifieds_resale",
               "classifieds_install_prompt"
             ],
             "additionalProperties": false,
@@ -44864,6 +44866,10 @@
               "classifieds_assistant": {
                 "type": "boolean",
                 "description": "Shop assistants (Anjio) in BitoCard Shop: finding listings, helping sellers post and answering questions. Needs classifieds on and an active shop assistant for the market."
+              },
+              "classifieds_resale": {
+                "type": "boolean",
+                "description": "B2B reselling: BitoCard Shop sellers can open their listings to resellers' stores (docs/BITOCARD_B2B_RESELLING_PLAN.md), with the discount and markup limit they choose inside BitoCard's limits (Shop > Settings > Resale). Needs classifieds on and the reseller fee set there. Off until holding money for two parties is cleared."
               },
               "classifieds_install_prompt": {
                 "type": "boolean",

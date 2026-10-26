@@ -14,7 +14,7 @@ import { ChatsService } from '../../support/chats.service.js';
 import { knowledgeContext, shopSystemPrompt, type ShopSurface } from '../../support/prompt.js';
 import { redact } from '../../support/redact.js';
 import { cleanMessage } from '../conversations.service.js';
-import { checkDescription, checkFeatureValue, checkTitle, conditions, linkPattern } from '../rules.js';
+import { checkDescription, checkFeatureValue, checkTitle, conditions, isOnShop, linkPattern } from '../rules.js';
 import { evalCases, type EvalOutcome, scoreCase } from './evals.js';
 import { answerLanguage, greetingFor, languageName } from './languages.js';
 import { quoted, sanitiseAnswer } from './sanitise.js';
@@ -154,8 +154,8 @@ export class ShopAssistantService {
     if (!bot.roles.includes(input.surface)) throw invalid('parameter_invalid', `${bot.name} does not do that here.`, 'surface');
     if (input.surface === 'sell' && !asker.customer) throw signIn();
     if (input.listing_id) {
-      const listing = await this.prisma.classifiedListing.findUnique({ where: { id: input.listing_id }, select: { country: true, status: true, customerId: true } });
-      const visible = listing && listing.country === country && (listing.status === 'active' || listing.customerId === asker.customer?.id);
+      const listing = await this.prisma.classifiedListing.findUnique({ where: { id: input.listing_id }, select: { country: true, status: true, onShop: true, customerId: true } });
+      const visible = listing && listing.country === country && (isOnShop(listing) || listing.customerId === asker.customer?.id);
       if (!visible || (input.surface === 'sell' && listing.customerId !== asker.customer?.id)) throw notFound('listing');
     }
     if (input.conversation_id) {
