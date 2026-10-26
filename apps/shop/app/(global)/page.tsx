@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import type { ShopShowcase } from "@bitocard/api-client/classifieds";
 import { Flag } from "@/components/flag";
-import { ShopIcon } from "@/components/icon";
+import { CategoryStrip } from "@/components/category-strip";
 import { ListingGrid } from "@/components/listing-card";
 import { markets, shopApi } from "@/lib/api";
 import { currentCustomer } from "@/lib/customer";
@@ -79,16 +79,7 @@ export default async function GlobalHome() {
               <h2 id="categories" className="mb-3 text-base font-bold">
                 Categories
               </h2>
-              <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-6 lg:grid-cols-8">
-                {showcase.data.categories.map(category => (
-                  <Link key={category.slug} href={`/c/${category.slug}`} className="flex flex-col items-center gap-1.5 rounded-2xl border border-navy-200 bg-white px-1 py-2.5 text-center text-xs font-semibold hover:border-navy-400">
-                    <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-700">
-                      <ShopIcon name={category.icon} className="size-5.5" />
-                    </span>
-                    <span className="line-clamp-2">{category.name}</span>
-                  </Link>
-                ))}
-              </div>
+              <CategoryStrip categories={showcase.data.categories} href={slug => `/c/${slug}`} />
             </section>
             {showcase.data.trending.length ? (
               <section aria-labelledby="trending">

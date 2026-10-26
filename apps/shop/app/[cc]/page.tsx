@@ -6,7 +6,7 @@ import { categoryPath, type ShopSearch } from "@bitocard/api-client/classifieds"
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
 import { SearchBar } from "@/components/search-bar";
-import { ShopIcon } from "@/components/icon";
+import { CategoryStrip } from "@/components/category-strip";
 import { marketFor, markets, shopApi } from "@/lib/api";
 import { siteOrigin } from "@/lib/customer";
 import { categoriesOf } from "@/lib/reference";
@@ -58,16 +58,7 @@ export default async function CountryHome({ params }: Props) {
             <h2 id="categories" className="mb-3 text-base font-bold">
               Categories
             </h2>
-            <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-6 lg:grid-cols-8">
-              {categories.map(category => (
-                <Link key={category.slug} href={categoryPath(cc, category.slug)} className="flex flex-col items-center gap-1.5 rounded-2xl border border-navy-200 bg-white px-1 py-2.5 text-center text-xs font-semibold hover:border-navy-400">
-                  <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-700">
-                    <ShopIcon name={category.icon} className="size-5.5" />
-                  </span>
-                  <span className="line-clamp-2">{category.name}</span>
-                </Link>
-              ))}
-            </div>
+            <CategoryStrip categories={categories} href={slug => categoryPath(cc, slug)} />
           </section>
         ) : null}
         <section aria-labelledby="recent">
