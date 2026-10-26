@@ -608,3 +608,21 @@ export function shopMessagesEmail(to: string, input: { name: string; chats: { ti
   ].join('');
   return { to, subject: heading, html, text: [heading, '', ...paragraphs, '', input.link, '', 'BitoCard, a Golojan Ltd venture.'].join('\n') };
 }
+
+/**
+ * B2B reselling: a resale order's step or a new message, to its buyer (under the store's name), supplier or reseller.
+ * Never carries codes, the buyer's contact details or message text: the link opens the order, behind sign-in.
+ */
+export function resaleOrderEmail(to: string, input: { title: string; body: string; link: string; action: string; signature: string; sandbox: boolean }): EmailMessage {
+  const subject = `${input.sandbox ? '[Sandbox] ' : ''}${input.title}`;
+  const paragraphs = [input.body, 'Keep every message and payment on BitoCard. Never give a release code before you have checked the item, and never pay outside BitoCard.'];
+  const html = [
+    '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#070f4c">',
+    `<h1 style="font-size:20px">${escape(input.title)}</h1>`,
+    ...paragraphs.map(paragraph => `<p style="font-size:15px;line-height:1.5">${escape(paragraph)}</p>`),
+    `<p><a href="${escape(input.link)}" style="display:inline-block;background:#e91e78;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">${escape(input.action)}</a></p>`,
+    `<p style="font-size:13px;color:#5b6488">${escape(input.signature)}</p>`,
+    '</div>',
+  ].join('');
+  return { to, subject, html, text: [input.title, '', ...paragraphs, '', `${input.action}: ${input.link}`, '', input.signature].join('\n') };
+}

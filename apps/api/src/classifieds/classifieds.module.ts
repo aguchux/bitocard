@@ -5,6 +5,7 @@ import { AdminClassifiedsController, AdminSafePayController, ClassifiedsAdminSer
 import { ClassifiedChatsController, ClassifiedListingsController, ClassifiedReferenceController, ClassifiedSafePayController, ClassifiedVideoUploadsController } from './classifieds.controller.js';
 import { SafePayService } from './safe-pay.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
+import { ShopEmails } from './shop-emails.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { ConversationsService } from './conversations.service.js';
 import { LeadsService } from './leads.service.js';
@@ -25,7 +26,7 @@ import { AdminRegistryController, ClassifiedRegistryService, ClassifiedSuggestio
 @Module({
   imports: [CheckoutModule, SettingsModule, IdentityModule],
   controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
-  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService],
-  exports: [ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, SafePayGuardsService, ListingSearchService],
+  providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService, ShopEmails],
+  exports: [ShopEmails, ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, SafePayGuardsService, ListingSearchService],
 })
 export class ClassifiedsModule {}

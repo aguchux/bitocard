@@ -468,3 +468,125 @@ describe('stage 5: disputes with both parties, reports of stores, strikes and re
     assert.ok(fees.top_resellers.some(item => item.reseller.name === 'Femi Gadgets'));
   });
 });
+
+describe('stage 6: Safe pay, resale and BitoCard Shop notices are emailed, with deadline reminders', () => {
+  let emailService;
+  const outbox = () => server.app.get(emailService).outbox;
+  before(async () => {
+    emailService = (await import('../dist/notifications/email.service.js')).EmailService;
+  });
+  const mail = async (to, match, count = 1) => {
+    for (let tries = 0; tries < 100; tries += 1) {
+      const found = outbox().filter(item => item.to === to && match.test(item.subject));
+      if (found.length >= count) return found;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.fail(`No email to ${to} matching ${match}: ${JSON.stringify(outbox().filter(item => item.to === to).map(item => item.subject))}`);
+  };
+
+  test('each step reaches every side by email, under the store name for the buyer, with links and nothing secret', async () => {
+    const seller = await supplier('Bola Ade');
+    const item = await listing(seller, 'Samsung 55 inch TV');
+    const reseller = await shop(item, 'Bola Electronics');
+    const person = await buyer(reseller.store, { funds: 30100000 });
+    const [buyerEmail, supplierEmail, ownerEmail] = await Promise.all([
+      prisma.customer.findUniqueOrThrow({ where: { id: person.id } }).then(row => row.email),
+      prisma.customer.findUniqueOrThrow({ where: { id: seller.id } }).then(row => row.email),
+      prisma.user.findUniqueOrThrow({ where: { id: reseller.userId } }).then(row => row.email),
+    ]);
+    const order = (await person.post('/v1/store/resale/orders', { ref: item.ref, fulfilment: 'meet_up', expected_total: 30100000 })).json;
+
+    const [placed] = await mail(buyerEmail, /is placed$/);
+    assert.match(placed.subject, /^\[Sandbox\] Your order SP-\d+ is placed$/);
+    assert.ok(placed.text.includes(`https://${reseller.store.subdomain}.`) && placed.text.includes(`/account/purchases/${order.id}`), placed.text);
+    assert.ok(placed.text.includes('Sent for Bola Electronics'));
+    const [toSupplier] = await mail(supplierEmail, /New order through Bola Electronics/);
+    assert.ok(toSupplier.text.includes(`/shop/orders/${order.id}`));
+    const [toReseller] = await mail(ownerEmail, /New order SP-/);
+    assert.ok(toReseller.text.includes(`/resale/orders/${order.id}`));
+
+    await seller.post(`/v1/classifieds/orders/${order.id}/accept`);
+    await mail(buyerEmail, /is confirmed/);
+    await mail(ownerEmail, /was accepted/);
+    const buyerPhone = (await prisma.customer.findUniqueOrThrow({ where: { id: person.id } })).phone;
+    const code = (await person.get(`/v1/store/resale/orders/${order.id}/release-code`)).json.code;
+    for (const message of outbox().filter(item => [supplierEmail, ownerEmail, buyerEmail].includes(item.to))) {
+      assert.ok(!message.text.includes(buyerPhone) && !message.text.includes(code), `no phone or release code in "${message.subject}"`);
+    }
+
+    // Messages: emailed without their text, once per 10 minutes per order and person.
+    assert.equal((await person.post(`/v1/store/resale/orders/${order.id}/messages`, { body: 'Can I collect on Saturday morning?' })).status, 201);
+    assert.equal((await person.post(`/v1/store/resale/orders/${order.id}/messages`, { body: 'Or Sunday works too.' })).status, 201);
+    const [first] = await mail(supplierEmail, /New message on SP-/);
+    await mail(ownerEmail, /New message on SP-/);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    assert.equal(outbox().filter(item => item.to === supplierEmail && /New message on SP-/.test(item.subject)).length, 1, 'the second message within 10 minutes sends no email');
+    assert.ok(!first.text.includes('Saturday'), 'the message text is never emailed');
+    assert.ok((await prisma.classifiedOrder.findUniqueOrThrow({ where: { id: order.id } })).supplierEmailedAt);
+
+    assert.equal((await seller.post(`/v1/classifieds/orders/${order.id}/release`, { code })).json.status, 'released');
+    await mail(ownerEmail, /was completed/);
+    await mail(buyerEmail, /Your order SP-\d+ is complete/);
+  });
+
+  test('deadline reminders: once each, by inbox and email, in the market time', async () => {
+    const seller = await supplier('Kemi Ojo');
+    const item = await listing(seller, 'LG 43 inch TV');
+    const reseller = await shop(item, 'Kemi Gadgets');
+    const person = await buyer(reseller.store, { funds: 30100000 });
+    const supplierEmail = (await prisma.customer.findUniqueOrThrow({ where: { id: seller.id } })).email;
+    const order = (await person.post('/v1/store/resale/orders', { ref: item.ref, fulfilment: 'meet_up', expected_total: 30100000 })).json;
+    // An hour of a 24-hour window left: remind the supplier to accept.
+    await prisma.classifiedOrder.update({ where: { id: order.id }, data: { createdAt: new Date(Date.now() - 23 * 3_600_000), acceptBy: new Date(Date.now() + 3_600_000) } });
+    assert.ok((await safePay.runDue()).reminded >= 1);
+    const [reminder] = await mail(supplierEmail, /Accept SP-\d+ soon/);
+    assert.ok(reminder.text.includes('counts as a strike'));
+    assert.ok(await prisma.notification.count({ where: { customerId: seller.id, type: 'customer.classifieds.order_reminder' } }));
+    await safePay.runDue();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(outbox().filter(item => item.to === supplierEmail && /Accept SP-/.test(item.subject)).length, 1, 'reminded once');
+
+    // A window that has only just opened is not reminded yet.
+    await seller.post(`/v1/classifieds/orders/${order.id}/accept`);
+    await prisma.classifiedOrder.update({ where: { id: order.id }, data: { paidAt: new Date(), handoverBy: new Date(Date.now() + 20 * 3_600_000) } });
+    await safePay.runDue();
+    assert.equal((await prisma.classifiedOrder.findUniqueOrThrow({ where: { id: order.id } })).handoverRemindedAt, null, 'not at the start of a short window');
+    await prisma.classifiedOrder.update({ where: { id: order.id }, data: { paidAt: new Date(Date.now() - 5 * 86_400_000) } });
+    await safePay.runDue();
+    await mail(supplierEmail, /Hand over SP-\d+ soon/);
+  });
+
+  test('suppliers and resellers working together, listing outcomes and direct Safe pay orders are emailed too', async () => {
+    const seller = await supplier('Tunde Bello');
+    const item = await listing(seller, 'Hisense 50 inch TV');
+    const reseller = await shop(item, 'Tunde Hub');
+    const supplierEmail = (await prisma.customer.findUniqueOrThrow({ where: { id: seller.id } })).email;
+    const ownerEmail = (await prisma.user.findUniqueOrThrow({ where: { id: reseller.userId } })).email;
+    await mail(supplierEmail, /Tunde Hub is reselling your listings/);
+
+    const relationship = (await seller.get('/v1/classifieds/me/resellers')).json.data[0];
+    for (const body of ['Can you give 12% on the 50 inch?', 'Also the 43 inch.']) assert.equal((await reseller.api.post(`/v1/resale/suppliers/${relationship.id}/messages`, { body })).status, 201);
+    const [toSupplier] = await mail(supplierEmail, /New message from Tunde Hub/);
+    assert.ok(!toSupplier.text.includes('12%') && toSupplier.text.includes(`/shop/resellers/${relationship.id}`));
+    assert.equal((await seller.post(`/v1/classifieds/me/resellers/${relationship.id}/messages`, { body: 'Yes, from Monday.' })).status, 201);
+    const [toReseller] = await mail(ownerEmail, /New message from Tunde B\./);
+    assert.ok(!toReseller.text.includes('Monday'));
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(outbox().filter(item => item.to === supplierEmail && /New message from/.test(item.subject)).length, 1, 'one email for messages within 10 minutes');
+
+    // A listing BitoCard removes is emailed to its seller.
+    assert.equal((await admin.post(`/v1/admin/classifieds/listings/${item.id}/remove`, { reason: 'Photos of another seller.' })).status, 200);
+    const [removed] = await mail(supplierEmail, /Your ad was removed/);
+    assert.ok(removed.text.includes('BitoCard Shop, a Golojan Ltd venture.'));
+
+    // A direct Safe pay order's seller and buyer (bitocard.com accounts) hear from BitoCard Shop.
+    const emails = server.app.get((await import('../dist/classifieds/shop-emails.service.js')).ShopEmails);
+    const id = randomUUID();
+    emails.order({ id, kind: 'direct', mode: 'live', storeId: null, resellerId: null, buyerId: seller.id, sellerId: seller.id }, 'supplier', { title: 'Direct order step', body: 'Hand it over.' });
+    const [direct] = await mail(supplierEmail, /^Direct order step$/);
+    assert.ok(direct.text.includes(`/shop/orders/${id}`) && direct.text.includes('BitoCard Shop, a Golojan Ltd venture.'));
+    emails.order({ id, kind: 'direct', mode: 'live', storeId: null, resellerId: null, buyerId: seller.id, sellerId: seller.id }, 'reseller', { title: 'Never sent', body: '' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(outbox().filter(item => item.subject === 'Never sent').length, 0, 'no reseller on a direct order');
+  });
+});

@@ -8,6 +8,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ShopEmails } from '../classifieds/shop-emails.service.js';
 import { templateFor } from '../stores/templates.js';
 import { ResaleOrdersService } from './resale-orders.service.js';
 
@@ -47,6 +48,7 @@ export class ResaleStoreReportsService {
     private readonly orders: ResaleOrdersService,
     private readonly inbox: InboxService,
     private readonly audit: AuditService,
+    private readonly emails: ShopEmails,
   ) {}
 
   private details(raw: string) {
@@ -117,6 +119,8 @@ export class ResaleStoreReportsService {
     if (!claimed.count) throw conflict('report_decided', 'This report was already decided.');
     await this.audit.record({ actorId, action: `resale.store_report_${input.decision}`, targetType: 'reseller', targetId: row.resellerId, before: { status: 'open' }, after: { report: id, store: row.storeId, reason: row.reason, note: input.note } });
     const verdict = input.decision === 'upheld' ? 'upheld' : 'looked into and closed';
+    this.emails.customer(row.reporter.id, { title: `Your report of ${row.store.name}`, body: `BitoCard ${verdict} your report. ${input.note}`.slice(0, 280), path: row.reporterKind === 'supplier' ? '/shop/resellers' : '/account/purchases' });
+    if (input.decision === 'upheld') this.emails.reseller(row.resellerId, { title: `A report of ${row.store.name} was upheld`, body: `It ${reasonText[row.reason as StoreReportReason]}. This counts as a strike. ${input.note}`.slice(0, 280), path: '/resale/orders' });
     await this.inbox.customer({ customerId: row.reporter.id, storeId: row.reporter.storeId }, 'customer.purchase.updated', { subject: `resale_store_report:${id}:decided`, title: `Your report of ${row.store.name}`, body: `BitoCard ${verdict} your report. ${input.note}`.slice(0, 280), link: row.reporterKind === 'supplier' ? '/shop/resellers' : '/account/purchases' });
     if (input.decision === 'upheld') {
       await this.inbox.reseller(row.resellerId, 'resale.order_updated', { subject: `resale_store_report:${id}`, title: `A report of ${row.store.name} was upheld`, body: `It ${reasonText[row.reason as StoreReportReason]}. This counts as a strike. ${input.note}`.slice(0, 280), link: '/resale/orders' });

@@ -6,6 +6,7 @@ import { StoreSellers } from '../checkout/store-sellers.js';
 import { linkPattern, heldUnits, invalid, priceText } from '../classifieds/rules.js';
 import { ResaleService } from '../classifieds/resale.service.js';
 import { SafePayGuardsService } from '../classifieds/safe-pay-guards.service.js';
+import { ShopEmails } from '../classifieds/shop-emails.service.js';
 import { deliveryOptions, fulfilmentOf, newSellerSales, orderInclude, type OrderRow, safePayFee, SafePayService, totalOf } from '../classifieds/safe-pay.service.js';
 import { publicName } from '../classifieds/search.service.js';
 import { ApiError } from '../common/errors/api-error.js';
@@ -88,6 +89,7 @@ export class ResaleOrdersService implements OnModuleInit {
     private readonly events: EventsService,
     private readonly integrations: IntegrationsService,
     private readonly audit: AuditService,
+    private readonly emails: ShopEmails,
   ) {}
 
   onModuleInit() {
@@ -296,6 +298,12 @@ export class ResaleOrdersService implements OnModuleInit {
       mode: order.mode,
     });
     await this.inbox.reseller(context.reseller.id, 'resale.order_new', { subject: `${id}:new`, title: `New order SP-${order.number}`, body: `"${order.listing.title}" × ${order.quantity} for ${priceText(order.priceMinor, order.currency)}. It waits for the supplier to accept.`, link: `/resale/orders/${id}`, mode: order.mode });
+    this.emails.order(order, 'buyer', {
+      title: `Your order SP-${order.number} is placed`,
+      body: `"${order.listing.title}" × ${order.quantity}: ${priceText(order.priceMinor + order.buyerFeeMinor + order.deliveryFeeMinor, order.currency)} is locked in your wallet until the supplier confirms it, within ${figures.acceptHours} hours. If they do not, it goes back to your wallet.`,
+    });
+    this.emails.order(order, 'supplier', { title: `New order through ${context.store.name}`, body: `"${order.listing.title}" × ${order.quantity}, paid and locked. Accept within ${figures.acceptHours} hours, or it goes back to the buyer.` });
+    this.emails.order(order, 'reseller', { title: `New order SP-${order.number}`, body: `"${order.listing.title}" × ${order.quantity} for ${priceText(order.priceMinor, order.currency)}. It waits for the supplier to accept.` });
     // A supplier who chose auto-accept takes it straight away (if they can accept now).
     if (await this.safePay.autoAccept(id)) order = await this.safePay.reloadOrder(id);
     return this.safePay.present(order, 'buyer');
@@ -373,6 +381,7 @@ export class ResaleOrdersService implements OnModuleInit {
     if (!standing.limited) return standing;
     const subject = `${resellerId}:${standing.cleared_at ?? 'never'}`;
     await this.inbox.reseller(resellerId, 'resale.order_updated', { subject: `limited:${subject}`, title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact BitoCard to have it reviewed.`, link: '/resale/orders' });
+    this.emails.reseller(resellerId, { title: 'Your Resale shop checkout is paused', body: `Your stores have ${standing.strikes} strikes in ${resellerStrikeDays} days (orders cancelled, disputes lost, reports upheld). Contact BitoCard to have it reviewed.`, path: '/resale/orders' });
     await this.inbox.admins('admin.classifieds.seller_limited', { subject: `reseller:${subject}`, title: 'A reseller reached the resale strike limit', body: `${standing.cancelled_by_store} orders cancelled, ${standing.disputes_lost} disputes lost and ${standing.reports_upheld} reports upheld in ${resellerStrikeDays} days.`, link: `/resellers/${resellerId}` });
     return standing;
   }
@@ -492,6 +501,10 @@ export class ResaleOrdersService implements OnModuleInit {
     if (toBuyer) await this.inbox.customer({ customerId: order.buyer.id, storeId: order.buyer.storeId }, 'customer.purchase.message', { subject: message.id, title: `${order.store?.name ?? 'The store'} wrote about your order`, body: preview, link: `/account/purchases/${order.id}`, mode: order.mode });
     if (toSupplier) await this.inbox.customer({ customerId: order.seller.id, storeId: order.seller.storeId }, 'customer.classifieds.order_message', { subject: message.id, title: `${author === 'buyer' ? 'The buyer' : order.store?.name} wrote on SP-${order.number}${thread === 'trade' ? ' (trade thread)' : ''}`, body: preview, link: `/shop/orders/${order.id}`, mode: order.mode });
     if (toReseller && order.resellerId) await this.inbox.reseller(order.resellerId, 'resale.order_message', { subject: message.id, title: `${author === 'buyer' ? 'The buyer' : 'The supplier'} wrote on SP-${order.number}${thread === 'trade' ? ' (trade thread)' : ''}`, body: preview, link: `/resale/orders/${order.id}`, mode: order.mode });
+    // Emailed without the text, at most every 10 minutes per order and person.
+    if (toBuyer) this.emails.order(order, 'buyer', { title: `${order.store?.name ?? 'The store'} wrote about your order SP-${order.number}`, body: '', message: true });
+    if (toSupplier) this.emails.order(order, 'supplier', { title: `New message on SP-${order.number}`, body: '', message: true });
+    if (toReseller) this.emails.order(order, 'reseller', { title: `New message on SP-${order.number}`, body: '', message: true });
     return this.presentMessage(message, order, author);
   }
 

@@ -3,6 +3,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ShopEmails } from '../classifieds/shop-emails.service.js';
 import { ResaleService } from '../classifieds/resale.service.js';
 import { featureValueOut, holdingStatuses, invalid, linkPattern, maxPriceMinor } from '../classifieds/rules.js';
 import { publicName } from '../classifieds/search.service.js';
@@ -90,6 +91,7 @@ export class ResaleStoresService {
     private readonly resale: ResaleService,
     private readonly trade: ResaleTradeService,
     private readonly inbox: InboxService,
+    private readonly emails: ShopEmails,
   ) {}
 
   // ---- Who may resell ----
@@ -679,6 +681,7 @@ export class ResaleStoresService {
           body: stateText[item.state] ?? 'It is not on sale on your store now.',
           link: `/resale/listings/${item.row.id}`,
         });
+        this.emails.reseller(item.row.resellerId, { title: `${item.row.listing.title ?? 'A listing'} stopped selling`, body: stateText[item.state] ?? 'It is not on sale on your store now.', path: `/resale/listings/${item.row.id}` });
       }
       if (rows.length < 200) break;
     }

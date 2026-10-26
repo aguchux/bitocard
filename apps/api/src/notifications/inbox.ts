@@ -187,6 +187,7 @@ export const notificationTypes = {
   'customer.classifieds.order_cancelled': { realm: 'customer', severity: 'warning', label: 'Safe pay order cancelled', push: true },
   'customer.classifieds.order_paid': { realm: 'customer', severity: 'success', label: 'Safe pay order paid: hand it over', push: true },
   'customer.classifieds.order_sent': { realm: 'customer', severity: 'info', label: 'Your Safe pay order was sent', push: true },
+  'customer.classifieds.order_reminder': { realm: 'customer', severity: 'warning', label: 'A Safe pay deadline is near', push: true },
   'customer.classifieds.order_released': { realm: 'customer', severity: 'success', label: 'Safe pay money released', push: true },
   'customer.classifieds.order_refunded': { realm: 'customer', severity: 'info', label: 'Safe pay order refunded', push: true },
   'customer.classifieds.order_disputed': { realm: 'customer', severity: 'warning', label: 'A Safe pay order is disputed', push: true },

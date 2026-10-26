@@ -4,6 +4,7 @@ import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma, ResaleDeal } from '../generated/prisma/client.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { type EmailThrottle, ShopEmails } from '../classifieds/shop-emails.service.js';
 import { ResaleService } from '../classifieds/resale.service.js';
 import { invalid } from '../classifieds/rules.js';
 import { publicName } from '../classifieds/search.service.js';
@@ -41,6 +42,7 @@ export class ResaleTradeService {
     private readonly prisma: PrismaService,
     private readonly resale: ResaleService,
     private readonly inbox: InboxService,
+    private readonly emails: ShopEmails,
   ) {}
 
   // ---- Used by the stores service ----
@@ -76,6 +78,20 @@ export class ResaleTradeService {
     const row = await this.prisma.resaleRelationship.findUnique({ where: { id: relationshipId }, select: { supplier: { select: { id: true, storeId: true } } } });
     if (!row) return;
     await this.inbox.customer({ customerId: row.supplier.id, storeId: row.supplier.storeId }, type, { subject, title, body, link: `/shop/resellers/${relationshipId}` });
+    const message = type === 'customer.resale.message';
+    this.emails.customer(row.supplier.id, {
+      title,
+      body: message ? 'Open the chat to read it and reply.' : body,
+      path: `/shop/resellers/${relationshipId}`,
+      action: 'Open My Resellers',
+      throttle: message ? { model: 'resaleRelationship', id: relationshipId, field: 'supplierEmailedAt' } : undefined,
+    });
+  }
+
+  /** Tells the reseller in SHQ and emails their owner (a message without its text, at most every 10 minutes). */
+  private async tellReseller(resellerId: string, type: Parameters<InboxService['reseller']>[1], content: Parameters<InboxService['reseller']>[2], throttle?: EmailThrottle) {
+    await this.inbox.reseller(resellerId, type, content);
+    this.emails.reseller(resellerId, { title: content.title, body: throttle ? 'Open the chat to read it and reply.' : content.body, path: content.link ?? '/resale/suppliers', throttle });
   }
 
   async tellSupplierAdded(relationshipId: string) {
@@ -97,7 +113,7 @@ export class ResaleTradeService {
       ended += 1;
       const row = await this.prisma.resaleDeal.findUniqueOrThrow({ where: { id: deal.id }, include: { listing: { select: { title: true } }, relationship: { select: { resellerId: true } } } });
       await this.system(row.relationshipId, `Deal ended at its end date: ${this.dealText(row)}.`, row.id);
-      await this.inbox.reseller(row.relationship.resellerId, 'resale.deal_ended', { subject: row.id, title: 'A supplier deal ended', body: `Its end date passed: ${this.dealText(row)}.`, link: `/resale/suppliers/${row.relationshipId}` });
+      await this.tellReseller(row.relationship.resellerId, 'resale.deal_ended', { subject: row.id, title: 'A supplier deal ended', body: `Its end date passed: ${this.dealText(row)}.`, link: `/resale/suppliers/${row.relationshipId}` });
     }
     return ended;
   }
@@ -285,7 +301,7 @@ export class ResaleTradeService {
     if (side === 'reseller') {
       await this.tellSupplier(row.id, 'customer.resale.message', `${row.id}:${row.supplierReadAt?.getTime() ?? 0}`, `New message from ${row.reseller.name}`, text.slice(0, 140));
     } else {
-      await this.inbox.reseller(row.resellerId, 'resale.message_received', { subject: `${row.id}:${row.resellerReadAt?.getTime() ?? 0}`, title: `New message from ${publicName(row.supplier.name)}`, body: text.slice(0, 140), link: `/resale/suppliers/${row.id}` });
+      await this.tellReseller(row.resellerId, 'resale.message_received', { subject: `${row.id}:${row.resellerReadAt?.getTime() ?? 0}`, title: `New message from ${publicName(row.supplier.name)}`, body: text.slice(0, 140), link: `/resale/suppliers/${row.id}` }, { model: 'resaleRelationship', id: row.id, field: 'resellerEmailedAt' });
     }
     const people = userId ? await this.prisma.user.findMany({ where: { id: userId }, select: { id: true, name: true } }) : [];
     return this.presentMessage(message, { supplier: publicName(row.supplier.name), reseller: row.reseller.name, people: new Map(people.map(person => [person.id, person.name])) }, side, new Map());
@@ -390,7 +406,7 @@ export class ResaleTradeService {
       await this.prisma.resaleRelationship.update({ where: { id: row.id }, data: { supplierBlockedAt: stopped ? new Date() : null } });
       if (stopped) {
         await this.prisma.resaleDeal.updateMany({ where: { relationshipId: row.id, status: { in: ['offered', 'active'] } }, data: { status: 'ended', endedAt: new Date(), endedBy: 'supplier' } });
-        await this.inbox.reseller(row.resellerId, 'resale.supplier_stopped', {
+        await this.tellReseller(row.resellerId, 'resale.supplier_stopped', {
           subject: `${row.id}:${Date.now()}`,
           title: `${publicName(row.supplier.name)} stopped you reselling their listings`,
           body: 'Their listings are off your stores. Your chat with them is closed.',
@@ -423,7 +439,7 @@ export class ResaleTradeService {
     const deal = await this.prisma.resaleDeal.create({ data: { relationshipId: row.id, listingId: input.listing_id ?? null, discountBps: input.discount_bps, floorBps: floor, endsAt }, include: this.dealInclude });
     const text = this.dealText(deal);
     await this.system(row.id, `Deal offered: ${text}.`, deal.id);
-    await this.inbox.reseller(row.resellerId, 'resale.deal_offered', { subject: deal.id, title: `${publicName(row.supplier.name)} offered you a deal`, body: `${text}.`, link: `/resale/suppliers/${row.id}` });
+    await this.tellReseller(row.resellerId, 'resale.deal_offered', { subject: deal.id, title: `${publicName(row.supplier.name)} offered you a deal`, body: `${text}.`, link: `/resale/suppliers/${row.id}` });
     return this.presentDeal(deal);
   }
 
@@ -446,7 +462,7 @@ export class ResaleTradeService {
     await this.system(deal.relationshipId, `Deal ended by the ${by}: ${text}.`, deal.id);
     if (by === 'supplier') {
       const row = await this.prisma.resaleRelationship.findUniqueOrThrow({ where: { id: deal.relationshipId }, select: { resellerId: true } });
-      await this.inbox.reseller(row.resellerId, 'resale.deal_ended', { subject: `${deal.id}:ended`, title: 'A supplier ended a deal', body: `${text}. New orders use the listing’s own terms; check your prices.`, link: `/resale/suppliers/${deal.relationshipId}` });
+      await this.tellReseller(row.resellerId, 'resale.deal_ended', { subject: `${deal.id}:ended`, title: 'A supplier ended a deal', body: `${text}. New orders use the listing’s own terms; check your prices.`, link: `/resale/suppliers/${deal.relationshipId}` });
     } else {
       await this.tellSupplier(deal.relationshipId, 'customer.resale.deal_answered', `${deal.id}:ended`, 'A reseller ended a deal', `${text}.`);
     }
@@ -466,7 +482,7 @@ export class ResaleTradeService {
       data: { noteStatus: status, noteReason: decision === 'approve' ? null : (input.reason?.trim() || null), noteDecidedAt: new Date() },
     });
     if (!claimed.count) throw conflict('note_changed', 'The reseller changed this note; read it again.', 'note');
-    await this.inbox.reseller(row.resellerId, 'resale.note_decided', {
+    await this.tellReseller(row.resellerId, 'resale.note_decided', {
       subject: `${row.id}:${Date.now()}`,
       title: decision === 'approve' ? 'Your note was approved' : decision === 'refuse' ? 'Your note was refused' : 'The supplier withdrew their approval of your note',
       body: `${row.listing.title ?? 'A listing'}${input.reason ? `: ${input.reason.trim()}` : ''}`,

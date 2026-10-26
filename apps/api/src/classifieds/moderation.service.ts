@@ -4,6 +4,7 @@ import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ShopEmails } from './shop-emails.service.js';
 import { invalid } from './rules.js';
 
 /** Why a listing was sent to a moderator. */
@@ -37,6 +38,7 @@ export class ModerationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly inbox: InboxService,
+    private readonly emails: ShopEmails,
   ) {}
 
   /** `classifieds_suspended` for a suspended seller. */
@@ -107,6 +109,7 @@ export class ModerationService {
   }
 
   private notify(listing: { id: string; title: string | null; customer: { id: string; storeId: string } }, type: 'customer.classifieds.listing_live' | 'customer.classifieds.listing_rejected' | 'customer.classifieds.listing_removed', title: string, body: string) {
+    this.emails.customer(listing.customer.id, { title, body, path: '/shop', action: 'Open My listings' });
     return this.inbox.customer({ customerId: listing.customer.id, storeId: listing.customer.storeId }, type, { subject: `${listing.id}:${Date.now()}`, title, body, link: '/shop/listings' });
   }
 

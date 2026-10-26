@@ -5,6 +5,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { LedgerMode } from '../generated/prisma/client.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { InboxService } from '../notifications/inbox.service.js';
+import { ShopEmails } from './shop-emails.service.js';
 
 const dayMs = 86_400_000;
 /** Strikes count over this many days. */
@@ -28,6 +29,7 @@ export class SafePayGuardsService {
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
     private readonly inbox: InboxService,
+    private readonly emails: ShopEmails,
   ) {}
 
   // ---- The same person ----
@@ -118,6 +120,7 @@ export class SafePayGuardsService {
       body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you and pay you directly. Contact BitoCard to have it reviewed.`,
       link: '/shop/orders',
     });
+    this.emails.customer(seller.id, { title: 'You cannot take Safe pay orders for now', body: `You cancelled, did not accept or hand over, or lost ${standing.strikes} Safe pay orders in ${strikeWindowDays} days. Buyers can still chat with you. Contact BitoCard to have it reviewed.`, path: '/shop/orders' });
     await this.inbox.admins('admin.classifieds.seller_limited', { subject, title: 'A BitoCard Shop seller reached the Safe pay strike limit', body: `${standing.strikes} strikes in ${strikeWindowDays} days. Review the seller and lift the limit if it is fair.`, link: `/storefront/customers/${seller.id}` });
   }
 

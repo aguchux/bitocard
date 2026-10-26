@@ -4932,6 +4932,15 @@ model ClassifiedOrder {
   sentAt                   DateTime?          @map("sent_at")
   releasedAt               DateTime?          @map("released_at")
   refundedAt               DateTime?          @map("refunded_at")
+  /// Resale orders: when each person was last emailed about a new message (at most every 10 minutes).
+  buyerEmailedAt           DateTime?          @map("buyer_emailed_at")
+  supplierEmailedAt        DateTime?          @map("supplier_emailed_at")
+  resellerEmailedAt        DateTime?          @map("reseller_emailed_at")
+  /// Deadline reminders, each sent once: accept, pay, hand over, confirm.
+  acceptRemindedAt         DateTime?          @map("accept_reminded_at")
+  payRemindedAt            DateTime?          @map("pay_reminded_at")
+  handoverRemindedAt       DateTime?          @map("handover_reminded_at")
+  confirmRemindedAt        DateTime?          @map("confirm_reminded_at")
   /// When it ended without money moving (declined, lapsed or cancelled before payment).
   closedAt                 DateTime?          @map("closed_at")
   /// buyer, seller or bitocard: who cancelled, declined or let it lapse.
@@ -5092,6 +5101,9 @@ model ResaleRelationship {
   lastMessageAt     DateTime?       @map("last_message_at")
   supplierReadAt    DateTime?       @map("supplier_read_at")
   resellerReadAt    DateTime?       @map("reseller_read_at")
+  /// When each side was last emailed about a new message (at most every 10 minutes).
+  supplierEmailedAt DateTime?       @map("supplier_emailed_at")
+  resellerEmailedAt DateTime?       @map("reseller_emailed_at")
   createdAt         DateTime        @default(now()) @map("created_at")
   supplier          Customer        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   reseller          Reseller        @relation(fields: [resellerId], references: [id], onDelete: Cascade)

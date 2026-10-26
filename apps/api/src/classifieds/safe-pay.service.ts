@@ -17,6 +17,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { cleanMessage } from './conversations.service.js';
 import { SafePayGuardsService } from './safe-pay-guards.service.js';
+import { ShopEmails } from './shop-emails.service.js';
 import { ListingsService } from './listings.service.js';
 import type { MediaUpload } from './media.service.js';
 import { heldUnits, invalid, isOnShop, priceText } from './rules.js';
@@ -98,6 +99,14 @@ export const orderInclude = {
 } satisfies Prisma.ClassifiedOrderInclude;
 export type OrderRow = Prisma.ClassifiedOrderGetPayload<{ include: typeof orderInclude }>;
 
+/** Where each market's deadlines are told in (its own time; UTC elsewhere). */
+const marketZones: Record<string, string> = { NG: 'Africa/Lagos', GH: 'Africa/Accra', KE: 'Africa/Nairobi', ZA: 'Africa/Johannesburg', GB: 'Europe/London' };
+
+/** A deadline as people read it: "Tue 27 Oct, 14:00" in the market's time. */
+export function deadlineText(at: Date, country: string) {
+  return at.toLocaleString('en-GB', { timeZone: marketZones[country] ?? 'UTC', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (marketZones[country] ? '' : ' UTC');
+}
+
 const covers = [
   'Your money is held by BitoCard until you have the item.',
   'At a meet-up, give the release code only once you have inspected it.',
@@ -130,6 +139,7 @@ export class SafePayService {
     private readonly audit: AuditService,
     private readonly guards: SafePayGuardsService,
     private readonly terms: ShopTermsService,
+    private readonly emails: ShopEmails,
   ) {}
 
   private encryption() {
@@ -800,7 +810,7 @@ export class SafePayService {
     const photo = file ? await this.storeDisputePhoto(order.dispute.id, file) : {};
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: side, authorId: customer.id, body: text, ...photo } });
     await this.tell(order, side === 'buyer' ? 'seller' : 'buyer', 'customer.classifieds.dispute_message', `New message on the dispute for SP-${order.number}`, text.slice(0, 140) || 'A photo');
-    await this.tellReseller(order, `New message on the dispute for SP-${order.number}`, `From the ${side === 'buyer' ? 'buyer' : 'supplier'}: ${text.slice(0, 140) || 'a photo'}`);
+    await this.tellReseller(order, `New message on the dispute for SP-${order.number}`, `From the ${side === 'buyer' ? 'buyer' : 'supplier'}: ${text.slice(0, 140) || 'a photo'}`, true);
     await this.inbox.admins('admin.classifieds.dispute_message', { subject: message.id, title: `New message on the dispute for SP-${order.number}`, body: `From the ${side}.`, link: `/classifieds/disputes/${order.dispute.id}` });
     return this.presentDisputeMessage(message, order, side);
   }
@@ -876,7 +886,7 @@ export class SafePayService {
     if (!text) throw invalid('parameter_missing', 'Write a message.', 'body');
     const message = await this.prisma.classifiedDisputeMessage.create({ data: { disputeId: order.dispute.id, author: 'bitocard', authorId: actorId, body: text } });
     for (const side of ['buyer', 'seller'] as const) await this.tell(order, side, 'customer.classifieds.dispute_message', `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140));
-    await this.tellReseller(order, `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140));
+    await this.tellReseller(order, `BitoCard wrote on the dispute for SP-${order.number}`, text.slice(0, 140), true);
     return this.presentDisputeMessage(message, order, 'admin');
   }
 
@@ -1020,6 +1030,7 @@ export class SafePayService {
     let lapsed = 0;
     let refunded = 0;
     let released = 0;
+    const reminded = await this.remind(now);
     // Resale orders the supplier did not accept in time: the buyer's money is unlocked, and it is a strike.
     for (const order of await this.prisma.classifiedOrder.findMany({ where: { status: 'locked', acceptBy: { lte: now } }, include: orderInclude, take: 200 })) {
       try {
@@ -1058,7 +1069,46 @@ export class SafePayService {
         if (!(error instanceof ApiError)) throw error;
       }
     }
-    return { lapsed, refunded, released };
+    return { lapsed, refunded, released, reminded };
+  }
+
+  /**
+   * One reminder before each deadline, claimed so it is sent once: the seller to accept (3 hours before) and to hand
+   * over or ship (24 hours before), the buyer to pay (3 hours before) and to confirm a delivery (24 hours before). A
+   * short window is reminded at its half way instead, so nobody is reminded the moment it opens.
+   */
+  private async remind(now: Date) {
+    const hourMs = 3_600_000;
+    const due = (deadline: Date | null, start: Date | null, before: number) => !!deadline && deadline.getTime() - now.getTime() <= Math.min(before, (deadline.getTime() - (start ?? deadline).getTime()) / 2);
+    const steps = [
+      { field: 'acceptRemindedAt', before: 3 * hourMs, where: { status: { in: ['requested', 'locked'] }, acceptBy: { gt: now, lte: new Date(now.getTime() + 3 * hourMs) } }, deadline: (order: OrderRow) => order.acceptBy, start: (order: OrderRow) => order.createdAt },
+      { field: 'payRemindedAt', before: 3 * hourMs, where: { status: 'awaiting_payment', payBy: { gt: now, lte: new Date(now.getTime() + 3 * hourMs) } }, deadline: (order: OrderRow) => order.payBy, start: (order: OrderRow) => order.acceptedAt },
+      { field: 'handoverRemindedAt', before: 24 * hourMs, where: { status: 'paid', handoverBy: { gt: now, lte: new Date(now.getTime() + 24 * hourMs) } }, deadline: (order: OrderRow) => order.handoverBy, start: (order: OrderRow) => order.paidAt },
+      { field: 'confirmRemindedAt', before: 24 * hourMs, where: { status: 'sent', confirmBy: { gt: now, lte: new Date(now.getTime() + 24 * hourMs) } }, deadline: (order: OrderRow) => order.confirmBy, start: (order: OrderRow) => order.sentAt },
+    ] as const;
+    let reminded = 0;
+    for (const step of steps) {
+      for (const order of await this.prisma.classifiedOrder.findMany({ where: { ...step.where, [step.field]: null } as Prisma.ClassifiedOrderWhereInput, include: orderInclude, take: 200 })) {
+        const deadline = step.deadline(order);
+        if (!due(deadline, step.start(order), step.before)) continue;
+        const claimed = await this.prisma.classifiedOrder.updateMany({ where: { id: order.id, status: order.status, [step.field]: null }, data: { [step.field]: now } });
+        if (!claimed.count) continue;
+        reminded += 1;
+        const by = deadlineText(deadline!, order.country);
+        const title = order.listing.title ?? 'your item';
+        if (step.field === 'acceptRemindedAt') {
+          await this.tell(order, 'seller', 'customer.classifieds.order_reminder', `Accept SP-${order.number} soon`, order.kind === 'resale' ? `Accept or decline the order for "${title}" by ${by}. If you do not, the buyer's money goes back to them and it counts as a strike.` : `Accept or decline the Safe pay request for "${title}" by ${by}, or it ends.`);
+        } else if (step.field === 'payRemindedAt') {
+          await this.tell(order, 'buyer', 'customer.classifieds.order_reminder', `Pay for "${title}" soon`, `The seller accepted your Safe pay request. Pay from your wallet by ${by}, or the request ends.`);
+        } else if (step.field === 'handoverRemindedAt') {
+          await this.tell(order, 'seller', 'customer.classifieds.order_reminder', `Hand over SP-${order.number} soon`, `${order.fulfilment === 'meet_up' ? 'Hand' : 'Ship'} "${title}" ${order.fulfilment === 'meet_up' ? 'over to the buyer' : 'to the buyer with tracking'} by ${by}. If you do not, the buyer is refunded and it counts as a strike.`);
+          await this.tellReseller(order, `SP-${order.number}: hand-over due by ${by}`, `The supplier has until then to ${order.fulfilment === 'meet_up' ? 'hand it over' : 'ship it'}.`);
+        } else {
+          await this.tell(order, 'buyer', 'customer.classifieds.order_reminder', `Did "${title}" arrive as described?`, `Confirm it, or open a dispute, by ${by}. After that the money is released to the seller.`);
+        }
+      }
+    }
+    return reminded;
   }
 
   // ---- Money ----
@@ -1145,6 +1195,7 @@ export class SafePayService {
     if (done.kind === 'resale') {
       const words = status === 'released' ? 'was completed' : status === 'refunded' ? 'was refunded' : 'was partly refunded';
       await this.tellReseller(done, `SP-${done.number} ${words}`, split && split.resellerPayout > 0n ? `${priceText(split.resellerPayout, done.currency)} was added to your earnings, withdrawable after the payout hold.` : 'Nothing was added to your earnings.');
+      if (status === 'released') await this.tell(done, 'buyer', 'customer.purchase.updated', `Your order SP-${done.number} is complete`, `Thank you for buying "${done.listing.title}" from ${done.store?.name ?? 'the store'}. You can still write to the store in your order chat.`);
     }
     if (status !== 'refunded') {
       await this.tell(
@@ -1217,7 +1268,8 @@ export class SafePayService {
 
   /**
    * Tells the buyer or the seller. A resale order's buyer hears from the store they bought on (their order page in its
-   * account app), whatever type the call names; its supplier sees it in the Shop tab like any order.
+   * account app), whatever type the call names; its supplier sees it in the Shop tab like any order. Both are emailed
+   * too (a dispute message as a new message, without its text).
    */
   private async tell(order: OrderRow, to: Side, type: Parameters<InboxService['customer']>[1], title: string, body: string) {
     const recipient = to === 'buyer' ? order.buyer : order.seller;
@@ -1229,12 +1281,14 @@ export class SafePayService {
       link: resaleBuyer ? `/account/purchases/${order.id}` : `/shop/orders/${order.id}`,
       mode: order.mode,
     });
+    this.emails.order(order, to === 'buyer' ? 'buyer' : 'supplier', { title, body, message: type === 'customer.classifieds.dispute_message' });
   }
 
-  /** Tells a resale order's reseller (nothing for a direct order). */
-  private async tellReseller(order: OrderRow, title: string, body: string) {
+  /** Tells a resale order's reseller, in SHQ and by email (nothing for a direct order). */
+  private async tellReseller(order: OrderRow, title: string, body: string, message = false) {
     if (order.kind !== 'resale' || !order.resellerId) return;
     await this.inbox.reseller(order.resellerId, 'resale.order_updated', { subject: `${order.id}:${title}`, title, body, link: `/resale/orders/${order.id}`, mode: order.mode });
+    this.emails.order(order, 'reseller', { title, body, message });
   }
 
   /** A line from BitoCard in the order's conversation: a resale order's order chat, else the buyer's chat with the seller. */
