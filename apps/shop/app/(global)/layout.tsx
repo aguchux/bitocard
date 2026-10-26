@@ -9,11 +9,7 @@ export default async function GlobalLayout({ children }: { children: React.React
   const own = all.data.find(market => market.country === customer?.country) ?? null;
   return (
     <>
-      <header className="bg-navy-900 px-4 py-3">
-        <div className="mx-auto max-w-6xl">
-          <ShopHeader market={all.showcase ? null : own ?? all.data[0] ?? null} customer={customer} showcase={all.showcase} />
-        </div>
-      </header>
+      <ShopHeader market={all.showcase ? null : own ?? all.data[0] ?? null} customer={customer} showcase={all.showcase} />
       <main>{children}</main>
       <ShopFooter />
     </>

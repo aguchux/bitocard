@@ -34,7 +34,7 @@ export default async function GlobalCategory({ params }: Props) {
   const showcase = await shopApi<ShopShowcase>(`/v1/classifieds/showcase?category=${encodeURIComponent(category)}`);
   if (!showcase.ok || !showcase.data.category || !showcase.data.sections) notFound();
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-4 pt-5">
+    <div className="mx-auto grid max-w-[1400px] gap-8 px-4 sm:px-6 lg:px-8 pt-5">
       <h1 className="text-2xl font-extrabold tracking-tight">{showcase.data.category.name} across Africa</h1>
       {showcase.data.sections.map(section => (
         <section key={section.country} aria-labelledby={`in-${section.country}`}>

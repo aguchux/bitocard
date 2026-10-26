@@ -39,8 +39,8 @@ export default async function GlobalHome() {
   const own = all.data.find(market => market.country === customer?.country);
   return (
     <>
-      <section className="bg-navy-900 px-4 pb-6">
-        <div className="mx-auto grid max-w-6xl gap-4">
+      <section className="bg-navy-900 pt-5 pb-6">
+        <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-4">
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">
             BitoCard Shop across Africa
             <br />
@@ -54,7 +54,7 @@ export default async function GlobalHome() {
           ) : null}
         </div>
       </section>
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 pt-5">
+      <div className="mx-auto grid max-w-[1400px] gap-8 px-4 sm:px-6 lg:px-8 pt-5">
         <section aria-labelledby="countries">
           <h2 id="countries" className="mb-3 text-base font-bold">
             Choose your country

@@ -17,11 +17,7 @@ export default async function CountryLayout({ children, params }: { children: Re
   const [customer, all, assistant] = await Promise.all([currentCustomer(), markets(), assistantFor(market.country)]);
   return (
     <AssistantProvider country={market.country} profile={assistant} signedIn={Boolean(customer)}>
-      <header className="bg-navy-900 px-4 py-3">
-        <div className="mx-auto max-w-6xl">
-          <ShopHeader market={market} customer={customer} showcase={all.showcase} />
-        </div>
-      </header>
+      <ShopHeader market={market} customer={customer} showcase={all.showcase} />
       <main>{children}</main>
       <ShopFooter country={{ code: market.country, name: market.name }} />
       <SellButton customer={customer} />

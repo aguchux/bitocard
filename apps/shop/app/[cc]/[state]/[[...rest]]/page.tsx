@@ -82,12 +82,12 @@ export default async function PlacePage({ params, searchParams }: Props) {
   const areas = found.place.area ? [] : found.place.state.areas;
   return (
     <>
-      <section className="bg-navy-900 px-4 pb-4">
-        <div className="mx-auto max-w-6xl">
+      <section className="bg-navy-900 pt-5 pb-4">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
           <SearchBar country={market.country} q={filters.q} area={found.place.area?.slug} state={state} />
         </div>
       </section>
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 pt-4">
+      <div className="mx-auto grid max-w-[1400px] gap-4 px-4 sm:px-6 lg:px-8 pt-4">
         <Breadcrumbs trail={trail} />
         <h1 className="text-2xl font-extrabold tracking-tight">
           {category ? category.name : "For sale"} <span className="text-navy-500">in {where(found.place)}</span>

@@ -134,7 +134,7 @@ export default async function ListingPage({ params }: Props) {
   const origin = siteOrigin();
 
   return (
-    <article className="mx-auto max-w-6xl pb-6 sm:px-4 sm:pt-4">
+    <article className="mx-auto max-w-[1400px] pb-6 sm:px-6 sm:pt-4 lg:px-8">
       <div className="hidden px-4 pt-3 sm:block sm:px-0 sm:pt-0">
         <Breadcrumbs trail={trail} />
       </div>

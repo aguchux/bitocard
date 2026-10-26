@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { MapPin, ShieldCheck } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { categoryPath, type ShopSearch } from "@bitocard/api-client/classifieds";
 import { JsonLd } from "@/components/json-ld";
 import { ListingGrid } from "@/components/listing-card";
@@ -37,8 +37,8 @@ export default async function CountryHome({ params }: Props) {
   const [categories, recent] = await Promise.all([categoriesOf(cc), shopApi<ShopSearch>(`/v1/classifieds/listings?country=${market.country}&sort=newest&limit=12`)]);
   return (
     <>
-      <section className="bg-navy-900 px-4 pt-2 pb-5">
-        <div className="mx-auto grid max-w-6xl gap-3.5">
+      <section className="bg-navy-900 pt-6 pb-6">
+        <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-3.5">
           <h1 className="text-[22px] leading-tight font-extrabold text-white sm:text-3xl">
             Buy and sell near you,
             <br />
@@ -52,14 +52,7 @@ export default async function CountryHome({ params }: Props) {
           </Link>
         </div>
       </section>
-      <div className="mx-auto grid max-w-6xl gap-7 px-4 pt-4">
-        <Link href="/safe-trade#safe-pay" className="flex items-center gap-3 rounded-2xl border border-mint-500/30 bg-mint-50 px-3.5 py-3 text-mint-700">
-          <ShieldCheck className="size-7 shrink-0" aria-hidden="true" />
-          <span className="grid gap-0.5 text-[13px] leading-snug">
-            <strong className="text-sm">Safe pay on any listing</strong>
-            We hold the money until you have the item.
-          </span>
-        </Link>
+      <div className="mx-auto grid max-w-[1400px] gap-7 px-4 sm:px-6 lg:px-8 pt-4">
         {categories.length ? (
           <section aria-labelledby="categories">
             <h2 id="categories" className="mb-3 text-base font-bold">

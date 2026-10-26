@@ -549,13 +549,12 @@ export function useAssistantDraft(listingId: string, onOpen: () => void) {
 }
 
 /** Ask Anjio in the header. */
-export function AskButton() {
+export function AskButton({ className }: { className?: string }) {
   const assistant = useAssistant();
   if (!assistant.available) return null;
   return (
-    <button type="button" onClick={() => assistant.open()} className="flex h-9 items-center gap-1.5 rounded-full border border-navy-700 bg-navy-800 px-3 text-sm font-semibold text-white hover:bg-navy-700">
-      <Sparkles className="size-4 text-brand-400" aria-hidden="true" /> <span className="hidden sm:inline">Ask {assistant.name}</span>
-      <span className="sr-only sm:hidden">Ask {assistant.name}</span>
+    <button type="button" onClick={() => assistant.open()} className={`gap-1.5 ${className ?? ""}`}>
+      <Sparkles className="size-4 text-brand-500" aria-hidden="true" /> Ask {assistant.name}
     </button>
   );
 }

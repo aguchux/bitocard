@@ -14,7 +14,7 @@ const labels: Record<(typeof customerDocuments)[number], string> = {
 export function ShopFooter({ country }: { country?: { code: string; name: string } | null }) {
   return (
     <footer className="mt-12 border-t border-navy-200 bg-white">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-navy-600 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 sm:px-6 lg:px-8 py-8 text-sm text-navy-600 sm:flex-row sm:items-start sm:justify-between">
         <div className="grid gap-1.5">
           <strong className="text-navy-900">BitoCard Shop{country ? ` ${country.name}` : ""}</strong>
           <p className="max-w-sm">Buy and sell near you. Safe pay holds the money until you have the item.</p>

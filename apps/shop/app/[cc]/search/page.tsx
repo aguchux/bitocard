@@ -32,8 +32,8 @@ export default async function SearchPage({ params, searchParams }: Props) {
   const where = place ? (place.area ? `${place.area.name}, ${place.state.name}` : place.state.name) : null;
   return (
     <>
-      <section className="bg-navy-900 px-4 pb-4">
-        <div className="mx-auto grid max-w-6xl gap-2.5">
+      <section className="bg-navy-900 pt-5 pb-4">
+        <div className="mx-auto grid max-w-[1400px] px-4 sm:px-6 lg:px-8 gap-2.5">
           <SearchBar country={market.country} q={filters.q} area={filters.area} state={filters.state} autoFocus={!filters.q} />
           <Link href={`/${cc}/areas?next=${encodeURIComponent(`/${cc}/search${filters.q ? `?q=${encodeURIComponent(filters.q)}` : ""}`)}`} className="flex h-10 items-center gap-2 rounded-xl border border-navy-700 bg-navy-800 px-3 text-sm font-semibold text-white sm:max-w-sm">
             <MapPin className="size-4.5 text-brand-300" aria-hidden="true" />
@@ -42,7 +42,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
           </Link>
         </div>
       </section>
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 pt-4">
+      <div className="mx-auto grid max-w-[1400px] gap-4 px-4 sm:px-6 lg:px-8 pt-4">
         <h1 className="text-2xl font-extrabold tracking-tight">{filters.q ? `Results for “${filters.q}”` : `Everything in ${market.name}`}</h1>
         {result.ok ? (
           <Results result={result.data} filters={filters} path={`/${cc}/search`} category={null} place={{ area: place?.area?.name, state: place?.state.name, country: market.name }} currency={market.currency} />
