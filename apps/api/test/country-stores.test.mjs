@@ -302,10 +302,20 @@ describe('country stores: general rollout, not just the pilots (Stage 5)', () =>
     assert.equal(za.reseller.country, 'ZA');
   });
 
+  test('every market had its country store made and switched on by migration, its address left to the domains job', async () => {
+    for (const code of ['NG', 'GH', 'KE']) {
+      const store = await prisma.store.findUniqueOrThrow({ where: { subdomain: code.toLowerCase() }, include: { reseller: true } });
+      assert.deepEqual([store.name, store.status, store.checkoutMode, store.template, store.reseller.house, store.reseller.country, store.reseller.status], ['BitoCard', 'published', 'live', 'all_in_one', true, code, 'active'], code);
+      assert.ok(['pending', 'ready', 'failed'].includes(store.hostStatus), code);
+      const on = await prisma.featureSwitch.findFirst({ where: { key: 'country_stores', countryCode: code, resellerId: null } });
+      assert.equal(on?.enabled, true, code);
+    }
+  });
+
   test('an admin brings a country store up ahead of its first sale, idempotently, audited', async () => {
-    // Kenya: seeded, never bought from through root in this file, so no store yet — proving the admin action needs
-    // no prior checkout either, for any market in the list.
-    assert.equal(await prisma.store.findUnique({ where: { subdomain: 'ke' } }), null);
+    // Kenya as a market added after the migration (which made a store for every market then): no store yet, and no
+    // checkout there either — the admin action needs neither.
+    await prisma.store.delete({ where: { subdomain: 'ke' } });
     const created = await admin.post('/v1/admin/countries/KE/store');
     assert.equal(created.status, 201, JSON.stringify(created.json));
     assert.equal(created.json.subdomain, 'ke');
