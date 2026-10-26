@@ -24,7 +24,9 @@ export const appOrigin = 'http://localhost:3004';
 const baseEnv = {
   // Request logs only in the Docker run, where CI needs them to diagnose failures.
   LOG_LEVEL: dockerUrl ? 'error' : 'silent',
-  RATE_LIMIT_PER_MINUTE: '1000',
+  // High, like the other limits: in the Docker run every test file shares one Redis and one address, so signed-out
+  // requests from files running at once all count together. The rate-limit tests set their own small limits.
+  RATE_LIMIT_PER_MINUTE: '100000',
   ADDRESS_RATE_LIMIT_PER_MINUTE: '100000',
   AUTH_RATE_LIMIT_PER_MINUTE: '100000',
   PASSWORD_BREACH_CHECK: 'off',

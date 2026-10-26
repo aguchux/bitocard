@@ -176,8 +176,8 @@ describe('idempotency', () => {
 describe('rate limits', () => {
   test('/v1 endpoints carry rate limit headers', async () => {
     const res = await post('/v1/fixtures/things/accept', {}, { 'idempotency-key': 'rate-1' });
-    assert.equal(res.headers.get('ratelimit-limit'), '1000');
-    assert.ok(Number(res.headers.get('ratelimit-remaining')) < 1000);
+    assert.equal(res.headers.get('ratelimit-limit'), '100000');
+    assert.ok(Number(res.headers.get('ratelimit-remaining')) < 100000);
   });
 
   test('with Redis configured, counters are stored in Redis', { skip: !useRedis && 'Redis not configured' }, async () => {
