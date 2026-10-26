@@ -16,6 +16,7 @@ import { CronController } from './cron.controller.js';
 import { SupportModule } from '../support/support.module.js';
 import { ClassifiedsModule } from '../classifieds/classifieds.module.js';
 import { ShopAssistantModule } from '../classifieds/assistant/assistant.module.js';
+import { ResaleModule } from '../resale/resale.module.js';
 
-@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule], controllers: [CronController] })
+@Module({ imports: [CheckoutModule, CryptoModule, FxModule, PaymentsModule, PayoutsModule, BillingModule, OrdersModule, NumbersModule, EsimsModule, IdentityModule, ResellerIntegrationsModule, DomainsModule, StoresModule, SupportModule, ClassifiedsModule, ShopAssistantModule, ResaleModule], controllers: [CronController] })
 export class CronModule {}

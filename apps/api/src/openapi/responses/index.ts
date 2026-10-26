@@ -10,6 +10,7 @@ import { exchangeDocs } from './exchange.js';
 import { moneyDocs } from './money.js';
 import { storesDocs } from './stores.js';
 import { domainsDocs } from './domains.js';
+import { resaleDocs } from './resale.js';
 
 /**
  * What every operation returns, written once per area of the API and merged into the OpenAPI document, so the docs
@@ -29,7 +30,7 @@ export type ResponseDoc = {
 /** One area of the API: its reusable object schemas, and the response of each operation (`'GET /v1/orders/{id}'`). */
 export type DocsArea = { schemas: Record<string, Schema>; responses: Record<string, ResponseDoc> };
 
-export const docsAreas: Record<string, DocsArea> = { accountDocs, commerceDocs, moneyDocs, developersDocs, storesDocs, dashboardDocs, disputesDocs, supportDocs, exchangeDocs, cryptoDocs, domainsDocs };
+export const docsAreas: Record<string, DocsArea> = { accountDocs, commerceDocs, moneyDocs, developersDocs, storesDocs, dashboardDocs, disputesDocs, supportDocs, exchangeDocs, cryptoDocs, domainsDocs, resaleDocs };
 
 /** Every error has this shape; `param` is present only when the error is about one field. */
 export const errorSchema = objectSchema(

@@ -21,6 +21,8 @@ export const apiKeyScopes = [
   'disputes:write',
   'support:read',
   'support:write',
+  'resale:read',
+  'resale:write',
 ] as const;
 
 export const maxActiveKeys = 20;

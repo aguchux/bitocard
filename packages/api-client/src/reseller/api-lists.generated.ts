@@ -16,6 +16,8 @@ export const apiKeyScopes = [
   'disputes:write',
   'support:read',
   'support:write',
+  'resale:read',
+  'resale:write',
 ] as const;
 
 /** Event types an endpoint can subscribe to (`eventTypes` in the API); `*` means all, including later ones. */

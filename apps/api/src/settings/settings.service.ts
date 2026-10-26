@@ -143,6 +143,11 @@ export const switchDefinitions = {
     description:
       "B2B reselling: BitoCard Shop sellers can open their listings to resellers' stores (docs/BITOCARD_B2B_RESELLING_PLAN.md), with the discount and markup limit they choose inside BitoCard's limits (Shop > Settings > Resale). Needs classifieds on and the reseller fee set there. Off until holding money for two parties is cleared.",
   },
+  reseller_resale: {
+    scopes: ['global', 'country', 'reseller'],
+    description:
+      "B2B reselling for resellers: a verified reseller with a Resale shop store browses BitoCard Shop suppliers' resale listings in their country, adds them to the store at their own price within the supplier's limits, and works with suppliers in a chat with deals (docs/BITOCARD_B2B_RESELLING_PLAN.md). Needs classifieds_resale open in the country. Every plan.",
+  },
   classifieds_install_prompt: {
     scopes: ['global', 'country'],
     description:

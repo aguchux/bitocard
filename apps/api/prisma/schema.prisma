@@ -510,6 +510,9 @@ model Reseller {
   cryptoDeposits            CryptoDeposit[]
   cryptoWithdrawals         CryptoWithdrawal[]
   cryptoWithdrawalAddresses CryptoWithdrawalAddress[]
+  resaleListings            ResaleListing[]
+  resaleRules               ResaleRule[]
+  resaleRelationships       ResaleRelationship[]
   @@map("resellers")
   invoices              Invoice[]
 }
@@ -814,6 +817,8 @@ model Store {
   homeVersions          StoreHomeVersion[]
   subscription          StoreSubscription?
   publicSpinClaims      PublicSpinClaim[]
+  resaleListings        ResaleListing[]
+  resaleRules           ResaleRule[]
 
   @@index([resellerId])
   @@index([hostStatus])
@@ -2573,6 +2578,7 @@ model Customer {
   classifiedFeatureSuggestions ClassifiedFeatureSuggestion[]
   handoffs                  CustomerHandoff[]
   assistantThreads          AssistantThread[]
+  resaleRelationships       ResaleRelationship[]
 
   @@unique([storeId, email])
   @@unique([storeId, phone])
@@ -4352,6 +4358,7 @@ model ClassifiedCategory {
   countries       ClassifiedCategoryCountry[]
   listings        ClassifiedListing[]
   featureSuggestions ClassifiedFeatureSuggestion[]
+  resaleRules     ResaleRule[]
 
   @@index([parentId, position])
   @@map("classified_categories")
@@ -4571,6 +4578,8 @@ model ClassifiedListing {
   orders       ClassifiedOrder[]
   offers       ClassifiedOffer[]
   leadRows     ClassifiedLead[]
+  resaleListings ResaleListing[]
+  resaleDeals  ResaleDeal[]
 
   @@index([customerId, status])
   @@index([country, status, stateId, areaId])
@@ -4933,4 +4942,135 @@ model ClassifiedDisputeMessage {
 
   @@index([disputeId, createdAt])
   @@map("classified_dispute_messages")
+}
+
+/// B2B reselling, stage 2 (`docs/BITOCARD_B2B_RESELLING_PLAN.md`): a reseller's store selling a supplier's resale
+/// listing. Nothing about the item is kept here: the store reads the supplier's listing every time, so the reseller can
+/// never change what is said about it. Their only words are one note, served only once the supplier approves it.
+model ResaleListing {
+  id              String             @id @default(uuid()) @db.Uuid
+  storeId         String             @map("store_id") @db.Uuid
+  resellerId      String             @map("reseller_id") @db.Uuid
+  listingId       String             @map("listing_id") @db.Uuid
+  relationshipId  String             @map("relationship_id") @db.Uuid
+  /// The reseller's price: a markup over the supplier's price in basis points (it follows the price), or a fixed
+  /// price; exactly one (a database check).
+  markupBps       Int?               @map("markup_bps")
+  fixedPriceMinor BigInt?            @map("fixed_price_minor")
+  /// active, paused (by the reseller) or removed (kept, so a rule never adds it again).
+  status          String             @default("active")
+  /// The auto-listing rule that added it.
+  ruleId          String?            @map("rule_id") @db.Uuid
+  /// At most 140 characters of plain text, checked like a listing's words.
+  note            String?
+  /// pending, approved, refused or withdrawn (the supplier took back an approval); null without a note.
+  noteStatus      String?            @map("note_status")
+  noteReason      String?            @map("note_reason")
+  noteSubmittedAt DateTime?          @map("note_submitted_at")
+  noteDecidedAt   DateTime?          @map("note_decided_at")
+  /// What it could last do (selling, sold_out, price_out_of_rangeâ€¦) as told to the reseller, so each change is told once.
+  notifiedState   String?            @map("notified_state")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  store           Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  reseller        Reseller           @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  listing         ClassifiedListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  relationship    ResaleRelationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+  rule            ResaleRule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, listingId])
+  @@index([listingId])
+  @@index([resellerId, status])
+  @@index([relationshipId])
+  @@map("resale_listings")
+}
+
+/// A reseller's auto-listing rule: every resale listing in a category (or every category) opened in their country is
+/// added to the store at this markup, except their excluded suppliers and listings they removed.
+model ResaleRule {
+  id                  String              @id @default(uuid()) @db.Uuid
+  resellerId          String              @map("reseller_id") @db.Uuid
+  storeId             String              @map("store_id") @db.Uuid
+  categoryId          String?             @map("category_id") @db.Uuid
+  markupBps           Int                 @map("markup_bps")
+  excludedSupplierIds String[]            @default([]) @map("excluded_supplier_ids") @db.Uuid
+  active              Boolean             @default(true)
+  lastRunAt           DateTime?           @map("last_run_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  reseller            Reseller            @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  store               Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category            ClassifiedCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  listings            ResaleListing[]
+
+  @@index([resellerId])
+  @@index([active])
+  @@map("resale_rules")
+}
+
+/// A supplier and a reseller carrying their listings (My Resellers): their chat, phone numbers shown to each other,
+/// and deals. Made when the reseller first adds one of the supplier's listings or writes to them.
+model ResaleRelationship {
+  id                String          @id @default(uuid()) @db.Uuid
+  supplierId        String          @map("supplier_id") @db.Uuid
+  resellerId        String          @map("reseller_id") @db.Uuid
+  /// The supplier stopped this reseller selling their listings; the chat closes too.
+  supplierBlockedAt DateTime?       @map("supplier_blocked_at")
+  /// The reseller closed the chat.
+  resellerBlockedAt DateTime?       @map("reseller_blocked_at")
+  lastMessageAt     DateTime?       @map("last_message_at")
+  supplierReadAt    DateTime?       @map("supplier_read_at")
+  resellerReadAt    DateTime?       @map("reseller_read_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  supplier          Customer        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  reseller          Reseller        @relation(fields: [resellerId], references: [id], onDelete: Cascade)
+  messages          ResaleMessage[]
+  deals             ResaleDeal[]
+  listings          ResaleListing[]
+
+  @@unique([supplierId, resellerId])
+  @@index([resellerId, lastMessageAt])
+  @@map("resale_relationships")
+}
+
+/// A message between a supplier and a reseller (`system`: a deal offered, accepted, declined or ended).
+model ResaleMessage {
+  id             String             @id @default(uuid()) @db.Uuid
+  relationshipId String             @map("relationship_id") @db.Uuid
+  /// supplier, reseller or system.
+  author         String
+  /// The reseller's team member who wrote it.
+  userId         String?            @map("user_id") @db.Uuid
+  body           String
+  dealId         String?            @map("deal_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at")
+  relationship   ResaleRelationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+
+  @@index([relationshipId, createdAt])
+  @@map("resale_messages")
+}
+
+/// Better terms a supplier offers one reseller in their chat: a bigger discount, and a floor below the supplier's price
+/// down to which the reseller may sell. Applies to new orders only; either side ends it.
+model ResaleDeal {
+  id             String             @id @default(uuid()) @db.Uuid
+  relationshipId String             @map("relationship_id") @db.Uuid
+  /// One listing, or every resale listing of the supplier (null).
+  listingId      String?            @map("listing_id") @db.Uuid
+  discountBps    Int                @map("discount_bps")
+  /// How far below the supplier's price the reseller may sell, 0 to the discount.
+  floorBps       Int                @default(0) @map("floor_bps")
+  /// offered, active, declined, withdrawn (before an answer) or ended.
+  status         String             @default("offered")
+  endsAt         DateTime?          @map("ends_at")
+  respondedAt    DateTime?          @map("responded_at")
+  endedAt        DateTime?          @map("ended_at")
+  /// supplier, reseller or expired.
+  endedBy        String?            @map("ended_by")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  relationship   ResaleRelationship @relation(fields: [relationshipId], references: [id], onDelete: Cascade)
+  listing        ClassifiedListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([relationshipId, status])
+  @@map("resale_deals")
 }

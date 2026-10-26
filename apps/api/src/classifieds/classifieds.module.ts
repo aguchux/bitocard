@@ -26,6 +26,6 @@ import { AdminRegistryController, ClassifiedRegistryService, ClassifiedSuggestio
   imports: [CheckoutModule, SettingsModule, IdentityModule],
   controllers: [ClassifiedReferenceController, ClassifiedVideoUploadsController, ClassifiedListingsController, ClassifiedChatsController, ClassifiedSafePayController, ClassifiedSuggestionsController, AdminClassifiedsController, AdminSafePayController, AdminRegistryController],
   providers: [MediaStorage, ModerationService, ListingsService, ClassifiedsAdminService, ListingMediaService, ClassifiedReferenceService, ListingSearchService, FavouritesService, KycStorage, ConversationsService, LeadsService, SafePayService, SafePayGuardsService, ClassifiedRegistryService, ShopDirectoryService, ShopTermsService, ResaleService],
-  exports: [ShopTermsService, ListingsService, ListingMediaService, ConversationsService, SafePayService, ListingSearchService],
+  exports: [ShopTermsService, ResaleService, ListingsService, ListingMediaService, ConversationsService, SafePayService, ListingSearchService],
 })
 export class ClassifiedsModule {}
