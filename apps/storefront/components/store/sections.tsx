@@ -363,7 +363,8 @@ function isEmpty(section: ResolvedSection) {
  * The home page: each section on the grid (12 columns on desktop, 6 on tablets, one on phones), densely packed. A
  * reseller's store passes its `design`: its variant's hero, spacing and the template sections' shapes.
  */
-export function HomeSections({ sections, groups, countries, design }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[]; design?: StoreDesign | null }) {
+/** `afterHero`: shown right under the hero, above the laid-out sections (bitocard.com's BitoCard Shop band). */
+export function HomeSections({ sections, groups, countries, design, afterHero }: { sections: ResolvedSection[]; groups: StoreNavigationGroup[]; countries: StoreCountry[]; design?: StoreDesign | null; afterHero?: React.ReactNode }) {
   // A full-width hero at the top runs edge to edge under the header (full bleed); the rest sit in the grid.
   const [first, ...others] = sections;
   const bleed = first?.type === "hero" && first.span.lg === 12 ? first : null;
@@ -375,6 +376,7 @@ export function HomeSections({ sections, groups, countries, design }: { sections
   return (
     <>
       {bleed ? <div className="relative z-20 -mt-6 mb-6 lg:mb-7">{hero(bleed, true)}</div> : null}
+      {afterHero ? <div className="mb-8 lg:mb-10">{afterHero}</div> : null}
     <div className={`grid grid-flow-row-dense grid-cols-1 md:grid-cols-6 lg:grid-cols-12 ${densityGap[style?.density ?? "comfortable"]}`}>
       {grid.filter(section => !(style && isEmpty(section))).map(section => (
         <div key={section.id} className={`min-w-0 ${mdSpan[section.span.md]} ${lgSpan[section.span.lg]} ${section.span.rows === 2 ? "md:row-span-2" : ""}`}>

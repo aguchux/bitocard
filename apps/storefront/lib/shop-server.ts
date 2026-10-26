@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import type { ShopAssistantProfile, ShopMarkets, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
+import type { ShopAssistantProfile, ShopCategoryCovers, ShopMarkets, ShopState, ShopTopCategory } from "@bitocard/api-client/classifieds";
 import { appUrl } from "@bitocard/ui/site";
 import { apiUrl } from "./api";
 import { currentCustomer, customerApi } from "./customer";
@@ -27,6 +27,25 @@ export const shopMarkets = cache(async (): Promise<ShopMarkets["data"]> => {
 export async function shopMarketFor(customer: { country: string | null } | null) {
   if (!customer?.country || !(await onHouseSite())) return null;
   return (await shopMarkets()).find(market => market.country === customer.country) ?? null;
+}
+
+/**
+ * BitoCard Shop's band on the home page: the market's categories, each with a random live listing's photo (a new pick
+ * about every minute), on BitoCard's own sites only, where the Shop is open in the shopper's market and has listings.
+ * Null otherwise, and while the API cannot be reached.
+ */
+export async function shopBandFor(country: string | null) {
+  if (!country || !(await onHouseSite())) return null;
+  const market = (await shopMarkets()).find(item => item.country === country);
+  if (!market || market.listings === 0) return null;
+  try {
+    const res = await fetch(apiUrl(`/v1/classifieds/category-covers?country=${encodeURIComponent(country)}`), { next: { revalidate: 60, tags: ["store"] } });
+    if (!res.ok) return null;
+    const covers = (await res.json()) as ShopCategoryCovers;
+    return covers.data.length ? { market, categories: covers.data } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** A page on shop.bitocard.com, reached through the sign-in handoff so the customer arrives signed in there too. */

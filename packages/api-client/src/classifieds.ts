@@ -55,6 +55,19 @@ export type ShopCategory = {
 };
 export type ShopTopCategory = ShopCategory & { children: ShopCategory[] };
 
+/** A country's category for bitocard.com's Shop band: its live listings and a random live listing's cover photo. */
+export type ShopCategoryCover = {
+  object: 'classified_category_cover';
+  slug: string;
+  name: string;
+  icon: string;
+  listings: number;
+  /** The category on shop.bitocard.com. */
+  url: string;
+  photo: { url: string; width: number | null; height: number | null; alt: string } | null;
+};
+export type ShopCategoryCovers = { object: 'list'; country: string; url: string; data: ShopCategoryCover[] };
+
 export type ShopArea = { object: 'classified_area'; id: string; slug: string; name: string; kind: 'state' | 'area'; latitude: number; longitude: number };
 export type ShopState = ShopArea & { kind: 'state'; areas: ShopArea[] };
 

@@ -2,8 +2,11 @@ import type { ResolvedSection, StoreHome } from "@bitocard/api-client/storefront
 import { JsonLd, organizationId, organizationSchema } from "@bitocard/ui/seo";
 import { appUrl, brand } from "@bitocard/ui/site";
 import { HomeSections } from "@/components/store/sections";
+import { ShopBand } from "@/components/store/shop-band";
 import { storeApi } from "@/lib/api";
-import { inMarket } from "@/lib/market";
+import { currentCustomer } from "@/lib/customer";
+import { currentMarket, inMarket } from "@/lib/market";
+import { shopBandFor, shopHref, shopOrigin } from "@/lib/shop-server";
 import { currentStore } from "@/lib/store";
 
 export const revalidate = 60;
@@ -29,11 +32,20 @@ const offline: ResolvedSection[] = [
 
 /**
  * The home page as admins laid it out in the Storefront Manager. Until a layout is published, the API serves the
- * approved default layout, so bitocard.com is always the store; resellers find their page through its links.
+ * approved default layout, so bitocard.com is always the store; resellers find their page through its links. On
+ * BitoCard's own sites, where BitoCard Shop is open in the shopper's market, its categories slide under the hero.
  */
 export default async function Home() {
-  const [home, { store }] = await Promise.all([inMarket("/v1/store/home").then(path => storeApi<StoreHome>(path)), currentStore()]);
+  const [home, { store }, band, customer] = await Promise.all([
+    inMarket("/v1/store/home").then(path => storeApi<StoreHome>(path)),
+    currentStore(),
+    currentMarket().then(shopBandFor),
+    currentCustomer(),
+  ]);
   const resellerStore = Boolean(store);
+  // Signed in, through the sign-in handoff so they arrive signed in on the Shop too; signed out, straight there.
+  const shopLink = (path: string) => (customer ? shopHref(path) : `${shopOrigin()}${path}`);
+  const shopBand = band ? <ShopBand country={{ code: band.market.country, name: band.market.name }} categories={band.categories} href={shopLink} /> : null;
   return (
     <>
       {resellerStore ? null : (
@@ -55,7 +67,7 @@ export default async function Home() {
         }}
       />
       )}
-      {home.ok ? <HomeSections sections={home.data.sections} groups={home.data.navigation} countries={home.data.countries} design={store?.design} /> : <HomeSections sections={offline} groups={[]} countries={[]} design={store?.design} />}
+      {home.ok ? <HomeSections sections={home.data.sections} groups={home.data.navigation} countries={home.data.countries} design={store?.design} afterHero={shopBand} /> : <HomeSections sections={offline} groups={[]} countries={[]} design={store?.design} afterHero={shopBand} />}
     </>
   );
 }

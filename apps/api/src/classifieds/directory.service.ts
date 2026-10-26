@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { ListingsService } from './listings.service.js';
+import { ListingsService, shopOrigin } from './listings.service.js';
 import { ListingSearchService, soldVisibleMs } from './search.service.js';
 
 /** The global showcase opens with the second market (owner's decision: Nigeria first, without it). */
@@ -62,6 +62,59 @@ export class ShopDirectoryService {
         install_prompt: installPrompt[index]!,
       })),
       showcase: open.length >= showcaseFrom,
+    };
+  }
+
+  /**
+   * A country's top categories for bitocard.com's BitoCard Shop band: each with its live listings and, where it has
+   * any with a photo, the cover photo of one chosen at random (answers are cached a minute, so the pick changes about
+   * that often). The listing named is only where the photo came from: the band links to the category.
+   */
+  async categoryCovers(country: string) {
+    await this.listings.requireOpen(country);
+    const categories = await this.prisma.classifiedCategory.findMany({
+      where: { enabled: true, parentId: null, countries: { some: { country, enabled: true } } },
+      select: { id: true, slug: true, name: true, icon: true },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+    });
+    // Listings sit in a category or its subcategory; each counts towards its top category.
+    const rows = await this.prisma.$queryRaw<{ top: string; listings: bigint; url: string | null; width: number | null; height: number | null; title: string | null }[]>`
+      WITH live AS (
+        SELECT l."id", l."title", COALESCE(c."parent_id", c."id") AS top
+        FROM "classified_listings" l JOIN "classified_categories" c ON c."id" = l."category_id"
+        WHERE l."country" = ${country} AND l."status" = 'active'
+      )
+      SELECT counts.top, counts.listings, pick.url, pick.width, pick.height, pick.title
+      FROM (SELECT top, count(*) AS listings FROM live GROUP BY top) counts
+      LEFT JOIN LATERAL (
+        SELECT cover."url", cover."width", cover."height", live."title"
+        FROM live
+        JOIN LATERAL (
+          SELECT m."url", m."width", m."height" FROM "classified_media" m
+          WHERE m."listing_id" = live."id" AND m."kind" = 'photo' AND m."status" = 'ready' AND m."url" IS NOT NULL
+          ORDER BY m."position" LIMIT 1
+        ) cover ON true
+        WHERE live.top = counts.top
+        ORDER BY random() LIMIT 1
+      ) pick ON true`;
+    const byTop = new Map(rows.map(row => [row.top, row]));
+    const cc = country.toLowerCase();
+    return {
+      object: 'list' as const,
+      country,
+      url: `${shopOrigin}/${cc}`,
+      data: categories.map(category => {
+        const row = byTop.get(category.id);
+        return {
+          object: 'classified_category_cover' as const,
+          slug: category.slug,
+          name: category.name,
+          icon: category.icon,
+          listings: Number(row?.listings ?? 0),
+          url: `${shopOrigin}/${cc}/c/${category.slug}`,
+          photo: row?.url ? { url: row.url, width: row.width, height: row.height, alt: row.title ?? category.name } : null,
+        };
+      }),
     };
   }
 

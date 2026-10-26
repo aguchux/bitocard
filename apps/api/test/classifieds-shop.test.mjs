@@ -194,6 +194,33 @@ describe('sitemap data', () => {
   });
 });
 
+describe("category covers (bitocard.com's Shop band)", () => {
+  test('every open category of the country in order, with its live listings and a live listing’s cover photo', async () => {
+    const covers = await get('/v1/classifieds/category-covers?country=ng');
+    assert.equal(covers.status, 200, JSON.stringify(covers.json));
+    assert.equal(covers.cache, 'public, max-age=60');
+    assert.equal(covers.json.url, 'https://shop.bitocard.com/ng');
+    const categories = (await get('/v1/classifieds/categories?country=NG')).json.data.map(row => row.slug);
+    assert.deepEqual(
+      covers.json.data.map(row => row.slug),
+      categories.filter(slug => covers.json.data.some(row => row.slug === slug)),
+      'in the categories’ own order',
+    );
+    const phones = covers.json.data.find(row => row.slug === 'phones-tablets');
+    assert.ok(phones.listings >= 1, 'a top category counts its subcategories’ listings');
+    assert.equal(phones.url, 'https://shop.bitocard.com/ng/c/phones-tablets');
+    // The cover is the first photo of one of its live listings (sold ones are not live).
+    const liveIds = [made.phone.id, made.laptop.id];
+    assert.match(phones.photo.url, new RegExp(`^https://media\\.test/(${liveIds.join('|')})/0\\.jpg$`));
+    assert.deepEqual([phones.photo.width, phones.photo.height], [1600, 1200]);
+    assert.ok(phones.photo.alt);
+    const empty = covers.json.data.find(row => row.listings === 0);
+    if (empty) assert.equal(empty.photo, null, 'nothing live, no photo');
+    assert.ok(!keys(covers.json).some(key => ['id', 'ref', 'customer_id', 'seller'].includes(key)), 'names no listing or seller');
+    assert.equal((await get('/v1/classifieds/category-covers?country=KE')).json.error.code, 'classifieds_unavailable');
+  });
+});
+
 describe('the signed-in viewer of a listing', () => {
   test('saved, a chat, own listings, and whether they can contact the seller', async () => {
     const { buyer, seller, phone } = made;

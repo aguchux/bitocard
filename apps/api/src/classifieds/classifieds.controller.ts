@@ -254,6 +254,13 @@ export class ClassifiedReferenceController {
     return this.directory.showcase(query.category);
   }
 
+  /** A country's categories with their live listings and a random listing's cover photo each (bitocard.com's Shop band). */
+  @Get('category-covers')
+  @Header('Cache-Control', 'public, max-age=60')
+  categoryCovers(@Query() query: CountryDto) {
+    return this.directory.categoryCovers(query.country);
+  }
+
   /** What a country's sitemap lists: category and place counts, and its listings a page at a time. */
   @Get('sitemap')
   @Header('Cache-Control', 'public, max-age=300')
