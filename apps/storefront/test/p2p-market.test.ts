@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { StoreCryptoWallets, StoreP2pAd } from "@bitocard/api-client/storefront";
@@ -62,6 +63,12 @@ const wallets = (extra: Partial<StoreCryptoWallets> = {}) =>
 
 const ok = <T>(data: T) => ({ ok: true, status: 200, data });
 
+/** Renders as the Crypto tab's layout does: the shared trading forms get the store's actions (stubbed here). */
+const { CryptoActionsProvider } = await import("@bitocard/crypto-ui/forms");
+const stub = async () => ({});
+const render = (element: ReactElement) =>
+  renderToStaticMarkup(createElement(CryptoActionsProvider, { actions: { takeAd: stub, confirmTrade: stub, postAd: stub, repriceAd: stub, chooseNickname: stub }, links: { postAd: "/account/crypto/ads/post", wallet: "/account/wallet" } }, element));
+
 describe("the P2P market's filters", () => {
   test("read from the address, keeping only what is open and valid", () => {
     expect(marketState({}, ["USDT", "BTC"], "NGN")).toEqual({ path: "/account/crypto", market: "", side: "buy", asset: "USDT", currency: "NGN", amount: "", q: "", experienced: false, sort: "price", view: "grid" });
@@ -118,13 +125,13 @@ describe("choosing a market", () => {
   test("the switcher: the standard tabs, one per market with its currencies, the chosen one marked", () => {
     const state = marketState({ market: "GH" }, ["USDT"], "NGN", markets);
     const href = (item: MarketChoice) => marketHref(state, { market: item.home ? "" : item.market, currency: item.currencies[0] });
-    const html = renderToStaticMarkup(createElement(MarketSwitcher, { markets, current: href(markets[2]), href }));
+    const html = render(createElement(MarketSwitcher, { markets, current: href(markets[2]), href }));
     expect(html).toContain('aria-label="Market"');
     expect(html).toContain("Nigeria (NGN, USD)");
     expect(html).toContain("Global (USD)");
     expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*>Ghana \(GHS\)<\/a>/);
     expect(html).toContain('href="/account/crypto?side=buy&amp;asset=USDT&amp;currency=NGN"');
-    expect(renderToStaticMarkup(createElement(MarketSwitcher, { markets: markets.slice(0, 1), current: "", href }))).toBe("");
+    expect(render(createElement(MarketSwitcher, { markets: markets.slice(0, 1), current: "", href }))).toBe("");
   });
 });
 
@@ -133,20 +140,20 @@ describe("the market's views", () => {
 
   test("the grid shows cards, the list a table with headings; each ad can be taken", () => {
     const ads = [ad("a", 12, { terms: "Fast replies" }), ad("b", 1)];
-    const grid = renderToStaticMarkup(createElement(MarketAds, { ads, state }));
+    const grid = render(createElement(MarketAds, { ads, state }));
     expect(grid).toContain("xl:grid-cols-3");
     expect(grid).toContain("Fast replies");
     expect(grid).toContain('aria-label="Experienced trader"');
     // Each ad: its button and its dialog's title.
     expect(grid.match(/Buy USDT/g)).toHaveLength(4);
-    const list = renderToStaticMarkup(createElement(MarketAds, { ads, state: { ...state, view: "list" } }));
+    const list = render(createElement(MarketAds, { ads, state: { ...state, view: "list" } }));
     expect(list).toContain("Per trade");
     expect(list).toContain("Trader");
     expect(list).not.toContain("xl:grid-cols-3");
   });
 
   test("the filters: buy or sell, coins, currencies, the amount and trader form, experienced, order and view", () => {
-    const html = renderToStaticMarkup(createElement(MarketFilters, { state: { ...state, view: "list" }, assets: ["USDT", "BTC"], currencies: ["NGN", "USD"] }));
+    const html = render(createElement(MarketFilters, { state: { ...state, view: "list" }, assets: ["USDT", "BTC"], currencies: ["NGN", "USD"] }));
     expect(html).toContain('href="/account/crypto?side=sell&amp;asset=USDT&amp;currency=NGN&amp;view=list"');
     expect(html).toContain('href="/account/crypto?side=buy&amp;asset=BTC&amp;currency=NGN&amp;view=list"');
     expect(html).toContain('href="/account/crypto?side=buy&amp;asset=USDT&amp;currency=USD&amp;view=list"');
@@ -165,7 +172,7 @@ describe("the Crypto tab opens on the market", () => {
     customerApi.mockImplementation(async (_method: string, path: string) =>
       path === "/v1/store/crypto" ? ok(wallets()) : path === "/v1/store/p2p/markets" ? ok({ object: "list", data: [] }) : ok({ object: "list", data: [ad("a", 12), ad("b", 3)] }),
     );
-    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({ asset: "BTC", amount: "1000", experienced: "1" }) }));
+    const html = render(await MarketPage({ searchParams: Promise.resolve({ asset: "BTC", amount: "1000", experienced: "1" }) }));
     expect(customerApi).toHaveBeenCalledWith("GET", "/v1/store/p2p/market?asset=BTC&side=buy&currency=NGN&fiat=100000");
     expect(html).toContain("data-full-bleed");
     expect(html).toContain("P2P market");
@@ -178,7 +185,7 @@ describe("the Crypto tab opens on the market", () => {
 
   test("before trading, the declaration: not a citizen or resident of the US or UK, and no market until it is made", async () => {
     customerApi.mockImplementation(async (_method: string, path: string) => (path === "/v1/store/crypto" ? ok(wallets({ declaration: { version: "2026-10-27", declared: false } })) : ok({ object: "list", data: [] })));
-    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({}) }));
+    const html = render(await MarketPage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain("One question before you trade");
     expect(html).toContain("I am not a citizen or a resident of the United States or the United Kingdom.");
     expect(html).toContain('name="version" value="2026-10-27"');
@@ -189,7 +196,7 @@ describe("the Crypto tab opens on the market", () => {
 
   test("with nothing matching, it says so and offers to clear the filters", async () => {
     customerApi.mockImplementation(async (_method: string, path: string) => (path === "/v1/store/crypto" ? ok(wallets()) : ok({ object: "list", data: [] })));
-    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({ q: "Ada" }) }));
+    const html = render(await MarketPage({ searchParams: Promise.resolve({ q: "Ada" }) }));
     expect(html).toContain("No ads match your filters");
     expect(html).toContain("Clear filters");
   });
@@ -199,7 +206,7 @@ describe("the Crypto tab opens on the market", () => {
     answer({ p2p_enabled: false });
     await expect(MarketPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/account/crypto/wallets");
     answer({ verified: false });
-    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({}) }));
+    const html = render(await MarketPage({ searchParams: Promise.resolve({}) }));
     expect(customerApi.mock.calls.some(call => String(call[1]).startsWith("/v1/store/p2p/market?"))).toBe(false);
     expect(html).not.toContain("Post ad");
   });
@@ -212,7 +219,7 @@ describe("the Crypto tab opens on the market", () => {
     customerApi.mockImplementation(async (_method: string, path: string) =>
       path === "/v1/store/crypto" ? ok(wallets()) : path === "/v1/store/p2p/markets" ? ok({ object: "list", data: markets }) : ok({ object: "list", data: [ad("a", 4, { market: "GH", country: "GH", currency: "GHS" })] }),
     );
-    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({ market: "GH" }) }));
+    const html = render(await MarketPage({ searchParams: Promise.resolve({ market: "GH" }) }));
     expect(customerApi).toHaveBeenCalledWith("GET", "/v1/store/p2p/market?market=GH&asset=USDT&side=buy&currency=GHS");
     expect(html).toContain('aria-label="Market"');
     expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*>Ghana \(GHS\)<\/a>/);
@@ -240,7 +247,7 @@ describe("the Crypto tab opens on the market", () => {
 
 describe("the Crypto tab's places", () => {
   test("underlined tabs, the market first, the current one marked, with the grey line running on to the end", () => {
-    const html = renderToStaticMarkup(createElement(CryptoNav, { current: "/account/crypto/wallets" }));
+    const html = render(createElement(CryptoNav, { current: "/account/crypto/wallets" }));
     expect(html).toContain('aria-label="Crypto"');
     expect(html.match(/<a /g)).toHaveLength(8);
     expect(html.indexOf("P2P market")).toBeLessThan(html.indexOf("Wallets"));

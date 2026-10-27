@@ -42,7 +42,7 @@ const idempotencyKeyPattern = /^[A-Za-z0-9_-]{8,128}$/;
  * Calls a customer endpoint with the signed-in customer's session. Never cached; never throws. Every POST carries a
  * fresh Idempotency-Key unless `idempotencyKey` names one (a form's nonce, so a double submit acts once).
  */
-export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<CustomerResult<T>> {
+export async function customerApi<T>(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: unknown, options: { idempotencyKey?: string } = {}): Promise<CustomerResult<T>> {
   const token = (await cookies()).get(customerCookie)?.value;
   try {
     const res = await fetch(apiUrl(path), {

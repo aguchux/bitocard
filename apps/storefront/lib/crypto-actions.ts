@@ -3,10 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreP2pAd, StoreP2pProfile, StoreP2pQuote, StoreP2pTrade, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
+import type { StoreCryptoWithdrawal, StoreCustomerBankAccount, StoreCustomerPayout, StoreP2pAd, StoreP2pQuote, StoreWithdrawalAddress } from "@bitocard/api-client/storefront";
 import type { FormState } from "@/lib/account-actions";
 import { customerApi } from "@/lib/customer";
 import { exchangeHref } from "@/lib/exchange";
+import { tradeActions } from "@bitocard/crypto-ui/trade-actions";
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
 
@@ -36,13 +37,6 @@ function signInFirst(status: number, path: string) {
 }
 
 /** Sandbox stores only: test crypto into the customer's wallet. */
-/** The crypto declaration (not a US or UK citizen or resident), made once per version before trading. */
-export async function declareCrypto(form: FormData): Promise<void> {
-  if (form.get("confirm") !== "yes") return;
-  await customerApi("POST", "/v1/store/crypto/declaration", { version: text(form, "version") });
-  revalidatePath("/account/crypto", "layout");
-}
-
 export async function addTestCrypto(_state: FormState, form: FormData): Promise<FormState> {
   const amount = cryptoAmount(text(form, "amount"));
   if (!amount) return { error: "Enter an amount above zero.", field: "amount" };
@@ -71,88 +65,56 @@ export async function findBestPrice(_state: FormState, form: FormData): Promise<
   redirect(`/account/crypto/confirm?${new URLSearchParams({ ad: result.data.ad!.id, price: String(result.data.price), fiat: String(fiat) }).toString()}`);
 }
 
+/**
+ * The trading actions: the work is `@bitocard/crypto-ui`'s (`tradeActions`, shared with BitoCard Crypto), over this
+ * store's customer session and on the Crypto tab's pages.
+ */
+const trade = tradeActions({
+  api: customerApi,
+  paths: {
+    confirm: "/account/crypto/confirm",
+    trade: id => `/account/crypto/trades/${id}?done=1`,
+    ads: "/account/crypto/ads",
+    signIn: next => `/signin?next=${encodeURIComponent(next)}`,
+    refresh: ["/account/crypto"],
+  },
+  redirect,
+  revalidate: revalidatePath,
+});
+
+/** The crypto declaration (not a US or UK citizen or resident), made once per version before trading. */
+export async function declareCrypto(form: FormData): Promise<void> {
+  return trade.declare(form);
+}
+
 /** Takes an ad from the market list: the amount typed, then the confirmation. */
 export async function takeAd(_state: FormState, form: FormData): Promise<FormState> {
-  const fiat = toMinor(text(form, "fiat"));
-  if (!fiat) return { error: "Enter an amount.", field: "fiat" };
-  redirect(`/account/crypto/confirm?${new URLSearchParams({ ad: text(form, "ad_id"), price: text(form, "price"), fiat: String(fiat) }).toString()}`);
+  return trade.takeAd(form);
 }
 
 /** The trade the customer confirmed: settled at once from their wallets, then its receipt. */
 export async function confirmTrade(_state: NonceFormState, form: FormData): Promise<NonceFormState> {
-  const fiat = Number(text(form, "fiat"));
-  // The fee rate the customer was shown: a changed fee is refused, like a changed price.
-  const feeBps = text(form, "fee_bps");
-  const body = { ad_id: text(form, "ad_id"), price: Number(text(form, "price")), ...(feeBps ? { fee_bps: Number(feeBps) } : {}), fiat };
-  const result = await customerApi<StoreP2pTrade>("POST", "/v1/store/p2p/trades", body, { idempotencyKey: nonceOf(form) });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto");
-    if (result.code === "insufficient_funds") return fresh({ error: result.message, field: "funds" });
-    return fresh({ error: result.message });
-  }
-  revalidatePath("/account/crypto", "layout");
-  redirect(`/account/crypto/trades/${result.data.id}?done=1`);
+  return trade.confirmTrade(form);
 }
 
-/** Posts an ad: price and limits in the customer's currency, the amount in the asset. */
+/** Posts an ad: price and limits in the market's currency, the amount in the coin. */
 export async function postAd(_state: FormState, form: FormData): Promise<FormState> {
-  const price = toMinor(text(form, "price"));
-  const min = toMinor(text(form, "min_fiat"));
-  const max = toMinor(text(form, "max_fiat"));
-  const amount = cryptoAmount(text(form, "amount"));
-  if (!price) return { error: "Enter your price.", field: "price" };
-  if (!amount) return { error: "Enter how much to trade.", field: "amount" };
-  if (!min) return { error: "Enter the smallest trade you take.", field: "min_fiat" };
-  if (!max) return { error: "Enter the largest trade you take.", field: "max_fiat" };
-  const result = await customerApi<StoreP2pAd>("POST", "/v1/store/p2p/ads", {
-    side: text(form, "side") === "buy" ? "buy" : "sell",
-    asset: text(form, "asset"),
-    ...(text(form, "currency") ? { currency: text(form, "currency") } : {}),
-    ...(/^[A-Z]{2}$/.test(text(form, "market")) ? { market: text(form, "market") } : {}),
-    price,
-    amount,
-    min_fiat: min,
-    max_fiat: max,
-    terms: text(form, "terms") || undefined,
-  });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/ads");
-    return { error: result.message, field: result.param };
-  }
-  revalidatePath("/account/crypto", "layout");
-  redirect("/account/crypto/ads?posted=1");
+  return trade.postAd(form);
 }
 
 /** Pauses, resumes or closes one of the customer's ads (closing gives back what it locks). */
 export async function changeAd(_state: FormState, form: FormData): Promise<FormState> {
-  const id = encodeURIComponent(text(form, "id"));
-  const op = text(form, "op");
-  const result = op === "cancel" ? await customerApi("POST", `/v1/store/p2p/ads/${id}/cancel`) : await customerApi("PATCH", `/v1/store/p2p/ads/${id}`, { status: op === "resume" ? "active" : "paused" });
-  if (!result.ok) {
-    signInFirst(result.status, "/account/crypto/ads");
-    return { error: result.message };
-  }
-  revalidatePath("/account/crypto/ads");
-  revalidatePath("/account/crypto", "layout");
-  return {};
+  return trade.changeAd(form);
 }
 
 /** Changes an ad's price (a buy ad locks more, or gives back what it no longer needs). */
 export async function repriceAd(_state: FormState, form: FormData): Promise<FormState> {
-  const price = toMinor(text(form, "price"));
-  if (!price) return { error: "Enter your new price.", field: "price" };
-  const result = await customerApi("PATCH", `/v1/store/p2p/ads/${encodeURIComponent(text(form, "id"))}`, { price });
-  if (!result.ok) return { error: result.message, field: "price" };
-  revalidatePath("/account/crypto/ads");
-  return { notice: "Price updated." };
+  return trade.repriceAd(form);
 }
 
 /** Chooses the nickname others see on the market, once. */
 export async function chooseNickname(_state: FormState, form: FormData): Promise<FormState> {
-  const result = await customerApi<StoreP2pProfile>("PUT", "/v1/store/p2p/profile", { nickname: text(form, "nickname") });
-  if (!result.ok) return { error: result.message, field: "nickname" };
-  revalidatePath("/account/crypto", "layout");
-  return { notice: `You trade as ${result.data.nickname}.` };
+  return trade.chooseNickname(form);
 }
 
 // -- Withdrawals ----------------------------------------------------------------------------------------------------

@@ -12,18 +12,16 @@ import {
   addWithdrawalAddress,
   bestP2pPrice,
   cashOut,
-  chooseNickname,
-  confirmTrade,
   confirmWithdrawal,
   createWithdrawal,
   findBestPrice,
   type NonceFormState,
-  postAd,
-  repriceAd,
   resendWithdrawalCode,
   reviewWithdrawal,
-  takeAd,
 } from "@/lib/crypto-actions";
+
+// The trading forms are shared with BitoCard Crypto; each app gives them its own actions (`CryptoActionsProvider`).
+export { ConfirmTradeForm, NicknameForm, PostAdForm, RepriceForm, TakeAdForm } from "@bitocard/crypto-ui/forms";
 
 const selectClass = "min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-navy-900 focus:border-brand-500 focus:ring-2 focus:ring-pink-100 focus:outline-none";
 
@@ -234,117 +232,6 @@ export function TestCryptoForm({ assets }: { assets: string[] }) {
 }
 
 /** Taking one ad from the market list: an amount in the customer's currency, then the confirmation. */
-export function TakeAdForm({ adId, price, currency, side, min, max }: { adId: string; price: number; currency: string; side: "buy" | "sell"; min: string; max: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(takeAd, {});
-  return (
-    <form action={action} className="flex flex-col gap-2 sm:flex-row sm:items-end" aria-label={side === "buy" ? "Buy from this ad" : "Sell to this ad"}>
-      <input type="hidden" name="ad_id" value={adId} />
-      <input type="hidden" name="price" value={price} />
-      <div className="min-w-0 flex-1">
-        <TextField label={`Amount (${currency})`} name="fiat" inputMode="decimal" placeholder={`${min} – ${max}`} required state={state} />
-      </div>
-      <Submit pending={pending} className={side === "buy" ? "bg-emerald-600 hover:bg-emerald-700" : ""}>
-        {side === "buy" ? "Buy" : "Sell"}
-      </Submit>
-      {state.error ? <p className="text-sm text-red-700" role="alert">{state.error}</p> : null}
-    </form>
-  );
-}
-
-/** The final step: confirms exactly the trade shown. */
-export function ConfirmTradeForm({ adId, price, feeBps, fiat, label, nonce }: { adId: string; price: number; feeBps: number; fiat: number; label: string; nonce: string }) {
-  const [state, action, pending] = useActionState<NonceFormState, FormData>(confirmTrade, {});
-  return (
-    <form action={action} className="space-y-3">
-      {/* Sent as the Idempotency-Key, so a double tap trades once. */}
-      <input type="hidden" name="nonce" value={state.nonce ?? nonce} />
-      <input type="hidden" name="ad_id" value={adId} />
-      <input type="hidden" name="price" value={price} />
-      <input type="hidden" name="fee_bps" value={feeBps} />
-      <input type="hidden" name="fiat" value={fiat} />
-      <FormMessage state={state} />
-      {state.field === "funds" ? (
-        <a href="/account/wallet" className="inline-flex min-h-11 items-center font-semibold text-brand-500 hover:underline">
-          Add money to your wallet
-        </a>
-      ) : null}
-      <Submit pending={pending} className="w-full">
-        <Check className="size-4" aria-hidden="true" /> {label}
-      </Submit>
-    </form>
-  );
-}
-
-/** Posting an ad: sell (your crypto is locked for the market) or buy (the money it needs is locked). */
-export function PostAdForm({
-  asset,
-  currency,
-  side,
-  market = "",
-  suggestedPrice,
-  suggestedAmount,
-  suggestedMax,
-}: {
-  asset: string;
-  currency: string;
-  side: "buy" | "sell";
-  /** The market the ad goes in ("" for the customer's own). */
-  market?: string;
-  suggestedPrice?: string;
-  suggestedAmount?: string;
-  suggestedMax?: string;
-}) {
-  const [state, action, pending] = useActionState<FormState, FormData>(postAd, {});
-  return (
-    <form action={action} className="space-y-4" aria-label="Post an ad">
-      <input type="hidden" name="side" value={side} />
-      <input type="hidden" name="asset" value={asset} />
-      <input type="hidden" name="currency" value={currency} />
-      {market ? <input type="hidden" name="market" value={market} /> : null}
-      <FormMessage state={state} />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <TextField label={`Your price per ${asset} (${currency})`} name="price" inputMode="decimal" defaultValue={suggestedPrice} placeholder="Enter a price" required state={state} hint={suggestedPrice ? "Filled from the current market price and desk markup. You can edit it." : "Enter the price you want to offer."} />
-        <TextField label={`How much (${asset})`} name="amount" inputMode="decimal" defaultValue={suggestedAmount} placeholder="Amount" required state={state} hint={side === "sell" ? "Locked from your coin wallet while the ad is open." : `Calculated from your ${currency} balance at the suggested price; the final amount is locked when you post.`} />
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Min per trade" name="min_fiat" inputMode="decimal" placeholder="Minimum" required state={state} />
-          <TextField label="Max per trade" name="max_fiat" inputMode="decimal" defaultValue={suggestedMax} placeholder="Maximum" required state={state} />
-        </div>
-      </div>
-      <TextField label="Terms (optional)" name="terms" maxLength={500} placeholder="Anything buyers should know" state={state} />
-      <Submit pending={pending} className="w-full sm:w-auto">
-        <Plus className="size-4" aria-hidden="true" /> Post ad
-      </Submit>
-    </form>
-  );
-}
-
-export function RepriceForm({ id, currency, price }: { id: string; currency: string; price: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(repriceAd, {});
-  return (
-    <form action={action} className="flex flex-wrap items-end gap-2" aria-label="Change price">
-      <input type="hidden" name="id" value={id} />
-      <div className="w-40">
-        <TextField label={`New price (${currency})`} name="price" inputMode="decimal" defaultValue={price} required state={state} />
-      </div>
-      <button type="submit" disabled={pending} className="min-h-12 rounded-xl px-4 font-semibold ring-1 ring-slate-300 hover:ring-slate-400 disabled:opacity-60">
-        Save
-      </button>
-      {state.error || state.notice ? <p className={`basis-full text-sm ${state.error ? "text-red-700" : "text-emerald-700"}`}>{state.error ?? state.notice}</p> : null}
-    </form>
-  );
-}
-
-export function NicknameForm({ current }: { current: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(chooseNickname, {});
-  return (
-    <form action={action} className="space-y-3" aria-label="Choose your nickname">
-      <FormMessage state={state} />
-      <TextField label="Nickname" name="nickname" defaultValue={current} pattern="[A-Za-z0-9_]{3,20}" maxLength={20} required state={state} hint="What other traders see instead of your name. 3 to 20 letters, numbers or underscores; you can choose it once." />
-      <Submit pending={pending}>Save nickname</Submit>
-    </form>
-  );
-}
-
 /** Saves an address to withdraw to on a network: usable 24 hours after it is added. */
 export function AddWithdrawalAddressForm({ chain, network }: { chain: string; network: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(addWithdrawalAddress, {});

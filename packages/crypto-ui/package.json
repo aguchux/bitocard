@@ -7,7 +7,9 @@
     "./market": "./src/market.ts",
     "./coins": "./src/coins.tsx",
     "./market-view": "./src/market-view.tsx",
-    "./market-switcher": "./src/market-switcher.tsx"
+    "./market-switcher": "./src/market-switcher.tsx",
+    "./forms": "./src/forms.tsx",
+    "./trade-actions": "./src/trade-actions.ts"
   },
   "scripts": {
     "lint": "eslint .",
