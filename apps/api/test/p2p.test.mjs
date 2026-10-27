@@ -2,7 +2,7 @@
 // admin freezes. Races from other P2P systems (two buyers on one ad, cancel against a trade) must never move money twice.
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { adminClient, adminCode, lastEmailCode, startApp } from './helpers.mjs';
+import { adminClient, adminCode, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 let server;
 let admin;
@@ -24,12 +24,13 @@ const switches = async enabled => {
   for (const key of ['crypto_wallets', 'p2p_trading']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
 };
 
-function storeServer() {
+function storeServer(subdomain = null) {
   let token = null;
   const request = async (method, path, body) => {
     const res = await fetch(`${server.base}${path}`, {
       method,
       headers: {
+        ...(subdomain ? { 'bitocard-store': subdomain } : {}),
         ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
         ...(token ? { 'bitocard-customer-session': token } : {}),
         ...(method === 'POST' ? { 'idempotency-key': `store-${Date.now()}-${Math.random()}` } : {}),
@@ -45,8 +46,8 @@ function storeServer() {
 }
 
 let counter = 0;
-async function customer(country = 'NG') {
-  const shopper = storeServer();
+async function customer(country = 'NG', subdomain = null) {
+  const shopper = storeServer(subdomain);
   const email = `p2p${(counter += 1)}-${Date.now()}@example.com`;
   const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada Trader', email, password: 'correct horse battery', country });
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
@@ -637,5 +638,46 @@ describe('markets: the global market and trading across borders', () => {
     assert.equal((await nigerian.post(`/v1/store/p2p/ads/${ad.json.id}/cancel`)).status, 200);
     await ledgerOk();
     await cryptoConserved();
+  });
+
+  test("a reseller's store is its customers' door into every market, as far as the reseller allows", async () => {
+    for (const country of ['NG', 'GH']) {
+      await set('crypto_wallets', true, country);
+      await set('p2p_trading', true, country);
+    }
+    await set('crypto_global', true);
+    await set('crypto_cross_border', true, 'GH');
+    const reseller = await resellerClient(server);
+    await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
+    await prisma.reseller.update({ where: { id: reseller.resellerId }, data: { status: 'active' } });
+    const store = await reseller.browser.post('/v1/stores', { name: 'Ada Coins', subdomain: `coin${Date.now().toString(36)}` });
+    assert.equal(store.status, 201, JSON.stringify(store.json));
+    assert.equal((await reseller.browser.post(`/v1/stores/${store.json.id}/publish`)).status, 200);
+    const shopper = await customer('NG', store.json.subdomain);
+    const markets = async who => (await who.get('/v1/store/p2p/markets')).json.data.map(item => item.market);
+
+    // By default the store's customers trade wherever the country allows, from the store: never crypto.bitocard.com.
+    assert.deepEqual(await markets(shopper), ['NG', 'WW', 'GH']);
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy&market=WW')).status, 200);
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy&market=GH')).status, 200);
+
+    // The reseller keeps their customers to their own market: global off, then trading abroad off.
+    await admin.put('/v1/admin/switches/crypto_global', { enabled: false, reseller_id: reseller.resellerId });
+    assert.deepEqual(await markets(shopper), ['NG', 'GH']);
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
+    await admin.put('/v1/admin/switches/crypto_trade_abroad', { enabled: false, reseller_id: reseller.resellerId });
+    assert.deepEqual(await markets(shopper), ['NG']);
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy&market=GH')).json.error.code, 'market_unavailable');
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy')).status, 200, 'their own market stays open');
+
+    // bitocard.com's customers in the same country are not touched by a reseller's choice.
+    assert.deepEqual(await markets(await customer('NG')), ['NG', 'WW', 'GH']);
+    // With the store's own market closed, its customers trade nowhere, whatever the country allows.
+    await admin.put('/v1/admin/switches/crypto_global', { enabled: null, reseller_id: reseller.resellerId });
+    await admin.put('/v1/admin/switches/crypto_trade_abroad', { enabled: null, reseller_id: reseller.resellerId });
+    await admin.put('/v1/admin/switches/p2p_trading', { enabled: false, reseller_id: reseller.resellerId });
+    assert.deepEqual(await markets(shopper), []);
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
+    await admin.put('/v1/admin/switches/p2p_trading', { enabled: null, reseller_id: reseller.resellerId });
   });
 });

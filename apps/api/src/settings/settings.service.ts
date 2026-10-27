@@ -72,13 +72,18 @@ export const switchDefinitions = {
     description: "BitoCard Crypto (crypto.bitocard.com) shows this country's market. Its residents and its ID documents are allowed in BitoCard Crypto only where it, or global trading, is on.",
   },
   crypto_global: {
-    scopes: ['global', 'country'],
+    scopes: ['global', 'country', 'reseller'],
     description:
-      "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off. Needs both.",
+      "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off; a reseller decides for their stores' customers (following the country unless set). Needs the global level on too.",
   },
   crypto_cross_border: {
     scopes: ['country'],
     description: "Residents of other allowed countries may trade in this country's local-currency P2P market (a Nigerian selling USDT for cedis in Ghana's), within its cross-border limits.",
+  },
+  crypto_trade_abroad: {
+    scopes: ['reseller'],
+    default: true,
+    description: "Customers of this reseller's stores may trade in other countries' local P2P markets, where those take cross-border trades. On unless switched off.",
   },
   crypto_install_prompt: {
     scopes: ['global', 'country'],

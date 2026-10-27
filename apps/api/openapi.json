@@ -1709,6 +1709,7 @@
                     "crypto_app": false,
                     "crypto_global": false,
                     "crypto_cross_border": false,
+                    "crypto_trade_abroad": true,
                     "crypto_install_prompt": false,
                     "store_template_all_in_one": true,
                     "store_template_topups": true,
@@ -50845,6 +50846,7 @@
               "crypto_app",
               "crypto_global",
               "crypto_cross_border",
+              "crypto_trade_abroad",
               "crypto_install_prompt",
               "store_template_all_in_one",
               "store_template_topups",
@@ -50930,11 +50932,15 @@
               },
               "crypto_global": {
                 "type": "boolean",
-                "description": "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off. Needs both."
+                "description": "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off; a reseller decides for their stores' customers (following the country unless set). Needs the global level on too."
               },
               "crypto_cross_border": {
                 "type": "boolean",
                 "description": "Residents of other allowed countries may trade in this country's local-currency P2P market (a Nigerian selling USDT for cedis in Ghana's), within its cross-border limits."
+              },
+              "crypto_trade_abroad": {
+                "type": "boolean",
+                "description": "Customers of this reseller's stores may trade in other countries' local P2P markets, where those take cross-border trades. On unless switched off."
               },
               "crypto_install_prompt": {
                 "type": "boolean",

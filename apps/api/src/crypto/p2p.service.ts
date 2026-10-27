@@ -79,19 +79,35 @@ export class P2pService {
   }
 
   /**
+   * Whether this customer may trade on the global market: the market itself on, and on for them. bitocard.com's
+   * customers follow their country (even where its own market is off); a reseller's store's customers follow the
+   * reseller's switch (else their country), and only while their store's own market is open.
+   */
+  private async globalAllowed(context: CryptoContext, home: boolean) {
+    if (context.customer.store.reseller.house) return this.globalOpenFor(context.country);
+    return home && (await this.settings.isOnGlobally('crypto_global')) && (await this.settings.isOn('crypto_global', context.seller.id));
+  }
+
+  /** Whether this customer may trade in other countries' books: their own country allowed, and their reseller agreeing. */
+  private async abroadAllowed(context: CryptoContext, home: boolean) {
+    if (context.customer.store.reseller.house) return home || (await this.globalOpenFor(context.country));
+    return home && (await this.settings.isOn('crypto_trade_abroad', context.seller.id));
+  }
+
+  /**
    * Which market and currency a customer may trade in, with every check for trading (store open, email, not frozen,
    * identity checked live), else `market_unavailable` or `currency_unsupported`:
    * - their own market (the default): its local currency or US dollars, with crypto and P2P on for their seller;
    * - the global market (`WW`): US dollars, while it is open for their country, whether or not their own market is;
    * - another country's market: its local currency only, where it takes cross-border trades and the customer's own
    *   country is allowed (its own market open, or global trading open for it).
-   * Customers of a reseller's store trade only while their store's own market is open (the reseller's switches).
+   * Customers of a reseller's store trade outside their own market only while it is open and their reseller allows it
+   * (`crypto_global`, `crypto_trade_abroad`): their store is their door into every market, never crypto.bitocard.com.
    */
   async access(customer: CustomerWithStore, requested?: { market?: string; currency?: string }): Promise<{ context: CryptoContext; book: MarketBook }> {
     const context = await this.wallets.requireOpen(customer);
     const market = (requested?.market ?? context.country).toUpperCase();
     const home = await this.homeOpen(context);
-    const house = context.customer.store.reseller.house;
     let currency: string;
     if (market === context.country) {
       if (!home) {
@@ -100,13 +116,12 @@ export class P2pService {
       }
       currency = this.tradeCurrency(context.currency, requested?.currency);
     } else if (market === globalMarket) {
-      if (!(house || home) || !(await this.globalOpenFor(context.country))) throw marketUnavailable();
+      if (!(await this.globalAllowed(context, home))) throw marketUnavailable();
       currency = this.oneCurrency(globalCurrency, requested?.currency);
     } else {
       const country = /^[A-Z]{2}$/.test(market) ? await this.prisma.country.findUnique({ where: { code: market }, select: { currency: true } }) : null;
       if (!country) throw marketUnavailable();
-      const allowed = home || (house && (await this.globalOpenFor(context.country)));
-      if (!allowed || !(await this.crossBorderInto(market))) throw marketUnavailable();
+      if (!(await this.abroadAllowed(context, home)) || !(await this.crossBorderInto(market))) throw marketUnavailable();
       currency = this.oneCurrency(country.currency, requested?.currency);
     }
     await this.profileFor(customer.id);
@@ -120,14 +135,14 @@ export class P2pService {
   async markets(customer: CustomerWithStore) {
     const context = await this.wallets.requireOpen(customer);
     const home = await this.homeOpen(context);
-    const house = context.customer.store.reseller.house;
-    const global = (house || home) && (await this.globalOpenFor(context.country));
+    const global = await this.globalAllowed(context, home);
+    const abroad = await this.abroadAllowed(context, home);
     const countries = await this.prisma.country.findMany({ orderBy: { name: 'asc' }, select: { code: true, name: true, currency: true } });
     const data: Array<{ object: 'p2p_market'; market: string; name: string; currencies: string[]; home: boolean; cross_border: boolean }> = [];
     const own = countries.find(country => country.code === context.country);
     if (home && own) data.push({ object: 'p2p_market', market: own.code, name: own.name, currencies: [...new Set([own.currency, globalCurrency])], home: true, cross_border: false });
     if (global) data.push({ object: 'p2p_market', market: globalMarket, name: 'Global', currencies: [globalCurrency], home: false, cross_border: true });
-    if (home || global) {
+    if (abroad) {
       for (const country of countries) {
         if (country.code === context.country || !(await this.crossBorderInto(country.code))) continue;
         data.push({ object: 'p2p_market', market: country.code, name: country.name, currencies: [country.currency], home: false, cross_border: true });
