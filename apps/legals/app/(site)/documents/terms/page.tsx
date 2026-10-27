@@ -27,7 +27,7 @@ export default function TermsOfUse() {
           <li>Planned features, products, markets, timings and prices may change or may not launch. Availability will vary by country and depends on local law, regulatory approval, payment and verification arrangements, and supplier coverage.</li>
           <li>Setup times, including our five-minute store setup goal, are goals, not promises. Verification, funding and readiness to take orders may take longer.</li>
         </ul>
-        <p>Crypto wallets and peer-to-peer (P2P) trading are not offered in any country yet. Section 4 explains how they will work where we switch them on.</p>
+        <p>BitoCard does not offer crypto wallets or crypto trading. Spin and win, a free promotion, follows section 4.</p>
         <p>VPN access is not sold in any country yet either. Section 5 sets out its terms for when it is.</p>
         <p>BitoCard Shop (shop.bitocard.com), our marketplace for buying and selling near you, is not open in any country yet. Buying and selling there, Safe pay and its shop assistants follow our <Link href="/documents/shop-terms">BitoCard Shop terms</Link>.</p>
         <p>When a service launches, it will be governed by separate terms, such as our <Link href="/documents/reseller-terms">reseller terms</Link> and customer terms of sale, which you will need to accept before using it.</p>
@@ -50,102 +50,15 @@ export default function TermsOfUse() {
         </ul>
       </Section>
 
-      <Section id="crypto" title="4. Crypto wallets and P2P trading">
-        <p>This section applies only where we offer crypto wallets and P2P trading. <strong>We do not offer them in any country yet.</strong> We will switch them on country by country, and only after taking legal advice in that country. A store may choose not to offer them even where we do. Where they are not switched on for you, nothing in this section is an offer.</p>
-
-        <h3 id="crypto-who">Who can use them</h3>
-        <ul>
-          <li>You need a customer account at a store on BitoCard, with a confirmed email address, in a country where we offer crypto. You trade in your account&apos;s country and its currency.</li>
-          <li>You must be at least 18 and use your account only for yourself. You must not let anyone else use it, or use anyone else&apos;s.</li>
-          <li>You must pass our identity check first: in Nigeria a BVN check, elsewhere a check of an identity document and a selfie. Our <Link href="/documents/privacy">privacy notice</Link> explains how these work.</li>
-          <li>Stores that are still testing (sandbox stores) show test crypto that has no value and cannot be withdrawn.</li>
-        </ul>
-
-        <h3 id="crypto-custody">How we hold your crypto</h3>
-        <ul>
-          <li>You can hold USDT, USDC, BTC, ETH, BNB, POL, TRX, LTC and DOGE, on the networks we show for each coin when you deposit or withdraw. Some coins come on several networks (for example ETH on Ethereum, Arbitrum, Base and OP Mainnet): your balance is the same whichever network it arrived on, but send each deposit only on a network we show for it. We may add or remove coins and networks.</li>
-          <li>We hold your crypto for you in wallets BitoCard controls. Their keys are kept in a key management service behind our signing service, and you do not hold them: you move your crypto only through BitoCard, as described here. The crypto we hold for customers is held together in BitoCard&apos;s wallets, and how much of it is yours is recorded in our records, which your balance shows.</li>
-          <li>We check every day that our wallets hold what our records say we hold for customers.</li>
-          <li>Your crypto balance is not a bank deposit or e-money. We do not pay interest on it, and we do not lend, stake or invest it.</li>
-        </ul>
-
-        <h3 id="crypto-market">The P2P market</h3>
-        <ul>
-          <li>Customers of every store on BitoCard, including bitocard.com, trade with each other in one market for each country. Prices are set by customers in their ads, not by BitoCard, and each trade is between you and the other customer.</li>
-          <li>Other traders see you only by a nickname, which we create for you and which you can change once, and by how many trades you have completed. They never see your name, email address or store.</li>
-          <li><strong>Ads.</strong> You can post up to 10 open ads to sell or buy a coin at a fixed price, with the smallest and largest trade you accept. A sell ad locks all the crypto it offers. A buy ad locks the money it needs, taken first from your P2P money and then from your wallet; if you change its price, we lock more or give back the difference. Locked amounts cannot be used for anything else while the ad is open. You can pause or close an ad at any time, and closing it gives back whatever is still locked.</li>
-          <li><strong>Ads must be honest.</strong> Do not post ads you do not mean to honour, misleading prices or terms, or ads that ask anyone to pay or talk outside BitoCard.</li>
-          <li><strong>Instant trades.</strong> When you take an ad, you see the price, the amount, our fee and what you will receive before you confirm. When you confirm, the trade completes at once: the seller&apos;s crypto goes to the buyer, less our fee, and the buyer&apos;s money goes to the seller&apos;s P2P money. Either everything moves or nothing does. If the ad&apos;s price or our fee has changed since you saw it, the trade is refused and you are not charged.</li>
-          <li><strong>Completed trades are final.</strong> They cannot be cancelled or reversed. If you believe a trade was made through fraud or an error on our part, contact us and we will look into it.</li>
-          <li><strong>Fees.</strong> Our P2P fee is a percentage of each trade, set for each coin and taken from the crypto the buyer receives. Withdrawals have their own network fee (see below). We show every fee before you confirm.</li>
-        </ul>
-
-        <h3 id="crypto-deposits">Deposits</h3>
-        <ul>
-          <li>You get your own deposit address for each network. Send only the coin shown, on the network shown. A different coin or token, the wrong network, or the wrong address may be lost, and we may not be able to recover it.</li>
-          <li>We credit a deposit only once it has the number of network confirmations we require for that network. Larger deposits are also checked through a second, independent source first. Deposits can take longer when a network is busy or our providers cannot be reached.</li>
-          <li>We record each coin to 6 decimal places (USDT, USDC and TRX) or 8 (BTC, ETH, BNB, POL, LTC and DOGE). Anything smaller is not credited.</li>
-        </ul>
-
-        <h3 id="crypto-withdrawals">Withdrawals</h3>
-        <ul>
-          <li>You can withdraw only to an address you have saved. You can use a new address 24 hours after adding it, and we email you every time one is added, so you notice if it was not you.</li>
-          <li>Each withdrawal shows our network fee, which is added to the amount, the minimum for that network and your daily limit for that coin (over any 24 hours). We set the amount and fee aside and email you a code naming the amount, network and address. The withdrawal goes ahead only when you enter the code, within 30 minutes; otherwise it is cancelled and the amount returned. You can cancel it until it is sent.</li>
-          <li>We screen every address against sanctions lists when you add it and again before we send to it, and we refuse addresses that are on them.</li>
-          <li>Our team reviews some withdrawals before they are sent, for example large amounts, addresses we could not screen, and withdrawals soon after a card or mobile money top-up. We may approve or refuse them; a refused withdrawal&apos;s amount and fee are returned to you.</li>
-          <li><strong>Check the address and network.</strong> Once a withdrawal is sent on the blockchain, it cannot be reversed. Crypto sent to a mistyped address or on the wrong network may be lost for good.</li>
-          <li>A withdrawal is complete once the network has confirmed it. If it fails before it is sent, the amount and fee are returned to you.</li>
-        </ul>
-
-        <h3 id="crypto-freezes">Freezes and seizure</h3>
-        <ul>
-          <li>We may freeze an amount of your crypto, or your whole crypto account, for security reasons, if we suspect fraud or a breach of these terms, for legal or sanctions reasons, or where a court or authority requires it. A frozen amount cannot be used. While your account is frozen you cannot trade, post ads or withdraw, and your ads leave the market.</li>
-          <li>We release a freeze when its reason ends. Where the law, a court or an authority requires it, or to make good losses caused by fraud, we may instead take the frozen crypto from your account.</li>
-          <li>We may close any ad that breaks these terms or that we need to stop; whatever it locks goes back to you.</li>
-          <li>We will tell you about a freeze unless the law or an authority prevents us.</li>
-        </ul>
-
-        <h3 id="crypto-closing">If crypto closes in your country or your store closes</h3>
-        <p>We may stop crypto wallets or P2P trading in a country, stop offering a coin, or a store may close. You then cannot post ads or trade, but you can still see what you hold, close your ads (getting back what they lock), withdraw your crypto on chain and cash out your P2P money. Do not send new deposits after we tell you crypto is closing; a deposit to your address that arrives anyway is still credited to you once confirmed, and you can withdraw it.</p>
-
-        <h3 id="crypto-cash-out">Cashing out P2P money to your bank</h3>
-        <p>Money you receive from selling crypto is your P2P money. You can use it to buy crypto or cash it out to your bank:</p>
-        <ul>
-          <li>only to a bank account in the name verified by your identity check, never anyone else&apos;s. You can save up to 3 accounts; a new account can be used 24 hours after you add it, and we email you each time;</li>
-          <li>each sale&apos;s money can be cashed out once your country&apos;s payout hold has passed, so a payment later reversed can still be put right. We show how much is held and the minimum amount;</li>
-          <li>we send the transfer through our bank transfer provider. If the transfer fails, the money returns to your P2P money. If the provider&apos;s answer is unclear, we check with it, and the money stays set aside until we know: this can take longer.</li>
-        </ul>
-        <p>Money you add to your store wallet can be spent on crypto, but cannot itself be cashed out.</p>
-
-        <h3 id="crypto-risks">Risks you should understand</h3>
-        <ul>
-          <li>Crypto prices can rise and fall sharply, and you can lose some or all of the value you hold. Stablecoins such as USDT and USDC aim to track the US dollar but may not.</li>
-          <li>Crypto is not legal tender and not a bank deposit. It is not protected by any deposit protection or investor compensation scheme.</li>
-          <li>Blockchain networks can be congested, change their rules or stop working, and their fees can change. Transfers on them cannot be reversed.</li>
-          <li>Laws on crypto are changing and may require us to limit or stop the service in your country.</li>
-          <li>You are responsible for any tax on your crypto and your trades.</li>
-          <li>We do not give investment advice (see section 6). Only buy crypto you can afford to lose.</li>
-        </ul>
-
-        <h3 id="crypto-prohibited">What you must not do</h3>
-        <ul>
-          <li>launder money, finance terrorism, or deal in the proceeds of crime;</li>
-          <li>commit or help fraud, including with stolen cards, accounts or payments;</li>
-          <li>evade sanctions, or trade for or with anyone under sanctions;</li>
-          <li>use someone else&apos;s account, identity or bank account, or let someone use yours;</li>
-          <li>post misleading ads or manipulate prices.</li>
-        </ul>
-        <p>If you do, we may freeze your crypto and your account, cancel anything not yet completed, and report it to the authorities where the law requires it.</p>
-
-        <h3 id="crypto-spin">Spin and win</h3>
+      <Section id="spin" title="4. Spin and win">
         <p>Where we run it, Spin and win is a free BitoCard promotion: nothing is bought to take part. These rules apply:</p>
         <ul>
           <li>Where free public spins are open, you may take the number of visitor spins shown (six unless we set another number for your country) before signing in. We keep the results against a random browser claim for 30 days. Create an account or sign in on that browser to claim the total into your local or US dollar store wallet. A visitor claim is once only, cannot be transferred, and is removed if it has expired, the account has already started this promotion, or the account has already used that day&apos;s registered spins.</li>
-          <li>Each person can win US$1 in crypto in all, once, whichever stores they use: an email address that has had it at one store cannot have it again at another. Opening other accounts to take part again is not allowed.</li>
+          <li>Each person can win US$1 in all, once, whichever stores they use: an email address that has had it at one store cannot have it again at another. Opening other accounts to take part again is not allowed.</li>
           <li>You get between 50 and 100 spins, set when you first spin, and can spin as many times a day as the store shows, two unless we change it for your country (days start at midnight UTC). Each spin wins between US$0.01 and US$0.10, and your spins add up to exactly US$1. What each spin wins is set by us in advance, not by chance on the wheel: the wheel shows it, and shows only amounts that can be won.</li>
-          <li>Wins are credited at once to your Spin and win rewards with us, in BNB, USDT or USDC as the wheel shows. USDT and USDC count as one US dollar each. BNB is worth the win at its US dollar price when you spin, rounded down; if we cannot get a price, that spin is credited in USDT instead.</li>
-          <li>Rewards are store credit, not crypto you can take away: they cannot be withdrawn, sent to an address, sold on the P2P market or paid out to a bank. You can move them into your store wallet, in US dollars or your country&apos;s currency, and spend them there on the store&apos;s products like any wallet money (which is never withdrawn either). They are valued when you move them: USDT and USDC at one US dollar, BNB at its US dollar price then, rounded down to the cent, then converted at our exchange rate for wallets, shown before you confirm.</li>
-          <li>You need everything our crypto wallets need (section 4): a confirmed email, your identity checked where required, and an account that is not frozen. Test stores pay test crypto with no value.</li>
+          <li>Wins are credited at once to your Spin and win rewards with us, in US dollars.</li>
+          <li>Rewards are store credit: they cannot be withdrawn, transferred or paid out to a bank. You can move them into your store wallet, as US dollars or in your country&apos;s currency at our exchange rate for wallets, rounded down and shown before you confirm, and spend them there on the store&apos;s products like any wallet money (which is never withdrawn either).</li>
+          <li>You need a customer account with a confirmed email address, at a store that is open. Test stores pay test rewards with no value.</li>
           <li>We may end or change the promotion at any time, without affecting what you have already won: rewards you hold can still be moved into your wallet after it ends. We may take back rewards gained by breaking these rules.</li>
         </ul>
       </Section>
