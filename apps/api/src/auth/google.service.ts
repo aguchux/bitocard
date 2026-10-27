@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+import type { AppConfig } from '../config/config.js';
 import { IntegrationsService } from '../integrations/integrations.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { randomToken, sha256 } from '../common/crypto.js';
@@ -14,13 +15,72 @@ const stateLifetimeMs = 10 * 60 * 1000;
 const googleIssuers = ['https://accounts.google.com', 'accounts.google.com'];
 
 /** A failure during the Google round trip. The browser is sent back to the app with `?auth_error=<code>`. */
-class GoogleSignInError extends Error {
+export class GoogleSignInError extends Error {
   constructor(readonly code: string) {
     super(code);
   }
 }
 
-type GoogleClaims = JWTPayload & { email?: string; email_verified?: boolean; name?: string; nonce?: string };
+export type GoogleClaims = JWTPayload & { email?: string; email_verified?: boolean; name?: string; nonce?: string };
+
+/** Google's consent page for a round trip (authorization code with PKCE), with the product's own client. */
+export function googleAuthorizationUrl(config: Pick<AppConfig, 'GOOGLE_AUTH_URL'>, input: { clientId: string; redirectUri: string; state: string; nonce: string; codeVerifier: string }) {
+  const url = new URL(config.GOOGLE_AUTH_URL);
+  url.search = new URLSearchParams({
+    client_id: input.clientId,
+    redirect_uri: input.redirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state: input.state,
+    nonce: input.nonce,
+    code_challenge: createHash('sha256').update(input.codeVerifier).digest('base64url'),
+    code_challenge_method: 'S256',
+    prompt: 'select_account',
+  }).toString();
+  return url.toString();
+}
+
+const jwksByUrl = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+
+/**
+ * Exchanges a code with Google (the product's own client and redirect address) and verifies the ID token against
+ * Google's published keys: issuer, audience (that client), the round trip's nonce, and a verified email.
+ */
+export async function googleClaims(
+  config: Pick<AppConfig, 'GOOGLE_TOKEN_URL' | 'GOOGLE_JWKS_URL'>,
+  input: { code: string; codeVerifier: string; nonce: string; clientId: string; clientSecret: string; redirectUri: string },
+): Promise<GoogleClaims> {
+  const res = await fetch(config.GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code: input.code,
+      code_verifier: input.codeVerifier,
+      client_id: input.clientId,
+      client_secret: input.clientSecret,
+      redirect_uri: input.redirectUri,
+      grant_type: 'authorization_code',
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new GoogleSignInError('google_failed');
+  const { id_token: idToken } = (await res.json()) as { id_token?: string };
+  if (!idToken) throw new GoogleSignInError('google_failed');
+  let jwks = jwksByUrl.get(config.GOOGLE_JWKS_URL);
+  if (!jwks) {
+    jwks = createRemoteJWKSet(new URL(config.GOOGLE_JWKS_URL));
+    jwksByUrl.set(config.GOOGLE_JWKS_URL, jwks);
+  }
+  let claims: GoogleClaims;
+  try {
+    ({ payload: claims } = await jwtVerify<GoogleClaims>(idToken, jwks, { issuer: googleIssuers, audience: input.clientId }));
+  } catch {
+    throw new GoogleSignInError('google_token_invalid');
+  }
+  if (claims.nonce !== input.nonce) throw new GoogleSignInError('google_token_invalid');
+  if (!claims.sub || !claims.email || claims.email_verified !== true) throw new GoogleSignInError('google_email_unverified');
+  return claims;
+}
 
 /** Why the Google round trip was started. */
 export type GoogleIntent = 'signin' | 'signup' | 'link';
@@ -41,7 +101,6 @@ export type GoogleIntent = 'signin' | 'signup' | 'link';
 @Injectable()
 export class GoogleService {
   private readonly logger = new Logger('GoogleSignIn');
-  private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
   /** Admin integration settings over the environment, read fresh on every use. */
   private get config() {
@@ -83,19 +142,7 @@ export class GoogleService {
       maxAge: stateLifetimeMs,
     });
 
-    const url = new URL(this.config.GOOGLE_AUTH_URL);
-    url.search = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'openid email profile',
-      state,
-      nonce,
-      code_challenge: createHash('sha256').update(codeVerifier).digest('base64url'),
-      code_challenge_method: 'S256',
-      prompt: 'select_account',
-    }).toString();
-    return url.toString();
+    return googleAuthorizationUrl(this.config, { clientId, redirectUri, state, nonce, codeVerifier });
   }
 
   /** Finishes the flow and returns where to send the browser (the app, with `auth_error` on failure). */
@@ -125,41 +172,16 @@ export class GoogleService {
     }
   }
 
+  /** One of BitoCard's own round trips (never Afrippa's), used once. */
   private async takeState(state: string) {
     const record = await this.prisma.oAuthState.findUnique({ where: { id: sha256(state) } });
-    if (!record) return null;
+    if (!record || record.platform !== 'bitocard') return null;
     await this.prisma.oAuthState.delete({ where: { id: record.id } }).catch(() => undefined);
     return record.expiresAt > new Date() ? record : null;
   }
 
-  private async exchange(code: string, codeVerifier: string, nonce: string): Promise<GoogleClaims> {
-    const res = await fetch(this.config.GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        code_verifier: codeVerifier,
-        client_id: this.config.GOOGLE_CLIENT_ID ?? '',
-        client_secret: this.config.GOOGLE_CLIENT_SECRET ?? '',
-        redirect_uri: this.config.GOOGLE_REDIRECT_URI,
-        grant_type: 'authorization_code',
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) throw new GoogleSignInError('google_failed');
-    const { id_token: idToken } = (await res.json()) as { id_token?: string };
-    if (!idToken) throw new GoogleSignInError('google_failed');
-
-    this.jwks ??= createRemoteJWKSet(new URL(this.config.GOOGLE_JWKS_URL));
-    let claims: GoogleClaims;
-    try {
-      ({ payload: claims } = await jwtVerify<GoogleClaims>(idToken, this.jwks, { issuer: googleIssuers, audience: this.config.GOOGLE_CLIENT_ID }));
-    } catch {
-      throw new GoogleSignInError('google_token_invalid');
-    }
-    if (claims.nonce !== nonce) throw new GoogleSignInError('google_token_invalid');
-    if (!claims.sub || !claims.email || claims.email_verified !== true) throw new GoogleSignInError('google_email_unverified');
-    return claims;
+  private exchange(code: string, codeVerifier: string, nonce: string): Promise<GoogleClaims> {
+    return googleClaims(this.config, { code, codeVerifier, nonce, clientId: this.config.GOOGLE_CLIENT_ID ?? '', clientSecret: this.config.GOOGLE_CLIENT_SECRET ?? '', redirectUri: this.config.GOOGLE_REDIRECT_URI });
   }
 
   private async resolveUser(claims: GoogleClaims, intent: GoogleIntent, linkUserId: string | null): Promise<string> {

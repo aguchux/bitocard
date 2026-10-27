@@ -220,6 +220,10 @@ export class CustomersService {
 
   /** Needs the current password (wrong ones count towards the sign-in lockout); signs out the customer's other sessions. */
   async changePassword(customer: Customer, sessionId: string, input: { current_password: string; password: string }) {
+    // Afrippa's Google-only traders have none until Forgot password sets one.
+    if (!customer.passwordHash) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'password_not_set', 'Your account has no password yet. Set one with "Forgot password" first.');
+    }
     if (customer.lockedUntil && customer.lockedUntil > new Date()) {
       throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit_error', 'account_locked', 'Too many wrong attempts. Try again in 15 minutes, or reset your password.');
     }

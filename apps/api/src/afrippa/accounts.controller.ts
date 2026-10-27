@@ -13,6 +13,7 @@ import { CustomersService } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { MfaMethod } from '../generated/prisma/client.js';
 import { afrippaStoreId } from './ids.js';
+import { TraderGoogleService } from './google.service.js';
 import { everywhere, type TraderSession, TraderTwoStepService } from './two-step.service.js';
 
 const lowerTrim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -63,6 +64,25 @@ class TwoStepSetupDto {
   /** Changing an existing method (outside signing in): a code from it. */
   @IsOptional() @Transform(lowerTrim) @Matches(/^(\d{6}|[a-z0-9]{4}-[a-z0-9]{4})$/, { message: 'current_code must be a 6-digit code or a recovery code' })
   current_code?: string;
+}
+
+class GoogleStartDto {
+  @IsIn(['signin', 'signup'])
+  intent: 'signin' | 'signup';
+}
+
+class GoogleFinishDto {
+  /** The state from `google/start`, as Afrippa's server kept it. */
+  @IsString() @Length(20, 200)
+  state: string;
+
+  /** The code Google returned to afrippa.com. */
+  @IsString() @Length(1, 2000)
+  code: string;
+
+  /** Signing up: the trader's country (one of the markets), fixed for good. */
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'country must be a 2-letter code' })
+  country?: string;
 }
 
 class PhoneDto {
@@ -122,7 +142,26 @@ export class AfrippaAccountController {
     private readonly prisma: PrismaService,
     private readonly customers: CustomersService,
     private readonly twoStep: TraderTwoStepService,
+    private readonly google: TraderGoogleService,
   ) {}
+
+  /** Google sign-in, step 1: Google's consent address and the one-time state Afrippa's server keeps. */
+  @Post('google/start')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  googleStart(@Body() body: GoogleStartDto) {
+    return this.google.start(body.intent);
+  }
+
+  /** Google sign-in, step 2: the code Google returned; the trader is signed in (signed up first), two-step pending. */
+  @Post('google/finish')
+  @HttpCode(HttpStatus.OK)
+  @SkipIdempotency()
+  async googleFinish(@Body() body: GoogleFinishDto) {
+    const result = await this.google.finish(body);
+    const customer = await this.prisma.customer.findUniqueOrThrow({ where: { id: result.customer.id }, include: { store: { include: { reseller: { select: { house: true } } } } } });
+    return { ...result, two_step: await this.twoStep.state({ customer, sessionId: '', mfaVerifiedAt: null, mfaReconfirmedAt: null }) };
+  }
 
   /** A new trader: their account and a session waiting for two-step set-up; a code to confirm the email is sent. */
   @Post('signup')

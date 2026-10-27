@@ -128,6 +128,9 @@ model OAuthState {
   linkUserId   String?     @map("link_user_id") @db.Uuid
   /// Only `signup` creates an account; `signin` with an unknown Google account fails.
   intent       OAuthIntent @default(signin)
+  /// Whose round trip it is: BitoCard's resellers', or Afrippa's traders' (with Afrippa's own Google client). Neither
+  /// side finishes the other's.
+  platform     Platform    @default(bitocard)
   expiresAt    DateTime    @map("expires_at")
   createdAt    DateTime    @default(now()) @map("created_at")
 
@@ -2550,8 +2553,11 @@ model Customer {
   /// Stored lower-case.
   email                     String
   name                      String
-  /// Argon2id.
-  passwordHash              String                    @map("password_hash")
+  /// Argon2id. Null for an Afrippa trader who signed up with Google, until they set one with Forgot password.
+  passwordHash              String?                   @map("password_hash")
+  /// Afrippa's traders who signed up with Google: the Google account's subject (one account per store). Never set by
+  /// matching an email: a Google account never links itself to a password account.
+  googleSubject             String?                   @map("google_subject")
   emailVerifiedAt           DateTime?                 @map("email_verified_at")
   phone                     String?
   phoneVerifiedAt           DateTime?                 @map("phone_verified_at")
@@ -2631,6 +2637,7 @@ model Customer {
   resaleRelationships       ResaleRelationship[]
 
   @@unique([storeId, email])
+  @@unique([storeId, googleSubject])
   @@unique([storeId, phone])
   @@map("customers")
   resaleStoreReports        ResaleStoreReport[]
