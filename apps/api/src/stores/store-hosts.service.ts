@@ -67,7 +67,8 @@ export class StoreHostsService {
   /** Sets the store's address up (or moves it after a rename). Never throws: a failure is kept on the store for the job. */
   async sync(storeId: string) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId } });
-    if (!store || store.id === rootStoreId) return null;
+    // Root bitocard.com needs no address, and Afrippa's store is reached on afrippa.com, never a bitocard.com one.
+    if (!store || store.id === rootStoreId || store.platform !== 'bitocard') return null;
     if (!this.configured()) return 'pending' as const;
     const { vercel, cloudflare, target } = this.clients();
     const name = `${store.subdomain}.${storeHostDomain}`;
@@ -109,7 +110,7 @@ export class StoreHostsService {
   async job() {
     if (!this.configured()) return { set_up: 0, failed: 0, skipped: 'store addresses not configured' };
     const due = await this.prisma.store.findMany({
-      where: { hostStatus: { in: ['pending', 'failed'] }, id: { not: rootStoreId } },
+      where: { hostStatus: { in: ['pending', 'failed'] }, id: { not: rootStoreId }, platform: 'bitocard' },
       orderBy: [{ hostSyncedAt: { sort: 'asc', nulls: 'first' } }],
       select: { id: true },
       take: 50,

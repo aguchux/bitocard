@@ -58,7 +58,7 @@ export class StoreVisitsService {
     const cached = this.stores.get(host);
     if (cached && now - cached.at < 60_000) return cached.id;
     const sub = subdomainHost.exec(host)?.[1];
-    const where = { status: 'published' as const, reseller: { house: false, status: { not: 'suspended' as const } } };
+    const where = { status: 'published' as const, reseller: { house: false, platform: 'bitocard' as const, status: { not: 'suspended' as const } } };
     const store = sub
       ? await this.prisma.store.findFirst({ where: { ...where, subdomain: sub }, select: { id: true } })
       : (await this.prisma.storeDomain.findFirst({ where: { name: host, status: 'active', store: where }, select: { storeId: true } }))?.storeId ?? null;

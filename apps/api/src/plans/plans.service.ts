@@ -101,7 +101,7 @@ export class PlansService {
     const plans = await this.prisma.plan.findMany({ orderBy: [{ sortOrder: 'asc' }, { priceCents: 'asc' }, { code: 'asc' }], include: { localPrices: true } });
     const markets = await this.prisma.country.findMany({ orderBy: { name: 'asc' }, select: { code: true, name: true, currency: true } });
     const currencies = [...new Set(markets.map(market => market.currency))].filter(currency => currency !== 'USD').sort();
-    const counts = await this.prisma.reseller.groupBy({ by: ['planCode'], where: { house: false }, _count: { _all: true } });
+    const counts = await this.prisma.reseller.groupBy({ by: ['planCode'], where: { house: false, platform: 'bitocard' }, _count: { _all: true } });
     return {
       object: 'plan_settings' as const,
       plans: await Promise.all(
@@ -295,7 +295,7 @@ export class PlansService {
     const names = features.map(feature => planFeatureCatalogue[feature].name);
     const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
     for (let after: string | undefined; ; ) {
-      const page = await this.prisma.reseller.findMany({ where: { planCode: code, house: false }, select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(after ? { cursor: { id: after }, skip: 1 } : {}) });
+      const page = await this.prisma.reseller.findMany({ where: { planCode: code, house: false, platform: 'bitocard' }, select: { id: true }, orderBy: { id: 'asc' }, take: 500, ...(after ? { cursor: { id: after }, skip: 1 } : {}) });
       for (const reseller of page) {
         await this.inbox.reseller(reseller.id, 'plan.feature_changed', {
           subject: `${code}:${features.join(',')}:${at}`,
@@ -311,8 +311,8 @@ export class PlansService {
 
   async listResellers(filter: { status?: ResellerStatus; country?: string }) {
     const resellers = await this.prisma.reseller.findMany({
-      // BitoCard's own store accounts are not resellers.
-      where: { status: filter.status, country: filter.country?.toUpperCase(), house: false },
+      // BitoCard's own store accounts are not resellers, and Afrippa's operator account is not BitoCard's.
+      where: { status: filter.status, country: filter.country?.toUpperCase(), house: false, platform: 'bitocard' },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -324,7 +324,7 @@ export class PlansService {
       where: { id },
       include: { members: { include: { user: true } }, plan: true, stores: true },
     });
-    if (!reseller) throw missingReseller();
+    if (!reseller || reseller.platform !== 'bitocard') throw missingReseller();
     const waivedBy = reseller.identityWaivedBy ? await this.prisma.user.findUnique({ where: { id: reseller.identityWaivedBy }, select: { id: true, name: true } }) : null;
     return {
       object: 'reseller' as const,
@@ -353,7 +353,7 @@ export class PlansService {
   /** Admin: activate (after verification), suspend, or change plan. Suspension stops every API key at once. */
   async updateReseller(actorId: string | null, id: string, input: { status?: ResellerStatus; plan?: string }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
-    if (!before) throw missingReseller();
+    if (!before || before.platform !== 'bitocard') throw missingReseller();
     if (input.plan && !(await this.prisma.plan.findUnique({ where: { code: input.plan } }))) {
       throw new ApiError(HttpStatus.BAD_REQUEST, 'invalid_request_error', 'parameter_invalid', 'No such plan.', 'plan');
     }
@@ -391,7 +391,7 @@ export class PlansService {
    */
   async unsuspend(actorId: string | null, id: string, input: { reason: string }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
-    if (!before || before.house) throw missingReseller();
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
     if (before.status !== 'suspended') throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_suspended', 'This reseller is not suspended.');
     const status: ResellerStatus = before.verifiedAt || before.identityWaivedAt ? 'active' : 'pending';
     // Claimed on the status, so two admins lifting it at once record it once.
@@ -415,7 +415,7 @@ export class PlansService {
    */
   async waiveIdentity(actorId: string | null, id: string, input: { reason: string; activate?: boolean }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
-    if (!before || before.house) throw missingReseller();
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
     if (before.verifiedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'already_verified', "The owner's identity is already verified: there is nothing to waive.");
     const activate = input.activate === true && before.status === 'pending';
     const after = await this.prisma.reseller.update({
@@ -429,7 +429,7 @@ export class PlansService {
   /** Withdraws the waiver (audited). A reseller still unverified and active goes back to pending: they stop selling live. */
   async restoreIdentityCheck(actorId: string | null, id: string, input: { reason: string }) {
     const before = await this.prisma.reseller.findUnique({ where: { id } });
-    if (!before || before.house) throw missingReseller();
+    if (!before || before.house || before.platform !== 'bitocard') throw missingReseller();
     if (!before.identityWaivedAt) throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'not_waived', 'The identity check is not waived for this reseller.');
     const after = await this.prisma.reseller.update({
       where: { id },

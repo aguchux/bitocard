@@ -208,7 +208,7 @@ export class ReportsService {
 
   private async dailyValues(mode: LedgerMode, from: Date, to: Date, metric: ReportMetric): Promise<Map<string, number>> {
     if (metric === 'new_resellers') {
-      const resellers = await this.prisma.reseller.findMany({ where: { house: false, createdAt: { gte: from, lt: to } }, select: { createdAt: true } });
+      const resellers = await this.prisma.reseller.findMany({ where: { house: false, platform: 'bitocard', createdAt: { gte: from, lt: to } }, select: { createdAt: true } });
       const byDay = new Map<string, number>();
       for (const reseller of resellers) {
         const key = dateKey(reseller.createdAt);

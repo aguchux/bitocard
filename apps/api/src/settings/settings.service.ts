@@ -191,7 +191,7 @@ export const isSwitchKey = (key: string): key is SwitchKey => key in switchDefin
 /** A switch's value where no admin has set it: off, unless its definition says `default: true`. */
 /**
  * Crypto's switches, kept for Afrippa (crypto has left BitoCard; `docs/CRYPTO_SPINOFF_PLAN.md`): never listed to
- * BitoCard's admins or resellers. Their routes are closed (`CryptoClosedGuard`), so they change nothing in BitoCard.
+ * BitoCard's admins or resellers. Their routes are closed (`AfrippaGateGuard`), so they change nothing in BitoCard.
  */
 export const afrippaSwitches: ReadonlySet<SwitchKey> = new Set<SwitchKey>([
   'crypto_wallets',

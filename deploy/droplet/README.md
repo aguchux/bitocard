@@ -63,6 +63,9 @@ ssh -t deploy@<droplet> sh /opt/bitocard/set-env.sh ENCRYPTION_KEY
   are safe for production.
 - **`STORE_SERVER_SECRET`** must equal the storefront project's own. If it is lost, set a new one (at least 32
   characters) on both: the droplet, and Vercel `bitocard-storefront` (redeploy it).
+- **`AFRIPPA_SERVER_SECRET`** (optional until Afrippa's site is built): shared with Afrippa's server, which signs every
+  request to Afrippa's routes (`/v1/afrippa/`) with it. At least 32 characters and never the same as
+  `STORE_SERVER_SECRET` (the API refuses to start otherwise). Unset, Afrippa's routes stay closed.
 - **`UPSTASH_REDIS_REST_TOKEN`**: Upstash console > the database > REST API (or Vercel > Storage > the Upstash store).
 - **`CRON_SECRET`** is the droplet's own (only its scheduler sends it), a new random value.
 

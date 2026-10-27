@@ -21,6 +21,7 @@ if (env.APP_ENV === 'production') {
   if (/(^|,)\s*http:\/\//.test(env.ALLOWED_ORIGINS ?? '')) fail('ALLOWED_ORIGINS lists plain http:// origins (local development) in production');
   if ((env.CRON_SECRET ?? '').length < 32) fail('CRON_SECRET is shorter than 32 characters');
   if (env.STORE_SERVER_SECRET === undefined) say(true, 'STORE_SERVER_SECRET unset: signed-out shoppers share the store server’s rate limit');
+  if (env.AFRIPPA_SERVER_SECRET === undefined) say(true, 'AFRIPPA_SERVER_SECRET unset: Afrippa’s routes stay closed');
 }
 
 const key = Buffer.from(env.ENCRYPTION_KEY ?? '', 'base64');

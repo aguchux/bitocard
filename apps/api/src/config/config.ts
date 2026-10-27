@@ -39,6 +39,12 @@ export const configSchema = z.object({
    * shoppers are rate limited one by one instead of sharing the store server's address. Unset: they share it.
    */
   STORE_SERVER_SECRET: z.string().min(32).optional(),
+  /**
+   * Shared with Afrippa's server (afrippa.com), which signs every request to Afrippa's routes with it
+   * (`Afrippa-Signature`, `src/afrippa/signature.ts`) and its visitors' addresses (`BitoCard-Client`). Unset: no
+   * request can be signed, so Afrippa's routes stay closed. Environment only: it decides who may reach them.
+   */
+  AFRIPPA_SERVER_SECRET: z.string().min(32).optional(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).default('info'),
 
   /**
@@ -123,6 +129,8 @@ export const configSchema = z.object({
   /** BitoCard Verify, where people complete identity checks in Verify countries. */
   VERIFY_URL: z.string().url().default('https://verify.bitocard.com'),
   SHOP_URL: z.string().url().default('https://shop.bitocard.com'),
+  /** Afrippa's site (docs/CRYPTO_SPINOFF_PLAN.md): where its emails and links point. */
+  AFRIPPA_URL: z.string().url().default('https://afrippa.com'),
 
   // Payments, reserved accounts and payouts. A provider without keys is switched off; the sandbox never calls providers.
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),
@@ -317,9 +325,9 @@ export const configSchema = z.object({
   /** Local development and tests only: allows http:// and private addresses as webhook endpoints. Refused in production. */
   WEBHOOK_ALLOW_PRIVATE_URLS: flag.prefault('off'),
   /**
-   * Crypto's routes for store customers, resellers and the public are closed (crypto has left BitoCard; see
-   * `docs/CRYPTO_SPINOFF_PLAN.md`). `open` keeps them for tests and local development until they move to Afrippa's own
-   * surface; refused in production.
+   * Afrippa's customer and public routes answer only requests its server signed, and the retired crypto routes none
+   * (crypto has left BitoCard; see `docs/CRYPTO_SPINOFF_PLAN.md`). `open` lets unsigned requests reach them too, for
+   * tests and local development; refused in production.
    */
   CRYPTO_ROUTES: z.enum(['closed', 'open']).default('closed'),
   /**
@@ -356,6 +364,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (config.CRYPTO_ROUTES === 'open' && appEnv === 'production') {
     throw new Error('Invalid environment configuration: CRYPTO_ROUTES must be closed in production');
+  }
+  // One secret for two servers would let either pass for the other.
+  if (config.AFRIPPA_SERVER_SECRET && config.AFRIPPA_SERVER_SECRET === config.STORE_SERVER_SECRET) {
+    throw new Error('Invalid environment configuration: AFRIPPA_SERVER_SECRET must differ from STORE_SERVER_SECRET');
   }
   // Session cookies over plain HTTP in production would leak sessions: refuse to start rather than run that way.
   if (config.COOKIE_SECURE === false && appEnv === 'production') {

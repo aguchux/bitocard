@@ -75,6 +75,15 @@ const rateLimited = () => new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limit
  * limit. Generous: the per-caller limit below does the fine-grained work. Shoppers behind a store's server count by the
  * address it signs.
  */
+/**
+ * The secret a visitor's address is signed with (`BitoCard-Client`): Afrippa's server signs for its routes
+ * (`/v1/afrippa/`) with its own secret, the stores' servers for everything else with theirs, so neither can vouch for
+ * the other's visitors.
+ */
+function clientSecret(url: string, secrets: { storeServerSecret: string | undefined; afrippaServerSecret: string | undefined }) {
+  return url.startsWith('/v1/afrippa/') ? secrets.afrippaServerSecret : secrets.storeServerSecret;
+}
+
 @Injectable()
 export class AddressRateLimitGuard implements CanActivate {
   private readonly logger = new Logger('RateLimit');
@@ -83,9 +92,11 @@ export class AddressRateLimitGuard implements CanActivate {
   /** Counts sign-in and code routes on this instance while Redis is unreachable. */
   private readonly sensitiveFallback: Limiter;
   private readonly storeServerSecret: string | undefined;
+  private readonly afrippaServerSecret: string | undefined;
 
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
     this.storeServerSecret = config.STORE_SERVER_SECRET;
+    this.afrippaServerSecret = config.AFRIPPA_SERVER_SECRET;
     this.limiter = limiterFor(config, config.ADDRESS_RATE_LIMIT_PER_MINUTE);
     this.sensitive = limiterFor(config, config.AUTH_RATE_LIMIT_PER_MINUTE);
     this.sensitiveFallback = new MemoryLimiter(config.AUTH_RATE_LIMIT_PER_MINUTE);
@@ -95,7 +106,7 @@ export class AddressRateLimitGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const res = context.switchToHttp().getResponse<Response>();
     if (!req.originalUrl.startsWith('/v1/')) return true;
-    const address = signedClientIp(req.get(clientHeader), this.storeServerSecret) ?? req.ip ?? 'unknown';
+    const address = signedClientIp(req.get(clientHeader), clientSecret(req.originalUrl, { storeServerSecret: this.storeServerSecret, afrippaServerSecret: this.afrippaServerSecret })) ?? req.ip ?? 'unknown';
     if (isSensitive(req.method, req.originalUrl)) {
       let verdict: Verdict;
       try {
@@ -134,12 +145,14 @@ export class RateLimitGuard implements CanActivate {
   private readonly logger = new Logger('RateLimit');
   private readonly limiter: Limiter;
   private readonly storeServerSecret: string | undefined;
+  private readonly afrippaServerSecret: string | undefined;
 
   constructor(
     @Inject(APP_CONFIG) config: AppConfig,
     private readonly prisma: PrismaService,
   ) {
     this.storeServerSecret = config.STORE_SERVER_SECRET;
+    this.afrippaServerSecret = config.AFRIPPA_SERVER_SECRET;
     this.limiter = limiterFor(config, config.RATE_LIMIT_PER_MINUTE);
   }
 
@@ -152,7 +165,7 @@ export class RateLimitGuard implements CanActivate {
     if (store) await this.identifyCustomer(req);
     const scope = callerScope(req);
     // Signed-out shoppers reach the API through their store's server: limit them by the address it vouches for.
-    const shopper = store && scope === 'anonymous' ? signedClientIp(req.get(clientHeader), this.storeServerSecret) : null;
+    const shopper = store && scope === 'anonymous' ? signedClientIp(req.get(clientHeader), clientSecret(req.originalUrl, { storeServerSecret: this.storeServerSecret, afrippaServerSecret: this.afrippaServerSecret })) : null;
     const key = scope === 'anonymous' ? `ip:${shopper ?? req.ip ?? 'unknown'}` : `caller:${scope}`;
     let verdict: Verdict;
     try {

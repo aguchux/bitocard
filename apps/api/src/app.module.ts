@@ -48,7 +48,7 @@ import { CryptoModule } from './crypto/crypto.module.js';
 import { SpinsModule } from './spins/spins.module.js';
 import { ManualTopUpsModule } from './top-ups/manual-top-ups.module.js';
 import { AddressRateLimitGuard, RateLimitGuard } from './common/rate-limit/rate-limit.guard.js';
-import { CryptoClosedGuard } from './crypto/closed.guard.js';
+import { AfrippaGateGuard } from './afrippa/gate.guard.js';
 import { loggerParams } from './common/request/logging.js';
 import { APP_CONFIG, type AppConfig } from './config/config.js';
 import { ConfigModule } from './config/config.module.js';
@@ -129,7 +129,7 @@ export class AppModule {
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
         // Guards run in this order: a generous limit per address (before any database lookup), identify the caller,
         // then rate-limit per caller.
-        { provide: APP_GUARD, useClass: CryptoClosedGuard },
+        { provide: APP_GUARD, useClass: AfrippaGateGuard },
         { provide: APP_GUARD, useClass: AddressRateLimitGuard },
         { provide: APP_GUARD, useExisting: AuthGuard },
         { provide: APP_GUARD, useClass: RateLimitGuard },

@@ -432,6 +432,9 @@ enum ResellerStatus {
 /// A reseller business. Stores, wallets and countries attach to it in later milestones.
 model Reseller {
   id                        String                    @id @default(uuid()) @db.Uuid
+  /// The product the account belongs to: BitoCard's resellers and house accounts, or Afrippa's operator account
+  /// (docs/CRYPTO_SPINOFF_PLAN.md). BitoCard's admin, lists and reports never show Afrippa's.
+  platform                  Platform                  @default(bitocard)
   /// Who collects their hosted stores' customer payments: `own` (their own payment gateway, where they may use and have
   /// one; Premium and switched on for their market) or `bitocard` (BitoCard's gateways, the money reaching their wallet).
   paymentCollector          String                    @default("own") @map("payment_collector")
@@ -755,6 +758,13 @@ model PlanPrice {
   @@map("plan_prices")
 }
 
+/// The two products sharing this API and database: BitoCard, and Afrippa, the escrowed P2P crypto market that left it
+/// (docs/CRYPTO_SPINOFF_PLAN.md). Not the catalogue's product brands (`brands`).
+enum Platform {
+  bitocard
+  afrippa
+}
+
 enum StoreStatus {
   draft
   published
@@ -764,6 +774,8 @@ enum StoreStatus {
 /// A reseller's hosted storefront on <subdomain>.bitocard.com.
 model Store {
   id                    String             @id @default(uuid()) @db.Uuid
+  /// The product the store belongs to (its account's): Afrippa's one store holds its traders' accounts.
+  platform              Platform           @default(bitocard)
   resellerId            String             @map("reseller_id") @db.Uuid
   name                  String
   /// Lower-case, unique, for example "adadigital" in adadigital.bitocard.com.

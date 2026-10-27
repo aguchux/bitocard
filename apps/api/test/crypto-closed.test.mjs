@@ -7,7 +7,7 @@ import { after, before, describe, test } from 'node:test';
 import { adminClient, lastEmailCode, resellerClient, startApp } from './helpers.mjs';
 
 const { loadConfig } = await import('../dist/config/config.js');
-const { closedCryptoRoutes } = await import('../dist/crypto/closed.guard.js');
+const { closedCryptoRoutes } = await import('../dist/afrippa/gate.guard.js');
 
 let server;
 

@@ -40,7 +40,7 @@ export const planFeatures = Object.keys(planFeatureCatalogue) as PlanFeature[];
 
 /**
  * Crypto's plan features, kept for Afrippa (crypto has left BitoCard; `docs/CRYPTO_SPINOFF_PLAN.md`): never shown to
- * BitoCard's admins or resellers, nor listed on a plan. Their routes are closed (`CryptoClosedGuard`).
+ * BitoCard's admins or resellers, nor listed on a plan. Their routes are closed (`AfrippaGateGuard`).
  */
 export const afrippaPlanFeatures: ReadonlySet<PlanFeature> = new Set<PlanFeature>(['onchain_crypto', 'reseller_desks']);
 
