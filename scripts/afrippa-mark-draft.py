@@ -1,8 +1,8 @@
 """
 Draft Afrippa marks (a lowercase "a") drawn from BitoCard's "b" mark's own geometry and colours (assets/logo.png):
-the same bowl, counter, pink arrow wedge and its cut lines, and the pink cap, but with the stem on the right at the
+the same bowl, counter, pink arrow wedge and its cut lines, and the pink bar, but with the stem on the right at the
 bowl's height, so nothing rises above the bowl and it reads as a small "a", never a "d".
-  C (mark-c-single.png): a single-storey "a": the stem from the bowl's top to the baseline, its top the pink cap.
+  C (mark-c-single.png): a single-storey "a": the stem from the bowl's top to the baseline, the pink bar its foot.
 Drafts only: the approved mark is redrawn as a vector. Run from the repository root:
 python scripts/afrippa-mark-draft.py
 """
@@ -73,9 +73,9 @@ def single():
     sx = cx + R - STEM + 15            # the stem's left edge, as far right as the b's stem was left
     d.rectangle([P(sx), P(cy - R), P(sx + STEM), P(cy + R)], fill=NAVY)
     d.ellipse([P(cx - r), P(cy - r), P(cx + r), P(cy + r)], fill=(0, 0, 0, 0))
-    # The cap: the stem's top, pink, with the white gap under it running across the stem.
-    d.rectangle([P(sx), P(cy - R), P(sx + STEM), P(cy - R + CAP)], fill=PINK)
-    d.rectangle([P(sx), P(cy - R + CAP), P(sx + STEM), P(cy - R + CAP + GAP)], fill=(0, 0, 0, 0))
+    # The pink bar: the foot of the stem, on the baseline, with the white gap above it running across the stem.
+    d.rectangle([P(sx), P(cy + R - CAP), P(sx + STEM), P(cy + R)], fill=PINK)
+    d.rectangle([P(sx), P(cy + R - CAP - GAP), P(sx + STEM), P(cy + R - CAP)], fill=(0, 0, 0, 0))
     return finish(arrow(im, cx, cy), "mark-c-single.png")
 
 
