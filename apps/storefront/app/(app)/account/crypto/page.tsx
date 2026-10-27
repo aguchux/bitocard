@@ -33,14 +33,14 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
 
   return (
     <div data-full-bleed className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-extrabold text-navy-900 sm:text-3xl">P2P market{wallets?.mode === "test" ? " (test)" : ""}</h1>
           <p className="text-sm text-slate-600">Buy and sell crypto with other people, paid instantly from your BitoCard wallet.</p>
         </div>
         {!blocked && assets.length ? (
           <span className="flex shrink-0 items-center gap-2">
-            <Link href="/account/crypto/ads" className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400">
+            <Link href="/account/crypto/ads" className="hidden min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-navy-900 ring-1 ring-slate-300 hover:ring-slate-400 sm:inline-flex">
               My ads
             </Link>
             <PostAdLauncher assets={assets} initialAsset={state.asset} initialSide={state.side} />
