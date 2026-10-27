@@ -21,7 +21,11 @@ after(async () => {
 const returnUrl = 'https://shop.example/account/wallet';
 const ledgerOk = async () => assert.equal((await admin.get('/v1/admin/ledger/check')).json.ok, true);
 const switches = async enabled => {
-  for (const key of ['crypto_wallets', 'p2p_trading']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+  for (const key of ['crypto_wallets', 'p2p_trading']) {
+    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+    // Crypto trading is open only in countries switched on by themselves (the global level never allows a country).
+    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, country_code: 'NG' })).status, 200);
+  }
 };
 
 function storeServer(subdomain = null) {
@@ -46,7 +50,7 @@ function storeServer(subdomain = null) {
 }
 
 let counter = 0;
-async function customer(country = 'NG', subdomain = null) {
+async function customer(country = 'NG', subdomain = null, declare = true) {
   const shopper = storeServer(subdomain);
   const email = `p2p${(counter += 1)}-${Date.now()}@example.com`;
   const signup = await shopper.post('/v1/store/account/signup', { name: 'Ada Trader', email, password: 'correct horse battery', country });
@@ -54,6 +58,7 @@ async function customer(country = 'NG', subdomain = null) {
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   shopper.id = signup.json.customer.id;
   shopper.email = email;
+  if (declare) assert.equal((await shopper.post('/v1/store/crypto/declaration', { version: (await shopper.get('/v1/store/crypto/declaration')).json.version })).status, 200);
   return shopper;
 }
 
@@ -535,7 +540,7 @@ describe('markets: the global market and trading across borders', () => {
   const set = async (key, enabled, country) => assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, ...(country ? { country_code: country } : {}) })).status, 200);
   const credit = async (shopper, asset, amount) => assert.equal((await admin.post(`/v1/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing markets' })).status, 201);
   const holding = async (shopper, kind, currency) => (await prisma.ledgerAccount.findFirst({ where: { customerId: shopper.id, mode: 'test', kind, currency } }))?.balanceMinor ?? 0n;
-  const keys = ['crypto_wallets', 'p2p_trading', 'crypto_global', 'crypto_cross_border'];
+  const keys = ['crypto_wallets', 'p2p_trading', 'crypto_global', 'crypto_cross_border', 'crypto_app'];
 
   after(async () => {
     for (const key of keys) {
@@ -550,7 +555,10 @@ describe('markets: the global market and trading across borders', () => {
     await set('p2p_trading', true, 'NG');
     await set('crypto_wallets', false, 'GH');
     await set('p2p_trading', false, 'GH');
+    // The global market itself, and each country whose residents may trade there, set for it by itself.
     await set('crypto_global', true);
+    await set('crypto_global', true, 'NG');
+    await set('crypto_global', true, 'GH');
     const nigerian = await customer('NG');
     const ghanaian = await customer('GH');
 
@@ -559,7 +567,11 @@ describe('markets: the global market and trading across borders', () => {
     // Ghana's own market stays closed to them.
     assert.equal((await ghanaian.get('/v1/store/p2p/market?asset=USDT&side=buy')).json.error.code, 'crypto_not_enabled');
 
-    await credit(ghanaian, 'USDT', '30');
+    // They hold crypto for the global market: the overview and test deposits are open to them.
+    const overview = (await ghanaian.get('/v1/store/crypto')).json;
+    assert.deepEqual([overview.enabled, overview.p2p_enabled, overview.global_enabled], [true, false, true]);
+    assert.equal((await ghanaian.post('/v1/store/crypto/test-deposits', { asset: 'USDT', amount: '5' })).status, 201);
+    await credit(ghanaian, 'USDT', '25');
     const ad = await sellAd(ghanaian, { market: 'WW', price: 100, amount: '10', min_fiat: 100, max_fiat: 1000 });
     assert.equal(ad.status, 201, JSON.stringify(ad.json));
     assert.deepEqual([ad.json.market, ad.json.currency], ['WW', 'USD']);
@@ -586,7 +598,7 @@ describe('markets: the global market and trading across borders', () => {
     // What they hold is still theirs: closing the ad gives the rest back.
     assert.equal((await ghanaian.post(`/v1/store/p2p/ads/${ad.json.id}/cancel`)).status, 200);
     // The global market itself off: nobody trades there.
-    await set('crypto_global', null, 'GH');
+    await set('crypto_global', true, 'GH');
     await set('crypto_global', false);
     assert.equal((await nigerian.get('/v1/store/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
     await ledgerOk();
@@ -630,6 +642,8 @@ describe('markets: the global market and trading across borders', () => {
     const bought = await nigerian.post('/v1/store/p2p/trades', { ad_id: back.json.id, price: 15_00, amount: '2' });
     assert.equal(bought.status, 201, JSON.stringify(bought.json));
     assert.equal(await holding(nigerian, 'customer_withdrawable', 'GHS'), 60_00n);
+    // The cedis are listed as P2P money in another country's currency: spent in Ghana's market.
+    assert.deepEqual((await nigerian.get('/v1/store/crypto')).json.other_cash, [{ currency: 'GHS', proceeds: 60_00, locked: 0 }]);
 
     // Cross-border trades closed again: the Nigerian's ad leaves Ghana's book; closing it still works.
     await set('crypto_cross_border', null, 'GH');
@@ -646,6 +660,7 @@ describe('markets: the global market and trading across borders', () => {
       await set('p2p_trading', true, country);
     }
     await set('crypto_global', true);
+    await set('crypto_global', true, 'NG');
     await set('crypto_cross_border', true, 'GH');
     const reseller = await resellerClient(server);
     await reseller.browser.post('/v1/auth/email/verify', { code: await lastEmailCode(server.app, reseller.email) });
@@ -679,5 +694,51 @@ describe('markets: the global market and trading across borders', () => {
     assert.deepEqual(await markets(shopper), []);
     assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy&market=WW')).json.error.code, 'market_unavailable');
     await admin.put('/v1/admin/switches/p2p_trading', { enabled: null, reseller_id: reseller.resellerId });
+  });
+
+  test('trading needs the declaration (not a US or UK citizen or resident) and, live, an ID from an allowed country', async () => {
+    await set('crypto_wallets', true, 'NG');
+    await set('p2p_trading', true, 'NG');
+    const shopper = await customer('NG', null, false);
+    const declaration = (await shopper.get('/v1/store/crypto/declaration')).json;
+    assert.deepEqual([declaration.declared, declaration.text], [false, 'I am not a citizen or a resident of the United States or the United Kingdom.']);
+    const refused = await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy');
+    assert.deepEqual([refused.status, refused.json.error.code, refused.json.error.param], [409, 'declaration_required', 'declaration']);
+    assert.equal((await shopper.post('/v1/store/crypto/declaration', { version: '2020-01-01' })).json.error.code, 'declaration_changed');
+    const made = await shopper.post('/v1/store/crypto/declaration', { version: declaration.version });
+    assert.deepEqual([made.status, made.json.declared], [200, true]);
+    assert.equal((await shopper.post('/v1/store/crypto/declaration', { version: declaration.version })).status, 200, 'declaring again changes nothing');
+    assert.equal((await shopper.get('/v1/store/p2p/market?asset=USDT&side=buy')).status, 200);
+
+    // Live, the ID document's country must be an allowed market: a US passport is refused whatever was declared.
+    const { CryptoWalletsService } = await import('../dist/crypto/crypto-wallets.service.js');
+    const wallets = server.app.get(CryptoWalletsService);
+    const row = await prisma.customer.findUniqueOrThrow({ where: { id: shopper.id }, include: { store: { include: { reseller: { select: { house: true } } } }, market: true } });
+    const context = { ...(await wallets.context(row)), mode: 'live' };
+    const check = async documentCountry => {
+      await prisma.identityVerification.deleteMany({ where: { customerReference: shopper.id } });
+      if (documentCountry) {
+        await prisma.identityVerification.create({
+          data: { subject: 'customer', resellerId: context.seller.id, mode: 'live', customerReference: shopper.id, method: 'document', provider: 'sandbox', providerReference: `doc-${Date.now()}-${Math.random()}`, status: 'approved', country: 'NG', consentAt: new Date(), documentCountry },
+        });
+      }
+      try {
+        await wallets.requireEligible(context);
+        return 'ok';
+      } catch (error) {
+        return error.code;
+      }
+    };
+    assert.equal(await check('NG'), 'ok');
+    assert.equal(await check('US'), 'country_not_allowed');
+    assert.equal(await check('GB'), 'country_not_allowed');
+    await set('crypto_wallets', false, 'GH');
+    await set('crypto_global', false, 'GH');
+    assert.equal(await check('GH'), 'country_not_allowed', 'Ghana is not allowed until an admin opens it');
+    await set('crypto_app', true, 'GH');
+    assert.equal(await check('GH'), 'ok');
+    assert.equal(await check(null), 'country_not_allowed', 'no approved check, no live trading');
+    await set('crypto_app', null, 'GH');
+    await prisma.identityVerification.deleteMany({ where: { customerReference: shopper.id } });
   });
 });

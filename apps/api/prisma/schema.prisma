@@ -2579,6 +2579,7 @@ model Customer {
   classifiedListings        ClassifiedListing[]
   classifiedSeller          ClassifiedSeller?
   classifiedTermsAcceptances ClassifiedTermsAcceptance[]
+  cryptoDeclarations         CryptoDeclaration[]
   classifiedReportsMade     ClassifiedReport[]        @relation("ClassifiedReporter")
   classifiedReportsAbout    ClassifiedReport[]        @relation("ClassifiedReported")
   classifiedFavourites      ClassifiedFavourite[]
@@ -4722,6 +4723,18 @@ model ClassifiedTermsAcceptance {
 
   @@id([customerId, version])
   @@map("classified_terms_acceptances")
+}
+
+/// A customer's crypto declaration, by version (`cryptoDeclarationVersion`): not a citizen or resident of the
+/// United States or the United Kingdom. Needed to trade on the P2P markets (BitoCard Crypto and every store's Crypto tab).
+model CryptoDeclaration {
+  customerId String   @map("customer_id") @db.Uuid
+  version    String   @db.VarChar(20)
+  declaredAt DateTime @default(now()) @map("declared_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, version])
+  @@map("crypto_declarations")
 }
 
 /// A customer's standing in BitoCard Shop: suspended sellers cannot post, and their listings leave the market.

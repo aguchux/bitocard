@@ -517,6 +517,10 @@ export type StoreCryptoWallets = {
   currency: string;
   enabled: boolean;
   p2p_enabled: boolean;
+  /** The global market (US dollars, across countries) is open to the customer, even where their own market is off. */
+  global_enabled: boolean;
+  /** The crypto declaration (not a US or UK citizen or resident), needed to trade: confirm it with `POST /v1/store/crypto/declaration { version }`. */
+  declaration: { version: string; declared: boolean };
   verified: boolean;
   frozen: boolean;
   assets: StoreCryptoBalance[];
@@ -524,6 +528,8 @@ export type StoreCryptoWallets = {
   cash: { currency: string; proceeds: number; wallet: number; locked: number; paying_out: number };
   /** USD balances when the customer's home currency is not USD. */
   usd_cash?: { currency: 'USD'; proceeds: number; wallet: number; locked: number; paying_out: number };
+  /** P2P money in other countries' currencies (from selling in their markets): spent in those markets, never cashed out by the customer. */
+  other_cash: Array<{ currency: string; proceeds: number; locked: number }>;
 };
 
 export type StoreCryptoTransaction = {

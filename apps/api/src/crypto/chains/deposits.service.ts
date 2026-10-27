@@ -155,7 +155,7 @@ export class CryptoDepositsService {
 
   /** The networks a customer can deposit an asset on now (switched on, with a key and a provider for the store's mode). */
   async depositNetworks(customer: CustomerWithStore, asset: string) {
-    const context = await this.wallets.require(customer);
+    const context = await this.wallets.requireUse(customer);
     return this.networksOpen(context.mode, asset);
   }
 
@@ -181,7 +181,7 @@ export class CryptoDepositsService {
    * next free index, then the same every time; showing it watches it for deposits for a week.
    */
   async depositAddress(customer: CustomerWithStore, input: { asset: string; chain: string }) {
-    const context = await this.wallets.require(customer);
+    const context = await this.wallets.requireUse(customer);
     return this.addressFor({ customerId: customer.id }, context.mode, input);
   }
 

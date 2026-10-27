@@ -40,6 +40,11 @@ class TestDepositDto {
   amount: string;
 }
 
+class DeclarationDto {
+  @IsString() @Length(1, 20)
+  version: string;
+}
+
 class NicknameDto {
   @Matches(/^[A-Za-z0-9_]{3,20}$/, { message: 'nickname must be 3 to 20 letters, numbers or underscores' })
   nickname: string;
@@ -192,6 +197,19 @@ export class CustomerCryptoController {
     private readonly wallets: CryptoWalletsService,
     private readonly deposits: CryptoDepositsService,
   ) {}
+
+  /** The crypto declaration (not a citizen or resident of the US or UK) for the current version, and whether it was made. */
+  @Get('declaration')
+  declaration(@CurrentCustomer() caller: CustomerCaller) {
+    return this.wallets.declaration(caller.customer);
+  }
+
+  /** Makes the declaration for the version shown (needed to trade). */
+  @Post('declaration')
+  @HttpCode(HttpStatus.OK)
+  declare(@CurrentCustomer() caller: CustomerCaller, @Body() body: DeclarationDto) {
+    return this.wallets.declare(caller.customer, body.version);
+  }
 
   /** The networks an asset can be deposited on now. */
   @Get('deposit-networks')

@@ -19,6 +19,13 @@ export const assetUnavailable = (param = 'asset') => new ApiError(HttpStatus.BAD
 export const cryptoFrozen = () =>
   new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'crypto_account_frozen', 'Your crypto account is frozen. Contact support to find out why.');
 
+/**
+ * The crypto declaration's version (its date): bump it when everyone must declare again. Every account declares, once
+ * per version, that it is not a citizen or resident of the United States or the United Kingdom before trading.
+ */
+export const cryptoDeclarationVersion = '2026-10-27';
+export const cryptoDeclarationText = 'I am not a citizen or a resident of the United States or the United Kingdom.';
+
 /** Who a customer is in the crypto market: their store's mode, the seller behind it and their country's currency. */
 export type CryptoContext = { customer: CustomerWithStore; mode: LedgerMode; seller: Reseller; country: string; currency: string };
 
@@ -115,6 +122,88 @@ export class CryptoWalletsService {
     return context;
   }
 
+  // -- Markets: whose crypto is on ----------------------------------------------------------------------------
+
+  /** Whether the customer's own market is open: crypto and P2P switched on for their store's seller. */
+  async homeOpen(context: CryptoContext) {
+    return (await this.enabled(context.seller)) && (await this.settings.isOn('p2p_trading', context.seller.id));
+  }
+
+  /**
+   * Whether residents of `country` may trade on the global market: the market itself on, and switched on for that
+   * country by itself (the global level never opens a country: only countries admins allow, absolutely).
+   */
+  async globalOpenFor(country: string) {
+    return (await this.settings.isOnGlobally('crypto_global')) && (await this.settings.isSetFor('crypto_global', { countryCode: country })) === true;
+  }
+
+  /**
+   * Whether this customer may trade on the global market: the market itself on, and on for them. bitocard.com's
+   * customers follow their country (even where its own market is off); a reseller's store's customers follow the
+   * reseller's switch (else their country), and only while their store's own market is open.
+   */
+  async globalAllowed(context: CryptoContext, home?: boolean) {
+    if (context.customer.store.reseller.house) return this.globalOpenFor(context.country);
+    const open = home ?? (await this.homeOpen(context));
+    if (!open || !(await this.settings.isOnGlobally('crypto_global'))) return false;
+    // The reseller's own choice, else their country's, set for it by itself: never the global level alone.
+    return ((await this.settings.isSetFor('crypto_global', { resellerId: context.seller.id })) ?? (await this.settings.isSetFor('crypto_global', { countryCode: context.country }))) === true;
+  }
+
+  /**
+   * Whether a country is one admins allow in the crypto markets: one of BitoCard's markets with, set for that country
+   * by itself, BitoCard Crypto showing it (`crypto_app`), its residents allowed on the global market, or its own
+   * market open (crypto and P2P on). Global switches never allow a country, and nobody else trades, whatever they
+   * declare: an allow-list, never a list of refused countries.
+   */
+  async allowedCountry(code: string) {
+    if (!/^[A-Z]{2}$/.test(code) || !(await this.prisma.country.findUnique({ where: { code }, select: { code: true } }))) return false;
+    const set = async (key: 'crypto_app' | 'crypto_wallets' | 'p2p_trading') => (await this.settings.isSetFor(key, { countryCode: code })) === true;
+    return (await set('crypto_app')) || (await this.globalOpenFor(code)) || ((await set('crypto_wallets')) && (await set('p2p_trading')));
+  }
+
+  /** The customer's declaration for the current version: whether they made it, and what it says. */
+  async declaration(customer: CustomerWithStore) {
+    const found = await this.prisma.cryptoDeclaration.findUnique({ where: { customerId_version: { customerId: customer.id, version: cryptoDeclarationVersion } } });
+    return { object: 'crypto_declaration' as const, version: cryptoDeclarationVersion, text: cryptoDeclarationText, declared: Boolean(found), declared_at: found?.declaredAt.toISOString() ?? null };
+  }
+
+  /** Records the declaration for `version`, which must be the current one; declaring again changes nothing. */
+  async declare(customer: CustomerWithStore, version: string) {
+    if (version !== cryptoDeclarationVersion) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'declaration_changed', 'The declaration has changed. Read it again and confirm.', 'version');
+    }
+    await this.prisma.cryptoDeclaration.upsert({ where: { customerId_version: { customerId: customer.id, version } }, create: { customerId: customer.id, version }, update: {} });
+    return this.declaration(customer);
+  }
+
+  /**
+   * Whether the customer may trade at all: their declaration for the current version, their own country allowed, and,
+   * live, the country of the document their identity check verified allowed too (so US, UK and every other country
+   * outside the allowed markets are refused, whatever is declared).
+   */
+  async requireEligible(context: CryptoContext) {
+    if (!(await this.prisma.cryptoDeclaration.findUnique({ where: { customerId_version: { customerId: context.customer.id, version: cryptoDeclarationVersion } } }))) {
+      throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'declaration_required', 'Confirm you are not a citizen or resident of the United States or the United Kingdom first.', 'declaration');
+    }
+    const refused = () => new ApiError(HttpStatus.FORBIDDEN, 'permission_error', 'country_not_allowed', 'Crypto trading is open only to residents of the countries BitoCard serves.');
+    if (!(await this.allowedCountry(context.country))) throw refused();
+    if (context.mode === 'live') {
+      const document = await this.identity.customerDocumentCountry(context.seller.id, context.mode, context.customer.id);
+      if (!document || !(await this.allowedCountry(document))) throw refused();
+    }
+  }
+
+  /**
+   * The checks before using crypto at all (deposits, test crypto): `require`'s, with crypto on either in the customer's
+   * own market or for the global market, so residents trading only globally (their own market off) still hold coins.
+   */
+  async requireUse(customer: CustomerWithStore) {
+    const context = await this.requireOpen(customer);
+    if ((await this.enabled(context.seller)) || (await this.globalAllowed(context))) return context;
+    throw new ApiError(HttpStatus.CONFLICT, 'conflict_error', 'crypto_not_enabled', 'Crypto is not available in your country yet.');
+  }
+
   /**
    * `require` without the crypto switch: the store open, then `requireHolder`'s checks. For the P2P markets, whose
    * switches depend on the market (the global market does not need the customer's own country's crypto on).
@@ -161,6 +250,17 @@ export class CryptoWalletsService {
     return (kind: AccountKind, currency: string) => rows.find(row => row.kind === kind && row.currency === currency)?.balanceMinor ?? 0n;
   }
 
+  /** Fiat currencies other than `known` in which the customer holds P2P money or has it locked in buy ads. */
+  private async otherCurrencies(customerId: string, mode: LedgerMode, known: string[]) {
+    const rows = await this.prisma.ledgerAccount.findMany({
+      where: { customerId, mode, kind: { in: ['customer_withdrawable', 'p2p_fiat_locked'] }, currency: { notIn: known }, balanceMinor: { gt: 0n } },
+      select: { currency: true },
+      distinct: ['currency'],
+      orderBy: { currency: 'asc' },
+    });
+    return rows.map(row => row.currency);
+  }
+
   private async assetBalances(customerId: string, mode: LedgerMode, assets: CryptoAsset[]) {
     const balance = await this.accounts(customerId, mode);
     return assets.map(asset => {
@@ -188,13 +288,15 @@ export class CryptoWalletsService {
   /** The customer's crypto wallets and P2P cash, with what they can do now. */
   async overview(customer: CustomerWithStore) {
     const context = await this.context(customer);
-    const [enabled, p2p, verified, fresh, all] = await Promise.all([
+    const [home, p2p, global, verified, fresh, all] = await Promise.all([
       this.enabled(context.seller),
       this.settings.isOn('p2p_trading', context.seller.id),
+      this.globalAllowed(context),
       this.verified(context),
       this.prisma.customer.findUniqueOrThrow({ where: { id: customer.id }, select: { cryptoFrozenAt: true } }),
       this.assets(true),
     ]);
+    const enabled = home || global;
     const balance = await this.accounts(customer.id, context.mode);
     // A switched-off asset is listed only while the customer still holds some, so they can withdraw it.
     const held = (code: string) => cryptoKinds.some(kind => balance(kind, code) > 0n);
@@ -204,9 +306,14 @@ export class CryptoWalletsService {
       mode: context.mode,
       country: context.country,
       currency: context.currency,
+      /** Crypto usable: on in the customer's own market, or the global market open to them. */
       enabled,
-      p2p_enabled: enabled && p2p,
+      /** Their own country's P2P market open (`p2p_enabled`), and the global market open to them (`global_enabled`). */
+      p2p_enabled: home && p2p,
+      global_enabled: global,
       verified,
+      /** The crypto declaration (not a US or UK citizen or resident), needed to trade: its version and whether it was made. */
+      declaration: { version: cryptoDeclarationVersion, declared: Boolean(await this.prisma.cryptoDeclaration.findUnique({ where: { customerId_version: { customerId: customer.id, version: cryptoDeclarationVersion } } })) },
       frozen: Boolean(fresh.cryptoFrozenAt),
       assets: await this.assetBalances(customer.id, context.mode, listed),
       /** Money in the customer's country currency for P2P: sale proceeds (withdrawable), the wallet (top-ups) and what buy ads lock. */
@@ -218,13 +325,22 @@ export class CryptoWalletsService {
         /** P2P money on its way to the customer's bank, until the transfer is paid or returned. */
         paying_out: minor(balance('customer_payouts_pending', context.currency)),
       },
+      /**
+       * P2P money in other countries' currencies, from selling in their markets (a Nigerian's cedis): spent in those
+       * markets, never cashed out here (cash-out is through the customer's own country only). Only currencies held.
+       */
+      other_cash: (await this.otherCurrencies(customer.id, context.mode, [context.currency, 'USD'])).map(code => ({
+        currency: code,
+        proceeds: minor(balance('customer_withdrawable', code)),
+        locked: minor(balance('p2p_fiat_locked', code)),
+      })),
       ...(context.currency !== 'USD' ? { usd_cash: { currency: 'USD', proceeds: minor(balance('customer_withdrawable', 'USD')), wallet: minor(balance('customer_wallet', 'USD')), locked: minor(balance('p2p_fiat_locked', 'USD')), paying_out: minor(balance('customer_payouts_pending', 'USD')) } } : {}),
     };
   }
 
   /** Sandbox stores only: test crypto into the customer's wallet (in place of an on-chain deposit). */
   async testDeposit(customer: CustomerWithStore, input: { asset: string; amount: string }) {
-    const context = await this.require(customer);
+    const context = await this.requireUse(customer);
     if (context.mode !== 'test') throw testModeOnly();
     const asset = await this.asset(input.asset);
     const amount = toUnits(input.amount, asset.decimals);

@@ -158,7 +158,23 @@ export default async function CryptoWalletsPage() {
               <div><dt className="text-xs text-slate-500">USD in buy ads</dt><dd className="font-bold">{formatFace(wallets.usd_cash.locked, "USD")}</dd></div>
             </dl>
           ) : null}
-          <p className="mt-2 text-xs text-slate-500">Buying spends P2P money in the ad&apos;s currency first, then that currency&apos;s wallet. Bank cash out is available for local-currency P2P money.</p>
+          {wallets.other_cash?.length ? (
+            <dl className="mt-2 grid gap-2 rounded-2xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
+              {wallets.other_cash.map(item => (
+                <div key={item.currency}>
+                  <dt className="text-xs text-slate-500">{item.currency} P2P money</dt>
+                  <dd className="font-bold">
+                    {formatFace(item.proceeds, item.currency)}
+                    {item.locked > 0 ? <span className="block text-xs font-normal text-slate-500">{formatFace(item.locked, item.currency)} in buy ads</span> : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          <p className="mt-2 text-xs text-slate-500">
+            Buying spends P2P money in the ad&apos;s currency first, then that currency&apos;s wallet. Bank cash out is available for local-currency P2P money.
+            {wallets.other_cash?.length ? " Money in another country's currency is spent in that country's market." : ""}
+          </p>
         </section>
       ) : null}
 

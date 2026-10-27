@@ -293,10 +293,13 @@ describe("what the crypto pages offer", () => {
     currency: "NGN",
     enabled: true,
     p2p_enabled: true,
+    global_enabled: false,
     verified: true,
+    declaration: { version: "2026-10-27", declared: true },
     frozen: false,
     assets: [coin("USDT", "0"), coin("BTC", "0.5"), coin("BNB", "1", false)],
     cash: { currency: "NGN", proceeds: 0, wallet: 0, locked: 0, paying_out: 0 },
+    other_cash: [],
     ...over,
   });
 

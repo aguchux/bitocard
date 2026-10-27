@@ -19,7 +19,11 @@ after(async () => {
 });
 
 const switches = async enabled => {
-  for (const key of ['crypto_wallets', 'p2p_trading']) assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+  for (const key of ['crypto_wallets', 'p2p_trading']) {
+    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled })).status, 200);
+    // Crypto trading is open only in countries switched on by themselves (the global level never allows a country).
+    assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, country_code: 'NG' })).status, 200);
+  }
 };
 const outside = '0x52908400098527886E0F7030069857D2E4169EE7';
 
@@ -52,6 +56,8 @@ async function customer(subdomain = null) {
   assert.equal(signup.status, 201, JSON.stringify(signup.json));
   assert.equal((await shopper.post('/v1/store/account/email/verify', { code: await lastEmailCode(server.app, email) })).status, 200);
   shopper.id = signup.json.customer.id;
+  // Trading needs the crypto declaration (not a US or UK citizen or resident).
+  assert.equal((await shopper.post('/v1/store/crypto/declaration', { version: (await shopper.get('/v1/store/crypto/declaration')).json.version })).status, 200);
   return shopper;
 }
 

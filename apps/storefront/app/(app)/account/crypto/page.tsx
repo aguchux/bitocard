@@ -26,7 +26,8 @@ export default async function MarketPage({ searchParams }: { searchParams: Promi
   if (wallets && (!wallets.enabled || !wallets.p2p_enabled)) redirect("/account/crypto/wallets");
   const assets = tradableAssets(wallets);
   const state = marketState(params, assets, wallets?.currency ?? "USD");
-  const blocked = !wallets || wallets.frozen || !wallets.verified;
+  // Trading needs the account's declaration (not a US or UK citizen or resident), asked here once per version.
+  const blocked = !wallets || wallets.frozen || !wallets.verified || wallets.declaration?.declared === false;
   const book = blocked || !assets.length ? null : await customerApi<StoreList<StoreP2pAd>>("GET", `/v1/store/p2p/market?${marketQuery(state)}`);
   const ads = book?.ok ? shownAds(book.data.data, state) : [];
   const filtered = Boolean(state.q || state.amount || state.experienced);

@@ -50932,7 +50932,7 @@
               },
               "crypto_global": {
                 "type": "boolean",
-                "description": "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off; a reseller decides for their stores' customers (following the country unless set). Needs the global level on too."
+                "description": "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; each country must be switched on by itself for its residents to trade there (even where its own market is off): the global level alone opens no country. A reseller decides for their stores' customers (following the country unless set)."
               },
               "crypto_cross_border": {
                 "type": "boolean",

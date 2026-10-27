@@ -52,6 +52,7 @@ const wallets = (extra: Partial<StoreCryptoWallets> = {}) =>
     p2p_enabled: true,
     frozen: false,
     verified: true,
+    declaration: { version: "2026-10-27", declared: true },
     currency: "NGN",
     assets: ["USDT", "BTC"].map(asset => ({ asset, name: asset, enabled: true, available: "0", locked: "0", frozen: "0", withdrawing: "0" })),
     ...extra,
@@ -136,6 +137,17 @@ describe("the Crypto tab opens on the market", () => {
     expect(html).toContain("1 ad selling BTC for NGN");
     expect(html).toContain("Tradera");
     expect(html).not.toContain("Traderb");
+  });
+
+  test("before trading, the declaration: not a citizen or resident of the US or UK, and no market until it is made", async () => {
+    customerApi.mockImplementation(async () => ok(wallets({ declaration: { version: "2026-10-27", declared: false } })));
+    const html = renderToStaticMarkup(await MarketPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("One question before you trade");
+    expect(html).toContain("I am not a citizen or a resident of the United States or the United Kingdom.");
+    expect(html).toContain('name="version" value="2026-10-27"');
+    expect(html).toMatch(/<input type="checkbox" required=""[^>]*name="confirm" value="yes"/);
+    expect(html).not.toContain("Post ad");
+    expect(customerApi).toHaveBeenCalledTimes(1);
   });
 
   test("with nothing matching, it says so and offers to clear the filters", async () => {

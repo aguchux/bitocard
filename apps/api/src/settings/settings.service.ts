@@ -74,7 +74,7 @@ export const switchDefinitions = {
   crypto_global: {
     scopes: ['global', 'country', 'reseller'],
     description:
-      "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; a country lets its residents trade there, even where its own market is off; a reseller decides for their stores' customers (following the country unless set). Needs the global level on too.",
+      "BitoCard Crypto's global market: one P2P market in US dollars across countries. Global opens the market itself; each country must be switched on by itself for its residents to trade there (even where its own market is off): the global level alone opens no country. A reseller decides for their stores' customers (following the country unless set).",
   },
   crypto_cross_border: {
     scopes: ['country'],
@@ -265,6 +265,15 @@ export class SettingsService {
       pick(row => row.countryCode === null && row.resellerId === null) ??
       switchDefault(key)
     );
+  }
+
+  /**
+   * A switch's value set at exactly one scope (a country, or a reseller), else null: nothing falls through. For rules
+   * that must be set for each country on purpose, such as which countries may use crypto.
+   */
+  async isSetFor(key: SwitchKey, scope: { countryCode?: string; resellerId?: string }) {
+    const row = await this.prisma.featureSwitch.findFirst({ where: { key, countryCode: scope.countryCode ?? null, resellerId: scope.resellerId ?? null } });
+    return row?.enabled ?? null;
   }
 
   /** A switch's global value alone (its global row, else its default): for switches whose global level means the feature itself. */

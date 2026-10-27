@@ -313,6 +313,15 @@ export class IdentityService {
     return (await this.latestCustomer(resellerId, mode, reference))?.status === 'approved';
   }
 
+  /**
+   * The country of the document an approved check verified (else the check's own country: a BVN is Nigerian), or
+   * null without an approved check.
+   */
+  async customerDocumentCountry(resellerId: string, mode: LedgerMode, reference: string) {
+    const record = await this.latestCustomer(resellerId, mode, reference);
+    return record?.status === 'approved' ? (record.documentCountry ?? record.country) : null;
+  }
+
   /** The name an approved check verified for the customer (to match their bank account), or null. */
   async customerVerifiedName(resellerId: string, mode: LedgerMode, reference: string) {
     const record = await this.latestCustomer(resellerId, mode, reference);

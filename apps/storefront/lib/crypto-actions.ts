@@ -36,6 +36,13 @@ function signInFirst(status: number, path: string) {
 }
 
 /** Sandbox stores only: test crypto into the customer's wallet. */
+/** The crypto declaration (not a US or UK citizen or resident), made once per version before trading. */
+export async function declareCrypto(form: FormData): Promise<void> {
+  if (form.get("confirm") !== "yes") return;
+  await customerApi("POST", "/v1/store/crypto/declaration", { version: text(form, "version") });
+  revalidatePath("/account/crypto", "layout");
+}
+
 export async function addTestCrypto(_state: FormState, form: FormData): Promise<FormState> {
   const amount = cryptoAmount(text(form, "amount"));
   if (!amount) return { error: "Enter an amount above zero.", field: "amount" };
