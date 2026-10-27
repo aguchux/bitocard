@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
+import { HouseService } from '../checkout/house.service.js';
 import { ApiError } from '../common/errors/api-error.js';
 import type { CustomerWithStore } from '../customers/customers.service.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -11,6 +12,7 @@ import { InboxService } from '../notifications/inbox.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { feeFor, fiatFor, fromUnits, toUnits, unitsFor } from './amounts.js';
 import { type CryptoContext, CryptoWalletsService, cryptoFeesRef, notFound } from './crypto-wallets.service.js';
+import { CryptoMarketLimitsService, crossBorder } from './market-limits.service.js';
 
 export type AdSide = 'buy' | 'sell';
 const openStatuses = ['active', 'paused'];
@@ -56,6 +58,8 @@ export class P2pService {
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
     private readonly inbox: InboxService,
+    private readonly limits: CryptoMarketLimitsService,
+    private readonly house: HouseService,
   ) {}
 
   /** Whether other countries' residents may trade in `country`'s local book: its market open, and cross-border on there. */
@@ -294,12 +298,12 @@ export class P2pService {
     return known.get(customerId)!;
   }
 
-  private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string, take: number, trader?: string) {
+  private async book(mode: LedgerMode, book: MarketBook, asset: CryptoAsset, side: AdSide, viewerId: string | null, take: number, trader?: string) {
     // To buy, the viewer takes sell ads (cheapest first); to sell, buy ads (highest first).
     const adSide = side === 'buy' ? 'sell' : 'buy';
     const known = new Map<string, Promise<boolean>>();
     const ads = await this.prisma.p2pAd.findMany({
-      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', customerId: { not: viewerId }, remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
+      where: { mode, country: book.market, currency: book.currency, asset: asset.code, side: adSide, status: 'active', ...(viewerId ? { customerId: { not: viewerId } } : {}), remainingAmount: { gt: 0 }, customer: { cryptoFrozenAt: null, ...(trader ? { p2pProfile: { nickname: { contains: trader, mode: 'insensitive' } } } : {}) } },
       orderBy: [{ priceMinor: adSide === 'sell' ? 'asc' : 'desc' }, { createdAt: 'asc' }],
       take,
     });
@@ -359,6 +363,77 @@ export class P2pService {
       fiat: minor(terms.fiat),
       /** BitoCard's fee rate the amounts were worked out with: send it back with the trade to refuse a changed fee. */
       fee_bps: asset.p2pFeeBps,
+    };
+  }
+
+  // -- Public pages (crypto.bitocard.com) ----------------------------------------------------------------------
+
+  /**
+   * The markets BitoCard Crypto shows, with no sign-in: the global market while it is open, and every country set to
+   * show (`crypto_app`, for that country by itself), with their currencies and how many ads each book has. In the
+   * mode bitocard.com sells in (its Customer checkout sandbox), as the trading pages are.
+   */
+  async publicMarkets() {
+    const mode = this.house.mode();
+    const countries = await this.prisma.country.findMany({ orderBy: { name: 'asc' }, select: { code: true, name: true, currency: true } });
+    const shown = [];
+    for (const country of countries) if ((await this.settings.isSetFor('crypto_app', { countryCode: country.code })) === true) shown.push(country);
+    const global = await this.settings.isOnGlobally('crypto_global');
+    const counts = await this.prisma.p2pAd.groupBy({
+      by: ['country', 'currency'],
+      where: { mode, status: 'active', remainingAmount: { gt: 0 }, country: { in: [...(global ? [globalMarket] : []), ...shown.map(country => country.code)] } },
+      _count: { _all: true },
+    });
+    const ads = (market: string, currency: string) => counts.find(row => row.country === market && row.currency === currency)?._count._all ?? 0;
+    const entry = (market: string, name: string, currencies: string[]) => ({
+      object: 'crypto_market' as const,
+      market,
+      name,
+      currencies,
+      ads: Object.fromEntries(currencies.map(currency => [currency, ads(market, currency)])),
+    });
+    return {
+      object: 'list' as const,
+      mode,
+      data: [...(global ? [entry(globalMarket, 'Global', [globalCurrency])] : []), ...shown.map(country => entry(country.code, country.name, [...new Set([country.currency, globalCurrency])]))],
+    };
+  }
+
+  /** A market's book for the public pages: the same ads traders see (nicknames, prices, limits), with no viewer. */
+  async publicAds(market: string, query: { asset: string; side: AdSide; currency?: string; q?: string; fiat?: number; limit?: number }) {
+    const code = market.toUpperCase();
+    const listed = (await this.publicMarkets()).data.find(item => item.market === code);
+    if (!listed) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'market_unavailable', 'This market is not open.', 'market');
+    const currency = query.currency?.toUpperCase() ?? listed.currencies[0];
+    if (!listed.currencies.includes(currency)) throw invalid('currency_unsupported', `This market trades in ${listed.currencies.join(' or ')}.`, 'currency');
+    const mode = this.house.mode();
+    const asset = await this.wallets.asset(query.asset);
+    const book: MarketBook = { market: code, currency };
+    const ads = await this.book(mode, book, asset, query.side, null, 200, query.q?.trim());
+    const fiat = query.fiat !== undefined ? BigInt(query.fiat) : null;
+    const usable = ads.filter(ad => {
+      const capacity = this.capacity(ad, asset);
+      return capacity.available > 0n && (fiat === null || (fiat >= capacity.min && fiat <= capacity.max));
+    });
+    const shown = usable.slice(0, query.limit ?? 50);
+    const { owner, stats } = await this.owners(shown, mode);
+    return { object: 'list' as const, market: code, asset: asset.code, currency, side: query.side, data: shown.map(ad => this.presentAd(ad, asset, owner(ad.customerId), stats.get(ad.customerId))) };
+  }
+
+  /** A trader's public card by nickname: completed trades, open ads and the markets they are in. Nothing else about them. */
+  async publicTrader(nickname: string) {
+    const mode = this.house.mode();
+    const profile = await this.prisma.p2pProfile.findUnique({ where: { nicknameKey: nickname.toLowerCase() }, include: { customer: { select: { status: true, cryptoFrozenAt: true } } } });
+    if (!profile || profile.customer.status !== 'active' || profile.customer.cryptoFrozenAt) throw notFound('trader');
+    const stats = (await this.stats([profile.customerId], mode)).get(profile.customerId)!;
+    const ads = await this.prisma.p2pAd.findMany({ where: { customerId: profile.customerId, mode, status: 'active', remainingAmount: { gt: 0 } }, select: { country: true } });
+    return {
+      object: 'p2p_trader' as const,
+      nickname: profile.nickname,
+      ...stats,
+      open_ads: ads.length,
+      markets: [...new Set(ads.map(ad => ad.country))].sort(),
+      since: profile.createdAt.toISOString(),
     };
   }
 
@@ -611,8 +686,9 @@ export class P2pService {
       const ad = await this.lockAd(tx, found.id);
       if (!ad || ad.status !== 'active') throw adUnavailable();
       if (ad.priceMinor !== found.priceMinor) throw conflict('price_changed', 'The price of this ad changed. Check the new price and try again.', 'price');
-      const owner = await tx.customer.findUniqueOrThrow({ where: { id: ad.customerId }, select: { cryptoFrozenAt: true } });
+      const owner = await tx.customer.findUniqueOrThrow({ where: { id: ad.customerId }, select: { cryptoFrozenAt: true, country: true } });
       if (owner.cryptoFrozenAt) throw adUnavailable();
+      const ownerHome = owner.country ?? ad.country;
       // The ad as it is now: another trade may have taken part of it since it was read.
       const now = this.terms(ad, asset, input);
       let fromProceeds = 0n;
@@ -633,6 +709,17 @@ export class P2pService {
         adData.fiatLockedMinor = ad.fiatLockedMinor - now.fiat;
         adData.fiatFromProceeds = ad.fiatFromProceeds - fromProceeds;
       }
+      // The market's limits for both parties, with their accounts locked: parallel trades cannot pass them together.
+      await this.limits.check(tx, {
+        mode,
+        market: ad.country,
+        currency: ad.currency,
+        fiat: now.fiat,
+        parties: [
+          { customerId: customer.id, home: context.country, taker: true },
+          { customerId: ad.customerId, home: ownerHome, taker: false },
+        ],
+      });
       if (ad.remainingAmount === now.amount) adData.status = 'completed';
       await tx.p2pAd.update({ where: { id: ad.id }, data: adData });
       const trade = await tx.p2pTrade.create({
@@ -652,6 +739,7 @@ export class P2pService {
           fiatMinor: now.fiat,
           fiatFromProceeds: fromProceeds,
           fiatFromWallet: fromWallet,
+          crossBorder: crossBorder(ad.country, context.country) || crossBorder(ad.country, ownerHome),
           completedAt: new Date(),
         },
       });

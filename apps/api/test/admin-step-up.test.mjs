@@ -25,6 +25,7 @@ const protectedRoutes = [
   ['post', `/v1/admin/crypto/freezes/${randomId}/seize`, { note: 'ok' }],
   ['post', `/v1/admin/crypto/freezes/${randomId}/release`, { note: 'ok' }],
   ['patch', '/v1/admin/crypto/assets/USDT', { p2p_fee_bps: 10 }],
+  ['put', '/v1/admin/crypto/market-limits', { mode: 'test', market: 'NG', currency: 'NGN', per_trade: 100 }],
   ['patch', `/v1/admin/crypto/networks/${randomId}`, { withdrawals_enabled: false }],
   ['put', '/v1/admin/crypto/chains/ETHEREUM/routes', { order: [], disabled: [] }],
   ['post', `/v1/admin/orders/${randomId}/refund`, { reason: 'x' }],

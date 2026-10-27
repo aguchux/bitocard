@@ -742,3 +742,130 @@ describe('markets: the global market and trading across borders', () => {
     await prisma.identityVerification.deleteMany({ where: { customerReference: shopper.id } });
   });
 });
+
+describe('market limits, the cross-border hold and the public pages', () => {
+  const set = async (key, enabled, country) => assert.equal((await admin.put(`/v1/admin/switches/${key}`, { enabled, ...(country ? { country_code: country } : {}) })).status, 200);
+  const credit = async (shopper, asset, amount) => assert.equal((await admin.post(`/v1/admin/crypto/customers/${shopper.id}/test-credits`, { asset, amount, reason: 'Testing limits' })).status, 201);
+  const limits = body => admin.put('/v1/admin/crypto/market-limits', { mode: 'test', ...body });
+  const publicGet = async path => {
+    const res = await fetch(`${server.base}${path}`);
+    return { status: res.status, cache: res.headers.get('cache-control'), json: await res.json() };
+  };
+
+  before(async () => {
+    for (const country of ['NG', 'GH']) {
+      await set('crypto_wallets', true, country);
+      await set('p2p_trading', true, country);
+    }
+  });
+  after(async () => {
+    await prisma.cryptoMarketLimit.deleteMany({});
+    for (const key of ['crypto_wallets', 'p2p_trading', 'crypto_app', 'crypto_global', 'crypto_cross_border']) {
+      if (key !== 'crypto_cross_border') await set(key, null);
+      for (const country of ['NG', 'GH']) await set(key, null, country);
+    }
+  });
+
+  test('per trade and per 24 hours, for the taker and the ad owner alike', async () => {
+    assert.equal((await limits({ market: 'WW', currency: 'NGN', per_trade: 1 })).json.error.code, 'parameter_invalid', 'the global market is USD only');
+    assert.equal((await limits({ market: 'ZZ', currency: 'USD', per_trade: 1 })).json.error.code, 'parameter_invalid');
+    const saved = await limits({ market: 'NG', currency: 'NGN', per_trade: 60_00, per_day: 100_00 });
+    assert.equal(saved.status, 200, JSON.stringify(saved.json));
+    assert.deepEqual([saved.json.per_trade, saved.json.per_day, saved.json.cross_border_per_trade], [60_00, 100_00, null]);
+    assert.equal((await admin.get('/v1/admin/crypto/market-limits?mode=test')).json.data.some(row => row.market === 'NG' && row.currency === 'NGN'), true);
+
+    const seller = await customer('NG');
+    const buyer = await customer('NG');
+    const other = await customer('NG');
+    await credit(seller, 'USDT', '10');
+    await fund(buyer, 500_00);
+    await fund(other, 500_00);
+    const ad = await sellAd(seller, { price: 100_00, amount: '5', min_fiat: 100, max_fiat: 500_00 });
+    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    const take = (who, amount) => who.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 100_00, amount });
+
+    const tooBig = await take(buyer, '0.7');
+    assert.deepEqual([tooBig.status, tooBig.json.error.code], [409, 'trade_limit']);
+    assert.match(tooBig.json.error.message, /NGN 60\.00/);
+    assert.equal((await take(buyer, '0.5')).status, 201);
+    const overDay = await take(buyer, '0.6');
+    assert.equal(overDay.json.error.code, 'trade_limit');
+    assert.match(overDay.json.error.message, /NGN 50\.00/, 'what is left today');
+    assert.equal((await take(buyer, '0.5')).status, 201);
+    // The seller has now traded NGN 100.00 today: their ad takes no more, whoever asks.
+    assert.equal((await take(other, '0.1')).json.error.code, 'ad_limit');
+    await ledgerOk();
+  });
+
+  test("people from other countries have the tighter cross-border limits in a country's book, and its longer hold", async () => {
+    await set('crypto_cross_border', true, 'GH');
+    const hold = (await prisma.country.findUniqueOrThrow({ where: { code: 'GH' } })).payoutHoldDays;
+    assert.equal((await limits({ market: 'GH', currency: 'GHS', per_trade: 100_00, cross_border_per_trade: 20_00, cross_border_hold_days: hold + 10 })).status, 200);
+    const nigerian = await customer('NG');
+    const ghanaian = await customer('GH');
+    await credit(nigerian, 'USDT', '10');
+    await fund(ghanaian, 200_00);
+    const ad = await sellAd(nigerian, { market: 'GH', price: 10_00, amount: '5', min_fiat: 100, max_fiat: 100_00 });
+    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    // The Ghanaian is in their own market (GHS 100.00 a trade); the Nigerian owner is from elsewhere (GHS 20.00).
+    assert.equal((await ghanaian.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 10_00, amount: '3' })).json.error.code, 'ad_limit');
+    const sold = await ghanaian.post('/v1/store/p2p/trades', { ad_id: ad.json.id, price: 10_00, amount: '1.5' });
+    assert.equal(sold.status, 201, JSON.stringify(sold.json));
+    assert.equal((await prisma.p2pTrade.findUniqueOrThrow({ where: { id: sold.json.id } })).crossBorder, true);
+
+    // The Nigerian spends the cedis buying from another Ghanaian: that Ghanaian's sale is cross-border, so its money
+    // waits for the longer hold, even once it is older than Ghana's own.
+    const seller = await customer('GH');
+    await credit(seller, 'USDT', '5');
+    const back = await sellAd(seller, { price: 10_00, amount: '2', min_fiat: 100, max_fiat: 100_00 });
+    const bought = await nigerian.post('/v1/store/p2p/trades', { ad_id: back.json.id, price: 10_00, amount: '1' });
+    assert.equal(bought.status, 201, JSON.stringify(bought.json));
+    const old = new Date(Date.now() - (hold + 5) * 86_400_000);
+    await prisma.p2pTrade.update({ where: { id: bought.json.id }, data: { createdAt: old } });
+    await prisma.journalEntry.updateMany({ where: { reference: `p2p_trade:${bought.json.id}` }, data: { createdAt: old } });
+    const cash = (await seller.get('/v1/store/crypto/cash')).json;
+    assert.deepEqual([cash.balance, cash.held, cash.available, cash.cross_border_hold_days], [10_00, 10_00, 0, hold + 10]);
+    await prisma.cryptoMarketLimit.update({ where: { mode_market_currency: { mode: 'test', market: 'GH', currency: 'GHS' } }, data: { crossBorderHoldDays: null } });
+    assert.equal((await seller.get('/v1/store/crypto/cash')).json.available, 10_00, "without the longer hold, Ghana's own applies");
+
+    // Live, a market without limits set takes no trades.
+    const { CryptoMarketLimitsService } = await import('../dist/crypto/market-limits.service.js');
+    const service = server.app.get(CryptoMarketLimitsService);
+    await assert.rejects(
+      prisma.$transaction(tx => service.check(tx, { mode: 'live', market: 'KE', currency: 'KES', fiat: 1n, parties: [] })),
+      error => error.code === 'market_limits_unset',
+    );
+    await ledgerOk();
+    await cryptoConserved();
+  });
+
+  test('the public pages: markets shown, their ads and traders, with nicknames only and no sign-in', async () => {
+    assert.deepEqual((await publicGet('/v1/crypto/markets')).json.data, []);
+    await set('crypto_app', true, 'NG');
+    await set('crypto_global', true);
+    const markets = await publicGet('/v1/crypto/markets');
+    assert.equal(markets.cache, 'public, max-age=60');
+    assert.deepEqual(markets.json.data.map(item => [item.market, item.currencies]), [['WW', ['USD']], ['NG', ['NGN', 'USD']]]);
+
+    const seller = await customer('NG');
+    await credit(seller, 'USDT', '5');
+    const ad = await sellAd(seller, { price: 100_00, amount: '2', min_fiat: 100, max_fiat: 50_00 });
+    assert.equal(ad.status, 201, JSON.stringify(ad.json));
+    const nickname = ad.json.trader.nickname;
+    const book = await publicGet('/v1/crypto/markets/ng/ads?asset=USDT&side=buy');
+    assert.equal(book.status, 200, JSON.stringify(book.json));
+    const listed = book.json.data.find(item => item.id === ad.json.id);
+    assert.deepEqual([listed.market, listed.trader.nickname, listed.mine], ['NG', nickname, false]);
+    assert.equal(JSON.stringify(book.json).includes(seller.id), false, 'never a customer id');
+    assert.equal(JSON.stringify(book.json).includes(seller.email), false);
+    assert.ok((await publicGet('/v1/crypto/markets')).json.data.find(item => item.market === 'NG').ads.NGN >= 1);
+    assert.equal((await publicGet('/v1/crypto/markets/NG/ads?asset=USDT&side=buy&currency=GHS')).json.error.code, 'currency_unsupported');
+    assert.equal((await publicGet('/v1/crypto/markets/GH/ads?asset=USDT&side=buy')).json.error.code, 'market_unavailable', 'Ghana is not shown on BitoCard Crypto');
+
+    const trader = await publicGet(`/v1/crypto/traders/${nickname.toLowerCase()}`);
+    assert.equal(trader.status, 200, JSON.stringify(trader.json));
+    assert.deepEqual([trader.json.nickname, trader.json.open_ads, trader.json.markets], [nickname, 1, ['NG']]);
+    assert.equal(JSON.stringify(trader.json).includes(seller.id), false);
+    assert.equal((await publicGet('/v1/crypto/traders/NoSuchTrader')).status, 404);
+  });
+});

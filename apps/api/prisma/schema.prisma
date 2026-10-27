@@ -2977,6 +2977,9 @@ model P2pTrade {
   fiatFromWallet   BigInt     @default(0) @map("fiat_from_wallet")
   /// instant (BitoCard wallet) for now; classic (paid off platform) later.
   settlement       String     @default("instant")
+  /// A trade across borders: on the global market, or with a party from another country than the market's. Its sale
+  /// money waits for the market's cross-border payout hold.
+  crossBorder      Boolean    @default(false) @map("cross_border")
   status           String     @default("completed")
   createdAt        DateTime   @default(now()) @map("created_at")
   completedAt      DateTime?  @map("completed_at")
@@ -4723,6 +4726,28 @@ model ClassifiedTermsAcceptance {
 
   @@id([customerId, version])
   @@map("classified_terms_acceptances")
+}
+
+/// How much one customer may trade on a P2P market, per mode, market (a country, or `WW`) and currency, in that
+/// currency's minor units: per trade and per 24 hours, with tighter amounts for people from other countries trading
+/// in a country's book, and the longer payout hold on money from cross-border trades. Null is no limit. Live trading
+/// in a market needs its row (admins set low limits first and raise them as operations prove trustworthy).
+model CryptoMarketLimit {
+  id                       String     @id @default(uuid()) @db.Uuid
+  mode                     LedgerMode
+  market                   String     @db.Char(2)
+  currency                 String     @db.Char(3)
+  perTradeMinor            BigInt?    @map("per_trade_minor")
+  perDayMinor              BigInt?    @map("per_day_minor")
+  crossBorderPerTradeMinor BigInt?    @map("cross_border_per_trade_minor")
+  crossBorderPerDayMinor   BigInt?    @map("cross_border_per_day_minor")
+  crossBorderHoldDays      Int?       @map("cross_border_hold_days")
+  updatedById              String?    @map("updated_by_id") @db.Uuid
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+
+  @@unique([mode, market, currency])
+  @@map("crypto_market_limits")
 }
 
 /// A customer's crypto declaration, by version (`cryptoDeclarationVersion`): not a citizen or resident of the

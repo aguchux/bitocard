@@ -1,6 +1,6 @@
 # BitoCard Crypto (`crypto.bitocard.com`): plan
 
-**Status:** planned 27 October 2026; the owner's decisions recorded the same day (below). Built so far: `crypto` reserved as a subdomain no store can take; stage 1a (below).
+**Status:** planned 27 October 2026; the owner's decisions recorded the same day (below). Built so far: `crypto` reserved as a subdomain no store can take; stage 1, the API (below).
 
 BitoCard Crypto is a public crypto market app in the style of BitoCard Shop: `apps/crypto` at `https://crypto.bitocard.com`, with the **global market** at `/` (US dollars, traded across BitoCard's African markets) and a **country market** at `/<cc>` (`/ng` in naira, `/ke` in shillings, `/gh` in cedis). It is built on what already exists: the P2P order books, ads, instant trades, crypto wallets, deposits and withdrawals, cash-out and the sign-in handoff BitoCard Shop uses. What is new is the global book, the app itself, and **global money rails**: ways to pay USD in and take USD out that admins integrate and switch on.
 
@@ -141,7 +141,9 @@ Built like `apps/shop` (Next.js App Router, server components reading the API on
    - **1b, built 27 October 2026:** the reseller gates of decision 13 (`crypto_global` per reseller; `crypto_trade_abroad`, reseller only, on unless switched off).
    - **1c, built 27 October 2026:** global-only residents hold crypto for the global market (`CryptoWalletsService.requireUse` for deposits and test crypto; `enabled` and `global_enabled` on the overview); every other currency held listed as `other_cash` (cash-out already pays only the customer's own country's currency, through its rails).
    - **1d, built 27 October 2026:** the declaration (`crypto_declarations`, `GET/POST /v1/store/crypto/declaration`, asked by the store's Crypto tab before the market) and the absolute allow-list (`requireEligible`: the account's country and, live, the identity document's country must be BitoCard markets switched on for that country by itself; global switches never allow a country, which also closed a gap where `crypto_global` on globally let every country in).
-   - **Next (1e, 1f):** per-market limits and holds (lower cross-border); public reads for crypto.bitocard.com.
+   - **1e, built 27 October 2026:** per-market limits (`crypto_market_limits`: per trade and per 24 hours, tighter for people from other countries in a country's book; checked for both parties inside the trade's transaction; live trading needs a market's row), the cross-border flag on trades and the longer cross-border payout hold; admin `GET/PUT /v1/admin/crypto/market-limits` (screens come with Crypto > Markets in stage 5).
+   - **1f, built 27 October 2026:** the public reads for crypto.bitocard.com (`/v1/crypto/markets`, `/v1/crypto/markets/:market/ads`, `/v1/crypto/traders/:nickname`).
+   - **Stage 1 is complete.**
    - The `market` parameter, home, cross-border and global access, the three switches, and the `WW` book.
    - All sale money withdrawable by currency; holdings in other markets' currencies.
    - Per-market limits and holds; the citizenship declaration and the refused document countries; public reads.

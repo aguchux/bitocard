@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiError } from '../common/errors/api-error.js';
 import type { Request } from 'express';
 import { ApiExcludeController, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
@@ -12,6 +13,7 @@ import { chains } from './chains/client.js';
 import { CryptoDepositsService } from './chains/deposits.service.js';
 import { CryptoWalletsService, presentAsset } from './crypto-wallets.service.js';
 import { type AdSide, P2pService } from './p2p.service.js';
+import { CryptoMarketLimitsService } from './market-limits.service.js';
 import { CryptoReconciliationService } from './custody/reconciliation.service.js';
 import { CryptoWithdrawalsService } from './withdrawals.service.js';
 import { CustomerPayoutsService } from '../payouts/customer-payouts.service.js';
@@ -69,6 +71,27 @@ class MarketQueryDto {
   q?: string;
 
   /** Only ads taking this amount (fiat minor units). */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  fiat?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number;
+}
+
+/** A public market's book: the same filters as the signed-in market, without `market` (it is in the address). */
+class PublicMarketQueryDto {
+  @Transform(upper) @assetCode()
+  asset: string;
+
+  @IsIn(['buy', 'sell'])
+  side: AdSide;
+
+  @IsOptional() @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  currency?: string;
+
+  @IsOptional() @IsString() @MaxLength(20)
+  q?: string;
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1)
   fiat?: number;
 
@@ -432,6 +455,37 @@ export class CustomerCashController {
   }
 }
 
+/**
+ * BitoCard Crypto's public pages (crypto.bitocard.com): the markets, each market's ads and traders' cards, with no
+ * sign-in and cached for a minute. Nicknames only, never customers.
+ */
+@ApiExcludeController()
+@Public()
+@Controller('crypto')
+export class PublicCryptoController {
+  constructor(private readonly p2p: P2pService) {}
+
+  @Get('markets')
+  @Header('Cache-Control', 'public, max-age=60')
+  markets() {
+    return this.p2p.publicMarkets();
+  }
+
+  @Get('markets/:market/ads')
+  @Header('Cache-Control', 'public, max-age=60')
+  ads(@Param('market') market: string, @Query() query: PublicMarketQueryDto) {
+    if (!/^[A-Za-z]{2}$/.test(market)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'market_unavailable', 'This market is not open.', 'market');
+    return this.p2p.publicAds(market, query);
+  }
+
+  @Get('traders/:nickname')
+  @Header('Cache-Control', 'public, max-age=60')
+  trader(@Param('nickname') nickname: string) {
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(nickname)) throw new ApiError(HttpStatus.NOT_FOUND, 'not_found_error', 'resource_missing', 'No such trader.');
+    return this.p2p.publicTrader(nickname);
+  }
+}
+
 /** The P2P market for store customers: ads, quotes and instant trades paid from BitoCard wallets. */
 @ApiExcludeController()
 @Public()
@@ -560,6 +614,39 @@ class ResolveDto {
   note: string;
 }
 
+class MarketLimitsQueryDto {
+  @IsOptional() @IsIn(['live', 'test'])
+  mode?: LedgerMode;
+}
+
+/** A P2P market's limits, in the currency's minor units; null (or left out) is no limit. */
+class MarketLimitDto {
+  @IsIn(['live', 'test'])
+  mode: LedgerMode;
+
+  /** A country code, or WW for the global market. */
+  @Transform(upper) @Matches(/^[A-Z]{2}$/, { message: 'market must be a country code such as NG, or WW' })
+  market: string;
+
+  @Transform(upper) @Matches(/^[A-Z]{3}$/)
+  currency: string;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  per_trade?: number | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  per_day?: number | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  cross_border_per_trade?: number | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(1) @Max(1_000_000_000_000_00)
+  cross_border_per_day?: number | null;
+
+  @IsOptional() @ValidateIf((_, value) => value !== null) @IsInt() @Min(0) @Max(365)
+  cross_border_hold_days?: number | null;
+}
+
 class AdminListDto {
   @IsOptional() @IsIn(['live', 'test'])
   mode?: LedgerMode;
@@ -583,7 +670,24 @@ class AdminListDto {
 @AdminRoles('operations', 'finance', 'support')
 @Controller('admin/crypto')
 export class AdminCryptoController {
-  constructor(private readonly wallets: CryptoWalletsService) {}
+  constructor(
+    private readonly wallets: CryptoWalletsService,
+    private readonly limits: CryptoMarketLimitsService,
+  ) {}
+
+  /** Every P2P market's limits (per trade, per 24 hours, across borders) and its cross-border payout hold. */
+  @Get('market-limits')
+  marketLimits(@Query() query: MarketLimitsQueryDto) {
+    return this.limits.list(query.mode);
+  }
+
+  /** Sets a market's limits: live trading in a market needs them. Finance or operations, after step-up; audited. */
+  @AdminRoles('operations', 'finance')
+  @StepUp()
+  @Put('market-limits')
+  setMarketLimits(@CurrentCaller() caller: Caller, @Body() body: MarketLimitDto) {
+    return this.limits.set(adminId(caller), body);
+  }
 
   @Get('assets')
   async assets() {
