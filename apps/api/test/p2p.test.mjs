@@ -845,6 +845,7 @@ describe('market limits, the cross-border hold and the public pages', () => {
     await set('crypto_global', true);
     const markets = await publicGet('/v1/crypto/markets');
     assert.equal(markets.cache, 'public, max-age=60');
+    assert.deepEqual(markets.json.assets.slice(0, 2), ['USDT', 'USDC'], 'the coins on sale, in order');
     assert.deepEqual(markets.json.data.map(item => [item.market, item.currencies]), [['WW', ['USD']], ['NG', ['NGN', 'USD']]]);
 
     const seller = await customer('NG');

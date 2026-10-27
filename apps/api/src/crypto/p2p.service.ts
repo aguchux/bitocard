@@ -395,6 +395,8 @@ export class P2pService {
     return {
       object: 'list' as const,
       mode,
+      /** The coins on sale, in the order shown. */
+      assets: (await this.wallets.assets()).map(asset => asset.code),
       data: [...(global ? [entry(globalMarket, 'Global', [globalCurrency])] : []), ...shown.map(country => entry(country.code, country.name, [...new Set([country.currency, globalCurrency])]))],
     };
   }

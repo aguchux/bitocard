@@ -9,7 +9,8 @@
     "./reseller": "./src/reseller/index.ts",
     "./storefront": "./src/storefront.ts",
     "./classifieds": "./src/classifieds.ts",
-    "./kyc": "./src/kyc.ts"
+    "./kyc": "./src/kyc.ts",
+    "./crypto": "./src/crypto.ts"
   },
   "scripts": {
     "lint": "eslint .",
