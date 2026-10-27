@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { formatCrypto, formatFace, type StoreCryptoWallets, type StoreCryptoWithdrawal, type StoreP2pTrade } from "@bitocard/api-client/storefront";
 import { cryptoSections } from "./sub-menus";
+import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 
 export const card = "rounded-3xl bg-white p-5 ring-1 ring-slate-200/70";
 
@@ -19,25 +20,12 @@ export const withdrawalStatus: Record<StoreCryptoWithdrawal["status"], string> =
 };
 
 /**
- * The crypto section's places (`cryptoSections`), as pills under the page title on phones and tablets; desktops have
- * the sub rail beside the app's rail instead (`SubRail`). On phones the row scrolls sideways on its own, inside its own
- * box, so the page never scrolls sideways.
+ * The crypto section's places (`cryptoSections`), as underlined tabs under the page title on phones and tablets (they
+ * slide sideways inside their own row, never the page); desktops have the sub rail beside the app's rail instead
+ * (`SubRail`).
  */
 export function CryptoNav({ current }: { current: string }) {
-  return (
-    <nav aria-label="Crypto" className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:hidden">
-      {cryptoSections.map(section => (
-        <Link
-          key={section.href}
-          href={section.href}
-          aria-current={section.href === current ? "page" : undefined}
-          className="inline-flex min-h-11 shrink-0 items-center rounded-full px-4 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:text-brand-600 focus-visible:outline-3 focus-visible:outline-offset-5 focus-visible:outline-brand-700 aria-[current=page]:bg-brand-50 aria-[current=page]:text-brand-700 aria-[current=page]:ring-brand-500"
-        >
-          {section.label}
-        </Link>
-      ))}
-    </nav>
-  );
+  return <UnderlineTabs label="Crypto" tabs={cryptoSections.map(({ href, label }) => ({ href, label }))} current={current} className="lg:hidden" />;
 }
 
 /**

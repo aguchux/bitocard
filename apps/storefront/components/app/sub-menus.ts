@@ -65,7 +65,7 @@ export type SubMenu = {
  */
 export type SubMenuContext = { groups: Array<{ key: string; label: string }>; currency: string | null; shop?: { browse: string; unread: number; resellers?: { count: number; waiting: number } } | null };
 
-/** The Shop tab's places (the design canvas's ShopTab board): pills on phones and tablets, the sub rail on desktop. */
+/** The Shop tab's places (the design canvas's ShopTab board): underlined tabs on phones and tablets, the sub rail on desktop. */
 export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenuItem[] => [
   { href: shop.browse, label: "Browse", icon: Compass, external: true },
   { href: "/shop/post", label: "Post an ad", icon: SquarePlus },
@@ -78,7 +78,7 @@ export const shopSections = (shop: NonNullable<SubMenuContext["shop"]>): SubMenu
   { href: "/shop/safe-pay", label: "Safe pay", icon: ShieldCheck },
 ];
 
-/** The Crypto tab's places: pills under the title on phones and tablets, the sub rail on desktop. The market comes first. */
+/** The Crypto tab's places: underlined tabs under the title on phones and tablets, the sub rail on desktop. The market comes first. */
 export const cryptoSections: SubMenuItem[] = [
   // The P2P market is the tab's first screen (BitoCard's biggest crypto market); the coins themselves are in Wallets.
   { href: "/account/crypto", label: "P2P market", icon: ArrowLeftRight },

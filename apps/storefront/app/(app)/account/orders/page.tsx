@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { formatPrice, type StoreCheckout, type StoreList } from "@bitocard/api-client/storefront";
@@ -41,18 +42,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           Your disputes
         </Link>
       </div>
-      <nav aria-label="Show" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 lg:hidden">
-        {(Object.keys(filters) as Filter[]).map(key => (
-          <Link
-            key={key}
-            href={`/account/orders${key === "all" ? "" : `?show=${key}`}`}
-            aria-current={filter === key ? "true" : undefined}
-            className={`inline-flex min-h-10 shrink-0 items-center rounded-full px-4 text-sm font-semibold ${filter === key ? "bg-navy-900 text-white" : "bg-white text-navy-900 ring-1 ring-slate-200 hover:ring-slate-300"}`}
-          >
-            {filters[key].label}
-          </Link>
-        ))}
-      </nav>
+      <UnderlineTabs
+        label="Show"
+        className="lg:hidden"
+        current={filter === "all" ? "/account/orders" : `/account/orders?show=${filter}`}
+        tabs={(Object.keys(filters) as Filter[]).map(key => ({ href: `/account/orders${key === "all" ? "" : `?show=${key}`}`, label: filters[key].label }))}
+      />
 
       {!result.ok ? (
         <p className="rounded-3xl bg-red-50 p-5 text-red-800">{result.message}</p>

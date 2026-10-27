@@ -5,7 +5,7 @@ export type AccountSectionKey = "profile" | "security" | "identity" | "support" 
 export type AccountSection = {
   key: AccountSectionKey;
   href: string;
-  /** The pill's and the row's name. */
+  /** The tab's and the row's name. */
   label: string;
   /** The row's second line on the Account page. */
   note: string;
@@ -15,8 +15,8 @@ export type AccountSection = {
 };
 
 /**
- * The Account tab's screens, in menu order: each its own route, listed as rows on `/account/profile` and as pills at
- * the top of every screen. The identity check keeps its own address (`/account/verification`), which checkout, the
+ * The Account tab's screens, in menu order: each its own route, listed as rows on `/account/profile` and as underlined
+ * tabs at the top of every screen. The identity check keeps its own address (`/account/verification`), which checkout, the
  * crypto pages and the identity partners' return links already use.
  */
 export const accountSections: AccountSection[] = [

@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 
 const { amountMinor, cleanAmount, marketHref, marketQuery, marketState, shownAds } = await import("@/lib/p2p-market");
 const { MarketAds, MarketFilters } = await import("@/components/app/p2p-market");
+const { CryptoNav } = await import("@/components/app/crypto");
 const { default: MarketPage } = await import("@/app/(app)/account/crypto/page");
 const { default: MarketMoved } = await import("@/app/(app)/account/crypto/market/page");
 
@@ -155,5 +156,21 @@ describe("the Crypto tab opens on the market", () => {
   test("the old Market address goes to the tab with its filters", async () => {
     await expect(MarketMoved({ searchParams: Promise.resolve({ asset: "USDT", side: "sell" }) })).rejects.toThrow("redirect:/account/crypto?asset=USDT&side=sell");
     await expect(MarketMoved({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/account/crypto");
+  });
+});
+
+describe("the Crypto tab's places", () => {
+  test("underlined tabs, the market first, the current one marked, with the grey line running on to the end", () => {
+    const html = renderToStaticMarkup(createElement(CryptoNav, { current: "/account/crypto/wallets" }));
+    expect(html).toContain('aria-label="Crypto"');
+    expect(html.match(/<a /g)).toHaveLength(8);
+    expect(html.indexOf("P2P market")).toBeLessThan(html.indexOf("Wallets"));
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*>Wallets<\/a>/);
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toContain("border-b-2 border-slate-200");
+    expect(html).toContain("aria-[current=page]:border-brand-500");
+    expect(html).toContain("overflow-x-auto");
+    expect(html).toContain("scroll-smooth");
+    expect(html).not.toContain("rounded-full");
   });
 });

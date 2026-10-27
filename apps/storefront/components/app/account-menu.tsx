@@ -51,7 +51,7 @@ export function AccountList({ label, children }: { label: string; children: Reac
 }
 
 /**
- * An account screen: back to the Account page and the pills to move between screens (phones and tablets; desktops
+ * An account screen: back to the Account page and the tabs to move between screens (phones and tablets; desktops
  * have the sub rail beside the app's rail instead), the title and a short lead, then the screen's own cards.
  */
 export function AccountScreen({ title, lead, children }: { title: string; lead?: React.ReactNode; children: React.ReactNode }) {

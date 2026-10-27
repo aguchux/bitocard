@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { ArrowRight, X, Zap } from "lucide-react";
 import type { StoreBrand, StoreList, StoreProduct } from "@bitocard/api-client/storefront";
 import { colors } from "@bitocard/ui/tokens";
@@ -73,17 +74,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         <p className="mt-1 text-slate-600">Everything you can buy, grouped to find it fast.</p>
       </div>
 
-      {/* Group chips: a sideways row on phones and tablets; on desktop the sub rail lists the groups. */}
-      <nav aria-label="Categories" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:hidden">
-        <Chip href={href({ q })} active={!group}>
-          All
-        </Chip>
-        {groups.map(item => (
-          <Chip key={item.key} href={href({ q, group: item.key, brand })} active={group === item.key}>
-            {item.label}
-          </Chip>
-        ))}
-      </nav>
+      {/* The groups as underlined tabs on phones and tablets; on desktop the sub rail lists them. */}
+      <UnderlineTabs
+        label="Categories"
+        className="lg:hidden"
+        current={group ? href({ q, group, brand }) : href({ q })}
+        tabs={[{ href: href({ q }), label: "All" }, ...groups.map(item => ({ href: href({ q, group: item.key, brand }), label: item.label }))]}
+      />
 
       {group === "mobile" ? (
         <Link href="/account/topup" className="flex items-center gap-3 rounded-2xl bg-navy-900 p-4 text-white transition hover:bg-navy-800">

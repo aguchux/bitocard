@@ -1,47 +1,22 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { UnderlineTabs } from "@bitocard/ui/underline-tabs";
 import { shopSections, type SubMenuContext } from "../sub-menus";
 
 /**
- * The Shop tab's places as pills under the title on phones and tablets (the sub rail has them on desktop), Messages
- * with its unread count. `active` is the current item's address.
+ * The Shop tab's places as underlined tabs under the title on phones and tablets (the sub rail has them on desktop),
+ * Messages with its unread count. `active` is the current item's address.
  */
 export function ShopPills({ shop, active }: { shop: NonNullable<SubMenuContext["shop"]>; active: string | null }) {
   return (
-    <nav aria-label="Shop" className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden">
-      <ul className="flex gap-2 whitespace-nowrap">
-        {shopSections(shop)
-          .filter(item => item.href !== "/shop/post")
-          .map(item => {
-            const current = item.href === active;
-            const className = `flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold ${current ? "border-navy-900 bg-navy-900 text-white" : "border-slate-300 bg-white text-navy-900 hover:border-slate-400"}`;
-            const inner = (
-              <>
-                {item.label}
-                {item.badge ? (
-                  <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand-700 px-1 text-[11px] text-white">
-                    {item.badge > 99 ? "99+" : item.badge}
-                    <span className="sr-only"> unread</span>
-                  </span>
-                ) : null}
-              </>
-            );
-            return (
-              <li key={item.href}>
-                {item.external ? (
-                  <a href={item.href} className={className}>
-                    {inner}
-                  </a>
-                ) : (
-                  <Link href={item.href} aria-current={current ? "page" : undefined} className={className}>
-                    {inner}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-      </ul>
-    </nav>
+    <UnderlineTabs
+      label="Shop"
+      className="lg:hidden"
+      current={active}
+      tabs={shopSections(shop)
+        .filter(item => item.href !== "/shop/post")
+        .map(({ href, label, badge, external }) => ({ href, label, badge, external }))}
+    />
   );
 }
 

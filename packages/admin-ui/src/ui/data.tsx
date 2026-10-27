@@ -178,15 +178,34 @@ export function LoadMore({ hasMore, loading, onClick }: { hasMore?: boolean; loa
   );
 }
 
-/** Underlined tabs (or segmented pills) with buttons; the page keeps the selected value. */
+/**
+ * BitoCard's standard tabs, with buttons (the page keeps the selected value): each tab on a grey line, the selected one
+ * on a pink line in ink, as the storefront's `UnderlineTabs`. The row slides sideways where it does not fit (smooth
+ * scrolling, no scroll bar, never the page) and slides the selected tab into view. `pills` (a segmented control, for a
+ * short choice such as a period) is drawn so from `sm` up; on phones it is the same underlined row, so every
+ * dashboard's tabs look alike on a phone.
+ */
 export function Tabs<V extends string>({ value, onChange, items, variant = 'underline', label }: { value: V; onChange: (value: V) => void; items: Array<{ value: V; label: string; count?: number }>; variant?: 'underline' | 'pills'; label: string }) {
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = row.current;
+    const selected = scroller?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!scroller || !selected || scroller.scrollWidth <= scroller.clientWidth) return;
+    const left = selected.offsetLeft - (scroller.clientWidth - selected.clientWidth) / 2;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    scroller.scrollTo?.({ left: Math.max(0, left), behavior: reduce ? 'auto' : 'smooth' });
+  }, [value]);
+  const pills = variant === 'pills';
   return (
-    // Scrolls sideways on narrow screens, never vertically: the underline's base line is drawn inside the bar (an inset
-    // shadow the selected tab's border covers), so nothing sticks out below it and no vertical scrollbar appears.
+    // Scrolls sideways on narrow screens, never vertically. The row is positioned, so offsetLeft is a tab's place in it.
     <div
+      ref={row}
       role="tablist"
       aria-label={label}
-      className={cn('flex gap-1 overflow-x-auto overflow-y-hidden', variant === 'underline' ? 'shadow-[inset_0_-1px_0_var(--color-line)]' : 'rounded-lg border border-line bg-white p-1')}
+      className={cn(
+        'relative flex overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden',
+        pills && 'sm:gap-1 sm:rounded-lg sm:border sm:border-line sm:bg-white sm:p-1',
+      )}
     >
       {items.map(item => {
         const selected = item.value === value;
@@ -198,17 +217,18 @@ export function Tabs<V extends string>({ value, onChange, items, variant = 'unde
             aria-selected={selected}
             onClick={() => onChange(item.value)}
             className={cn(
-              'inline-flex min-h-10 shrink-0 items-center gap-2 px-4 text-sm font-semibold transition-colors',
-              variant === 'underline'
-                ? cn('border-b-2', selected ? 'border-brand-500 text-brand-600' : 'border-transparent text-muted hover:text-ink')
-                : cn('rounded-md', selected ? 'bg-brand-500 text-white' : 'text-muted hover:bg-canvas'),
+              'inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition-colors',
+              selected ? 'border-brand-500 text-ink' : 'border-line text-muted hover:border-muted/40 hover:text-ink',
+              pills && cn('sm:min-h-10 sm:rounded-md sm:border-b-0 sm:px-4', selected ? 'sm:bg-brand-500 sm:text-white' : 'sm:hover:bg-canvas'),
             )}
           >
             {item.label}
-            {item.count !== undefined ? <span className={cn('rounded-full px-1.5 text-xs', selected && variant === 'pills' ? 'bg-white/25' : 'bg-canvas')}>{item.count}</span> : null}
+            {item.count !== undefined ? <span className={cn('rounded-full bg-canvas px-1.5 text-xs', selected && pills && 'sm:bg-white/25')}>{item.count}</span> : null}
           </button>
         );
       })}
+      {/* The grey line runs on past the last tab. */}
+      <span aria-hidden="true" className={cn('min-w-4 flex-1 border-b-2 border-line', pills && 'sm:hidden')} />
     </div>
   );
 }
