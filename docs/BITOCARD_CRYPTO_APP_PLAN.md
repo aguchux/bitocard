@@ -31,10 +31,11 @@ BitoCard Crypto is a public crypto market app in the style of BitoCard Shop: `ap
 9. **BitoCard's own sites point to it:** the header's Crypto link and the account app's Crypto tab on bitocard.com and the country stores open crypto.bitocard.com (through the handoff when signed in). Resellers' stores keep their own Crypto tab, trading in the same books.
 10. **One address per market, no content by cookie or address.** `/` is always the global market and `/<cc>` always that country's. Signed-in customers get **Your market** first in the switcher, never a silent redirect.
 11. **Accounts are bitocard.com's.** Anyone with a bitocard.com account signs in through the Shop's handoff (Continue as ...); new customers sign up on bitocard.com. A customer's country stays fixed and is their home market.
+12. **The global market does not need the local market.** Residents of a country whose own market is off (local crypto or P2P switched off there) may still trade on the global market, while global trading is open for their country (`crypto_global`). Their wallets, deposits, withdrawals and USD cash-out then serve the global market only.
 
 ## Legal and risk (before anything goes live)
 
-- **Licensing per country** for every open market (SEC Nigeria, Ghana's VASP regime, Kenya's VASP Act 2025), and for the **cross-border** trades: one company settling trades between residents of two countries, in either country's currency, is the point counsel must clear first. AML/CFT, and the travel rule for on-chain withdrawals and possibly P2P transfers between users.
+- **Licensing per country** for every open market and for every country whose residents trade on the global market (decision 12 serves them even where their own market is closed) (SEC Nigeria, Ghana's VASP regime, Kenya's VASP Act 2025), and for the **cross-border** trades: one company settling trades between residents of two countries, in either country's currency, is the point counsel must clear first. AML/CFT, and the travel rule for on-chain withdrawals and possibly P2P transfers between users.
 - **US and UK:** the citizenship declaration and refusing US and UK documents keep the market for Africans as decided. The sites stay reachable from anywhere, so the terms and pages also need wording that makes no offer to US or UK persons.
 - **Sanctions:** refuse sanctioned countries' documents at the identity check, and screen payout accounts through the payout providers.
 - **Fraud** (decision 6). `PLANS.md` 6b item 5 becomes a launch blocker: a card top-up spent in P2P becomes the counterparty's withdrawable money after the payout hold, which is shorter than chargeback windows. So:
@@ -59,13 +60,13 @@ BitoCard Crypto is a public crypto market app in the style of BitoCard Shop: `ap
   `CryptoWalletsService.context(customer, market, currency)` decides what the customer may do there:
   - **home market:** local and USD;
   - **another open country:** its local currency only, while that market's cross-border switch and the customer's own country's allow it;
-  - **`WW`:** while global trading is open for their country;
+  - **`WW`:** while global trading is open for their country, whether or not their own market is (decision 12);
   - anything else: `market_unavailable`.
 
   `trade` looks ads up by market, not by the customer's own country. Add the missing index on `currency`.
 - **Switches** (all off by default):
   - `crypto_app`: global or country. The country market appears on crypto.bitocard.com.
-  - `crypto_global`: global or country. Global is the market itself; country is whose residents may trade in it. It needs `crypto_wallets` and `p2p_trading` for the customer's country, as today.
+  - `crypto_global`: global or country. Global is the market itself; country is whose residents may trade in it. It does **not** need the country's `crypto_wallets` or `p2p_trading` (decision 12): with only `crypto_global` on, a resident's crypto wallet, deposits, withdrawals and USD cash-out work for the global market, and their country's market stays closed to them. `CryptoWalletsService.require` takes the market it is asked for.
   - `crypto_cross_border`: country. Residents of other open countries may trade in this market's local book.
   - `crypto_install_prompt`: as the other install prompts.
 - **Eligibility record:** `crypto_declarations` (customer, version, citizenship declaration, time), required for live trading. The identity check's document country is checked against a refused list (US, GB and sanctioned countries) for crypto.
@@ -147,6 +148,5 @@ Built like `apps/shop` (Next.js App Router, server components reading the API on
 
 ## Open questions for the owner
 
-1. Can residents of a country whose local crypto trading is off still trade on the global market? (Recommended: no; a country must be open for its residents to trade anywhere.)
-2. Should the declaration also say "not resident in" the US or UK, and refuse sanctioned countries' documents? (Recommended: yes.)
-3. Which country pilots first? (Recommended: Nigeria, then Ghana for the first cross-border trades.)
+1. Should the declaration also say "not resident in" the US or UK, and refuse sanctioned countries' documents? (Recommended: yes.)
+2. Which country pilots first? (Recommended: Nigeria, then Ghana for the first cross-border trades.)
